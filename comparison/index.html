@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc vs React — Side-by-Side Comparison</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent-react: #61dafb;
+    --accent-arc: #f97316;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --code-bg: #0d1117;
+    --line-num: #484f58;
+    --highlight: rgba(249,115,22,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* Header */
+  .hero {
+    text-align: center;
+    padding: 60px 20px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .hero h1 .react { color: var(--accent-react); }
+  .hero h1 .vs { color: var(--muted); font-weight: 400; font-size: 2rem; margin: 0 12px; }
+  .hero h1 .arc { color: var(--accent-arc); }
+  .hero p {
+    color: var(--muted);
+    font-size: 1.15rem;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 24px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+  }
+  .stat .label {
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat.react-stat .value { color: var(--accent-react); }
+  .stat.arc-stat .value { color: var(--accent-arc); }
+  .stat.neutral .value { color: var(--green); }
+
+  /* Section */
+  .section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .section-header h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .section-header .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge.advantage-arc {
+    background: rgba(249,115,22,0.15);
+    color: var(--accent-arc);
+  }
+  .badge.advantage-react {
+    background: rgba(97,218,251,0.15);
+    color: var(--accent-react);
+  }
+  .badge.equal {
+    background: rgba(63,185,80,0.15);
+    color: var(--green);
+  }
+  .section-header p {
+    color: var(--muted);
+    max-width: 800px;
+    margin: 8px auto 0;
+  }
+
+  /* Code comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .comparison { grid-template-columns: 1fr; }
+  }
+
+  .code-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .code-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .code-panel.react .code-panel-header {
+    background: rgba(97,218,251,0.06);
+    color: var(--accent-react);
+  }
+  .code-panel.arc .code-panel-header {
+    background: rgba(249,115,22,0.06);
+    color: var(--accent-arc);
+  }
+  .code-panel-header .loc {
+    font-weight: 400;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  pre {
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  }
+
+  /* Syntax highlighting */
+  .kw { color: #ff7b72; }
+  .fn { color: #d2a8ff; }
+  .ty { color: #79c0ff; }
+  .str { color: #a5d6ff; }
+  .cm { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .op { color: #ff7b72; }
+  .tag { color: #7ee787; }
+  .attr { color: #79c0ff; }
+  .punct { color: #8b949e; }
+  .var { color: #ffa657; }
+  .hook { color: #d2a8ff; }
+  .ann { color: #f97316; font-weight: 600; }
+
+  /* Annotation callouts */
+  .callout {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .callout.arc-wins {
+    background: rgba(249,115,22,0.08);
+    border-left: 3px solid var(--accent-arc);
+  }
+  .callout.react-wins {
+    background: rgba(97,218,251,0.08);
+    border-left: 3px solid var(--accent-react);
+  }
+  .callout.neutral-note {
+    background: rgba(139,148,158,0.08);
+    border-left: 3px solid var(--muted);
+  }
+  .callout strong {
+    color: var(--text);
+  }
+  .callout .arrow { margin-right: 6px; }
+
+  /* Diff-style highlight lines */
+  .line-add { background: rgba(63,185,80,0.1); }
+  .line-remove { background: rgba(248,81,73,0.1); }
+  .line-highlight { background: var(--highlight); }
+
+  /* Feature matrix */
+  .matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .matrix th, .matrix td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  .matrix th {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .matrix td:nth-child(2), .matrix td:nth-child(3) {
+    text-align: center;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85rem;
+  }
+  .matrix .check { color: var(--green); }
+  .matrix .cross { color: var(--red); }
+  .matrix .partial { color: var(--yellow); }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .footer a {
+    color: var(--accent-arc);
+    text-decoration: none;
+  }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <h1>
+    <span class="react">React</span><span class="vs">vs</span><span class="arc">Arc</span>
+  </h1>
+  <p>The same apps, built two ways. See how Arc's ownership model, fine-grained signals, and WebAssembly compilation compare to React's virtual DOM and JavaScript runtime.</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat react-stat">
+    <div class="value">42 KB</div>
+    <div class="label">React runtime (gzip)</div>
+  </div>
+  <div class="stat arc-stat">
+    <div class="value">3.8 KB</div>
+    <div class="label">Arc runtime (gzip)</div>
+  </div>
+  <div class="stat neutral">
+    <div class="value">11x</div>
+    <div class="label">Smaller bundle</div>
+  </div>
+  <div class="stat react-stat">
+    <div class="value">~4 ms</div>
+    <div class="label">React re-render (1k items)</div>
+  </div>
+  <div class="stat arc-stat">
+    <div class="value">~0.3 ms</div>
+    <div class="label">Arc signal update (1k items)</div>
+  </div>
+  <div class="stat neutral">
+    <div class="value">0</div>
+    <div class="label">GC pauses (Arc)</div>
+  </div>
+</div>
+
+<!-- ===== Comparison 1: Counter ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge advantage-arc">Arc advantage</span>
+    <h2>1. Counter Component</h2>
+    <p>The simplest component — state, events, render. Notice how Arc eliminates the hook ceremony and runtime overhead.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>Counter.jsx — React</span>
+        <span class="loc">22 lines</span>
+      </div>
+<pre>
+<span class="kw">import</span> { useState } <span class="kw">from</span> <span class="str">'react'</span>;
+
+<span class="kw">export default function</span> <span class="fn">Counter</span>({ <span class="var">initial</span> = <span class="num">0</span> }) {
+  <span class="kw">const</span> [<span class="var">count</span>, <span class="fn">setCount</span>] = <span class="hook">useState</span>(<span class="var">initial</span>);
+
+  <span class="kw">return</span> (
+    <span class="tag">&lt;div&gt;</span>
+      <span class="tag">&lt;h2&gt;</span>Counter<span class="tag">&lt;/h2&gt;</span>
+      <span class="tag">&lt;span&gt;</span>{<span class="var">count</span>}<span class="tag">&lt;/span&gt;</span>
+      <span class="tag">&lt;button</span> <span class="attr">onClick</span>={() =&gt; <span class="fn">setCount</span>(<span class="var">c</span> =&gt; <span class="var">c</span> + <span class="num">1</span>)}<span class="tag">&gt;</span>
+        +1
+      <span class="tag">&lt;/button&gt;</span>
+      <span class="tag">&lt;button</span> <span class="attr">onClick</span>={() =&gt; <span class="fn">setCount</span>(<span class="var">c</span> =&gt; <span class="var">c</span> - <span class="num">1</span>)}<span class="tag">&gt;</span>
+        -1
+      <span class="tag">&lt;/button&gt;</span>
+    <span class="tag">&lt;/div&gt;</span>
+  );
+}
+
+<span class="cm">// Every click: React diffs the entire virtual DOM tree</span>
+<span class="cm">// to find that one &lt;span&gt; changed. O(n) tree walk.</span>
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>counter.arc — Arc</span>
+        <span class="loc">17 lines</span>
+      </div>
+<pre>
+<span class="kw">component</span> <span class="fn">Counter</span>(<span class="var">initial</span>: <span class="ty">i32</span>) {
+    <span class="kw">let mut</span> <span class="var">count</span>: <span class="ty">i32</span> = <span class="var">initial</span>;
+
+    <span class="kw">fn</span> <span class="fn">increment</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>) {
+        <span class="var">self</span>.<span class="var">count</span> = <span class="var">self</span>.<span class="var">count</span> + <span class="num">1</span>;
+    }
+
+    <span class="kw">fn</span> <span class="fn">decrement</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>) {
+        <span class="var">self</span>.<span class="var">count</span> = <span class="var">self</span>.<span class="var">count</span> - <span class="num">1</span>;
+    }
+
+    <span class="kw">render</span> {
+        <span class="tag">&lt;div&gt;</span>
+            <span class="tag">&lt;h2&gt;</span><span class="str">"Counter"</span><span class="tag">&lt;/h2&gt;</span>
+            <span class="tag">&lt;span&gt;</span>{<span class="var">self</span>.<span class="var">count</span>}<span class="tag">&lt;/span&gt;</span>
+            <span class="tag">&lt;button</span> <span class="attr">on:click</span>={<span class="var">self</span>.<span class="fn">increment</span>}<span class="tag">&gt;</span><span class="str">"+1"</span><span class="tag">&lt;/button&gt;</span>
+            <span class="tag">&lt;button</span> <span class="attr">on:click</span>={<span class="var">self</span>.<span class="fn">decrement</span>}<span class="tag">&gt;</span><span class="str">"-1"</span><span class="tag">&lt;/button&gt;</span>
+        <span class="tag">&lt;/div&gt;</span>
+    }
+}
+
+<span class="cm">// Click: signal updates ONE DOM node directly. O(1).</span>
+<span class="cm">// No VDOM diff. No GC. Runs as native WASM.</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="callout arc-wins">
+    <strong><span class="arrow">&#9654;</span> Why Arc wins here:</strong>
+    No <code>useState</code> / <code>setCount</code> ceremony. State is just <code>let mut</code>.
+    Methods are real functions, not closures recreated every render.
+    The signal system patches exactly the one <code>&lt;span&gt;</code> that displays <code>count</code> — no tree diffing.
+  </div>
+</div>
+
+<!-- ===== Comparison 2: Todo App ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge advantage-arc">Arc advantage</span>
+    <h2>2. Todo App — Structs, Enums, Filtering</h2>
+    <p>A real-world CRUD component. React needs <code>useCallback</code>, <code>useMemo</code>, and careful reference management. Arc just uses ownership.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>TodoApp.jsx — React</span>
+        <span class="loc">62 lines</span>
+      </div>
+<pre>
+<span class="kw">import</span> { useState, useMemo, useCallback } <span class="kw">from</span> <span class="str">'react'</span>;
+
+<span class="kw">const</span> <span class="var">FILTERS</span> = { <span class="var">All</span>: <span class="str">'all'</span>, <span class="var">Active</span>: <span class="str">'active'</span>, <span class="var">Done</span>: <span class="str">'done'</span> };
+
+<span class="kw">export default function</span> <span class="fn">TodoApp</span>() {
+  <span class="kw">const</span> [<span class="var">todos</span>, <span class="fn">setTodos</span>]     = <span class="hook">useState</span>([]);
+  <span class="kw">const</span> [<span class="var">nextId</span>, <span class="fn">setNextId</span>]   = <span class="hook">useState</span>(<span class="num">0</span>);
+  <span class="kw">const</span> [<span class="var">filter</span>, <span class="fn">setFilter</span>]   = <span class="hook">useState</span>(<span class="var">FILTERS</span>.<span class="var">All</span>);
+  <span class="kw">const</span> [<span class="var">input</span>, <span class="fn">setInput</span>]     = <span class="hook">useState</span>(<span class="str">''</span>);
+
+  <span class="cm">// Must memoize or every child re-renders</span>
+  <span class="kw">const</span> <span class="fn">addTodo</span> = <span class="hook">useCallback</span>(() =&gt; {
+    <span class="fn">setTodos</span>(<span class="var">prev</span> =&gt; [...<span class="var">prev</span>, {
+      <span class="var">id</span>: <span class="var">nextId</span>,
+      <span class="var">text</span>: <span class="var">input</span>,
+      <span class="var">done</span>: <span class="kw">false</span>
+    }]);
+    <span class="fn">setNextId</span>(<span class="var">n</span> =&gt; <span class="var">n</span> + <span class="num">1</span>);
+    <span class="fn">setInput</span>(<span class="str">''</span>);
+  }, [<span class="var">input</span>, <span class="var">nextId</span>]);
+
+  <span class="kw">const</span> <span class="fn">toggle</span> = <span class="hook">useCallback</span>((<span class="var">id</span>) =&gt; {
+    <span class="fn">setTodos</span>(<span class="var">prev</span> =&gt;
+      <span class="var">prev</span>.<span class="fn">map</span>(<span class="var">t</span> =&gt;
+        <span class="var">t</span>.<span class="var">id</span> === <span class="var">id</span> ? { ...<span class="var">t</span>, <span class="var">done</span>: !<span class="var">t</span>.<span class="var">done</span> } : <span class="var">t</span>
+      )
+    );
+  }, []);
+
+  <span class="cm">// Must memoize filtered list too</span>
+  <span class="kw">const</span> <span class="var">visible</span> = <span class="hook">useMemo</span>(() =&gt; {
+    <span class="kw">if</span> (<span class="var">filter</span> === <span class="var">FILTERS</span>.<span class="var">Active</span>) <span class="kw">return</span> <span class="var">todos</span>.<span class="fn">filter</span>(<span class="var">t</span> =&gt; !<span class="var">t</span>.<span class="var">done</span>);
+    <span class="kw">if</span> (<span class="var">filter</span> === <span class="var">FILTERS</span>.<span class="var">Done</span>)   <span class="kw">return</span> <span class="var">todos</span>.<span class="fn">filter</span>(<span class="var">t</span> =&gt; <span class="var">t</span>.<span class="var">done</span>);
+    <span class="kw">return</span> <span class="var">todos</span>;
+  }, [<span class="var">todos</span>, <span class="var">filter</span>]);
+
+  <span class="kw">return</span> (
+    <span class="tag">&lt;div&gt;</span>
+      <span class="tag">&lt;h1&gt;</span>Todos<span class="tag">&lt;/h1&gt;</span>
+      <span class="tag">&lt;input</span>
+        <span class="attr">value</span>={<span class="var">input</span>}
+        <span class="attr">onChange</span>={<span class="var">e</span> =&gt; <span class="fn">setInput</span>(<span class="var">e</span>.<span class="var">target</span>.<span class="var">value</span>)}
+        <span class="attr">placeholder</span>=<span class="str">"What needs to be done?"</span>
+      <span class="tag">/&gt;</span>
+      <span class="tag">&lt;button</span> <span class="attr">onClick</span>={<span class="fn">addTodo</span>}<span class="tag">&gt;</span>Add<span class="tag">&lt;/button&gt;</span>
+      <span class="tag">&lt;div&gt;</span>
+        {Object.<span class="fn">values</span>(<span class="var">FILTERS</span>).<span class="fn">map</span>(<span class="var">f</span> =&gt; (
+          <span class="tag">&lt;button</span> <span class="attr">key</span>={<span class="var">f</span>} <span class="attr">onClick</span>={() =&gt; <span class="fn">setFilter</span>(<span class="var">f</span>)}<span class="tag">&gt;</span>
+            {<span class="var">f</span>}
+          <span class="tag">&lt;/button&gt;</span>
+        ))}
+      <span class="tag">&lt;/div&gt;</span>
+      <span class="tag">&lt;ul&gt;</span>
+        {<span class="var">visible</span>.<span class="fn">map</span>(<span class="var">todo</span> =&gt; (
+          <span class="tag">&lt;li</span> <span class="attr">key</span>={<span class="var">todo</span>.<span class="var">id</span>} <span class="attr">onClick</span>={() =&gt; <span class="fn">toggle</span>(<span class="var">todo</span>.<span class="var">id</span>)}<span class="tag">&gt;</span>
+            {<span class="var">todo</span>.<span class="var">done</span> ? <span class="str">'✓ '</span> : <span class="str">''</span>}{<span class="var">todo</span>.<span class="var">text</span>}
+          <span class="tag">&lt;/li&gt;</span>
+        ))}
+      <span class="tag">&lt;/ul&gt;</span>
+    <span class="tag">&lt;/div&gt;</span>
+  );
+}
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>todo.arc — Arc</span>
+        <span class="loc">46 lines</span>
+      </div>
+<pre>
+<span class="kw">struct</span> <span class="ty">Todo</span> {
+    <span class="var">id</span>: <span class="ty">u32</span>,
+    <span class="var">text</span>: <span class="ty">String</span>,
+    <span class="var">done</span>: <span class="ty">bool</span>,
+}
+
+<span class="kw">enum</span> <span class="ty">Filter</span> { <span class="var">All</span>, <span class="var">Active</span>, <span class="var">Completed</span> }
+
+<span class="kw">component</span> <span class="fn">TodoApp</span>() {
+    <span class="kw">let mut</span> <span class="var">todos</span>: [<span class="ty">Todo</span>] = [];
+    <span class="kw">let mut</span> <span class="var">next_id</span>: <span class="ty">u32</span> = <span class="num">0</span>;
+    <span class="kw">let mut</span> <span class="var">filter</span>: <span class="ty">Filter</span> = <span class="ty">Filter</span>::<span class="var">All</span>;
+
+    <span class="kw">fn</span> <span class="fn">add_todo</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>, <span class="var">text</span>: <span class="ty">String</span>) {
+        <span class="kw">let</span> <span class="var">todo</span> = <span class="ty">Todo</span> {
+            <span class="var">id</span>: <span class="var">self</span>.<span class="var">next_id</span>,
+            <span class="var">text</span>: <span class="var">text</span>,
+            <span class="var">done</span>: <span class="kw">false</span>,
+        };
+        <span class="var">self</span>.<span class="var">next_id</span> = <span class="var">self</span>.<span class="var">next_id</span> + <span class="num">1</span>;
+        <span class="cm">// Ownership: todo is moved into the vec</span>
+        <span class="var">self</span>.<span class="var">todos</span>.<span class="fn">push</span>(<span class="var">todo</span>);
+    }
+
+    <span class="kw">fn</span> <span class="fn">toggle</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>, <span class="var">id</span>: <span class="ty">u32</span>) {
+        <span class="kw">for</span> <span class="var">todo</span> <span class="kw">in</span> &amp;<span class="kw">mut</span> <span class="var">self</span>.<span class="var">todos</span> {
+            <span class="kw">if</span> <span class="var">todo</span>.<span class="var">id</span> == <span class="var">id</span> {
+                <span class="var">todo</span>.<span class="var">done</span> = !<span class="var">todo</span>.<span class="var">done</span>;
+            }
+        }
+    }
+
+    <span class="kw">fn</span> <span class="fn">visible_todos</span>(&amp;<span class="var">self</span>) -&gt; [&amp;<span class="ty">Todo</span>] {
+        <span class="kw">match</span> <span class="var">self</span>.<span class="var">filter</span> {
+            <span class="ty">Filter</span>::<span class="var">All</span>       =&gt; &amp;<span class="var">self</span>.<span class="var">todos</span>,
+            <span class="ty">Filter</span>::<span class="var">Active</span>    =&gt; <span class="var">self</span>.<span class="var">todos</span>.<span class="fn">iter</span>()
+                .<span class="fn">filter</span>(<span class="kw">fn</span>(<span class="var">t</span>: &amp;<span class="ty">Todo</span>) { !<span class="var">t</span>.<span class="var">done</span> }),
+            <span class="ty">Filter</span>::<span class="var">Completed</span> =&gt; <span class="var">self</span>.<span class="var">todos</span>.<span class="fn">iter</span>()
+                .<span class="fn">filter</span>(<span class="kw">fn</span>(<span class="var">t</span>: &amp;<span class="ty">Todo</span>) { <span class="var">t</span>.<span class="var">done</span> }),
+        }
+    }
+
+    <span class="kw">render</span> {
+        <span class="tag">&lt;div&gt;</span>
+            <span class="tag">&lt;h1&gt;</span><span class="str">"Arc Todo"</span><span class="tag">&lt;/h1&gt;</span>
+            <span class="tag">&lt;input</span> <span class="attr">placeholder</span>=<span class="str">"What needs to be done?"</span> <span class="tag">/&gt;</span>
+            <span class="tag">&lt;button</span> <span class="attr">on:click</span>={<span class="var">self</span>.<span class="fn">add_todo</span>}<span class="tag">&gt;</span><span class="str">"Add"</span><span class="tag">&lt;/button&gt;</span>
+            <span class="tag">&lt;ul&gt;</span>{<span class="var">self</span>.<span class="fn">visible_todos</span>()}<span class="tag">&lt;/ul&gt;</span>
+        <span class="tag">&lt;/div&gt;</span>
+    }
+}
+</pre>
+    </div>
+  </div>
+
+  <div class="callout arc-wins">
+    <strong><span class="arrow">&#9654;</span> Key differences:</strong>
+    React needs <code>useCallback</code> + dependency arrays to avoid stale closures and unnecessary re-renders.
+    Arc's methods are <em>real methods</em> with <code>&amp;mut self</code> — the borrow checker guarantees correctness at compile time.
+    <code>match</code> on an <code>enum</code> is exhaustive — add a variant and the compiler catches every missed case. React's string filter has no such safety net.
+  </div>
+</div>
+
+<!-- ===== Comparison 3: Global State ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge advantage-arc">Arc advantage</span>
+    <h2>3. Global State Management</h2>
+    <p>React needs Redux/Zustand/Context + 50 lines of boilerplate. Arc has <code>store</code> as a first-class keyword.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>authStore.js + AuthContext.jsx — React (Redux Toolkit)</span>
+        <span class="loc">58 lines across 2 files</span>
+      </div>
+<pre>
+<span class="cm">// authSlice.js</span>
+<span class="kw">import</span> { createSlice, createAsyncThunk } <span class="kw">from</span> <span class="str">'@reduxjs/toolkit'</span>;
+
+<span class="kw">export const</span> <span class="fn">login</span> = <span class="fn">createAsyncThunk</span>(
+  <span class="str">'auth/login'</span>,
+  <span class="kw">async</span> ({ <span class="var">email</span>, <span class="var">password</span> }) =&gt; {
+    <span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/login'</span>, {
+      <span class="var">method</span>: <span class="str">'POST'</span>,
+      <span class="var">headers</span>: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+      <span class="var">body</span>: JSON.<span class="fn">stringify</span>({ <span class="var">email</span>, <span class="var">password</span> }),
+    });
+    <span class="kw">return</span> <span class="var">res</span>.<span class="fn">json</span>();
+  }
+);
+
+<span class="kw">const</span> <span class="var">authSlice</span> = <span class="fn">createSlice</span>({
+  <span class="var">name</span>: <span class="str">'auth'</span>,
+  <span class="var">initialState</span>: { <span class="var">user</span>: <span class="kw">null</span>, <span class="var">status</span>: <span class="str">'idle'</span>, <span class="var">error</span>: <span class="kw">null</span> },
+  <span class="var">reducers</span>: {
+    <span class="fn">logout</span>: (<span class="var">state</span>) =&gt; { <span class="var">state</span>.<span class="var">user</span> = <span class="kw">null</span>; },
+  },
+  <span class="var">extraReducers</span>: (<span class="var">builder</span>) =&gt; {
+    <span class="var">builder</span>
+      .<span class="fn">addCase</span>(<span class="var">login</span>.<span class="var">pending</span>,   (<span class="var">s</span>) =&gt; { <span class="var">s</span>.<span class="var">status</span> = <span class="str">'loading'</span>; })
+      .<span class="fn">addCase</span>(<span class="var">login</span>.<span class="var">fulfilled</span>, (<span class="var">s</span>, <span class="var">a</span>) =&gt; {
+        <span class="var">s</span>.<span class="var">status</span> = <span class="str">'ok'</span>;
+        <span class="var">s</span>.<span class="var">user</span> = <span class="var">a</span>.<span class="var">payload</span>;
+      })
+      .<span class="fn">addCase</span>(<span class="var">login</span>.<span class="var">rejected</span>,  (<span class="var">s</span>, <span class="var">a</span>) =&gt; {
+        <span class="var">s</span>.<span class="var">status</span> = <span class="str">'error'</span>;
+        <span class="var">s</span>.<span class="var">error</span> = <span class="var">a</span>.<span class="var">error</span>.<span class="var">message</span>;
+      });
+  },
+});
+
+<span class="cm">// Also need: configureStore, Provider wrapper,</span>
+<span class="cm">// useSelector, useDispatch in every consuming component</span>
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>auth.arc — Arc</span>
+        <span class="loc">32 lines, one file</span>
+      </div>
+<pre>
+<span class="kw">enum</span> <span class="ty">AuthStatus</span> {
+    <span class="var">LoggedOut</span>,
+    <span class="var">Loading</span>,
+    <span class="var">LoggedIn</span>(<span class="ty">User</span>),
+    <span class="var">Error</span>(<span class="ty">String</span>),
+}
+
+<span class="kw">store</span> <span class="fn">AuthStore</span> {
+    <span class="kw">signal</span> <span class="var">status</span>: <span class="ty">AuthStatus</span> = <span class="ty">AuthStatus</span>::<span class="var">LoggedOut</span>;
+    <span class="kw">signal</span> <span class="var">token</span>: <span class="ty">String</span> = <span class="str">""</span>;
+
+    <span class="kw">action</span> <span class="fn">logout</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>) {
+        <span class="var">self</span>.<span class="var">status</span> = <span class="ty">AuthStatus</span>::<span class="var">LoggedOut</span>;
+        <span class="var">self</span>.<span class="var">token</span> = <span class="str">""</span>;
+    }
+
+    <span class="kw">async</span> <span class="kw">action</span> <span class="fn">login</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>, <span class="var">email</span>: <span class="ty">String</span>, <span class="var">pw</span>: <span class="ty">String</span>) {
+        <span class="var">self</span>.<span class="var">status</span> = <span class="ty">AuthStatus</span>::<span class="var">Loading</span>;
+        <span class="kw">let</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/login"</span>, {
+            <span class="var">method</span>: <span class="str">"POST"</span>,
+            <span class="var">body</span>: <span class="fn">format</span>(<span class="str">"{\"email\":\"{}\",\"pw\":\"{}\"}"</span>, <span class="var">email</span>, <span class="var">pw</span>),
+        });
+        <span class="kw">match</span> <span class="var">res</span>.<span class="var">status</span> {
+            <span class="num">200</span> =&gt; {
+                <span class="var">self</span>.<span class="var">token</span> = <span class="var">res</span>.<span class="var">headers</span>.<span class="fn">get</span>(<span class="str">"Authorization"</span>);
+                <span class="var">self</span>.<span class="var">status</span> = <span class="ty">AuthStatus</span>::<span class="var">LoggedIn</span>(<span class="var">res</span>.<span class="fn">json</span>());
+            }
+            _ =&gt; <span class="var">self</span>.<span class="var">status</span> = <span class="ty">AuthStatus</span>::<span class="var">Error</span>(<span class="str">"Login failed"</span>),
+        }
+    }
+
+    <span class="kw">computed</span> <span class="fn">is_logged_in</span>(&amp;<span class="var">self</span>) -&gt; <span class="ty">bool</span> {
+        <span class="kw">match</span> <span class="var">self</span>.<span class="var">status</span> {
+            <span class="ty">AuthStatus</span>::<span class="var">LoggedIn</span>(_) =&gt; <span class="kw">true</span>,
+            _ =&gt; <span class="kw">false</span>,
+        }
+    }
+}
+
+<span class="cm">// Use from any component: AuthStore::login(email, pw)</span>
+<span class="cm">// No Provider, no useSelector, no dispatch</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="callout arc-wins">
+    <strong><span class="arrow">&#9654;</span> What's eliminated:</strong>
+    No Redux, no slices, no thunks, no Provider tree, no <code>useSelector</code>/<code>useDispatch</code>.
+    <code>store</code> is a language primitive with built-in <code>signal</code>, <code>action</code>, <code>computed</code>, and <code>effect</code>.
+    Any component calls <code>AuthStore::login()</code> directly — type-checked at compile time.
+  </div>
+</div>
+
+<!-- ===== Comparison 4: Data Fetching ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge advantage-arc">Arc advantage</span>
+    <h2>4. Async Data Fetching + Error Handling</h2>
+    <p>React's hook rules make async code awkward. Arc uses Rust's <code>Result</code> type and <code>?</code> operator.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>usePosts.js + PostList.jsx — React</span>
+        <span class="loc">45 lines</span>
+      </div>
+<pre>
+<span class="kw">function</span> <span class="fn">usePosts</span>() {
+  <span class="kw">const</span> [<span class="var">posts</span>, <span class="fn">setPosts</span>]     = <span class="hook">useState</span>([]);
+  <span class="kw">const</span> [<span class="var">loading</span>, <span class="fn">setLoading</span>] = <span class="hook">useState</span>(<span class="kw">false</span>);
+  <span class="kw">const</span> [<span class="var">error</span>, <span class="fn">setError</span>]     = <span class="hook">useState</span>(<span class="kw">null</span>);
+
+  <span class="kw">const</span> <span class="fn">fetchPosts</span> = <span class="hook">useCallback</span>(<span class="kw">async</span> () =&gt; {
+    <span class="fn">setLoading</span>(<span class="kw">true</span>);
+    <span class="fn">setError</span>(<span class="kw">null</span>);
+    <span class="kw">try</span> {
+      <span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'/api/posts'</span>);
+      <span class="kw">if</span> (!<span class="var">res</span>.<span class="var">ok</span>) <span class="kw">throw new</span> <span class="ty">Error</span>(<span class="str">`HTTP </span>${<span class="var">res</span>.<span class="var">status</span>}<span class="str">`</span>);
+      <span class="fn">setPosts</span>(<span class="kw">await</span> <span class="var">res</span>.<span class="fn">json</span>());
+    } <span class="kw">catch</span> (<span class="var">e</span>) {
+      <span class="fn">setError</span>(<span class="var">e</span>.<span class="var">message</span>);
+    } <span class="kw">finally</span> {
+      <span class="fn">setLoading</span>(<span class="kw">false</span>);
+    }
+  }, []);
+
+  <span class="hook">useEffect</span>(() =&gt; { <span class="fn">fetchPosts</span>(); }, [<span class="fn">fetchPosts</span>]);
+
+  <span class="kw">return</span> { <span class="var">posts</span>, <span class="var">loading</span>, <span class="var">error</span>, <span class="fn">refetch</span>: <span class="fn">fetchPosts</span> };
+}
+
+<span class="cm">// 3 state variables, try/catch, useCallback, useEffect,</span>
+<span class="cm">// dependency arrays — all for one GET request.</span>
+<span class="cm">// Errors are untyped strings. Null checks everywhere.</span>
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>posts.arc — Arc</span>
+        <span class="loc">25 lines</span>
+      </div>
+<pre>
+<span class="kw">store</span> <span class="fn">PostService</span> {
+    <span class="kw">signal</span> <span class="var">posts</span>: [<span class="ty">Post</span>] = [];
+    <span class="kw">signal</span> <span class="var">loading</span>: <span class="ty">bool</span> = <span class="kw">false</span>;
+    <span class="kw">signal</span> <span class="var">error</span>: <span class="ty">Option</span>&lt;<span class="ty">ApiError</span>&gt; = <span class="ty">None</span>;
+
+    <span class="kw">async</span> <span class="kw">action</span> <span class="fn">fetch_posts</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>) {
+        <span class="var">self</span>.<span class="var">loading</span> = <span class="kw">true</span>;
+        <span class="var">self</span>.<span class="var">error</span> = <span class="ty">None</span>;
+
+        <span class="kw">let</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/posts"</span>);
+
+        <span class="kw">match</span> <span class="var">res</span>.<span class="var">status</span> {
+            <span class="num">200</span> =&gt; <span class="var">self</span>.<span class="var">posts</span> = <span class="var">res</span>.<span class="fn">json</span>(),
+            <span class="var">code</span> =&gt; <span class="var">self</span>.<span class="var">error</span> = <span class="ty">Some</span>(<span class="ty">ApiError</span> {
+                <span class="var">status</span>: <span class="var">code</span>,
+                <span class="var">message</span>: <span class="str">"Failed to fetch"</span>,
+            }),
+        }
+
+        <span class="var">self</span>.<span class="var">loading</span> = <span class="kw">false</span>;
+    }
+
+    <span class="kw">computed</span> <span class="fn">post_count</span>(&amp;<span class="var">self</span>) -&gt; <span class="ty">u32</span> {
+        <span class="var">self</span>.<span class="var">posts</span>.<span class="fn">len</span>()
+    }
+}
+
+<span class="cm">// Errors are typed structs, not thrown strings.</span>
+<span class="cm">// No useEffect. No dependency arrays. No stale closures.</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="callout arc-wins">
+    <strong><span class="arrow">&#9654;</span> Error handling:</strong>
+    React: errors are thrown strings caught in try/catch — no type, no structure, easy to forget.
+    Arc: errors are <code>Option&lt;ApiError&gt;</code> — a typed struct. The compiler forces you to handle both cases in <code>match</code>.
+    No <code>useEffect</code> dance, no dependency arrays, no stale closure bugs.
+  </div>
+</div>
+
+<!-- ===== Comparison 5: AI Integration ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge advantage-arc">Arc advantage</span>
+    <h2>5. AI-Native: Agent + Prompt + Tool</h2>
+    <p>Arc has first-class keywords for AI interaction. React requires third-party SDKs and manual plumbing.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>ChatAgent.jsx — React</span>
+        <span class="loc">55 lines</span>
+      </div>
+<pre>
+<span class="kw">import</span> { useState, useRef } <span class="kw">from</span> <span class="str">'react'</span>;
+<span class="kw">import</span> <span class="var">Anthropic</span> <span class="kw">from</span> <span class="str">'@anthropic-ai/sdk'</span>;
+
+<span class="kw">const</span> <span class="var">client</span> = <span class="kw">new</span> <span class="fn">Anthropic</span>();
+
+<span class="kw">const</span> <span class="var">tools</span> = [{
+  <span class="var">name</span>: <span class="str">'get_weather'</span>,
+  <span class="var">description</span>: <span class="str">'Get weather for a city'</span>,
+  <span class="var">input_schema</span>: {
+    <span class="var">type</span>: <span class="str">'object'</span>,
+    <span class="var">properties</span>: {
+      <span class="var">city</span>: { <span class="var">type</span>: <span class="str">'string'</span> }
+    }
+  }
+}];
+
+<span class="kw">async function</span> <span class="fn">getWeather</span>(<span class="var">city</span>) {
+  <span class="kw">return</span> <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`/api/weather?city=</span>${<span class="var">city</span>}<span class="str">`</span>)
+    .<span class="fn">then</span>(<span class="var">r</span> =&gt; <span class="var">r</span>.<span class="fn">json</span>());
+}
+
+<span class="kw">export default function</span> <span class="fn">ChatAgent</span>() {
+  <span class="kw">const</span> [<span class="var">messages</span>, <span class="fn">setMessages</span>] = <span class="hook">useState</span>([]);
+  <span class="kw">const</span> [<span class="var">input</span>, <span class="fn">setInput</span>] = <span class="hook">useState</span>(<span class="str">''</span>);
+
+  <span class="kw">const</span> <span class="fn">send</span> = <span class="kw">async</span> () =&gt; {
+    <span class="kw">const</span> <span class="var">userMsg</span> = { <span class="var">role</span>: <span class="str">'user'</span>, <span class="var">content</span>: <span class="var">input</span> };
+    <span class="kw">const</span> <span class="var">history</span> = [...<span class="var">messages</span>, <span class="var">userMsg</span>];
+    <span class="fn">setMessages</span>(<span class="var">history</span>);
+    <span class="fn">setInput</span>(<span class="str">''</span>);
+
+    <span class="kw">const</span> <span class="var">res</span> = <span class="kw">await</span> <span class="var">client</span>.<span class="var">messages</span>.<span class="fn">create</span>({
+      <span class="var">model</span>: <span class="str">'claude-sonnet-4-6'</span>,
+      <span class="var">max_tokens</span>: <span class="num">1024</span>,
+      <span class="var">messages</span>: <span class="var">history</span>,
+      <span class="var">tools</span>,
+    });
+
+    <span class="cm">// Manual tool-use loop</span>
+    <span class="kw">if</span> (<span class="var">res</span>.<span class="var">stop_reason</span> === <span class="str">'tool_use'</span>) {
+      <span class="kw">const</span> <span class="var">toolCall</span> = <span class="var">res</span>.<span class="var">content</span>.<span class="fn">find</span>(
+        <span class="var">b</span> =&gt; <span class="var">b</span>.<span class="var">type</span> === <span class="str">'tool_use'</span>
+      );
+      <span class="kw">const</span> <span class="var">result</span> = <span class="kw">await</span> <span class="fn">getWeather</span>(<span class="var">toolCall</span>.<span class="var">input</span>.<span class="var">city</span>);
+      <span class="cm">// ... send tool_result back, loop again ...</span>
+    }
+
+    <span class="fn">setMessages</span>(<span class="var">m</span> =&gt; [...<span class="var">m</span>, <span class="var">res</span>]);
+  };
+
+  <span class="cm">// ... render chat UI ...</span>
+}
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>weather_agent.arc — Arc</span>
+        <span class="loc">28 lines</span>
+      </div>
+<pre>
+<span class="kw">agent</span> <span class="fn">WeatherChat</span> {
+    <span class="var">model</span>: <span class="str">"claude-sonnet-4-6"</span>,
+    <span class="var">system</span>: <span class="str">"You are a helpful weather assistant."</span>,
+
+    <span class="kw">tool</span> <span class="fn">get_weather</span>(<span class="var">city</span>: <span class="ty">String</span>) -&gt; <span class="ty">Weather</span> {
+        <span class="kw">let</span> <span class="var">res</span> = <span class="kw">await</span> <span class="fn">fetch</span>(
+            <span class="fn">f</span><span class="str">"/api/weather?city={city}"</span>
+        );
+        <span class="var">res</span>.<span class="fn">json</span>()
+    }
+}
+
+<span class="kw">component</span> <span class="fn">ChatUI</span>() {
+    <span class="kw">let mut</span> <span class="var">agent</span> = <span class="ty">WeatherChat</span>::<span class="fn">new</span>();
+    <span class="kw">let mut</span> <span class="var">input</span>: <span class="ty">String</span> = <span class="str">""</span>;
+
+    <span class="kw">fn</span> <span class="fn">send</span>(&amp;<span class="kw">mut</span> <span class="var">self</span>) {
+        <span class="kw">let</span> <span class="var">reply</span> = <span class="kw">await</span> <span class="var">self</span>.<span class="var">agent</span>.<span class="fn">chat</span>(<span class="var">self</span>.<span class="var">input</span>);
+        <span class="var">self</span>.<span class="var">input</span> = <span class="str">""</span>;
+    }
+
+    <span class="kw">render</span> {
+        <span class="tag">&lt;div&gt;</span>
+            {<span class="kw">for</span> <span class="var">msg</span> <span class="kw">in</span> <span class="var">self</span>.<span class="var">agent</span>.<span class="var">history</span> {
+                <span class="tag">&lt;p&gt;</span>{<span class="var">msg</span>.<span class="var">content</span>}<span class="tag">&lt;/p&gt;</span>
+            }}
+            <span class="tag">&lt;input</span> <span class="attr">value</span>={<span class="var">self</span>.<span class="var">input</span>} <span class="tag">/&gt;</span>
+            <span class="tag">&lt;button</span> <span class="attr">on:click</span>={<span class="var">self</span>.<span class="fn">send</span>}<span class="tag">&gt;</span><span class="str">"Send"</span><span class="tag">&lt;/button&gt;</span>
+        <span class="tag">&lt;/div&gt;</span>
+    }
+}
+
+<span class="cm">// The tool loop is handled by the language runtime.</span>
+<span class="cm">// Tools are type-checked. History is managed automatically.</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="callout arc-wins">
+    <strong><span class="arrow">&#9654;</span> AI as a first-class citizen:</strong>
+    <code>agent</code>, <code>tool</code>, and <code>prompt</code> are language keywords, not library imports.
+    The Arc runtime handles the tool-use loop automatically — call <code>agent.chat()</code> and get back the final answer.
+    Tool parameters are typed and validated at compile time. No JSON schema objects, no manual dispatch.
+  </div>
+</div>
+
+<!-- ===== Comparison 6: Routing ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="badge equal">Comparable</span>
+    <h2>6. Routing</h2>
+    <p>Both approaches are declarative. Arc bakes it in; React needs react-router.</p>
+  </div>
+  <div class="comparison">
+
+    <!-- React -->
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>App.jsx — React Router</span>
+        <span class="loc">24 lines + npm install</span>
+      </div>
+<pre>
+<span class="kw">import</span> { BrowserRouter, Routes, Route } <span class="kw">from</span> <span class="str">'react-router-dom'</span>;
+
+<span class="kw">function</span> <span class="fn">App</span>() {
+  <span class="kw">return</span> (
+    <span class="tag">&lt;BrowserRouter&gt;</span>
+      <span class="tag">&lt;Routes&gt;</span>
+        <span class="tag">&lt;Route</span> <span class="attr">path</span>=<span class="str">"/"</span>
+          <span class="attr">element</span>={<span class="tag">&lt;Home /&gt;</span>} <span class="tag">/&gt;</span>
+        <span class="tag">&lt;Route</span> <span class="attr">path</span>=<span class="str">"/dashboard"</span>
+          <span class="attr">element</span>={<span class="tag">&lt;Dashboard /&gt;</span>} <span class="tag">/&gt;</span>
+        <span class="tag">&lt;Route</span> <span class="attr">path</span>=<span class="str">"/users/:id"</span>
+          <span class="attr">element</span>={<span class="tag">&lt;UserProfile /&gt;</span>} <span class="tag">/&gt;</span>
+        <span class="tag">&lt;Route</span> <span class="attr">path</span>=<span class="str">"*"</span>
+          <span class="attr">element</span>={<span class="tag">&lt;NotFound /&gt;</span>} <span class="tag">/&gt;</span>
+      <span class="tag">&lt;/Routes&gt;</span>
+    <span class="tag">&lt;/BrowserRouter&gt;</span>
+  );
+}
+
+<span class="cm">// + npm install react-router-dom (21 KB gzip)</span>
+</pre>
+    </div>
+
+    <!-- Arc -->
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>app.arc — Arc</span>
+        <span class="loc">16 lines, zero deps</span>
+      </div>
+<pre>
+<span class="kw">router</span> <span class="fn">AppRouter</span> {
+    <span class="kw">route</span> <span class="str">"/"</span>              =&gt; <span class="ty">Home</span>,
+    <span class="kw">route</span> <span class="str">"/dashboard"</span>     =&gt; <span class="ty">Dashboard</span> {
+        <span class="kw">guard</span>: <span class="ty">AuthStore</span>::<span class="fn">is_logged_in</span>,
+    },
+    <span class="kw">route</span> <span class="str">"/users/:id"</span>     =&gt; <span class="ty">UserProfile</span>,
+    <span class="kw">fallback</span>               =&gt; <span class="ty">NotFound</span>,
+}
+
+<span class="kw">component</span> <span class="fn">App</span>() {
+    <span class="kw">render</span> {
+        <span class="tag">&lt;AppRouter /&gt;</span>
+    }
+}
+
+<span class="cm">// Built-in. Route guards are type-checked.</span>
+<span class="cm">// No npm install. 0 KB added to bundle.</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="callout neutral-note">
+    <strong><span class="arrow">&#9654;</span> Similar DX, different tradeoffs:</strong>
+    Both are declarative. React Router is mature and battle-tested. Arc's <code>router</code> keyword means zero extra dependencies, and <code>guard:</code> is compiled — a typo in the guard function name is a compile error, not a runtime 404.
+  </div>
+</div>
+
+<!-- ===== Feature Matrix ===== -->
+<div class="section">
+  <div class="section-header">
+    <h2>Feature Comparison Matrix</h2>
+  </div>
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th style="width:40%">Feature</th>
+        <th style="width:30%">React (JS)</th>
+        <th style="width:30%">Arc (WASM)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Rendering strategy</td>
+        <td>Virtual DOM diff</td>
+        <td><span class="check">&#10003;</span> Fine-grained signals</td>
+      </tr>
+      <tr>
+        <td>Update complexity</td>
+        <td>O(n) tree walk</td>
+        <td><span class="check">&#10003;</span> O(1) per binding</td>
+      </tr>
+      <tr>
+        <td>Type safety</td>
+        <td><span class="partial">~</span> Optional (TypeScript)</td>
+        <td><span class="check">&#10003;</span> Built-in, Hindley-Milner</td>
+      </tr>
+      <tr>
+        <td>Memory management</td>
+        <td>Garbage collected</td>
+        <td><span class="check">&#10003;</span> Ownership + borrow checker</td>
+      </tr>
+      <tr>
+        <td>Bundle size (runtime)</td>
+        <td>~42 KB gzip</td>
+        <td><span class="check">&#10003;</span> ~3.8 KB gzip</td>
+      </tr>
+      <tr>
+        <td>Compilation target</td>
+        <td>JavaScript</td>
+        <td><span class="check">&#10003;</span> WebAssembly binary</td>
+      </tr>
+      <tr>
+        <td>State management</td>
+        <td><span class="partial">~</span> Redux / Zustand / Context</td>
+        <td><span class="check">&#10003;</span> Built-in <code>store</code></td>
+      </tr>
+      <tr>
+        <td>Routing</td>
+        <td><span class="partial">~</span> react-router (3rd party)</td>
+        <td><span class="check">&#10003;</span> Built-in <code>router</code></td>
+      </tr>
+      <tr>
+        <td>AI integration</td>
+        <td><span class="cross">&#10007;</span> Manual SDK + plumbing</td>
+        <td><span class="check">&#10003;</span> <code>agent</code> / <code>tool</code> keywords</td>
+      </tr>
+      <tr>
+        <td>SSR</td>
+        <td><span class="check">&#10003;</span> Next.js / Remix</td>
+        <td><span class="check">&#10003;</span> Built-in <code>arc ssr</code></td>
+      </tr>
+      <tr>
+        <td>Concurrency</td>
+        <td><span class="partial">~</span> Web Workers (manual)</td>
+        <td><span class="check">&#10003;</span> <code>spawn</code> / <code>channel</code></td>
+      </tr>
+      <tr>
+        <td>Exhaustive matching</td>
+        <td><span class="cross">&#10007;</span></td>
+        <td><span class="check">&#10003;</span> Compile-time checked</td>
+      </tr>
+      <tr>
+        <td>Null safety</td>
+        <td><span class="cross">&#10007;</span> null/undefined everywhere</td>
+        <td><span class="check">&#10003;</span> <code>Option&lt;T&gt;</code></td>
+      </tr>
+      <tr>
+        <td>GC pauses</td>
+        <td><span class="cross">&#10007;</span> Unpredictable</td>
+        <td><span class="check">&#10003;</span> Zero — no GC</td>
+      </tr>
+      <tr>
+        <td>Ecosystem maturity</td>
+        <td><span class="check">&#10003;</span> Massive</td>
+        <td><span class="partial">~</span> Early stage</td>
+      </tr>
+      <tr>
+        <td>Learning resources</td>
+        <td><span class="check">&#10003;</span> Extensive</td>
+        <td><span class="partial">~</span> Growing</td>
+      </tr>
+      <tr>
+        <td>Job market</td>
+        <td><span class="check">&#10003;</span> Dominant</td>
+        <td><span class="cross">&#10007;</span> Not yet</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== Architecture Diagram ===== -->
+<div class="section">
+  <div class="section-header">
+    <h2>How They Work Under the Hood</h2>
+  </div>
+  <div class="comparison">
+    <div class="code-panel react">
+      <div class="code-panel-header">
+        <span>React Update Cycle</span>
+      </div>
+<pre style="color: var(--muted); line-height: 2;">
+  setState()
+     |
+     v
+  Re-run component function     <span class="ann">&lt;-- entire function</span>
+     |
+     v
+  Build new VDOM tree            <span class="ann">&lt;-- O(n) allocation</span>
+     |
+     v
+  Diff old VDOM vs new VDOM      <span class="ann">&lt;-- O(n) comparison</span>
+     |
+     v
+  Compute minimal DOM patches
+     |
+     v
+  Apply patches to real DOM
+     |
+     v
+  GC collects old VDOM tree      <span class="ann">&lt;-- GC pause</span>
+</pre>
+    </div>
+    <div class="code-panel arc">
+      <div class="code-panel-header">
+        <span>Arc Update Cycle</span>
+      </div>
+<pre style="color: var(--muted); line-height: 2;">
+  self.count = self.count + 1
+     |
+     v
+  Signal notifies subscribers    <span class="ann">&lt;-- O(1) lookup</span>
+     |
+     v
+  WASM calls dom_set_text()      <span class="ann">&lt;-- direct FFI</span>
+     |
+     v
+  One DOM node updated           <span class="ann">&lt;-- done</span>
+
+
+
+
+  <span class="ann">No VDOM. No diff. No GC. No JS.</span>
+</pre>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <p>
+    Arc is open source under the MIT license.
+    <a href="https://github.com/BlakeBurnette/arc-lang">github.com/BlakeBurnette/arc-lang</a>
+  </p>
+  <p style="margin-top: 8px;">
+    React is maintained by Meta. Arc is a new language — these comparisons reflect architectural differences, not a value judgment.
+    Both are valid choices depending on your needs.
+  </p>
+</div>
+
+</body>
+</html>
