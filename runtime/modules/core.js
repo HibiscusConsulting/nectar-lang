@@ -404,52 +404,39 @@ export const wasmImports = {
     getReadyState(wsId) { return R.__getObject(wsId).readyState; },
   },
 
-  // ── IndexedDB ──────────────────────────────────────────────────────────
+  // ── IndexedDB — pure syscalls, no logic. WASM handles serialization. ──
   db: {
-    open(namePtr, nameLen, version) {
-      const name = R.__getString(namePtr, nameLen);
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(name, version || 1);
-        req.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          if (!db.objectStoreNames.contains('default')) db.createObjectStore('default', { keyPath: 'id' });
-        };
-        req.onsuccess = (e) => { resolve(R.__registerObject(e.target.result)); };
-        req.onerror = () => reject(0);
-      });
+    open(namePtr, nameLen, version, cbIdx) {
+      const req = indexedDB.open(R.__getString(namePtr, nameLen), version || 1);
+      req.onupgradeneeded = (e) => { e.target.result.createObjectStore('default', { keyPath: 'id' }); };
+      req.onsuccess = (e) => { R.__cbData(cbIdx, R.__registerObject(e.target.result)); };
+      req.onerror = () => { R.__cbData(cbIdx, 0); };
     },
-    put(dbId, storePtr, storeLen, dataPtr, dataLen) {
-      const db = R.__getObject(dbId);
+    put(dbId, storePtr, storeLen, keyPtr, keyLen, valPtr, valLen) {
       const store = R.__getString(storePtr, storeLen);
-      const data = JSON.parse(R.__getString(dataPtr, dataLen));
-      const tx = db.transaction(store, 'readwrite');
-      tx.objectStore(store).put(data);
+      const tx = R.__getObject(dbId).transaction(store, 'readwrite');
+      tx.objectStore(store).put({ id: R.__getString(keyPtr, keyLen), v: R.__getString(valPtr, valLen) });
     },
-    get(dbId, storePtr, storeLen, keyPtr, keyLen) {
-      const db = R.__getObject(dbId);
+    get(dbId, storePtr, storeLen, keyPtr, keyLen, cbIdx) {
       const store = R.__getString(storePtr, storeLen);
-      const key = R.__getString(keyPtr, keyLen);
-      return new Promise((resolve) => {
-        const tx = db.transaction(store, 'readonly');
-        const req = tx.objectStore(store).get(key);
-        req.onsuccess = () => resolve(req.result ? R.__allocString(JSON.stringify(req.result)) : 0);
-      });
+      const tx = R.__getObject(dbId).transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(R.__getString(keyPtr, keyLen));
+      req.onsuccess = () => { R.__cbData(cbIdx, req.result ? R.__allocString(req.result.v) : 0); };
     },
     delete(dbId, storePtr, storeLen, keyPtr, keyLen) {
-      const db = R.__getObject(dbId);
       const store = R.__getString(storePtr, storeLen);
-      const key = R.__getString(keyPtr, keyLen);
-      const tx = db.transaction(store, 'readwrite');
-      tx.objectStore(store).delete(key);
+      R.__getObject(dbId).transaction(store, 'readwrite').objectStore(store).delete(R.__getString(keyPtr, keyLen));
     },
-    query(dbId, storePtr, storeLen) {
-      const db = R.__getObject(dbId);
+    getAll(dbId, storePtr, storeLen, cbIdx) {
       const store = R.__getString(storePtr, storeLen);
-      return new Promise((resolve) => {
-        const tx = db.transaction(store, 'readonly');
-        const req = tx.objectStore(store).getAll();
-        req.onsuccess = () => resolve(R.__allocString(JSON.stringify(req.result)));
-      });
+      const tx = R.__getObject(dbId).transaction(store, 'readonly');
+      const req = tx.objectStore(store).getAll();
+      req.onsuccess = () => {
+        const items = req.result;
+        const count = items.length;
+        for (let i = 0; i < count; i++) R.__cbData(cbIdx, R.__allocString(items[i].v));
+        R.__cbData(cbIdx, 0);
+      };
     },
   },
 
@@ -553,21 +540,12 @@ export const wasmImports = {
     },
   },
 
-  // ── Auth — redirect + cookies ──────────────────────────────────────────
+  // ── Auth — pure syscalls, no logic. WASM parses cookies. ────────────────
   auth: {
     login(urlPtr, urlLen) { location.href = R.__getString(urlPtr, urlLen); },
     logout(urlPtr, urlLen) { if (urlPtr) location.href = R.__getString(urlPtr, urlLen); },
-    getCookie(namePtr, nameLen) {
-        const name = R.__getString(namePtr, nameLen);
-        const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-        return match ? R.__allocString(decodeURIComponent(match[1])) : 0;
-    },
+    getRawCookies() { return R.__allocString(document.cookie); },
     setCookie(ptr, len) { document.cookie = R.__getString(ptr, len); },
-    clearCookies() {
-        document.cookie.split(';').forEach(c => {
-            document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-        });
-    },
   },
 
   // ── Upload — file picker + XHR ─────────────────────────────────────────

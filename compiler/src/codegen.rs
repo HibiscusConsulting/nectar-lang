@@ -166,14 +166,14 @@ impl WasmCodegen {
         self.line("(import \"ws\" \"onError\" (func $ws_onError (param i32 i32)))");
         self.line("(import \"ws\" \"getReadyState\" (func $ws_getReadyState (param i32) (result i32)))");
 
-        // ── IndexedDB ────────────────────────────────────────────────────────
+        // ── IndexedDB — pure syscalls, WASM handles serialization ────────────
         self.line("");
-        self.line(";; Database — browser IndexedDB API");
-        self.line("(import \"db\" \"open\" (func $db_open (param i32 i32 i32) (result i32)))");
-        self.line("(import \"db\" \"put\" (func $db_put (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"get\" (func $db_get (param i32 i32 i32 i32 i32) (result i32)))");
+        self.line(";; Database — browser IndexedDB API (no JSON logic in JS)");
+        self.line("(import \"db\" \"open\" (func $db_open (param i32 i32 i32 i32)))");
+        self.line("(import \"db\" \"put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"db\" \"get\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
         self.line("(import \"db\" \"delete\" (func $db_delete (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"query\" (func $db_query (param i32 i32 i32) (result i32)))");
+        self.line("(import \"db\" \"getAll\" (func $db_getAll (param i32 i32 i32 i32)))");
 
         // ── Workers ──────────────────────────────────────────────────────────
         self.line("");
@@ -208,14 +208,13 @@ impl WasmCodegen {
         self.line("(import \"payment\" \"createCheckout\" (func $payment_create_checkout (param i32 i32 i32 i32) (result i32)))");
         self.line("(import \"payment\" \"processPayment\" (func $payment_process (param i32 i32) (result i32)))");
 
-        // ── Auth — cookies + redirect ────────────────────────────────────────
+        // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
         self.line("");
-        self.line(";; Auth — browser cookie/navigation APIs");
+        self.line(";; Auth — browser cookie/navigation APIs (no parsing in JS)");
         self.line("(import \"auth\" \"login\" (func $auth_login (param i32 i32)))");
         self.line("(import \"auth\" \"logout\" (func $auth_logout (param i32 i32)))");
-        self.line("(import \"auth\" \"getCookie\" (func $auth_get_cookie (param i32 i32) (result i32)))");
+        self.line("(import \"auth\" \"getRawCookies\" (func $auth_getRawCookies (result i32)))");
         self.line("(import \"auth\" \"setCookie\" (func $auth_set_cookie (param i32 i32)))");
-        self.line("(import \"auth\" \"clearCookies\" (func $auth_clear_cookies))");
 
         // ── Upload — file picker + XHR ───────────────────────────────────────
         self.line("");
