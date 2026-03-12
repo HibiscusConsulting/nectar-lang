@@ -73,6 +73,24 @@ const NectarRuntime = {
   __cb(idx) { this.__instance.exports.__callback(idx); },
   __cbData(idx, ptr) { this.__instance.exports.__callback_with_data(idx, ptr); },
 
+  // Read flat key-value pairs from WASM memory. WASM writes:
+  // [key_ptr:i32, key_len:i32, val_ptr:i32, val_len:i32, ...] terminated by (0,0).
+  // Returns a JS object. Same pattern as flush() — structured memory read.
+  __readOpts(ptr) {
+    const dv = new DataView(this.__memory.buffer);
+    const o = {};
+    let i = ptr;
+    while (true) {
+      const kp = dv.getInt32(i, true); i += 4;
+      const kl = dv.getInt32(i, true); i += 4;
+      if (kp === 0 && kl === 0) break;
+      const vp = dv.getInt32(i, true); i += 4;
+      const vl = dv.getInt32(i, true); i += 4;
+      o[this.__getString(kp, kl)] = this.__getString(vp, vl);
+    }
+    return o;
+  },
+
   __init(instance) {
     this.__instance = instance;
     this.__memory = instance.exports.memory;
@@ -84,7 +102,7 @@ const R = NectarRuntime;
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  WASM IMPORTS — organized by namespace to match codegen.rs import declarations
-//  21 namespaces. Every function calls a browser API WASM physically cannot.
+//  15 namespaces. Every function calls a browser API WASM physically cannot.
 // ══════════════════════════════════════════════════════════════════════════════
 
 export const name = 'core';
@@ -290,6 +308,16 @@ export const wasmImports = {
     // Absorbed from pdf — contentWindow.print() is a browser API
     print(elId) { R.__getElement(elId).contentWindow.print(); },
 
+    // Hot reload — WebAssembly.compile + instantiate cannot be called from WASM
+    reloadModule(urlPtr, urlLen, cbIdx) {
+      fetch(R.__getString(urlPtr, urlLen), { cache: 'no-store' })
+        .then(r => r.arrayBuffer())
+        .then(b => WebAssembly.compile(b))
+        .then(m => WebAssembly.instantiate(m, wasmImports))
+        .then(inst => { R.__init(inst); R.__cb(cbIdx); })
+        .catch(() => R.__cb(cbIdx));
+    },
+
     // Absorbed from io — Blob + URL.createObjectURL are browser APIs
     download(dataPtr, dataLen, namePtr, nameLen) {
       const data = R.__getString(dataPtr, dataLen);
@@ -365,24 +393,22 @@ export const wasmImports = {
 
   // ── HTTP — fetch() is a browser API ────────────────────────────────────
   http: {
-    fetch(urlPtr, urlLen, optsPtr, optsLen) {
-      const url = R.__getString(urlPtr, urlLen);
-      const opts = optsLen > 0 ? JSON.parse(R.__getString(optsPtr, optsLen)) : {};
-      return R.__registerObject(fetch(url, opts));
-    },
-    fetchGetBody(promiseId) {
-      return R.__getObject(promiseId);
-    },
-    fetchGetStatus(promiseId) {
-      return R.__getObject(promiseId);
+    _h: null,
+    setMethod(ptr, len) { this._m = R.__getString(ptr, len); },
+    setBody(ptr, len) { this._b = R.__getString(ptr, len); },
+    addHeader(kp, kl, vp, vl) { if (!this._h) this._h = {}; this._h[R.__getString(kp, kl)] = R.__getString(vp, vl); },
+    fetch(urlPtr, urlLen) {
+      const o = { method: this._m || 'GET', headers: this._h || undefined, body: this._b || undefined };
+      this._m = null; this._b = null; this._h = null;
+      return R.__registerObject(fetch(R.__getString(urlPtr, urlLen), o));
     },
   },
 
   // ── Observer — IntersectionObserver, matchMedia ────────────────────────
   observe: {
     matchMedia(qPtr, qLen) { return matchMedia(R.__getString(qPtr, qLen)).matches ? 1 : 0; },
-    intersectionObserver(cbIdx, optsPtr, optsLen) {
-      const opts = optsLen > 0 ? JSON.parse(R.__getString(optsPtr, optsLen)) : {};
+    intersectionObserver(cbIdx, optsPtr) {
+      const opts = optsPtr ? R.__readOpts(optsPtr) : {};
       return R.__registerObject(new IntersectionObserver(() => R.__cb(cbIdx), opts));
     },
     observe(obsId, elId) { R.__getObject(obsId).observe(R.__getElement(elId)); },
@@ -460,13 +486,13 @@ export const wasmImports = {
     },
     channelRecv(portId, cbIdx) {
       const port = R.__getObject(portId);
-      port.addEventListener('message', (e) => R.__cbData(cbIdx, R.__allocString(JSON.stringify(e.data))));
+      port.addEventListener('message', (e) => R.__cbData(cbIdx, R.__allocString(typeof e.data === 'string' ? e.data : '')));
       port.start();
     },
     parallel(fnPtrsPtr, fnCount, cbIdx) { R.__cb(cbIdx); },
     await(promiseId) { return R.__getObject(promiseId); },
     postMessage(workerId, dataPtr, dataLen) { R.__getObject(workerId).postMessage(R.__getString(dataPtr, dataLen)); },
-    onMessage(workerId, cbIdx) { R.__getObject(workerId).addEventListener('message', (e) => R.__cbData(cbIdx, R.__allocString(JSON.stringify(e.data)))); },
+    onMessage(workerId, cbIdx) { R.__getObject(workerId).addEventListener('message', (e) => R.__cbData(cbIdx, R.__allocString(typeof e.data === 'string' ? e.data : ''))); },
     terminate(workerId) { R.__getObject(workerId).terminate(); },
   },
 
@@ -475,10 +501,10 @@ export const wasmImports = {
     cachePrecache(namePtr, nameLen) {
       return caches.open(R.__getString(namePtr, nameLen));
     },
-    registerPush(optsPtr, optsLen) {
+    registerPush(optsPtr) {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 0;
       return navigator.serviceWorker.ready.then(reg =>
-        reg.pushManager.subscribe(optsLen > 0 ? JSON.parse(R.__getString(optsPtr, optsLen)) : {})
+        reg.pushManager.subscribe(optsPtr ? R.__readOpts(optsPtr) : {})
       );
     },
     registerServiceWorker(pathPtr, pathLen, cbIdx) {
@@ -490,15 +516,15 @@ export const wasmImports = {
   // ── Hardware APIs ──────────────────────────────────────────────────────
   hardware: {
     haptic(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); },
-    biometricAuth(optsPtr, optsLen, successCb, failCb) {
+    biometricAuth(optsPtr, successCb, failCb) {
       if (!navigator.credentials) { R.__cb(failCb); return; }
-      navigator.credentials.get(JSON.parse(R.__getString(optsPtr, optsLen)))
+      navigator.credentials.get(optsPtr ? R.__readOpts(optsPtr) : {})
         .then(() => R.__cb(successCb))
         .catch(() => R.__cb(failCb));
     },
-    cameraCapture(constraintsPtr, constraintsLen, cbIdx) {
+    cameraCapture(constraintsPtr, cbIdx) {
       if (!navigator.mediaDevices) { R.__cb(cbIdx); return; }
-      navigator.mediaDevices.getUserMedia(JSON.parse(R.__getString(constraintsPtr, constraintsLen)))
+      navigator.mediaDevices.getUserMedia(constraintsPtr ? R.__readOpts(constraintsPtr) : {})
         .then(stream => { R.__cbData(cbIdx, R.__registerObject(stream)); });
     },
     geolocationCurrent(cbIdx) {
@@ -573,9 +599,9 @@ export const wasmImports = {
       return R.__allocString(new Intl.DateTimeFormat(locale).format(new Date(ms)));
     },
     getTimezoneOffset() { return new Date().getTimezoneOffset(); },
-    formatDate(ms, localePtr, localeLen, optsPtr, optsLen) {
+    formatDate(ms, localePtr, localeLen, optsPtr) {
       const locale = localePtr ? R.__getString(localePtr, localeLen) : undefined;
-      const opts = optsLen > 0 ? JSON.parse(R.__getString(optsPtr, optsLen)) : {};
+      const opts = optsPtr ? R.__readOpts(optsPtr) : {};
       return R.__allocString(new Intl.DateTimeFormat(locale, opts).format(new Date(ms)));
     },
   },
@@ -614,148 +640,21 @@ export async function instantiate(wasmUrl, extraImports = {}) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  HYDRATION — attaches WASM interactivity to server-rendered HTML
+//  HYDRATION — thin bootstrap, WASM controls event delegation + state restore
 // ══════════════════════════════════════════════════════════════════════════════
-
-const __delegatedHandlers = new Map();
-const DELEGATED_EVENTS = [
-  'click', 'input', 'change', 'submit', 'keydown', 'keyup',
-  'focus', 'blur', 'mousedown', 'mouseup', 'touchstart', 'touchend',
-];
-
-function __initEventDelegation(root) {
-  for (const evt of DELEGATED_EVENTS) {
-    root.addEventListener(evt, (e) => {
-      let t = e.target;
-      while (t && t !== root) {
-        const key = t.getAttribute('data-nectar-key');
-        if (key) {
-          const h = __delegatedHandlers.get(key);
-          if (h && h[evt]) { h[evt](e); return; }
-        }
-        t = t.parentElement;
-      }
-    });
-  }
-}
 
 export function hydrate(wasmInstance, rootElement) {
-  if (window.__NECTAR_STATE__ && wasmInstance.exports) {
-    for (const [store, data] of Object.entries(window.__NECTAR_STATE__)) {
-      const init = wasmInstance.exports[store + '_init'];
-      if (typeof init === 'function') init(data);
-    }
-  }
-  __initEventDelegation(rootElement);
-  const roots = rootElement.querySelectorAll('[data-nectar-hydrate]');
-  for (const el of roots) {
-    const name = el.getAttribute('data-nectar-hydrate');
-    const fn = wasmInstance.exports[name + '_hydrate'] || wasmInstance.exports[name + '_mount'];
-    if (typeof fn === 'function') fn(NectarRuntime.__registerElement(el));
-  }
+  const rootId = NectarRuntime.__registerElement(rootElement);
+  if (wasmInstance.exports.__hydrate) wasmInstance.exports.__hydrate(rootId);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  SERVICE WORKER REGISTRATION — browser API, cannot be WASM
-// ══════════════════════════════════════════════════════════════════════════════
+// SW registration: use pwa.registerServiceWorker syscall from WASM.
+// Update detection, offline listeners — all WASM-internal via existing
+// dom.addEventListener + pwa namespace syscalls.
 
-export const sw = {
-  _reg: null,
-  _updateAvailable: false,
-  _listeners: { update: [], offline: [] },
+// Hot reload: WASM controls the WebSocket connection (ws.connect + ws.onMessage),
+// CSS updates (dom.querySelector + SET_STYLE/SET_INNER_HTML opcodes), and
+// reconnection (timer.setTimeout). Only reloadModule needs JS — WebAssembly
+// cannot compile/instantiate itself.
 
-  async register(swUrl) {
-    if (!('serviceWorker' in navigator)) return null;
-    try {
-      this._reg = await navigator.serviceWorker.register(swUrl || '/nectar-sw.js');
-      if (this._reg.waiting) { this._updateAvailable = true; this._listeners.update.forEach(f => f()); }
-      this._reg.addEventListener('updatefound', () => {
-        const nw = this._reg.installing;
-        if (!nw) return;
-        nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-            this._updateAvailable = true;
-            this._listeners.update.forEach(f => f());
-          }
-        });
-      });
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (this._updateAvailable) window.location.reload();
-      });
-      return this._reg;
-    } catch (e) { console.error('[nectar] SW registration failed:', e); return null; }
-  },
-
-  update() {
-    if (this._reg && this._reg.waiting) this._reg.waiting.postMessage('nectar:skipWaiting');
-    else if (this._reg) this._reg.update();
-  },
-
-  on(evt, cb) { if (this._listeners[evt]) this._listeners[evt].push(cb); },
-  get isOffline() { return !navigator.onLine; },
-  get updateAvailable() { return this._updateAvailable; },
-};
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => sw._listeners.offline.forEach(f => f()));
-  window.addEventListener('offline', () => sw._listeners.offline.forEach(f => f()));
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-//  HOT RELOAD — dev-mode only, injected by `nectar dev` server
-// ══════════════════════════════════════════════════════════════════════════════
-
-export function connectHotReload(wsUrl) {
-  let ws, reconnectDelay = 1000;
-
-  function connect() {
-    ws = new WebSocket(wsUrl || 'ws://localhost:3000');
-    ws.onopen = () => { console.log('[nectar] hot reload connected'); reconnectDelay = 1000; };
-    ws.onclose = () => { setTimeout(connect, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); };
-    ws.onmessage = async (e) => {
-      let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
-
-      if (msg.type === 'css') {
-        for (const file of (msg.files || [])) {
-          const links = document.querySelectorAll('link[rel="stylesheet"]');
-          const name = file.split('/').pop();
-          for (const link of links) {
-            if (link.href && link.href.includes(name)) {
-              const url = new URL(link.href);
-              url.searchParams.set('_r', Date.now());
-              link.href = url.toString();
-            }
-          }
-        }
-        for (const [scope, css] of Object.entries(msg.css || {})) {
-          let el = document.querySelector(`style[data-nectar-scope="${scope}"]`);
-          if (!el) { el = document.createElement('style'); el.setAttribute('data-nectar-scope', scope); document.head.appendChild(el); }
-          el.textContent = css;
-        }
-      }
-
-      if (msg.type === 'reload') {
-        for (const file of (msg.files || [])) {
-          if (file.endsWith('.css')) continue;
-          try {
-            const wasmUrl = '/' + file.split('/').pop().replace(/\.[^.]+$/, '') + '.wasm';
-            const resp = await fetch(wasmUrl, { cache: 'no-store' });
-            if (!resp.ok) throw new Error(`${resp.status}`);
-            const bytes = await resp.arrayBuffer();
-            const mod = await WebAssembly.compile(bytes);
-            const inst = await WebAssembly.instantiate(mod, wasmImports);
-            NectarRuntime.__init(inst);
-            if (inst.exports._start) inst.exports._start();
-            else if (inst.exports.main) inst.exports.main();
-            console.log('[nectar] reloaded:', file);
-          } catch (err) { console.error('[nectar] reload failed:', file, err); }
-        }
-      }
-    };
-  }
-
-  connect();
-}
-
-if (typeof module !== "undefined") module.exports = { name, runtime, wasmImports, NectarRuntime, instantiate, hydrate, sw, connectHotReload };
+if (typeof module !== "undefined") module.exports = { name, runtime, wasmImports, NectarRuntime, instantiate, hydrate };

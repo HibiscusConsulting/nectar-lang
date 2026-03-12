@@ -93,6 +93,7 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"progressiveImage\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"print\" (func $dom_print (param i32)))");
         self.line("(import \"dom\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
+        self.line("(import \"dom\" \"reloadModule\" (func $dom_reloadModule (param i32 i32 i32)))");
 
         // ── Timer — browser timer APIs ───────────────────────────────────────
         self.line("");
@@ -139,16 +140,19 @@ impl WasmCodegen {
         self.line("(import \"webapi\" \"perfMeasure\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
 
 
-        // ── HTTP — browser fetch API ─────────────────────────────────────────
+        // ── HTTP — typed setters + fetch ─────────────────────────────────────
         self.line("");
-        self.line(";; HTTP — browser fetch API");
-        self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32 i32 i32) (result i32)))");
+        self.line(";; HTTP — browser fetch API (typed setters, no JSON)");
+        self.line("(import \"http\" \"setMethod\" (func $http_setMethod (param i32 i32)))");
+        self.line("(import \"http\" \"setBody\" (func $http_setBody (param i32 i32)))");
+        self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
+        self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))");
 
         // ── Observe — IntersectionObserver + matchMedia ──────────────────────
         self.line("");
         self.line(";; Observe — browser IntersectionObserver + matchMedia APIs");
         self.line("(import \"observe\" \"matchMedia\" (func $observe_matchMedia (param i32 i32) (result i32)))");
-        self.line("(import \"observe\" \"intersectionObserver\" (func $observe_intersectionObserver (param i32 i32 i32) (result i32)))");
+        self.line("(import \"observe\" \"intersectionObserver\" (func $observe_intersectionObserver (param i32 i32) (result i32)))");
         self.line("(import \"observe\" \"observe\" (func $observe_observe (param i32 i32)))");
         self.line("(import \"observe\" \"unobserve\" (func $observe_unobserve (param i32 i32)))");
         self.line("(import \"observe\" \"disconnect\" (func $observe_disconnect (param i32)))");
@@ -178,7 +182,7 @@ impl WasmCodegen {
         // ── Workers ──────────────────────────────────────────────────────────
         self.line("");
         self.line(";; Workers — browser Web Worker API");
-        self.line("(import \"worker\" \"spawn\" (func $worker_spawn (param i32) (result i32)))");
+        self.line("(import \"worker\" \"spawn\" (func $worker_spawn (param i32 i32) (result i32)))");
         self.line("(import \"worker\" \"channelCreate\" (func $worker_channelCreate (result i32)))");
         self.line("(import \"worker\" \"channelSend\" (func $worker_channelSend (param i32 i32 i32)))");
         self.line("(import \"worker\" \"channelRecv\" (func $worker_channelRecv (param i32 i32)))");
@@ -190,15 +194,15 @@ impl WasmCodegen {
         self.line("");
         self.line(";; PWA — browser Service Worker + Push APIs");
         self.line("(import \"pwa\" \"cachePrecache\" (func $pwa_cachePrecache (param i32 i32)))");
-        self.line("(import \"pwa\" \"registerPush\" (func $pwa_registerPush (param i32 i32)))");
+        self.line("(import \"pwa\" \"registerPush\" (func $pwa_registerPush (param i32)))");
         self.line("(import \"pwa\" \"registerServiceWorker\" (func $pwa_registerServiceWorker (param i32 i32 i32)))");
 
         // ── Hardware — device APIs ───────────────────────────────────────────
         self.line("");
         self.line(";; Hardware — browser device APIs");
         self.line("(import \"hardware\" \"haptic\" (func $hardware_haptic (param i32)))");
-        self.line("(import \"hardware\" \"biometricAuth\" (func $hardware_biometricAuth (param i32 i32 i32 i32)))");
-        self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32 i32)))");
+        self.line("(import \"hardware\" \"biometricAuth\" (func $hardware_biometricAuth (param i32 i32 i32)))");
+        self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
         self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
 
         // ── Payment — only processPayment (contentWindow.postMessage) ────────
@@ -227,7 +231,7 @@ impl WasmCodegen {
         self.line("(import \"time\" \"now\" (func $time_now (result f64)))");
         self.line("(import \"time\" \"format\" (func $time_format (param f64 i32 i32) (result i32)))");
         self.line("(import \"time\" \"getTimezoneOffset\" (func $time_getTimezoneOffset (result i32)))");
-        self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
 
         // ── Streaming — ReadableStream + EventSource ─────────────────────────
         self.line("");
