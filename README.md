@@ -2,7 +2,7 @@
 
 **A programming language that compiles to WebAssembly, built for the next era of web development.**
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![WASM](https://img.shields.io/badge/target-WebAssembly-654ff0.svg)
 
@@ -25,19 +25,80 @@ component Counter(initial: i32) {
 }
 ```
 
-## Quick Start
+## Install
+
+### From source (Rust toolchain required)
 
 ```bash
-git clone https://github.com/BlakeBurnette/nectar-lang.git
-cd nectar-lang
-cargo build --release
+cargo install nectar-lang
+```
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install hibiscus-consulting/tap/nectar
+```
+
+### Binary download
+
+Pre-built binaries for macOS, Linux, and Windows are available on the [Releases page](https://github.com/HibiscusConsulting/nectar-lang/releases).
+
+## Usage
+
+```bash
 # Compile to WebAssembly
-./target/release/nectar build hello.nectar --emit-wasm
+nectar build app.nectar --emit-wasm
 
 # Start dev server with hot reload
-./target/release/nectar dev --src . --port 3000
+nectar dev --src . --port 3000
+
+# Format, lint, test
+nectar fmt app.nectar
+nectar lint app.nectar
+nectar test app.nectar
+
+# Type-check and borrow-check without building
+nectar check app.nectar
 ```
+
+### Use in your app
+
+`nectar build` outputs `app.wasm` and bundles `core.js` (~3 KB gzip). Include both in your HTML:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="module">
+        import { instantiate } from './core.js';
+        const app = await instantiate('./app.wasm');
+        app.exports.main();
+    </script>
+</head>
+<body>
+    <div id="app"></div>
+</body>
+</html>
+```
+
+That's it. No bundler, no node_modules, no build pipeline.
+
+## Deploy
+
+Nectar compiles to static files (WASM + JS). Deploy anywhere you'd deploy a website.
+
+| Platform | How |
+|---|---|
+| **AWS** | Upload to S3, serve via CloudFront |
+| **GCP** | Upload to Cloud Storage, serve via Cloud CDN |
+| **Azure** | Azure Static Web Apps, or Blob Storage + CDN |
+| **Render** | Create a Static Site, point to your build directory |
+| **Vercel** | `vercel deploy` with the build output directory |
+| **Netlify** | Drag and drop, or connect your repo |
+| **Cloudflare Pages** | Connect repo, set build command to `nectar build` |
+| **GitHub Pages** | Push build output to `gh-pages` branch |
+
+For SSR (`nectar build --ssr`), deploy to any platform that runs a web server (Render Web Service, AWS Lambda, Cloud Run, etc.).
 
 ## What You Get
 
@@ -51,23 +112,21 @@ cargo build --release
 
 **Toolchain** — compiler, formatter (`nectar fmt`), linter (`nectar lint`), test runner, dev server, package manager, LSP — one binary
 
-**Build targets** — `--target pwa`, `--target ssg`, `--target ssr`, `--target capacitor` (iOS/Android), `--target twa` (Play Store)
-
 ## How It Works
 
 ```
   .nectar source
-       ↓
+       |
   Compiler (Rust)
-  ├─ Parse → AST
-  ├─ Type check + borrow check
-  ├─ Codegen → WAT
-  └─ Binary emit → .wasm
-       ↓
+  |- Parse -> AST
+  |- Type check + borrow check
+  |- Codegen -> WAT
+  '- Binary emit -> .wasm
+       |
   Browser loads .wasm + single JS syscall file (~3 KB gzip)
-       ↓
-  mount() → innerHTML from WASM-built string (1 call)
-  flush() → batched DOM ops from command buffer (1 call/frame)
+       |
+  mount() -> innerHTML from WASM-built string (1 call)
+  flush() -> batched DOM ops from command buffer (1 call/frame)
 ```
 
 Initial renders use `innerHTML` from a WASM-built HTML string. Updates write opcodes into a command buffer in linear memory — a single `flush()` call per frame executes them all. The JS layer is one file with browser API syscalls that WASM physically cannot call (DOM, WebSocket, IndexedDB, clipboard, etc.). All logic runs in WASM.
@@ -94,7 +153,7 @@ See [`examples/`](examples/) for complete working apps:
 | [crypto.nectar](examples/crypto.nectar) | Hash, encrypt, sign |
 | [std-lib.nectar](examples/std-lib.nectar) | Standard library usage |
 
-[See all 39 examples →](examples/)
+[See all 39 examples ->](examples/)
 
 ## Documentation
 
@@ -107,10 +166,8 @@ See [`examples/`](examples/) for complete working apps:
 | [Toolchain](docs/toolchain.md) | CLI commands, formatter, linter, LSP |
 | [AI Integration](docs/nectar-for-ai.md) | Agents, tools, prompts, streaming |
 
-## Comparison
-
-[**Nectar vs React — interactive side-by-side →**](comparison/index.html)
-
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Business Source License 1.1 — see [LICENSE](LICENSE).
+
+You can use Nectar for any purpose, including production apps. The BSL restriction only prevents offering Nectar itself as a hosted compiler service or selling it as a standalone product. On the Change Date (2030-03-12), the license converts to Apache 2.0.
