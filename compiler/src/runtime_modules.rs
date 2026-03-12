@@ -172,35 +172,23 @@ fn check_expr(expr: &Expr, modules: &mut HashSet<String>) {
             check_expr(template, modules);
         }
         Expr::Fetch { .. } => { /* core handles fetch */ }
-        // Detect std lib function calls by name
+        // Detect JS runtime module needs.
+        // NOTE: Most std lib features (crypto, BigDecimal, collections, url, mask,
+        // search, pagination logic) are pure WASM — compiled from Rust into the
+        // binary. They do NOT need JS runtime modules.
+        // Only features that need browser APIs get JS modules:
+        //   - toast/skeleton: need DOM syscalls (already in core)
+        //   - format (locale): needs Intl API (intl.js bridge)
+        //   - debounce/throttle: need setTimeout (already in core)
         Expr::FnCall { callee, args, .. } => {
-            if let Expr::Ident(ref name) = **callee {
-                match name.as_str() {
-                    "debounce" | "throttle" | "deep_clone" | "deep_merge" => {
-                        modules.insert("std_util".to_string());
-                    }
-                    "toast" => {
-                        modules.insert("std_toast".to_string());
-                    }
-                    "paginate" | "page_numbers" | "infinite_scroll" => {
-                        modules.insert("std_pagination".to_string());
-                    }
-                    _ => {}
-                }
-            }
-            // Check for namespace calls like format::number, collections::group_by
-            if let Expr::FieldAccess { object, field, .. } = &**callee {
+            // Detect Intl-dependent formatting (needs intl.js bridge)
+            if let Expr::FieldAccess { object, .. } = &**callee {
                 if let Expr::Ident(ref ns) = **object {
                     match ns.as_str() {
-                        "format" => { modules.insert("std_format".to_string()); }
-                        "collections" => { modules.insert("std_collections".to_string()); }
-                        "url" => { modules.insert("std_url".to_string()); }
-                        "mask" => { modules.insert("std_mask".to_string()); }
-                        "search" => { modules.insert("std_search".to_string()); }
-                        "toast" => { modules.insert("std_toast".to_string()); }
-                        "skeleton" => { modules.insert("std_skeleton".to_string()); }
-                        "pagination" => { modules.insert("std_pagination".to_string()); }
-                        _ => {}
+                        "format" => { modules.insert("intl".to_string()); }
+                        "toast" => { /* uses core DOM syscalls, no extra JS */ }
+                        "skeleton" => { /* uses core DOM syscalls, no extra JS */ }
+                        _ => {} // collections, url, mask, search, pagination = pure WASM
                     }
                 }
             }
@@ -209,20 +197,11 @@ fn check_expr(expr: &Expr, modules: &mut HashSet<String>) {
                 check_expr(arg, modules);
             }
         }
-        // Detect BigDecimal usage
         Expr::MethodCall { object, args, .. } => {
             if let Expr::Ident(ref name) = **object {
                 match name.as_str() {
                     "clipboard" => { modules.insert("clipboard".to_string()); }
-                    "crypto" => { modules.insert("crypto".to_string()); }
-                    "BigDecimal" => { modules.insert("std_decimal".to_string()); }
-                    "toast" => { modules.insert("std_toast".to_string()); }
-                    "skeleton" => { modules.insert("std_skeleton".to_string()); }
-                    "format" => { modules.insert("std_format".to_string()); }
-                    "collections" => { modules.insert("std_collections".to_string()); }
-                    "url" => { modules.insert("std_url".to_string()); }
-                    "mask" => { modules.insert("std_mask".to_string()); }
-                    "search" => { modules.insert("std_search".to_string()); }
+                    // crypto is pure WASM now — no JS module needed
                     _ => {}
                 }
             }

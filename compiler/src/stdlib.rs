@@ -86,6 +86,12 @@ impl StdLib {
         stdlib.register_math_functions();
         stdlib.register_formatting_functions();
         stdlib.register_web_api_functions();
+        stdlib.register_crypto_functions();
+        stdlib.register_bigdecimal_type();
+        stdlib.register_collections_functions();
+        stdlib.register_url_functions();
+        stdlib.register_mask_functions();
+        stdlib.register_search_functions();
 
         stdlib
     }
@@ -1089,6 +1095,434 @@ impl StdLib {
         for f in web_fns {
             self.register_fn(f);
         }
+    }
+
+    fn register_crypto_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let bool_ty = Type::Named("bool".into());
+        let i32_ty = Type::Named("i32".into());
+        let bytes_ty = Type::Array(Box::new(Type::Named("u8".into())));
+
+        let crypto_fns = vec![
+            BuiltinFn {
+                name: "crypto_sha256".into(),
+                params: vec![BuiltinParam { name: "data".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "SHA-256 hash of input data, returned as hex string. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_sha512".into(),
+                params: vec![BuiltinParam { name: "data".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "SHA-512 hash of input data, returned as hex string. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_hmac".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "HMAC-SHA256 of data using key. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_encrypt".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "plaintext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-GCM encryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_decrypt".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "ciphertext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-GCM decryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_sign".into(),
+                params: vec![
+                    BuiltinParam { name: "private_key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Ed25519 digital signature. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_verify".into(),
+                params: vec![
+                    BuiltinParam { name: "public_key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "signature".into(), ty: string_ty.clone() },
+                ],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Ed25519 signature verification. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_derive_key".into(),
+                params: vec![
+                    BuiltinParam { name: "password".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "salt".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "PBKDF2 key derivation. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_random_uuid".into(),
+                params: vec![],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Generate a cryptographically random UUID v4. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_random_bytes".into(),
+                params: vec![BuiltinParam { name: "length".into(), ty: i32_ty.clone() }],
+                return_type: bytes_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Generate cryptographically random bytes. Pure WASM implementation.".into(),
+            },
+        ];
+
+        for f in crypto_fns {
+            self.register_fn(f);
+        }
+    }
+
+    fn register_bigdecimal_type(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i64_ty = Type::Named("i64".into());
+        let f64_ty = Type::Named("f64".into());
+        let bool_ty = Type::Named("bool".into());
+        let i32_ty = Type::Named("i32".into());
+
+        self.register_type(BuiltinType {
+            name: "BigDecimal".into(),
+            type_params: vec![],
+            description: "Arbitrary-precision decimal type. No floating-point errors. Pure WASM implementation.".into(),
+            methods: vec![
+                BuiltinFn {
+                    name: "add".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: Type::Named("BigDecimal".into()),
+                    takes_self: true, self_mutable: false,
+                    description: "Add two BigDecimals.".into(),
+                },
+                BuiltinFn {
+                    name: "sub".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: Type::Named("BigDecimal".into()),
+                    takes_self: true, self_mutable: false,
+                    description: "Subtract two BigDecimals.".into(),
+                },
+                BuiltinFn {
+                    name: "mul".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: Type::Named("BigDecimal".into()),
+                    takes_self: true, self_mutable: false,
+                    description: "Multiply two BigDecimals.".into(),
+                },
+                BuiltinFn {
+                    name: "div".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: Type::Named("BigDecimal".into()),
+                    takes_self: true, self_mutable: false,
+                    description: "Divide two BigDecimals.".into(),
+                },
+                BuiltinFn {
+                    name: "eq".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: bool_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Check equality.".into(),
+                },
+                BuiltinFn {
+                    name: "gt".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: bool_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Greater than comparison.".into(),
+                },
+                BuiltinFn {
+                    name: "lt".into(),
+                    params: vec![BuiltinParam { name: "other".into(), ty: Type::Named("BigDecimal".into()) }],
+                    return_type: bool_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Less than comparison.".into(),
+                },
+                BuiltinFn {
+                    name: "to_string".into(),
+                    params: vec![],
+                    return_type: string_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Convert to string representation.".into(),
+                },
+                BuiltinFn {
+                    name: "to_fixed".into(),
+                    params: vec![BuiltinParam { name: "digits".into(), ty: i32_ty.clone() }],
+                    return_type: string_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Format to fixed decimal places.".into(),
+                },
+            ],
+            variants: vec![],
+        });
+
+        // Static constructors
+        let constructors = vec![
+            BuiltinFn {
+                name: "BigDecimal_new".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: string_ty.clone() }],
+                return_type: Type::Named("BigDecimal".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create BigDecimal from string (e.g. \"19.99\").".into(),
+            },
+            BuiltinFn {
+                name: "BigDecimal_from_i64".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: i64_ty.clone() }],
+                return_type: Type::Named("BigDecimal".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create BigDecimal from integer.".into(),
+            },
+            BuiltinFn {
+                name: "BigDecimal_from_f64".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: f64_ty.clone() }],
+                return_type: Type::Named("BigDecimal".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create BigDecimal from float.".into(),
+            },
+        ];
+        for f in constructors { self.register_fn(f); }
+    }
+
+    fn register_collections_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let any_array = Type::Array(Box::new(Type::Named("Any".into())));
+        let bool_ty = Type::Named("bool".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "collections_group_by".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                ],
+                return_type: Type::Named("HashMap".into()),
+                takes_self: false, self_mutable: false,
+                description: "Group array items by a key field. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_sort_by".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                ],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Sort array items by a key field. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_uniq_by".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                ],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Remove duplicates by key. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_chunk".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "size".into(), ty: i32_ty.clone() },
+                ],
+                return_type: Type::Array(Box::new(any_array.clone())),
+                takes_self: false, self_mutable: false,
+                description: "Split array into chunks of given size. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_flatten".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: Type::Array(Box::new(any_array.clone())) },
+                ],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Flatten nested array one level. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_zip".into(),
+                params: vec![
+                    BuiltinParam { name: "a".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "b".into(), ty: any_array.clone() },
+                ],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Zip two arrays into array of pairs. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "collections_partition".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "predicate".into(), ty: Type::Named("Fn".into()) },
+                ],
+                return_type: Type::Tuple(vec![any_array.clone(), any_array.clone()]),
+                takes_self: false, self_mutable: false,
+                description: "Split array into two based on predicate. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    fn register_url_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let option_string = Type::Named("Option".into()); // Option<String>
+        let bool_ty = Type::Named("bool".into());
+
+        // Register Url struct type
+        self.register_type(BuiltinType {
+            name: "Url".into(),
+            type_params: vec![],
+            description: "Parsed URL with components. Pure WASM URL parser.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "url_parse".into(),
+                params: vec![BuiltinParam { name: "url".into(), ty: string_ty.clone() }],
+                return_type: Type::Named("Url".into()),
+                takes_self: false, self_mutable: false,
+                description: "Parse URL string into Url struct. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "url_build".into(),
+                params: vec![BuiltinParam { name: "base".into(), ty: string_ty.clone() }],
+                return_type: Type::Named("Url".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create URL builder from base. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "url_query_get".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                ],
+                return_type: option_string.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get query parameter value by key. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "url_query_set".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "value".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set query parameter, returns new URL string. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    fn register_mask_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "mask_phone".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Format as phone number (555) 123-4567. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "mask_currency".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Format as currency with commas and decimals. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "mask_credit_card".into(),
+                params: vec![BuiltinParam { name: "value".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Format as credit card XXXX XXXX XXXX XXXX. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "mask_pattern".into(),
+                params: vec![
+                    BuiltinParam { name: "value".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "pattern".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Apply custom mask pattern (# = digit, A = letter, * = any). Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    fn register_search_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let any_array = Type::Array(Box::new(Type::Named("Any".into())));
+        let string_array = Type::Array(Box::new(string_ty.clone()));
+
+        self.register_type(BuiltinType {
+            name: "SearchIndex".into(),
+            type_params: vec![],
+            description: "Client-side fuzzy search index. Pure WASM implementation.".into(),
+            methods: vec![
+                BuiltinFn {
+                    name: "search".into(),
+                    params: vec![BuiltinParam { name: "query".into(), ty: string_ty.clone() }],
+                    return_type: any_array.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Search the index with a query string.".into(),
+                },
+            ],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "search_create_index".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "keys".into(), ty: string_array.clone() },
+                ],
+                return_type: Type::Named("SearchIndex".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create a fuzzy search index over items using specified keys. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "search_query".into(),
+                params: vec![
+                    BuiltinParam { name: "index".into(), ty: Type::Named("SearchIndex".into()) },
+                    BuiltinParam { name: "query".into(), ty: string_ty.clone() },
+                ],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Search index with query, returns ranked results. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
     }
 }
 
