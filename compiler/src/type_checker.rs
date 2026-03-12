@@ -706,6 +706,54 @@ impl TypeChecker {
                 params: vec![Ty::I32],
                 ret: Box::new(Ty::String_),
             });
+            self.fn_sigs.insert("crypto::sha1".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::sha384".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::generate_key_pair".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::Tuple(vec![Ty::String_, Ty::String_])),
+            });
+            self.fn_sigs.insert("crypto::export_key".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::ecdh_derive".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::derive_bits".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_, Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::encrypt_aes_cbc".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::decrypt_aes_cbc".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::encrypt_aes_ctr".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::decrypt_aes_ctr".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::hmac_sha512".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("crypto::hkdf".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_, Ty::String_, Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
         }
 
         // Register debounce and throttle utility functions
@@ -2030,6 +2078,21 @@ impl TypeChecker {
                 }
             }
             TemplateNode::TextLiteral(_) => {}
+            TemplateNode::Outlet => {}
+            TemplateNode::Layout(layout_node) => {
+                let children = match layout_node {
+                    LayoutNode::Stack { children, .. }
+                    | LayoutNode::Row { children, .. }
+                    | LayoutNode::Grid { children, .. }
+                    | LayoutNode::Center { children, .. }
+                    | LayoutNode::Cluster { children, .. }
+                    | LayoutNode::Sidebar { children, .. }
+                    | LayoutNode::Switcher { children, .. } => children,
+                };
+                for child in children {
+                    self.check_template_secret_safety(child, env, span);
+                }
+            }
         }
     }
 
@@ -3993,5 +4056,2807 @@ mod closure_tests {
             },
         ]);
         infer_program(&program);
+    }
+}
+
+#[cfg(test)]
+mod comprehensive_type_checker_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    fn simple_program(items: Vec<Item>) -> Program {
+        Program { items }
+    }
+
+    fn make_fn_with_body(name: &str, params: Vec<Param>, ret: Option<Type>, stmts: Vec<Stmt>) -> Item {
+        Item::Function(Function {
+            name: name.into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params,
+            return_type: ret,
+            trait_bounds: vec![],
+            body: block(stmts),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })
+    }
+
+    fn make_main(stmts: Vec<Stmt>) -> Item {
+        make_fn_with_body("main", vec![], None, stmts)
+    }
+
+    // -----------------------------------------------------------------------
+    // Bool literal inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn infer_bool_literal() {
+        let program = simple_program(vec![make_main(vec![Stmt::Let {
+            name: "b".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Bool(true),
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "bool literal should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // String literal inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn infer_string_literal() {
+        let program = simple_program(vec![make_main(vec![Stmt::Let {
+            name: "s".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::StringLit("hello".into()),
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "string literal should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Binary comparison operators return bool
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn comparison_operators_type_check() {
+        for op in &[BinOp::Eq, BinOp::Neq, BinOp::Lt, BinOp::Gt, BinOp::Lte, BinOp::Gte] {
+            let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Binary {
+                op: op.clone(),
+                left: Box::new(Expr::Integer(1)),
+                right: Box::new(Expr::Integer(2)),
+            })])]);
+            let result = infer_program(&program);
+            assert!(result.is_ok(), "{:?} should type check: {:?}", op, result.err());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Logical operators
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn logical_and_or_type_check() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::And,
+            left: Box::new(Expr::Bool(true)),
+            right: Box::new(Expr::Bool(false)),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "logical AND should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Arithmetic type mismatch
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn float_plus_float_succeeds() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::Float(1.0)),
+            right: Box::new(Expr::Float(2.0)),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "f64 + f64 should succeed: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Subtraction, multiplication, division
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn arithmetic_ops_same_type_succeeds() {
+        for op in &[BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Mod] {
+            let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Binary {
+                op: op.clone(),
+                left: Box::new(Expr::Integer(10)),
+                right: Box::new(Expr::Integer(3)),
+            })])]);
+            let result = infer_program(&program);
+            assert!(result.is_ok(), "{:?} should type check: {:?}", op, result.err());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Unary operators
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn unary_neg_on_int() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Integer(42)),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "negation should type check: {:?}", result.err());
+    }
+
+    #[test]
+    fn unary_not_on_bool() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Unary {
+            op: UnaryOp::Not,
+            operand: Box::new(Expr::Bool(true)),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "boolean not should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // If expression type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn if_expression_basic() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+            else_block: Some(block(vec![Stmt::Expr(Expr::Integer(2))])),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "if/else should type check: {:?}", result.err());
+    }
+
+    #[test]
+    fn if_without_else() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+            else_block: None,
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "if without else should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Match expression type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn match_expression() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Match {
+            subject: Box::new(Expr::Integer(1)),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Literal(Expr::Integer(1)),
+                    body: Expr::Integer(10),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    body: Expr::Integer(0),
+                },
+            ],
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "match should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // For loop type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn for_loop_basic() {
+        let program = simple_program(vec![Item::Function(Function {
+            name: "main".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param {
+                name: "arr".into(),
+                ty: Type::Array(Box::new(Type::Named("i32".into()))),
+                ownership: Ownership::Owned,
+            }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::For {
+                binding: "item".into(),
+                iterator: Box::new(Expr::Ident("arr".into())),
+                body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
+            })]),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "for loop should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // While loop type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn while_loop_basic() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::While {
+            condition: Box::new(Expr::Bool(true)),
+            body: block(vec![Stmt::Expr(Expr::Integer(0))]),
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "while loop should type check: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Closure with multiple params
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn closure_with_two_params() {
+        let program = simple_program(vec![make_main(vec![Stmt::Let {
+            name: "add".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Closure {
+                params: vec![
+                    ("a".into(), Some(Type::Named("i32".into()))),
+                    ("b".into(), Some(Type::Named("i32".into()))),
+                ],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Add,
+                    left: Box::new(Expr::Ident("a".into())),
+                    right: Box::new(Expr::Ident("b".into())),
+                }),
+            },
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "closure with two params: {:?}", result.err());
+    }
+
+    #[test]
+    fn closure_returning_bool() {
+        let program = simple_program(vec![make_main(vec![Stmt::Let {
+            name: "pred".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Closure {
+                params: vec![("x".into(), Some(Type::Named("i32".into())))],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Gt,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(0)),
+                }),
+            },
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "closure returning bool: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Method call type resolution
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn method_call_on_array_iter() {
+        let program = simple_program(vec![Item::Function(Function {
+            name: "main".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param {
+                name: "arr".into(),
+                ty: Type::Array(Box::new(Type::Named("i32".into()))),
+                ownership: Ownership::Owned,
+            }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Let {
+                name: "it".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "iter".into(),
+                    args: vec![],
+                },
+                ownership: Ownership::Owned,
+            }]),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "iter() on array: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct field access on nested structs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn nested_struct_field_access() {
+        let program = simple_program(vec![
+            Item::Struct(StructDef {
+                name: "Inner".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![Field { name: "val".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                is_pub: true,
+                span: span(),
+            }),
+            Item::Struct(StructDef {
+                name: "Outer".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![Field { name: "inner".into(), ty: Type::Named("Inner".into()), is_pub: true }],
+                is_pub: true,
+                span: span(),
+            }),
+            Item::Function(Function {
+                name: "main".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![
+                    Stmt::Let {
+                        name: "o".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::StructInit {
+                            name: "Outer".into(),
+                            fields: vec![
+                                ("inner".into(), Expr::StructInit {
+                                    name: "Inner".into(),
+                                    fields: vec![("val".into(), Expr::Integer(42))],
+                                }),
+                            ],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::FieldAccess {
+                        object: Box::new(Expr::Ident("o".into())),
+                        field: "inner".into(),
+                    }),
+                ]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "nested struct field access: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Enum variant type checking
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn enum_variant_in_match() {
+        let program = simple_program(vec![
+            Item::Enum(EnumDef {
+                name: "Color".into(),
+                type_params: vec![],
+                variants: vec![
+                    Variant { name: "Red".into(), fields: vec![] },
+                    Variant { name: "Green".into(), fields: vec![] },
+                    Variant { name: "Blue".into(), fields: vec![] },
+                ],
+                is_pub: true,
+                span: span(),
+            }),
+            make_main(vec![Stmt::Expr(Expr::Match {
+                subject: Box::new(Expr::Integer(0)),
+                arms: vec![
+                    MatchArm {
+                        pattern: Pattern::Literal(Expr::Integer(0)),
+                        body: Expr::Integer(1),
+                    },
+                    MatchArm {
+                        pattern: Pattern::Wildcard,
+                        body: Expr::Integer(0),
+                    },
+                ],
+            })]),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "enum with match: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Return type match with explicit annotation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn return_type_bool_matches() {
+        let program = simple_program(vec![make_fn_with_body(
+            "is_positive",
+            vec![Param {
+                name: "x".into(),
+                ty: Type::Named("i32".into()),
+                ownership: Ownership::Owned,
+            }],
+            Some(Type::Named("bool".into())),
+            vec![Stmt::Expr(Expr::Binary {
+                op: BinOp::Gt,
+                left: Box::new(Expr::Ident("x".into())),
+                right: Box::new(Expr::Integer(0)),
+            })],
+        )]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "return type bool: {:?}", result.err());
+    }
+
+    #[test]
+    fn return_type_string_mismatch() {
+        let program = simple_program(vec![make_fn_with_body(
+            "bad",
+            vec![],
+            Some(Type::Named("String".into())),
+            vec![Stmt::Expr(Expr::Integer(42))],
+        )]);
+        let result = infer_program(&program);
+        assert!(result.is_err(), "returning int when String expected should fail");
+    }
+
+    // -----------------------------------------------------------------------
+    // Function call with correct types
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fn_call_correct_types() {
+        let program = simple_program(vec![
+            make_fn_with_body(
+                "square",
+                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+                Some(Type::Named("i32".into())),
+                vec![Stmt::Expr(Expr::Binary {
+                    op: BinOp::Mul,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Ident("x".into())),
+                })],
+            ),
+            make_main(vec![Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::Ident("square".into())),
+                args: vec![Expr::Integer(5)],
+            })]),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "fn call with correct types: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Component with typed props and inferred state
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn component_typed_props() {
+        let program = simple_program(vec![Item::Component(Component {
+            name: "Greeting".into(),
+            type_params: vec![],
+            props: vec![
+                Prop { name: "name".into(), ty: Type::Named("String".into()), default: None },
+                Prop { name: "count".into(), ty: Type::Named("i32".into()), default: Some(Expr::Integer(0)) },
+            ],
+            state: vec![StateField {
+                name: "visible".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                atomic: false,
+                initializer: Expr::Bool(true),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::TextLiteral("hi".into()), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "component with props: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Signal statement type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn signal_statement_type_inferred() {
+        let program = simple_program(vec![make_main(vec![
+            Stmt::Signal {
+                name: "count".into(),
+                ty: None,
+                secret: false,
+                atomic: false,
+                value: Expr::Integer(0),
+            },
+        ])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "signal statement: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Block expression type inference
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn block_expression() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Block(
+            block(vec![
+                Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(1), ownership: Ownership::Owned },
+                Stmt::Expr(Expr::Ident("x".into())),
+            ]),
+        ))])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "block expression: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Fetch expression type
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fetch_expression_type_checks() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Fetch {
+            url: Box::new(Expr::StringLit("https://api.example.com".into())),
+            options: None,
+            contract: None,
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "fetch expression: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct init with wrong field name
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_init_wrong_field() {
+        let program = simple_program(vec![
+            Item::Struct(StructDef {
+                name: "Pt".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![
+                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: true },
+                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: true },
+                ],
+                is_pub: true,
+                span: span(),
+            }),
+            make_main(vec![Stmt::Let {
+                name: "p".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::StructInit {
+                    name: "Pt".into(),
+                    fields: vec![
+                        ("x".into(), Expr::Integer(1)),
+                        ("z".into(), Expr::Integer(2)), // z doesn't exist
+                    ],
+                },
+                ownership: Ownership::Owned,
+            }]),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_err(), "wrong field name should fail");
+    }
+
+    // -----------------------------------------------------------------------
+    // Multiple function definitions (forward reference)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn forward_reference_fn_call() {
+        let program = simple_program(vec![
+            make_main(vec![Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::Ident("helper".into())),
+                args: vec![Expr::Integer(1)],
+            })]),
+            make_fn_with_body(
+                "helper",
+                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+                Some(Type::Named("i32".into())),
+                vec![Stmt::Expr(Expr::Ident("x".into()))],
+            ),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "forward ref fn call: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Assign expression
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn assign_expression() {
+        let program = simple_program(vec![make_main(vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: Expr::Integer(1), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::Assign {
+                target: Box::new(Expr::Ident("x".into())),
+                value: Box::new(Expr::Integer(2)),
+            }),
+        ])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "assign expression: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Await expression
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn await_expression() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Await(
+            Box::new(Expr::Fetch {
+                url: Box::new(Expr::StringLit("https://api.example.com".into())),
+                options: None,
+                contract: None,
+            }),
+        ))])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "await expression: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Return statement in function
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn return_statement_matching_type() {
+        let program = simple_program(vec![make_fn_with_body(
+            "get_val",
+            vec![],
+            Some(Type::Named("i32".into())),
+            vec![Stmt::Return(Some(Expr::Integer(42)))],
+        )]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "return matching type: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Impl block type checking
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn impl_block_method_type_checks() {
+        let program = simple_program(vec![
+            Item::Struct(StructDef {
+                name: "Counter".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![Field { name: "val".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                is_pub: true,
+                span: span(),
+            }),
+            Item::Impl(ImplBlock {
+                target: "Counter".into(),
+                trait_impls: vec![],
+                methods: vec![Function {
+                    name: "get_val".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: Some(Type::Named("i32".into())),
+                    trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(Expr::Integer(0))]),
+                    is_pub: true,
+                    must_use: false,
+                    span: span(),
+                }],
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "impl block: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Trait definition passes type checking
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn trait_definition() {
+        let program = simple_program(vec![Item::Trait(TraitDef {
+            name: "Printable".into(),
+            type_params: vec![],
+            methods: vec![TraitMethod {
+                name: "print".into(),
+                params: vec![],
+                return_type: None,
+                default_body: None,
+                span: span(),
+            }],
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "trait def: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Index expression
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn index_expression() {
+        let program = simple_program(vec![Item::Function(Function {
+            name: "main".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param {
+                name: "arr".into(),
+                ty: Type::Array(Box::new(Type::Named("i32".into()))),
+                ownership: Ownership::Owned,
+            }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Index {
+                object: Box::new(Expr::Ident("arr".into())),
+                index: Box::new(Expr::Integer(0)),
+            })]),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "index expression: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Format string expression
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn format_string_type_checks() {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::FormatString {
+            parts: vec![
+                FormatPart::Literal("hello ".into()),
+                FormatPart::Expression(Box::new(Expr::Integer(42))),
+                FormatPart::Literal("!".into()),
+            ],
+        })])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "format string: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // StructInit correct types
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_init_correct_field_types() {
+        let program = simple_program(vec![
+            Item::Struct(StructDef {
+                name: "Pair".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![
+                    Field { name: "a".into(), ty: Type::Named("i32".into()), is_pub: true },
+                    Field { name: "b".into(), ty: Type::Named("String".into()), is_pub: true },
+                ],
+                is_pub: true,
+                span: span(),
+            }),
+            make_main(vec![Stmt::Let {
+                name: "p".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::StructInit {
+                    name: "Pair".into(),
+                    fields: vec![
+                        ("a".into(), Expr::Integer(1)),
+                        ("b".into(), Expr::StringLit("hello".into())),
+                    ],
+                },
+                ownership: Ownership::Owned,
+            }]),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "correct struct init: {:?}", result.err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Multiple errors accumulated
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn multiple_type_errors() {
+        let program = simple_program(vec![make_main(vec![
+            Stmt::Expr(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(Expr::StringLit("a".into())),
+                right: Box::new(Expr::Integer(1)),
+            }),
+            Stmt::Expr(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(Expr::Bool(true)),
+                right: Box::new(Expr::Integer(1)),
+            }),
+        ])]);
+        let result = infer_program(&program);
+        assert!(result.is_err(), "should have type errors");
+        let errors = result.unwrap_err();
+        assert!(errors.len() >= 2, "should accumulate multiple errors, got {}", errors.len());
+    }
+
+    // -----------------------------------------------------------------------
+    // Self expression in impl
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn self_expr_in_method() {
+        let program = simple_program(vec![
+            Item::Struct(StructDef {
+                name: "Foo".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                trait_bounds: vec![],
+                fields: vec![Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                is_pub: true,
+                span: span(),
+            }),
+            Item::Impl(ImplBlock {
+                target: "Foo".into(),
+                trait_impls: vec![],
+                methods: vec![Function {
+                    name: "get_x".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![Param {
+                        name: "self".into(),
+                        ty: Type::Named("Foo".into()),
+                        ownership: Ownership::Borrowed,
+                    }],
+                    return_type: Some(Type::Named("i32".into())),
+                    trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "x".into(),
+                    })]),
+                    is_pub: true,
+                    must_use: false,
+                    span: span(),
+                }],
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "self in method: {:?}", result.err());
+    }
+}
+
+#[cfg(test)]
+mod coverage_type_checker_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    fn program(items: Vec<Item>) -> Program {
+        Program { items }
+    }
+
+    fn func(name: &str, body: Vec<Stmt>) -> Function {
+        Function {
+            name: name.into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(body),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        }
+    }
+
+    fn func_ret(name: &str, ret: Type, body: Vec<Stmt>) -> Function {
+        Function {
+            name: name.into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: Some(ret),
+            trait_bounds: vec![],
+            body: block(body),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        }
+    }
+
+    fn func_with_params(name: &str, params: Vec<Param>, ret: Option<Type>, body: Vec<Stmt>) -> Function {
+        Function {
+            name: name.into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params,
+            return_type: ret,
+            trait_bounds: vec![],
+            body: block(body),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        }
+    }
+
+    fn param(name: &str, ty: Type) -> Param {
+        Param { name: name.into(), ty, ownership: Ownership::Owned }
+    }
+
+    // ── Ty Display coverage ─────────────────────────────────────────────
+
+    #[test]
+    fn ty_display_all_variants() {
+        assert_eq!(format!("{}", Ty::Var(TypeId(0))), "?T0");
+        assert_eq!(format!("{}", Ty::I32), "i32");
+        assert_eq!(format!("{}", Ty::I64), "i64");
+        assert_eq!(format!("{}", Ty::U32), "u32");
+        assert_eq!(format!("{}", Ty::U64), "u64");
+        assert_eq!(format!("{}", Ty::F32), "f32");
+        assert_eq!(format!("{}", Ty::F64), "f64");
+        assert_eq!(format!("{}", Ty::Bool), "bool");
+        assert_eq!(format!("{}", Ty::String_), "String");
+        assert_eq!(format!("{}", Ty::Unit), "()");
+        assert_eq!(format!("{}", Ty::Array(Box::new(Ty::I32))), "[i32]");
+        assert_eq!(format!("{}", Ty::Iterator(Box::new(Ty::I32))), "Iterator<i32>");
+        assert_eq!(format!("{}", Ty::Option_(Box::new(Ty::I32))), "Option<i32>");
+        assert_eq!(format!("{}", Ty::Tuple(vec![Ty::I32, Ty::Bool])), "(i32, bool)");
+        assert_eq!(
+            format!("{}", Ty::Function { params: vec![Ty::I32], ret: Box::new(Ty::Bool) }),
+            "fn(i32) -> bool"
+        );
+        assert_eq!(
+            format!("{}", Ty::Reference { mutable: false, lifetime: None, inner: Box::new(Ty::I32) }),
+            "&i32"
+        );
+        assert_eq!(
+            format!("{}", Ty::Reference { mutable: true, lifetime: None, inner: Box::new(Ty::I32) }),
+            "&mut i32"
+        );
+        assert_eq!(format!("{}", Ty::Struct("Foo".into())), "Foo");
+        assert_eq!(format!("{}", Ty::Enum("Color".into())), "Color");
+        assert_eq!(format!("{}", Ty::Contract("Api".into())), "contract Api");
+        assert_eq!(
+            format!("{}", Ty::Result_ { ok: Box::new(Ty::I32), err: Box::new(Ty::String_) }),
+            "Result<i32, String>"
+        );
+        assert_eq!(format!("{}", Ty::TypeParam("T".into())), "T");
+        assert_eq!(format!("{}", Ty::SelfType), "Self");
+        assert_eq!(format!("{}", Ty::Secret(Box::new(Ty::I32))), "secret i32");
+        assert_eq!(format!("{}", Ty::Error), "<error>");
+    }
+
+    #[test]
+    fn ty_display_empty_tuple() {
+        assert_eq!(format!("{}", Ty::Tuple(vec![])), "()");
+    }
+
+    #[test]
+    fn ty_display_multi_param_function() {
+        let f = Ty::Function {
+            params: vec![Ty::I32, Ty::String_, Ty::Bool],
+            ret: Box::new(Ty::Unit),
+        };
+        assert_eq!(format!("{}", f), "fn(i32, String, bool) -> ()");
+    }
+
+    // ── TypeError Display ───────────────────────────────────────────────
+
+    #[test]
+    fn type_error_display() {
+        let err = TypeError::new("test error", Span::new(10, 20, 5, 3));
+        let s = format!("{}", err);
+        assert!(s.contains("line 5:3"));
+        assert!(s.contains("test error"));
+    }
+
+    // ── Unification coverage ────────────────────────────────────────────
+
+    #[test]
+    fn unify_contract_and_struct() {
+        // Contract and struct with same name should unify
+        let prog = program(vec![
+            Item::Contract(ContractDef {
+                name: "User".into(),
+                fields: vec![ContractField {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                }],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Struct(StructDef {
+                name: "User".into(),
+                type_params: vec![],
+                fields: vec![Field {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    is_pub: false,
+                }],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "u".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::StructInit {
+                        name: "User".into(),
+                        fields: vec![("name".into(), Expr::StringLit("Alice".into()))],
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "contract-struct unification: {:?}", result.err());
+    }
+
+    #[test]
+    fn unify_numeric_coercion() {
+        // i32 and i64 should unify, f32 and f64 should unify
+        let prog = program(vec![Item::Function(func_with_params(
+            "coerce",
+            vec![param("a", Type::Named("i32".into())), param("b", Type::Named("i64".into()))],
+            Some(Type::Named("i32".into())),
+            vec![Stmt::Return(Some(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(Expr::Ident("a".into())),
+                right: Box::new(Expr::Ident("b".into())),
+            }))],
+        ))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "numeric coercion: {:?}", result.err());
+    }
+
+    #[test]
+    fn unify_error_absorbs() {
+        // Error type should unify with anything
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::Ident("nonexistent".into())),
+                args: vec![],
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        // Should have errors but not panic
+        assert!(result.is_err());
+    }
+
+    // ── Expression inference coverage ───────────────────────────────────
+
+    #[test]
+    fn infer_self_outside_impl() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::SelfExpr),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("self")));
+    }
+
+    #[test]
+    fn infer_unary_neg_numeric() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Unary {
+                    op: UnaryOp::Neg,
+                    operand: Box::new(Expr::Integer(5)),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_unary_neg_non_numeric() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(Expr::Bool(true)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("cannot negate")));
+    }
+
+    #[test]
+    fn infer_unary_not() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Unary {
+                    op: UnaryOp::Not,
+                    operand: Box::new(Expr::Bool(true)),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_fn_call_wrong_arg_count() {
+        let prog = program(vec![
+            Item::Function(func_with_params(
+                "add",
+                vec![param("a", Type::Named("i32".into())), param("b", Type::Named("i32".into()))],
+                Some(Type::Named("i32".into())),
+                vec![Stmt::Return(Some(Expr::Binary {
+                    op: BinOp::Add,
+                    left: Box::new(Expr::Ident("a".into())),
+                    right: Box::new(Expr::Ident("b".into())),
+                }))],
+            )),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("add".into())),
+                    args: vec![Expr::Integer(1)], // only 1 arg, needs 2
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("expects 2 arguments")));
+    }
+
+    #[test]
+    fn infer_fn_call_non_callable() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::Ident("x".into())),
+                args: vec![],
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("not callable")));
+    }
+
+    #[test]
+    fn infer_index_non_array() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::Index {
+                object: Box::new(Expr::Ident("x".into())),
+                index: Box::new(Expr::Integer(0)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("cannot index")));
+    }
+
+    #[test]
+    fn infer_index_non_integer_idx() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "arr".into(),
+                ty: Some(Type::Array(Box::new(Type::Named("i32".into())))),
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Index {
+                object: Box::new(Expr::Ident("arr".into())),
+                index: Box::new(Expr::StringLit("key".into())),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("index must be integer")));
+    }
+
+    #[test]
+    fn infer_if_else_unifies() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::If {
+                    condition: Box::new(Expr::Bool(true)),
+                    then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                    else_block: Some(block(vec![Stmt::Expr(Expr::Integer(2))])),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_if_no_else_is_unit() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::If {
+                condition: Box::new(Expr::Bool(true)),
+                then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                else_block: None,
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_match_expr() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Match {
+                    subject: Box::new(Expr::Integer(1)),
+                    arms: vec![
+                        MatchArm {
+                            pattern: Pattern::Literal(Expr::Integer(1)),
+                            body: Expr::StringLit("one".into()),
+                        },
+                        MatchArm {
+                            pattern: Pattern::Wildcard,
+                            body: Expr::StringLit("other".into()),
+                        },
+                    ],
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_for_loop() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::For {
+                binding: "item".into(),
+                iterator: Box::new(Expr::Integer(0)), // not really an array, but covered
+                body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_while_loop() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::While {
+                condition: Box::new(Expr::Bool(true)),
+                body: block(vec![Stmt::Expr(Expr::Integer(1))]),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_block_expr() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Block(block(vec![Stmt::Expr(Expr::Integer(42))]))),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_borrow_and_borrow_mut() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
+            Stmt::Let { name: "r".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(Expr::Ident("x".into()))), ownership: Ownership::Owned },
+            Stmt::Let { name: "m".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(Expr::Ident("x".into()))), ownership: Ownership::Owned },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_struct_init() {
+        let prog = program(vec![
+            Item::Struct(StructDef {
+                name: "Point".into(),
+                type_params: vec![],
+                fields: vec![
+                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
+                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: false },
+                ],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "p".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::StructInit {
+                        name: "Point".into(),
+                        fields: vec![
+                            ("x".into(), Expr::Integer(1)),
+                            ("y".into(), Expr::Integer(2)),
+                        ],
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_struct_init_missing_field() {
+        let prog = program(vec![
+            Item::Struct(StructDef {
+                name: "Point".into(),
+                type_params: vec![],
+                fields: vec![
+                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
+                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: false },
+                ],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::StructInit {
+                    name: "Point".into(),
+                    fields: vec![("x".into(), Expr::Integer(1))], // missing y
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("missing field")));
+    }
+
+    #[test]
+    fn infer_struct_init_unknown_field() {
+        let prog = program(vec![
+            Item::Struct(StructDef {
+                name: "Point".into(),
+                type_params: vec![],
+                fields: vec![
+                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
+                ],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::StructInit {
+                    name: "Point".into(),
+                    fields: vec![
+                        ("x".into(), Expr::Integer(1)),
+                        ("z".into(), Expr::Integer(3)), // unknown
+                    ],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("no field named z")));
+    }
+
+    #[test]
+    fn infer_struct_init_unknown_struct() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::StructInit {
+                name: "Unknown".into(),
+                fields: vec![],
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn infer_assign() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::Assign {
+                target: Box::new(Expr::Ident("x".into())),
+                value: Box::new(Expr::Integer(42)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_await() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Await(Box::new(Expr::Integer(1)))),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_fetch_with_contract() {
+        let prog = program(vec![
+            Item::Contract(ContractDef {
+                name: "UserApi".into(),
+                fields: vec![ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                }],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "u".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Fetch {
+                        url: Box::new(Expr::StringLit("https://api.example.com".into())),
+                        options: None,
+                        contract: Some("UserApi".into()),
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_fetch_unknown_contract() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Fetch {
+                url: Box::new(Expr::StringLit("https://api.example.com".into())),
+                options: None,
+                contract: Some("Unknown".into()),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn infer_fetch_no_contract() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Fetch {
+                url: Box::new(Expr::StringLit("https://api.example.com".into())),
+                options: Some(Box::new(Expr::Integer(0))),
+                contract: None,
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_closure() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Closure {
+                    params: vec![
+                        ("x".into(), Some(Type::Named("i32".into()))),
+                        ("y".into(), None),
+                    ],
+                    body: Box::new(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("x".into())),
+                        right: Box::new(Expr::Ident("y".into())),
+                    }),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_prompt_template() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::PromptTemplate {
+                template: "Hello {name}!".into(),
+                interpolations: vec![("name".into(), Expr::StringLit("world".into()))],
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_navigate() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Navigate {
+                path: Box::new(Expr::StringLit("/home".into())),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_stream() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Stream {
+                source: Box::new(Expr::Integer(0)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_suspend() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Suspend {
+                fallback: Box::new(Expr::StringLit("loading".into())),
+                body: Box::new(Expr::Integer(42)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_spawn() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Spawn {
+                body: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_channel_send_receive() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "ch".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Channel { ty: None },
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Send {
+                channel: Box::new(Expr::Ident("ch".into())),
+                value: Box::new(Expr::Integer(42)),
+            }),
+            Stmt::Expr(Expr::Receive {
+                channel: Box::new(Expr::Ident("ch".into())),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_parallel() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Parallel {
+                tasks: vec![Expr::Integer(1), Expr::Integer(2)],
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_try_catch() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::TryCatch {
+                body: Box::new(Expr::Integer(1)),
+                error_binding: "err".into(),
+                catch_body: Box::new(Expr::Integer(0)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_assert() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Assert {
+                condition: Box::new(Expr::Bool(true)),
+                message: Some("test".into()),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_assert_eq() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::AssertEq {
+                left: Box::new(Expr::Integer(1)),
+                right: Box::new(Expr::Integer(1)),
+                message: None,
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_animate() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Animate {
+                target: Box::new(Expr::Integer(0)),
+                animation: "fadeIn".into(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_format_string() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "s".into(), ty: None, mutable: false, secret: false,
+                value: Expr::FormatString {
+                    parts: vec![
+                        FormatPart::Literal("hello ".into()),
+                        FormatPart::Expression(Box::new(Expr::Integer(42))),
+                    ],
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_try_operator_on_result() {
+        let prog = program(vec![Item::Function(func_with_params(
+            "main",
+            vec![param("r", Type::Result {
+                ok: Box::new(Type::Named("i32".into())),
+                err: Box::new(Type::Named("String".into())),
+            })],
+            Some(Type::Named("i32".into())),
+            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("r".into())))))],
+        ))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_try_operator_on_option() {
+        let prog = program(vec![Item::Function(func_with_params(
+            "main",
+            vec![param("o", Type::Option(Box::new(Type::Named("i32".into()))))],
+            Some(Type::Named("i32".into())),
+            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("o".into())))))],
+        ))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_try_operator_on_non_result() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Try(Box::new(Expr::Integer(1)))),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("?")));
+    }
+
+    #[test]
+    fn infer_dynamic_import() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::DynamicImport {
+                path: Box::new(Expr::StringLit("./module.js".into())),
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_download() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Download {
+                data: Box::new(Expr::StringLit("data".into())),
+                filename: Box::new(Expr::StringLit("file.txt".into())),
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_env() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Env {
+                name: Box::new(Expr::StringLit("HOME".into())),
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_trace() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Trace {
+                label: Box::new(Expr::StringLit("debug".into())),
+                body: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_flag() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "f".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Flag { name: Box::new(Expr::StringLit("dark-mode".into())), span: span() },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_virtual_list() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::VirtualList {
+                items: Box::new(Expr::Integer(0)),
+                item_height: Box::new(Expr::Integer(50)),
+                template: Box::new(Expr::Integer(0)),
+                buffer: None,
+                span: span(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    // ── Statement inference coverage ────────────────────────────────────
+
+    #[test]
+    fn infer_signal_with_secret() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Signal {
+                name: "token".into(),
+                ty: Some(Type::Named("String".into())),
+                secret: true,
+                atomic: false,
+                value: Expr::StringLit("abc".into()),
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_let_with_secret() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "key".into(),
+                ty: None,
+                mutable: false,
+                secret: true,
+                value: Expr::StringLit("secret-value".into()),
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_return_none() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Return(None),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_yield_stmt() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Yield(Expr::Integer(42)),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn infer_let_destructure_tuple() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "t".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::LetDestructure {
+                    pattern: Pattern::Tuple(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]),
+                    ty: None,
+                    value: Expr::Ident("t".into()),
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "destructure_tuple: {:?}", result.err());
+    }
+
+    #[test]
+    fn infer_let_destructure_array() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::LetDestructure {
+                    pattern: Pattern::Array(vec![Pattern::Ident("first".into()), Pattern::Wildcard]),
+                    ty: None,
+                    value: Expr::Ident("arr".into()),
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "destructure_array: {:?}", result.err());
+    }
+
+    #[test]
+    fn infer_let_destructure_non_tuple() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![Pattern::Ident("a".into())]),
+                ty: None,
+                value: Expr::Integer(0), // i32, not a tuple
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("non-tuple")));
+    }
+
+    #[test]
+    fn infer_let_destructure_non_array() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::LetDestructure {
+                pattern: Pattern::Array(vec![Pattern::Ident("a".into())]),
+                ty: None,
+                value: Expr::Integer(0),
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("non-array")));
+    }
+
+    #[test]
+    fn infer_let_destructure_non_struct() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::LetDestructure {
+                pattern: Pattern::Struct {
+                    name: "Foo".into(),
+                    fields: vec![("x".into(), Pattern::Ident("x".into()))],
+                    rest: false,
+                },
+                ty: None,
+                value: Expr::Integer(0),
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("non-struct")));
+    }
+
+    // ── Binary op coverage ──────────────────────────────────────────────
+
+    #[test]
+    fn binary_string_concat() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "s".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Binary {
+                    op: BinOp::Add,
+                    left: Box::new(Expr::StringLit("hello".into())),
+                    right: Box::new(Expr::StringLit(" world".into())),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn binary_arithmetic_non_numeric() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Binary {
+                op: BinOp::Sub,
+                left: Box::new(Expr::Bool(true)),
+                right: Box::new(Expr::Bool(false)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("cannot apply arithmetic")));
+    }
+
+    #[test]
+    fn binary_float_arithmetic() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Binary {
+                    op: BinOp::Mul,
+                    left: Box::new(Expr::Float(1.5)),
+                    right: Box::new(Expr::Integer(2)),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn binary_comparison_ops() {
+        for op in &[BinOp::Eq, BinOp::Neq, BinOp::Lt, BinOp::Gt, BinOp::Lte, BinOp::Gte] {
+            let prog = program(vec![Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "b".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::Binary {
+                        op: op.clone(),
+                        left: Box::new(Expr::Integer(1)),
+                        right: Box::new(Expr::Integer(2)),
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ]))]);
+            let result = infer_program(&prog);
+            assert!(result.is_ok(), "comparison op {:?} failed", op);
+        }
+    }
+
+    #[test]
+    fn binary_logical_ops() {
+        for op in &[BinOp::And, BinOp::Or] {
+            let prog = program(vec![Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "b".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::Binary {
+                        op: op.clone(),
+                        left: Box::new(Expr::Bool(true)),
+                        right: Box::new(Expr::Bool(false)),
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ]))]);
+            let result = infer_program(&prog);
+            assert!(result.is_ok(), "logical op {:?} failed", op);
+        }
+    }
+
+    // ── Field access coverage ───────────────────────────────────────────
+
+    #[test]
+    fn field_access_on_tuple() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "t".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("t".into())),
+                    field: "0".into(),
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "field_access_on_tuple: {:?}", result.err());
+    }
+
+    #[test]
+    fn field_access_tuple_out_of_range() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "t".into(),
+                ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("t".into())),
+                field: "5".into(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("out of range")));
+    }
+
+    #[test]
+    fn field_access_tuple_non_numeric() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "t".into(),
+                ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("t".into())),
+                field: "name".into(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("cannot access field")));
+    }
+
+    #[test]
+    fn field_access_on_non_struct() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Integer(5),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("x".into())),
+                field: "y".into(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+    }
+
+    // ── Iterator method coverage ────────────────────────────────────────
+
+    #[test]
+    fn iterator_fold() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "iter".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "iter".into(),
+                        args: vec![],
+                    },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "sum".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("iter".into())),
+                        method: "fold".into(),
+                        args: vec![
+                            Expr::Integer(0),
+                            Expr::Closure {
+                                params: vec![("acc".into(), None), ("x".into(), None)],
+                                body: Box::new(Expr::Binary {
+                                    op: BinOp::Add,
+                                    left: Box::new(Expr::Ident("acc".into())),
+                                    right: Box::new(Expr::Ident("x".into())),
+                                }),
+                            },
+                        ],
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "fold: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_any_all() {
+        for method in &["any", "all"] {
+            let prog = program(vec![
+                Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                    Stmt::Expr(Expr::Integer(0)),
+                ])),
+                Item::Function(func("main", vec![
+                    Stmt::Let {
+                        name: "arr".into(), ty: None, mutable: false, secret: false,
+                        value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "iter".into(), ty: None, mutable: false, secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("arr".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("iter".into())),
+                        method: method.to_string(),
+                        args: vec![Expr::Closure {
+                            params: vec![("x".into(), None)],
+                            body: Box::new(Expr::Bool(true)),
+                        }],
+                    }),
+                ])),
+            ]);
+            let result = infer_program(&prog);
+            assert!(result.is_ok(), "{}: {:?}", method, result.err());
+        }
+    }
+
+    #[test]
+    fn iterator_enumerate() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "iter".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "iter".into(),
+                        args: vec![],
+                    },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("iter".into())),
+                    method: "enumerate".into(),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "enumerate: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_zip() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr_i32", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func_ret("make_arr_str", Type::Array(Box::new(Type::Named("String".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "a".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_i32".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "b".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_str".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "ai".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("a".into())),
+                        method: "iter".into(),
+                        args: vec![],
+                    },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "bi".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("b".into())),
+                        method: "iter".into(),
+                        args: vec![],
+                    },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("ai".into())),
+                    method: "zip".into(),
+                    args: vec![Expr::Ident("bi".into())],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "zip: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_count() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::Integer(0)),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "iter".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "iter".into(),
+                        args: vec![],
+                    },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("iter".into())),
+                    method: "count".into(),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "count: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_take_skip() {
+        for method in &["take", "skip"] {
+            let prog = program(vec![
+                Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                    Stmt::Expr(Expr::Integer(0)),
+                ])),
+                Item::Function(func("main", vec![
+                    Stmt::Let {
+                        name: "arr".into(), ty: None, mutable: false, secret: false,
+                        value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "iter".into(), ty: None, mutable: false, secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("arr".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("iter".into())),
+                        method: method.to_string(),
+                        args: vec![Expr::Integer(5)],
+                    }),
+                ])),
+            ]);
+            let result = infer_program(&prog);
+            assert!(result.is_ok(), "{}: {:?}", method, result.err());
+        }
+    }
+
+    // ── Item-level coverage ─────────────────────────────────────────────
+
+    #[test]
+    fn check_test_block() {
+        let prog = program(vec![
+            Item::Test(TestDef {
+                name: "basic".into(),
+                body: block(vec![Stmt::Expr(Expr::Assert {
+                    condition: Box::new(Expr::Bool(true)),
+                    message: None,
+                })]),
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_store() {
+        let prog = program(vec![
+            Item::Store(StoreDef {
+                name: "AppStore".into(),
+                signals: vec![StateField {
+                    name: "count".into(),
+                    ty: Some(Type::Named("i32".into())),
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                }],
+                actions: vec![],
+                computed: vec![],
+                effects: vec![],
+                selectors: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_form_methods() {
+        let prog = program(vec![
+            Item::Form(FormDef {
+                name: "LoginForm".into(),
+                fields: vec![],
+                on_submit: None,
+                steps: vec![],
+                methods: vec![func("on_submit", vec![Stmt::Return(None)])],
+                styles: vec![],
+                render: Some(RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: span(),
+                }),
+                is_pub: false,
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_page_methods() {
+        let prog = program(vec![
+            Item::Page(PageDef {
+                name: "HomePage".into(),
+                props: vec![],
+                meta: None,
+                state: vec![],
+                methods: vec![func("load", vec![Stmt::Return(None)])],
+                styles: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_trait_missing_method() {
+        let prog = program(vec![
+            Item::Trait(TraitDef {
+                name: "Greet".into(),
+                type_params: vec![],
+                methods: vec![TraitMethod {
+                    name: "hello".into(),
+                    params: vec![],
+                    return_type: Some(Type::Named("String".into())),
+                    default_body: None,
+                    span: span(),
+                }],
+                span: span(),
+            }),
+            Item::Struct(StructDef {
+                name: "Foo".into(),
+                type_params: vec![],
+                fields: vec![],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Impl(ImplBlock {
+                target: "Foo".into(),
+                trait_impls: vec!["Greet".into()],
+                methods: vec![], // missing "hello"
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("does not implement required trait method")));
+    }
+
+    #[test]
+    fn check_trait_not_found() {
+        let prog = program(vec![
+            Item::Struct(StructDef {
+                name: "Bar".into(),
+                type_params: vec![],
+                fields: vec![],
+                lifetimes: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Impl(ImplBlock {
+                target: "Bar".into(),
+                trait_impls: vec!["NonExistent".into()],
+                methods: vec![],
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("trait") && e.message.contains("not found")));
+    }
+
+    // ── Must-use warning ────────────────────────────────────────────────
+
+    #[test]
+    fn must_use_function_warning() {
+        let prog = program(vec![
+            Item::Function(Function {
+                name: "important".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::Integer(42)))]),
+                is_pub: false,
+                must_use: true,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("important".into())),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("must_use")));
+    }
+
+    // ── Discarded Result/Option warnings ────────────────────────────────
+
+    #[test]
+    fn unused_result_warning() {
+        let prog = program(vec![
+            Item::Function(Function {
+                name: "fallible".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Result {
+                    ok: Box::new(Type::Named("i32".into())),
+                    err: Box::new(Type::Named("String".into())),
+                }),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::Integer(0)))]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("fallible".into())),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("unused Result")));
+    }
+
+    #[test]
+    fn unused_option_warning() {
+        let prog = program(vec![
+            Item::Function(Function {
+                name: "maybe".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Option(Box::new(Type::Named("i32".into())))),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::Integer(0)))]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("maybe".into())),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_err());
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("unused Option")));
+    }
+
+    // ── Various Item coverage (pass-through) ────────────────────────────
+
+    #[test]
+    fn check_various_items_pass_through() {
+        // These items have TODO type checking, they should not cause errors
+        let prog = program(vec![
+            Item::Use(UsePath { segments: vec!["std".into(), "io".into()], alias: None, glob: false, group: None, span: span() }),
+            Item::Channel(ChannelDef {
+                name: "Events".into(), url: Expr::StringLit("ws://localhost".into()),
+                contract: None, on_message: None, on_connect: None, on_disconnect: None,
+                reconnect: false, heartbeat_interval: None, methods: vec![],
+                is_pub: false, span: span(),
+            }),
+            Item::Embed(EmbedDef {
+                name: "Map".into(), src: Expr::StringLit("https://maps.example.com".into()),
+                loading: None, sandbox: true, integrity: None, permissions: None,
+                is_pub: false, span: span(),
+            }),
+            Item::Pdf(PdfDef {
+                name: "Invoice".into(),
+                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                page_size: None, orientation: None, margins: None,
+                is_pub: false, span: span(),
+            }),
+            Item::Payment(PaymentDef {
+                name: "Checkout".into(), provider: None, public_key: None,
+                sandbox_mode: false, on_success: None, on_error: None,
+                methods: vec![], is_pub: false, span: span(),
+            }),
+            Item::Auth(AuthDef {
+                name: "Auth".into(), provider: None, providers: vec![], methods: vec![],
+                on_login: None, on_logout: None, on_error: None,
+                session_storage: None, is_pub: false, span: span(),
+            }),
+            Item::Upload(UploadDef {
+                name: "Files".into(), endpoint: Expr::StringLit("/up".into()),
+                max_size: None, accept: vec![], chunked: false,
+                on_progress: None, on_complete: None, on_error: None,
+                methods: vec![], is_pub: false, span: span(),
+            }),
+            Item::Cache(CacheDef {
+                name: "C".into(), strategy: None, default_ttl: None,
+                persist: false, max_entries: None, queries: vec![],
+                mutations: vec![], is_pub: false, span: span(),
+            }),
+            Item::Breakpoints(BreakpointsDef {
+                breakpoints: vec![], span: span(),
+            }),
+            Item::Theme(ThemeDef {
+                name: "T".into(), light: None, dark: None, dark_auto: false,
+                primary: None, is_pub: false, span: span(),
+            }),
+            Item::Animation(AnimationBlockDef {
+                name: "A".into(), kind: AnimationKind::Spring {
+                    stiffness: None, damping: None, mass: None, properties: vec![],
+                },
+                is_pub: false, span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "pass-through items: {:?}", result.err());
+    }
+
+    // ── Component type checking ─────────────────────────────────────────
+
+    #[test]
+    fn check_component_basic() {
+        let prog = program(vec![
+            Item::Component(Component {
+                name: "Counter".into(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![StateField {
+                    name: "count".into(),
+                    ty: Some(Type::Named("i32".into())),
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                }],
+                methods: vec![func("increment", vec![Stmt::Return(None)])],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "component: {:?}", result.err());
+    }
+
+    // ── Lazy component ──────────────────────────────────────────────────
+
+    #[test]
+    fn check_lazy_component() {
+        let prog = program(vec![
+            Item::LazyComponent(LazyComponentDef {
+                component: Component {
+                    name: "Heavy".into(),
+                    type_params: vec![],
+                    props: vec![],
+                    state: vec![],
+                    methods: vec![],
+                    styles: vec![],
+                    transitions: vec![],
+                    trait_bounds: vec![],
+                    render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                    permissions: None,
+                    gestures: vec![],
+                    skeleton: None,
+                    error_boundary: None,
+                    chunk: None,
+                    on_destroy: None,
+                    a11y: None,
+                    shortcuts: vec![],
+                    span: span(),
+                },
+                span: span(),
+            }),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok());
     }
 }

@@ -837,4 +837,563 @@ mod tests {
         assert!(labels.contains(&"signal"));
         assert!(labels.contains(&"struct"));
     }
+
+    // --- More keyword completions ---
+
+    #[test]
+    fn test_completion_includes_all_important_keywords() {
+        let server = LspServer::new();
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"let"));
+        assert!(labels.contains(&"mut"));
+        assert!(labels.contains(&"if"));
+        assert!(labels.contains(&"else"));
+        assert!(labels.contains(&"match"));
+        assert!(labels.contains(&"for"));
+        assert!(labels.contains(&"while"));
+        assert!(labels.contains(&"return"));
+        assert!(labels.contains(&"enum"));
+        assert!(labels.contains(&"impl"));
+        assert!(labels.contains(&"trait"));
+        assert!(labels.contains(&"store"));
+        assert!(labels.contains(&"agent"));
+        assert!(labels.contains(&"channel"));
+        assert!(labels.contains(&"spawn"));
+        assert!(labels.contains(&"parallel"));
+        assert!(labels.contains(&"suspend"));
+        assert!(labels.contains(&"yield"));
+        assert!(labels.contains(&"router"));
+        assert!(labels.contains(&"navigate"));
+        assert!(labels.contains(&"i32"));
+        assert!(labels.contains(&"f64"));
+        assert!(labels.contains(&"bool"));
+        assert!(labels.contains(&"String"));
+    }
+
+    // --- Completion from parsed document ---
+
+    #[test]
+    fn test_completion_includes_document_items() {
+        let mut server = LspServer::new();
+        let source = "fn helper() -> i32 { return 1; }\nstruct Point { x: i32, y: i32 }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"helper"), "should include function name");
+        assert!(labels.contains(&"Point"), "should include struct name");
+    }
+
+    // --- Parse document with errors still returns program ---
+
+    #[test]
+    fn test_parse_document_with_errors() {
+        let server = LspServer::new();
+        // Malformed but parser can recover
+        let source = "fn main() { let x = ; }";
+        let program = server.parse_document(source);
+        // parse_document returns Some even with errors (partial analysis)
+        assert!(program.is_some());
+    }
+
+    // --- Identifier at position edge cases ---
+
+    #[test]
+    fn test_identifier_at_position_start_of_line() {
+        let server = LspServer::new();
+        let text = "counter";
+        assert_eq!(
+            server.identifier_at_position(text, 1, 1),
+            Some("counter".to_string())
+        );
+    }
+
+    #[test]
+    fn test_identifier_at_position_end_of_line() {
+        let server = LspServer::new();
+        let text = "let x";
+        assert_eq!(
+            server.identifier_at_position(text, 1, 5),
+            Some("x".to_string())
+        );
+    }
+
+    #[test]
+    fn test_identifier_at_position_out_of_bounds() {
+        let server = LspServer::new();
+        let text = "hi";
+        assert_eq!(server.identifier_at_position(text, 1, 100), None);
+    }
+
+    #[test]
+    fn test_identifier_at_position_empty_line() {
+        let server = LspServer::new();
+        let text = "first\n\nthird";
+        assert_eq!(server.identifier_at_position(text, 2, 1), None);
+    }
+
+    #[test]
+    fn test_identifier_at_position_on_symbol() {
+        let server = LspServer::new();
+        let text = "a + b";
+        // Position on "+"
+        assert_eq!(server.identifier_at_position(text, 1, 3), None);
+    }
+
+    #[test]
+    fn test_identifier_with_underscores() {
+        let server = LspServer::new();
+        let text = "my_long_var";
+        assert_eq!(
+            server.identifier_at_position(text, 1, 5),
+            Some("my_long_var".to_string())
+        );
+    }
+
+    // --- Hover returns None for unknown document ---
+
+    #[test]
+    fn test_hover_unknown_document() {
+        let server = LspServer::new();
+        let params = HoverParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///nonexistent.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let result = server.on_hover(params);
+        assert!(result.is_none());
+    }
+
+    // --- Definition returns None for unknown document ---
+
+    #[test]
+    fn test_definition_unknown_document() {
+        let server = LspServer::new();
+        let params = DefinitionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///nonexistent.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let result = server.on_definition(params);
+        assert!(result.is_none());
+    }
+
+    // --- Span helpers ---
+
+    #[test]
+    fn test_span_contains() {
+        let server = LspServer::new();
+        let span = crate::token::Span::new(0, 10, 5, 1);
+        assert!(server.span_contains(&span, 5, 1));
+        assert!(!server.span_contains(&span, 6, 1));
+    }
+
+    #[test]
+    fn test_span_to_range() {
+        let server = LspServer::new();
+        let span = crate::token::Span::new(0, 10, 5, 3);
+        let range = server.span_to_range(&span);
+        assert_eq!(range.start.line, 4); // 5-1
+        assert_eq!(range.start.character, 2); // 3-1
+    }
+
+    // --- LspServer::new ---
+
+    #[test]
+    fn test_lsp_server_new_empty() {
+        let server = LspServer::new();
+        assert!(server.documents.is_empty());
+    }
+
+    // --- Completion with store ---
+
+    #[test]
+    fn test_completion_includes_store_name() {
+        let mut server = LspServer::new();
+        let source = "store Counter { signal count: i32 = 0; }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"Counter"), "should include store name");
+    }
+
+    // --- Hover with function ---
+
+    #[test]
+    fn test_hover_on_function() {
+        let mut server = LspServer::new();
+        let source = "fn add(a: i32, b: i32) -> i32 { return a; }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+
+        let params = HoverParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 3 }, // on "add"
+        };
+        let result = server.on_hover(params);
+        // May or may not return hover info depending on span matching
+        // At minimum, it should not panic
+        let _ = result;
+    }
+
+    // --- Completion includes enum name ---
+
+    #[test]
+    fn test_completion_includes_enum_name() {
+        let mut server = LspServer::new();
+        let source = "enum Color { Red, Green, Blue }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"Color"), "should include enum name");
+    }
+
+    // --- Completion includes component name ---
+
+    #[test]
+    fn test_completion_includes_component_name() {
+        let mut server = LspServer::new();
+        let source = "component App { render { <div /> } }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"App"), "should include component name");
+    }
+
+    // --- Completion includes struct fields and impl methods ---
+
+    #[test]
+    fn test_completion_includes_struct_fields() {
+        let mut server = LspServer::new();
+        let source = "struct Point { x: i32, y: i32 }\nimpl Point { fn origin() -> Point { return Point { x: 0, y: 0 }; } }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 0 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"x"), "should include field 'x'");
+        assert!(labels.contains(&"y"), "should include field 'y'");
+        assert!(labels.contains(&"origin"), "should include method 'origin'");
+    }
+
+    // --- Hover on struct ---
+
+    #[test]
+    fn test_hover_on_struct() {
+        let mut server = LspServer::new();
+        let source = "struct Point { x: i32, y: i32 }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = HoverParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 7 }, // on "Point"
+        };
+        let result = server.on_hover(params);
+        // Should not panic
+        let _ = result;
+    }
+
+    // --- Hover on component ---
+
+    #[test]
+    fn test_hover_on_component() {
+        let mut server = LspServer::new();
+        let source = "component App { render { <div /> } }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = HoverParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 10 }, // on "App"
+        };
+        let result = server.on_hover(params);
+        let _ = result;
+    }
+
+    // --- Definition for function ---
+
+    #[test]
+    fn test_definition_for_function() {
+        let mut server = LspServer::new();
+        let source = "fn helper() -> i32 { return 1; }\nfn main() -> i32 { return helper(); }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = DefinitionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 3 }, // on "helper"
+        };
+        let result = server.on_definition(params);
+        // Should not panic. May or may not find definition depending on span matching.
+        let _ = result;
+    }
+
+    // --- Definition for struct ---
+
+    #[test]
+    fn test_definition_for_struct() {
+        let mut server = LspServer::new();
+        let source = "struct Point { x: i32 }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = DefinitionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 7 }, // on "Point"
+        };
+        let result = server.on_definition(params);
+        let _ = result;
+    }
+
+    // --- Diagnostics for valid program ---
+
+    #[test]
+    fn test_collect_diagnostics_valid() {
+        let server = LspServer::new();
+        let source = "fn main() -> i32 { return 42; }";
+        let program = server.parse_document(source);
+        let diagnostics = server.collect_diagnostics(source, &program);
+        // Valid program may have type checker errors but should not panic
+        let _ = diagnostics;
+    }
+
+    // --- Diagnostics when program is None ---
+
+    #[test]
+    fn test_collect_diagnostics_none_program() {
+        let server = LspServer::new();
+        // Completely invalid input that may fail to lex
+        let diagnostics = server.collect_diagnostics("@@@invalid$$$", &None);
+        // Should produce some diagnostics or empty, but not panic
+        let _ = diagnostics;
+    }
+
+    // --- handle_message coverage ---
+
+    #[test]
+    fn test_handle_initialize() {
+        let mut server = LspServer::new();
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            method: "initialize".to_string(),
+            params: None,
+        };
+        // Will write to stdout, but should not panic
+        let _ = server.handle_message(request);
+    }
+
+    #[test]
+    fn test_handle_initialized() {
+        let mut server = LspServer::new();
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: None,
+            method: "initialized".to_string(),
+            params: None,
+        };
+        let result = server.handle_message(request);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_handle_shutdown() {
+        let mut server = LspServer::new();
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            method: "shutdown".to_string(),
+            params: None,
+        };
+        let _ = server.handle_message(request);
+    }
+
+    #[test]
+    fn test_handle_unknown_method_notification() {
+        let mut server = LspServer::new();
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: None, // notification (no id)
+            method: "unknown/method".to_string(),
+            params: None,
+        };
+        let result = server.handle_message(request);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_handle_unknown_method_request() {
+        let mut server = LspServer::new();
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(99)),
+            method: "unknown/method".to_string(),
+            params: None,
+        };
+        let _ = server.handle_message(request);
+    }
+
+    // --- on_did_open and on_did_change ---
+
+    #[test]
+    fn test_on_did_open() {
+        let mut server = LspServer::new();
+        let params = DidOpenParams {
+            text_document: TextDocumentItem {
+                uri: "file:///test.nectar".to_string(),
+                language_id: "nectar".to_string(),
+                version: 1,
+                text: "fn main() -> i32 { return 1; }".to_string(),
+            },
+        };
+        let _ = server.on_did_open(params);
+        assert!(server.documents.contains_key("file:///test.nectar"));
+    }
+
+    #[test]
+    fn test_on_did_change() {
+        let mut server = LspServer::new();
+        // First open
+        let open_params = DidOpenParams {
+            text_document: TextDocumentItem {
+                uri: "file:///test.nectar".to_string(),
+                language_id: "nectar".to_string(),
+                version: 1,
+                text: "fn main() -> i32 { return 1; }".to_string(),
+            },
+        };
+        let _ = server.on_did_open(open_params);
+
+        // Then change
+        let change_params = DidChangeParams {
+            text_document: VersionedTextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+                version: Some(2),
+            },
+            content_changes: vec![ContentChange {
+                text: "fn main() -> i32 { return 2; }".to_string(),
+            }],
+        };
+        let _ = server.on_did_change(change_params);
+        assert!(server.documents.contains_key("file:///test.nectar"));
+    }
+
+    // --- read_content_length ---
+
+    #[test]
+    fn test_read_content_length() {
+        let server = LspServer::new();
+        let input = "Content-Length: 42\r\n\r\n";
+        let mut reader = std::io::BufReader::new(input.as_bytes());
+        let length = server.read_content_length(&mut reader).unwrap();
+        assert_eq!(length, 42);
+    }
+
+    #[test]
+    fn test_read_content_length_no_header() {
+        let server = LspServer::new();
+        let input = "\r\n";
+        let mut reader = std::io::BufReader::new(input.as_bytes());
+        let length = server.read_content_length(&mut reader).unwrap();
+        assert_eq!(length, 0);
+    }
+
+    // --- identifier_at_position edge cases ---
+
+    #[test]
+    fn test_identifier_at_position_line_not_found() {
+        let server = LspServer::new();
+        let text = "hello";
+        assert_eq!(server.identifier_at_position(text, 5, 1), None);
+    }
+
+    #[test]
+    fn test_identifier_underscore_only() {
+        let server = LspServer::new();
+        let text = "_";
+        assert_eq!(
+            server.identifier_at_position(text, 1, 1),
+            Some("_".to_string())
+        );
+    }
 }

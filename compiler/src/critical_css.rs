@@ -296,4 +296,205 @@ mod tests {
         assert!(result.skeleton_css.contains(".nectar-skeleton"));
         assert!(result.skeleton_css.contains("nectar-shimmer"));
     }
+
+    // --- Edge case: to_base36 with zero ---
+
+    #[test]
+    fn test_to_base36_zero() {
+        assert_eq!(to_base36(0), "0");
+    }
+
+    #[test]
+    fn test_to_base36_small() {
+        assert_eq!(to_base36(10), "a");
+        assert_eq!(to_base36(35), "z");
+        assert_eq!(to_base36(36), "10");
+    }
+
+    // --- Empty program ---
+
+    #[test]
+    fn test_extract_empty_program() {
+        let program = Program { items: vec![] };
+        let result = CriticalCssExtractor::extract(&program);
+        assert!(result.critical_css.is_empty());
+        assert!(result.deferred_css.is_empty());
+        assert!(!result.skeleton_css.is_empty()); // skeleton always present
+    }
+
+    // --- Multiple selectors (comma-separated) ---
+
+    #[test]
+    fn test_compile_styles_multiple_selectors() {
+        let styles = vec![StyleBlock {
+            selector: ".a, .b".to_string(),
+            properties: vec![("color".to_string(), "red".to_string())],
+            span: dummy_span(),
+        }];
+        let result = CriticalCssExtractor::compile_styles("Multi", &styles);
+        let scope_id = format!("nectar-{}", hash_string("Multi"));
+        assert!(result.contains(&format!("[data-{}] .a", scope_id)));
+        assert!(result.contains(&format!("[data-{}] .b", scope_id)));
+    }
+
+    // --- Multiple style blocks ---
+
+    #[test]
+    fn test_compile_styles_multiple_blocks() {
+        let styles = vec![
+            StyleBlock {
+                selector: ".x".to_string(),
+                properties: vec![("margin".to_string(), "0".to_string())],
+                span: dummy_span(),
+            },
+            StyleBlock {
+                selector: ".y".to_string(),
+                properties: vec![("padding".to_string(), "10px".to_string())],
+                span: dummy_span(),
+            },
+        ];
+        let result = CriticalCssExtractor::compile_styles("Double", &styles);
+        assert!(result.contains("margin: 0;"));
+        assert!(result.contains("padding: 10px;"));
+    }
+
+    // --- Lazy component that is first route target goes to critical ---
+
+    #[test]
+    fn test_lazy_first_route_goes_critical() {
+        let program = Program {
+            items: vec![
+                Item::Router(RouterDef {
+                    name: "AppRouter".to_string(),
+                    routes: vec![RouteDef {
+                        path: "/".to_string(),
+                        params: vec![],
+                        component: "Home".to_string(),
+                        guard: None,
+                        transition: None,
+                        span: dummy_span(),
+                    }],
+                    fallback: None,
+                    layout: None,
+                    transition: None,
+                    span: dummy_span(),
+                }),
+                Item::LazyComponent(LazyComponentDef {
+                    component: Component {
+                        name: "Home".to_string(),
+                        type_params: vec![],
+                        props: vec![],
+                        state: vec![],
+                        methods: vec![],
+                        styles: vec![StyleBlock {
+                            selector: ".home".to_string(),
+                            properties: vec![("display".to_string(), "block".to_string())],
+                            span: dummy_span(),
+                        }],
+                        transitions: vec![],
+                        trait_bounds: vec![],
+                        render: RenderBlock {
+                            body: TemplateNode::Fragment(vec![]),
+                            span: dummy_span(),
+                        },
+                        permissions: None,
+                        gestures: vec![],
+                        skeleton: None,
+                        error_boundary: None,
+                        chunk: None,
+                        on_destroy: None,
+                        a11y: None,
+                        shortcuts: vec![],
+                        span: dummy_span(),
+                    },
+                    span: dummy_span(),
+                }),
+            ],
+        };
+        let result = CriticalCssExtractor::extract(&program);
+        assert!(result.critical_css.contains(".home"), "first-route lazy component should be critical");
+        assert!(!result.deferred_css.contains(".home"));
+    }
+
+    // --- Component without styles has empty CSS ---
+
+    #[test]
+    fn test_component_without_styles() {
+        let program = Program {
+            items: vec![Item::Component(Component {
+                name: "Empty".to_string(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: dummy_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: dummy_span(),
+            })],
+        };
+        let result = CriticalCssExtractor::extract(&program);
+        assert!(result.critical_css.is_empty());
+    }
+
+    // --- Skeleton CSS always includes base reset ---
+
+    #[test]
+    fn test_skeleton_includes_base_reset() {
+        let program = Program { items: vec![] };
+        let result = CriticalCssExtractor::extract(&program);
+        assert!(result.skeleton_css.contains("box-sizing: border-box"));
+        assert!(result.skeleton_css.contains("data-nectar-hydrate"));
+        assert!(result.skeleton_css.contains("nectar-loading"));
+    }
+
+    // --- Hash string empty input ---
+
+    #[test]
+    fn test_hash_string_empty() {
+        let h = hash_string("");
+        assert!(!h.is_empty());
+        // djb2 with no chars: hash stays 5381
+        assert_eq!(h, to_base36(5381));
+    }
+
+    // --- Multiple properties in a style block ---
+
+    #[test]
+    fn test_compile_styles_multiple_properties() {
+        let styles = vec![StyleBlock {
+            selector: ".btn".to_string(),
+            properties: vec![
+                ("color".to_string(), "blue".to_string()),
+                ("padding".to_string(), "8px".to_string()),
+                ("border".to_string(), "none".to_string()),
+            ],
+            span: dummy_span(),
+        }];
+        let result = CriticalCssExtractor::compile_styles("Button", &styles);
+        assert!(result.contains("color: blue;"));
+        assert!(result.contains("padding: 8px;"));
+        assert!(result.contains("border: none;"));
+    }
+
+    // --- CriticalCssExtractor::new ---
+
+    #[test]
+    fn test_extractor_new() {
+        let ext = CriticalCssExtractor::new();
+        assert!(ext.first_route_components.is_empty());
+        assert!(ext.lazy_component_names.is_empty());
+    }
 }

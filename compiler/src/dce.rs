@@ -538,4 +538,869 @@ mod tests {
         }
         assert_eq!(stats.unused_vars_removed, 0);
     }
+
+    // --- Dead code after return in nested blocks ---
+
+    #[test]
+    fn test_remove_after_return_in_nested_if() {
+        let stmts = vec![
+            Stmt::Expr(Expr::If {
+                condition: Box::new(Expr::Bool(true)),
+                then_block: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                else_block: None,
+            }),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_remove_after_return_in_else_block() {
+        let stmts = vec![
+            Stmt::Expr(Expr::If {
+                condition: Box::new(Expr::Ident("x".to_string())),
+                then_block: Block {
+                    stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                    span: dummy_span(),
+                },
+                else_block: Some(Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(2))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                }),
+            }),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_dead_code_in_for_loop() {
+        let stmts = vec![
+            Stmt::Expr(Expr::For {
+                binding: "i".to_string(),
+                iterator: Box::new(Expr::Ident("items".to_string())),
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+            }),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_dead_code_in_while_loop() {
+        let stmts = vec![
+            Stmt::Expr(Expr::While {
+                condition: Box::new(Expr::Bool(true)),
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+            }),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_dead_code_in_closure() {
+        let stmts = vec![
+            Stmt::Expr(Expr::Closure {
+                params: vec![],
+                body: Box::new(Expr::Block(Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                })),
+            }),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    // --- If false with else not removed (has else) ---
+
+    #[test]
+    fn test_if_false_with_else_not_removed() {
+        // `if false { ... } else { ... }` should NOT be removed (it has an else)
+        let stmts = vec![
+            Stmt::Expr(Expr::If {
+                condition: Box::new(Expr::Bool(false)),
+                then_block: Block {
+                    stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                    span: dummy_span(),
+                },
+                else_block: Some(Block {
+                    stmts: vec![Stmt::Expr(Expr::Integer(2))],
+                    span: dummy_span(),
+                }),
+            }),
+            Stmt::Expr(Expr::Integer(10)),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        // Should still have 2 statements (if false + else is kept, plus the 10)
+        match &program.items[0] {
+            Item::Function(f) => assert_eq!(f.body.stmts.len(), 2),
+            _ => panic!("expected function"),
+        }
+    }
+
+    // --- Multiple unused local variables ---
+
+    #[test]
+    fn test_remove_multiple_unused_locals() {
+        let stmts = vec![
+            Stmt::Let {
+                name: "a".to_string(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(1),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".to_string(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(2),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Integer(10)),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.unused_vars_removed, 2);
+        match &program.items[0] {
+            Item::Function(f) => assert_eq!(f.body.stmts.len(), 1),
+            _ => panic!("expected function"),
+        }
+    }
+
+    // --- Keep impure unused vars ---
+
+    #[test]
+    fn test_keep_impure_unused_var() {
+        let stmts = vec![
+            Stmt::Let {
+                name: "result".to_string(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::FnCall {
+                    callee: Box::new(Expr::Ident("side_effect".to_string())),
+                    args: vec![],
+                },
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Integer(10)),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        // Should NOT be removed because value is a function call (side effect)
+        assert_eq!(stats.unused_vars_removed, 0);
+    }
+
+    // --- Unused private functions (multiple) ---
+
+    #[test]
+    fn test_remove_multiple_unused_private_functions() {
+        let items = vec![
+            make_fn("main", true, vec![Stmt::Return(Some(Expr::Integer(0)))]),
+            make_fn("unused1", false, vec![Stmt::Return(Some(Expr::Integer(1)))]),
+            make_fn("unused2", false, vec![Stmt::Return(Some(Expr::Integer(2)))]),
+            make_fn("unused3", false, vec![Stmt::Return(Some(Expr::Integer(3)))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.functions_removed, 3);
+        assert_eq!(program.items.len(), 1);
+    }
+
+    // --- Pub functions are never removed ---
+
+    #[test]
+    fn test_keep_all_pub_functions() {
+        let items = vec![
+            make_fn("a", true, vec![Stmt::Return(Some(Expr::Integer(1)))]),
+            make_fn("b", true, vec![Stmt::Return(Some(Expr::Integer(2)))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.functions_removed, 0);
+        assert_eq!(program.items.len(), 2);
+    }
+
+    // --- No return in block ---
+
+    #[test]
+    fn test_no_dead_code_without_return() {
+        let stmts = vec![
+            Stmt::Expr(Expr::Integer(1)),
+            Stmt::Expr(Expr::Integer(2)),
+            Stmt::Expr(Expr::Integer(3)),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        match &program.items[0] {
+            Item::Function(f) => assert_eq!(f.body.stmts.len(), 3),
+            _ => panic!("expected function"),
+        }
+        assert_eq!(stats.stmts_removed, 0);
+    }
+
+    // --- DCE inside component/impl/store/agent/page/form ---
+
+    #[test]
+    fn test_dce_inside_component() {
+        let items = vec![Item::Component(Component {
+            name: "Test".to_string(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![Function {
+                name: "m".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                is_pub: false,
+                must_use: false,
+                span: dummy_span(),
+            }],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: dummy_span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_dce_inside_impl() {
+        let items = vec![Item::Impl(ImplBlock {
+            target: "Foo".to_string(),
+            trait_impls: vec![],
+            methods: vec![Function {
+                name: "m".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)),
+                    ],
+                    span: dummy_span(),
+                },
+                is_pub: false,
+                must_use: false,
+                span: dummy_span(),
+            }],
+            span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    // --- DCE inside Store (actions, computed, effects) ---
+
+    fn make_method(name: &str, stmts: Vec<Stmt>) -> Function {
+        Function {
+            name: name.to_string(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block { stmts, span: dummy_span() },
+            is_pub: false,
+            must_use: false,
+            span: dummy_span(),
+        }
+    }
+
+    #[test]
+    fn test_dce_inside_store() {
+        let items = vec![Item::Store(StoreDef {
+            name: "S".to_string(),
+            signals: vec![],
+            actions: vec![ActionDef {
+                name: "inc".to_string(), params: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                is_async: false, span: dummy_span(),
+            }],
+            computed: vec![ComputedDef {
+                name: "dbl".to_string(), return_type: None,
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(2))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                span: dummy_span(),
+            }],
+            effects: vec![EffectDef {
+                name: "log".to_string(),
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(3))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                span: dummy_span(),
+            }],
+            selectors: vec![],
+            is_pub: false, span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 3);
+    }
+
+    // --- DCE inside Agent (methods, tools) ---
+
+    #[test]
+    fn test_dce_inside_agent() {
+        let items = vec![Item::Agent(AgentDef {
+            name: "Bot".to_string(),
+            system_prompt: None,
+            tools: vec![ToolDef {
+                name: "search".to_string(), description: None, params: vec![],
+                return_type: None,
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
+                },
+                span: dummy_span(),
+            }],
+            state: vec![],
+            methods: vec![make_method("go", vec![
+                Stmt::Return(Some(Expr::Integer(2))),
+                Stmt::Expr(Expr::Integer(99)), // dead
+            ])],
+            render: None, span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 2);
+    }
+
+    // --- DCE inside Page ---
+
+    #[test]
+    fn test_dce_inside_page() {
+        let items = vec![Item::Page(PageDef {
+            name: "Home".to_string(), props: vec![], meta: None, state: vec![],
+            methods: vec![make_method("init", vec![
+                Stmt::Return(Some(Expr::Integer(1))),
+                Stmt::Expr(Expr::Integer(99)), // dead
+            ])],
+            styles: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: dummy_span(),
+            },
+            permissions: None, gestures: vec![],
+            is_pub: false, span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    // --- DCE inside Form ---
+
+    #[test]
+    fn test_dce_inside_form() {
+        let items = vec![Item::Form(FormDef {
+            name: "F".to_string(), fields: vec![], on_submit: None, steps: vec![],
+            methods: vec![make_method("submit", vec![
+                Stmt::Return(Some(Expr::Integer(1))),
+                Stmt::Expr(Expr::Integer(99)), // dead
+            ])],
+            styles: vec![], render: None, is_pub: false, span: dummy_span(),
+        })];
+        let mut program = Program { items };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    // --- collect_references_in_expr coverage ---
+
+    #[test]
+    fn test_collect_refs_binary() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::Ident("a".to_string())),
+            right: Box::new(Expr::Ident("b".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("a"));
+        assert!(refs.contains("b"));
+    }
+
+    #[test]
+    fn test_collect_refs_unary() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Ident("x".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("x"));
+    }
+
+    #[test]
+    fn test_collect_refs_method_call() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::MethodCall {
+            object: Box::new(Expr::Ident("obj".to_string())),
+            method: "m".to_string(),
+            args: vec![Expr::Ident("arg".to_string())],
+        }, &mut refs);
+        assert!(refs.contains("obj"));
+        assert!(refs.contains("arg"));
+    }
+
+    #[test]
+    fn test_collect_refs_field_access() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::FieldAccess {
+            object: Box::new(Expr::Ident("x".to_string())),
+            field: "f".to_string(),
+        }, &mut refs);
+        assert!(refs.contains("x"));
+    }
+
+    #[test]
+    fn test_collect_refs_index() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Index {
+            object: Box::new(Expr::Ident("arr".to_string())),
+            index: Box::new(Expr::Ident("i".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("arr"));
+        assert!(refs.contains("i"));
+    }
+
+    #[test]
+    fn test_collect_refs_assign() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Assign {
+            target: Box::new(Expr::Ident("t".to_string())),
+            value: Box::new(Expr::Ident("v".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("t"));
+        assert!(refs.contains("v"));
+    }
+
+    #[test]
+    fn test_collect_refs_closure() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Closure {
+            params: vec![],
+            body: Box::new(Expr::Ident("body_dep".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("body_dep"));
+    }
+
+    #[test]
+    fn test_collect_refs_struct_init() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::StructInit {
+            name: "S".to_string(),
+            fields: vec![("x".to_string(), Expr::Ident("val".to_string()))],
+        }, &mut refs);
+        assert!(refs.contains("val"));
+    }
+
+    #[test]
+    fn test_collect_refs_match() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("subj".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                body: Expr::Ident("arm_body".to_string()),
+            }],
+        }, &mut refs);
+        assert!(refs.contains("subj"));
+        assert!(refs.contains("arm_body"));
+    }
+
+    #[test]
+    fn test_collect_refs_borrow_await_etc() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Borrow(Box::new(Expr::Ident("a".to_string()))), &mut refs);
+        collect_references_in_expr(&Expr::BorrowMut(Box::new(Expr::Ident("b".to_string()))), &mut refs);
+        collect_references_in_expr(&Expr::Await(Box::new(Expr::Ident("c".to_string()))), &mut refs);
+        collect_references_in_expr(&Expr::Stream { source: Box::new(Expr::Ident("d".to_string())) }, &mut refs);
+        collect_references_in_expr(&Expr::Navigate { path: Box::new(Expr::Ident("e".to_string())) }, &mut refs);
+        collect_references_in_expr(&Expr::Receive { channel: Box::new(Expr::Ident("f".to_string())) }, &mut refs);
+        assert!(refs.contains("a") && refs.contains("b") && refs.contains("c"));
+        assert!(refs.contains("d") && refs.contains("e") && refs.contains("f"));
+    }
+
+    #[test]
+    fn test_collect_refs_spawn_send_suspend() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Spawn {
+            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("sp".to_string()))], span: dummy_span() },
+            span: dummy_span(),
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Send {
+            channel: Box::new(Expr::Ident("ch".to_string())),
+            value: Box::new(Expr::Ident("v".to_string())),
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Suspend {
+            fallback: Box::new(Expr::Ident("fb".to_string())),
+            body: Box::new(Expr::Ident("bd".to_string())),
+        }, &mut refs);
+        assert!(refs.contains("sp") && refs.contains("ch") && refs.contains("v"));
+        assert!(refs.contains("fb") && refs.contains("bd"));
+    }
+
+    #[test]
+    fn test_collect_refs_try_catch_fetch_parallel() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::TryCatch {
+            body: Box::new(Expr::Ident("tc".to_string())),
+            error_binding: "e".to_string(),
+            catch_body: Box::new(Expr::Ident("ca".to_string())),
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Fetch {
+            url: Box::new(Expr::Ident("u".to_string())),
+            options: Some(Box::new(Expr::Ident("o".to_string()))),
+            contract: None,
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Parallel {
+            tasks: vec![Expr::Ident("t1".to_string())],
+            span: dummy_span(),
+        }, &mut refs);
+        assert!(refs.contains("tc") && refs.contains("ca"));
+        assert!(refs.contains("u") && refs.contains("o"));
+        assert!(refs.contains("t1"));
+    }
+
+    #[test]
+    fn test_collect_refs_prompt_env_trace_flag() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::PromptTemplate {
+            template: "hi".to_string(),
+            interpolations: vec![("x".to_string(), Expr::Ident("pt".to_string()))],
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Env {
+            name: Box::new(Expr::Ident("en".to_string())),
+            span: dummy_span(),
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Trace {
+            label: Box::new(Expr::Ident("lb".to_string())),
+            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tb".to_string()))], span: dummy_span() },
+            span: dummy_span(),
+        }, &mut refs);
+        collect_references_in_expr(&Expr::Flag {
+            name: Box::new(Expr::Ident("fl".to_string())),
+            span: dummy_span(),
+        }, &mut refs);
+        assert!(refs.contains("pt") && refs.contains("en"));
+        assert!(refs.contains("lb") && refs.contains("tb"));
+        assert!(refs.contains("fl"));
+    }
+
+    // --- is_pure coverage ---
+
+    #[test]
+    fn test_is_pure_binary() {
+        assert!(is_pure(&Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(2)),
+        }));
+    }
+
+    #[test]
+    fn test_is_pure_unary() {
+        assert!(is_pure(&Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Integer(1)),
+        }));
+    }
+
+    #[test]
+    fn test_is_pure_struct_init() {
+        assert!(is_pure(&Expr::StructInit {
+            name: "S".to_string(),
+            fields: vec![("x".to_string(), Expr::Integer(1))],
+        }));
+    }
+
+    #[test]
+    fn test_is_pure_field_access() {
+        assert!(is_pure(&Expr::FieldAccess {
+            object: Box::new(Expr::Ident("x".to_string())),
+            field: "f".to_string(),
+        }));
+    }
+
+    #[test]
+    fn test_is_pure_borrow() {
+        assert!(is_pure(&Expr::Borrow(Box::new(Expr::Ident("x".to_string())))));
+        assert!(is_pure(&Expr::BorrowMut(Box::new(Expr::Ident("x".to_string())))));
+    }
+
+    #[test]
+    fn test_is_pure_self_expr() {
+        assert!(is_pure(&Expr::SelfExpr));
+    }
+
+    #[test]
+    fn test_is_not_pure_fn_call() {
+        assert!(!is_pure(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("f".to_string())),
+            args: vec![],
+        }));
+    }
+
+    // --- collect_called_functions_in_item coverage ---
+
+    #[test]
+    fn test_called_fns_in_store() {
+        let mut called = std::collections::HashSet::new();
+        let item = Item::Store(StoreDef {
+            name: "S".to_string(), signals: vec![],
+            actions: vec![ActionDef {
+                name: "a".to_string(), params: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep1".to_string()))], span: dummy_span() },
+                is_async: false, span: dummy_span(),
+            }],
+            computed: vec![ComputedDef {
+                name: "c".to_string(), return_type: None,
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep2".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            effects: vec![EffectDef {
+                name: "e".to_string(),
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep3".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            selectors: vec![], is_pub: false, span: dummy_span(),
+        });
+        collect_called_functions_in_item(&item, &mut called);
+        assert!(called.contains("dep1"));
+        assert!(called.contains("dep2"));
+        assert!(called.contains("dep3"));
+    }
+
+    #[test]
+    fn test_called_fns_in_agent() {
+        let mut called = std::collections::HashSet::new();
+        let item = Item::Agent(AgentDef {
+            name: "A".to_string(), system_prompt: None,
+            tools: vec![ToolDef {
+                name: "t".to_string(), description: None, params: vec![],
+                return_type: None,
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tool_dep".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            state: vec![],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            render: None, span: dummy_span(),
+        });
+        collect_called_functions_in_item(&item, &mut called);
+        assert!(called.contains("tool_dep"));
+        assert!(called.contains("meth_dep"));
+    }
+
+    #[test]
+    fn test_called_fns_in_router() {
+        let mut called = std::collections::HashSet::new();
+        let item = Item::Router(RouterDef {
+            name: "R".to_string(),
+            routes: vec![RouteDef {
+                path: "/".to_string(), params: vec![],
+                component: "Home".to_string(),
+                guard: Some(Expr::Ident("guard_fn".to_string())),
+                transition: None,
+                span: dummy_span(),
+            }],
+            fallback: None, layout: None, transition: None, span: dummy_span(),
+        });
+        collect_called_functions_in_item(&item, &mut called);
+        assert!(called.contains("Home"));
+        assert!(called.contains("guard_fn"));
+    }
+
+    // --- eliminate_in_stmt for Signal and Yield ---
+
+    #[test]
+    fn test_dce_signal_stmt() {
+        let stmts = vec![
+            Stmt::Signal {
+                name: "s".to_string(), ty: None, secret: false, atomic: false,
+                value: Expr::If {
+                    condition: Box::new(Expr::Bool(true)),
+                    then_block: Block {
+                        stmts: vec![
+                            Stmt::Return(Some(Expr::Integer(1))),
+                            Stmt::Expr(Expr::Integer(99)), // dead
+                        ],
+                        span: dummy_span(),
+                    },
+                    else_block: None,
+                },
+            },
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    #[test]
+    fn test_dce_yield_stmt() {
+        let stmts = vec![
+            Stmt::Yield(Expr::Block(Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
+            })),
+        ];
+        let mut program = Program {
+            items: vec![make_fn("test", true, stmts)],
+        };
+        let mut stats = DceStats::default();
+        eliminate_dead_code(&mut program, &mut stats);
+        assert_eq!(stats.stmts_removed, 1);
+    }
+
+    // --- collect_references_in_stmt for Yield and Return(None) ---
+
+    #[test]
+    fn test_collect_refs_in_stmt_yield() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_stmt(&Stmt::Yield(Expr::Ident("y".to_string())), &mut refs);
+        assert!(refs.contains("y"));
+    }
+
+    #[test]
+    fn test_collect_refs_in_stmt_return_none() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_stmt(&Stmt::Return(None), &mut refs);
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_collect_refs_in_stmt_signal() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_stmt(&Stmt::Signal {
+            name: "s".to_string(), ty: None, secret: false, atomic: false,
+            value: Expr::Ident("sig_dep".to_string()),
+        }, &mut refs);
+        assert!(refs.contains("sig_dep"));
+    }
 }

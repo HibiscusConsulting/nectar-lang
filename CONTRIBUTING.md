@@ -72,6 +72,7 @@ JavaScript is permitted ONLY for browser APIs that WebAssembly physically cannot
 - **Intl API** — `Intl.DateTimeFormat` (locale-aware formatting only)
 - **Performance API** — `performance.mark()`, `performance.measure()`
 - **EventSource** — `new EventSource()` (SSE)
+- **WebRTC** — `RTCPeerConnection`, `RTCDataChannel`, `getUserMedia()`, `getDisplayMedia()`
 
 If it's not on this list, it doesn't get a JS implementation. Period.
 

@@ -27,7 +27,7 @@ cargo --version
 Clone the Nectar repository and build the compiler:
 
 ```sh
-git clone https://github.com/example/nectar-lang.git
+git clone https://github.com/HibiscusConsulting/nectar-lang.git
 cd nectar-lang
 cargo build --release
 ```
@@ -89,8 +89,7 @@ Create an `index.html` file:
 <head><title>My Nectar App</title></head>
 <body>
   <div id="app"></div>
-  <script src="core.js"></script>
-  <script>
+  <script type="module">
     import { instantiate } from './core.js';
     instantiate('hello.wasm').then(inst => inst.exports.main());
   </script>

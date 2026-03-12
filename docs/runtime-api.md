@@ -1,906 +1,380 @@
-# Nectar Runtime API Reference
+# Nectar Runtime API
 
-This document describes every WASM import namespace and function provided by the Nectar runtime (`runtime/modules/core.js`). These are the host functions that compiled Nectar modules call to interact with the browser environment.
+This document describes the complete runtime layer that bridges Nectar's WASM modules to browser APIs. Understanding this architecture is critical for compiler development and debugging.
 
-> **Note:** All WASM imports are provided by a single runtime file (core.js). Namespaces below are logical groupings within that file, not separate modules.
+## Architecture
 
----
+Nectar's runtime is a single JavaScript file (`runtime/modules/core.js`, ~660 lines) that provides browser API syscalls to WASM. **All logic runs in WASM.** JavaScript functions are 1-3 lines each — pure bridges with zero computation.
 
-## Table of Contents
+### What Lives Where
 
-All syscalls live in a single `core.js` file, organized by the following namespaces:
+| Layer | Runs in | Examples |
+|---|---|---|
+| **Application logic** | WASM | Components, stores, routing, validation, crypto, formatting |
+| **Reactive system** | WASM | Signals, effects, memos, dependency tracking, batching |
+| **String operations** | WASM | Concat, fromI32, fromF64, fromBool — all in linear memory |
+| **Animation math** | WASM | Spring physics, easing, interpolation |
+| **Browser syscalls** | JS (core.js) | DOM, fetch, WebSocket, IndexedDB, timers, clipboard |
 
-1. [dom](#dom) -- DOM manipulation
-2. [signal](#signal) -- Reactive state primitives
-3. [http](#http) -- HTTP communication
-4. [worker](#worker) -- Concurrency primitives
-5. [ai](#ai) -- AI/LLM interaction
-6. [streaming](#streaming) -- Streaming data
-7. [media](#media) -- Image and resource loading
-8. [router](#router) -- Client-side routing
-9. [style](#style) -- Scoped CSS injection
-10. [animation](#animation) -- Web Animations API bridge
-11. [a11y](#a11y) -- Accessibility
-12. [webapi](#webapi) -- Web platform APIs
-13. [string](#string) -- String operations
-14. [test](#test) -- Testing support
-15. [sw](#sw) -- Service worker
+### Key Patterns
 
----
+**Command Buffer (mount/flush):**
+- Initial render: WASM builds an HTML string in linear memory → single `mount()` call sets `innerHTML`
+- Updates: WASM writes opcodes into a command buffer in linear memory → single `flush()` call per animation frame reads and executes them all
+- This collapses ~50 individual WASM→JS boundary crossings into 1-2 per frame
 
-## dom
+**`__readOpts` pattern:** WASM writes flat (key_ptr, key_len, val_ptr, val_len) tuples terminated by (0,0) into linear memory. JS reads them to build option objects for browser APIs. Replaces all JSON.parse/stringify. Zero serialization overhead.
 
-DOM manipulation functions for creating and updating the document tree.
+**Typed setters:** For complex APIs like fetch, WASM calls `setMethod()`, `setBody()`, `addHeader()` individually before triggering the call. No option object serialization.
 
-### Primary Rendering Path: mount / hydrateRefs / flush
+**Callbacks:** WASM registers callback indices. JS calls `R.__cb(cbIdx)` when async operations complete. Data is written to WASM linear memory before the callback fires.
 
-The primary rendering path uses bulk operations rather than individual DOM syscalls:
-
-#### mount
-
-```
-dom.mount(containerElId: i32, htmlPtr: i32, htmlLen: i32)
-```
-
-Initial render via `innerHTML` from a WASM-built string. The WASM module constructs the full HTML string in linear memory, and the runtime sets it as the container's `innerHTML` in a single operation.
-
-#### hydrateRefs
-
-```
-dom.hydrateRefs(containerElId: i32)
-```
-
-Walks the rendered DOM tree looking for `data-nid` attributes and registers element handles for each one. This allows subsequent fine-grained updates to reference specific elements without `querySelector` calls.
-
-#### flush
-
-```
-dom.flush(bufPtr: i32, bufLen: i32)
-```
-
-Reads batched opcodes from a WASM command buffer and applies them to the DOM in a single pass. Supported opcodes:
-
-- `SET_TEXT` -- set text content of an element
-- `SET_ATTR` -- set an HTML attribute
-- `REMOVE_ATTR` -- remove an HTML attribute
-- `APPEND_CHILD` -- append a child element
-- `REMOVE_CHILD` -- remove a child element
-- `INSERT_BEFORE` -- insert an element before a reference node
-- `SET_STYLE` -- set an inline style property
-- `CLASS_ADD` -- add a CSS class
-- `CLASS_REMOVE` -- remove a CSS class
-- `CLASS_TOGGLE` -- toggle a CSS class
-- `SET_INNER_HTML` -- set innerHTML of an element
-- `ADD_EVENT` -- add an event listener
-- `REMOVE_EVENT` -- remove an event listener
-- `FOCUS` -- focus an element
-- `BLUR` -- blur (unfocus) an element
-- `SET_PROPERTY` -- set a DOM property
-
-### Individual DOM Syscalls
-
-The individual syscalls below are still available for operations that need return values (e.g., `createElement`, `querySelector`, `getElementById`).
-
-### createElement
-
-```
-dom.createElement(tagPtr: i32, tagLen: i32) -> i32
-```
-
-Creates a DOM element with the given tag name. Returns an element handle (integer) used to reference the element in subsequent calls.
-
-**Parameters:**
-- `tagPtr` -- pointer to the tag name string in WASM memory
-- `tagLen` -- length of the tag name string
-
-**Returns:** Element handle (i32)
-
-### setText
-
-```
-dom.setText(parentHandle: i32, textPtr: i32, textLen: i32)
-```
-
-Sets the `textContent` of the element identified by `parentHandle`.
-
-### appendChild
-
-```
-dom.appendChild(parentHandle: i32, childHandle: i32)
-```
-
-Appends the child element to the parent element in the DOM tree.
-
-### addEventListener
-
-```
-dom.addEventListener(handle: i32, eventPtr: i32, eventLen: i32, callbackIdx: i32)
-```
-
-Adds an event listener to the element. When the event fires, the WASM function exported as `__handler_{callbackIdx}` is called.
-
-**Parameters:**
-- `handle` -- element handle
-- `eventPtr`, `eventLen` -- event name (e.g., "click", "submit", "input")
-- `callbackIdx` -- index of the handler function in the WASM exports
-
-### setAttribute
-
-```
-dom.setAttribute(handle: i32, namePtr: i32, nameLen: i32, valPtr: i32, valLen: i32)
-```
-
-Sets an HTML attribute on the element (e.g., `class`, `id`, `placeholder`).
-
-### setProperty
-
-```
-dom.setProperty(handle: i32, namePtr: i32, nameLen: i32, valPtr: i32, valLen: i32)
-```
-
-Sets a DOM property (not an HTML attribute) on the element. Used by two-way form bindings (`bind:value`, `bind:checked`). Boolean properties like `checked`, `disabled`, and `readOnly` are converted from string to boolean automatically.
-
-### getProperty
-
-```
-dom.getProperty(handle: i32, namePtr: i32, nameLen: i32) -> (i32, i32)
-```
-
-Gets a DOM property value from the element. Returns a `(ptr, len)` pair pointing to the string value in WASM memory.
-
-### lazyMount
-
-```
-dom.lazyMount(componentNamePtr: i32, componentNameLen: i32, rootHandle: i32, fallbackFnIdx: i32)
-```
-
-Mounts a lazy-loaded component. Shows the fallback content immediately, then dynamically fetches and instantiates the component's WASM chunk (from `./{componentName}.wasm`). Once loaded, the fallback is replaced with the actual component.
-
-### errorBoundary
-
-```
-dom.errorBoundary(rootHandle: i32, mountFnIdx: i32, fallbackFnIdx: i32)
-```
-
-Wraps a component mount in an error boundary. Attempts to mount the component using `__handler_{mountFnIdx}`. If an exception is thrown, clears the failed render and mounts the fallback UI using `__handler_{fallbackFnIdx}`. Stores retry information on the element for potential recovery.
+**Element registry:** DOM elements are registered by integer ID. WASM refers to elements by ID, never by reference. `R.__registerElement(el)` returns an integer handle.
 
 ---
 
-## signal
+## Flush Opcodes
 
-Reactive state management primitives. Signals are the foundation of Nectar's fine-grained reactivity system.
+The command buffer uses these opcodes for batched DOM updates:
 
-### create
-
-```
-signal.create(initialValue: i32) -> i32
-```
-
-Creates a new reactive signal with the given initial value. Returns a signal ID for use with `get`, `set`, and `subscribe`.
-
-### get
-
-```
-signal.get(signalId: i32) -> i32
-```
-
-Reads the current value of a signal. If called inside an effect, the effect is automatically registered as a dependency -- it will re-run when this signal changes.
-
-### set
-
-```
-signal.set(signalId: i32, newValue: i32)
-```
-
-Updates the signal value. If the new value differs from the current value, all subscribed effects are scheduled for re-execution.
-
-### subscribe
-
-```
-signal.subscribe(signalId: i32, callbackIdx: i32)
-```
-
-Registers an effect that runs whenever the signal value changes. The WASM function `__effect_{callbackIdx}` is called with the new signal value as its parameter.
-
-### createEffect
-
-```
-signal.createEffect(fnIdx: i32)
-```
-
-Creates a reactive effect. The WASM function `__effect_{fnIdx}` is called immediately to capture initial dependencies, then re-run automatically whenever any signal it reads changes.
-
-### createMemo
-
-```
-signal.createMemo(fnIdx: i32) -> i32
-```
-
-Creates a memoized computed value. The WASM function `__memo_{fnIdx}` is called to compute the initial value. The result is cached and only recomputed when its signal dependencies change. Returns a signal ID that can be read with `signal.get`.
-
-### batch
-
-```
-signal.batch(fnIdx: i32)
-```
-
-Executes the WASM function `__batch_{fnIdx}` inside a batch. Multiple signal updates within the batch are grouped so that dependent effects only run once after the batch completes. The batch flushes synchronously.
+| Opcode | Value | Operation |
+|---|---|---|
+| `OP_SET_TEXT` | 1 | Set textContent on element |
+| `OP_SET_ATTR` | 2 | Set attribute (name, value) |
+| `OP_REMOVE_ATTR` | 3 | Remove attribute |
+| `OP_APPEND_CHILD` | 4 | Append child element |
+| `OP_REMOVE_CHILD` | 5 | Remove child element |
+| `OP_INSERT_BEFORE` | 6 | Insert element before reference |
+| `OP_SET_STYLE` | 7 | Set inline style property |
+| `OP_CLASS_ADD` | 8 | Add CSS class |
+| `OP_CLASS_REMOVE` | 9 | Remove CSS class |
+| `OP_CLASS_TOGGLE` | 10 | Toggle CSS class |
+| `OP_SET_INNER_HTML` | 11 | Set innerHTML |
+| `OP_ADD_EVENT` | 12 | Add event listener |
+| `OP_REMOVE_EVENT` | 13 | Remove event listener |
+| `OP_FOCUS` | 14 | Focus element |
+| `OP_BLUR` | 15 | Blur element |
+| `OP_SET_PROPERTY` | 16 | Set DOM property (value, checked, etc.) |
 
 ---
 
-## http
+## Namespaces
 
-HTTP communication from WASM.
+core.js exports 16 namespaces via `wasmImports`. Each namespace contains only functions that call browser APIs WASM physically cannot invoke.
 
-### fetch
+### dom
 
-```
-http.fetch(urlPtr: i32, urlLen: i32, methodPtr: i32, methodLen: i32) -> i32
-```
+DOM manipulation, element queries, and rendering.
 
-Initiates an HTTP request. Returns a fetch ID that can be used with `fetchGetBody` and `fetchGetStatus` to retrieve the response.
+| Function | Parameters | Browser API |
+|---|---|---|
+| `mount` | containerElId, htmlPtr, htmlLen | `el.innerHTML = html` |
+| `hydrateRefs` | containerElId | `querySelectorAll('[data-nid]')` |
+| `flush` | bufPtr, bufLen | Reads opcode buffer, executes batched DOM ops |
+| `getElementById` | ptr, len | `document.getElementById()` |
+| `querySelector` | ptr, len | `document.querySelector()` |
+| `createElement` | ptr, len | `document.createElement()` |
+| `createTextNode` | ptr, len | `document.createTextNode()` |
+| `getBody` | — | `document.body` |
+| `getHead` | — | `document.head` |
+| `getRoot` | — | `document.getElementById('app')` or `document.body` |
+| `getDocumentElement` | — | `document.documentElement` |
+| `addEventListener` | elId, evtPtr, evtLen, cbIdx | `el.addEventListener()` — marshals event data (clientX/Y, keyCode, modifiers, key, dataTransfer) |
+| `removeEventListener` | elId, evtPtr, evtLen, cbIdx | `el.removeEventListener()` |
+| `lazyMount` | containerElId, urlPtr, urlLen, cbIdx | `import(url)` dynamic module loading |
+| `setTitle` | ptr, len | `document.title = str` |
+| `getScrollTop` | elId | `el.scrollTop` |
+| `getScrollLeft` | elId | `el.scrollLeft` |
+| `getClientHeight` | elId | `el.clientHeight` |
+| `getClientWidth` | elId | `el.clientWidth` |
+| `getWindowWidth` | — | `window.innerWidth` |
+| `getWindowHeight` | — | `window.innerHeight` |
+| `getOuterHtml` | — | `document.documentElement.outerHTML` |
+| `setDragData` | fmtPtr, fmtLen, dataPtr, dataLen | `dataTransfer.setData()` |
+| `getDragData` | fmtPtr, fmtLen | `dataTransfer.getData()` |
+| `preventDefault` | — | `event.preventDefault()` |
+| `loadScript` | urlPtr, urlLen, cbIdx | Creates `<script>` element, sets src |
+| `loadChunk` | urlPtr, urlLen | Creates `<script>`, returns promise ID |
+| `decodeImage` | srcPtr, srcLen, cbIdx | `new Image()`, `img.decode()` |
+| `progressiveImage` | elId, lowPtr, lowLen, highPtr, highLen | Sets low-res src, swaps to high-res on load |
+| `print` | elId | `contentWindow.print()` |
+| `reloadModule` | urlPtr, urlLen, cbIdx | `fetch()` → `WebAssembly.compile()` → `WebAssembly.instantiate()` |
+| `download` | dataPtr, dataLen, namePtr, nameLen | `Blob` → `URL.createObjectURL()` → `<a>` click → `URL.revokeObjectURL()` |
 
-**Parameters:**
-- `urlPtr`, `urlLen` -- request URL
-- `methodPtr`, `methodLen` -- HTTP method ("GET", "POST", etc.)
+### timer
 
-### fetchGetBody
+Timing and animation frame scheduling.
 
-```
-http.fetchGetBody(fetchId: i32) -> (i32, i32)
-```
+| Function | Parameters | Browser API |
+|---|---|---|
+| `setTimeout` | cbIdx, ms | `setTimeout()` |
+| `clearTimeout` | id | `clearTimeout()` |
+| `setInterval` | cbIdx, ms | `setInterval()` |
+| `clearInterval` | id | `clearInterval()` |
+| `requestAnimationFrame` | cbIdx | `requestAnimationFrame()` |
+| `cancelAnimationFrame` | id | `cancelAnimationFrame()` |
+| `now` | — | `performance.now()` |
 
-Retrieves the response body for a completed fetch. Returns `(ptr, len)` pointing to the response body in WASM memory.
+### webapi
 
-### fetchGetStatus
+General browser APIs — storage, clipboard, location, history, console, sharing, performance.
 
-```
-http.fetchGetStatus(fetchId: i32) -> i32
-```
+| Function | Parameters | Browser API |
+|---|---|---|
+| `localStorageGet` | keyPtr, keyLen | `localStorage.getItem()` |
+| `localStorageSet` | keyPtr, keyLen, valPtr, valLen | `localStorage.setItem()` |
+| `localStorageRemove` | keyPtr, keyLen | `localStorage.removeItem()` |
+| `sessionStorageGet` | keyPtr, keyLen | `sessionStorage.getItem()` |
+| `sessionStorageSet` | keyPtr, keyLen, valPtr, valLen | `sessionStorage.setItem()` |
+| `clipboardWrite` | ptr, len | `navigator.clipboard.writeText()` |
+| `clipboardRead` | cbIdx | `navigator.clipboard.readText()` |
+| `getLocationHref` | — | `location.href` |
+| `getLocationSearch` | — | `location.search` |
+| `getLocationHash` | — | `location.hash` |
+| `getLocationPathname` | — | `location.pathname` |
+| `pushState` | urlPtr, urlLen | `history.pushState()` |
+| `replaceState` | urlPtr, urlLen | `history.replaceState()` |
+| `consoleLog` | ptr, len | `console.log()` |
+| `consoleWarn` | ptr, len | `console.warn()` |
+| `consoleError` | ptr, len | `console.error()` |
+| `onPopState` | cbIdx | `addEventListener('popstate')` |
+| `envGet` | namePtr, nameLen | `window.__env[name]` |
+| `canShare` | — | `!!navigator.share` |
+| `nativeShare` | titlePtr, titleLen, textPtr, textLen, urlPtr, urlLen | `navigator.share()` |
+| `perfMark` | namePtr, nameLen | `performance.mark()` |
+| `perfMeasure` | namePtr, nameLen, startPtr, startLen, endPtr, endLen | `performance.measure()` |
 
-Returns the HTTP status code for a completed fetch.
+### http
 
-### fetchAsync
+HTTP communication via typed setters — no serialization.
 
-```
-http.fetchAsync(urlPtr: i32, urlLen: i32, methodPtr: i32, methodLen: i32, callbackIdx: i32)
-```
+| Function | Parameters | Browser API |
+|---|---|---|
+| `setMethod` | ptr, len | Stores method string for next fetch |
+| `setBody` | ptr, len | Stores body string for next fetch |
+| `addHeader` | keyPtr, keyLen, valPtr, valLen | Adds to headers for next fetch |
+| `fetch` | urlPtr, urlLen | `fetch()` with stored method/body/headers, returns promise ID |
 
-Initiates an asynchronous HTTP request. When the response arrives, calls `__fetch_callback_{callbackIdx}(status, bodyPtr, bodyLen)`. On error, calls `__fetch_error_{callbackIdx}(errorPtr, errorLen)`.
+**Pattern:** WASM calls `setMethod("POST")`, `addHeader("Content-Type", "application/json")`, `setBody(json)`, then `fetch(url)`. Each call is a simple string store — zero serialization overhead.
+
+### observe
+
+Intersection, resize, and mutation observers.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `matchMedia` | queryPtr, queryLen | `matchMedia()` — returns boolean |
+| `intersectionObserver` | cbIdx, optsPtr | `new IntersectionObserver()` — uses `__readOpts` for options |
+| `observe` | obsId, elId | `observer.observe(el)` |
+| `unobserve` | obsId, elId | `observer.unobserve(el)` |
+| `disconnect` | obsId | `observer.disconnect()` |
+
+### ws
+
+WebSocket connections.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `connect` | urlPtr, urlLen | `new WebSocket(url)` |
+| `send` | wsId, dataPtr, dataLen | `ws.send(str)` |
+| `sendBinary` | wsId, ptr, len | `ws.send(Uint8Array)` |
+| `close` | wsId | `ws.close()` |
+| `closeWithCode` | wsId, code, reasonPtr, reasonLen | `ws.close(code, reason)` |
+| `onOpen` | wsId, cbIdx | `ws.addEventListener('open')` |
+| `onMessage` | wsId, cbIdx | `ws.addEventListener('message')` — writes data to WASM memory |
+| `onClose` | wsId, cbIdx | `ws.addEventListener('close')` |
+| `onError` | wsId, cbIdx | `ws.addEventListener('error')` |
+| `getReadyState` | wsId | `ws.readyState` |
+
+### db
+
+IndexedDB operations.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `open` | namePtr, nameLen, version, cbIdx | `indexedDB.open()` — creates 'default' store on upgrade |
+| `put` | dbId, storePtr, storeLen, keyPtr, keyLen, valPtr, valLen | `objectStore.put()` |
+| `get` | dbId, storePtr, storeLen, keyPtr, keyLen, cbIdx | `objectStore.get()` |
+| `delete` | dbId, storePtr, storeLen, keyPtr, keyLen | `objectStore.delete()` |
+| `getAll` | dbId, storePtr, storeLen, cbIdx | `objectStore.getAll()` |
+
+### worker
+
+Web Workers and message channels.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `spawn` | codePtr, codeLen | `new Worker(Blob URL)` from code string |
+| `channelCreate` | — | `new MessageChannel()` — returns port1 ID |
+| `channelSend` | portId, dataPtr, dataLen | `port.postMessage()` |
+| `channelRecv` | portId, cbIdx | `port.onmessage`, `port.start()` |
+| `parallel` | fnPtrsPtr, fnCount, cbIdx | Callback dispatch (stub) |
+| `await` | promiseId | Returns promise object |
+| `postMessage` | workerId, dataPtr, dataLen | `worker.postMessage()` |
+| `onMessage` | workerId, cbIdx | `worker.addEventListener('message')` |
+| `terminate` | workerId | `worker.terminate()` |
+
+### pwa
+
+Service workers, push notifications, and caching.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `cachePrecache` | namePtr, nameLen | `caches.open()` |
+| `registerPush` | optsPtr | `pushManager.subscribe()` — uses `__readOpts` for options |
+| `registerServiceWorker` | pathPtr, pathLen, cbIdx | `navigator.serviceWorker.register()` |
+
+### hardware
+
+Device hardware access.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `haptic` | pattern | `navigator.vibrate()` |
+| `biometricAuth` | optsPtr, successCb, failCb | `navigator.credentials.get()` — uses `__readOpts` |
+| `cameraCapture` | constraintsPtr, cbIdx | `navigator.mediaDevices.getUserMedia()` — uses `__readOpts` |
+| `geolocationCurrent` | cbIdx | `navigator.geolocation.getCurrentPosition()` — writes lat/lon to WASM memory |
+
+### payment
+
+Payment processing via sandboxed iframes.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `processPayment` | elId, msgPtr, msgLen, cbIdx | `contentWindow.postMessage()`, listens for response via `window.addEventListener('message')` |
+
+### auth
+
+OAuth and credential management.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `login` | urlPtr, urlLen | `location.href = url` (redirect to OAuth provider) |
+| `logout` | urlPtr, urlLen | `location.href = url` (redirect to logout endpoint) |
+| `getRawCookies` | — | `document.cookie` |
+| `setCookie` | ptr, len | `document.cookie = str` |
+
+### upload
+
+File input and transfer.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `init` | acceptPtr, acceptLen, multiple, cbIdx | Creates `<input type="file">`, calls `click()` |
+| `start` | urlPtr, urlLen, cbIdx | `new XMLHttpRequest()`, opens POST, tracks `progress`/`load` events |
+| `cancel` | xhrId | `xhr.abort()` |
+
+### time
+
+Locale-aware date/time formatting (the only valid use of `Intl` from JS).
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `now` | — | `Date.now()` |
+| `format` | ms, localePtr, localeLen | `new Intl.DateTimeFormat(locale).format()` |
+| `getTimezoneOffset` | — | `new Date().getTimezoneOffset()` |
+| `formatDate` | ms, localePtr, localeLen, optsPtr | `new Intl.DateTimeFormat(locale, opts).format()` — uses `__readOpts` |
+
+### streaming
+
+Server-Sent Events and streaming fetch.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `streamFetch` | urlPtr, urlLen, cbIdx | `fetch()` → `body.getReader()` → pumps chunks with `read()` |
+| `sseConnect` | urlPtr, urlLen, cbIdx | `new EventSource(url)`, listens for `message` events |
+
+### rtc
+
+WebRTC peer connections, data channels, and media tracks.
+
+| Function | Parameters | Browser API |
+|---|---|---|
+| `createPeer` | optsPtr | `new RTCPeerConnection(opts)` |
+| `createPeerWithIce` | urlsPtr, urlsLen | `new RTCPeerConnection({iceServers:[{urls}]})` |
+| `createOffer` | pcId, cbIdx | `pc.createOffer()` |
+| `createAnswer` | pcId, cbIdx | `pc.createAnswer()` |
+| `setLocalDescription` | pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx | `pc.setLocalDescription()` |
+| `setRemoteDescription` | pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx | `pc.setRemoteDescription()` |
+| `addIceCandidate` | pcId, candPtr, candLen, midPtr, midLen, cbIdx | `pc.addIceCandidate()` |
+| `createDataChannel` | pcId, labelPtr, labelLen, optsPtr | `pc.createDataChannel()` |
+| `dataChannelSend` | dcId, dataPtr, dataLen | `dc.send(string)` |
+| `dataChannelSendBinary` | dcId, ptr, len | `dc.send(Uint8Array)` |
+| `dataChannelClose` | dcId | `dc.close()` |
+| `dataChannelGetState` | dcId | `dc.readyState` |
+| `onDataChannelMessage` | dcId, cbIdx | `dc.onmessage` |
+| `onDataChannelOpen` | dcId, cbIdx | `dc.onopen` |
+| `onDataChannelClose` | dcId, cbIdx | `dc.onclose` |
+| `addTrack` | pcId, trackId, streamId | `pc.addTrack()` |
+| `removeTrack` | pcId, senderId | `pc.removeTrack()` |
+| `getStats` | pcId, cbIdx | `pc.getStats()` |
+| `close` | pcId | `pc.close()` |
+| `onIceCandidate` | pcId, cbIdx | `pc.onicecandidate` |
+| `onIceCandidateFull` | pcId, cbIdx | `pc.onicecandidate` (full candidate object) |
+| `onTrack` | pcId, cbIdx | `pc.ontrack` |
+| `onDataChannel` | pcId, cbIdx | `pc.ondatachannel` |
+| `onConnectionStateChange` | pcId, cbIdx | `pc.onconnectionstatechange` |
+| `onIceConnectionStateChange` | pcId, cbIdx | `pc.oniceconnectionstatechange` |
+| `onIceGatheringStateChange` | pcId, cbIdx | `pc.onicegatheringstatechange` |
+| `onSignalingStateChange` | pcId, cbIdx | `pc.onsignalingstate` |
+| `onNegotiationNeeded` | pcId, cbIdx | `pc.onnegotiationneeded` |
+| `getConnectionState` | pcId | `pc.connectionState` |
+| `getIceConnectionState` | pcId | `pc.iceConnectionState` |
+| `getSignalingState` | pcId | `pc.signalingState` |
+| `attachStream` | elId, streamId | `el.srcObject = stream` |
+| `getUserMedia` | optsPtr, cbIdx | `navigator.mediaDevices.getUserMedia()` |
+| `getDisplayMedia` | optsPtr, cbIdx | `navigator.mediaDevices.getDisplayMedia()` |
+| `stopTrack` | trackId | `track.stop()` |
+| `setTrackEnabled` | trackId, enabled | `track.enabled = bool` |
+| `getTrackKind` | trackId | `track.kind` |
 
 ---
 
-## worker
+## WASM-Internal Features (No JS)
 
-Concurrency primitives using Web Workers.
+These features run entirely in WASM with zero JavaScript involvement:
 
-### spawn
-
-```
-worker.spawn(funcIdx: i32) -> i32
-```
-
-Spawns a WASM function on a background Web Worker by function table index. Returns the function index. The worker pool automatically manages worker lifecycle and reuse.
-
-### channelCreate
-
-```
-worker.channelCreate() -> i32
-```
-
-Creates a new message channel for communication between the main thread and workers. Returns a channel ID. Internally uses `MessageChannel` for cross-worker delivery.
-
-### channelSend
-
-```
-worker.channelSend(channelId: i32, valuePtr: i32, valueLen: i32)
-```
-
-Sends a value through a channel. The value bytes are copied from WASM memory. If a receiver is waiting, the value is delivered immediately; otherwise it is buffered.
-
-### channelRecv
-
-```
-worker.channelRecv(channelId: i32, callbackIdx: i32)
-```
-
-Receives a value from a channel asynchronously. When a value is available, calls `__channel_recv_{callbackIdx}(ptr, len)` with the value written to WASM memory. If a value is already buffered, delivery is immediate.
-
-### parallel
-
-```
-worker.parallel(funcIndicesPtr: i32, funcIndicesLen: i32, callbackIdx: i32)
-```
-
-Runs multiple WASM functions in parallel on the worker pool. `funcIndicesPtr` points to an array of i32 function table indices. When all functions complete, calls `__parallel_done_{callbackIdx}(resultsPtr, resultsLen)` with the collected results.
-
-If no worker pool is available, functions fall back to sequential execution on the main thread.
+- **Reactive signals** — dependency graph, effect scheduling, batching, memos
+- **String runtime** — concat, fromI32, fromF64, fromBool, toString
+- **Router matching** — URL parsing, pattern matching, parameter extraction
+- **Form validation** — schema checking, field validation, error collection
+- **Crypto** — SHA-256/512/384/1, AES-GCM/CBC/CTR, Ed25519, HMAC-SHA256/512, PBKDF2, HKDF, ECDH, UUID v4, random bytes — all pure WASM, zero JS
+- **Formatting** — number/currency/date formatting with compiled-in locale tables
+- **Collections** — BTreeMap, HashSet, Vec, etc.
+- **BigDecimal** — arbitrary precision arithmetic
+- **URL parsing** — RFC 3986 compliant parser
+- **Fuzzy search** — approximate string matching
+- **Feature flags** — compile-time constants in WASM data section
+- **Caching logic** — LRU, TTL, invalidation
+- **Permissions enforcement** — capability checks
+- **Animation math** — spring physics, easing functions, interpolation
+- **Gesture recognition** — velocity, direction, distance calculations
+- **Virtual scroll** — visible range calculation
+- **Style injection** — scoped CSS generation
+- **A11y** — ARIA attribute management, focus trapping
+- **Theming** — CSS custom property generation
+- **SEO** — meta tag generation, JSON-LD, sitemap
+- **Tracing/observability** — performance marks, spans
+- **State management** — atomic operations on shared memory
+- **Chart** — line, bar, pie, scatter chart generation
+- **CSV** — parse, stringify, typed parsing, export
+- **Date picker** — date selection, formatting, range validation
+- **Toast** — notification queue, positioning, auto-dismiss
+- **Debounce/throttle** — rate limiting for event handlers
+- **Pagination** — page calculation, offset/limit generation
+- **Input masking** — phone, currency, custom format masks
 
 ---
 
-## ai
+## Exported Functions
 
-AI/LLM interaction primitives for building intelligent applications.
+core.js also exports:
 
-### chatStream
-
-```
-ai.chatStream(
-    modelPtr: i32, modelLen: i32,
-    messagesPtr: i32, messagesLen: i32,
-    toolsPtr: i32, toolsLen: i32,
-    onTokenIdx: i32,
-    onToolCallIdx: i32,
-    onDoneIdx: i32
-)
-```
-
-Initiates a streaming chat completion. Sends a POST request to `/api/chat` with the model, message history, and tool definitions. As tokens arrive via Server-Sent Events:
-
-- **Token callback**: `__ai_token_{onTokenIdx}(ptr, len)` is called with each content token
-- **Tool call callback**: `__ai_tool_call_{onToolCallIdx}(ptr, len)` is called with the tool call JSON. The runtime automatically dispatches the tool call to the registered WASM function and feeds the result back
-- **Done callback**: `__ai_done_{onDoneIdx}()` is called when the stream ends
-
-### chatComplete
-
-```
-ai.chatComplete(
-    modelPtr: i32, modelLen: i32,
-    messagesPtr: i32, messagesLen: i32,
-    callbackIdx: i32
-)
-```
-
-Non-streaming chat completion. Sends the request and waits for the full response. Calls `__ai_complete_{callbackIdx}(ptr, len)` with the complete response content.
-
-### registerTool
-
-```
-ai.registerTool(
-    namePtr: i32, nameLen: i32,
-    descPtr: i32, descLen: i32,
-    schemaPtr: i32, schemaLen: i32,
-    funcIdx: i32
-)
-```
-
-Registers a tool that the AI model can call. The tool body is a WASM-exported function at `funcIdx`. Parameters:
-
-- `name` -- tool name (matches what the AI sees)
-- `description` -- human-readable description
-- `schema` -- JSON schema for the tool parameters
-- `funcIdx` -- WASM function table index
-
-### embed
-
-```
-ai.embed(textPtr: i32, textLen: i32, callbackIdx: i32)
-```
-
-Generates an embedding vector for the given text. Sends a POST to `/api/embed`. Calls `__ai_embed_{callbackIdx}(ptr, len)` with a Float32Array of the embedding written to WASM memory.
-
-### parseStructured
-
-```
-ai.parseStructured(responsePtr: i32, responseLen: i32, schemaPtr: i32, schemaLen: i32) -> i32
-```
-
-Parses an AI response string as structured JSON data. Returns a pointer to the parsed JSON string in WASM memory, or 0 (null) on parse failure.
-
----
-
-## streaming
-
-Streaming data sources: fetch streams, Server-Sent Events, and WebSockets.
-
-### streamFetch
-
-```
-streaming.streamFetch(urlPtr: i32, urlLen: i32, callbackIdx: i32)
-```
-
-Creates a streaming fetch that processes the response body as a `ReadableStream`. For each chunk:
-
-- **Chunk callback**: `__stream_chunk_{callbackIdx}(ptr, len)` is called with the decoded text
-- **Done callback**: `__stream_done_{callbackIdx}()` is called when the stream ends
-
-### sseConnect
-
-```
-streaming.sseConnect(urlPtr: i32, urlLen: i32, callbackIdx: i32)
-```
-
-Connects to a Server-Sent Events endpoint. Each incoming event triggers `__stream_chunk_{callbackIdx}(ptr, len)` with the event data. On error or close, `__stream_done_{callbackIdx}()` is called.
-
-### wsConnect
-
-```
-streaming.wsConnect(urlPtr: i32, urlLen: i32, callbackIdx: i32) -> i32
-```
-
-Opens a WebSocket connection. Returns a WebSocket handle ID. Incoming messages trigger `__stream_chunk_{callbackIdx}(ptr, len)`. On close, `__stream_done_{callbackIdx}()` is called.
-
-### wsSend
-
-```
-streaming.wsSend(wsId: i32, dataPtr: i32, dataLen: i32)
-```
-
-Sends a text message through an open WebSocket connection.
-
-### wsClose
-
-```
-streaming.wsClose(wsId: i32)
-```
-
-Closes a WebSocket connection.
-
-### yield
-
-```
-streaming.yield(dataPtr: i32, dataLen: i32)
-```
-
-Emits a value from a WASM-originated stream. Used internally when Nectar code uses the `yield` statement inside a streaming context.
-
----
-
-## media
-
-Image and resource loading utilities.
-
-### lazyImage
-
-```
-media.lazyImage(srcPtr: i32, srcLen: i32, placeholderPtr: i32, placeholderLen: i32, elementHandle: i32)
-```
-
-Implements lazy image loading with `IntersectionObserver`. The placeholder image is shown immediately. When the element scrolls into view (with a 200px root margin), the full image source is loaded.
-
-Falls back to immediate loading if `IntersectionObserver` is not available.
-
-### decodeImage
-
-```
-media.decodeImage(srcPtr: i32, srcLen: i32, callbackIdx: i32)
-```
-
-Decodes an image off the main thread using `createImageBitmap`. When decoding completes, calls `__media_decoded_{callbackIdx}(handle)` with an element handle for the decoded bitmap.
-
-### preload
-
-```
-media.preload(urlPtr: i32, urlLen: i32, typePtr: i32, typeLen: i32)
-```
-
-Preloads a critical resource by injecting a `<link rel="preload">` element into the document head. The `type` parameter maps to the `as` attribute (e.g., "image", "script", "style", "font").
-
-### progressiveImage
-
-```
-media.progressiveImage(thumbPtr: i32, thumbLen: i32, fullPtr: i32, fullLen: i32, elementHandle: i32)
-```
-
-Implements progressive image loading (blur-up technique). The tiny thumbnail is shown immediately with a CSS blur filter. Once the full-resolution image loads in the background, it replaces the thumbnail and the blur is removed with a smooth transition.
-
----
-
-## router
-
-Client-side URL routing.
-
-### init
-
-```
-router.init(routesPtr: i32, routesLen: i32)
-```
-
-Initializes the router. Sets up the `popstate` event listener for browser back/forward navigation and matches the initial URL against registered routes.
-
-### navigate
-
-```
-router.navigate(pathPtr: i32, pathLen: i32)
-```
-
-Programmatically navigates to a new URL path. Uses `history.pushState` to update the browser URL without a full page reload, then matches the new path against routes and mounts the corresponding component.
-
-### currentPath
-
-```
-router.currentPath() -> i32
-```
-
-Returns a pointer to the current URL path string in WASM memory.
-
-### getParam
-
-```
-router.getParam(namePtr: i32, nameLen: i32) -> i32
-```
-
-Returns the value of a named route parameter (extracted from `:param` segments in the route pattern). Returns a pointer to the parameter value string in WASM memory.
-
-### registerRoute
-
-```
-router.registerRoute(pathPtr: i32, pathLen: i32, mountFnIdx: i32)
-```
-
-Registers a route pattern with a mount function index. The pattern supports:
-
-- **Static segments**: `"/about"` -- exact match
-- **Parameters**: `"/user/:id"` -- captures `id`
-- **Wildcards**: `"/admin/*"` -- matches anything under `/admin/`
-
----
-
-## style
-
-Scoped CSS injection and management.
-
-### isCriticalLoaded
-
-```
-style.isCriticalLoaded() -> i32
-```
-
-Checks whether critical CSS has already been inlined by the server during SSR with `--critical-css`. Returns `1` if `window.__nectarCriticalLoaded` is set, `0` otherwise.
-
-This is used internally by the runtime to avoid double-injecting styles that the SSR pass has already inlined in a `<style data-nectar-critical>` tag.
-
-### injectStyles
-
-```
-style.injectStyles(componentNamePtr: i32, componentNameLen: i32, cssPtr: i32, cssLen: i32) -> i32
-```
-
-Injects scoped CSS for a component. The runtime:
-
-1. Generates a unique scope ID from the component name (hash-based)
-2. **If critical CSS was inlined by SSR** (`window.__nectarCriticalLoaded` is set), checks whether this component's scoped styles already exist in the `<style data-nectar-critical>` tag. If so, skips injection and returns the scope ID immediately -- avoiding double-injection of styles.
-3. Prefixes all CSS selectors with `[data-nectar-HASH]` for scoping
-4. Creates a `<style>` element in the document head
-5. Removes any existing style for the same component (supporting hot reload)
-
-Returns a pointer to the scope ID string in WASM memory.
-
-### applyScope
-
-```
-style.applyScope(elementHandle: i32, scopeIdPtr: i32, scopeIdLen: i32)
-```
-
-Applies a scope ID to a DOM element by setting a `data-nectar-HASH` attribute. This ensures the scoped CSS selectors match only elements within this component.
-
----
-
-## animation
-
-Web Animations API bridge for transitions and keyframe animations.
-
-### registerTransition
-
-```
-animation.registerTransition(
-    elementId: i32,
-    propertyPtr: i32, propertyLen: i32,
-    durationPtr: i32, durationLen: i32,
-    easingPtr: i32, easingLen: i32
-)
-```
-
-Registers a CSS transition on an element by setting its `style.transition` property. Multiple transitions can be registered on the same element (they are appended with commas).
-
-### registerKeyframes
-
-```
-animation.registerKeyframes(
-    namePtr: i32, nameLen: i32,
-    keyframesJsonPtr: i32, keyframesJsonLen: i32
-)
-```
-
-Registers a named keyframe animation. The keyframes are provided as a JSON array of objects with `offset` and CSS properties. The animation can later be played with `animation.play`.
-
-### play
-
-```
-animation.play(
-    elementId: i32,
-    namePtr: i32, nameLen: i32,
-    durationPtr: i32, durationLen: i32
-)
-```
-
-Plays a registered animation on an element using `Element.animate()`. Supports duration strings like `"0.5s"` or `"500ms"`. The animation fills forward by default.
-
-### pause
-
-```
-animation.pause(elementId: i32)
-```
-
-Pauses all active animations on an element, including both tracked animations and any animations returned by `Element.getAnimations()`.
-
-### cancel
-
-```
-animation.cancel(elementId: i32)
-```
-
-Cancels all active animations on an element and clears the tracking state.
-
-### onFinish
-
-```
-animation.onFinish(elementId: i32, callbackIndex: i32)
-```
-
-Registers a callback for when the most recent animation on an element finishes. Calls `__handler_{callbackIndex}()` when the animation completes.
-
----
-
-## a11y
-
-Accessibility utilities for building inclusive applications.
-
-### setAriaAttribute
-
-```
-a11y.setAriaAttribute(elementId: i32, namePtr: i32, nameLen: i32, valuePtr: i32, valueLen: i32)
-```
-
-Sets any `aria-*` attribute on an element. The `name` parameter should include the `aria-` prefix (e.g., `"aria-label"`, `"aria-hidden"`).
-
-### setRole
-
-```
-a11y.setRole(elementId: i32, rolePtr: i32, roleLen: i32)
-```
-
-Sets the `role` attribute on an element (e.g., `"button"`, `"navigation"`, `"dialog"`).
-
-### manageFocus
-
-```
-a11y.manageFocus(elementId: i32)
-```
-
-Programmatically moves focus to an element. If the element is not natively focusable (not `<input>`, `<button>`, `<a>`, `<select>`, or `<textarea>`), a `tabindex="-1"` attribute is added automatically before focusing.
-
-### announceToScreenReader
-
-```
-a11y.announceToScreenReader(textPtr: i32, textLen: i32, priority: i32)
-```
-
-Announces text to screen readers using an `aria-live` region. The priority parameter controls urgency:
-
-- `0` -- polite (waits for current speech to finish)
-- `1` -- assertive (interrupts current speech)
-
-The runtime maintains hidden `aria-live` regions in the DOM. Text is cleared and re-set to trigger a fresh announcement.
-
-### trapFocus
-
-```
-a11y.trapFocus(containerElementId: i32)
-```
-
-Creates a focus trap within a container element (useful for modals and dialogs). When the user presses Tab at the last focusable element, focus wraps to the first; Shift+Tab at the first element wraps to the last. The first focusable element inside the container receives focus immediately.
-
-Focusable elements include: `a[href]`, `button:not([disabled])`, `textarea:not([disabled])`, `input:not([disabled])`, `select:not([disabled])`, and `[tabindex]:not([tabindex="-1"])`.
-
-### releaseFocusTrap
-
-```
-a11y.releaseFocusTrap()
-```
-
-Releases the current focus trap, allowing normal tab navigation.
-
----
-
-## webapi
-
-General web platform APIs.
-
-### localStorage
-
-```
-webapi.localStorageGet(keyPtr: i32, keyLen: i32) -> (i32, i32)
-webapi.localStorageSet(keyPtr: i32, keyLen: i32, valPtr: i32, valLen: i32)
-webapi.localStorageRemove(keyPtr: i32, keyLen: i32)
-```
-
-Read, write, and delete values in `localStorage`. `localStorageGet` returns `(ptr, len)` of the stored value (empty string if not found).
-
-### sessionStorage
-
-```
-webapi.sessionStorageGet(keyPtr: i32, keyLen: i32) -> (i32, i32)
-webapi.sessionStorageSet(keyPtr: i32, keyLen: i32, valPtr: i32, valLen: i32)
-```
-
-Read and write values in `sessionStorage`.
-
-### Clipboard
-
-```
-webapi.clipboardWrite(textPtr: i32, textLen: i32)
-webapi.clipboardRead(callbackIdx: i32)
-```
-
-Write text to the system clipboard (`navigator.clipboard.writeText`) and read text from the clipboard. `clipboardRead` is asynchronous -- calls `__clipboard_read_{callbackIdx}(ptr, len)` when the text is available.
-
-### Timers
-
-```
-webapi.setTimeout(callbackIdx: i32, delayMs: i32) -> i32
-webapi.setInterval(callbackIdx: i32, intervalMs: i32) -> i32
-webapi.clearTimer(timerId: i32)
-```
-
-Standard timer functions. Callbacks invoke `__timer_{callbackIdx}()`. `clearTimer` clears both timeouts and intervals.
-
-### URL and History
-
+```javascript
+export function instantiate(wasmUrl)  // Load and initialize a WASM module
+export function hydrate(wasmInstance, rootElement)  // Attach WASM to server-rendered DOM
 ```
-webapi.getLocationHref() -> (i32, i32)
-webapi.getLocationSearch() -> (i32, i32)
-webapi.getLocationHash() -> (i32, i32)
-webapi.pushState(urlPtr: i32, urlLen: i32)
-webapi.replaceState(urlPtr: i32, urlLen: i32)
-```
-
-Access the current URL components and manipulate browser history.
-
-### Console
-
-```
-webapi.consoleLog(msgPtr: i32, msgLen: i32)
-webapi.consoleWarn(msgPtr: i32, msgLen: i32)
-webapi.consoleError(msgPtr: i32, msgLen: i32)
-```
-
-Log messages to the browser developer console at different severity levels.
-
-### Miscellaneous
-
-```
-webapi.randomFloat() -> f64
-```
-
-Returns a cryptographically random float between 0 and 1 (using `crypto.getRandomValues` when available, falling back to `Math.random`).
-
-```
-webapi.now() -> f64
-```
-
-Returns a high-resolution timestamp in milliseconds (using `performance.now` when available, falling back to `Date.now`).
-
-```
-webapi.requestAnimationFrame(callbackIdx: i32) -> i32
-```
-
-Schedules a callback before the next repaint. Calls `__raf_{callbackIdx}()`. Returns the animation frame request ID.
-
----
-
-## string
-
-String manipulation functions for building strings in WASM linear memory.
-
-### concat
-
-```
-string.concat(ptr1: i32, len1: i32, ptr2: i32, len2: i32) -> (i32, i32)
-```
-
-Concatenates two strings. Returns `(ptr, len)` of the resulting string in WASM memory.
-
-### fromI32
-
-```
-string.fromI32(value: i32) -> (i32, i32)
-```
-
-Converts an `i32` integer to its decimal string representation.
-
-### fromF64
-
-```
-string.fromF64(value: f64) -> (i32, i32)
-```
-
-Converts an `f64` float to its string representation.
-
-### fromBool
-
-```
-string.fromBool(value: i32) -> (i32, i32)
-```
-
-Converts a boolean (i32: 0 or 1) to `"true"` or `"false"`.
-
----
-
-## test
-
-Testing support functions used by the test runner.
-
-### pass
-
-Reports a test as passed.
-
-### fail
-
-Reports a test as failed with an error message.
-
-### summary
-
-Prints the test summary (total passed, total failed).
-
-Note: The current test runner validates tests through the full compilation pipeline (lex, parse, borrow check, type check, codegen) rather than executing WASM. Tests that compile without errors are reported as passing.
-
----
-
-## sw
-
-Service worker management for offline-first applications. Nectar ships a built-in service worker (`nectar-service-worker.js`). Registration and update detection are handled by the `sw` namespace in `core.js`.
-
-### register
-
-```
-sw.register()
-```
-
-Registers the Nectar service worker at `/nectar-sw.js`. If the `NectarSW` client library is loaded on the page, delegates to it for update detection and lifecycle management. Otherwise, performs a direct `navigator.serviceWorker.register()` call.
-
-### precache
-
-```
-sw.precache(urlPtr: i32, urlLen: i32)
-```
-
-Adds a URL to the precache list. If a service worker is already active, sends it a message to cache the URL immediately. The URL is also stored on the runtime instance for compile-time manifest generation.
-
-**Parameters:**
-- `urlPtr` -- pointer to the URL string in WASM memory
-- `urlLen` -- length of the URL string
-
-### isOffline
-
-```
-sw.isOffline() -> i32
-```
-
-Returns the current offline status. Uses `NectarSW.isOffline` if the client library is loaded, otherwise falls back to `navigator.onLine`.
-
-**Returns:**
-- `1` if the browser is offline
-- `0` if the browser is online
-
-### Service Worker Features
-
-The built-in service worker (`nectar-service-worker.js`) provides:
-
-- **Cache-first for app shell** -- HTML, CSS, JS, images, and fonts are served from cache when available
-- **Network-first for API calls** -- requests to `/api/*` try the network first, falling back to cached responses
-- **Aggressive WASM caching** -- `.wasm` files are stored in a dedicated cache and served cache-first
-- **Offline fallback** -- navigation requests that fail show a cached offline page
-- **Auto-versioning** -- the `CACHE_VERSION` constant is stamped by the compiler at build time; old caches are purged on activation
-
-### Client Registration Script
 
-The `sw` export from `core.js` provides:
+`instantiate()` is the main entry point — fetches the WASM file, compiles it, creates the runtime bridge, and calls the module's `main()` export.
 
-- `sw.register(swUrl?)` -- registers the service worker (default path: `/nectar-sw.js`)
-- `sw.update()` -- forces a waiting service worker to activate (triggers page reload)
-- `sw.updateAvailable` -- boolean, true when a new version is waiting
-- `sw.isOffline` -- boolean, reactive offline status
-- `sw.on('update', cb)` / `sw.on('offline', cb)` -- event listeners
-- `NectarSW.on("update", fn)` -- listen for update availability
-- `NectarSW.on("offline", fn)` -- listen for online/offline state changes
+`hydrate()` is the SSR entry point — registers the root element and calls the module's `__hydrate()` export if present.

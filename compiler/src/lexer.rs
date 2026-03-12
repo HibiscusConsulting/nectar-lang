@@ -434,6 +434,9 @@ impl Lexer {
             "droppable" => TokenKind::Droppable,
             "a11y" => TokenKind::A11y,
             "manual" => TokenKind::Manual,
+            "hybrid" => TokenKind::Hybrid,
+            "layout" => TokenKind::Layout,
+            "outlet" => TokenKind::Outlet,
             "crypto" => TokenKind::Crypto,
             "theme" => TokenKind::Theme,
             "spring" => TokenKind::Spring,
@@ -684,5 +687,379 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens[0].kind, TokenKind::Ident("x".into()));
         assert_eq!(tokens[1].kind, TokenKind::QuestionMark);
+    }
+
+    // ========================================================================
+    // COMPREHENSIVE LEXER COVERAGE TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_all_single_char_tokens() {
+        let mut lexer = Lexer::new("( ) { } [ ] , ; . ? %");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::LeftParen);
+        assert_eq!(tokens[1].kind, TokenKind::RightParen);
+        assert_eq!(tokens[2].kind, TokenKind::LeftBrace);
+        assert_eq!(tokens[3].kind, TokenKind::RightBrace);
+        assert_eq!(tokens[4].kind, TokenKind::LeftBracket);
+        assert_eq!(tokens[5].kind, TokenKind::RightBracket);
+        assert_eq!(tokens[6].kind, TokenKind::Comma);
+        assert_eq!(tokens[7].kind, TokenKind::Semicolon);
+        assert_eq!(tokens[8].kind, TokenKind::Dot);
+        assert_eq!(tokens[9].kind, TokenKind::QuestionMark);
+        assert_eq!(tokens[10].kind, TokenKind::Percent);
+    }
+
+    #[test]
+    fn test_ampersand_tokens() {
+        let mut lexer = Lexer::new("& &&");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ampersand);
+        assert_eq!(tokens[1].kind, TokenKind::AmpAmp);
+    }
+
+    #[test]
+    fn test_pipe_tokens() {
+        let mut lexer = Lexer::new("| ||");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Pipe);
+        assert_eq!(tokens[1].kind, TokenKind::PipePipe);
+    }
+
+    #[test]
+    fn test_colon_tokens() {
+        let mut lexer = Lexer::new(": ::");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Colon);
+        assert_eq!(tokens[1].kind, TokenKind::ColonColon);
+    }
+
+    #[test]
+    fn test_plus_tokens() {
+        let mut lexer = Lexer::new("+ +=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Plus);
+        assert_eq!(tokens[1].kind, TokenKind::PlusEquals);
+    }
+
+    #[test]
+    fn test_minus_tokens() {
+        let mut lexer = Lexer::new("- -> -=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Minus);
+        assert_eq!(tokens[1].kind, TokenKind::Arrow);
+        assert_eq!(tokens[2].kind, TokenKind::MinusEquals);
+    }
+
+    #[test]
+    fn test_star_tokens() {
+        let mut lexer = Lexer::new("* *=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Star);
+        assert_eq!(tokens[1].kind, TokenKind::StarEquals);
+    }
+
+    #[test]
+    fn test_slash_tokens() {
+        let mut lexer = Lexer::new("/ /=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Slash);
+        assert_eq!(tokens[1].kind, TokenKind::SlashEquals);
+    }
+
+    #[test]
+    fn test_equals_tokens() {
+        let mut lexer = Lexer::new("= == =>");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Equals);
+        assert_eq!(tokens[1].kind, TokenKind::DoubleEquals);
+        assert_eq!(tokens[2].kind, TokenKind::FatArrow);
+    }
+
+    #[test]
+    fn test_bang_tokens() {
+        let mut lexer = Lexer::new("! !=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Bang);
+        assert_eq!(tokens[1].kind, TokenKind::NotEquals);
+    }
+
+    #[test]
+    fn test_angle_tokens() {
+        let mut lexer = Lexer::new("< <= > >=");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::LeftAngle);
+        assert_eq!(tokens[1].kind, TokenKind::LessEqual);
+        assert_eq!(tokens[2].kind, TokenKind::RightAngle);
+        assert_eq!(tokens[3].kind, TokenKind::GreaterEqual);
+    }
+
+    #[test]
+    fn test_string_escape_sequences() {
+        let mut lexer = Lexer::new(r#""hello\nworld\t\\\"""#);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::StringLit("hello\nworld\t\\\"".into()));
+    }
+
+    #[test]
+    fn test_string_unknown_escape() {
+        let mut lexer = Lexer::new(r#""\q""#);
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::StringLit("q".into()));
+    }
+
+    #[test]
+    fn test_unterminated_string() {
+        let mut lexer = Lexer::new("\"hello");
+        let result = lexer.tokenize();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("Unterminated"));
+    }
+
+    #[test]
+    fn test_number_with_underscores() {
+        let mut lexer = Lexer::new("1_000_000");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Integer(1000000));
+    }
+
+    #[test]
+    fn test_float_number() {
+        let mut lexer = Lexer::new("42.5");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Float(42.5));
+    }
+
+    #[test]
+    fn test_line_comments_skipped() {
+        let mut lexer = Lexer::new("// this is a comment\nlet x = 1;");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Let);
+    }
+
+    #[test]
+    fn test_unexpected_character() {
+        let mut lexer = Lexer::new("@");
+        let result = lexer.tokenize();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.message.contains("Unexpected character"));
+    }
+
+    #[test]
+    fn test_lifetime_error_bare_quote() {
+        let mut lexer = Lexer::new("'");
+        let result = lexer.tokenize();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_lex_error_display() {
+        let err = LexError {
+            message: "test error".into(),
+            line: 5,
+            col: 10,
+        };
+        assert_eq!(format!("{}", err), "[5:10] test error");
+    }
+
+    #[test]
+    fn test_format_string_escapes() {
+        let mut lexer = Lexer::new(r#"f"tab:\there\n""#);
+        let tokens = lexer.tokenize().unwrap();
+        if let TokenKind::FormatString(parts) = &tokens[0].kind {
+            if let FormatStringPart::Lit(s) = &parts[0] {
+                assert!(s.contains('\t'));
+                assert!(s.contains('\n'));
+            }
+        } else {
+            panic!("Expected FormatString");
+        }
+    }
+
+    #[test]
+    fn test_unterminated_format_string() {
+        let mut lexer = Lexer::new("f\"hello {name");
+        let result = lexer.tokenize();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_format_string_nested_braces() {
+        let mut lexer = Lexer::new("f\"result: {foo(a, {b})}\"");
+        let tokens = lexer.tokenize().unwrap();
+        if let TokenKind::FormatString(parts) = &tokens[0].kind {
+            assert_eq!(parts.len(), 2);
+            if let FormatStringPart::Expr(e) = &parts[1] {
+                assert!(e.contains("{b}"));
+            }
+        } else {
+            panic!("Expected FormatString");
+        }
+    }
+
+    #[test]
+    fn test_all_keywords() {
+        let keywords = vec![
+            ("let", TokenKind::Let), ("mut", TokenKind::Mut), ("fn", TokenKind::Fn),
+            ("component", TokenKind::Component), ("render", TokenKind::Render),
+            ("struct", TokenKind::Struct), ("enum", TokenKind::Enum),
+            ("impl", TokenKind::Impl), ("trait", TokenKind::Trait),
+            ("if", TokenKind::If), ("else", TokenKind::Else),
+            ("match", TokenKind::Match), ("for", TokenKind::For),
+            ("in", TokenKind::In), ("while", TokenKind::While),
+            ("return", TokenKind::Return), ("own", TokenKind::Own),
+            ("ref", TokenKind::Ref), ("self", TokenKind::SelfKw),
+            ("Self", TokenKind::SelfType), ("pub", TokenKind::Pub),
+            ("use", TokenKind::Use), ("mod", TokenKind::Mod),
+            ("true", TokenKind::True), ("false", TokenKind::False),
+            ("signal", TokenKind::Signal), ("store", TokenKind::Store),
+            ("action", TokenKind::Action), ("effect", TokenKind::Effect),
+            ("computed", TokenKind::Computed), ("async", TokenKind::Async),
+            ("await", TokenKind::Await), ("fetch", TokenKind::Fetch),
+            ("derive", TokenKind::Derive), ("spawn", TokenKind::Spawn),
+            ("channel", TokenKind::Channel), ("select", TokenKind::Select),
+            ("parallel", TokenKind::Parallel), ("stream", TokenKind::Stream),
+            ("on_message", TokenKind::OnMessage),
+            ("on_connect", TokenKind::OnConnect),
+            ("on_disconnect", TokenKind::OnDisconnect),
+            ("lazy", TokenKind::Lazy), ("suspend", TokenKind::Suspend),
+            ("yield", TokenKind::Yield), ("agent", TokenKind::Agent),
+            ("prompt", TokenKind::Prompt), ("tool", TokenKind::Tool),
+            ("route", TokenKind::Route), ("link", TokenKind::Link),
+            ("navigate", TokenKind::Navigate), ("router", TokenKind::Router),
+            ("fallback", TokenKind::Fallback), ("guard", TokenKind::Guard),
+            ("style", TokenKind::Style), ("try", TokenKind::Try),
+            ("catch", TokenKind::Catch), ("test", TokenKind::Test),
+            ("assert", TokenKind::Assert), ("expect", TokenKind::Expect),
+            ("assert_eq", TokenKind::AssertEq),
+            ("transition", TokenKind::Transition),
+            ("animate", TokenKind::Animate), ("contract", TokenKind::Contract),
+            ("app", TokenKind::App), ("manifest", TokenKind::Manifest),
+            ("offline", TokenKind::Offline), ("push", TokenKind::Push),
+            ("gesture", TokenKind::Gesture), ("haptic", TokenKind::Haptic),
+            ("biometric", TokenKind::Biometric), ("camera", TokenKind::Camera),
+            ("geolocation", TokenKind::Geolocation), ("as", TokenKind::As),
+            ("where", TokenKind::Where), ("secret", TokenKind::Secret),
+            ("permissions", TokenKind::Permissions), ("page", TokenKind::Page),
+            ("meta", TokenKind::Meta), ("sitemap", TokenKind::Sitemap),
+            ("schema", TokenKind::Schema), ("canonical", TokenKind::Canonical),
+            ("form", TokenKind::Form), ("field", TokenKind::Field),
+            ("validate", TokenKind::Validate), ("must_use", TokenKind::MustUse),
+            ("chunk", TokenKind::Chunk), ("atomic", TokenKind::Atomic),
+            ("selector", TokenKind::Selector), ("embed", TokenKind::Embed),
+            ("sandbox", TokenKind::Sandbox), ("loading", TokenKind::Loading),
+            ("instant", TokenKind::Instant), ("duration", TokenKind::Duration),
+            ("pdf", TokenKind::Pdf), ("download", TokenKind::Download),
+            ("payment", TokenKind::Payment), ("auth", TokenKind::Auth),
+            ("upload", TokenKind::Upload), ("env", TokenKind::Env),
+            ("db", TokenKind::Db), ("trace", TokenKind::Trace),
+            ("flag", TokenKind::Flag), ("cache", TokenKind::Cache),
+            ("query", TokenKind::Query), ("mutation", TokenKind::Mutation),
+            ("invalidate", TokenKind::Invalidate),
+            ("optimistic", TokenKind::Optimistic),
+            ("breakpoint", TokenKind::Breakpoint), ("fluid", TokenKind::Fluid),
+            ("clipboard", TokenKind::Clipboard),
+            ("draggable", TokenKind::Draggable),
+            ("droppable", TokenKind::Droppable), ("a11y", TokenKind::A11y),
+            ("manual", TokenKind::Manual), ("hybrid", TokenKind::Hybrid),
+            ("layout", TokenKind::Layout), ("outlet", TokenKind::Outlet),
+            ("crypto", TokenKind::Crypto),
+            ("theme", TokenKind::Theme), ("spring", TokenKind::Spring),
+            ("stagger", TokenKind::Stagger), ("keyframes", TokenKind::Keyframes),
+            ("shortcut", TokenKind::Shortcut), ("virtual", TokenKind::Virtual),
+        ];
+        for (src, expected) in keywords {
+            let mut lexer = Lexer::new(src);
+            let tokens = lexer.tokenize().unwrap();
+            assert_eq!(tokens[0].kind, expected, "keyword '{}' mismatch", src);
+        }
+    }
+
+    #[test]
+    fn test_type_keywords() {
+        let types = vec![
+            ("i32", TokenKind::I32), ("i64", TokenKind::I64),
+            ("f32", TokenKind::F32), ("f64", TokenKind::F64),
+            ("u32", TokenKind::U32), ("u64", TokenKind::U64),
+            ("bool", TokenKind::Bool_), ("String", TokenKind::StringType),
+        ];
+        for (src, expected) in types {
+            let mut lexer = Lexer::new(src);
+            let tokens = lexer.tokenize().unwrap();
+            assert_eq!(tokens[0].kind, expected, "type '{}' mismatch", src);
+        }
+    }
+
+    #[test]
+    fn test_identifier_with_underscore() {
+        let mut lexer = Lexer::new("_foo _bar_baz __x");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("_foo".into()));
+        assert_eq!(tokens[1].kind, TokenKind::Ident("_bar_baz".into()));
+        assert_eq!(tokens[2].kind, TokenKind::Ident("__x".into()));
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let mut lexer = Lexer::new("");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::Eof);
+    }
+
+    #[test]
+    fn test_whitespace_only() {
+        let mut lexer = Lexer::new("   \n\t  \n  ");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::Eof);
+    }
+
+    #[test]
+    fn test_span_tracking() {
+        let mut lexer = Lexer::new("let x");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].span.line, 1);
+        assert_eq!(tokens[0].span.col, 1);
+    }
+
+    #[test]
+    fn test_multiline_span() {
+        let mut lexer = Lexer::new("let\nx");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].span.line, 1);
+        assert_eq!(tokens[1].span.line, 2);
+    }
+
+    #[test]
+    fn test_f_ident_followed_by_space() {
+        // `f` not followed by `"` should be a normal identifier
+        let mut lexer = Lexer::new("f x");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("f".into()));
+        assert_eq!(tokens[1].kind, TokenKind::Ident("x".into()));
+    }
+
+    #[test]
+    fn test_format_string_backslash_escapes() {
+        let mut lexer = Lexer::new(r#"f"a\\b\"c""#);
+        let tokens = lexer.tokenize().unwrap();
+        if let TokenKind::FormatString(parts) = &tokens[0].kind {
+            if let FormatStringPart::Lit(s) = &parts[0] {
+                assert!(s.contains('\\'));
+                assert!(s.contains('"'));
+            }
+        }
+    }
+
+    #[test]
+    fn test_comment_at_end_of_file() {
+        let mut lexer = Lexer::new("let x = 1; // end comment");
+        let tokens = lexer.tokenize().unwrap();
+        // Should parse the tokens before the comment, then EOF
+        assert_eq!(tokens.last().unwrap().kind, TokenKind::Eof);
+        assert!(tokens.len() > 1);
     }
 }

@@ -13,7 +13,7 @@ component Nav() {
                 <a href="/install">"Install"</a>
                 <a href="/examples">"Examples"</a>
                 <a href="/playground">"Playground"</a>
-                <a href="https://github.com/BlakeBurnette/nectar-lang" class="github">"GitHub"</a>
+                <a href="https://github.com/HibiscusConsulting/nectar-lang" class="github">"GitHub"</a>
             </div>
         </nav>
     }

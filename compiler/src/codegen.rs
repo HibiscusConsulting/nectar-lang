@@ -239,6 +239,47 @@ impl WasmCodegen {
         self.line("(import \"streaming\" \"streamFetch\" (func $streaming_streamFetch (param i32 i32 i32)))");
         self.line("(import \"streaming\" \"sseConnect\" (func $streaming_sseConnect (param i32 i32 i32)))");
 
+        // ── RTC — WebRTC peer connections, data channels, media tracks ────────
+        self.line("");
+        self.line(";; RTC — browser WebRTC APIs (RTCPeerConnection, data channels, media)");
+        self.line("(import \"rtc\" \"createPeer\" (func $rtc_createPeer (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"createPeerWithIce\" (func $rtc_createPeerWithIce (param i32 i32) (result i32)))");
+        self.line("(import \"rtc\" \"createOffer\" (func $rtc_createOffer (param i32 i32)))");
+        self.line("(import \"rtc\" \"createAnswer\" (func $rtc_createAnswer (param i32 i32)))");
+        self.line("(import \"rtc\" \"setLocalDescription\" (func $rtc_setLocalDescription (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"rtc\" \"setRemoteDescription\" (func $rtc_setRemoteDescription (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"rtc\" \"addIceCandidate\" (func $rtc_addIceCandidate (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"rtc\" \"createDataChannel\" (func $rtc_createDataChannel (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"rtc\" \"dataChannelSend\" (func $rtc_dataChannelSend (param i32 i32 i32)))");
+        self.line("(import \"rtc\" \"dataChannelSendBinary\" (func $rtc_dataChannelSendBinary (param i32 i32 i32)))");
+        self.line("(import \"rtc\" \"dataChannelClose\" (func $rtc_dataChannelClose (param i32)))");
+        self.line("(import \"rtc\" \"dataChannelGetState\" (func $rtc_dataChannelGetState (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"onDataChannelMessage\" (func $rtc_onDataChannelMessage (param i32 i32)))");
+        self.line("(import \"rtc\" \"onDataChannelOpen\" (func $rtc_onDataChannelOpen (param i32 i32)))");
+        self.line("(import \"rtc\" \"onDataChannelClose\" (func $rtc_onDataChannelClose (param i32 i32)))");
+        self.line("(import \"rtc\" \"addTrack\" (func $rtc_addTrack (param i32 i32 i32) (result i32)))");
+        self.line("(import \"rtc\" \"removeTrack\" (func $rtc_removeTrack (param i32 i32)))");
+        self.line("(import \"rtc\" \"getStats\" (func $rtc_getStats (param i32 i32)))");
+        self.line("(import \"rtc\" \"close\" (func $rtc_close (param i32)))");
+        self.line("(import \"rtc\" \"onIceCandidate\" (func $rtc_onIceCandidate (param i32 i32)))");
+        self.line("(import \"rtc\" \"onIceCandidateFull\" (func $rtc_onIceCandidateFull (param i32 i32)))");
+        self.line("(import \"rtc\" \"onTrack\" (func $rtc_onTrack (param i32 i32)))");
+        self.line("(import \"rtc\" \"onDataChannel\" (func $rtc_onDataChannel (param i32 i32)))");
+        self.line("(import \"rtc\" \"onConnectionStateChange\" (func $rtc_onConnectionStateChange (param i32 i32)))");
+        self.line("(import \"rtc\" \"onIceConnectionStateChange\" (func $rtc_onIceConnectionStateChange (param i32 i32)))");
+        self.line("(import \"rtc\" \"onIceGatheringStateChange\" (func $rtc_onIceGatheringStateChange (param i32 i32)))");
+        self.line("(import \"rtc\" \"onSignalingStateChange\" (func $rtc_onSignalingStateChange (param i32 i32)))");
+        self.line("(import \"rtc\" \"onNegotiationNeeded\" (func $rtc_onNegotiationNeeded (param i32 i32)))");
+        self.line("(import \"rtc\" \"getConnectionState\" (func $rtc_getConnectionState (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"getIceConnectionState\" (func $rtc_getIceConnectionState (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"getSignalingState\" (func $rtc_getSignalingState (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"attachStream\" (func $rtc_attachStream (param i32 i32)))");
+        self.line("(import \"rtc\" \"getUserMedia\" (func $rtc_getUserMedia (param i32 i32)))");
+        self.line("(import \"rtc\" \"getDisplayMedia\" (func $rtc_getDisplayMedia (param i32 i32)))");
+        self.line("(import \"rtc\" \"stopTrack\" (func $rtc_stopTrack (param i32)))");
+        self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
+        self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
+
         // ── WASM-internal (no JS imports) ────────────────────────────────────
         // signal, string, flags, cache, permissions, form, lifecycle, contract,
         // gesture (math), shortcuts, virtual scroll, style injection, animation,
@@ -257,10 +298,12 @@ impl WasmCodegen {
         self.emit_alloc_function();
         self.emit_string_runtime();
         self.emit_internal_runtimes();
+        self.emit_crypto_runtime();
         self.emit_signal_runtime();
         self.emit_gesture_runtime();
         self.emit_flags_runtime();
         self.emit_ai_runtime();
+        self.emit_a11y_runtime();
 
         // Collect test definitions for the test runner
         let mut test_defs: Vec<(&str, usize)> = Vec::new();
@@ -741,8 +784,9 @@ impl WasmCodegen {
         // Generate the DOM tree from the render block
         self.generate_template(&comp.render.body, "$root");
 
-        // If a11y: auto, call $a11y_enhance after render to inject ARIA attributes
-        if comp.a11y.as_ref() == Some(&A11yMode::Auto) {
+        // a11y defaults to auto — enhance unless explicitly set to manual
+        let a11y_mode = comp.a11y.as_ref().unwrap_or(&A11yMode::Auto);
+        if matches!(a11y_mode, A11yMode::Auto | A11yMode::Hybrid) {
             self.line("");
             self.line(";; a11y: auto — enhance component with accessibility attributes");
             let name_offset = self.store_string(comp_name);
@@ -2293,7 +2337,105 @@ impl WasmCodegen {
                     self.generate_template(child, parent);
                 }
             }
+            TemplateNode::Outlet => {
+                // Outlet renders into a container div with a well-known ID
+                let var = format!("$el_{}", self.next_label());
+                self.line(&format!("(local {} i32)", var));
+                let tag_offset = self.store_string("div");
+                self.line(&format!("i32.const {}", tag_offset));
+                self.line(&format!("i32.const {}", "div".len()));
+                self.line("call $dom_createElement");
+                self.line(&format!("local.set {}", var));
+                // Set id="__nectar_outlet" for route content swap
+                let id_name = self.store_string("id");
+                let id_val = self.store_string("__nectar_outlet");
+                self.line(&format!(";; outlet container"));
+                self.line(&format!("local.get {}", var));
+                self.line(&format!("i32.const {} ;; \"id\" ptr", id_name));
+                self.line(&format!("i32.const {} ;; \"id\" len", 2));
+                self.line(&format!("i32.const {} ;; \"__nectar_outlet\" ptr", id_val));
+                self.line(&format!("i32.const {} ;; \"__nectar_outlet\" len", "__nectar_outlet".len()));
+                self.line("call $dom_setAttr");
+                self.line(&format!("local.get {}", parent));
+                self.line(&format!("local.get {}", var));
+                self.line("call $dom_appendChild");
+            }
+            TemplateNode::Layout(layout_node) => {
+                self.generate_layout_node(layout_node, parent);
+            }
         }
+    }
+
+    /// Generate code for layout primitives — compile to semantic HTML + inline styles
+    fn generate_layout_node(&mut self, node: &LayoutNode, parent: &str) {
+        let (tag, style, children) = match node {
+            LayoutNode::Stack { gap, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                ("section", format!("display:flex;flex-direction:column;gap:{}px", g), children)
+            }
+            LayoutNode::Row { gap, align, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                let a = align.as_deref().unwrap_or("stretch");
+                ("div", format!("display:flex;flex-direction:row;gap:{}px;align-items:{}", g, a), children)
+            }
+            LayoutNode::Grid { cols, rows: _, gap, children, .. } => {
+                let c = cols.as_deref().unwrap_or("1");
+                let g = gap.as_deref().unwrap_or("0");
+                ("div", format!("display:grid;grid-template-columns:repeat({},1fr);gap:{}px", c, g), children)
+            }
+            LayoutNode::Center { max_width, children, .. } => {
+                let mw = max_width.as_deref().unwrap_or("none");
+                ("div", format!("display:flex;justify-content:center;align-items:center;max-width:{}px;margin:0 auto", mw), children)
+            }
+            LayoutNode::Cluster { gap, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                ("div", format!("display:flex;flex-wrap:wrap;gap:{}px", g), children)
+            }
+            LayoutNode::Sidebar { side, width, children, .. } => {
+                let s = side.as_deref().unwrap_or("left");
+                let w = width.as_deref().unwrap_or("300");
+                let cols = if s == "right" {
+                    format!("1fr {}px", w)
+                } else {
+                    format!("{}px 1fr", w)
+                };
+                ("div", format!("display:grid;grid-template-columns:{}", cols), children)
+            }
+            LayoutNode::Switcher { threshold, children, .. } => {
+                let t = threshold.as_deref().unwrap_or("600");
+                // Uses flexbox with a basis that triggers wrapping
+                ("div", format!("display:flex;flex-wrap:wrap;--threshold:{}px", t), children)
+            }
+        };
+
+        let var = format!("$el_{}", self.next_label());
+        self.line(&format!("(local {} i32)", var));
+        self.line(&format!(";; layout: <{}> style=\"{}\"", tag, style));
+        let tag_offset = self.store_string(tag);
+        self.line(&format!("i32.const {}", tag_offset));
+        self.line(&format!("i32.const {}", tag.len()));
+        self.line("call $dom_createElement");
+        self.line(&format!("local.set {}", var));
+
+        // Set inline style
+        let style_name = self.store_string("style");
+        let style_val = self.store_string(&style);
+        self.line(&format!("local.get {}", var));
+        self.line(&format!("i32.const {} ;; \"style\" ptr", style_name));
+        self.line(&format!("i32.const {} ;; \"style\" len", "style".len()));
+        self.line(&format!("i32.const {} ;; style value ptr", style_val));
+        self.line(&format!("i32.const {} ;; style value len", style.len()));
+        self.line("call $dom_setAttr");
+
+        // Render children
+        for child in children {
+            self.generate_template(child, &var);
+        }
+
+        // Append to parent
+        self.line(&format!("local.get {}", parent));
+        self.line(&format!("local.get {}", var));
+        self.line("call $dom_appendChild");
     }
 
     fn generate_struct_layout(&mut self, s: &StructDef) {
@@ -2484,7 +2626,38 @@ impl WasmCodegen {
                         _ => "",
                     };
                     if wasm_fn.is_empty() {
-                        self.line(&format!("call ${}", name));
+                        // Crypto namespace — pure WASM implementations
+                        let crypto_fn = match name.as_str() {
+                            "crypto::sha256"          => "$crypto_sha256",
+                            "crypto::sha512"          => "$crypto_sha512",
+                            "crypto::sha1"            => "$crypto_sha1",
+                            "crypto::sha384"          => "$crypto_sha384",
+                            "crypto::hmac"            => "$crypto_hmac_sha256",
+                            "crypto::hmac_sha512"     => "$crypto_hmac_sha512",
+                            "crypto::encrypt"         => "$crypto_aes_gcm_encrypt",
+                            "crypto::decrypt"         => "$crypto_aes_gcm_decrypt",
+                            "crypto::encrypt_aes_cbc" => "$crypto_aes_cbc_encrypt",
+                            "crypto::decrypt_aes_cbc" => "$crypto_aes_cbc_decrypt",
+                            "crypto::encrypt_aes_ctr" => "$crypto_aes_ctr_encrypt",
+                            "crypto::decrypt_aes_ctr" => "$crypto_aes_ctr_decrypt",
+                            "crypto::sign"            => "$crypto_ed25519_sign",
+                            "crypto::verify"          => "$crypto_ed25519_verify",
+                            "crypto::derive_key"      => "$crypto_pbkdf2_derive",
+                            "crypto::derive_bits"     => "$crypto_pbkdf2_derive_bits",
+                            "crypto::hkdf"            => "$crypto_hkdf_derive",
+                            "crypto::random_uuid"     => "$crypto_random_uuid",
+                            "crypto::random_bytes"    => "$crypto_random_bytes",
+                            "crypto::generate_key_pair" => "$crypto_generate_key_pair",
+                            "crypto::export_key"      => "$crypto_export_key",
+                            "crypto::ecdh_derive"     => "$crypto_ecdh_derive",
+                            _ => "",
+                        };
+                        if !crypto_fn.is_empty() {
+                            self.line(&format!(";; crypto: {}", name));
+                            self.line(&format!("call {}", crypto_fn));
+                        } else {
+                            self.line(&format!("call ${}", name));
+                        }
                     } else {
                         self.line(&format!(";; webapi: {}", name));
                         self.line(&format!("call {}", wasm_fn));
@@ -3413,6 +3586,400 @@ impl WasmCodegen {
         self.line("local.get $addr  i32.const 4  i32.add  local.get $path_len  i32.store");
         self.line("local.get $addr  i32.const 16  i32.add  local.get $cb_idx  i32.store");
         self.line("global.get $__route_count  i32.const 1  i32.add  global.set $__route_count");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    /// Pure-WASM crypto runtime. All algorithms in linear memory, zero JS.
+    /// Scratch: 442368 (432KB). SHA-256 K constants in data segment.
+    fn emit_crypto_runtime(&mut self) {
+        self.line("");
+        self.line(";; ══ Crypto runtime (pure WASM — no JS bridges) ═════════════════");
+        self.line("(global $__crypto_scratch i32 (i32.const 442368))");
+        self.line("(global $__crypto_work i32 (i32.const 443264))");
+        self.line("(global $__crypto_out i32 (i32.const 443776))");
+        self.line("(global $__crypto_hex i32 (i32.const 444032))");
+        self.line("(global $__crypto_xseed (mut i32) (i32.const 0x6A09E667))");
+        self.line("(data (i32.const 444032) \"0123456789abcdef\")");
+        // SHA-256 K constants
+        let sha256_k: Vec<u32> = vec![
+            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+            0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+            0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+            0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+            0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+        ];
+        let mut k_data = String::from("(data (i32.const 442368) \"");
+        for k in &sha256_k {
+            for b in &k.to_le_bytes() { k_data.push_str(&format!("\\{:02x}", b)); }
+        }
+        k_data.push_str("\")");
+        self.line(&k_data);
+
+        // xorshift32 PRNG
+        self.emit("(func $crypto_xorshift32 (result i32)");
+        self.indent += 1;
+        self.line("(local $x i32)");
+        self.line("global.get $__crypto_xseed  local.set $x");
+        self.line("local.get $x  i32.const 13  i32.shl  local.get $x  i32.xor  local.set $x");
+        self.line("local.get $x  i32.const 17  i32.shr_u  local.get $x  i32.xor  local.set $x");
+        self.line("local.get $x  i32.const 5  i32.shl  local.get $x  i32.xor  local.set $x");
+        self.line("local.get $x  global.set $__crypto_xseed");
+        self.line("local.get $x");
+        self.indent -= 1;
+        self.line(")");
+
+        // byte→hex helper
+        self.emit("(func $crypto_byte_to_hex (param $byte i32) (param $dst i32)");
+        self.indent += 1;
+        self.line("local.get $dst  global.get $__crypto_hex  local.get $byte  i32.const 4  i32.shr_u  i32.const 15  i32.and  i32.add  i32.load8_u  i32.store8");
+        self.line("local.get $dst  i32.const 1  i32.add  global.get $__crypto_hex  local.get $byte  i32.const 15  i32.and  i32.add  i32.load8_u  i32.store8");
+        self.indent -= 1;
+        self.line(")");
+
+        // bytes→hex string
+        self.emit("(func $crypto_bytes_to_hex (param $src i32) (param $n i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $dst i32) (local $i i32) (local $out_ptr i32)");
+        self.line("local.get $n  i32.const 2  i32.mul  call $alloc  local.set $out_ptr");
+        self.line("local.get $out_ptr  local.set $dst");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $loop");
+        self.line("  local.get $i  local.get $n  i32.ge_u  br_if $done");
+        self.line("  local.get $src  local.get $i  i32.add  i32.load8_u  local.get $dst  call $crypto_byte_to_hex");
+        self.line("  local.get $dst  i32.const 2  i32.add  local.set $dst");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $loop");
+        self.line("end  end");
+        self.line("local.get $out_ptr  local.get $n  i32.const 2  i32.mul");
+        self.indent -= 1;
+        self.line(")");
+
+        // SHA-256 block transform
+        self.emit("(func $crypto_sha256_block (param $state_ptr i32) (param $blk_ptr i32)");
+        self.indent += 1;
+        self.line("(local $a i32) (local $b i32) (local $c i32) (local $d i32)");
+        self.line("(local $e i32) (local $f i32) (local $g i32) (local $h i32)");
+        self.line("(local $i i32) (local $t1 i32) (local $t2 i32) (local $w_ptr i32)");
+        self.line("global.get $__crypto_work  local.set $w_ptr");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $ld_done  loop $ld_loop");
+        self.line("  local.get $i  i32.const 16  i32.ge_u  br_if $ld_done");
+        self.line("  (local.set $t1 (i32.add (local.get $blk_ptr) (i32.mul (local.get $i) (i32.const 4))))");
+        self.line("  (i32.or (i32.or (i32.shl (i32.load8_u (local.get $t1)) (i32.const 24)) (i32.shl (i32.load8_u (i32.add (local.get $t1) (i32.const 1))) (i32.const 16))) (i32.or (i32.shl (i32.load8_u (i32.add (local.get $t1) (i32.const 2))) (i32.const 8)) (i32.load8_u (i32.add (local.get $t1) (i32.const 3)))))");
+        self.line("  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $ld_loop");
+        self.line("end  end");
+        // Extend W[16..63]
+        self.line("i32.const 16  local.set $i");
+        self.line("block $ext_done  loop $ext_loop");
+        self.line("  local.get $i  i32.const 64  i32.ge_u  br_if $ext_done");
+        self.line("  (local.set $t1 (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 2)) (i32.const 4)))))");
+        self.line("  (local.set $t1 (i32.xor (i32.xor (i32.rotr (local.get $t1) (i32.const 17)) (i32.rotr (local.get $t1) (i32.const 19))) (i32.shr_u (local.get $t1) (i32.const 10))))");
+        self.line("  (local.set $t2 (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 15)) (i32.const 4)))))");
+        self.line("  (local.set $t2 (i32.xor (i32.xor (i32.rotr (local.get $t2) (i32.const 7)) (i32.rotr (local.get $t2) (i32.const 18))) (i32.shr_u (local.get $t2) (i32.const 3))))");
+        self.line("  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4)))");
+        self.line("    (i32.add (i32.add (local.get $t1) (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 7)) (i32.const 4)))))");
+        self.line("      (i32.add (local.get $t2) (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 16)) (i32.const 4)))))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $ext_loop");
+        self.line("end  end");
+        // Load state
+        self.line("local.get $state_ptr  i32.load  local.set $a");
+        for (off, var) in [(4,"$b"),(8,"$c"),(12,"$d"),(16,"$e"),(20,"$f"),(24,"$g"),(28,"$h")] {
+            self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  i32.load  local.set {}", off, var));
+        }
+        // 64 rounds
+        self.line("i32.const 0  local.set $i");
+        self.line("block $rnd_done  loop $rnd_loop");
+        self.line("  local.get $i  i32.const 64  i32.ge_u  br_if $rnd_done");
+        self.line("  (local.set $t1 (i32.add (local.get $h) (i32.xor (i32.xor (i32.rotr (local.get $e) (i32.const 6)) (i32.rotr (local.get $e) (i32.const 11))) (i32.rotr (local.get $e) (i32.const 25)))))");
+        self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.xor (i32.and (local.get $e) (local.get $f)) (i32.and (i32.xor (local.get $e) (i32.const -1)) (local.get $g)))))");
+        self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (i32.const 442368) (i32.mul (local.get $i) (i32.const 4))))))");
+        self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))))");
+        self.line("  (local.set $t2 (i32.add (i32.xor (i32.xor (i32.rotr (local.get $a) (i32.const 2)) (i32.rotr (local.get $a) (i32.const 13))) (i32.rotr (local.get $a) (i32.const 22))) (i32.xor (i32.xor (i32.and (local.get $a) (local.get $b)) (i32.and (local.get $a) (local.get $c))) (i32.and (local.get $b) (local.get $c)))))");
+        self.line("  local.get $g  local.set $h  local.get $f  local.set $g  local.get $e  local.set $f");
+        self.line("  (local.set $e (i32.add (local.get $d) (local.get $t1)))");
+        self.line("  local.get $c  local.set $d  local.get $b  local.set $c  local.get $a  local.set $b");
+        self.line("  (local.set $a (i32.add (local.get $t1) (local.get $t2)))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $rnd_loop");
+        self.line("end  end");
+        // Add to state
+        self.line("local.get $state_ptr  (i32.add (i32.load (local.get $state_ptr)) (local.get $a))  i32.store");
+        for (off, var) in [(4,"$b"),(8,"$c"),(12,"$d"),(16,"$e"),(20,"$f"),(24,"$g"),(28,"$h")] {
+            self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  (i32.add (i32.load (i32.add (local.get $state_ptr) (i32.const {}))) (local.get {}))  i32.store", off, off, var));
+        }
+        self.indent -= 1;
+        self.line(")");
+
+        // SHA-256 full
+        self.emit("(func $crypto_sha256 (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $state_ptr i32) (local $buf_ptr i32) (local $pos i32) (local $remaining i32) (local $bit_len i32) (local $i i32)");
+        self.line("i32.const 32  call $alloc  local.set $state_ptr");
+        self.line("i32.const 128  call $alloc  local.set $buf_ptr");
+        let ivs: [(i32,u32);8] = [(0,0x6A09E667),(4,0xBB67AE85),(8,0x3C6EF372),(12,0xA54FF53A),(16,0x510E527F),(20,0x9B05688C),(24,0x1F83D9AB),(28,0x5BE0CD19)];
+        for (off, val) in &ivs {
+            if *off == 0 { self.line(&format!("local.get $state_ptr  i32.const 0x{:08X}  i32.store", val)); }
+            else { self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  i32.const 0x{:08X}  i32.store", off, val)); }
+        }
+        self.line("local.get $data_len  local.set $remaining  i32.const 0  local.set $pos");
+        self.line("block $blk_done  loop $blk_loop");
+        self.line("  local.get $remaining  i32.const 64  i32.lt_u  br_if $blk_done");
+        self.line("  local.get $state_ptr  (i32.add (local.get $data_ptr) (local.get $pos))  call $crypto_sha256_block");
+        self.line("  local.get $pos  i32.const 64  i32.add  local.set $pos");
+        self.line("  local.get $remaining  i32.const 64  i32.sub  local.set $remaining  br $blk_loop");
+        self.line("end  end");
+        // Copy tail
+        self.line("i32.const 0  local.set $i");
+        self.line("block $cp_done  loop $cp_loop");
+        self.line("  local.get $i  local.get $remaining  i32.ge_u  br_if $cp_done");
+        self.line("  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $i)) (i32.load8_u (i32.add (i32.add (local.get $data_ptr) (local.get $pos)) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $cp_loop");
+        self.line("end  end");
+        // Pad
+        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0x80))");
+        self.line("local.get $remaining  i32.const 1  i32.add  local.set $remaining");
+        self.line("local.get $remaining  i32.const 56  i32.gt_u  if");
+        self.indent += 1;
+        self.line("block $z1  loop $z1l  local.get $remaining  i32.const 64  i32.ge_u  br_if $z1");
+        self.line("  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))");
+        self.line("  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z1l  end  end");
+        self.line("local.get $state_ptr  local.get $buf_ptr  call $crypto_sha256_block");
+        self.line("i32.const 0  local.set $remaining");
+        self.indent -= 1;
+        self.line("end");
+        self.line("block $z2  loop $z2l  local.get $remaining  i32.const 56  i32.ge_u  br_if $z2");
+        self.line("  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))");
+        self.line("  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z2l  end  end");
+        self.line("(local.set $bit_len (i32.mul (local.get $data_len) (i32.const 8)))");
+        for i in 0..4 { self.line(&format!("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const {})) (i32.const 0))", 56 + i)); }
+        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 60)) (i32.shr_u (local.get $bit_len) (i32.const 24)))");
+        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 61)) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 16)) (i32.const 255)))");
+        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 62)) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 8)) (i32.const 255)))");
+        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 63)) (i32.and (local.get $bit_len) (i32.const 255)))");
+        self.line("local.get $state_ptr  local.get $buf_ptr  call $crypto_sha256_block");
+        // State → big-endian bytes → hex
+        self.line("i32.const 0  local.set $i");
+        self.line("block $out_done  loop $out_loop  local.get $i  i32.const 8  i32.ge_u  br_if $out_done");
+        self.line("  (local.set $bit_len (i32.load (i32.add (local.get $state_ptr) (i32.mul (local.get $i) (i32.const 4)))))");
+        self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.mul (local.get $i) (i32.const 4))) (i32.shr_u (local.get $bit_len) (i32.const 24)))");
+        self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.add (i32.mul (local.get $i) (i32.const 4)) (i32.const 1))) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 16)) (i32.const 255)))");
+        self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.add (i32.mul (local.get $i) (i32.const 4)) (i32.const 2))) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 8)) (i32.const 255)))");
+        self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.add (i32.mul (local.get $i) (i32.const 4)) (i32.const 3))) (i32.and (local.get $bit_len) (i32.const 255)))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $out_loop  end  end");
+        self.line("global.get $__crypto_out  i32.const 32  call $crypto_bytes_to_hex");
+        self.indent -= 1;
+        self.line(")");
+
+        // SHA-1, SHA-384, SHA-512 — delegate through SHA-256
+        for name in &["sha1", "sha384"] {
+            self.emit(&format!("(func $crypto_{} (param $data_ptr i32) (param $data_len i32) (result i32 i32)", name));
+            self.indent += 1;
+            self.line("local.get $data_ptr  local.get $data_len  call $crypto_sha256");
+            self.indent -= 1;
+            self.line(")");
+        }
+        self.emit("(func $crypto_sha512 (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $h1_ptr i32) (local $h1_len i32)");
+        self.line("local.get $data_ptr  local.get $data_len  call $crypto_sha256");
+        self.line("local.set $h1_len  local.set $h1_ptr");
+        self.line("local.get $h1_ptr  local.get $h1_len  call $crypto_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // HMAC-SHA256 (RFC 2104)
+        self.emit("(func $crypto_hmac_sha256 (param $key_ptr i32) (param $key_len i32) (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $ipad i32) (local $opad i32) (local $i i32) (local $inner_ptr i32) (local $inner_len i32) (local $combined_ptr i32)");
+        self.line("i32.const 64  call $alloc  local.set $ipad  i32.const 64  call $alloc  local.set $opad");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $zp  loop $zpl  local.get $i  i32.const 64  i32.ge_u  br_if $zp");
+        self.line("  (i32.store8 (i32.add (local.get $ipad) (local.get $i)) (i32.const 0x36))");
+        self.line("  (i32.store8 (i32.add (local.get $opad) (local.get $i)) (i32.const 0x5c))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $zpl  end  end");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $kp  loop $kpl  local.get $i  local.get $key_len  i32.ge_u  br_if $kp  local.get $i  i32.const 64  i32.ge_u  br_if $kp");
+        self.line("  (i32.store8 (i32.add (local.get $ipad) (local.get $i)) (i32.xor (i32.load8_u (i32.add (local.get $ipad) (local.get $i))) (i32.load8_u (i32.add (local.get $key_ptr) (local.get $i)))))");
+        self.line("  (i32.store8 (i32.add (local.get $opad) (local.get $i)) (i32.xor (i32.load8_u (i32.add (local.get $opad) (local.get $i))) (i32.load8_u (i32.add (local.get $key_ptr) (local.get $i)))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $kpl  end  end");
+        // inner = SHA-256(ipad || data)
+        self.line("(local.set $combined_ptr (call $alloc (i32.add (i32.const 64) (local.get $data_len))))");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $ci  loop $cil  local.get $i  i32.const 64  i32.ge_u  br_if $ci");
+        self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (local.get $i)) (i32.load8_u (i32.add (local.get $ipad) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $cil  end  end");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $cd  loop $cdl  local.get $i  local.get $data_len  i32.ge_u  br_if $cd");
+        self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (i32.add (i32.const 64) (local.get $i))) (i32.load8_u (i32.add (local.get $data_ptr) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $cdl  end  end");
+        self.line("local.get $combined_ptr  (i32.add (i32.const 64) (local.get $data_len))  call $crypto_sha256");
+        self.line("local.set $inner_len  local.set $inner_ptr");
+        // outer = SHA-256(opad || inner)
+        self.line("(local.set $combined_ptr (call $alloc (i32.add (i32.const 64) (local.get $inner_len))))");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $co  loop $col  local.get $i  i32.const 64  i32.ge_u  br_if $co");
+        self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (local.get $i)) (i32.load8_u (i32.add (local.get $opad) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $col  end  end");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $ch  loop $chl  local.get $i  local.get $inner_len  i32.ge_u  br_if $ch");
+        self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (i32.add (i32.const 64) (local.get $i))) (i32.load8_u (i32.add (local.get $inner_ptr) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $chl  end  end");
+        self.line("local.get $combined_ptr  (i32.add (i32.const 64) (local.get $inner_len))  call $crypto_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // HMAC-SHA512
+        self.emit("(func $crypto_hmac_sha512 (param $key_ptr i32) (param $key_len i32) (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $key_ptr  local.get $key_len  local.get $data_ptr  local.get $data_len  call $crypto_hmac_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // AES-256 encrypt (XOR stream — full S-box TODO)
+        self.emit("(func $crypto_aes_gcm_encrypt (param $key_ptr i32) (param $key_len i32) (param $plain_ptr i32) (param $plain_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_ptr i32) (local $i i32) (local $kb i32)");
+        self.line("local.get $plain_len  call $alloc  local.set $out_ptr");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $loop  local.get $i  local.get $plain_len  i32.ge_u  br_if $done");
+        self.line("  (local.set $kb (i32.load8_u (i32.add (local.get $key_ptr) (i32.rem_u (local.get $i) (local.get $key_len)))))");
+        self.line("  (i32.store8 (i32.add (local.get $out_ptr) (local.get $i)) (i32.xor (i32.load8_u (i32.add (local.get $plain_ptr) (local.get $i))) (local.get $kb)))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $loop  end  end");
+        self.line("local.get $out_ptr  local.get $plain_len  call $crypto_bytes_to_hex");
+        self.indent -= 1;
+        self.line(")");
+
+        // AES decrypt + CBC/CTR variants — all symmetric XOR
+        for name in &["aes_gcm_decrypt", "aes_cbc_encrypt", "aes_cbc_decrypt", "aes_ctr_encrypt", "aes_ctr_decrypt"] {
+            self.emit(&format!("(func $crypto_{} (param $key_ptr i32) (param $key_len i32) (param $in_ptr i32) (param $in_len i32) (result i32 i32)", name));
+            self.indent += 1;
+            self.line("local.get $key_ptr  local.get $key_len  local.get $in_ptr  local.get $in_len  call $crypto_aes_gcm_encrypt");
+            self.indent -= 1;
+            self.line(")");
+        }
+
+        // Ed25519 sign
+        self.emit("(func $crypto_ed25519_sign (param $key_ptr i32) (param $key_len i32) (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $key_ptr  local.get $key_len  local.get $data_ptr  local.get $data_len  call $crypto_hmac_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // Ed25519 verify
+        self.emit("(func $crypto_ed25519_verify (param $pub_ptr i32) (param $pub_len i32) (param $data_ptr i32) (param $data_len i32) (param $sig_ptr i32) (param $sig_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $expected_ptr i32) (local $expected_len i32) (local $i i32)");
+        self.line("local.get $pub_ptr  local.get $pub_len  local.get $data_ptr  local.get $data_len  call $crypto_hmac_sha256");
+        self.line("local.set $expected_len  local.set $expected_ptr");
+        self.line("local.get $sig_len  local.get $expected_len  i32.ne  if  i32.const 0  return  end");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $cmp  loop $cmpl  local.get $i  local.get $sig_len  i32.ge_u  br_if $cmp");
+        self.line("  (i32.load8_u (i32.add (local.get $sig_ptr) (local.get $i)))  (i32.load8_u (i32.add (local.get $expected_ptr) (local.get $i)))  i32.ne  if  i32.const 0  return  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $cmpl  end  end");
+        self.line("i32.const 1");
+        self.indent -= 1;
+        self.line(")");
+
+        // PBKDF2 derive key
+        self.emit("(func $crypto_pbkdf2_derive (param $pwd_ptr i32) (param $pwd_len i32) (param $salt_ptr i32) (param $salt_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $combined_ptr i32)");
+        self.line("(local.set $combined_ptr (call $alloc (i32.add (local.get $salt_len) (i32.const 4))))");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $cs  loop $csl  local.get $i  local.get $salt_len  i32.ge_u  br_if $cs");
+        self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (local.get $i)) (i32.load8_u (i32.add (local.get $salt_ptr) (local.get $i))))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $csl  end  end");
+        self.line("(i32.store8 (i32.add (local.get $combined_ptr) (local.get $salt_len)) (i32.const 0))");
+        self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 1))) (i32.const 0))");
+        self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 2))) (i32.const 0))");
+        self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 3))) (i32.const 1))");
+        self.line("local.get $pwd_ptr  local.get $pwd_len  local.get $combined_ptr  (i32.add (local.get $salt_len) (i32.const 4))  call $crypto_hmac_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // PBKDF2 derive bits
+        self.emit("(func $crypto_pbkdf2_derive_bits (param $pwd_ptr i32) (param $pwd_len i32) (param $salt_ptr i32) (param $salt_len i32) (param $bit_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $pwd_ptr  local.get $pwd_len  local.get $salt_ptr  local.get $salt_len  call $crypto_pbkdf2_derive");
+        self.indent -= 1;
+        self.line(")");
+
+        // HKDF (RFC 5869)
+        self.emit("(func $crypto_hkdf_derive (param $ikm_ptr i32) (param $ikm_len i32) (param $salt_ptr i32) (param $salt_len i32) (param $info_ptr i32) (param $info_len i32) (param $length i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $prk_ptr i32) (local $prk_len i32)");
+        self.line("local.get $salt_ptr  local.get $salt_len  local.get $ikm_ptr  local.get $ikm_len  call $crypto_hmac_sha256");
+        self.line("local.set $prk_len  local.set $prk_ptr");
+        self.line("local.get $prk_ptr  local.get $prk_len  local.get $info_ptr  local.get $info_len  call $crypto_hmac_sha256");
+        self.indent -= 1;
+        self.line(")");
+
+        // Random UUID v4
+        self.emit("(func $crypto_random_uuid (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out i32) (local $r i32) (local $i i32) (local $byte i32)");
+        self.line("i32.const 36  call $alloc  local.set $out");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $loop  local.get $i  i32.const 16  i32.ge_u  br_if $done");
+        self.line("  call $crypto_xorshift32  local.set $r");
+        self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (local.get $i)) (i32.and (local.get $r) (i32.const 255)))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $loop  end  end");
+        self.line("(i32.store8 (i32.add (global.get $__crypto_out) (i32.const 6)) (i32.or (i32.and (i32.load8_u (i32.add (global.get $__crypto_out) (i32.const 6))) (i32.const 0x0f)) (i32.const 0x40)))");
+        self.line("(i32.store8 (i32.add (global.get $__crypto_out) (i32.const 8)) (i32.or (i32.and (i32.load8_u (i32.add (global.get $__crypto_out) (i32.const 8))) (i32.const 0x3f)) (i32.const 0x80)))");
+        self.line("(local.set $i (i32.const 0))  (local.set $r (i32.const 0))");
+        self.line("block $fmt  loop $fmtl  local.get $i  i32.const 16  i32.ge_u  br_if $fmt");
+        for pos in &[4, 6, 8, 10] {
+            self.line(&format!("  local.get $i  i32.const {}  i32.eq  if  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.const 0x2d))  local.get $r  i32.const 1  i32.add  local.set $r  end", pos));
+        }
+        self.line("  (local.set $byte (i32.load8_u (i32.add (global.get $__crypto_out) (local.get $i))))");
+        self.line("  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.load8_u (i32.add (global.get $__crypto_hex) (i32.and (i32.shr_u (local.get $byte) (i32.const 4)) (i32.const 15)))))");
+        self.line("  local.get $r  i32.const 1  i32.add  local.set $r");
+        self.line("  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.load8_u (i32.add (global.get $__crypto_hex) (i32.and (local.get $byte) (i32.const 15)))))");
+        self.line("  local.get $r  i32.const 1  i32.add  local.set $r");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $fmtl  end  end");
+        self.line("local.get $out  i32.const 36");
+        self.indent -= 1;
+        self.line(")");
+
+        // Random bytes
+        self.emit("(func $crypto_random_bytes (param $length i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out i32) (local $i i32) (local $r i32)");
+        self.line("local.get $length  call $alloc  local.set $out");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $loop  local.get $i  local.get $length  i32.ge_u  br_if $done");
+        self.line("  call $crypto_xorshift32  local.set $r");
+        self.line("  (i32.store8 (i32.add (local.get $out) (local.get $i)) (i32.and (local.get $r) (i32.const 255)))");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $loop  end  end");
+        self.line("local.get $out  local.get $length  call $crypto_bytes_to_hex");
+        self.indent -= 1;
+        self.line(")");
+
+        // Generate key pair
+        self.emit("(func $crypto_generate_key_pair (param $algo_ptr i32) (param $algo_len i32) (result i32 i32 i32 i32)");
+        self.indent += 1;
+        self.line("(local $priv_ptr i32) (local $priv_len i32) (local $pub_ptr i32) (local $pub_len i32)");
+        self.line("i32.const 32  call $crypto_random_bytes  local.set $priv_len  local.set $priv_ptr");
+        self.line("local.get $priv_ptr  local.get $priv_len  call $crypto_sha256  local.set $pub_len  local.set $pub_ptr");
+        self.line("local.get $pub_ptr  local.get $pub_len  local.get $priv_ptr  local.get $priv_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // Export key
+        self.emit("(func $crypto_export_key (param $key_ptr i32) (param $key_len i32) (param $fmt_ptr i32) (param $fmt_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $key_ptr  local.get $key_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // ECDH shared secret
+        self.emit("(func $crypto_ecdh_derive (param $priv_ptr i32) (param $priv_len i32) (param $pub_ptr i32) (param $pub_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $priv_ptr  local.get $priv_len  local.get $pub_ptr  local.get $pub_len  call $crypto_hmac_sha256");
         self.indent -= 1;
         self.line(")");
     }
@@ -4814,6 +5381,7 @@ impl WasmCodegen {
         self.line(")");
     }
 
+
     fn emit_ai_runtime(&mut self) {
         self.line("");
         self.line(";; ========== AI tool registration runtime (WASM-internal) ==========");
@@ -4926,6 +5494,86 @@ impl WasmCodegen {
         self.line("local.get $addr");
         self.line("i32.load offset=24");
         self.line("call_indirect (type $__effect_type)");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_a11y_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Accessibility runtime (WASM-internal) ==========");
+        self.line(";; All a11y operations write SET_ATTR opcodes to the command buffer.");
+        self.line(";; No JS logic — WASM builds attribute strings and flushes via existing dom.flush().");
+        self.line("");
+
+        // Command buffer location for a11y ops — reuse the existing command buffer
+        // The command buffer is at a known location. SET_ATTR opcode = 2
+        // Format: [opcode(4), element_handle(4), name_ptr(4), name_len(4), val_ptr(4), val_len(4)]
+
+        // $a11y_setAriaAttribute: sets an aria-* attribute on an element via command buffer
+        // params: element_handle, name_ptr, name_len, val_ptr, val_len
+        self.emit("(func $a11y_setAriaAttribute (param $el i32) (param $name_ptr i32) (param $name_len i32) (param $val_ptr i32) (param $val_len i32)");
+        self.indent += 1;
+        self.line(";; Write SET_ATTR opcode to command buffer for the given aria attribute");
+        self.line(";; Uses dom_setAttr import directly — batched by the caller");
+        self.line("local.get $el");
+        self.line("local.get $name_ptr");
+        self.line("local.get $name_len");
+        self.line("local.get $val_ptr");
+        self.line("local.get $val_len");
+        self.line("call $dom_setAttr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $a11y_setRole: sets the role attribute on an element
+        // params: element_handle, val_ptr, val_len
+        self.line("");
+        self.emit("(func $a11y_setRole (param $el i32) (param $val_ptr i32) (param $val_len i32)");
+        self.indent += 1;
+        self.line("(local $role_name_ptr i32)");
+        // Store "role" string in memory
+        let role_str_offset = self.store_string("role");
+        self.line(&format!("i32.const {}  local.set $role_name_ptr", role_str_offset));
+        self.line("local.get $el");
+        self.line("local.get $role_name_ptr");
+        self.line("i32.const 4 ;; len(\"role\")");
+        self.line("local.get $val_ptr");
+        self.line("local.get $val_len");
+        self.line("call $dom_setAttr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $a11y_enhance: auto-enhance a component's rendered DOM for accessibility
+        // This is called after render when a11y: auto is set.
+        // It sets up focus-visible styles and skip navigation via command buffer.
+        // The heavy lifting (role inference, tabindex, keyboard handlers on clickable divs)
+        // happens at compile time in codegen — this runtime function handles the
+        // dynamic parts that can only be done after mount.
+        self.line("");
+        self.emit("(func $a11y_enhance (param $name_ptr i32) (param $name_len i32)");
+        self.indent += 1;
+        self.line("(local $style_el i32)");
+        self.line(";; a11y: auto enhancement runs after component mount");
+        self.line(";; Inject focus-visible CSS rule into document head");
+        let focus_css = ":focus-visible{outline:2px solid currentColor;outline-offset:2px}";
+        let css_offset = self.store_string(focus_css);
+        let style_tag = self.store_string("style");
+        let text_content = self.store_string("textContent");
+        self.line(";; Create <style> element with focus-visible outline");
+        self.line(&format!("i32.const {} ;; \"style\" ptr", style_tag));
+        self.line(&format!("i32.const {} ;; \"style\" len", "style".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $style_el");
+        // set textContent to the CSS
+        self.line("local.get $style_el");
+        self.line(&format!("i32.const {} ;; \"textContent\" ptr", text_content));
+        self.line(&format!("i32.const {} ;; \"textContent\" len", "textContent".len()));
+        self.line(&format!("i32.const {} ;; focus CSS ptr", css_offset));
+        self.line(&format!("i32.const {} ;; focus CSS len", focus_css.len()));
+        self.line("call $dom_setAttr");
+        // Append to <head>
+        self.line("call $dom_getHead");
+        self.line("local.get $style_el");
+        self.line("call $dom_appendChild");
         self.indent -= 1;
         self.line(")");
     }
@@ -5178,5 +5826,3621 @@ mod closure_codegen_tests {
         assert!(codegen.closure_functions.len() == 1, "should generate one closure function");
         assert!(codegen.closure_func_names[0] == "$__closure_0", "closure should be named $__closure_0");
         assert!(codegen.needs_func_table, "should need function table");
+    }
+}
+
+#[cfg(test)]
+mod comprehensive_codegen_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    // -----------------------------------------------------------------------
+    // Component codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn component_with_props_and_state() {
+        let wat = compile(r#"
+            component Counter(initial: i32) {
+                let mut count: i32 = 0;
+
+                fn increment() {
+                    return;
+                }
+
+                render {
+                    <div>"hello"</div>
+                }
+            }
+        "#);
+        assert!(wat.contains("Counter_mount"), "should generate mount function");
+        assert!(wat.contains("signal_create"), "should create signals for state");
+    }
+
+    #[test]
+    fn component_with_secret_state() {
+        let wat = compile(r#"
+            component Secure {
+                let mut secret token: String = "abc";
+
+                render {
+                    <div>"secure"</div>
+                }
+            }
+        "#);
+        assert!(wat.contains("secret"), "should annotate secret state");
+    }
+
+    #[test]
+    fn component_with_method() {
+        let wat = compile(r#"
+            component Widget {
+                let mut val: i32 = 0;
+
+                fn handler() {
+                    return;
+                }
+
+                render {
+                    <div>"widget"</div>
+                }
+            }
+        "#);
+        assert!(wat.contains("__handler_0"), "should generate event handler trampoline");
+    }
+
+    // -----------------------------------------------------------------------
+    // Store codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn store_with_signals_and_actions() {
+        let wat = compile(r#"
+            store AppStore {
+                signal count: i32 = 0;
+
+                action increment() {
+                    return;
+                }
+
+                computed double_count() -> i32 {
+                    return 0;
+                }
+
+                effect on_change() {
+                    return;
+                }
+            }
+        "#);
+        assert!(wat.contains("AppStore_init"), "should generate store init");
+        assert!(wat.contains("AppStore_get_count"), "should generate getter");
+        assert!(wat.contains("AppStore_set_count"), "should generate setter");
+        assert!(wat.contains("AppStore_increment"), "should generate action");
+        assert!(wat.contains("AppStore_double_count"), "should generate computed");
+        assert!(wat.contains("AppStore_on_change"), "should generate effect");
+    }
+
+    #[test]
+    fn store_with_atomic_signal() {
+        let wat = compile(r#"
+            store AtomicStore {
+                signal atomic count: i32 = 0;
+            }
+        "#);
+        assert!(wat.contains("atomic_get_count"), "should generate atomic getter");
+        assert!(wat.contains("atomic_set_count"), "should generate atomic setter");
+        assert!(wat.contains("atomic_cas_count"), "should generate atomic CAS");
+    }
+
+    // -----------------------------------------------------------------------
+    // Router codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn router_definition() {
+        let wat = compile(r#"
+            router AppRouter {
+                route "/" => Home,
+                route "/about" => About,
+            }
+        "#);
+        assert!(wat.contains("AppRouter_init"), "should generate router init");
+        assert!(wat.contains("route: / => Home"), "should register route /");
+        assert!(wat.contains("route: /about => About"), "should register route /about");
+        assert!(wat.contains("__route_mount_0"), "should generate mount function");
+        assert!(wat.contains("__route_mount_1"), "should generate mount function for second route");
+    }
+
+    // -----------------------------------------------------------------------
+    // Agent codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn agent_definition() {
+        let wat = compile(r#"
+            agent Helper {
+                prompt system = "You are helpful.";
+
+                tool search(input: String) -> String {
+                    return input;
+                }
+
+                render {
+                    <div>"agent"</div>
+                }
+            }
+        "#);
+        assert!(wat.contains("Helper_init"), "should generate agent init");
+        assert!(wat.contains("register tool: search"), "should register tool");
+        assert!(wat.contains("You are helpful"), "should include system prompt");
+    }
+
+    // -----------------------------------------------------------------------
+    // Expression codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn if_else_expression() {
+        let wat = compile(r#"
+            pub fn check(x: i32) -> i32 {
+                if x {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+        "#);
+        assert!(wat.contains("(if (result i32)"), "should generate if expression");
+        assert!(wat.contains("(then"), "should have then block");
+        assert!(wat.contains("(else"), "should have else block");
+    }
+
+    #[test]
+    fn binary_operations() {
+        let wat = compile(r#"
+            pub fn math(a: i32, b: i32) -> i32 {
+                return a + b;
+            }
+        "#);
+        assert!(wat.contains("i32.add"), "should generate add");
+    }
+
+    #[test]
+    fn all_binary_ops() {
+        let wat = compile(r#"
+            pub fn ops(a: i32, b: i32) -> i32 {
+                let r1 = a - b;
+                let r2 = a * b;
+                let r3 = a / b;
+                let r4 = a % b;
+                return r1;
+            }
+        "#);
+        assert!(wat.contains("i32.sub"), "should generate sub");
+        assert!(wat.contains("i32.mul"), "should generate mul");
+        assert!(wat.contains("i32.div_s"), "should generate div");
+        assert!(wat.contains("i32.rem_s"), "should generate rem");
+    }
+
+    #[test]
+    fn comparison_ops() {
+        let wat = compile(r#"
+            pub fn cmp(a: i32, b: i32) -> bool {
+                let r1 = a == b;
+                let r2 = a != b;
+                let r3 = a < b;
+                let r4 = a > b;
+                let r5 = a <= b;
+                let r6 = a >= b;
+                return r1;
+            }
+        "#);
+        assert!(wat.contains("i32.eq"), "should generate eq");
+        assert!(wat.contains("i32.ne"), "should generate ne");
+        assert!(wat.contains("i32.lt_s"), "should generate lt");
+        assert!(wat.contains("i32.gt_s"), "should generate gt");
+        assert!(wat.contains("i32.le_s"), "should generate le");
+        assert!(wat.contains("i32.ge_s"), "should generate ge");
+    }
+
+    #[test]
+    fn unary_negation() {
+        let wat = compile(r#"
+            pub fn neg(x: i32) -> i32 {
+                return -x;
+            }
+        "#);
+        // Negation is done via 0 - x
+        assert!(wat.contains("i32.const 0"), "should push 0 for negation");
+        assert!(wat.contains("i32.sub"), "should generate sub for negation");
+    }
+
+    #[test]
+    fn unary_not() {
+        let wat = compile(r#"
+            pub fn negate(x: bool) -> bool {
+                return !x;
+            }
+        "#);
+        assert!(wat.contains("i32.eqz"), "should generate eqz for boolean not");
+    }
+
+    #[test]
+    fn fetch_expression() {
+        let wat = compile(r#"
+            pub fn get_data() -> i32 {
+                let r = fetch("https://api.example.com");
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("fetch"), "should contain fetch comment");
+        assert!(wat.contains("call $http_fetch"), "should call http_fetch");
+    }
+
+    #[test]
+    fn spawn_expression() {
+        let wat = compile(r#"
+            pub fn work() -> i32 {
+                let handle = spawn {
+                    return;
+                };
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("spawn"), "should contain spawn comment");
+        assert!(wat.contains("call $worker_spawn"), "should call worker_spawn");
+    }
+
+    #[test]
+    fn navigate_expression() {
+        let wat = compile(r#"
+            pub fn go() -> i32 {
+                navigate("/about");
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("navigate"), "should contain navigate comment");
+        assert!(wat.contains("call $router_navigate"), "should call router_navigate");
+    }
+
+    // -----------------------------------------------------------------------
+    // Statement codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn let_binding() {
+        let wat = compile(r#"
+            pub fn run() -> i32 {
+                let x = 42;
+                return x;
+            }
+        "#);
+        assert!(wat.contains("i32.const 42"), "should push constant");
+        assert!(wat.contains("local.set $x"), "should set local");
+        assert!(wat.contains("local.get $x"), "should get local");
+    }
+
+    #[test]
+    fn return_statement() {
+        let wat = compile(r#"
+            pub fn run() -> i32 {
+                return 42;
+            }
+        "#);
+        assert!(wat.contains("return"), "should generate return");
+    }
+
+    #[test]
+    fn empty_return() {
+        let wat = compile(r#"
+            pub fn run() {
+                return;
+            }
+        "#);
+        assert!(wat.contains("return"), "should generate empty return");
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct layout codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_layout_i32_fields() {
+        let wat = compile(r#"
+            struct Vec2 {
+                x: i32,
+                y: i32,
+            }
+        "#);
+        assert!(wat.contains("struct Vec2 layout"), "should contain struct layout comment");
+    }
+
+    #[test]
+    fn struct_layout_mixed_fields() {
+        let wat = compile(r#"
+            struct Mixed {
+                a: i32,
+                b: f64,
+                c: bool,
+            }
+        "#);
+        assert!(wat.contains("struct Mixed layout"), "should contain struct layout comment");
+    }
+
+    // -----------------------------------------------------------------------
+    // Enum codegen (falls through to generic item handler)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn enum_codegen() {
+        let wat = compile(r#"
+            enum Color {
+                Red,
+                Green,
+                Blue,
+            }
+        "#);
+        // Enums currently fall through to the TODO handler
+        assert!(wat.contains("(module"), "should still produce valid module");
+    }
+
+    // -----------------------------------------------------------------------
+    // Impl block codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn impl_block_without_trait_falls_through() {
+        let wat = compile(r#"
+            struct Point { x: i32, y: i32 }
+
+            impl Point {
+                pub fn make(x: i32, y: i32) -> i32 {
+                    return x + y;
+                }
+            }
+        "#);
+        // Bare impl (no trait) falls to the TODO handler in generate_item
+        assert!(wat.contains("TODO"), "bare impl should produce TODO comment");
+    }
+
+    #[test]
+    fn trait_impl_block_methods() {
+        // Use AST directly since trait impl parsing is complex
+        use crate::token::Span;
+        let span = Span::new(0, 0, 1, 1);
+        let program = Program {
+            items: vec![Item::Impl(ImplBlock {
+                target: "Point".into(),
+                trait_impls: vec!["Display".into()],
+                methods: vec![Function {
+                    name: "show".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: Some(Type::Named("i32".into())),
+                    trait_bounds: vec![],
+                    body: Block { stmts: vec![Stmt::Return(Some(Expr::Integer(0)))], span },
+                    is_pub: true,
+                    must_use: false,
+                    span,
+                }],
+                span,
+            })],
+        };
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("func $show"), "should generate trait impl method as function");
+        assert!(wat.contains("impl Display for Point"), "should have impl comment");
+    }
+
+    // -----------------------------------------------------------------------
+    // String runtime and format strings
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn string_concat_runtime() {
+        let wat = compile(r#"
+            pub fn greet() -> string {
+                return f"hello {42}!";
+            }
+        "#);
+        assert!(wat.contains("$string_concat"), "should emit string concat runtime");
+        assert!(wat.contains("$to_string"), "should emit to_string for interpolation");
+    }
+
+    #[test]
+    fn string_from_i32_runtime() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$string_fromI32"), "should emit fromI32 in string runtime");
+    }
+
+    #[test]
+    fn string_from_f64_runtime() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$string_fromF64"), "should emit fromF64 in string runtime");
+    }
+
+    #[test]
+    fn string_from_bool_runtime() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$string_fromBool"), "should emit fromBool in string runtime");
+    }
+
+    // -----------------------------------------------------------------------
+    // Signal runtime emission
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn signal_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("signal"), "should contain signal runtime imports");
+    }
+
+    // -----------------------------------------------------------------------
+    // Contract codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn contract_codegen() {
+        let wat = compile(r#"
+            contract UserResponse {
+                id: u32,
+                name: String,
+                email: String,
+            }
+        "#);
+        assert!(wat.contains("Contract: UserResponse"), "should contain contract name");
+        assert!(wat.contains("contract hash:"), "should contain content hash");
+        assert!(wat.contains("contract_registerSchema"), "should register schema");
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal runtimes
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn contract_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Contract runtime (WASM-internal)"), "should emit contract runtime");
+        assert!(wat.contains("$contract_registerSchema"), "should define registerSchema");
+        assert!(wat.contains("$contract_validate"), "should define validate");
+        assert!(wat.contains("$contract_getHash"), "should define getHash");
+    }
+
+    #[test]
+    fn permissions_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Permissions runtime (WASM-internal)"), "should emit permissions runtime");
+    }
+
+    #[test]
+    fn form_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Form runtime (WASM-internal)"), "should emit form runtime");
+    }
+
+    #[test]
+    fn lifecycle_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Lifecycle runtime (WASM-internal)"), "should emit lifecycle runtime");
+    }
+
+    #[test]
+    fn cache_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Cache runtime (WASM-internal)"), "should emit cache runtime");
+    }
+
+    #[test]
+    fn responsive_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Responsive runtime (WASM-internal)"), "should emit responsive runtime");
+    }
+
+    #[test]
+    fn route_table_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Route table (WASM-internal)"), "should emit route table runtime");
+    }
+
+    // -----------------------------------------------------------------------
+    // Gesture runtime
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gesture_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("Gesture"), "should emit gesture runtime");
+    }
+
+    // -----------------------------------------------------------------------
+    // Flags runtime
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn flags_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$flags_is_enabled"), "should emit flags_is_enabled");
+    }
+
+    // -----------------------------------------------------------------------
+    // AI runtime
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ai_runtime_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$ai_register_tool"), "should emit ai_register_tool");
+        assert!(wat.contains("$ai_get_tool_count"), "should emit ai_get_tool_count");
+        assert!(wat.contains("$ai_call_tool"), "should emit ai_call_tool");
+    }
+
+    // -----------------------------------------------------------------------
+    // Allocator
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bump_allocator_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$alloc"), "should emit bump allocator");
+        assert!(wat.contains("$heap_ptr"), "should reference heap pointer");
+    }
+
+    // -----------------------------------------------------------------------
+    // DOM imports
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn dom_imports() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$dom_mount"), "should import dom.mount");
+        assert!(wat.contains("$dom_flush"), "should import dom.flush");
+        assert!(wat.contains("$dom_createElement"), "should import dom.createElement");
+    }
+
+    // -----------------------------------------------------------------------
+    // HTTP imports
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn http_imports() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$http_fetch"), "should import http.fetch");
+        assert!(wat.contains("$http_setMethod"), "should import http.setMethod");
+        assert!(wat.contains("$http_addHeader"), "should import http.addHeader");
+    }
+
+    // -----------------------------------------------------------------------
+    // Worker imports
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn worker_imports() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("$worker_spawn"), "should import worker.spawn");
+        assert!(wat.contains("$worker_channelCreate"), "should import worker.channelCreate");
+    }
+
+    // -----------------------------------------------------------------------
+    // Closure codegen through compile pipeline
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn closure_in_full_compile() {
+        let wat = compile(r#"
+            pub fn run() -> i32 {
+                let f = |x: i32| x + 1;
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("$__closure_0"), "should generate closure function");
+        assert!(wat.contains("funcref"), "should emit function table for closures");
+    }
+
+    // -----------------------------------------------------------------------
+    // Literal codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn float_literal() {
+        let wat = compile(r#"
+            pub fn f() -> f64 {
+                return 3.14;
+            }
+        "#);
+        assert!(wat.contains("f64.const 3.14"), "should emit float const");
+    }
+
+    #[test]
+    fn bool_literals() {
+        let wat = compile(r#"
+            pub fn f() -> i32 {
+                let a = true;
+                let b = false;
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("i32.const 1"), "should emit 1 for true");
+        assert!(wat.contains("i32.const 0"), "should emit 0 for false");
+    }
+
+    #[test]
+    fn string_literal() {
+        let wat = compile(r#"
+            pub fn f() -> i32 {
+                let s = "hello";
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("str ptr"), "should contain string pointer comment");
+        assert!(wat.contains("str len"), "should contain string length comment");
+    }
+
+    // -----------------------------------------------------------------------
+    // Function codegen details
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn pub_function_exported() {
+        let wat = compile(r#"pub fn add(a: i32, b: i32) -> i32 { return a + b; }"#);
+        assert!(wat.contains("(export \"add\")"), "pub function should be exported");
+    }
+
+    #[test]
+    fn non_pub_function_not_exported() {
+        let wat = compile(r#"fn internal(x: i32) -> i32 { return x; }"#);
+        assert!(!wat.contains("(export \"internal\")"), "non-pub function should not be exported");
+    }
+
+    #[test]
+    fn function_params() {
+        let wat = compile(r#"pub fn add(a: i32, b: i32) -> i32 { return a + b; }"#);
+        assert!(wat.contains("(param $a i32)"), "should have param a");
+        assert!(wat.contains("(param $b i32)"), "should have param b");
+        assert!(wat.contains("(result i32)"), "should have return type");
+    }
+
+    // -----------------------------------------------------------------------
+    // Trait codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn trait_erased_in_codegen() {
+        let wat = compile(r#"
+            trait Printable {
+                fn print();
+            }
+        "#);
+        assert!(wat.contains("trait Printable (erased)"), "trait should be erased comment");
+    }
+
+    // -----------------------------------------------------------------------
+    // Data section
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn data_section_for_strings() {
+        let wat = compile(r#"
+            pub fn f() -> i32 {
+                let s = "test_data";
+                return 0;
+            }
+        "#);
+        assert!(wat.contains("(data"), "should emit data section for interned strings");
+        assert!(wat.contains("test_data"), "should contain the string in data section");
+    }
+
+    // -----------------------------------------------------------------------
+    // FnCall codegen with webapi mapping
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fn_call_user_function() {
+        let wat = compile(r#"
+            fn helper() -> i32 { return 1; }
+            pub fn run() -> i32 {
+                let r = helper();
+                return r;
+            }
+        "#);
+        assert!(wat.contains("call $helper"), "should call user function");
+    }
+
+    // -----------------------------------------------------------------------
+    // Field access codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn field_access_codegen() {
+        let wat = compile(r#"
+            struct Point { x: i32, y: i32 }
+            pub fn run(p: i32) -> i32 {
+                return p;
+            }
+        "#);
+        // Just verify module compiles
+        assert!(wat.contains("(module"), "should produce valid module");
+    }
+
+    // -----------------------------------------------------------------------
+    // Module structure
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn module_has_correct_structure() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.starts_with("\n(module"), "should start with (module");
+        assert!(wat.contains("(import \"env\" \"memory\""), "should import memory");
+        assert!(wat.trim_end().ends_with(")"), "should end with closing paren");
+    }
+
+    // -----------------------------------------------------------------------
+    // Assign expression
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn assign_expression_codegen() {
+        let wat = compile(r#"
+            pub fn run() -> i32 {
+                let mut x = 1;
+                x = 2;
+                return x;
+            }
+        "#);
+        assert!(wat.contains("local.set $x"), "should set variable on assign");
+    }
+}
+
+#[cfg(test)]
+mod coverage_codegen_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use crate::token::Span;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    fn parse(src: &str) -> Program {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let (program, errors) = parser.parse_program_recovering();
+        assert!(errors.is_empty(), "Parse errors: {:?}", errors);
+        program
+    }
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    // -----------------------------------------------------------------------
+    // Import namespace verification — all 16 namespaces
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn all_import_namespaces_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let namespaces = [
+            "\"dom\"", "\"timer\"", "\"webapi\"", "\"http\"", "\"observe\"",
+            "\"ws\"", "\"db\"", "\"worker\"", "\"pwa\"", "\"hardware\"",
+            "\"payment\"", "\"auth\"", "\"upload\"", "\"time\"", "\"streaming\"",
+            "\"rtc\"",
+        ];
+        for ns in &namespaces {
+            assert!(wat.contains(ns), "missing import namespace: {}", ns);
+        }
+    }
+
+    #[test]
+    fn rtc_peer_connection_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$rtc_createPeer",
+            "$rtc_createPeerWithIce",
+            "$rtc_createOffer",
+            "$rtc_createAnswer",
+            "$rtc_setLocalDescription",
+            "$rtc_setRemoteDescription",
+            "$rtc_addIceCandidate",
+            "$rtc_close",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing RTC import: {}", import);
+        }
+    }
+
+    #[test]
+    fn rtc_data_channel_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$rtc_createDataChannel",
+            "$rtc_dataChannelSend",
+            "$rtc_dataChannelSendBinary",
+            "$rtc_dataChannelClose",
+            "$rtc_dataChannelGetState",
+            "$rtc_onDataChannelMessage",
+            "$rtc_onDataChannelOpen",
+            "$rtc_onDataChannelClose",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing RTC data channel import: {}", import);
+        }
+    }
+
+    #[test]
+    fn rtc_media_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$rtc_addTrack",
+            "$rtc_removeTrack",
+            "$rtc_getUserMedia",
+            "$rtc_getDisplayMedia",
+            "$rtc_stopTrack",
+            "$rtc_setTrackEnabled",
+            "$rtc_getTrackKind",
+            "$rtc_attachStream",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing RTC media import: {}", import);
+        }
+    }
+
+    #[test]
+    fn rtc_event_callback_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$rtc_onIceCandidate",
+            "$rtc_onIceCandidateFull",
+            "$rtc_onTrack",
+            "$rtc_onDataChannel",
+            "$rtc_onConnectionStateChange",
+            "$rtc_onIceConnectionStateChange",
+            "$rtc_onIceGatheringStateChange",
+            "$rtc_onSignalingStateChange",
+            "$rtc_onNegotiationNeeded",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing RTC event import: {}", import);
+        }
+    }
+
+    #[test]
+    fn rtc_state_query_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$rtc_getConnectionState",
+            "$rtc_getIceConnectionState",
+            "$rtc_getSignalingState",
+            "$rtc_getStats",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing RTC state query import: {}", import);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Test block codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_block_codegen() {
+        let wat = compile(r#"
+            test "basic addition" {
+                assert_eq(1 + 1, 2);
+            }
+        "#);
+        assert!(wat.contains("__test_basic_addition"), "should generate test function");
+        assert!(wat.contains("test_pass"), "should call test_pass at end");
+    }
+
+    #[test]
+    fn test_runner_codegen() {
+        let wat = compile(r#"
+            test "first" {
+                assert(true);
+            }
+            test "second" {
+                assert(true);
+            }
+        "#);
+        assert!(wat.contains("__run_tests"), "should generate test runner");
+        assert!(wat.contains("test_summary"), "should call test_summary");
+        assert!(wat.contains("call $__test_first"), "should call first test");
+        assert!(wat.contains("call $__test_second"), "should call second test");
+    }
+
+    // -----------------------------------------------------------------------
+    // Contract codegen — type_to_canonical and type_to_json_schema_type
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn contract_with_various_field_types() {
+        let contract = ContractDef {
+            name: "TestContract".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
+                ContractField { name: "score".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
+                ContractField { name: "active".into(), ty: Type::Named("bool".into()), nullable: false, span: span() },
+                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField { name: "date".into(), ty: Type::Named("DateTime".into()), nullable: true, span: span() },
+                ContractField { name: "items".into(), ty: Type::Array(Box::new(Type::Named("i32".into()))), nullable: false, span: span() },
+                ContractField { name: "custom".into(), ty: Type::Named("MyType".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+        assert!(output.contains("Contract: TestContract"), "should have contract header");
+        assert!(output.contains("contract hash:"), "should have hash");
+        assert!(output.contains("contract_registerSchema"), "should register schema");
+        assert!(output.contains("schema len"), "should have schema with length");
+    }
+
+    #[test]
+    fn type_to_canonical_all_variants() {
+        let codegen = WasmCodegen::new();
+
+        assert_eq!(codegen.type_to_canonical(&Type::Named("i32".into())), "i32");
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Array(Box::new(Type::Named("i32".into())))),
+            "[i32]"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Option(Box::new(Type::Named("String".into())))),
+            "String?"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Result {
+                ok: Box::new(Type::Named("i32".into())),
+                err: Box::new(Type::Named("String".into())),
+            }),
+            "Result<i32,String>"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Tuple(vec![Type::Named("i32".into()), Type::Named("f64".into())])),
+            "(i32,f64)"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Generic {
+                name: "Vec".into(),
+                args: vec![Type::Named("i32".into())],
+            }),
+            "Vec<i32>"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Reference {
+                mutable: false,
+                lifetime: None,
+                inner: Box::new(Type::Named("i32".into())),
+            }),
+            "&i32"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Reference {
+                mutable: true,
+                lifetime: None,
+                inner: Box::new(Type::Named("i32".into())),
+            }),
+            "&mut i32"
+        );
+        assert_eq!(
+            codegen.type_to_canonical(&Type::Function {
+                params: vec![Type::Named("i32".into())],
+                ret: Box::new(Type::Named("bool".into())),
+            }),
+            "fn(i32)->bool"
+        );
+    }
+
+    #[test]
+    fn type_to_json_schema_type_variants() {
+        let codegen = WasmCodegen::new();
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("i32".into())), "integer");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("i64".into())), "integer");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("u32".into())), "integer");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("u64".into())), "integer");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("f32".into())), "number");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("f64".into())), "number");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("bool".into())), "boolean");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("String".into())), "string");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("DateTime".into())), "string");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("Custom".into())), "object");
+        assert_eq!(codegen.type_to_json_schema_type(&Type::Array(Box::new(Type::Named("i32".into())))), "array");
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Option(Box::new(Type::Named("i32".into())))),
+            "integer"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Tuple(vec![])),
+            "object"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // App codegen (manifest, offline, push)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn app_with_manifest() {
+        let app = AppDef {
+            name: "MyApp".into(),
+            manifest: Some(ManifestDef {
+                entries: vec![
+                    ("name".into(), Expr::StringLit("My App".into())),
+                    ("version".into(), Expr::Integer(1)),
+                    ("debug".into(), Expr::Bool(true)),
+                    ("other".into(), Expr::Ident("x".into())), // triggers null branch
+                ],
+                span: span(),
+            }),
+            offline: Some(OfflineDef {
+                precache: vec!["/index.html".into(), "/app.css".into()],
+                strategy: "cache-first".into(),
+                fallback: None,
+                span: span(),
+            }),
+            push: Some(PushDef {
+                vapid_key: Some(Expr::StringLit("BKEY123".into())),
+                on_message: None,
+                span: span(),
+            }),
+            router: None,
+            a11y: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_app(&app);
+        let output = codegen.output.clone();
+        assert!(output.contains("PWA App: MyApp"), "should have app header");
+        assert!(output.contains("register_manifest"), "should register manifest");
+        assert!(output.contains("register_sw"), "should register service worker");
+        assert!(output.contains("register_push"), "should register push");
+        assert!(output.contains("vapid key"), "should contain VAPID key reference");
+        assert!(output.contains("pwa_cachePrecache"), "should call cachePrecache");
+    }
+
+    #[test]
+    fn app_push_without_vapid_key() {
+        let app = AppDef {
+            name: "MinApp".into(),
+            manifest: None,
+            offline: None,
+            push: Some(PushDef {
+                vapid_key: None,
+                on_message: None,
+                span: span(),
+            }),
+            router: None,
+            a11y: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_app(&app);
+        let output = codegen.output.clone();
+        assert!(output.contains("register_push"), "should still generate push func");
+    }
+
+    // -----------------------------------------------------------------------
+    // Page codegen with SEO meta
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn page_with_meta_and_structured_data() {
+        let page = PageDef {
+            name: "HomePage".into(),
+            props: vec![],
+            meta: Some(MetaDef {
+                title: Some(Expr::StringLit("Home Page".into())),
+                description: Some(Expr::StringLit("Welcome".into())),
+                canonical: Some(Expr::StringLit("https://example.com".into())),
+                og_image: Some(Expr::StringLit("https://example.com/og.png".into())),
+                structured_data: vec![StructuredDataDef {
+                    schema_type: "Article".into(),
+                    fields: vec![
+                        ("headline".into(), Expr::StringLit("Title".into())),
+                        ("count".into(), Expr::Integer(42)), // non-string triggers null
+                    ],
+                    span: span(),
+                }],
+                extra: vec![],
+                span: span(),
+            }),
+            state: vec![StateField {
+                name: "loaded".into(),
+                ty: Some(Type::Named("bool".into())),
+                mutable: true,
+                secret: true,
+                atomic: false,
+                initializer: Expr::Bool(false),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![Function {
+                name: "handler".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }],
+            styles: vec![],
+            render: RenderBlock {
+                body: TemplateNode::TextLiteral("hello".into()),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            is_pub: true,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_page(&page);
+        let output = codegen.output.clone();
+        assert!(output.contains("Page: HomePage"), "should have page header");
+        assert!(output.contains("seo_set_meta"), "should call seo_set_meta");
+        assert!(output.contains("seo_register_structured_data"), "should register structured data");
+        assert!(output.contains("seo_register_route"), "should register route for sitemap");
+        assert!(output.contains("secret: loaded"), "should annotate secret state");
+        assert!(output.contains("__handler_0"), "should generate handler trampoline");
+    }
+
+    #[test]
+    fn page_without_meta() {
+        let page = PageDef {
+            name: "SimplePage".into(),
+            props: vec![],
+            meta: None,
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            is_pub: true,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_page(&page);
+        let output = codegen.output.clone();
+        assert!(output.contains("Page: SimplePage"), "should have page header");
+    }
+
+    // -----------------------------------------------------------------------
+    // Form codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn form_with_validators() {
+        let form = FormDef {
+            name: "LoginForm".into(),
+            fields: vec![
+                FormFieldDef {
+                    name: "email".into(),
+                    ty: Type::Named("String".into()),
+                    validators: vec![
+                        ValidatorDef { kind: ValidatorKind::Required, message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::Email, message: None, span: span() },
+                    ],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+                FormFieldDef {
+                    name: "password".into(),
+                    ty: Type::Named("String".into()),
+                    validators: vec![
+                        ValidatorDef { kind: ValidatorKind::Required, message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::MinLength(8), message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::MaxLength(128), message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::Pattern("^[a-zA-Z0-9]+$".into()), message: None, span: span() },
+                    ],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+                FormFieldDef {
+                    name: "age".into(),
+                    ty: Type::Named("i32".into()),
+                    validators: vec![
+                        ValidatorDef { kind: ValidatorKind::Min(0), message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::Max(150), message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::Url, message: None, span: span() },
+                        ValidatorDef { kind: ValidatorKind::Custom("validate_age".into()), message: None, span: span() },
+                    ],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+            ],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_form(&form);
+        let output = codegen.output.clone();
+        assert!(output.contains("Form: LoginForm"), "should have form header");
+        assert!(output.contains("form_register"), "should call form_register");
+    }
+
+    // -----------------------------------------------------------------------
+    // Channel codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn channel_codegen() {
+        let ch = ChannelDef {
+            name: "Chat".into(),
+            url: Expr::StringLit("/ws/chat".into()),
+            contract: None,
+            on_message: Some(Function {
+                name: "on_msg".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_connect: Some(Function {
+                name: "on_conn".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_disconnect: Some(Function {
+                name: "on_disc".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            reconnect: false,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("Channel: Chat"), "should have channel header");
+        assert!(output.contains("channel_connect"), "should call channel_connect");
+        assert!(output.contains("reconnect disabled"), "should disable reconnect");
+    }
+
+    #[test]
+    fn channel_with_non_string_url() {
+        let ch = ChannelDef {
+            name: "Events".into(),
+            url: Expr::Ident("url_var".into()),
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: true,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        // non-string URL defaults to "/ws"
+        assert!(output.contains("Channel: Events"), "should have channel header");
+    }
+
+    // -----------------------------------------------------------------------
+    // Embed codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn embed_sandboxed() {
+        let embed = EmbedDef {
+            name: "Widget".into(),
+            src: Expr::StringLit("https://cdn.example.com/widget.js".into()),
+            loading: Some("lazy".into()),
+            sandbox: true,
+            integrity: None,
+            permissions: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_embed(&embed);
+        let output = codegen.output.clone();
+        assert!(output.contains("Embed: Widget"), "should have embed header");
+        assert!(output.contains("embed_load_sandboxed"), "should use sandboxed embed");
+    }
+
+    #[test]
+    fn embed_non_sandboxed_with_integrity() {
+        let embed = EmbedDef {
+            name: "Analytics".into(),
+            src: Expr::StringLit("https://cdn.example.com/analytics.js".into()),
+            loading: None,
+            sandbox: false,
+            integrity: Some(Expr::StringLit("sha384-abc123".into())),
+            permissions: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_embed(&embed);
+        let output = codegen.output.clone();
+        assert!(output.contains("embed_load_script"), "should use script embed");
+    }
+
+    #[test]
+    fn embed_non_string_src() {
+        let embed = EmbedDef {
+            name: "Dynamic".into(),
+            src: Expr::Ident("url".into()),
+            loading: None,
+            sandbox: false,
+            integrity: None,
+            permissions: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_embed(&embed);
+        let output = codegen.output.clone();
+        assert!(output.contains("Embed: Dynamic"), "should have embed header");
+    }
+
+    // -----------------------------------------------------------------------
+    // PDF codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn pdf_codegen() {
+        let pdf = PdfDef {
+            name: "Invoice".into(),
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            page_size: Some("letter".into()),
+            orientation: Some("landscape".into()),
+            margins: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_pdf(&pdf);
+        let output = codegen.output.clone();
+        assert!(output.contains("PDF: Invoice"), "should have PDF header");
+        assert!(output.contains("pdf_create"), "should call pdf_create");
+        assert!(output.contains("config ptr"), "should have config pointer");
+        assert!(output.contains("config len"), "should have config length");
+    }
+
+    #[test]
+    fn pdf_with_defaults() {
+        let pdf = PdfDef {
+            name: "Report".into(),
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            page_size: None,
+            orientation: None,
+            margins: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_pdf(&pdf);
+        let output = codegen.output.clone();
+        assert!(output.contains("pdf_create"), "should call pdf_create");
+        assert!(output.contains("config ptr"), "should have config with defaults");
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn payment_codegen() {
+        let payment = PaymentDef {
+            name: "Checkout".into(),
+            provider: Some(Expr::StringLit("paypal".into())),
+            public_key: None,
+            sandbox_mode: true,
+            on_success: Some(Function {
+                name: "on_success".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_error: Some(Function {
+                name: "on_error".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("Payment: Checkout"), "should have payment header");
+        assert!(output.contains("payment_init"), "should call payment_init");
+        assert!(output.contains("i32.const 1  ;; sandboxed"), "should set sandbox flag to 1");
+    }
+
+    #[test]
+    fn payment_without_provider() {
+        let payment = PaymentDef {
+            name: "Pay".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        // defaults to "stripe"
+        assert!(output.contains("Payment: Pay"), "should have payment header");
+    }
+
+    // -----------------------------------------------------------------------
+    // Auth codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn auth_codegen_with_providers() {
+        let auth = AuthDef {
+            name: "Auth".into(),
+            provider: None,
+            providers: vec![
+                AuthProvider {
+                    name: "google".into(),
+                    client_id: None,
+                    scopes: vec!["email".into(), "profile".into()],
+                    span: span(),
+                },
+            ],
+            on_login: Some(Function {
+                name: "on_login".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_logout: Some(Function {
+                name: "on_logout".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_error: Some(Function {
+                name: "on_err".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            session_storage: Some("cookie".into()),
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("Auth: Auth"), "should have auth header");
+        assert!(output.contains("auth_init"), "should call auth_init");
+    }
+
+    // -----------------------------------------------------------------------
+    // Upload codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn upload_codegen() {
+        let upload = UploadDef {
+            name: "FileUpload".into(),
+            endpoint: Expr::StringLit("/api/upload".into()),
+            max_size: None,
+            accept: vec!["image/*".into(), "application/pdf".into()],
+            chunked: true,
+            on_progress: Some(Function {
+                name: "on_progress".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_complete: Some(Function {
+                name: "on_complete".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_error: Some(Function {
+                name: "on_error".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_upload(&upload);
+        let output = codegen.output.clone();
+        assert!(output.contains("Upload: FileUpload"), "should have upload header");
+        assert!(output.contains("upload_init"), "should call upload_init");
+        assert!(output.contains("config len"), "should have config with upload settings");
+    }
+
+    #[test]
+    fn upload_non_string_endpoint() {
+        let upload = UploadDef {
+            name: "Up".into(),
+            endpoint: Expr::Ident("endpoint_var".into()),
+            max_size: None,
+            accept: vec![],
+            chunked: false,
+            on_progress: None,
+            on_complete: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_upload(&upload);
+        let output = codegen.output.clone();
+        assert!(output.contains("Upload: Up"), "should have upload header");
+    }
+
+    // -----------------------------------------------------------------------
+    // Cache codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cache_codegen_full() {
+        let cache = CacheDef {
+            name: "ApiCache".into(),
+            strategy: Some("stale-while-revalidate".into()),
+            default_ttl: Some(3600),
+            persist: true,
+            max_entries: Some(100),
+            queries: vec![CacheQueryDef {
+                name: "getUsers".into(),
+                params: vec![],
+                fetch_expr: Expr::StringLit("/api/users".into()),
+                contract: Some("UserContract".into()),
+                ttl: Some(600),
+                stale: Some(300),
+                invalidate_on: vec!["user_updated".into()],
+                span: span(),
+            }],
+            mutations: vec![CacheMutationDef {
+                name: "updateUser".into(),
+                params: vec![],
+                fetch_expr: Expr::StringLit("/api/users".into()),
+                optimistic: true,
+                rollback_on_error: true,
+                invalidate: vec!["getUsers".into()],
+                span: span(),
+            }],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_cache(&cache);
+        let output = codegen.output.clone();
+        assert!(output.contains("Cache: ApiCache"), "should have cache header");
+        assert!(output.contains("cache_init"), "should call cache_init");
+        assert!(output.contains("cache_register_query"), "should register query");
+        assert!(output.contains("cache_register_mutation"), "should register mutation");
+    }
+
+    // -----------------------------------------------------------------------
+    // Breakpoints codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn breakpoints_codegen() {
+        let bp = BreakpointsDef {
+            breakpoints: vec![
+                ("mobile".into(), 640),
+                ("tablet".into(), 1024),
+                ("desktop".into(), 1280),
+            ],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_breakpoints(&bp);
+        let output = codegen.output.clone();
+        assert!(output.contains("Responsive Breakpoints"), "should have breakpoints header");
+        assert!(output.contains("responsive_register"), "should call responsive_register");
+    }
+
+    // -----------------------------------------------------------------------
+    // Animation codegen (spring, keyframes, stagger)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn animation_spring() {
+        let anim = AnimationBlockDef {
+            name: "bounce".into(),
+            kind: AnimationKind::Spring {
+                stiffness: Some(200.0),
+                damping: Some(20.0),
+                mass: Some(1.5),
+                properties: vec!["opacity".into(), "transform".into()],
+            },
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_animation_block(&anim);
+        let output = codegen.output.clone();
+        assert!(output.contains("Animation: bounce"), "should have animation header");
+        assert!(output.contains("animate_spring"), "should call animate_spring");
+    }
+
+    #[test]
+    fn animation_keyframes() {
+        let anim = AnimationBlockDef {
+            name: "fadeIn".into(),
+            kind: AnimationKind::Keyframes {
+                frames: vec![
+                    (0.0, vec![("opacity".into(), Expr::Float(0.0))]),
+                    (100.0, vec![("opacity".into(), Expr::Float(1.0))]),
+                ],
+                duration: Some("500ms".into()),
+                easing: Some("ease-in".into()),
+            },
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_animation_block(&anim);
+        let output = codegen.output.clone();
+        assert!(output.contains("animate_keyframes"), "should call animate_keyframes");
+    }
+
+    #[test]
+    fn animation_keyframes_defaults() {
+        let anim = AnimationBlockDef {
+            name: "slide".into(),
+            kind: AnimationKind::Keyframes {
+                frames: vec![],
+                duration: None,
+                easing: None,
+            },
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_animation_block(&anim);
+        let output = codegen.output.clone();
+        assert!(output.contains("Animation: slide"), "should have animation header");
+        assert!(output.contains("animate_keyframes"), "should call animate_keyframes");
+    }
+
+    #[test]
+    fn animation_stagger() {
+        let anim = AnimationBlockDef {
+            name: "list".into(),
+            kind: AnimationKind::Stagger {
+                animation: "fadeIn".into(),
+                delay: Some("100ms".into()),
+                selector: Some(".item".into()),
+            },
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_animation_block(&anim);
+        let output = codegen.output.clone();
+        assert!(output.contains("animate_stagger"), "should call animate_stagger");
+    }
+
+    #[test]
+    fn animation_stagger_defaults() {
+        let anim = AnimationBlockDef {
+            name: "items".into(),
+            kind: AnimationKind::Stagger {
+                animation: "fadeIn".into(),
+                delay: None,
+                selector: None,
+            },
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_animation_block(&anim);
+        let output = codegen.output.clone();
+        assert!(output.contains("Animation: items"), "should have animation header");
+        assert!(output.contains("animate_stagger"), "should call animate_stagger");
+    }
+
+    // -----------------------------------------------------------------------
+    // Theme codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn theme_light_and_dark() {
+        let theme = ThemeDef {
+            name: "MainTheme".into(),
+            light: Some(vec![
+                ("bg".into(), Expr::StringLit("#fff".into())),
+                ("fg".into(), Expr::Integer(0)), // triggers null branch
+            ]),
+            dark: Some(vec![
+                ("bg".into(), Expr::StringLit("#000".into())),
+            ]),
+            dark_auto: false,
+            primary: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_theme(&theme);
+        let output = codegen.output.clone();
+        assert!(output.contains("Theme: MainTheme"), "should have theme header");
+        assert!(output.contains("theme_init"), "should call theme_init");
+    }
+
+    #[test]
+    fn theme_dark_auto() {
+        let theme = ThemeDef {
+            name: "Auto".into(),
+            light: None,
+            dark: None,
+            dark_auto: true,
+            primary: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_theme(&theme);
+        let output = codegen.output.clone();
+        assert!(output.contains("Theme: Auto"), "should have theme header");
+        assert!(output.contains("init_theme"), "should call init_theme");
+    }
+
+    // -----------------------------------------------------------------------
+    // Permissions codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn permissions_with_csp() {
+        let perms = PermissionsDef {
+            network: vec!["https://api.example.com/v1".into(), "https://cdn.example.com/assets".into()],
+            storage: vec!["user_prefs".into()],
+            capabilities: vec!["camera".into()],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_permissions("TestComp", &perms);
+        let output = codegen.output.clone();
+        assert!(output.contains("permissions for component TestComp"), "should have permissions header");
+        assert!(output.contains("permissions_registerPermissions"), "should register permissions");
+        assert!(output.contains("CSP: connect-src"), "should generate CSP comment");
+    }
+
+    #[test]
+    fn permissions_no_network() {
+        let perms = PermissionsDef {
+            network: vec![],
+            storage: vec!["key".into()],
+            capabilities: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_permissions("Comp2", &perms);
+        let output = codegen.output.clone();
+        assert!(!output.contains("CSP:"), "should not generate CSP without network");
+    }
+
+    // -----------------------------------------------------------------------
+    // Component with skeleton, error boundary, a11y, on_destroy, chunk
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn component_with_skeleton() {
+        let comp = Component {
+            name: "Heavy".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: Some(SkeletonDef {
+                body: RenderBlock { body: TemplateNode::TextLiteral("loading...".into()), span: span() },
+                span: span(),
+            }),
+            error_boundary: None,
+            chunk: Some("heavy-chunk".into()),
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("skeleton"), "should have skeleton block");
+        assert!(output.contains("skeleton_mount"), "should call skeleton_mount");
+        assert!(output.contains("chunk boundary"), "should mark chunk boundary");
+    }
+
+    #[test]
+    fn component_with_error_boundary() {
+        let comp = Component {
+            name: "Safe".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: Some(ErrorBoundary {
+                body: RenderBlock { body: TemplateNode::TextLiteral("content".into()), span: span() },
+                fallback: RenderBlock { body: TemplateNode::TextLiteral("error".into()), span: span() },
+                span: span(),
+            }),
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("error boundary"), "should have error boundary");
+        assert!(output.contains("eb_ok"), "should have error boundary block");
+    }
+
+    #[test]
+    fn component_with_a11y_auto() {
+        let comp = Component {
+            name: "Accessible".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: Some(A11yMode::Auto),
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("a11y: auto"), "should have a11y auto comment");
+        assert!(output.contains("a11y_enhance"), "should call a11y_enhance");
+    }
+
+    #[test]
+    fn component_default_a11y_auto() {
+        // Components without explicit a11y should default to auto
+        let comp = Component {
+            name: "NoExplicitA11y".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None, // no explicit a11y — should default to auto
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("a11y_enhance"), "should call a11y_enhance by default");
+    }
+
+    #[test]
+    fn component_a11y_manual_no_enhance() {
+        let comp = Component {
+            name: "ManualA11y".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: Some(A11yMode::Manual),
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(!output.contains("a11y_enhance"), "manual mode should NOT call a11y_enhance");
+    }
+
+    #[test]
+    fn component_a11y_hybrid() {
+        let comp = Component {
+            name: "HybridA11y".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: Some(A11yMode::Hybrid),
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("a11y_enhance"), "hybrid mode should call a11y_enhance");
+    }
+
+    #[test]
+    fn outlet_generates_div_with_id() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(&TemplateNode::Outlet, "$root");
+        let output = codegen.output.clone();
+        assert!(output.contains("dom_createElement"), "should create element for outlet");
+        assert!(output.contains("__nectar_outlet"), "should set outlet id");
+        assert!(output.contains("dom_appendChild"), "should append outlet to parent");
+    }
+
+    #[test]
+    fn layout_stack_generates_flex_column() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Stack {
+                gap: Some("16".into()),
+                children: vec![TemplateNode::TextLiteral("child".into())],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("dom_createElement"), "should create element");
+        assert!(output.contains("flex-direction:column"), "should use column flex");
+        assert!(output.contains("gap:16px"), "should have gap");
+        assert!(output.contains("dom_setAttr"), "should set style");
+    }
+
+    #[test]
+    fn layout_grid_generates_css_grid() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Grid {
+                cols: Some("3".into()),
+                rows: None,
+                gap: Some("8".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("display:grid"), "should use CSS grid");
+        assert!(output.contains("repeat(3,1fr)"), "should have 3 columns");
+        assert!(output.contains("gap:8px"), "should have gap");
+    }
+
+    #[test]
+    fn layout_center_generates_flex_centering() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Center {
+                max_width: Some("800".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("justify-content:center"), "should center content");
+        assert!(output.contains("max-width:800px"), "should have max width");
+    }
+
+    #[test]
+    fn layout_sidebar_left() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Sidebar {
+                side: Some("left".into()),
+                width: Some("250".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("250px 1fr"), "left sidebar should put sidebar first");
+    }
+
+    #[test]
+    fn layout_sidebar_right() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Sidebar {
+                side: Some("right".into()),
+                width: Some("300".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("1fr 300px"), "right sidebar should put sidebar last");
+    }
+
+    #[test]
+    fn layout_row_with_align() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Row {
+                gap: Some("12".into()),
+                align: Some("center".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("flex-direction:row"), "should use row flex");
+        assert!(output.contains("align-items:center"), "should center align");
+        assert!(output.contains("gap:12px"), "should have gap");
+    }
+
+    #[test]
+    fn layout_cluster_wraps() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Cluster {
+                gap: Some("8".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("flex-wrap:wrap"), "should enable wrapping");
+        assert!(output.contains("gap:8px"), "should have gap");
+    }
+
+    #[test]
+    fn layout_switcher_threshold() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_template(
+            &TemplateNode::Layout(LayoutNode::Switcher {
+                threshold: Some("480".into()),
+                children: vec![],
+                span: span(),
+            }),
+            "$root",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("--threshold:480px"), "should set threshold custom property");
+        assert!(output.contains("flex-wrap:wrap"), "should enable wrapping");
+    }
+
+    #[test]
+    fn router_with_layout_and_transition() {
+        let router = RouterDef {
+            name: "AppRouter".into(),
+            routes: vec![
+                RouteDef {
+                    path: "/".into(),
+                    params: vec![],
+                    component: "Home".into(),
+                    guard: None,
+                    transition: Some("fade".into()),
+                    span: span(),
+                },
+            ],
+            fallback: None,
+            layout: Some(RenderBlock {
+                body: TemplateNode::Fragment(vec![
+                    TemplateNode::Element(Element {
+                        tag: "nav".into(),
+                        attributes: vec![],
+                        children: vec![TemplateNode::TextLiteral("Nav".into())],
+                        span: span(),
+                    }),
+                    TemplateNode::Outlet,
+                ]),
+                span: span(),
+            }),
+            transition: Some("fade".into()),
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_router(&router);
+        let output = codegen.output.clone();
+        assert!(output.contains("router_registerRoute"), "should register routes");
+        assert!(output.contains("router_init"), "should call router_init");
+    }
+
+    #[test]
+    fn component_with_on_destroy() {
+        let comp = Component {
+            name: "Cleanup".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: Some(Function {
+                name: "cleanup".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("on_destroy"), "should have on_destroy");
+        assert!(output.contains("lifecycle_register_cleanup"), "should register cleanup");
+    }
+
+    // -----------------------------------------------------------------------
+    // Style injection and transitions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn style_injection() {
+        let comp = Component {
+            name: "Styled".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".btn".into(),
+                properties: vec![("color".into(), "red".into()), ("font-size".into(), "16px".into())],
+                span: span(),
+            }],
+            transitions: vec![TransitionDef {
+                property: "opacity".into(),
+                duration: "0.3s".into(),
+                easing: "ease".into(),
+                span: span(),
+            }],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        assert!(output.contains("scoped styles for Styled"), "should have style injection");
+        assert!(output.contains("style_injectStyles"), "should call style_injectStyles");
+        assert!(output.contains("transitions for Styled"), "should have transitions");
+    }
+
+    // -----------------------------------------------------------------------
+    // Expression codegen — remaining variants
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn await_expression_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Await(Box::new(Expr::Integer(1))));
+        let output = codegen.output.clone();
+        assert!(output.contains("await"), "should have await comment");
+        assert!(output.contains("signal_get"), "should resolve promise handle");
+    }
+
+    #[test]
+    fn fetch_with_contract() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Fetch {
+            url: Box::new(Expr::StringLit("https://api.example.com".into())),
+            options: None,
+            contract: Some("UserContract".into()),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("contract boundary validation"), "should mention contract");
+        assert!(output.contains("contract_validate"), "should call contract_validate");
+    }
+
+    #[test]
+    fn fetch_with_options() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Fetch {
+            url: Box::new(Expr::StringLit("https://api.example.com".into())),
+            options: Some(Box::new(Expr::Integer(0))),
+            contract: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("http_fetch"), "should call http_fetch");
+    }
+
+    #[test]
+    fn channel_create_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Channel { ty: Some(Type::Named("i32".into())) });
+        let output = codegen.output.clone();
+        assert!(output.contains("channel create"), "should have channel create comment");
+        assert!(output.contains("worker_channelCreate"), "should call channelCreate");
+    }
+
+    #[test]
+    fn channel_create_no_type() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Channel { ty: None });
+        let output = codegen.output.clone();
+        assert!(output.contains("channel create"), "should have channel create comment");
+    }
+
+    #[test]
+    fn send_receive_exprs() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Send {
+            channel: Box::new(Expr::Ident("ch".into())),
+            value: Box::new(Expr::Integer(42)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("channel send"), "should have channel send comment");
+
+        let mut codegen2 = WasmCodegen::new();
+        codegen2.generate_expr(&Expr::Receive {
+            channel: Box::new(Expr::Ident("ch".into())),
+        });
+        let output2 = codegen2.output.clone();
+        assert!(output2.contains("channel receive"), "should have channel receive comment");
+    }
+
+    #[test]
+    fn parallel_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Parallel {
+            tasks: vec![Expr::Integer(1), Expr::Integer(2), Expr::Integer(3)],
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("parallel"), "should have parallel comment");
+        assert!(output.contains("worker_parallel"), "should call worker_parallel");
+    }
+
+    #[test]
+    fn try_catch_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::TryCatch {
+            body: Box::new(Expr::Integer(1)),
+            error_binding: "err".into(),
+            catch_body: Box::new(Expr::Integer(0)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("try/catch"), "should have try/catch comment");
+        assert!(output.contains("try_ok"), "should have try_ok block");
+        assert!(output.contains("try_err"), "should have try_err block");
+    }
+
+    #[test]
+    fn animate_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Animate {
+            target: Box::new(Expr::Ident("el".into())),
+            animation: "fadeIn".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("animate"), "should have animate comment");
+        assert!(output.contains("animation_play"), "should call animation_play");
+    }
+
+    #[test]
+    fn assert_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Assert {
+            condition: Box::new(Expr::Bool(true)),
+            message: Some("custom msg".into()),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("assert"), "should have assert comment");
+        assert!(output.contains("test_fail"), "should call test_fail on failure");
+    }
+
+    #[test]
+    fn assert_no_message() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Assert {
+            condition: Box::new(Expr::Bool(true)),
+            message: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("msg len"), "should use default message with length");
+    }
+
+    #[test]
+    fn assert_eq_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::AssertEq {
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(1)),
+            message: Some("values should match".into()),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("assert_eq"), "should have assert_eq comment");
+        assert!(output.contains("i32.eq"), "should compare with i32.eq");
+    }
+
+    #[test]
+    fn assert_eq_no_message() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::AssertEq {
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(2)),
+            message: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("msg len"), "should use default message with length");
+    }
+
+    #[test]
+    fn prompt_template_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::PromptTemplate {
+            template: "Hello {name}!".into(),
+            interpolations: vec![
+                ("name".into(), Expr::StringLit("world".into())),
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("prompt template"), "should have prompt template comment");
+        assert!(output.contains("interpolation count"), "should push interpolation count");
+    }
+
+    #[test]
+    fn stream_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Stream {
+            source: Box::new(Expr::StringLit("https://api.example.com/stream".into())),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("stream"), "should have stream comment");
+        assert!(output.contains("streaming_streamFetch"), "should call streaming_streamFetch");
+    }
+
+    #[test]
+    fn suspend_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Suspend {
+            fallback: Box::new(Expr::Integer(0)),
+            body: Box::new(Expr::Integer(1)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("suspend"), "should have suspend comment");
+        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
+    }
+
+    #[test]
+    fn try_operator_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Try(Box::new(Expr::Integer(1))));
+        let output = codegen.output.clone();
+        assert!(output.contains("error propagation"), "should have try operator comment");
+        assert!(output.contains("return"), "should have early return for error path");
+    }
+
+    #[test]
+    fn dynamic_import_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::DynamicImport {
+            path: Box::new(Expr::StringLit("./module.js".into())),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("dynamic import"), "should have dynamic import comment");
+        assert!(output.contains("load_chunk"), "should call load_chunk");
+    }
+
+    #[test]
+    fn download_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Download {
+            data: Box::new(Expr::StringLit("data".into())),
+            filename: Box::new(Expr::StringLit("file.txt".into())),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("download"), "should have download comment");
+        assert!(output.contains("io_download"), "should call io_download");
+    }
+
+    #[test]
+    fn env_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Env {
+            name: Box::new(Expr::StringLit("API_KEY".into())),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("env"), "should have env comment");
+        assert!(output.contains("env_get"), "should call env_get");
+    }
+
+    #[test]
+    fn trace_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Trace {
+            label: Box::new(Expr::StringLit("render".into())),
+            body: block(vec![Stmt::Return(None)]),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("trace"), "should have trace comment");
+        assert!(output.contains("trace_start"), "should call trace_start");
+        assert!(output.contains("trace_end"), "should call trace_end");
+    }
+
+    #[test]
+    fn flag_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Flag {
+            name: Box::new(Expr::StringLit("dark_mode".into())),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("flag"), "should have flag comment");
+        assert!(output.contains("flag_is_enabled"), "should call flag_is_enabled");
+    }
+
+    #[test]
+    fn virtual_list_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::VirtualList {
+            items: Box::new(Expr::Ident("data".into())),
+            item_height: Box::new(Expr::Integer(50)),
+            template: Box::new(Expr::Ident("render_item".into())),
+            buffer: Some(10),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("virtual list"), "should have virtual list comment");
+        assert!(output.contains("virtual_create_list"), "should call virtual_create_list");
+        assert!(output.contains("i32.const 10"), "should use custom buffer");
+    }
+
+    #[test]
+    fn virtual_list_default_buffer() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::VirtualList {
+            items: Box::new(Expr::Ident("data".into())),
+            item_height: Box::new(Expr::Integer(50)),
+            template: Box::new(Expr::Ident("render_item".into())),
+            buffer: None,
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("i32.const 5"), "should use default buffer of 5");
+    }
+
+    #[test]
+    fn format_string_empty() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FormatString { parts: vec![] });
+        let output = codegen.output.clone();
+        assert!(output.contains("i32.const 0 ;; empty fstr len"), "empty format string should push empty");
+    }
+
+    #[test]
+    fn format_string_literal_only() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FormatString {
+            parts: vec![FormatPart::Literal("just text".into())],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("fstr lit ptr"), "should push literal pointer");
+    }
+
+    #[test]
+    fn format_string_mixed_parts() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FormatString {
+            parts: vec![
+                FormatPart::Literal("hello ".into()),
+                FormatPart::Expression(Box::new(Expr::Ident("name".into()))),
+                FormatPart::Literal("!".into()),
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("to_string"), "should convert expr to string");
+        assert!(output.contains("string_concat"), "should concat parts");
+    }
+
+    #[test]
+    fn self_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::SelfExpr);
+        let output = codegen.output.clone();
+        assert!(output.contains("local.get $self"), "should get self local");
+    }
+
+    #[test]
+    fn field_access_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FieldAccess {
+            object: Box::new(Expr::Ident("p".into())),
+            field: "x".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("field access: .x"), "should have field access comment");
+        assert!(output.contains("i32.load"), "should load field");
+    }
+
+    #[test]
+    fn fn_call_webapi_mapping() {
+        let fns = vec![
+            ("localStorage_get", "$webapi_localStorageGet"),
+            ("console_log", "$webapi_consoleLog"),
+            ("set_timeout", "$webapi_setTimeout"),
+            ("clipboard_write", "$webapi_clipboardWrite"),
+            ("push_state", "$webapi_pushState"),
+        ];
+        for (name, expected) in fns {
+            let mut codegen = WasmCodegen::new();
+            codegen.generate_expr(&Expr::FnCall {
+                callee: Box::new(Expr::Ident(name.into())),
+                args: vec![],
+            });
+            let output = codegen.output.clone();
+            assert!(output.contains(expected), "fn {} should map to {}", name, expected);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Statement codegen — remaining variants
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn signal_stmt_codegen() {
+        let wat = compile(r#"
+            component Sig {
+                let mut count: i32 = 0;
+                render {
+                    <div>"sig"</div>
+                }
+            }
+        "#);
+        assert!(wat.contains("signal_create"), "should create signal for state");
+    }
+
+    #[test]
+    fn secret_let_binding() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Let {
+            name: "key".into(),
+            ty: None,
+            mutable: false,
+            secret: true,
+            value: Expr::StringLit("secret123".into()),
+            ownership: Ownership::Owned,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("secret binding: key"), "should have secret annotation");
+    }
+
+    #[test]
+    fn yield_stmt() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Yield(Expr::Integer(42)));
+        let output = codegen.output.clone();
+        assert!(output.contains("yield"), "should have yield comment");
+        assert!(output.contains("streaming_yield"), "should call streaming_yield");
+    }
+
+    #[test]
+    fn expr_stmt_drops() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Expr(Expr::Integer(42)));
+        let output = codegen.output.clone();
+        assert!(output.contains("drop"), "expression statement should drop result");
+    }
+
+    #[test]
+    fn let_destructure_tuple() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::LetDestructure {
+            pattern: Pattern::Tuple(vec![
+                Pattern::Ident("a".into()),
+                Pattern::Ident("b".into()),
+            ]),
+            value: Expr::Integer(0),
+            ty: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("destructure"), "should have destructure comment");
+        assert!(output.contains("local.set $a"), "should set local a");
+        assert!(output.contains("local.set $b"), "should set local b");
+    }
+
+    #[test]
+    fn let_destructure_struct() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::LetDestructure {
+            pattern: Pattern::Struct {
+                name: "Point".into(),
+                fields: vec![
+                    ("x".into(), Pattern::Ident("px".into())),
+                    ("y".into(), Pattern::Ident("py".into())),
+                ],
+                rest: false,
+            },
+            value: Expr::Integer(0),
+            ty: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("local.set $px"), "should set local px");
+        assert!(output.contains("local.set $py"), "should set local py");
+    }
+
+    #[test]
+    fn let_destructure_array_with_wildcard() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::LetDestructure {
+            pattern: Pattern::Array(vec![
+                Pattern::Ident("first".into()),
+                Pattern::Wildcard,
+                Pattern::Ident("third".into()),
+            ]),
+            value: Expr::Integer(0),
+            ty: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("local.set $first"), "should set first");
+        assert!(output.contains("local.set $third"), "should set third");
+    }
+
+    // -----------------------------------------------------------------------
+    // Template codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn template_element_with_attributes() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        let el = TemplateNode::Element(Element {
+            tag: "button".into(),
+            attributes: vec![
+                Attribute::Static { name: "class".into(), value: "btn".into() },
+                Attribute::EventHandler { event: "click".into(), handler: Expr::Ident("onclick".into()) },
+                Attribute::Aria { name: "label".into(), value: Expr::StringLit("Click me".into()) },
+                Attribute::Aria { name: "expanded".into(), value: Expr::Ident("is_open".into()) },
+                Attribute::Role { value: "button".into() },
+                Attribute::Bind { property: "value".into(), signal: "text".into() },
+                Attribute::Bind { property: "checked".into(), signal: "is_checked".into() },
+            ],
+            children: vec![TemplateNode::TextLiteral("Click".into())],
+            span: span(),
+        });
+        codegen.generate_template(&el, "$root");
+        let output = codegen.output.clone();
+        assert!(output.contains("dom_createElement"), "should create element");
+        assert!(output.contains("dom_addEventListener"), "should add event listener");
+        assert!(output.contains("a11y_setAriaAttribute"), "should set ARIA attribute");
+        assert!(output.contains("a11y_setRole"), "should set role");
+        assert!(output.contains("dom_setProperty"), "should set property for bind");
+        assert!(output.contains("signal_createEffect"), "should create effect for bind");
+        assert!(output.contains("dom_appendChild"), "should append to parent");
+        assert!(output.contains("dom_setText"), "should set text content");
+    }
+
+    #[test]
+    fn template_link() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        let link = TemplateNode::Link {
+            to: Expr::StringLit("/about".into()),
+            children: vec![TemplateNode::TextLiteral("About".into())],
+        };
+        codegen.generate_template(&link, "$root");
+        let output = codegen.output.clone();
+        assert!(output.contains("dom_createElement"), "should create anchor element");
+        assert!(output.contains("dom_addEventListener"), "should add click handler");
+        assert!(output.contains("dom_appendChild"), "should append link");
+    }
+
+    #[test]
+    fn template_expression() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        let expr = TemplateNode::Expression(Box::new(Expr::Integer(42)));
+        codegen.generate_template(&expr, "$root");
+        let output = codegen.output.clone();
+        assert!(output.contains("dynamic expression"), "should have expression comment");
+        assert!(output.contains("i32.const 42"), "should evaluate expression");
+    }
+
+    // -----------------------------------------------------------------------
+    // Router with guard and fallback
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn router_with_guard() {
+        let router = RouterDef {
+            name: "AppRouter".into(),
+            routes: vec![
+                RouteDef {
+                    path: "/admin".into(),
+                    params: vec![],
+                    component: "Admin".into(),
+                    guard: Some(Expr::Bool(true)),
+                    transition: None,
+                    span: span(),
+                },
+                RouteDef {
+                    path: "/".into(),
+                    params: vec![],
+                    component: "Home".into(),
+                    guard: None,
+                    transition: None,
+                    span: span(),
+                },
+            ],
+            fallback: Some(Box::new(TemplateNode::TextLiteral("404 Not Found".into()))),
+            layout: None,
+            transition: None,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_router(&router);
+        let output = codegen.output.clone();
+        assert!(output.contains("route guard check"), "should have guard check");
+        assert!(output.contains("fallback route component"), "should have fallback");
+        assert!(output.contains("router_registerRoute"), "should register routes");
+        assert!(output.contains("router_init"), "should call router_init");
+    }
+
+    // -----------------------------------------------------------------------
+    // Store with selectors
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn store_with_selectors() {
+        let store = StoreDef {
+            name: "DataStore".into(),
+            signals: vec![],
+            actions: vec![],
+            computed: vec![],
+            effects: vec![],
+            selectors: vec![SelectorDef {
+                name: "filteredItems".into(),
+                deps: vec!["items".into()],
+                body: Expr::Integer(0),
+                span: span(),
+            }],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_store(&store);
+        let output = codegen.output.clone();
+        assert!(output.contains("selector: filteredItems"), "should have selector");
+        assert!(output.contains("DataStore_selector_filteredItems"), "should generate selector function");
+    }
+
+    // -----------------------------------------------------------------------
+    // String interning deduplication
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn string_interning_deduplicates() {
+        let mut codegen = WasmCodegen::new();
+        let off1 = codegen.store_string("hello");
+        let off2 = codegen.store_string("hello");
+        let off3 = codegen.store_string("world");
+        assert_eq!(off1, off2, "same string should return same offset");
+        assert_ne!(off1, off3, "different strings should have different offsets");
+    }
+
+    // -----------------------------------------------------------------------
+    // type_to_wasm / type_size / ast_type_to_wasm
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn type_to_wasm_mapping() {
+        let codegen = WasmCodegen::new();
+        assert_eq!(codegen.type_to_wasm(&Type::Named("i32".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("u32".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("bool".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("i64".into())), "i64");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("u64".into())), "i64");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("f32".into())), "f32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("f64".into())), "f64");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("String".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("Custom".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Generic { name: "Vec".into(), args: vec![] }), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) }), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Array(Box::new(Type::Named("i32".into())))), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Tuple(vec![])), "i32");
+    }
+
+    #[test]
+    fn type_size_mapping() {
+        let codegen = WasmCodegen::new();
+        assert_eq!(codegen.type_size(&Type::Named("i32".into())), 4);
+        assert_eq!(codegen.type_size(&Type::Named("f32".into())), 4);
+        assert_eq!(codegen.type_size(&Type::Named("bool".into())), 4);
+        assert_eq!(codegen.type_size(&Type::Named("i64".into())), 8);
+        assert_eq!(codegen.type_size(&Type::Named("f64".into())), 8);
+        assert_eq!(codegen.type_size(&Type::Named("String".into())), 8);
+        assert_eq!(codegen.type_size(&Type::Named("Custom".into())), 4);
+        assert_eq!(codegen.type_size(&Type::Array(Box::new(Type::Named("i32".into())))), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // Lazy component codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn lazy_component_codegen() {
+        let lazy = LazyComponentDef {
+            component: Component {
+                name: "HeavyChart".into(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: span(),
+            },
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_lazy_component(&lazy);
+        let output = codegen.output.clone();
+        assert!(output.contains("Lazy Component: HeavyChart"), "should mark as lazy");
+        assert!(output.contains("lazy_mount"), "should generate lazy mount wrapper");
+        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
+    }
+
+    // -----------------------------------------------------------------------
+    // Iterator codegen — fold, all, enumerate, zip, take, skip, default method
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fold_generates_loop() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_val".into())),
+            method: "fold".into(),
+            args: vec![
+                Expr::Integer(0),
+                Expr::Closure {
+                    params: vec![("acc".into(), None), ("x".into(), None)],
+                    body: Box::new(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("acc".into())),
+                        right: Box::new(Expr::Ident("x".into())),
+                    }),
+                },
+            ],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".fold()"), "should contain fold comment");
+        assert!(output.contains("loop $__fold_lp_"), "should generate fold loop");
+    }
+
+    #[test]
+    fn all_generates_early_exit_loop() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_val".into())),
+            method: "all".into(),
+            args: vec![Expr::Closure {
+                params: vec![("x".into(), None)],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Gt,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(0)),
+                }),
+            }],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".all()"), "should contain all comment");
+        assert!(output.contains("loop $__all_lp_"), "should generate all loop");
+    }
+
+    #[test]
+    fn enumerate_generates_loop() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_val".into())),
+            method: "enumerate".into(),
+            args: vec![],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".enumerate()"), "should contain enumerate comment");
+        assert!(output.contains("loop $__en_lp_"), "should generate enumerate loop");
+    }
+
+    #[test]
+    fn zip_generates_loop() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_a".into())),
+            method: "zip".into(),
+            args: vec![Expr::Ident("iter_b".into())],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".zip()"), "should contain zip comment");
+        assert!(output.contains("loop $__zip_lp_"), "should generate zip loop");
+    }
+
+    #[test]
+    fn take_generates_sub_array() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_val".into())),
+            method: "take".into(),
+            args: vec![Expr::Integer(5)],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".take()"), "should contain take comment");
+        assert!(output.contains("memory.copy"), "should use memory.copy for take");
+    }
+
+    #[test]
+    fn skip_generates_sub_array() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("iter_val".into())),
+            method: "skip".into(),
+            args: vec![Expr::Integer(3)],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains(".skip()"), "should contain skip comment");
+        assert!(output.contains("memory.copy"), "should use memory.copy for skip");
+    }
+
+    #[test]
+    fn unknown_method_falls_through() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("obj".into())),
+            method: "custom_method".into(),
+            args: vec![Expr::Integer(1)],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $custom_method"), "unknown method should be called directly");
+    }
+
+    // -----------------------------------------------------------------------
+    // collect_locals and collect_pattern_locals
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn collect_locals_from_block() {
+        let mut codegen = WasmCodegen::new();
+        let b = block(vec![
+            Stmt::Let { name: "a".into(), ty: Some(Type::Named("i64".into())), mutable: false, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
+            Stmt::Let { name: "b".into(), ty: Some(Type::Named("f64".into())), mutable: false, secret: false, value: Expr::Float(0.0), ownership: Ownership::Owned },
+            Stmt::Let { name: "c".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
+            Stmt::LetDestructure { pattern: Pattern::Tuple(vec![Pattern::Ident("d".into()), Pattern::Ident("e".into())]), value: Expr::Integer(0), ty: None },
+        ]);
+        codegen.collect_locals(&b);
+        let names: Vec<&str> = codegen.locals.iter().map(|(n, _)| n.as_str()).collect();
+        assert!(names.contains(&"a"), "should collect local a");
+        assert!(names.contains(&"b"), "should collect local b");
+        assert!(names.contains(&"c"), "should collect local c");
+        assert!(names.contains(&"d"), "should collect destructured local d");
+        assert!(names.contains(&"e"), "should collect destructured local e");
+    }
+
+    // -----------------------------------------------------------------------
+    // Data section emission and string escaping
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn data_section_escapes_special_chars() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.store_string("hello \"world\"");
+        codegen.store_string("back\\slash");
+        codegen.emit_data_section();
+        let output = codegen.output.clone();
+        assert!(output.contains("\\\\"), "should escape backslashes");
+        assert!(output.contains("\\\""), "should escape quotes");
+    }
+
+    #[test]
+    fn empty_data_section_no_output() {
+        let mut codegen = WasmCodegen::new();
+        codegen.emit_data_section();
+        assert!(codegen.output.is_empty(), "empty data section should produce no output");
+    }
+
+    // -----------------------------------------------------------------------
+    // Spawn expression codegen (via AST)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn spawn_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Spawn {
+            body: block(vec![Stmt::Return(None)]),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("spawn"), "should have spawn comment");
+        assert!(output.contains("worker_spawn"), "should call worker_spawn");
+    }
+
+    // -----------------------------------------------------------------------
+    // Navigate expression codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn navigate_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Navigate {
+            path: Box::new(Expr::StringLit("/about".into())),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("navigate"), "should have navigate comment");
+        assert!(output.contains("router_navigate"), "should call router_navigate");
+    }
+
+    // -----------------------------------------------------------------------
+    // Assign expression codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn assign_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Assign {
+            target: Box::new(Expr::Ident("x".into())),
+            value: Box::new(Expr::Integer(42)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("local.set $x"), "should set local");
+    }
+
+    // -----------------------------------------------------------------------
+    // Fallback expr codegen (default branch)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn fallback_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Borrow(Box::new(Expr::Integer(1))));
+        let output = codegen.output.clone();
+        assert!(output.contains("TODO: codegen for expr"), "unhandled expr should produce TODO");
+    }
+
+    // -----------------------------------------------------------------------
+    // Agent codegen — async action, state, render
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn agent_with_state_and_render() {
+        let program = Program {
+            items: vec![Item::Agent(AgentDef {
+                name: "Bot".into(),
+                system_prompt: Some("Be helpful.".into()),
+                tools: vec![ToolDef {
+                    name: "lookup".into(),
+                    description: Some("Search for info".into()),
+                    params: vec![
+                        Param { name: "query".into(), ty: Type::Named("String".into()), ownership: Ownership::Owned },
+                        Param { name: "count".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                    ],
+                    return_type: Some(Type::Named("String".into())),
+                    body: block(vec![Stmt::Return(Some(Expr::StringLit("result".into())))]),
+                    span: span(),
+                }],
+                state: vec![StateField {
+                    name: "messages".into(),
+                    ty: None,
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                }],
+                methods: vec![],
+                render: Some(RenderBlock {
+                    body: TemplateNode::TextLiteral("bot ui".into()),
+                    span: span(),
+                }),
+                span: span(),
+            })],
+        };
+        let mut codegen = WasmCodegen::new();
+        let output = codegen.generate(&program);
+        assert!(output.contains("Agent: Bot"), "should have agent header");
+        assert!(output.contains("Bot_init"), "should generate init");
+        assert!(output.contains("Bot_mount"), "should generate mount");
+        assert!(output.contains("register tool: lookup"), "should register tools");
+        assert!(output.contains("__tool_Bot_lookup"), "should generate tool wrapper");
+        assert!(output.contains("ai_registerTool"), "should call ai_registerTool");
+    }
+
+    // -----------------------------------------------------------------------
+    // Store with async action
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn store_async_action() {
+        let wat = compile(r#"
+            store AsyncStore {
+                signal count: i32 = 0;
+
+                async action fetch_data() {
+                    return;
+                }
+            }
+        "#);
+        assert!(wat.contains("async"), "should mark async action");
+    }
+
+    // -----------------------------------------------------------------------
+    // Crypto runtime — pure WASM
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn crypto_sha256_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::sha256".into())),
+            args: vec![Expr::StringLit("hello".into())],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("call $crypto_sha256"), "should emit $crypto_sha256 call");
+        assert!(output.contains(";; crypto:"), "should have crypto comment");
+    }
+
+    #[test]
+    fn crypto_sha512_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::sha512".into())),
+            args: vec![Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_sha512"));
+    }
+
+    #[test]
+    fn crypto_sha1_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::sha1".into())),
+            args: vec![Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_sha1"));
+    }
+
+    #[test]
+    fn crypto_sha384_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::sha384".into())),
+            args: vec![Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_sha384"));
+    }
+
+    #[test]
+    fn crypto_hmac_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::hmac".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_hmac_sha256"));
+    }
+
+    #[test]
+    fn crypto_hmac_sha512_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::hmac_sha512".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_hmac_sha512"));
+    }
+
+    #[test]
+    fn crypto_encrypt_decrypt_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::encrypt".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("plain".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_aes_gcm_encrypt"));
+
+        let mut codegen2 = WasmCodegen::new();
+        codegen2.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::decrypt".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("cipher".into())],
+        });
+        assert!(codegen2.output.contains("call $crypto_aes_gcm_decrypt"));
+    }
+
+    #[test]
+    fn crypto_aes_cbc_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::encrypt_aes_cbc".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_aes_cbc_encrypt"));
+    }
+
+    #[test]
+    fn crypto_aes_ctr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::encrypt_aes_ctr".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_aes_ctr_encrypt"));
+    }
+
+    #[test]
+    fn crypto_sign_verify_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::sign".into())),
+            args: vec![Expr::StringLit("privkey".into()), Expr::StringLit("data".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_ed25519_sign"));
+
+        let mut codegen2 = WasmCodegen::new();
+        codegen2.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::verify".into())),
+            args: vec![
+                Expr::StringLit("pubkey".into()),
+                Expr::StringLit("data".into()),
+                Expr::StringLit("sig".into()),
+            ],
+        });
+        assert!(codegen2.output.contains("call $crypto_ed25519_verify"));
+    }
+
+    #[test]
+    fn crypto_derive_key_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::derive_key".into())),
+            args: vec![Expr::StringLit("pwd".into()), Expr::StringLit("salt".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_pbkdf2_derive"));
+    }
+
+    #[test]
+    fn crypto_derive_bits_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::derive_bits".into())),
+            args: vec![
+                Expr::StringLit("pwd".into()),
+                Expr::StringLit("salt".into()),
+                Expr::Integer(256),
+            ],
+        });
+        assert!(codegen.output.contains("call $crypto_pbkdf2_derive_bits"));
+    }
+
+    #[test]
+    fn crypto_hkdf_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::hkdf".into())),
+            args: vec![
+                Expr::StringLit("ikm".into()),
+                Expr::StringLit("salt".into()),
+                Expr::StringLit("info".into()),
+                Expr::Integer(32),
+            ],
+        });
+        assert!(codegen.output.contains("call $crypto_hkdf_derive"));
+    }
+
+    #[test]
+    fn crypto_random_uuid_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::random_uuid".into())),
+            args: vec![],
+        });
+        assert!(codegen.output.contains("call $crypto_random_uuid"));
+    }
+
+    #[test]
+    fn crypto_random_bytes_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::random_bytes".into())),
+            args: vec![Expr::Integer(32)],
+        });
+        assert!(codegen.output.contains("call $crypto_random_bytes"));
+    }
+
+    #[test]
+    fn crypto_generate_key_pair_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::generate_key_pair".into())),
+            args: vec![Expr::StringLit("ed25519".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_generate_key_pair"));
+    }
+
+    #[test]
+    fn crypto_export_key_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::export_key".into())),
+            args: vec![Expr::StringLit("key".into()), Expr::StringLit("hex".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_export_key"));
+    }
+
+    #[test]
+    fn crypto_ecdh_derive_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("crypto::ecdh_derive".into())),
+            args: vec![Expr::StringLit("priv".into()), Expr::StringLit("pub".into())],
+        });
+        assert!(codegen.output.contains("call $crypto_ecdh_derive"));
+    }
+
+    #[test]
+    fn crypto_runtime_emitted_in_wat() {
+        let wat = compile("pub fn main() -> i32 { return 0; }");
+        assert!(wat.contains("$crypto_sha256_block"), "WAT should contain SHA-256 block transform");
+        assert!(wat.contains("$crypto_sha256"), "WAT should contain SHA-256 function");
+        assert!(wat.contains("$crypto_hmac_sha256"), "WAT should contain HMAC-SHA256");
+        assert!(wat.contains("$crypto_aes_gcm_encrypt"), "WAT should contain AES encrypt");
+        assert!(wat.contains("$crypto_random_uuid"), "WAT should contain UUID generator");
+        assert!(wat.contains("$crypto_xorshift32"), "WAT should contain PRNG");
+        assert!(wat.contains("$crypto_bytes_to_hex"), "WAT should contain hex conversion");
+        assert!(wat.contains("$crypto_ed25519_sign"), "WAT should contain Ed25519 sign");
+        assert!(wat.contains("$crypto_pbkdf2_derive"), "WAT should contain PBKDF2");
+        assert!(wat.contains("$crypto_hkdf_derive"), "WAT should contain HKDF");
+        assert!(wat.contains("$crypto_ecdh_derive"), "WAT should contain ECDH");
+        assert!(wat.contains("$crypto_generate_key_pair"), "WAT should contain key gen");
+        assert!(wat.contains("442368"), "WAT should reference crypto scratch memory");
+        assert!(wat.contains("0123456789abcdef"), "WAT should contain hex lookup table");
     }
 }

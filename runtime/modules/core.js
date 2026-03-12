@@ -102,7 +102,7 @@ const R = NectarRuntime;
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  WASM IMPORTS — organized by namespace to match codegen.rs import declarations
-//  15 namespaces. Every function calls a browser API WASM physically cannot.
+//  16 namespaces. Every function calls a browser API WASM physically cannot.
 // ══════════════════════════════════════════════════════════════════════════════
 
 export const name = 'core';
@@ -625,6 +625,114 @@ export const wasmImports = {
       es.onmessage = (e) => R.__cbData(cbIdx, R.__allocString(e.data));
       return R.__registerObject(es);
     },
+  },
+  // ── RTC — WebRTC peer connections, data channels, media tracks ────────────
+  rtc: {
+    createPeer(optsPtr) {
+      return R.__registerObject(new RTCPeerConnection(optsPtr ? R.__readOpts(optsPtr) : {}));
+    },
+    createPeerWithIce(urlsPtr, urlsLen) {
+      const urls = R.__getString(urlsPtr, urlsLen);
+      return R.__registerObject(new RTCPeerConnection({ iceServers: [{ urls }] }));
+    },
+    createOffer(pcId, cbIdx) {
+      R.__objects[pcId].createOffer().then(o => { R.__writeString(o.sdp); R.__cb(cbIdx); });
+    },
+    createAnswer(pcId, cbIdx) {
+      R.__objects[pcId].createAnswer().then(a => { R.__writeString(a.sdp); R.__cb(cbIdx); });
+    },
+    setLocalDescription(pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx) {
+      const desc = { type: R.__getString(typePtr, typeLen), sdp: R.__getString(sdpPtr, sdpLen) };
+      R.__objects[pcId].setLocalDescription(desc).then(() => R.__cb(cbIdx));
+    },
+    setRemoteDescription(pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx) {
+      const desc = { type: R.__getString(typePtr, typeLen), sdp: R.__getString(sdpPtr, sdpLen) };
+      R.__objects[pcId].setRemoteDescription(desc).then(() => R.__cb(cbIdx));
+    },
+    addIceCandidate(pcId, candPtr, candLen, midPtr, midLen, cbIdx) {
+      const candidate = { candidate: R.__getString(candPtr, candLen), sdpMid: R.__getString(midPtr, midLen) };
+      R.__objects[pcId].addIceCandidate(candidate).then(() => R.__cb(cbIdx));
+    },
+    createDataChannel(pcId, labelPtr, labelLen, optsPtr) {
+      const opts = optsPtr ? R.__readOpts(optsPtr) : {};
+      return R.__registerObject(R.__objects[pcId].createDataChannel(R.__getString(labelPtr, labelLen), opts));
+    },
+    dataChannelSend(dcId, dataPtr, dataLen) {
+      R.__objects[dcId].send(R.__getString(dataPtr, dataLen));
+    },
+    dataChannelSendBinary(dcId, ptr, len) {
+      R.__objects[dcId].send(new Uint8Array(R.__memory.buffer, ptr, len));
+    },
+    dataChannelClose(dcId) { R.__objects[dcId].close(); },
+    dataChannelGetState(dcId) { return R.__allocString(R.__objects[dcId].readyState); },
+    onDataChannelMessage(dcId, cbIdx) {
+      R.__objects[dcId].onmessage = (e) => R.__cbData(cbIdx, R.__allocString(typeof e.data === 'string' ? e.data : ''));
+    },
+    onDataChannelOpen(dcId, cbIdx) { R.__objects[dcId].onopen = () => R.__cb(cbIdx); },
+    onDataChannelClose(dcId, cbIdx) { R.__objects[dcId].onclose = () => R.__cb(cbIdx); },
+    addTrack(pcId, trackId, streamId) {
+      return R.__registerObject(R.__objects[pcId].addTrack(R.__objects[trackId], R.__objects[streamId]));
+    },
+    removeTrack(pcId, senderId) { R.__objects[pcId].removeTrack(R.__objects[senderId]); },
+    getStats(pcId, cbIdx) {
+      R.__objects[pcId].getStats().then(stats => { R.__writeString(JSON.stringify([...stats.values()])); R.__cb(cbIdx); });
+    },
+    close(pcId) { R.__objects[pcId].close(); },
+    onIceCandidate(pcId, cbIdx) {
+      R.__objects[pcId].onicecandidate = (e) => {
+        if (e.candidate) R.__cbData(cbIdx, R.__allocString(e.candidate.candidate));
+      };
+    },
+    onIceCandidateFull(pcId, cbIdx) {
+      R.__objects[pcId].onicecandidate = (e) => {
+        if (e.candidate) {
+          R.__writeString(e.candidate.candidate);
+          R.__writeString2(e.candidate.sdpMid || '');
+          R.__cb(cbIdx);
+        }
+      };
+    },
+    onTrack(pcId, cbIdx) {
+      R.__objects[pcId].ontrack = (e) => {
+        const trackId = R.__registerObject(e.track);
+        const streamId = e.streams[0] ? R.__registerObject(e.streams[0]) : 0;
+        R.__cbData2(cbIdx, trackId, streamId);
+      };
+    },
+    onDataChannel(pcId, cbIdx) {
+      R.__objects[pcId].ondatachannel = (e) => R.__cbData(cbIdx, R.__registerObject(e.channel));
+    },
+    onConnectionStateChange(pcId, cbIdx) {
+      R.__objects[pcId].onconnectionstatechange = () => R.__cbData(cbIdx, R.__allocString(R.__objects[pcId].connectionState));
+    },
+    onIceConnectionStateChange(pcId, cbIdx) {
+      R.__objects[pcId].oniceconnectionstatechange = () => R.__cbData(cbIdx, R.__allocString(R.__objects[pcId].iceConnectionState));
+    },
+    onIceGatheringStateChange(pcId, cbIdx) {
+      R.__objects[pcId].onicegatheringstatechange = () => R.__cbData(cbIdx, R.__allocString(R.__objects[pcId].iceGatheringState));
+    },
+    onSignalingStateChange(pcId, cbIdx) {
+      R.__objects[pcId].onsignalingstatechange = () => R.__cbData(cbIdx, R.__allocString(R.__objects[pcId].signalingState));
+    },
+    onNegotiationNeeded(pcId, cbIdx) { R.__objects[pcId].onnegotiationneeded = () => R.__cb(cbIdx); },
+    getConnectionState(pcId) { return R.__allocString(R.__objects[pcId].connectionState); },
+    getIceConnectionState(pcId) { return R.__allocString(R.__objects[pcId].iceConnectionState); },
+    getSignalingState(pcId) { return R.__allocString(R.__objects[pcId].signalingState); },
+    attachStream(elId, streamId) { R.__elements[elId].srcObject = R.__objects[streamId]; },
+    getUserMedia(constraintsPtr, cbIdx) {
+      navigator.mediaDevices.getUserMedia(constraintsPtr ? R.__readOpts(constraintsPtr) : { audio: true, video: true })
+        .then(stream => R.__cbData(cbIdx, R.__registerObject(stream)))
+        .catch(() => R.__cbData(cbIdx, 0));
+    },
+    getDisplayMedia(constraintsPtr, cbIdx) {
+      navigator.mediaDevices.getDisplayMedia(constraintsPtr ? R.__readOpts(constraintsPtr) : { video: true })
+        .then(stream => R.__cbData(cbIdx, R.__registerObject(stream)))
+        .catch(() => R.__cbData(cbIdx, 0));
+    },
+    getStreamTracks(streamId) { return R.__objects[streamId].getTracks().map(t => R.__registerObject(t)); },
+    stopTrack(trackId) { R.__objects[trackId].stop(); },
+    setTrackEnabled(trackId, enabled) { R.__objects[trackId].enabled = !!enabled; },
+    getTrackKind(trackId) { return R.__allocString(R.__objects[trackId].kind); },
   },
 };
 

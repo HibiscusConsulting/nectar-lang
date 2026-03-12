@@ -580,4 +580,1065 @@ mod tests {
 
         assert_eq!(stats.constants_folded, 0);
     }
+
+    // --- Float operations ---
+
+    #[test]
+    fn test_fold_float_addition() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::Float(1.5)),
+            right: Box::new(Expr::Float(2.5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Float(4.0)));
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_float_subtraction() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Sub,
+            left: Box::new(Expr::Float(10.0)),
+            right: Box::new(Expr::Float(3.5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Float(6.5)));
+    }
+
+    #[test]
+    fn test_fold_float_multiplication() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Mul,
+            left: Box::new(Expr::Float(3.0)),
+            right: Box::new(Expr::Float(4.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Float(12.0)));
+    }
+
+    #[test]
+    fn test_fold_float_division() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Div,
+            left: Box::new(Expr::Float(10.0)),
+            right: Box::new(Expr::Float(4.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Float(2.5)));
+    }
+
+    #[test]
+    fn test_no_fold_float_division_by_zero() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Div,
+            left: Box::new(Expr::Float(10.0)),
+            right: Box::new(Expr::Float(0.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    #[test]
+    fn test_fold_float_comparison_lt() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Lt,
+            left: Box::new(Expr::Float(1.0)),
+            right: Box::new(Expr::Float(2.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_float_comparison_gte() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Gte,
+            left: Box::new(Expr::Float(3.0)),
+            right: Box::new(Expr::Float(3.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Integer sub/mod ---
+
+    #[test]
+    fn test_fold_integer_subtraction() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Sub,
+            left: Box::new(Expr::Integer(10)),
+            right: Box::new(Expr::Integer(3)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Integer(7)));
+    }
+
+    #[test]
+    fn test_fold_integer_modulo() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Mod,
+            left: Box::new(Expr::Integer(10)),
+            right: Box::new(Expr::Integer(3)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Integer(1)));
+    }
+
+    #[test]
+    fn test_no_fold_integer_mod_by_zero() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Mod,
+            left: Box::new(Expr::Integer(10)),
+            right: Box::new(Expr::Integer(0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Bool or/eq/neq ---
+
+    #[test]
+    fn test_fold_bool_or() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Or,
+            left: Box::new(Expr::Bool(false)),
+            right: Box::new(Expr::Bool(true)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_bool_eq() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Bool(true)),
+            right: Box::new(Expr::Bool(true)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_bool_neq() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Neq,
+            left: Box::new(Expr::Bool(true)),
+            right: Box::new(Expr::Bool(false)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Negation ---
+
+    #[test]
+    fn test_fold_negate_integer() {
+        let stmts = vec![Stmt::Expr(Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Integer(42)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Integer(-42)));
+    }
+
+    #[test]
+    fn test_fold_negate_float() {
+        let stmts = vec![Stmt::Expr(Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Float(3.14)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Float(-3.14)));
+    }
+
+    // --- If false with/without else ---
+
+    #[test]
+    fn test_fold_if_false_with_else() {
+        let stmts = vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Bool(false)),
+            then_block: Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                span: dummy_span(),
+            },
+            else_block: Some(Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(2))],
+                span: dummy_span(),
+            }),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        match get_first_stmt(&program) {
+            Stmt::Expr(Expr::Block(block)) => {
+                assert_eq!(block.stmts[0], Stmt::Expr(Expr::Integer(2)));
+            }
+            other => panic!("expected Block, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_fold_if_false_without_else() {
+        // if false { ... } with no else cannot be folded to a block
+        let stmts = vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Bool(false)),
+            then_block: Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                span: dummy_span(),
+            },
+            else_block: None,
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        // Should NOT be folded (no replacement)
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Folding inside various item types ---
+
+    fn make_function(name: &str, stmts: Vec<Stmt>) -> Function {
+        Function {
+            name: name.to_string(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block { stmts, span: dummy_span() },
+            is_pub: false,
+            must_use: false,
+            span: dummy_span(),
+        }
+    }
+
+    fn foldable_expr() -> Expr {
+        Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(2)),
+        }
+    }
+
+    #[test]
+    fn test_fold_inside_store() {
+        let mut program = Program {
+            items: vec![Item::Store(StoreDef {
+                name: "TestStore".to_string(),
+                signals: vec![StateField {
+                    name: "count".to_string(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    atomic: false,
+                    initializer: foldable_expr(),
+                    ownership: Ownership::Owned,
+                }],
+                actions: vec![ActionDef {
+                    name: "inc".to_string(),
+                    params: vec![],
+                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    is_async: false,
+                    span: dummy_span(),
+                }],
+                computed: vec![ComputedDef {
+                    name: "double".to_string(),
+                    return_type: None,
+                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    span: dummy_span(),
+                }],
+                effects: vec![EffectDef {
+                    name: "log".to_string(),
+                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    span: dummy_span(),
+                }],
+                selectors: vec![],
+                is_pub: false,
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 4);
+    }
+
+    #[test]
+    fn test_fold_inside_component() {
+        let mut program = Program {
+            items: vec![Item::Component(Component {
+                name: "Test".to_string(),
+                type_params: vec![],
+                props: vec![Prop {
+                    name: "x".to_string(),
+                    ty: Type::Named("i32".to_string()),
+                    default: Some(foldable_expr()),
+                }],
+                state: vec![StateField {
+                    name: "s".to_string(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    atomic: false,
+                    initializer: foldable_expr(),
+                    ownership: Ownership::Owned,
+                }],
+                methods: vec![make_function("m", vec![Stmt::Expr(foldable_expr())])],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: dummy_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 3);
+    }
+
+    #[test]
+    fn test_fold_inside_impl() {
+        let mut program = Program {
+            items: vec![Item::Impl(ImplBlock {
+                target: "Foo".to_string(),
+                trait_impls: vec![],
+                methods: vec![make_function("bar", vec![Stmt::Expr(foldable_expr())])],
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_agent() {
+        let mut program = Program {
+            items: vec![Item::Agent(AgentDef {
+                name: "Bot".to_string(),
+                system_prompt: None,
+                tools: vec![ToolDef {
+                    name: "search".to_string(),
+                    description: None,
+                    params: vec![],
+                    return_type: None,
+                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    span: dummy_span(),
+                }],
+                state: vec![],
+                methods: vec![make_function("go", vec![Stmt::Expr(foldable_expr())])],
+                render: None,
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_page() {
+        let mut program = Program {
+            items: vec![Item::Page(PageDef {
+                name: "Home".to_string(),
+                props: vec![],
+                meta: None,
+                state: vec![StateField {
+                    name: "x".to_string(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    atomic: false,
+                    initializer: foldable_expr(),
+                    ownership: Ownership::Owned,
+                }],
+                methods: vec![make_function("go", vec![Stmt::Expr(foldable_expr())])],
+                styles: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: dummy_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                is_pub: false,
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_form() {
+        let mut program = Program {
+            items: vec![Item::Form(FormDef {
+                name: "F".to_string(),
+                fields: vec![FormFieldDef {
+                    name: "x".to_string(),
+                    ty: Type::Named("i32".to_string()),
+                    validators: vec![],
+                    label: None,
+                    placeholder: None,
+                    default_value: Some(foldable_expr()),
+                    span: dummy_span(),
+                }],
+                on_submit: None,
+                steps: vec![],
+                methods: vec![make_function("go", vec![Stmt::Expr(foldable_expr())])],
+                styles: vec![],
+                render: None,
+                is_pub: false,
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_channel() {
+        let mut program = Program {
+            items: vec![Item::Channel(ChannelDef {
+                name: "Ch".to_string(),
+                url: Expr::StringLit("/ws".to_string()),
+                contract: None,
+                on_message: None,
+                on_connect: None,
+                on_disconnect: None,
+                reconnect: false,
+                heartbeat_interval: None,
+                methods: vec![make_function("send", vec![Stmt::Expr(foldable_expr())])],
+                is_pub: false,
+                span: dummy_span(),
+            })],
+        };
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    // --- Folding inside expressions ---
+
+    #[test]
+    fn test_fold_inside_for() {
+        let mut expr = Expr::For {
+            binding: "i".to_string(),
+            iterator: Box::new(foldable_expr()),
+            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_while() {
+        let mut expr = Expr::While {
+            condition: Box::new(foldable_expr()),
+            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_match() {
+        let mut expr = Expr::Match {
+            subject: Box::new(foldable_expr()),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                body: foldable_expr(),
+            }],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_closure() {
+        let mut expr = Expr::Closure {
+            params: vec![],
+            body: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_assign() {
+        let mut expr = Expr::Assign {
+            target: Box::new(Expr::Ident("x".to_string())),
+            value: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_index() {
+        let mut expr = Expr::Index {
+            object: Box::new(Expr::Ident("arr".to_string())),
+            index: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_field_access() {
+        let mut expr = Expr::FieldAccess {
+            object: Box::new(foldable_expr()),
+            field: "x".to_string(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_struct_init() {
+        let mut expr = Expr::StructInit {
+            name: "Point".to_string(),
+            fields: vec![("x".to_string(), foldable_expr())],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_borrow() {
+        let mut expr = Expr::Borrow(Box::new(foldable_expr()));
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_spawn() {
+        let mut expr = Expr::Spawn {
+            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_send() {
+        let mut expr = Expr::Send {
+            channel: Box::new(Expr::Ident("ch".to_string())),
+            value: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_suspend() {
+        let mut expr = Expr::Suspend {
+            fallback: Box::new(foldable_expr()),
+            body: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_try_catch() {
+        let mut expr = Expr::TryCatch {
+            body: Box::new(foldable_expr()),
+            error_binding: "e".to_string(),
+            catch_body: Box::new(foldable_expr()),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_fetch() {
+        let mut expr = Expr::Fetch {
+            url: Box::new(Expr::StringLit("http://x".to_string())),
+            options: Some(Box::new(foldable_expr())),
+            contract: None,
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_parallel() {
+        let mut expr = Expr::Parallel {
+            tasks: vec![foldable_expr(), foldable_expr()],
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_prompt_template() {
+        let mut expr = Expr::PromptTemplate {
+            template: "hello {x}".to_string(),
+            interpolations: vec![("x".to_string(), foldable_expr())],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_assert() {
+        let mut expr = Expr::Assert {
+            condition: Box::new(foldable_expr()),
+            message: None,
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_assert_eq() {
+        let mut expr = Expr::AssertEq {
+            left: Box::new(foldable_expr()),
+            right: Box::new(foldable_expr()),
+            message: None,
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_animate() {
+        let mut expr = Expr::Animate {
+            target: Box::new(foldable_expr()),
+            animation: "fade".to_string(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_format_string() {
+        let mut expr = Expr::FormatString {
+            parts: vec![
+                FormatPart::Literal("hi ".to_string()),
+                FormatPart::Expression(Box::new(foldable_expr())),
+            ],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_download() {
+        let mut expr = Expr::Download {
+            data: Box::new(foldable_expr()),
+            filename: Box::new(foldable_expr()),
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_env() {
+        let mut expr = Expr::Env {
+            name: Box::new(Expr::StringLit("KEY".to_string())),
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 0); // nothing to fold
+    }
+
+    #[test]
+    fn test_fold_inside_trace() {
+        let mut expr = Expr::Trace {
+            label: Box::new(Expr::StringLit("t".to_string())),
+            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_flag() {
+        let mut expr = Expr::Flag {
+            name: Box::new(Expr::StringLit("f".to_string())),
+            span: dummy_span(),
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Integer comparison edge cases ---
+
+    #[test]
+    fn test_fold_int_eq() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Integer(5)),
+            right: Box::new(Expr::Integer(5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_int_neq() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Neq,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(2)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_int_lte() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Lte,
+            left: Box::new(Expr::Integer(5)),
+            right: Box::new(Expr::Integer(5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Stmt folding ---
+
+    #[test]
+    fn test_fold_in_let_stmt() {
+        let stmts = vec![Stmt::Let {
+            name: "x".to_string(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: foldable_expr(),
+            ownership: Ownership::Owned,
+        }];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_in_signal_stmt() {
+        let stmts = vec![Stmt::Signal {
+            name: "s".to_string(),
+            ty: None,
+            secret: false,
+            atomic: false,
+            value: foldable_expr(),
+        }];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_in_return_stmt() {
+        let stmts = vec![Stmt::Return(Some(foldable_expr()))];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_in_yield_stmt() {
+        let stmts = vec![Stmt::Yield(foldable_expr())];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_return_none() {
+        let stmts = vec![Stmt::Return(None)];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Float comparison edge cases (Gt, Lte) ---
+
+    #[test]
+    fn test_fold_float_gt() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Gt,
+            left: Box::new(Expr::Float(5.0)),
+            right: Box::new(Expr::Float(3.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    #[test]
+    fn test_fold_float_lte() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Lte,
+            left: Box::new(Expr::Float(3.0)),
+            right: Box::new(Expr::Float(3.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Float ops that return None ---
+
+    #[test]
+    fn test_no_fold_float_eq() {
+        // Float Eq is not supported
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Float(1.0)),
+            right: Box::new(Expr::Float(1.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    #[test]
+    fn test_no_fold_float_mod() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Mod,
+            left: Box::new(Expr::Float(10.0)),
+            right: Box::new(Expr::Float(3.0)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Int And/Or returning None ---
+
+    #[test]
+    fn test_no_fold_int_and() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::And,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(2)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Bool ops that return None ---
+
+    #[test]
+    fn test_no_fold_bool_lt() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Lt,
+            left: Box::new(Expr::Bool(true)),
+            right: Box::new(Expr::Bool(false)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- String non-Add returning None ---
+
+    #[test]
+    fn test_no_fold_string_sub() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Sub,
+            left: Box::new(Expr::StringLit("a".to_string())),
+            right: Box::new(Expr::StringLit("b".to_string())),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    // --- Fold inside fn call and method call ---
+
+    #[test]
+    fn test_fold_inside_fn_call() {
+        let mut expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("f".to_string())),
+            args: vec![foldable_expr()],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_method_call() {
+        let mut expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("obj".to_string())),
+            method: "m".to_string(),
+            args: vec![foldable_expr()],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    // --- Int division ---
+
+    #[test]
+    fn test_fold_int_division() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Div,
+            left: Box::new(Expr::Integer(10)),
+            right: Box::new(Expr::Integer(3)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Integer(3)));
+    }
+
+    // --- Int Lt ---
+
+    #[test]
+    fn test_fold_int_lt() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Lt,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::Integer(5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Int Gte ---
+
+    #[test]
+    fn test_fold_int_gte() {
+        let stmts = vec![Stmt::Expr(Expr::Binary {
+            op: BinOp::Gte,
+            left: Box::new(Expr::Integer(5)),
+            right: Box::new(Expr::Integer(5)),
+        })];
+        let mut program = make_program(stmts);
+        let mut stats = FoldStats::default();
+        fold_program(&mut program, &mut stats);
+        assert_eq!(*get_first_stmt(&program), Stmt::Expr(Expr::Bool(true)));
+    }
+
+    // --- Fold inside BorrowMut, Await, Stream, Navigate, Receive ---
+
+    #[test]
+    fn test_fold_inside_borrow_mut() {
+        let mut expr = Expr::BorrowMut(Box::new(foldable_expr()));
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_await() {
+        let mut expr = Expr::Await(Box::new(foldable_expr()));
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_navigate() {
+        let mut expr = Expr::Navigate { path: Box::new(foldable_expr()) };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_receive() {
+        let mut expr = Expr::Receive { channel: Box::new(foldable_expr()) };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
 }

@@ -476,6 +476,21 @@ fn collect_template_deps(node: &TemplateNode, deps: &mut HashSet<String>) {
             for child in children { collect_template_deps(child, deps); }
         }
         TemplateNode::TextLiteral(_) => {}
+        TemplateNode::Outlet => {}
+        TemplateNode::Layout(layout_node) => {
+            let children = match layout_node {
+                LayoutNode::Stack { children, .. }
+                | LayoutNode::Row { children, .. }
+                | LayoutNode::Grid { children, .. }
+                | LayoutNode::Center { children, .. }
+                | LayoutNode::Cluster { children, .. }
+                | LayoutNode::Sidebar { children, .. }
+                | LayoutNode::Switcher { children, .. } => children,
+            };
+            for child in children {
+                collect_template_deps(child, deps);
+            }
+        }
     }
 }
 
@@ -633,5 +648,1150 @@ mod tests {
         assert_eq!(stats.items_removed, 2);
         assert!(stats.removed_names.contains(&"dead_a".to_string()));
         assert!(stats.removed_names.contains(&"dead_b".to_string()));
+    }
+
+    // --- Multiple entry points ---
+
+    #[test]
+    fn test_shake_multiple_entry_points() {
+        let items = vec![
+            make_fn("a", false, vec![Stmt::Expr(Expr::Integer(1))]),
+            make_fn("b", false, vec![Stmt::Expr(Expr::Integer(2))]),
+            make_fn("c", false, vec![Stmt::Expr(Expr::Integer(3))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &["a".to_string(), "c".to_string()], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"a".to_string()));
+        assert!(names.contains(&"c".to_string()));
+        assert!(!names.contains(&"b".to_string()));
+        assert_eq!(stats.items_removed, 1);
+    }
+
+    // --- Deeply nested transitive deps ---
+
+    #[test]
+    fn test_shake_deeply_nested_transitive_deps() {
+        // main -> a -> b -> c -> d
+        let items = vec![
+            make_fn("main", true, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("a".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("a", false, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("b".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("b", false, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("c".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("c", false, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("d".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("d", false, vec![Stmt::Return(Some(Expr::Integer(42)))]),
+            make_fn("orphan", false, vec![Stmt::Expr(Expr::Integer(0))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"main".to_string()));
+        assert!(names.contains(&"a".to_string()));
+        assert!(names.contains(&"b".to_string()));
+        assert!(names.contains(&"c".to_string()));
+        assert!(names.contains(&"d".to_string()));
+        assert!(!names.contains(&"orphan".to_string()));
+        assert_eq!(stats.items_removed, 1);
+    }
+
+    // --- Struct + impl shaking ---
+
+    #[test]
+    fn test_shake_struct_with_impl() {
+        let items = vec![
+            make_fn("main", true, vec![
+                Stmt::Expr(Expr::StructInit {
+                    name: "Foo".to_string(),
+                    fields: vec![("x".to_string(), Expr::Integer(1))],
+                }),
+            ]),
+            Item::Struct(StructDef {
+                name: "Foo".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                fields: vec![Field {
+                    name: "x".to_string(),
+                    ty: Type::Named("i32".to_string()),
+                    is_pub: true,
+                }],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: dummy_span(),
+            }),
+            Item::Impl(ImplBlock {
+                target: "Foo".to_string(),
+                trait_impls: vec![],
+                methods: vec![],
+                span: dummy_span(),
+            }),
+            Item::Struct(StructDef {
+                name: "Bar".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                fields: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"Foo".to_string()));
+        assert!(names.contains(&"Foo".to_string())); // impl target name
+        assert!(!names.contains(&"Bar".to_string()));
+    }
+
+    // --- Enum shaking ---
+
+    #[test]
+    fn test_shake_removes_unused_enum() {
+        let items = vec![
+            make_fn("main", true, vec![Stmt::Expr(Expr::Integer(1))]),
+            Item::Enum(EnumDef {
+                name: "Color".to_string(),
+                type_params: vec![],
+                variants: vec![
+                    Variant { name: "Red".to_string(), fields: vec![] },
+                ],
+                is_pub: false,
+                span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(!names.contains(&"Color".to_string()));
+        assert_eq!(stats.items_removed, 1);
+    }
+
+    #[test]
+    fn test_shake_keeps_used_enum() {
+        // The tree shaker tracks deps by name. Pattern::Variant inserts the
+        // variant name ("Red"), not the enum name. So to keep the enum, we
+        // reference it directly via Ident("Color") or through a function
+        // param type. Here we use a type annotation that references Color.
+        let items = vec![
+            make_fn("main", true, vec![
+                Stmt::Let {
+                    name: "c".to_string(),
+                    ty: Some(Type::Named("Color".to_string())),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Ident("Color".to_string()),
+                    ownership: Ownership::Owned,
+                },
+            ]),
+            Item::Enum(EnumDef {
+                name: "Color".to_string(),
+                type_params: vec![],
+                variants: vec![
+                    Variant { name: "Red".to_string(), fields: vec![] },
+                ],
+                is_pub: false,
+                span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"Color".to_string()));
+    }
+
+    // --- Unused imports (Use items are always kept) ---
+
+    #[test]
+    fn test_shake_keeps_use_items() {
+        let items = vec![
+            make_fn("main", true, vec![Stmt::Expr(Expr::Integer(1))]),
+            Item::Use(UsePath {
+                segments: vec!["std".to_string(), "io".to_string()],
+                alias: None,
+                glob: false,
+                group: None,
+                span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+        // Use items are always kept
+        assert_eq!(program.items.len(), 2);
+    }
+
+    // --- Circular function references ---
+
+    #[test]
+    fn test_shake_circular_functions() {
+        // main -> a, a -> b, b -> a (circular)
+        let items = vec![
+            make_fn("main", true, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("a".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("a", false, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("b".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("b", false, vec![
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("a".to_string())),
+                    args: vec![],
+                }),
+            ]),
+            make_fn("orphan", false, vec![Stmt::Expr(Expr::Integer(0))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"main".to_string()));
+        assert!(names.contains(&"a".to_string()));
+        assert!(names.contains(&"b".to_string()));
+        assert!(!names.contains(&"orphan".to_string()));
+        assert_eq!(stats.items_removed, 1);
+    }
+
+    // --- Components as entry points ---
+
+    #[test]
+    fn test_shake_component_is_entry_point() {
+        let items = vec![
+            Item::Component(Component {
+                name: "App".to_string(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: dummy_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: dummy_span(),
+            }),
+            make_fn("orphan", false, vec![Stmt::Expr(Expr::Integer(0))]),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+
+        let names = item_names(&program);
+        assert!(names.contains(&"App".to_string()));
+        assert!(!names.contains(&"orphan".to_string()));
+    }
+
+    // --- Empty program ---
+
+    #[test]
+    fn test_shake_empty_program() {
+        let mut program = Program { items: vec![] };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+        assert_eq!(stats.items_removed, 0);
+    }
+
+    // --- item_name coverage for all Item types ---
+
+    fn make_component(name: &str) -> Component {
+        Component {
+            name: name.to_string(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: dummy_span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: dummy_span(),
+        }
+    }
+
+    #[test]
+    fn test_item_name_all_variants() {
+        // Store
+        assert_eq!(item_name(&Item::Store(StoreDef {
+            name: "S".to_string(), signals: vec![], actions: vec![],
+            computed: vec![], effects: vec![], selectors: vec![],
+            is_pub: false, span: dummy_span(),
+        })), Some("S".to_string()));
+
+        // Agent
+        assert_eq!(item_name(&Item::Agent(AgentDef {
+            name: "A".to_string(), system_prompt: None, tools: vec![],
+            state: vec![], methods: vec![], render: None, span: dummy_span(),
+        })), Some("A".to_string()));
+
+        // Router
+        assert_eq!(item_name(&Item::Router(RouterDef {
+            name: "R".to_string(), routes: vec![], fallback: None, layout: None, transition: None, span: dummy_span(),
+        })), Some("R".to_string()));
+
+        // LazyComponent
+        assert_eq!(item_name(&Item::LazyComponent(LazyComponentDef {
+            component: make_component("Lz"), span: dummy_span(),
+        })), Some("Lz".to_string()));
+
+        // Contract
+        assert_eq!(item_name(&Item::Contract(ContractDef {
+            name: "C".to_string(), fields: vec![], is_pub: false, span: dummy_span(),
+        })), Some("C".to_string()));
+
+        // App
+        assert_eq!(item_name(&Item::App(AppDef {
+            name: "Ap".to_string(), manifest: None, offline: None,
+            push: None, router: None, a11y: None, is_pub: false, span: dummy_span(),
+        })), Some("Ap".to_string()));
+
+        // Trait
+        assert_eq!(item_name(&Item::Trait(TraitDef {
+            name: "T".to_string(), methods: vec![], type_params: vec![], span: dummy_span(),
+        })), Some("T".to_string()));
+
+        // Page
+        assert_eq!(item_name(&Item::Page(PageDef {
+            name: "P".to_string(), props: vec![], meta: None, state: vec![],
+            methods: vec![], styles: vec![], render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]), span: dummy_span(),
+            }, permissions: None, gestures: vec![], is_pub: false, span: dummy_span(),
+        })), Some("P".to_string()));
+
+        // Form
+        assert_eq!(item_name(&Item::Form(FormDef {
+            name: "F".to_string(), fields: vec![], on_submit: None, steps: vec![],
+            methods: vec![], styles: vec![], render: None, is_pub: false, span: dummy_span(),
+        })), Some("F".to_string()));
+
+        // Channel
+        assert_eq!(item_name(&Item::Channel(ChannelDef {
+            name: "Ch".to_string(), url: Expr::StringLit("/ws".to_string()),
+            contract: None, on_message: None, on_connect: None, on_disconnect: None,
+            reconnect: false, heartbeat_interval: None, methods: vec![],
+            is_pub: false, span: dummy_span(),
+        })), Some("Ch".to_string()));
+
+        // Mod
+        assert_eq!(item_name(&Item::Mod(ModDef {
+            name: "M".to_string(), items: None, is_external: true, span: dummy_span(),
+        })), Some("M".to_string()));
+
+        // Embed
+        assert_eq!(item_name(&Item::Embed(EmbedDef {
+            name: "E".to_string(), src: Expr::StringLit("x".to_string()),
+            loading: None, sandbox: false, integrity: None, permissions: None,
+            is_pub: false, span: dummy_span(),
+        })), Some("E".to_string()));
+
+        // Pdf
+        assert_eq!(item_name(&Item::Pdf(PdfDef {
+            name: "Pd".to_string(), render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]), span: dummy_span(),
+            }, page_size: None, orientation: None, margins: None,
+            is_pub: false, span: dummy_span(),
+        })), Some("Pd".to_string()));
+
+        // Payment
+        assert_eq!(item_name(&Item::Payment(PaymentDef {
+            name: "Py".to_string(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Py".to_string()));
+
+        // Auth
+        assert_eq!(item_name(&Item::Auth(AuthDef {
+            name: "Au".to_string(), provider: None, providers: vec![],
+            on_login: None, on_logout: None, on_error: None,
+            session_storage: None, methods: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Au".to_string()));
+
+        // Upload
+        assert_eq!(item_name(&Item::Upload(UploadDef {
+            name: "Up".to_string(), endpoint: Expr::StringLit("/up".to_string()),
+            max_size: None, accept: vec![], chunked: false,
+            on_progress: None, on_complete: None, on_error: None,
+            methods: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Up".to_string()));
+
+        // Db
+        assert_eq!(item_name(&Item::Db(DbDef {
+            name: "Db".to_string(), version: None, stores: vec![],
+            is_pub: false, span: dummy_span(),
+        })), Some("Db".to_string()));
+
+        // Cache
+        assert_eq!(item_name(&Item::Cache(CacheDef {
+            name: "Ca".to_string(), strategy: None, default_ttl: None,
+            persist: false, max_entries: None, queries: vec![],
+            mutations: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Ca".to_string()));
+
+        // Breakpoints - returns None
+        assert_eq!(item_name(&Item::Breakpoints(BreakpointsDef {
+            breakpoints: vec![], span: dummy_span(),
+        })), None);
+
+        // Theme
+        assert_eq!(item_name(&Item::Theme(ThemeDef {
+            name: "Th".to_string(), light: None, dark: None,
+            dark_auto: false, primary: None, is_pub: false, span: dummy_span(),
+        })), Some("Th".to_string()));
+
+        // Animation
+        assert_eq!(item_name(&Item::Animation(AnimationBlockDef {
+            name: "An".to_string(), kind: AnimationKind::Spring {
+                stiffness: None, damping: None, mass: None, properties: vec![],
+            }, is_pub: false, span: dummy_span(),
+        })), Some("An".to_string()));
+    }
+
+    // --- is_entry_point coverage ---
+
+    #[test]
+    fn test_is_entry_point_store_pub() {
+        let item = Item::Store(StoreDef {
+            name: "S".to_string(), signals: vec![], actions: vec![],
+            computed: vec![], effects: vec![], selectors: vec![],
+            is_pub: true, span: dummy_span(),
+        });
+        assert!(is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_store_private() {
+        let item = Item::Store(StoreDef {
+            name: "S".to_string(), signals: vec![], actions: vec![],
+            computed: vec![], effects: vec![], selectors: vec![],
+            is_pub: false, span: dummy_span(),
+        });
+        assert!(!is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_agent() {
+        let item = Item::Agent(AgentDef {
+            name: "A".to_string(), system_prompt: None, tools: vec![],
+            state: vec![], methods: vec![], render: None, span: dummy_span(),
+        });
+        assert!(is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_lazy_component() {
+        let item = Item::LazyComponent(LazyComponentDef {
+            component: make_component("L"), span: dummy_span(),
+        });
+        assert!(is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_page() {
+        let item = Item::Page(PageDef {
+            name: "P".to_string(), props: vec![], meta: None, state: vec![],
+            methods: vec![], styles: vec![], render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]), span: dummy_span(),
+            }, permissions: None, gestures: vec![], is_pub: false, span: dummy_span(),
+        });
+        assert!(is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_router() {
+        let item = Item::Router(RouterDef {
+            name: "R".to_string(), routes: vec![], fallback: None, layout: None, transition: None, span: dummy_span(),
+        });
+        assert!(is_entry_point(&item));
+    }
+
+    #[test]
+    fn test_is_entry_point_struct_is_false() {
+        let item = Item::Struct(StructDef {
+            name: "S".to_string(), lifetimes: vec![], type_params: vec![],
+            fields: vec![], trait_bounds: vec![], is_pub: false, span: dummy_span(),
+        });
+        assert!(!is_entry_point(&item));
+    }
+
+    // --- collect_item_deps for Store ---
+
+    #[test]
+    fn test_collect_deps_store() {
+        let store = Item::Store(StoreDef {
+            name: "S".to_string(),
+            signals: vec![],
+            actions: vec![ActionDef {
+                name: "inc".to_string(), params: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("helper".to_string()))], span: dummy_span() },
+                is_async: false, span: dummy_span(),
+            }],
+            computed: vec![ComputedDef {
+                name: "dbl".to_string(), return_type: None,
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("comp_dep".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            effects: vec![EffectDef {
+                name: "log".to_string(),
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("eff_dep".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            selectors: vec![], is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&store, &mut deps);
+        assert!(deps.contains("helper"));
+        assert!(deps.contains("comp_dep"));
+        assert!(deps.contains("eff_dep"));
+    }
+
+    // --- collect_item_deps for Agent ---
+
+    #[test]
+    fn test_collect_deps_agent() {
+        let agent = Item::Agent(AgentDef {
+            name: "A".to_string(), system_prompt: None,
+            tools: vec![ToolDef {
+                name: "t".to_string(), description: None, params: vec![],
+                return_type: None,
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tool_dep".to_string()))], span: dummy_span() },
+                span: dummy_span(),
+            }],
+            state: vec![],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            render: None, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&agent, &mut deps);
+        assert!(deps.contains("tool_dep"));
+        assert!(deps.contains("meth_dep"));
+    }
+
+    // --- collect_item_deps for Router ---
+
+    #[test]
+    fn test_collect_deps_router() {
+        let router = Item::Router(RouterDef {
+            name: "R".to_string(),
+            routes: vec![RouteDef {
+                path: "/".to_string(), params: vec![], component: "Home".to_string(),
+                guard: Some(Expr::Ident("is_auth".to_string())), transition: None, span: dummy_span(),
+            }],
+            fallback: None, layout: None, transition: None, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&router, &mut deps);
+        assert!(deps.contains("Home"));
+        assert!(deps.contains("is_auth"));
+    }
+
+    // --- collect_item_deps for LazyComponent ---
+
+    #[test]
+    fn test_collect_deps_lazy_component() {
+        let mut c = make_component("Lz");
+        c.methods = vec![Function {
+            name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+            params: vec![], return_type: None, trait_bounds: vec![],
+            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("lazy_dep".to_string()))], span: dummy_span() },
+            is_pub: false, must_use: false, span: dummy_span(),
+        }];
+        let item = Item::LazyComponent(LazyComponentDef { component: c, span: dummy_span() });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&item, &mut deps);
+        assert!(deps.contains("lazy_dep"));
+    }
+
+    // --- collect_item_deps for Page ---
+
+    #[test]
+    fn test_collect_deps_page() {
+        let page = Item::Page(PageDef {
+            name: "P".to_string(), props: vec![], meta: None,
+            state: vec![StateField {
+                name: "s".to_string(), ty: None, mutable: false, secret: false,
+                atomic: false, initializer: Expr::Ident("init_dep".to_string()),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("page_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            styles: vec![], render: RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: "MyComp".to_string(),
+                    attributes: vec![], children: vec![],
+                    span: dummy_span(),
+                }),
+                span: dummy_span(),
+            }, permissions: None, gestures: vec![], is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&page, &mut deps);
+        assert!(deps.contains("init_dep"));
+        assert!(deps.contains("page_dep"));
+        assert!(deps.contains("MyComp"));
+    }
+
+    // --- collect_item_deps for Form ---
+
+    #[test]
+    fn test_collect_deps_form() {
+        let form = Item::Form(FormDef {
+            name: "F".to_string(), fields: vec![], on_submit: None, steps: vec![],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("form_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            styles: vec![], render: None, is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&form, &mut deps);
+        assert!(deps.contains("form_dep"));
+    }
+
+    // --- collect_item_deps for Channel ---
+
+    #[test]
+    fn test_collect_deps_channel() {
+        let ch = Item::Channel(ChannelDef {
+            name: "Ch".to_string(),
+            url: Expr::Ident("url_dep".to_string()),
+            contract: Some("MyContract".to_string()),
+            on_message: Some(Function {
+                name: "on_msg".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("msg_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }),
+            on_connect: Some(Function {
+                name: "on_conn".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("conn_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }),
+            on_disconnect: Some(Function {
+                name: "on_disc".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("disc_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }),
+            reconnect: false, heartbeat_interval: None,
+            methods: vec![Function {
+                name: "send".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("ch_meth_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&ch, &mut deps);
+        assert!(deps.contains("url_dep"));
+        assert!(deps.contains("MyContract"));
+        assert!(deps.contains("msg_dep"));
+        assert!(deps.contains("conn_dep"));
+        assert!(deps.contains("disc_dep"));
+        assert!(deps.contains("ch_meth_dep"));
+    }
+
+    // --- collect_item_deps for App with router ---
+
+    #[test]
+    fn test_collect_deps_app_with_router() {
+        let app = Item::App(AppDef {
+            name: "MyApp".to_string(), manifest: None, offline: None,
+            push: None,
+            router: Some(RouterDef {
+                name: "R".to_string(),
+                routes: vec![RouteDef {
+                    path: "/".to_string(), params: vec![],
+                    component: "Home".to_string(), guard: None, transition: None, span: dummy_span(),
+                }],
+                fallback: None, layout: None, transition: None, span: dummy_span(),
+            }),
+            a11y: None, is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&app, &mut deps);
+        assert!(deps.contains("Home"));
+    }
+
+    // --- collect_item_deps for Upload ---
+
+    #[test]
+    fn test_collect_deps_upload() {
+        let upload = Item::Upload(UploadDef {
+            name: "Up".to_string(),
+            endpoint: Expr::Ident("upload_url".to_string()),
+            max_size: None, accept: vec![], chunked: false,
+            on_progress: None, on_complete: None, on_error: None,
+            methods: vec![], is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&upload, &mut deps);
+        assert!(deps.contains("upload_url"));
+    }
+
+    // --- collect_item_deps for Enum with fields ---
+
+    #[test]
+    fn test_collect_deps_enum() {
+        let en = Item::Enum(EnumDef {
+            name: "Shape".to_string(), type_params: vec![],
+            variants: vec![Variant {
+                name: "Circle".to_string(),
+                fields: vec![Type::Named("Radius".to_string())],
+            }],
+            is_pub: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&en, &mut deps);
+        assert!(deps.contains("Radius"));
+    }
+
+    // --- collect_item_deps for Component with props, state, methods, template ---
+
+    #[test]
+    fn test_collect_deps_component_full() {
+        let comp = Item::Component(Component {
+            name: "C".to_string(), type_params: vec![],
+            props: vec![Prop {
+                name: "x".to_string(),
+                ty: Type::Named("PropType".to_string()),
+                default: Some(Expr::Ident("default_val".to_string())),
+            }],
+            state: vec![StateField {
+                name: "s".to_string(), ty: None, mutable: false, secret: false,
+                atomic: false, initializer: Expr::Ident("state_dep".to_string()),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
+                is_pub: false, must_use: false, span: dummy_span(),
+            }],
+            styles: vec![], transitions: vec![], trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: dummy_span(),
+            },
+            permissions: None, gestures: vec![], skeleton: None,
+            error_boundary: None, chunk: None, on_destroy: None,
+            a11y: None, shortcuts: vec![], span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&comp, &mut deps);
+        assert!(deps.contains("PropType"));
+        assert!(deps.contains("default_val"));
+        assert!(deps.contains("state_dep"));
+        assert!(deps.contains("meth_dep"));
+    }
+
+    // --- collect_type_deps coverage ---
+
+    #[test]
+    fn test_collect_type_deps_generic() {
+        let ty = Type::Generic {
+            name: "Vec".to_string(),
+            args: vec![Type::Named("MyStruct".to_string())],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("Vec"));
+        assert!(deps.contains("MyStruct"));
+    }
+
+    #[test]
+    fn test_collect_type_deps_reference() {
+        let ty = Type::Reference {
+            inner: Box::new(Type::Named("Foo".to_string())),
+            mutable: false,
+            lifetime: None,
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("Foo"));
+    }
+
+    #[test]
+    fn test_collect_type_deps_array() {
+        let ty = Type::Array(Box::new(Type::Named("Item".to_string())));
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("Item"));
+    }
+
+    #[test]
+    fn test_collect_type_deps_option() {
+        let ty = Type::Option(Box::new(Type::Named("Val".to_string())));
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("Val"));
+    }
+
+    #[test]
+    fn test_collect_type_deps_tuple() {
+        let ty = Type::Tuple(vec![Type::Named("A".to_string()), Type::Named("B".to_string())]);
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("A"));
+        assert!(deps.contains("B"));
+    }
+
+    #[test]
+    fn test_collect_type_deps_function() {
+        let ty = Type::Function {
+            params: vec![Type::Named("In".to_string())],
+            ret: Box::new(Type::Named("Out".to_string())),
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_type_deps(&ty, &mut deps);
+        assert!(deps.contains("In"));
+        assert!(deps.contains("Out"));
+    }
+
+    // --- collect_expr_deps coverage ---
+
+    #[test]
+    fn test_collect_expr_deps_method_call() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("obj".to_string())),
+            method: "do_thing".to_string(),
+            args: vec![Expr::Ident("arg1".to_string())],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("obj"));
+        assert!(deps.contains("arg1"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_field_access() {
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Ident("obj".to_string())),
+            field: "f".to_string(),
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("obj"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_index() {
+        let expr = Expr::Index {
+            object: Box::new(Expr::Ident("arr".to_string())),
+            index: Box::new(Expr::Ident("idx".to_string())),
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("arr"));
+        assert!(deps.contains("idx"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_if_with_else() {
+        let expr = Expr::If {
+            condition: Box::new(Expr::Ident("cond".to_string())),
+            then_block: Block { stmts: vec![Stmt::Expr(Expr::Ident("then_dep".to_string()))], span: dummy_span() },
+            else_block: Some(Block { stmts: vec![Stmt::Expr(Expr::Ident("else_dep".to_string()))], span: dummy_span() }),
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("cond"));
+        assert!(deps.contains("then_dep"));
+        assert!(deps.contains("else_dep"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_match() {
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("subj".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Variant { name: "Var".to_string(), fields: vec![] },
+                body: Expr::Ident("body_dep".to_string()),
+            }],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("subj"));
+        assert!(deps.contains("Var"));
+        assert!(deps.contains("body_dep"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_borrow_await_etc() {
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&Expr::Borrow(Box::new(Expr::Ident("a".to_string()))), &mut deps);
+        collect_expr_deps(&Expr::BorrowMut(Box::new(Expr::Ident("b".to_string()))), &mut deps);
+        collect_expr_deps(&Expr::Await(Box::new(Expr::Ident("c".to_string()))), &mut deps);
+        collect_expr_deps(&Expr::Stream { source: Box::new(Expr::Ident("d".to_string())) }, &mut deps);
+        collect_expr_deps(&Expr::Navigate { path: Box::new(Expr::Ident("e".to_string())) }, &mut deps);
+        collect_expr_deps(&Expr::Receive { channel: Box::new(Expr::Ident("f".to_string())) }, &mut deps);
+        assert!(deps.contains("a"));
+        assert!(deps.contains("b"));
+        assert!(deps.contains("c"));
+        assert!(deps.contains("d"));
+        assert!(deps.contains("e"));
+        assert!(deps.contains("f"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_spawn_send_suspend() {
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&Expr::Spawn {
+            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("sp".to_string()))], span: dummy_span() },
+            span: dummy_span(),
+        }, &mut deps);
+        collect_expr_deps(&Expr::Send {
+            channel: Box::new(Expr::Ident("ch".to_string())),
+            value: Box::new(Expr::Ident("val".to_string())),
+        }, &mut deps);
+        collect_expr_deps(&Expr::Suspend {
+            fallback: Box::new(Expr::Ident("fb".to_string())),
+            body: Box::new(Expr::Ident("bd".to_string())),
+        }, &mut deps);
+        assert!(deps.contains("sp"));
+        assert!(deps.contains("ch"));
+        assert!(deps.contains("val"));
+        assert!(deps.contains("fb"));
+        assert!(deps.contains("bd"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_try_catch_fetch_parallel() {
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&Expr::TryCatch {
+            body: Box::new(Expr::Ident("tc_body".to_string())),
+            error_binding: "e".to_string(),
+            catch_body: Box::new(Expr::Ident("tc_catch".to_string())),
+        }, &mut deps);
+        collect_expr_deps(&Expr::Fetch {
+            url: Box::new(Expr::Ident("url".to_string())),
+            options: Some(Box::new(Expr::Ident("opts".to_string()))),
+            contract: None,
+        }, &mut deps);
+        collect_expr_deps(&Expr::Parallel {
+            tasks: vec![Expr::Ident("t1".to_string()), Expr::Ident("t2".to_string())],
+            span: dummy_span(),
+        }, &mut deps);
+        assert!(deps.contains("tc_body"));
+        assert!(deps.contains("tc_catch"));
+        assert!(deps.contains("url"));
+        assert!(deps.contains("opts"));
+        assert!(deps.contains("t1"));
+        assert!(deps.contains("t2"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_prompt_env_trace_flag() {
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&Expr::PromptTemplate {
+            template: "hi {x}".to_string(),
+            interpolations: vec![("x".to_string(), Expr::Ident("pt_dep".to_string()))],
+        }, &mut deps);
+        collect_expr_deps(&Expr::Env {
+            name: Box::new(Expr::Ident("env_dep".to_string())),
+            span: dummy_span(),
+        }, &mut deps);
+        collect_expr_deps(&Expr::Trace {
+            label: Box::new(Expr::Ident("tr_label".to_string())),
+            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tr_body".to_string()))], span: dummy_span() },
+            span: dummy_span(),
+        }, &mut deps);
+        collect_expr_deps(&Expr::Flag {
+            name: Box::new(Expr::Ident("fl_dep".to_string())),
+            span: dummy_span(),
+        }, &mut deps);
+        assert!(deps.contains("pt_dep"));
+        assert!(deps.contains("env_dep"));
+        assert!(deps.contains("tr_label"));
+        assert!(deps.contains("tr_body"));
+        assert!(deps.contains("fl_dep"));
+    }
+
+    // --- collect_stmt_deps coverage ---
+
+    #[test]
+    fn test_collect_stmt_deps_signal() {
+        let stmt = Stmt::Signal {
+            name: "s".to_string(),
+            ty: Some(Type::Named("SigType".to_string())),
+            secret: false, atomic: false,
+            value: Expr::Ident("sig_val".to_string()),
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_stmt_deps(&stmt, &mut deps);
+        assert!(deps.contains("sig_val"));
+        assert!(deps.contains("SigType"));
+    }
+
+    #[test]
+    fn test_collect_stmt_deps_yield() {
+        let stmt = Stmt::Yield(Expr::Ident("y_dep".to_string()));
+        let mut deps = std::collections::HashSet::new();
+        collect_stmt_deps(&stmt, &mut deps);
+        assert!(deps.contains("y_dep"));
+    }
+
+    // --- collect_template_deps coverage ---
+
+    #[test]
+    fn test_collect_template_deps_element_with_attrs() {
+        let template = TemplateNode::Element(Element {
+            tag: "div".to_string(),
+            attributes: vec![
+                Attribute::Dynamic { name: "class".to_string(), value: Expr::Ident("cls".to_string()) },
+                Attribute::EventHandler { event: "click".to_string(), handler: Expr::Ident("handler".to_string()) },
+            ],
+            children: vec![TemplateNode::Expression(Box::new(Expr::Ident("child_dep".to_string())))],
+            span: Span::new(0, 0, 0, 0),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_template_deps(&template, &mut deps);
+        assert!(deps.contains("cls"));
+        assert!(deps.contains("handler"));
+        assert!(deps.contains("child_dep"));
+    }
+
+    #[test]
+    fn test_collect_template_deps_link() {
+        let template = TemplateNode::Link {
+            to: Expr::Ident("dest".to_string()),
+            children: vec![TemplateNode::TextLiteral("Go".to_string())],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_template_deps(&template, &mut deps);
+        assert!(deps.contains("dest"));
+    }
+
+    // --- Shake keeps always-kept items ---
+
+    #[test]
+    fn test_shake_keeps_test_items() {
+        let items = vec![
+            make_fn("orphan", false, vec![]),
+            Item::Test(TestDef {
+                name: "my test".to_string(),
+                body: Block { stmts: vec![], span: dummy_span() },
+                span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+        assert_eq!(program.items.len(), 1); // test kept, orphan removed
+    }
+
+    #[test]
+    fn test_shake_keeps_contract_items() {
+        let items = vec![
+            make_fn("orphan", false, vec![]),
+            Item::Contract(ContractDef {
+                name: "C".to_string(), fields: vec![], is_pub: false, span: dummy_span(),
+            }),
+        ];
+        let mut program = Program { items };
+        let mut stats = ShakeStats::default();
+        shake(&mut program, &[], &mut stats);
+        assert!(program.items.len() >= 1);
+    }
+
+    // --- collect_pattern_deps coverage ---
+
+    #[test]
+    fn test_collect_pattern_deps_variant() {
+        let pat = Pattern::Variant {
+            name: "Some".to_string(),
+            fields: vec![Pattern::Ident("val".to_string())],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_pattern_deps(&pat, &mut deps);
+        assert!(deps.contains("Some"));
+        assert!(deps.contains("val"));
+    }
+
+    // --- Function with params and return type deps ---
+
+    #[test]
+    fn test_collect_deps_function_with_params_and_ret() {
+        let item = Item::Function(Function {
+            name: "f".to_string(), lifetimes: vec![], type_params: vec![],
+            params: vec![Param {
+                name: "x".to_string(), ty: Type::Named("ParamType".to_string()),
+                ownership: Ownership::Owned,
+            }],
+            return_type: Some(Type::Named("RetType".to_string())),
+            trait_bounds: vec![],
+            body: Block { stmts: vec![], span: dummy_span() },
+            is_pub: false, must_use: false, span: dummy_span(),
+        });
+        let mut deps = std::collections::HashSet::new();
+        collect_item_deps(&item, &mut deps);
+        assert!(deps.contains("ParamType"));
+        assert!(deps.contains("RetType"));
     }
 }

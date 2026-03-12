@@ -354,4 +354,121 @@ mod tests {
         assert!(stats.bytes_after <= stats.bytes_before);
         assert!(result.len() < wat.len());
     }
+
+    #[test]
+    fn test_merge_const_arithmetic_sub() {
+        let wat = "    i32.const 30\n    i32.const 10\n    i32.sub";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        assert!(result.contains("i32.const 20"));
+        assert!(!result.contains("i32.sub"));
+    }
+
+    #[test]
+    fn test_no_merge_unsupported_op() {
+        let wat = "    i32.const 10\n    i32.const 20\n    i32.div_s";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // div_s not handled, so no merge
+        assert!(result.contains("i32.const 10"));
+        assert!(result.contains("i32.const 20"));
+        assert!(result.contains("i32.div_s"));
+    }
+
+    #[test]
+    fn test_remove_drop_after_nop() {
+        let wat = "    nop\n    drop";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        assert!(result.contains("nop"));
+        assert!(!result.contains("drop"));
+        assert!(stats.patterns_optimized >= 1);
+    }
+
+    #[test]
+    fn test_remove_drop_after_drop() {
+        let wat = "    drop\n    drop";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // First drop kept, second removed
+        assert!(result.contains("drop"));
+        assert!(stats.patterns_optimized >= 1);
+    }
+
+    #[test]
+    fn test_remove_empty_paren_blocks() {
+        let wat = "    (block $lbl)\n    (end)\n    i32.const 1";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        assert!(!result.contains("block"));
+        assert!(!result.contains("(end)"));
+        assert!(result.contains("i32.const 1"));
+    }
+
+    #[test]
+    fn test_no_merge_different_local_vars() {
+        let wat = "    local.set $x\n    local.get $y";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // Different vars => no tee
+        assert!(result.contains("local.set $x"));
+        assert!(result.contains("local.get $y"));
+    }
+
+    #[test]
+    fn test_multiple_optimizations_combined() {
+        // Has const fold + redundant local pair + empty block
+        let wat = "    i32.const 3\n    i32.const 7\n    i32.add\n    local.set $x\n    local.get $x\n    block $b\n    end\n    nop\n    drop";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // Const fold: 3+7=10
+        assert!(result.contains("i32.const 10"));
+        assert!(!result.contains("i32.add"));
+        // Local pair: tee
+        assert!(result.contains("local.tee $x"));
+        // Empty block removed
+        assert!(!result.contains("block $b"));
+        // nop+drop => nop only
+        assert!(result.contains("nop"));
+        assert!(stats.patterns_optimized >= 3);
+    }
+
+    #[test]
+    fn test_deduplicate_identical_functions() {
+        let wat = "(module\n  (func $a (result i32)\n    i32.const 42\n  )\n  (func $b (result i32)\n    i32.const 42\n  )\n)";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // One of the functions should be deduplicated
+        assert!(result.contains("deduplicated") || stats.patterns_optimized >= 1);
+    }
+
+    #[test]
+    fn test_no_dedup_different_functions() {
+        let wat = "(module\n  (func $a (result i32)\n    i32.const 42\n  )\n  (func $b (result i32)\n    i32.const 99\n  )\n)";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        // Both functions should remain
+        assert!(result.contains("$a"));
+        assert!(result.contains("$b"));
+    }
+
+    #[test]
+    fn test_optimize_empty_input() {
+        let wat = "";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        assert_eq!(result, "");
+        assert_eq!(stats.bytes_before, 0);
+        assert_eq!(stats.bytes_after, 0);
+    }
+
+    #[test]
+    fn test_optimize_no_patterns() {
+        let wat = "    i32.const 42\n    return";
+        let mut stats = WasmOptStats::default();
+        let result = optimize_wat(wat, &mut stats);
+        assert!(result.contains("i32.const 42"));
+        assert!(result.contains("return"));
+        assert_eq!(stats.patterns_optimized, 0);
+    }
 }

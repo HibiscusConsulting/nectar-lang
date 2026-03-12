@@ -20,62 +20,62 @@ page Examples() {
                 <div class="example-card">
                     <h3>"Hello World"</h3>
                     <p>"The simplest Nectar component."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/hello.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/hello.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Counter"</h3>
                     <p>"Reactive state with signals."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/counter.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/counter.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Todo App"</h3>
                     <p>"Full CRUD with state management."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/todo.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/todo.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"API Contracts"</h3>
                     <p>"Type-safe API boundaries."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/contracts.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/contracts.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Security"</h3>
                     <p>"Secret types and permissions."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/security.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/security.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"PWA"</h3>
                     <p>"Mobile-native Progressive Web App."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/pwa-app.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/pwa-app.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"SEO"</h3>
                     <p>"Pages with meta, structured data."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/seo.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/seo.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Forms"</h3>
                     <p>"Declarative form handling."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/forms.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/forms.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Real-time"</h3>
                     <p>"WebSocket channels."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/realtime.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/realtime.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Concurrency"</h3>
                     <p>"Spawn and parallel execution."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/concurrency.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/concurrency.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"Error Handling"</h3>
                     <p>"Exhaustive Result/Option matching."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/error-handling.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/error-handling.nectar">"View source"</a>
                 </div>
                 <div class="example-card">
                     <h3>"AI Agent"</h3>
                     <p>"LLM integration with tools."</p>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/ai-chat.nectar">"View source"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/examples/ai-chat.nectar">"View source"</a>
                 </div>
             </section>
 

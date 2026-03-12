@@ -998,3 +998,490 @@ fn compile(
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// A simple valid Nectar program for testing.
+    const SIMPLE_PROGRAM: &str = r#"fn main() -> i32 {
+    let x = 42;
+    x
+}
+"#;
+
+    /// A program with a borrow error.
+    const BORROW_ERROR_PROGRAM: &str = r#"fn main() -> i32 {
+    let x = 42;
+    let y = x;
+    let z = x;
+    z
+}
+"#;
+
+    /// A program with a test block.
+    const TEST_PROGRAM: &str = r#"test "addition" {
+    assert_eq(1 + 1, 2);
+}
+"#;
+
+    fn write_temp_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
+        let path = dir.path().join(name);
+        fs::write(&path, content).unwrap();
+        path
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: basic WAT output
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_basic_wat() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.wat");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_ok(), "compile failed: {:?}", result);
+        assert!(output.exists());
+        let content = fs::read_to_string(&output).unwrap();
+        assert!(content.contains("module"), "WAT should contain 'module': {}", content);
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: emit_tokens
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_emit_tokens() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let result = compile(
+            &input,
+            None,
+            true, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: emit_ast
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_emit_ast() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let result = compile(
+            &input,
+            None,
+            false, true, false, false, false, false, 0, false,
+        );
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: emit_wasm (binary)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_emit_wasm() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.wasm");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, true, false, false, false, 0, false,
+        );
+        assert!(result.is_ok(), "compile wasm failed: {:?}", result);
+        assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: SSR mode
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_ssr() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.ssr.js");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, true, false, false, 0, false,
+        );
+        assert!(result.is_ok(), "compile ssr failed: {:?}", result);
+        assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: SSR with critical CSS
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_ssr_with_critical_css() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.ssr.js");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, true, false, false, 0, true,
+        );
+        assert!(result.is_ok(), "compile ssr+css failed: {:?}", result);
+        assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: hydrate mode
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_hydrate() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.hydrate.wat");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, false, true, false, 0, false,
+        );
+        assert!(result.is_ok(), "compile hydrate failed: {:?}", result);
+        assert!(output.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: no_check skips borrow/type checking
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_no_check() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", BORROW_ERROR_PROGRAM);
+        let output = dir.path().join("test.wat");
+        // With no_check, the borrow error program should compile
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, false, false, true, 0, false,
+        );
+        assert!(result.is_ok(), "compile no_check failed: {:?}", result);
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: optimization levels
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_opt_level_1() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.wat");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, false, false, false, 1, false,
+        );
+        assert!(result.is_ok(), "compile O1 failed: {:?}", result);
+    }
+
+    #[test]
+    fn compile_opt_level_2() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "test.nectar", SIMPLE_PROGRAM);
+        let output = dir.path().join("test.wat");
+        let result = compile(
+            &input,
+            Some(output.clone()),
+            false, false, false, false, false, false, 2, false,
+        );
+        assert!(result.is_ok(), "compile O2 failed: {:?}", result);
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: missing file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_missing_file() {
+        let path = PathBuf::from("/tmp/nonexistent_xyz.nectar");
+        let result = compile(
+            &path, None,
+            false, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("Failed to read"));
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: parse error
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_parse_error() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "bad.nectar", "fn { broken syntax !!!");
+        let result = compile(
+            &input, None,
+            false, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("parse error"));
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: borrow error (with check enabled)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_borrow_error() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "borrow_err.nectar", BORROW_ERROR_PROGRAM);
+        let result = compile(
+            &input, None,
+            false, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_err());
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("borrow error") || msg.contains("type error"));
+    }
+
+    // -----------------------------------------------------------------------
+    // compile: default output path (no output specified)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn compile_default_output_path() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "hello.nectar", SIMPLE_PROGRAM);
+        let result = compile(
+            &input, None,
+            false, false, false, false, false, false, 0, false,
+        );
+        assert!(result.is_ok(), "compile default path failed: {:?}", result);
+        let expected_output = dir.path().join("hello.wat");
+        assert!(expected_output.exists(), "default output .wat should exist");
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_test_once: with tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_test_once_runs_tests() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "tests.nectar", TEST_PROGRAM);
+        let result = cmd_test_once(&input, &None);
+        assert!(result.is_ok(), "cmd_test_once failed: {:?}", result);
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_test_once: no tests found
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_test_once_no_tests() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "empty.nectar", SIMPLE_PROGRAM);
+        let result = cmd_test_once(&input, &None);
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_test_once: with filter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_test_once_with_filter() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "tests.nectar", TEST_PROGRAM);
+        let result = cmd_test_once(&input, &Some("addition".to_string()));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn cmd_test_once_with_filter_no_match() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "tests.nectar", TEST_PROGRAM);
+        let result = cmd_test_once(&input, &Some("nonexistent_test_xyz".to_string()));
+        assert!(result.is_ok()); // 0 tests is OK, just prints "running 0 tests"
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_test_once: missing file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_test_once_missing_file() {
+        let path = PathBuf::from("/tmp/nonexistent_tests.nectar");
+        let result = cmd_test_once(&path, &None);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_test_once: parse error
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_test_once_parse_error() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "bad.nectar", "fn { broken !!!");
+        let result = cmd_test_once(&input, &None);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_fmt: format and write
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_fmt_write() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "fmt.nectar", SIMPLE_PROGRAM);
+        let result = cmd_fmt(Some(input.clone()), false, false);
+        assert!(result.is_ok(), "cmd_fmt failed: {:?}", result);
+        // File should still exist
+        assert!(input.exists());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_fmt: check mode (formatted file)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_fmt_check_formatted() {
+        let dir = TempDir::new().unwrap();
+        // First format the file, then check
+        let input = write_temp_file(&dir, "fmt.nectar", SIMPLE_PROGRAM);
+        let _ = cmd_fmt(Some(input.clone()), false, false);
+        // Read back what was written
+        let formatted = fs::read_to_string(&input).unwrap();
+        // Write it again and check -- should be already formatted
+        let input2 = write_temp_file(&dir, "fmt2.nectar", &formatted);
+        let result = cmd_fmt(Some(input2), true, false);
+        assert!(result.is_ok(), "check should pass for formatted file: {:?}", result);
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_fmt: missing file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_fmt_missing_file() {
+        let result = cmd_fmt(Some(PathBuf::from("/tmp/nonexistent_fmt.nectar")), false, false);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_fmt: no input file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_fmt_no_input() {
+        let result = cmd_fmt(None, false, false);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_fmt: parse error
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_fmt_parse_error() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "bad.nectar", "fn { broken !!!");
+        let result = cmd_fmt(Some(input), false, false);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_lint: no warnings
+    // -----------------------------------------------------------------------
+
+    // Note: cmd_lint calls std::process::exit(1) on warnings, so we cannot
+    // safely test it in-process when the code produces lint warnings.
+    // Instead, we test error paths (missing file, parse error) which return
+    // Err before reaching the exit call.
+
+    // -----------------------------------------------------------------------
+    // cmd_lint: missing file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_lint_missing_file() {
+        let path = PathBuf::from("/tmp/nonexistent_lint.nectar");
+        let result = cmd_lint(&path, false);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_lint: parse error
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn cmd_lint_parse_error() {
+        let dir = TempDir::new().unwrap();
+        let input = write_temp_file(&dir, "bad.nectar", "fn { broken !!!");
+        let result = cmd_lint(&input, false);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cmd_init: creates Nectar.toml
+    // -----------------------------------------------------------------------
+
+    // Note: cmd_init tests are combined into a single test to avoid
+    // race conditions with concurrent cwd changes in parallel test threads.
+    #[test]
+    fn cmd_init_all() {
+        // Guard: save and restore cwd
+        let original_dir = std::env::current_dir().unwrap();
+
+        // --- Test 1: creates manifest with name ---
+        {
+            let dir = TempDir::new().unwrap();
+            std::env::set_current_dir(dir.path()).unwrap();
+            let result = cmd_init(Some("test-project".to_string()));
+            std::env::set_current_dir(&original_dir).unwrap();
+            assert!(result.is_ok(), "cmd_init failed: {:?}", result);
+            assert!(dir.path().join("Nectar.toml").exists());
+            let content = fs::read_to_string(dir.path().join("Nectar.toml")).unwrap();
+            assert!(content.contains("test-project"));
+        }
+
+        // --- Test 2: creates manifest with default name ---
+        {
+            let dir = TempDir::new().unwrap();
+            std::env::set_current_dir(dir.path()).unwrap();
+            let result = cmd_init(None);
+            std::env::set_current_dir(&original_dir).unwrap();
+            assert!(result.is_ok(), "cmd_init default name failed: {:?}", result);
+            assert!(dir.path().join("Nectar.toml").exists());
+        }
+
+        // --- Test 3: already exists ---
+        {
+            let dir = TempDir::new().unwrap();
+            std::env::set_current_dir(dir.path()).unwrap();
+            fs::write(dir.path().join("Nectar.toml"), "existing").unwrap();
+            let result = cmd_init(Some("test".to_string()));
+            std::env::set_current_dir(&original_dir).unwrap();
+            assert!(result.is_err());
+            let msg = format!("{}", result.unwrap_err());
+            assert!(msg.contains("already exists"));
+        }
+    }
+}

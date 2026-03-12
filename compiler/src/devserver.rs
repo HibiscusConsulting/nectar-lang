@@ -529,4 +529,304 @@ mod tests {
         assert!(changed.is_empty());
         let _ = fs::remove_dir_all(&tmp);
     }
+
+    // --- Content type detection for all extensions ---
+
+    #[test]
+    fn test_content_type_json() {
+        assert_eq!(content_type_for("data.json"), "application/json");
+    }
+
+    #[test]
+    fn test_content_type_fallback() {
+        assert_eq!(content_type_for("file.bin"), "application/octet-stream");
+        assert_eq!(content_type_for("noext"), "application/octet-stream");
+        assert_eq!(content_type_for(""), "application/octet-stream");
+    }
+
+    #[test]
+    fn test_content_type_with_path() {
+        assert_eq!(content_type_for("/build/app.wasm"), "application/wasm");
+        assert_eq!(content_type_for("/static/runtime.js"), "application/javascript");
+        assert_eq!(content_type_for("/public/index.html"), "text/html");
+        assert_eq!(content_type_for("/assets/style.css"), "text/css");
+    }
+
+    // --- HTTP response building ---
+
+    #[test]
+    fn test_http_response_200() {
+        let resp = http_response(200, "text/html", b"<h1>Hi</h1>");
+        let resp_str = String::from_utf8_lossy(&resp);
+        assert!(resp_str.starts_with("HTTP/1.1 200 OK"));
+        assert!(resp_str.contains("Content-Type: text/html"));
+        assert!(resp_str.contains("Content-Length: 11"));
+        assert!(resp_str.contains("Access-Control-Allow-Origin: *"));
+        assert!(resp_str.ends_with("<h1>Hi</h1>"));
+    }
+
+    #[test]
+    fn test_http_response_404() {
+        let resp = http_response(404, "text/plain", b"Not Found");
+        let resp_str = String::from_utf8_lossy(&resp);
+        assert!(resp_str.starts_with("HTTP/1.1 404 Not Found"));
+    }
+
+    #[test]
+    fn test_http_response_500() {
+        let resp = http_response(500, "text/plain", b"Error");
+        let resp_str = String::from_utf8_lossy(&resp);
+        assert!(resp_str.starts_with("HTTP/1.1 500 Internal Server Error"));
+    }
+
+    #[test]
+    fn test_http_response_unknown_status() {
+        let resp = http_response(418, "text/plain", b"Teapot");
+        let resp_str = String::from_utf8_lossy(&resp);
+        assert!(resp_str.contains("418 Unknown"));
+    }
+
+    #[test]
+    fn test_http_response_empty_body() {
+        let resp = http_response(200, "text/plain", b"");
+        let resp_str = String::from_utf8_lossy(&resp);
+        assert!(resp_str.contains("Content-Length: 0"));
+    }
+
+    // --- WebSocket frame encoding ---
+
+    #[test]
+    fn test_ws_text_frame_empty() {
+        let frame = ws_text_frame("");
+        assert_eq!(frame[0], 0x81);
+        assert_eq!(frame[1], 0);
+        assert_eq!(frame.len(), 2);
+    }
+
+    #[test]
+    fn test_ws_text_frame_medium() {
+        // 126 bytes — triggers extended payload length (2-byte)
+        let payload = "a".repeat(126);
+        let frame = ws_text_frame(&payload);
+        assert_eq!(frame[0], 0x81);
+        assert_eq!(frame[1], 126); // extended length marker
+        // Next two bytes encode 126 as big-endian u16
+        assert_eq!(frame[2], 0);
+        assert_eq!(frame[3], 126);
+        assert_eq!(frame.len(), 4 + 126);
+    }
+
+    #[test]
+    fn test_ws_text_frame_large() {
+        // 65536 bytes — triggers 8-byte extended payload length
+        let payload = "b".repeat(65536);
+        let frame = ws_text_frame(&payload);
+        assert_eq!(frame[0], 0x81);
+        assert_eq!(frame[1], 127); // 8-byte length marker
+        assert_eq!(frame.len(), 10 + 65536);
+    }
+
+    // --- Base64 encoding ---
+
+    #[test]
+    fn test_base64_encode_empty() {
+        assert_eq!(base64_encode(b""), "");
+    }
+
+    #[test]
+    fn test_base64_encode_single() {
+        assert_eq!(base64_encode(b"M"), "TQ==");
+    }
+
+    #[test]
+    fn test_base64_encode_two_bytes() {
+        assert_eq!(base64_encode(b"Ma"), "TWE=");
+    }
+
+    #[test]
+    fn test_base64_encode_three_bytes() {
+        assert_eq!(base64_encode(b"Man"), "TWFu");
+    }
+
+    #[test]
+    fn test_base64_encode_longer() {
+        assert_eq!(base64_encode(b"Hello, World!"), "SGVsbG8sIFdvcmxkIQ==");
+    }
+
+    // --- File watcher with files ---
+
+    #[test]
+    fn test_file_watcher_detects_new_file() {
+        let tmp = std::env::temp_dir().join("nectar_test_watcher_new");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(&tmp);
+
+        let mut watcher = FileWatcher::new(tmp.clone(), "nectar", Duration::from_millis(100));
+
+        // Create a new file
+        fs::write(tmp.join("test.nectar"), "component A {}").unwrap();
+
+        let changed = watcher.poll();
+        assert_eq!(changed.len(), 1);
+        assert!(changed[0].to_string_lossy().contains("test.nectar"));
+
+        // Second poll with no changes
+        let changed2 = watcher.poll();
+        assert!(changed2.is_empty());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_watcher_ignores_wrong_extension() {
+        let tmp = std::env::temp_dir().join("nectar_test_watcher_ext");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(&tmp);
+
+        let mut watcher = FileWatcher::new(tmp.clone(), "nectar", Duration::from_millis(100));
+
+        // Create a .txt file — should be ignored
+        fs::write(tmp.join("readme.txt"), "hello").unwrap();
+
+        let changed = watcher.poll();
+        assert!(changed.is_empty());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_file_watcher_interval() {
+        let tmp = std::env::temp_dir().join("nectar_test_watcher_interval");
+        let _ = fs::create_dir_all(&tmp);
+        let watcher = FileWatcher::new(tmp.clone(), "nectar", Duration::from_millis(250));
+        assert_eq!(watcher.interval(), Duration::from_millis(250));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // --- DevServer construction ---
+
+    #[test]
+    fn test_devserver_new() {
+        let server = DevServer::new(
+            PathBuf::from("/tmp/src"),
+            PathBuf::from("/tmp/build"),
+        );
+        assert_eq!(server.source_dir, PathBuf::from("/tmp/src"));
+        assert_eq!(server.build_dir, PathBuf::from("/tmp/build"));
+    }
+
+    // --- ws_accept_key ---
+
+    #[test]
+    fn test_ws_accept_key_not_empty() {
+        let key = ws_accept_key("dGhlIHNhbXBsZSBub25jZQ==");
+        assert!(!key.is_empty());
+        // Should produce a base64-encoded string
+        assert!(key.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
+    }
+
+    #[test]
+    fn test_ws_accept_key_deterministic() {
+        let key1 = ws_accept_key("test-key");
+        let key2 = ws_accept_key("test-key");
+        assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn test_ws_accept_key_different_inputs() {
+        let key1 = ws_accept_key("key-a");
+        let key2 = ws_accept_key("key-b");
+        assert_ne!(key1, key2);
+    }
+
+    // --- serve_file ---
+
+    #[test]
+    fn test_serve_file_existing() {
+        let tmp = std::env::temp_dir().join("nectar_test_serve");
+        let _ = fs::create_dir_all(&tmp);
+        let file_path = tmp.join("test.html");
+        fs::write(&file_path, "<h1>Hello</h1>").unwrap();
+
+        let result = serve_file(&file_path);
+        assert!(result.is_some());
+        let (body, ct) = result.unwrap();
+        assert_eq!(ct, "text/html");
+        assert_eq!(body, b"<h1>Hello</h1>");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_serve_file_nonexistent() {
+        let result = serve_file(Path::new("/nonexistent/path/to/file.wasm"));
+        assert!(result.is_none());
+    }
+
+    // --- FileWatcher walk_dir with non-directory ---
+
+    #[test]
+    fn test_file_watcher_walk_dir_nonexistent() {
+        let watcher = FileWatcher {
+            root: PathBuf::from("/nonexistent"),
+            extension: "nectar".to_string(),
+            timestamps: HashMap::new(),
+            interval: Duration::from_millis(100),
+        };
+        let result = watcher.walk_dir(Path::new("/nonexistent_dir_xyz"));
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    // --- FileWatcher with nested directories ---
+
+    #[test]
+    fn test_file_watcher_nested_dirs() {
+        let tmp = std::env::temp_dir().join("nectar_test_watcher_nested");
+        let _ = fs::remove_dir_all(&tmp);
+        let _ = fs::create_dir_all(tmp.join("sub"));
+
+        let mut watcher = FileWatcher::new(tmp.clone(), "nectar", Duration::from_millis(100));
+
+        // Create files in nested directory
+        fs::write(tmp.join("sub/deep.nectar"), "hello").unwrap();
+
+        let changed = watcher.poll();
+        assert_eq!(changed.len(), 1);
+        assert!(changed[0].to_string_lossy().contains("deep.nectar"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // --- Base64 with various lengths ---
+
+    #[test]
+    fn test_base64_encode_binary() {
+        // Test with actual binary data
+        let data: Vec<u8> = (0..20).collect();
+        let encoded = base64_encode(&data);
+        assert!(!encoded.is_empty());
+    }
+
+    // --- WebSocket frame edge cases ---
+
+    #[test]
+    fn test_ws_text_frame_exactly_125() {
+        let payload = "x".repeat(125);
+        let frame = ws_text_frame(&payload);
+        assert_eq!(frame[0], 0x81);
+        assert_eq!(frame[1], 125); // single byte length
+        assert_eq!(frame.len(), 2 + 125);
+    }
+
+    #[test]
+    fn test_ws_text_frame_65535() {
+        let payload = "y".repeat(65535);
+        let frame = ws_text_frame(&payload);
+        assert_eq!(frame[0], 0x81);
+        assert_eq!(frame[1], 126); // 2-byte extended length
+        assert_eq!(frame[2], 0xFF);
+        assert_eq!(frame[3], 0xFF);
+        assert_eq!(frame.len(), 4 + 65535);
+    }
 }

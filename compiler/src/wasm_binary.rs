@@ -1419,4 +1419,1800 @@ mod tests {
         }
         (result, bytes.len())
     }
+
+    // ── Full program with component ──────────────────────────────────────
+
+    #[test]
+    fn test_emit_component_program() {
+        let program = make_program(vec![
+            Item::Component(Component {
+                name: "Counter".into(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![StateField {
+                    name: "count".into(),
+                    ty: Some(Type::Named("i32".into())),
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                }],
+                methods: vec![Function {
+                    name: "increment".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: None,
+                    trait_bounds: vec![],
+                    body: Block {
+                        stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                        span: empty_span(),
+                    },
+                    is_pub: false,
+                    must_use: false,
+                    span: empty_span(),
+                }],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: empty_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: empty_span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // Valid WASM header
+        assert_eq!(&bytes[0..4], &WASM_MAGIC);
+        assert_eq!(&bytes[4..8], &WASM_VERSION);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Store with actions ───────────────────────────────────────────────
+
+    #[test]
+    fn test_emit_store_program() {
+        let program = make_program(vec![
+            Item::Store(StoreDef {
+                name: "AppStore".into(),
+                signals: vec![],
+                actions: vec![],
+                computed: vec![],
+                effects: vec![],
+                selectors: vec![],
+                is_pub: false,
+                span: empty_span(),
+            }),
+            Item::Function(make_add_function()),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        assert_eq!(&bytes[0..4], &WASM_MAGIC);
+        // Should contain "add" export
+        assert!(bytes.windows(3).any(|w| w == b"add"));
+    }
+
+    // ── Memory section (imported) ────────────────────────────────────────
+
+    #[test]
+    fn test_import_section_contains_memory() {
+        let program = make_program(vec![Item::Function(make_add_function())]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // The import section should contain "env" and "memory"
+        assert!(bytes.windows(3).any(|w| w == b"env"), "missing 'env' in imports");
+        assert!(bytes.windows(6).any(|w| w == b"memory"), "missing 'memory' in imports");
+    }
+
+    // ── Import section has DOM functions ──────────────────────────────────
+
+    #[test]
+    fn test_import_section_has_dom_functions() {
+        let program = make_program(vec![Item::Function(make_add_function())]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // Should contain "dom" module and "createElement" function
+        assert!(bytes.windows(3).any(|w| w == b"dom"), "missing 'dom' in imports");
+        assert!(bytes.windows(13).any(|w| w == b"createElement"), "missing 'createElement'");
+        assert!(bytes.windows(7).any(|w| w == b"setText"), "missing 'setText'");
+        assert!(bytes.windows(11).any(|w| w == b"appendChild"), "missing 'appendChild'");
+    }
+
+    // ── Data section for strings ─────────────────────────────────────────
+
+    #[test]
+    fn test_data_section_present_with_strings() {
+        let program = make_program(vec![
+            Item::Function(Function {
+                name: "greet".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::StringLit("hello world".into()))],
+                    span: empty_span(),
+                },
+                is_pub: true,
+                must_use: false,
+                span: empty_span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // Data section (11) should be present
+        let mut pos = 8;
+        let mut found_data = false;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_DATA {
+                found_data = true;
+            }
+            pos += size as usize;
+        }
+        assert!(found_data, "data section not found");
+
+        // The string "hello world" should be in the binary
+        assert!(bytes.windows(11).any(|w| w == b"hello world"));
+    }
+
+    // ── Type section for function types ──────────────────────────────────
+
+    #[test]
+    fn test_type_section_present() {
+        let program = make_program(vec![Item::Function(make_add_function())]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        let mut pos = 8;
+        let mut found_type = false;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_TYPE {
+                found_type = true;
+                // Type section content should start with count, then func type entries
+                // Each entry starts with TYPE_FUNC (0x60)
+                let content_start = pos;
+                let (count, _) = read_unsigned_leb128(&bytes[content_start..]);
+                assert!(count > 0, "type section has zero entries");
+            }
+            pos += size as usize;
+        }
+        assert!(found_type, "type section not found");
+    }
+
+    // ── Code section for function bodies ─────────────────────────────────
+
+    #[test]
+    fn test_code_section_present() {
+        let program = make_program(vec![Item::Function(make_add_function())]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        let mut pos = 8;
+        let mut found_code = false;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_CODE {
+                found_code = true;
+            }
+            pos += size as usize;
+        }
+        assert!(found_code, "code section not found");
+    }
+
+    // ── Multiple functions ───────────────────────────────────────────────
+
+    #[test]
+    fn test_multiple_functions() {
+        let func1 = make_add_function();
+        let func2 = Function {
+            name: "sub".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![
+                Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+            ],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Binary {
+                        op: BinOp::Sub,
+                        left: Box::new(Expr::Ident("a".into())),
+                        right: Box::new(Expr::Ident("b".into())),
+                    })),
+                ],
+                span: empty_span(),
+            },
+            is_pub: true,
+            must_use: false,
+            span: empty_span(),
+        };
+        let program = make_program(vec![Item::Function(func1), Item::Function(func2)]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // Both names should appear in exports
+        assert!(bytes.windows(3).any(|w| w == b"add"));
+        assert!(bytes.windows(3).any(|w| w == b"sub"));
+    }
+
+    // ── Private function not exported ────────────────────────────────────
+
+    #[test]
+    fn test_private_function_not_exported() {
+        let func = Function {
+            name: "secret".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![Stmt::Return(Some(Expr::Integer(42)))],
+                span: empty_span(),
+            },
+            is_pub: false,
+            must_use: false,
+            span: empty_span(),
+        };
+        let program = make_program(vec![Item::Function(func)]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        // Extract export section content — "secret" should NOT be in exports
+        // (it might appear in the code section as a string literal, so we check
+        // specifically in the export section)
+        let mut pos = 8;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_EXPORT {
+                let export_content = &bytes[pos..pos + size as usize];
+                let export_str = String::from_utf8_lossy(export_content);
+                // "secret" should not be in export section
+                // (though "memory" and "alloc" might be, that's fine)
+                assert!(!export_str.contains("secret"), "private fn should not be exported");
+            }
+            pos += size as usize;
+        }
+    }
+
+    // ── String interning deduplication ───────────────────────────────────
+
+    #[test]
+    fn test_string_intern_empty() {
+        let mut intern = StringIntern::new(0);
+        let (off, len) = intern.intern("");
+        assert_eq!(off, 0);
+        assert_eq!(len, 0);
+    }
+
+    #[test]
+    fn test_string_intern_multiple_different() {
+        let mut intern = StringIntern::new(100);
+        let (o1, l1) = intern.intern("abc");
+        let (o2, l2) = intern.intern("def");
+        let (o3, l3) = intern.intern("ghi");
+        assert_eq!(o1, 100);
+        assert_eq!(l1, 3);
+        assert_eq!(o2, 103);
+        assert_eq!(l2, 3);
+        assert_eq!(o3, 106);
+        assert_eq!(l3, 3);
+        assert_eq!(intern.data, b"abcdefghi");
+    }
+
+    // ── Global section present ───────────────────────────────────────────
+
+    #[test]
+    fn test_global_section_present() {
+        let program = make_program(vec![Item::Function(make_add_function())]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        let mut pos = 8;
+        let mut found_global = false;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_GLOBAL {
+                found_global = true;
+            }
+            pos += size as usize;
+        }
+        assert!(found_global, "global section not found");
+    }
+
+    // ── Section encoding helper ──────────────────────────────────────────
+
+    #[test]
+    fn test_encode_section_helper() {
+        let content = vec![0x01, 0x02, 0x03];
+        let section = encode_section(SECTION_TYPE, &content);
+        assert_eq!(section[0], SECTION_TYPE);
+        // LEB128 of 3 is just 0x03
+        assert_eq!(section[1], 0x03);
+        assert_eq!(&section[2..], &content);
+    }
+
+    // ── Group locals helper ──────────────────────────────────────────────
+
+    #[test]
+    fn test_group_locals_same_type() {
+        let locals = vec![
+            ("a".into(), WasmValType::I32),
+            ("b".into(), WasmValType::I32),
+            ("c".into(), WasmValType::I32),
+        ];
+        let groups = group_locals(&locals);
+        assert_eq!(groups, vec![(3, WasmValType::I32)]);
+    }
+
+    #[test]
+    fn test_group_locals_mixed_types() {
+        let locals = vec![
+            ("a".into(), WasmValType::I32),
+            ("b".into(), WasmValType::F64),
+            ("c".into(), WasmValType::F64),
+            ("d".into(), WasmValType::I32),
+        ];
+        let groups = group_locals(&locals);
+        assert_eq!(groups, vec![
+            (1, WasmValType::I32),
+            (2, WasmValType::F64),
+            (1, WasmValType::I32),
+        ]);
+    }
+
+    #[test]
+    fn test_group_locals_empty() {
+        let locals: Vec<(String, WasmValType)> = vec![];
+        let groups = group_locals(&locals);
+        assert!(groups.is_empty());
+    }
+
+    // ── AST type to valtype ──────────────────────────────────────────────
+
+    #[test]
+    fn test_ast_type_to_valtype_mapping() {
+        assert_eq!(ast_type_to_valtype(&Type::Named("i32".into())), WasmValType::I32);
+        assert_eq!(ast_type_to_valtype(&Type::Named("i64".into())), WasmValType::I64);
+        assert_eq!(ast_type_to_valtype(&Type::Named("u64".into())), WasmValType::I64);
+        assert_eq!(ast_type_to_valtype(&Type::Named("f32".into())), WasmValType::F32);
+        assert_eq!(ast_type_to_valtype(&Type::Named("f64".into())), WasmValType::F64);
+        assert_eq!(ast_type_to_valtype(&Type::Named("String".into())), WasmValType::I32);
+        assert_eq!(ast_type_to_valtype(&Type::Generic {
+            name: "Vec".into(),
+            args: vec![Type::Named("i32".into())],
+        }), WasmValType::I32);
+    }
+
+    // ── Empty program produces valid WASM ────────────────────────────────
+
+    #[test]
+    fn test_empty_program_valid_wasm() {
+        let program = make_program(vec![]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        assert_eq!(&bytes[0..4], &WASM_MAGIC);
+        assert_eq!(&bytes[4..8], &WASM_VERSION);
+        // Should still have sections (imports at minimum)
+        assert!(bytes.len() > 8);
+    }
+}
+
+#[cfg(test)]
+mod coverage_wasm_binary_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span { start: 0, end: 0, line: 1, col: 1 }
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    fn make_program(items: Vec<Item>) -> Program {
+        Program { items }
+    }
+
+    fn read_unsigned_leb128(bytes: &[u8]) -> (u64, usize) {
+        let mut result: u64 = 0;
+        let mut shift: u32 = 0;
+        for (i, &byte) in bytes.iter().enumerate() {
+            result |= ((byte & 0x7F) as u64) << shift;
+            if byte & 0x80 == 0 {
+                return (result, i + 1);
+            }
+            shift += 7;
+        }
+        (result, bytes.len())
+    }
+
+    // ── LEB128 edge cases ───────────────────────────────────────────────
+
+    #[test]
+    fn unsigned_leb128_large_value() {
+        // Test a value that requires 3+ bytes
+        let bytes = encode_unsigned_leb128(0x4000); // 16384
+        assert!(bytes.len() >= 3);
+        // Verify round-trip
+        let (val, _) = read_unsigned_leb128(&bytes);
+        assert_eq!(val, 0x4000);
+    }
+
+    #[test]
+    fn unsigned_leb128_max_small() {
+        assert_eq!(encode_unsigned_leb128(127), vec![0x7F]);
+    }
+
+    #[test]
+    fn signed_leb128_large_positive() {
+        let bytes = encode_signed_leb128(1024);
+        assert!(bytes.len() >= 2);
+    }
+
+    #[test]
+    fn signed_leb128_large_negative() {
+        let bytes = encode_signed_leb128(-1024);
+        assert!(bytes.len() >= 2);
+    }
+
+    #[test]
+    fn signed_leb128_min_two_byte_boundary() {
+        // -65 requires two bytes
+        let bytes = encode_signed_leb128(-65);
+        assert_eq!(bytes.len(), 2);
+    }
+
+    // ── WasmValType::to_byte ────────────────────────────────────────────
+
+    #[test]
+    fn valtype_to_byte_all_variants() {
+        assert_eq!(WasmValType::I32.to_byte(), 0x7F);
+        assert_eq!(WasmValType::I64.to_byte(), 0x7E);
+        assert_eq!(WasmValType::F32.to_byte(), 0x7D);
+        assert_eq!(WasmValType::F64.to_byte(), 0x7C);
+    }
+
+    // ── ast_type_to_valtype extended ────────────────────────────────────
+
+    #[test]
+    fn ast_type_array_maps_to_i32() {
+        assert_eq!(ast_type_to_valtype(&Type::Array(Box::new(Type::Named("i32".into())))), WasmValType::I32);
+    }
+
+    #[test]
+    fn ast_type_option_maps_to_i32() {
+        assert_eq!(ast_type_to_valtype(&Type::Option(Box::new(Type::Named("i32".into())))), WasmValType::I32);
+    }
+
+    #[test]
+    fn ast_type_tuple_maps_to_i32() {
+        assert_eq!(ast_type_to_valtype(&Type::Tuple(vec![Type::Named("i32".into())])), WasmValType::I32);
+    }
+
+    #[test]
+    fn ast_type_result_maps_to_i32() {
+        assert_eq!(ast_type_to_valtype(&Type::Result {
+            ok: Box::new(Type::Named("i32".into())),
+            err: Box::new(Type::Named("String".into())),
+        }), WasmValType::I32);
+    }
+
+    #[test]
+    fn ast_type_reference_maps_to_i32() {
+        assert_eq!(ast_type_to_valtype(&Type::Reference {
+            mutable: false,
+            lifetime: None,
+            inner: Box::new(Type::Named("i32".into())),
+        }), WasmValType::I32);
+    }
+
+    // ── StringIntern ────────────────────────────────────────────────────
+
+    #[test]
+    fn string_intern_deduplication() {
+        let mut intern = StringIntern::new(0);
+        let (o1, l1) = intern.intern("hello");
+        let (o2, l2) = intern.intern("hello");
+        assert_eq!(o1, o2);
+        assert_eq!(l1, l2);
+        assert_eq!(intern.data.len(), 5); // stored only once
+    }
+
+    #[test]
+    fn string_intern_unicode() {
+        let mut intern = StringIntern::new(256);
+        let (off, len) = intern.intern("héllo");
+        assert_eq!(off, 256);
+        assert_eq!(len, "héllo".len() as u32); // 6 bytes in UTF-8
+    }
+
+    // ── group_locals ────────────────────────────────────────────────────
+
+    #[test]
+    fn group_locals_single_item() {
+        let locals = vec![("x".into(), WasmValType::F64)];
+        let groups = group_locals(&locals);
+        assert_eq!(groups, vec![(1, WasmValType::F64)]);
+    }
+
+    #[test]
+    fn group_locals_alternating_types() {
+        let locals = vec![
+            ("a".into(), WasmValType::I32),
+            ("b".into(), WasmValType::I64),
+            ("c".into(), WasmValType::I32),
+            ("d".into(), WasmValType::I64),
+        ];
+        let groups = group_locals(&locals);
+        assert_eq!(groups.len(), 4);
+    }
+
+    // ── encode_name ─────────────────────────────────────────────────────
+
+    #[test]
+    fn encode_name_produces_length_prefixed_bytes() {
+        let mut out = Vec::new();
+        encode_name(&mut out, "test");
+        assert_eq!(out[0], 4); // length
+        assert_eq!(&out[1..], b"test");
+    }
+
+    #[test]
+    fn encode_name_empty_string() {
+        let mut out = Vec::new();
+        encode_name(&mut out, "");
+        assert_eq!(out[0], 0);
+        assert_eq!(out.len(), 1);
+    }
+
+    // ── encode_section ──────────────────────────────────────────────────
+
+    #[test]
+    fn encode_section_empty_content() {
+        let section = encode_section(SECTION_DATA, &[]);
+        assert_eq!(section[0], SECTION_DATA);
+        assert_eq!(section[1], 0); // zero length
+        assert_eq!(section.len(), 2);
+    }
+
+    // ── Full program with test blocks ───────────────────────────────────
+
+    #[test]
+    fn emit_program_with_tests() {
+        let program = make_program(vec![
+            Item::Test(TestDef {
+                name: "addition works".into(),
+                body: block(vec![
+                    Stmt::Expr(Expr::Assert {
+                        condition: Box::new(Expr::Bool(true)),
+                        message: Some("should be true".into()),
+                    }),
+                ]),
+                span: span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        assert_eq!(&bytes[0..4], &[0x00, 0x61, 0x73, 0x6D]);
+        // Should contain __test_addition_works and __run_tests exports
+        assert!(bytes.windows(21).any(|w| w == b"__test_addition_works"));
+        assert!(bytes.windows(11).any(|w| w == b"__run_tests"));
+    }
+
+    #[test]
+    fn emit_program_with_multiple_tests() {
+        let program = make_program(vec![
+            Item::Test(TestDef {
+                name: "first".into(),
+                body: block(vec![Stmt::Expr(Expr::Bool(true))]),
+                span: span(),
+            }),
+            Item::Test(TestDef {
+                name: "second".into(),
+                body: block(vec![Stmt::Expr(Expr::Bool(false))]),
+                span: span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+
+        assert!(bytes.windows(12).any(|w| w == b"__test_first"));
+        assert!(bytes.windows(13).any(|w| w == b"__test_second"));
+        assert!(bytes.windows(11).any(|w| w == b"__run_tests"));
+    }
+
+    // ── Binary operations ───────────────────────────────────────────────
+
+    #[test]
+    fn emit_all_binary_ops() {
+        let ops = vec![
+            BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Mod,
+            BinOp::Eq, BinOp::Neq, BinOp::Lt, BinOp::Gt, BinOp::Lte,
+            BinOp::Gte, BinOp::And, BinOp::Or,
+        ];
+        for op in ops {
+            let program = make_program(vec![Item::Function(Function {
+                name: "op_test".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![
+                    Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                    Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                ],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::Binary {
+                    op: op.clone(),
+                    left: Box::new(Expr::Ident("a".into())),
+                    right: Box::new(Expr::Ident("b".into())),
+                }))]),
+                is_pub: true,
+                must_use: false,
+                span: span(),
+            })]);
+            let mut emitter = WasmBinaryEmitter::new();
+            let bytes = emitter.emit(&program);
+            assert!(bytes.len() > 8, "binary op {:?} should produce valid wasm", op);
+        }
+    }
+
+    // ── Unary operations ────────────────────────────────────────────────
+
+    #[test]
+    fn emit_unary_neg() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "negate".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(Expr::Ident("x".into())),
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_unary_not() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "logical_not".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Unary {
+                op: UnaryOp::Not,
+                operand: Box::new(Expr::Ident("x".into())),
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Expression encoding ─────────────────────────────────────────────
+
+    #[test]
+    fn emit_float_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "get_pi".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: Some(Type::Named("f64".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Float(3.14)))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        // F64 const opcode should appear
+        assert!(bytes.contains(&OP_F64_CONST));
+    }
+
+    #[test]
+    fn emit_bool_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "get_true".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Bool(true)))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_string_lit_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "greet".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::StringLit("test string".into()))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(11).any(|w| w == b"test string"));
+    }
+
+    #[test]
+    fn emit_if_else_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "check".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::If {
+                condition: Box::new(Expr::Ident("x".into())),
+                then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                else_block: Some(block(vec![Stmt::Expr(Expr::Integer(0))])),
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_IF));
+        assert!(bytes.contains(&OP_ELSE));
+    }
+
+    #[test]
+    fn emit_if_no_else() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "check".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::If {
+                condition: Box::new(Expr::Ident("x".into())),
+                then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
+                else_block: None,
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_IF));
+    }
+
+    #[test]
+    fn emit_assign_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "mutate".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![
+                Stmt::Let { name: "x".into(), ty: None, value: Expr::Integer(0), mutable: true, secret: false, ownership: Ownership::Owned },
+                Stmt::Expr(Expr::Assign {
+                    target: Box::new(Expr::Ident("x".into())),
+                    value: Box::new(Expr::Integer(42)),
+                }),
+            ]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_LOCAL_SET));
+    }
+
+    #[test]
+    fn emit_block_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "do_block".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Block(block(vec![
+                Stmt::Expr(Expr::Integer(1)),
+            ])))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_index_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "get_elem".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Index {
+                object: Box::new(Expr::Ident("arr".into())),
+                index: Box::new(Expr::Integer(0)),
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_I32_LOAD));
+        assert!(bytes.contains(&OP_I32_MUL));
+    }
+
+    #[test]
+    fn emit_borrow_and_borrow_mut() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "borrow_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![
+                Stmt::Expr(Expr::Borrow(Box::new(Expr::Ident("x".into())))),
+                Stmt::Return(Some(Expr::BorrowMut(Box::new(Expr::Ident("x".into()))))),
+            ]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_field_access() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "get_field".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("obj".into())),
+                field: "x".into(),
+            }))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_I32_LOAD));
+    }
+
+    #[test]
+    fn emit_fn_call() {
+        let program = make_program(vec![
+            Item::Function(Function {
+                name: "helper".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::Integer(1)))]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            Item::Function(Function {
+                name: "caller".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(Some(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("helper".into())),
+                    args: vec![],
+                }))]),
+                is_pub: true,
+                must_use: false,
+                span: span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_CALL));
+    }
+
+    #[test]
+    fn emit_method_call() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "test_method".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::MethodCall {
+                object: Box::new(Expr::Ident("obj".into())),
+                method: "do_thing".into(),
+                args: vec![Expr::Integer(1)],
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Assert and AssertEq expressions ─────────────────────────────────
+
+    #[test]
+    fn emit_assert_expr() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "test_assert".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Assert {
+                condition: Box::new(Expr::Bool(true)),
+                message: Some("custom msg".into()),
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_IF));
+        assert!(bytes.windows(10).any(|w| w == b"custom msg"));
+    }
+
+    #[test]
+    fn emit_assert_no_message() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "test_assert_default".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Assert {
+                condition: Box::new(Expr::Bool(true)),
+                message: None,
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(16).any(|w| w == b"assertion failed"));
+    }
+
+    #[test]
+    fn emit_assert_eq() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "test_eq".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::AssertEq {
+                left: Box::new(Expr::Integer(1)),
+                right: Box::new(Expr::Integer(1)),
+                message: Some("should be equal".into()),
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_I32_EQ));
+        assert!(bytes.windows(15).any(|w| w == b"should be equal"));
+    }
+
+    #[test]
+    fn emit_assert_eq_no_message() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "test_eq_default".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::AssertEq {
+                left: Box::new(Expr::Integer(1)),
+                right: Box::new(Expr::Integer(2)),
+                message: None,
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(13).any(|w| w == b"assert_eq fai"));
+    }
+
+    // ── TryCatch expression ─────────────────────────────────────────────
+
+    #[test]
+    fn emit_try_catch() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "safe_call".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::TryCatch {
+                body: Box::new(Expr::Integer(1)),
+                error_binding: "err".into(),
+                catch_body: Box::new(Expr::Integer(0)),
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_BLOCK));
+        assert!(bytes.contains(&OP_BR));
+    }
+
+    // ── FormatString expression ─────────────────────────────────────────
+
+    #[test]
+    fn emit_format_string_with_literal() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "fmt".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::FormatString {
+                parts: vec![
+                    FormatPart::Literal("hello ".into()),
+                    FormatPart::Literal("world".into()),
+                ],
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(6).any(|w| w == b"hello "));
+        assert!(bytes.windows(5).any(|w| w == b"world"));
+    }
+
+    #[test]
+    fn emit_format_string_with_expression() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "fmt_expr".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::FormatString {
+                parts: vec![
+                    FormatPart::Literal("val=".into()),
+                    FormatPart::Expression(Box::new(Expr::Ident("x".into()))),
+                ],
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(4).any(|w| w == b"val="));
+    }
+
+    #[test]
+    fn emit_format_string_empty() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "fmt_empty".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::FormatString {
+                parts: vec![],
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Try (?) operator ────────────────────────────────────────────────
+
+    #[test]
+    fn emit_try_operator() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "try_op".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("x".into())))))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_BR_IF));
+        assert!(bytes.contains(&OP_RETURN));
+    }
+
+    // ── Unsupported expression fallback (nop) ───────────────────────────
+
+    #[test]
+    fn emit_unsupported_expr_produces_nop() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "nop_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Await(Box::new(Expr::Integer(1))))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_NOP));
+    }
+
+    // ── Statement encoding ──────────────────────────────────────────────
+
+    #[test]
+    fn emit_signal_stmt() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "sig_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![
+                Stmt::Signal { name: "count".into(), ty: Some(Type::Named("i32".into())), value: Expr::Integer(0), secret: false, atomic: false },
+            ]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_LOCAL_SET));
+    }
+
+    #[test]
+    fn emit_return_none() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "early_return".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(None)]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_RETURN));
+    }
+
+    #[test]
+    fn emit_yield_stmt() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "gen".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Yield(Expr::Integer(42))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── LetDestructure with patterns ────────────────────────────────────
+
+    #[test]
+    fn emit_let_destructure_tuple() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "destructure_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "t".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Ident("a".into()),
+                    Pattern::Ident("b".into()),
+                ]),
+                value: Expr::Ident("t".into()),
+                ty: None,
+            }]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_I32_LOAD));
+    }
+
+    #[test]
+    fn emit_let_destructure_array() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "arr_destructure".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::LetDestructure {
+                pattern: Pattern::Array(vec![
+                    Pattern::Ident("first".into()),
+                    Pattern::Wildcard,
+                    Pattern::Ident("third".into()),
+                ]),
+                value: Expr::Ident("arr".into()),
+                ty: None,
+            }]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_let_destructure_struct() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "struct_destructure".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "s".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::LetDestructure {
+                pattern: Pattern::Struct {
+                    name: "Point".into(),
+                    fields: vec![
+                        ("x".into(), Pattern::Ident("px".into())),
+                        ("y".into(), Pattern::Ident("py".into())),
+                    ],
+                    rest: false,
+                },
+                value: Expr::Ident("s".into()),
+                ty: None,
+            }]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&OP_I32_LOAD));
+    }
+
+    #[test]
+    fn emit_let_destructure_wildcard_and_literal() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "pattern_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Wildcard,
+                    Pattern::Literal(Expr::Integer(42)),
+                ]),
+                value: Expr::Ident("v".into()),
+                ty: None,
+            }]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    #[test]
+    fn emit_let_destructure_variant() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "variant_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::LetDestructure {
+                pattern: Pattern::Variant {
+                    name: "Some".into(),
+                    fields: vec![Pattern::Ident("val".into())],
+                },
+                value: Expr::Ident("v".into()),
+                ty: None,
+            }]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── collect_block_locals ────────────────────────────────────────────
+
+    #[test]
+    fn collect_locals_from_signal() {
+        let blk = block(vec![
+            Stmt::Signal { name: "s".into(), ty: Some(Type::Named("f64".into())), value: Expr::Float(0.0), secret: false, atomic: false },
+        ]);
+        let mut locals = Vec::new();
+        collect_block_locals(&blk, &mut locals);
+        assert_eq!(locals.len(), 1);
+        assert_eq!(locals[0].0, "s");
+        assert_eq!(locals[0].1, WasmValType::F64);
+    }
+
+    #[test]
+    fn collect_locals_from_let_no_type() {
+        let blk = block(vec![
+            Stmt::Let { name: "x".into(), ty: None, value: Expr::Integer(0), mutable: false, secret: false, ownership: Ownership::Owned },
+        ]);
+        let mut locals = Vec::new();
+        collect_block_locals(&blk, &mut locals);
+        assert_eq!(locals.len(), 1);
+        assert_eq!(locals[0].1, WasmValType::I32); // default
+    }
+
+    #[test]
+    fn collect_locals_from_let_destructure() {
+        let blk = block(vec![
+            Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Ident("a".into()),
+                    Pattern::Ident("b".into()),
+                ]),
+                value: Expr::Integer(0),
+                ty: None,
+            },
+        ]);
+        let mut locals = Vec::new();
+        collect_block_locals(&blk, &mut locals);
+        assert_eq!(locals.len(), 2);
+    }
+
+    #[test]
+    fn collect_locals_skips_return_and_expr() {
+        let blk = block(vec![
+            Stmt::Return(Some(Expr::Integer(0))),
+            Stmt::Expr(Expr::Integer(1)),
+            Stmt::Yield(Expr::Integer(2)),
+        ]);
+        let mut locals = Vec::new();
+        collect_block_locals(&blk, &mut locals);
+        assert_eq!(locals.len(), 0);
+    }
+
+    // ── collect_pattern_locals_wasm ─────────────────────────────────────
+
+    #[test]
+    fn collect_pattern_locals_struct() {
+        let pattern = Pattern::Struct {
+            name: "P".into(),
+            fields: vec![
+                ("x".into(), Pattern::Ident("px".into())),
+                ("y".into(), Pattern::Ident("py".into())),
+            ],
+            rest: false,
+        };
+        let mut locals = Vec::new();
+        collect_pattern_locals_wasm(&pattern, &mut locals);
+        assert_eq!(locals.len(), 2);
+    }
+
+    #[test]
+    fn collect_pattern_locals_array() {
+        let pattern = Pattern::Array(vec![
+            Pattern::Ident("a".into()),
+            Pattern::Wildcard,
+            Pattern::Ident("c".into()),
+        ]);
+        let mut locals = Vec::new();
+        collect_pattern_locals_wasm(&pattern, &mut locals);
+        assert_eq!(locals.len(), 2);
+    }
+
+    #[test]
+    fn collect_pattern_locals_variant_and_literal() {
+        let pattern = Pattern::Variant { name: "Some".into(), fields: vec![Pattern::Ident("v".into())] };
+        let mut locals = Vec::new();
+        collect_pattern_locals_wasm(&pattern, &mut locals);
+        // Variant doesn't recursively collect in the impl
+        assert_eq!(locals.len(), 0);
+
+        let lit_pat = Pattern::Literal(Expr::Integer(0));
+        collect_pattern_locals_wasm(&lit_pat, &mut locals);
+        assert_eq!(locals.len(), 0);
+    }
+
+    // ── FuncSig dedup / intern_type ─────────────────────────────────────
+
+    #[test]
+    fn intern_type_deduplicates() {
+        let mut emitter = WasmBinaryEmitter::new();
+        let sig1 = FuncSig { params: vec![WasmValType::I32], results: vec![WasmValType::I32] };
+        let sig2 = FuncSig { params: vec![WasmValType::I32], results: vec![WasmValType::I32] };
+        let idx1 = emitter.intern_type(sig1);
+        let idx2 = emitter.intern_type(sig2);
+        assert_eq!(idx1, idx2);
+    }
+
+    #[test]
+    fn intern_type_different_sigs() {
+        let mut emitter = WasmBinaryEmitter::new();
+        let sig1 = FuncSig { params: vec![WasmValType::I32], results: vec![WasmValType::I32] };
+        let sig2 = FuncSig { params: vec![WasmValType::F64], results: vec![WasmValType::F64] };
+        let idx1 = emitter.intern_type(sig1);
+        let idx2 = emitter.intern_type(sig2);
+        assert_ne!(idx1, idx2);
+    }
+
+    // ── Data section edge cases ─────────────────────────────────────────
+
+    #[test]
+    fn data_section_empty_when_no_strings() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "no_strings".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Integer(42)))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        // Data section should still be present (empty segment)
+        let mut pos = 8;
+        let mut found_data = false;
+        while pos < bytes.len() {
+            let id = bytes[pos];
+            pos += 1;
+            let (size, read) = read_unsigned_leb128(&bytes[pos..]);
+            pos += read;
+            if id == SECTION_DATA {
+                found_data = true;
+            }
+            pos += size as usize;
+        }
+        assert!(found_data);
+    }
+
+    // ── SelfExpr ────────────────────────────────────────────────────────
+
+    #[test]
+    fn emit_self_expr() {
+        // SelfExpr only does something if "self" is in the local_map
+        // which happens when a param named "self" is present (but it's filtered)
+        // This tests the fallthrough case (no self in map)
+        let program = make_program(vec![Item::Function(Function {
+            name: "self_test".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::SelfExpr)]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Function with various param types ───────────────────────────────
+
+    #[test]
+    fn emit_function_with_i64_params() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "add64".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![
+                Param { name: "a".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned },
+                Param { name: "b".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned },
+            ],
+            return_type: Some(Type::Named("i64".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Ident("a".into())))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        // Should have i64 valtype (0x7E) in the type section
+        assert!(bytes.contains(&VALTYPE_I64));
+    }
+
+    #[test]
+    fn emit_function_with_f32_param() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "f32_func".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![
+                Param { name: "x".into(), ty: Type::Named("f32".into()), ownership: Ownership::Owned },
+            ],
+            return_type: Some(Type::Named("f32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Return(Some(Expr::Ident("x".into())))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.contains(&VALTYPE_F32));
+    }
+
+    // ── Alloc body encoding ─────────────────────────────────────────────
+
+    #[test]
+    fn alloc_body_has_correct_opcodes() {
+        let emitter = WasmBinaryEmitter::new();
+        let body = emitter.encode_alloc_body();
+        // Should contain: global.get, local.set, global.get, local.get, i32.add, global.set, local.get, end
+        assert!(body.contains(&OP_GLOBAL_GET));
+        assert!(body.contains(&OP_LOCAL_SET));
+        assert!(body.contains(&OP_I32_ADD));
+        assert!(body.contains(&OP_GLOBAL_SET));
+        assert!(body.contains(&OP_LOCAL_GET));
+        assert!(body.contains(&OP_END));
+    }
+
+    // ── Test with locals of different types ──────────────────────────────
+
+    #[test]
+    fn emit_function_with_mixed_locals() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "mixed".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![
+                Stmt::Let { name: "a".into(), ty: Some(Type::Named("i32".into())), value: Expr::Integer(0), mutable: false, secret: false, ownership: Ownership::Owned },
+                Stmt::Let { name: "b".into(), ty: Some(Type::Named("f64".into())), value: Expr::Float(0.0), mutable: false, secret: false, ownership: Ownership::Owned },
+                Stmt::Let { name: "c".into(), ty: Some(Type::Named("i64".into())), value: Expr::Integer(0), mutable: false, secret: false, ownership: Ownership::Owned },
+                Stmt::Let { name: "d".into(), ty: Some(Type::Named("f32".into())), value: Expr::Float(0.0), mutable: false, secret: false, ownership: Ownership::Owned },
+            ]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Test body with assert_eq inside ─────────────────────────────────
+
+    #[test]
+    fn emit_test_body_with_assertions() {
+        let program = make_program(vec![
+            Item::Test(TestDef {
+                name: "math works".into(),
+                body: block(vec![
+                    Stmt::Let { name: "x".into(), ty: None, value: Expr::Integer(5), mutable: false, secret: false, ownership: Ownership::Owned },
+                    Stmt::Expr(Expr::AssertEq {
+                        left: Box::new(Expr::Ident("x".into())),
+                        right: Box::new(Expr::Integer(5)),
+                        message: Some("x should be 5".into()),
+                    }),
+                ]),
+                span: span(),
+            }),
+        ]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.windows(13).any(|w| w == b"x should be 5"));
+    }
+
+    // ── FnCall with non-ident callee ────────────────────────────────────
+
+    #[test]
+    fn emit_fn_call_with_complex_callee() {
+        // When callee is not an Ident, no call is generated
+        let program = make_program(vec![Item::Function(Function {
+            name: "complex".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("obj".into())),
+                    field: "method".into(),
+                }),
+                args: vec![],
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Assign to non-ident target ──────────────────────────────────────
+
+    #[test]
+    fn emit_assign_to_non_ident() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "assign_field".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Assign {
+                target: Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("obj".into())),
+                    field: "x".into(),
+                }),
+                value: Box::new(Expr::Integer(1)),
+            })]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
+
+    // ── Ident not in local_map ──────────────────────────────────────────
+
+    #[test]
+    fn emit_unknown_ident() {
+        let program = make_program(vec![Item::Function(Function {
+            name: "unknown".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Ident("nonexistent".into()))]),
+            is_pub: true,
+            must_use: false,
+            span: span(),
+        })]);
+        let mut emitter = WasmBinaryEmitter::new();
+        let bytes = emitter.emit(&program);
+        assert!(bytes.len() > 8);
+    }
 }

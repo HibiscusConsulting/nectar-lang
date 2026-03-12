@@ -102,11 +102,11 @@ For SSR (`nectar build --ssr`), deploy to any platform that runs a web server (R
 
 ## What You Get
 
-**Language features** — components, stores, routers, signals, structs, enums, traits, generics, ownership, borrowing, pattern matching, async/await
+**Language features** — components, stores, routers, signals, structs, enums, traits, generics, ownership, borrowing, pattern matching, async/await, auto a11y, layout primitives, view transitions
 
-**Built-in keywords** — `page` (SEO), `form` (validation), `channel` (WebSocket), `auth`, `payment`, `upload`, `db`, `cache`, `embed`, `pdf`, `theme`, `app` (PWA), `agent` (AI)
+**Built-in keywords** — `page` (SEO), `form` (validation), `channel` (WebSocket/WebRTC), `auth`, `payment`, `upload`, `db`, `cache`, `embed`, `pdf`, `theme`, `app` (PWA), `agent` (AI), `crypto` (pure WASM)
 
-**Standard library** — `debounce`, `throttle`, `BigDecimal`, `format`, `collections`, `url`, `mask`, `search`, `toast`, `skeleton`, `pagination`, `crypto` — all auto-included, no imports needed
+**Standard library** — `debounce`, `throttle`, `BigDecimal`, `format`, `collections`, `url`, `mask`, `search`, `toast`, `skeleton`, `pagination`, `crypto`, `chart`, `csv` — all auto-included, no imports needed
 
 **Security** — XSS structurally impossible, `secret` types, capability-based `permissions`, zero JS dependencies, no `node_modules`
 

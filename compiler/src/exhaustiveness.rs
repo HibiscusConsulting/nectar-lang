@@ -915,4 +915,902 @@ mod tests {
             errors,
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Test: Integer match with wildcard is OK
+    // -----------------------------------------------------------------------
+    #[test]
+    fn integer_match_with_wildcard_ok() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Integer(1)), unit_body()),
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "expected no errors, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Integer match with duplicate literals detects redundancy
+    // -----------------------------------------------------------------------
+    #[test]
+    fn integer_match_duplicate_literal() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Integer(1)), unit_body()),
+                arm(Pattern::Literal(Expr::Integer(1)), unit_body()), // duplicate
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant pattern warning, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Bool match with both true and false is exhaustive
+    // -----------------------------------------------------------------------
+    #[test]
+    fn bool_match_both_branches_no_warning() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()),
+                arm(Pattern::Literal(Expr::Bool(false)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "expected no errors, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Bool match missing true
+    // -----------------------------------------------------------------------
+    #[test]
+    fn bool_match_missing_true() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Bool(false)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.missing_patterns.contains(&"true".to_string())),
+            "expected missing 'true', got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Bool match with wildcard
+    // -----------------------------------------------------------------------
+    #[test]
+    fn bool_match_wildcard_covers_all() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()),
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "expected no errors, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Bool match with redundant true after wildcard
+    // -----------------------------------------------------------------------
+    #[test]
+    fn bool_match_redundant_after_wildcard() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Wildcard, unit_body()),
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant warning, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Redundancy-only check for unknown types
+    // -----------------------------------------------------------------------
+    #[test]
+    fn redundancy_only_double_wildcard() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Wildcard, unit_body()),
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant warning for double wildcard, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Pattern after wildcard in unknown type
+    // -----------------------------------------------------------------------
+    #[test]
+    fn redundancy_pattern_after_wildcard() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Wildcard, unit_body()),
+                arm(Pattern::Literal(Expr::StringLit("x".into())), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant") && e.message.contains("wildcard")),
+            "expected redundant pattern follows wildcard, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Enum with all variants + redundant wildcard
+    // -----------------------------------------------------------------------
+    #[test]
+    fn enum_all_variants_plus_wildcard_redundant() {
+        let program = Program {
+            items: vec![
+                make_enum("Dir", vec![("Up", 0), ("Down", 0)]),
+                wrap_in_fn(match_expr(vec![
+                    arm(Pattern::Variant { name: "Up".into(), fields: vec![] }, unit_body()),
+                    arm(Pattern::Variant { name: "Down".into(), fields: vec![] }, unit_body()),
+                    arm(Pattern::Wildcard, unit_body()), // redundant
+                ])),
+            ],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant wildcard warning, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Enum with duplicate variant
+    // -----------------------------------------------------------------------
+    #[test]
+    fn enum_duplicate_variant_redundant() {
+        let program = Program {
+            items: vec![
+                make_enum("Dir", vec![("Up", 0), ("Down", 0)]),
+                wrap_in_fn(match_expr(vec![
+                    arm(Pattern::Variant { name: "Up".into(), fields: vec![] }, unit_body()),
+                    arm(Pattern::Variant { name: "Up".into(), fields: vec![] }, unit_body()), // duplicate
+                    arm(Pattern::Variant { name: "Down".into(), fields: vec![] }, unit_body()),
+                ])),
+            ],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant") && e.message.contains("Up")),
+            "expected redundant 'Up' warning, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Tuple pattern (falls through to Other)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn tuple_pattern_match() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Tuple(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        // Tuple patterns resolve to SubjectKind::Other, so no exhaustiveness check
+        assert!(errors.is_empty(), "expected no errors for tuple pattern, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: String pattern (falls through to Other)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn string_pattern_match() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::StringLit("hello".into())), unit_body()),
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "expected no errors for string match with wildcard, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Multiple missing variants
+    // -----------------------------------------------------------------------
+    #[test]
+    fn multiple_missing_variants() {
+        let program = Program {
+            items: vec![
+                make_enum("Dir", vec![("Up", 0), ("Down", 0), ("Left", 0), ("Right", 0)]),
+                wrap_in_fn(match_expr(vec![
+                    arm(Pattern::Variant { name: "Up".into(), fields: vec![] }, unit_body()),
+                ])),
+            ],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert_eq!(errors.len(), 1, "expected 1 error, got: {:?}", errors);
+        assert!(errors[0].missing_patterns.contains(&"Down".to_string()));
+        assert!(errors[0].missing_patterns.contains(&"Left".to_string()));
+        assert!(errors[0].missing_patterns.contains(&"Right".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: ExhaustivenessError Display trait
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_error_display() {
+        let err = ExhaustivenessError {
+            message: "test error".to_string(),
+            span: Span::new(0, 10, 5, 3),
+            missing_patterns: vec![],
+        };
+        let display = format!("{}", err);
+        assert_eq!(display, "5:3: test error");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Built-in Result<T,E> type exhaustiveness
+    // -----------------------------------------------------------------------
+    #[test]
+    fn builtin_result_missing_err() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Variant { name: "Ok".into(), fields: vec![Pattern::Ident("v".into())] }, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("non-exhaustive") && e.missing_patterns.contains(&"Err".to_string())),
+            "expected missing 'Err', got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Built-in Option<T> type exhaustiveness
+    // -----------------------------------------------------------------------
+    #[test]
+    fn builtin_option_complete() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Variant { name: "Some".into(), fields: vec![Pattern::Ident("v".into())] }, unit_body()),
+                arm(Pattern::Variant { name: "None".into(), fields: vec![] }, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "expected no errors for complete Option match, got: {:?}", errors);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Integer arm after wildcard is redundant
+    // -----------------------------------------------------------------------
+    #[test]
+    fn integer_arm_after_wildcard_redundant() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Wildcard, unit_body()),
+                arm(Pattern::Literal(Expr::Integer(1)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: walk_expr coverage for various expression types
+    // -----------------------------------------------------------------------
+
+    fn make_match_inside(expr: Expr) -> Item {
+        // Wraps an expression in a function so walk_item processes it
+        wrap_in_fn(expr)
+    }
+
+    #[test]
+    fn walk_expr_binary() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ])),
+                right: Box::new(Expr::Integer(1)),
+            })],
+        };
+        let errors = check_exhaustiveness(&program);
+        // No error for wildcard-only match
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn walk_expr_unary() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ])),
+            })],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn walk_expr_field_access() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::FieldAccess {
+                object: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                field: "f".to_string(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_method_call() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::MethodCall {
+                object: Box::new(Expr::Ident("x".to_string())),
+                method: "m".to_string(),
+                args: vec![match_expr(vec![arm(Pattern::Wildcard, unit_body())])],
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_fn_call() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::FnCall {
+                callee: Box::new(Expr::Ident("f".to_string())),
+                args: vec![match_expr(vec![arm(Pattern::Wildcard, unit_body())])],
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_index() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Index {
+                object: Box::new(Expr::Ident("arr".to_string())),
+                index: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_if() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::If {
+                condition: Box::new(Expr::Bool(true)),
+                then_block: block(vec![Stmt::Expr(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ]))]),
+                else_block: Some(block(vec![Stmt::Expr(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ]))])),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_for() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::For {
+                binding: "i".to_string(),
+                iterator: Box::new(Expr::Ident("items".to_string())),
+                body: block(vec![Stmt::Expr(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ]))]),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_while() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::While {
+                condition: Box::new(Expr::Bool(true)),
+                body: block(vec![Stmt::Expr(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ]))]),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_block() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Block(block(vec![
+                Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            ])))],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_borrow_and_variants() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Borrow(Box::new(
+                match_expr(vec![arm(Pattern::Wildcard, unit_body())]),
+            )))],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_spawn() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Spawn {
+                body: block(vec![Stmt::Expr(match_expr(vec![
+                    arm(Pattern::Wildcard, unit_body()),
+                ]))]),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_assign() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Assign {
+                target: Box::new(Expr::Ident("x".to_string())),
+                value: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_fetch() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Fetch {
+                url: Box::new(Expr::StringLit("u".to_string())),
+                options: Some(Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))),
+                contract: None,
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_closure() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Closure {
+                params: vec![],
+                body: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_suspend_and_send() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Suspend {
+                fallback: Box::new(Expr::Integer(0)),
+                body: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_try_catch() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::TryCatch {
+                body: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                error_binding: "e".to_string(),
+                catch_body: Box::new(Expr::Integer(0)),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_parallel() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Parallel {
+                tasks: vec![match_expr(vec![arm(Pattern::Wildcard, unit_body())])],
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_assert() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Assert {
+                condition: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                message: None,
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_assert_eq() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::AssertEq {
+                left: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                right: Box::new(Expr::Integer(1)),
+                message: None,
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_struct_init() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::StructInit {
+                name: "S".to_string(),
+                fields: vec![("x".to_string(), match_expr(vec![arm(Pattern::Wildcard, unit_body())]))],
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_animate() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Animate {
+                target: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                animation: "fade".to_string(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_prompt_template() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::PromptTemplate {
+                template: "{x}".to_string(),
+                interpolations: vec![("x".to_string(), match_expr(vec![arm(Pattern::Wildcard, unit_body())]))],
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_format_string() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::FormatString {
+                parts: vec![crate::ast::FormatPart::Expression(Box::new(
+                    match_expr(vec![arm(Pattern::Wildcard, unit_body())]),
+                ))],
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_download() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Download {
+                data: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                filename: Box::new(Expr::StringLit("f".to_string())),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_env() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Env {
+                name: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_trace() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Trace {
+                label: Box::new(Expr::StringLit("t".to_string())),
+                body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_expr_flag() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Flag {
+                name: Box::new(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // walk_item coverage for Component, Impl, Store, Agent, Test, Channel
+    // -----------------------------------------------------------------------
+
+    fn wrap_in_component_method(expr: Expr) -> Item {
+        Item::Component(Component {
+            name: "C".to_string(), type_params: vec![], props: vec![],
+            state: vec![],
+            methods: vec![Function {
+                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                params: vec![], return_type: None, trait_bounds: vec![],
+                body: block(vec![Stmt::Expr(expr)]),
+                is_pub: false, must_use: false, span: span(),
+            }],
+            styles: vec![], transitions: vec![], trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None, gestures: vec![], skeleton: None,
+            error_boundary: None, chunk: None, on_destroy: None,
+            a11y: None, shortcuts: vec![], span: span(),
+        })
+    }
+
+    #[test]
+    fn walk_item_component() {
+        let program = Program {
+            items: vec![wrap_in_component_method(
+                match_expr(vec![arm(Pattern::Wildcard, unit_body())]),
+            )],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_item_impl() {
+        let program = Program {
+            items: vec![Item::Impl(ImplBlock {
+                target: "Foo".to_string(), trait_impls: vec![],
+                methods: vec![Function {
+                    name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![
+                        arm(Pattern::Wildcard, unit_body()),
+                    ]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }],
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_item_store() {
+        let program = Program {
+            items: vec![Item::Store(StoreDef {
+                name: "S".to_string(), signals: vec![],
+                actions: vec![ActionDef {
+                    name: "a".to_string(), params: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_async: false, span: span(),
+                }],
+                computed: vec![ComputedDef {
+                    name: "c".to_string(), return_type: None,
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    span: span(),
+                }],
+                effects: vec![EffectDef {
+                    name: "e".to_string(),
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    span: span(),
+                }],
+                selectors: vec![], is_pub: false, span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_item_agent() {
+        let program = Program {
+            items: vec![Item::Agent(AgentDef {
+                name: "A".to_string(), system_prompt: None,
+                tools: vec![ToolDef {
+                    name: "t".to_string(), description: None, params: vec![],
+                    return_type: None,
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    span: span(),
+                }],
+                state: vec![],
+                methods: vec![Function {
+                    name: "m".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }],
+                render: None, span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_item_test() {
+        let program = Program {
+            items: vec![Item::Test(TestDef {
+                name: "test".to_string(),
+                body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    #[test]
+    fn walk_item_channel() {
+        let program = Program {
+            items: vec![Item::Channel(ChannelDef {
+                name: "Ch".to_string(),
+                url: Expr::StringLit("/ws".to_string()),
+                contract: None,
+                on_message: Some(Function {
+                    name: "on_msg".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }),
+                on_connect: Some(Function {
+                    name: "on_conn".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }),
+                on_disconnect: Some(Function {
+                    name: "on_disc".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }),
+                reconnect: false, heartbeat_interval: None,
+                methods: vec![Function {
+                    name: "send".to_string(), lifetimes: vec![], type_params: vec![],
+                    params: vec![], return_type: None, trait_bounds: vec![],
+                    body: block(vec![Stmt::Expr(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))]),
+                    is_pub: false, must_use: false, span: span(),
+                }],
+                is_pub: false, span: span(),
+            })],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // walk_block coverage for Signal, Let, Return stmts
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn walk_block_let_and_signal() {
+        let program = Program {
+            items: vec![wrap_in_fn(Expr::Block(block(vec![
+                Stmt::Let {
+                    name: "x".to_string(), ty: None, mutable: false, secret: false,
+                    value: match_expr(vec![arm(Pattern::Wildcard, unit_body())]),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Signal {
+                    name: "s".to_string(), ty: None, secret: false, atomic: false,
+                    value: match_expr(vec![arm(Pattern::Wildcard, unit_body())]),
+                },
+                Stmt::Return(Some(match_expr(vec![arm(Pattern::Wildcard, unit_body())]))),
+                Stmt::Return(None),
+                Stmt::Yield(match_expr(vec![arm(Pattern::Wildcard, unit_body())])),
+            ])))],
+        };
+        assert!(check_exhaustiveness(&program).is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Bool match with duplicate true
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bool_match_duplicate_true() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()),
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()), // duplicate
+                arm(Pattern::Literal(Expr::Bool(false)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant true, got: {:?}",
+            errors,
+        );
+    }
+
+    #[test]
+    fn bool_match_duplicate_false() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Literal(Expr::Bool(false)), unit_body()),
+                arm(Pattern::Literal(Expr::Bool(false)), unit_body()), // duplicate
+                arm(Pattern::Literal(Expr::Bool(true)), unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant")),
+            "expected redundant false, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Enum variant after wildcard
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn enum_variant_after_wildcard_redundant() {
+        let program = Program {
+            items: vec![
+                make_enum("Color", vec![("Red", 0), ("Green", 0)]),
+                wrap_in_fn(match_expr(vec![
+                    arm(Pattern::Variant { name: "Red".into(), fields: vec![] }, unit_body()),
+                    arm(Pattern::Wildcard, unit_body()),
+                    arm(Pattern::Variant { name: "Green".into(), fields: vec![] }, unit_body()), // redundant
+                ])),
+            ],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(
+            errors.iter().any(|e| e.message.contains("redundant") && e.message.contains("Green")),
+            "expected redundant Green after wildcard, got: {:?}",
+            errors,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test: Integer match with redundant wildcard after wildcard
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn integer_match_double_wildcard() {
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Wildcard, unit_body()),
+                arm(Pattern::Wildcard, unit_body()), // redundant
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.iter().any(|e| e.message.contains("redundant")));
+    }
 }

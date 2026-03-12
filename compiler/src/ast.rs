@@ -99,6 +99,7 @@ pub struct ContractField {
 #[derive(Debug, Clone, PartialEq)]
 pub enum A11yMode {
     Auto,    // compiler generates full a11y layer
+    Hybrid,  // developer overrides specific attrs, compiler fills the rest
     Manual,  // developer handles everything
 }
 
@@ -628,6 +629,10 @@ pub enum TemplateNode {
     Fragment(Vec<TemplateNode>),
     /// <Link to="/about">About</Link>
     Link { to: Expr, children: Vec<TemplateNode> },
+    /// <Outlet /> — marks where routed content renders inside a layout
+    Outlet,
+    /// Layout primitives — compile-time sugar for semantic HTML + CSS
+    Layout(LayoutNode),
 }
 
 #[derive(Debug, Clone)]
@@ -636,6 +641,26 @@ pub struct Element {
     pub attributes: Vec<Attribute>,
     pub children: Vec<TemplateNode>,
     pub span: Span,
+}
+
+/// Layout primitives — compile to semantic HTML + CSS at codegen time.
+/// Zero runtime cost — pure syntactic sugar.
+#[derive(Debug, Clone)]
+pub enum LayoutNode {
+    /// `<Stack gap="16">` → column flexbox
+    Stack { gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Row gap="8" align="center">` → row flexbox
+    Row { gap: Option<String>, align: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Grid cols="3" gap="16">` → CSS Grid
+    Grid { cols: Option<String>, rows: Option<String>, gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Center max_width="800">` → flex centering
+    Center { max_width: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Cluster gap="8">` → flex-wrap row
+    Cluster { gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Sidebar side="left" width="300">` → CSS Grid sidebar
+    Sidebar { side: Option<String>, width: Option<String>, children: Vec<TemplateNode>, span: Span },
+    /// `<Switcher threshold="600">` → flexbox that wraps based on container
+    Switcher { threshold: Option<String>, children: Vec<TemplateNode>, span: Span },
 }
 
 #[derive(Debug, Clone)]
@@ -833,6 +858,10 @@ pub struct RouterDef {
     pub name: String,
     pub routes: Vec<RouteDef>,
     pub fallback: Option<Box<TemplateNode>>,
+    /// Persistent layout shell — content renders into `<Outlet />`
+    pub layout: Option<RenderBlock>,
+    /// Default transition for all routes (can be overridden per-route)
+    pub transition: Option<String>,
     pub span: Span,
 }
 
@@ -843,6 +872,8 @@ pub struct RouteDef {
     pub params: Vec<String>,      // extracted from :param segments in path
     pub component: String,        // component to render
     pub guard: Option<Expr>,      // optional auth/permission guard
+    /// Per-route transition override: "fade", "slide-left", "slide-right", "none"
+    pub transition: Option<String>,
     pub span: Span,
 }
 

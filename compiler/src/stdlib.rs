@@ -115,6 +115,7 @@ impl StdLib {
         stdlib.register_qr_functions();
         stdlib.register_share_functions();
         stdlib.register_wizard_functions();
+        stdlib.register_rtc_functions();
 
         stdlib
     }
@@ -1215,6 +1216,120 @@ impl StdLib {
                 return_type: bytes_ty.clone(),
                 takes_self: false, self_mutable: false,
                 description: "Generate cryptographically random bytes. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_sha1".into(),
+                params: vec![BuiltinParam { name: "data".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "SHA-1 hash of input data, returned as hex string. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_sha384".into(),
+                params: vec![BuiltinParam { name: "data".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "SHA-384 hash of input data, returned as hex string. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_generate_key_pair".into(),
+                params: vec![BuiltinParam { name: "algorithm".into(), ty: string_ty.clone() }],
+                return_type: Type::Tuple(vec![string_ty.clone(), string_ty.clone()]),
+                takes_self: false, self_mutable: false,
+                description: "Generate a key pair for the given algorithm (ed25519, ecdh-p256). Returns (public_key, private_key) as hex strings. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_export_key".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Export a key in the given format (hex, base64). Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_ecdh_derive".into(),
+                params: vec![
+                    BuiltinParam { name: "private_key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "public_key".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "ECDH shared secret derivation from private + public key. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_derive_bits".into(),
+                params: vec![
+                    BuiltinParam { name: "password".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "salt".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "bit_length".into(), ty: i32_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "PBKDF2 raw bit derivation. Returns hex string of derived bits. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_encrypt_aes_cbc".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "plaintext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-CBC encryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_decrypt_aes_cbc".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "ciphertext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-CBC decryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_encrypt_aes_ctr".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "plaintext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-CTR encryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_decrypt_aes_ctr".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "ciphertext".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "AES-256-CTR decryption. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_hmac_sha512".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "HMAC-SHA512 of data using key. Pure WASM implementation.".into(),
+            },
+            BuiltinFn {
+                name: "crypto_hkdf".into(),
+                params: vec![
+                    BuiltinParam { name: "ikm".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "salt".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "info".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "length".into(), ty: i32_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "HKDF key derivation (extract + expand). Pure WASM implementation.".into(),
             },
         ];
 
@@ -2807,6 +2922,298 @@ impl StdLib {
         ];
         for f in fns { self.register_fn(f); }
     }
+
+    // -- WebRTC — peer connections, data channels, media tracks ---------------
+    // WASM hint: The rtc namespace in core.js provides thin syscalls to
+    // RTCPeerConnection, data channels, and media track APIs. All signaling
+    // logic (SDP parsing, ICE candidate filtering, state machines) runs in
+    // WASM. The JS layer is pure bridge code — zero computation.
+    fn register_rtc_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let bool_ty = Type::Named("bool".into());
+        let unit_ty = Type::Named("Unit".into());
+        let string_array_ty = Type::Array(Box::new(string_ty.clone()));
+
+        // Register RtcConfig type
+        self.register_type(BuiltinType {
+            name: "RtcConfig".into(),
+            type_params: vec![],
+            description: "Configuration for an RTCPeerConnection. WASM builds config, JS creates the peer.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        // Register RtcStats type
+        self.register_type(BuiltinType {
+            name: "RtcStats".into(),
+            type_params: vec![],
+            description: "WebRTC connection statistics. WASM parses the stats from the JS bridge.".into(),
+            methods: vec![
+                BuiltinFn {
+                    name: "get".into(),
+                    params: vec![BuiltinParam { name: "key".into(), ty: string_ty.clone() }],
+                    return_type: Type::Option(Box::new(string_ty.clone())),
+                    takes_self: true, self_mutable: false,
+                    description: "Look up a stat value by key. Pure WASM.".into(),
+                },
+            ],
+            variants: vec![],
+        });
+
+        // Register DataChannelConfig type
+        self.register_type(BuiltinType {
+            name: "DataChannelConfig".into(),
+            type_params: vec![],
+            description: "Configuration for a WebRTC data channel. Pure WASM config object.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        // Register MediaConstraints type
+        self.register_type(BuiltinType {
+            name: "MediaConstraints".into(),
+            type_params: vec![],
+            description: "Constraints for getUserMedia/getDisplayMedia. Pure WASM config.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            // -- Peer connection lifecycle --
+            BuiltinFn {
+                name: "rtc_create_peer".into(),
+                params: vec![BuiltinParam { name: "ice_servers".into(), ty: string_array_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create an RTCPeerConnection with ICE servers. Returns peer ID. JS syscall: new RTCPeerConnection().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_create_offer".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create an SDP offer. Returns SDP string. JS syscall: pc.createOffer().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_create_answer".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create an SDP answer. Returns SDP string. JS syscall: pc.createAnswer().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_set_local_description".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "sdp_type".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "sdp".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set local SDP description. JS syscall: pc.setLocalDescription().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_set_remote_description".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "sdp_type".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "sdp".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set remote SDP description. JS syscall: pc.setRemoteDescription().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_add_ice_candidate".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "candidate".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "sdp_mid".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Add an ICE candidate. JS syscall: pc.addIceCandidate().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_close".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Close the peer connection. JS syscall: pc.close().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_connection_state".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get connection state (new/connecting/connected/disconnected/failed/closed). JS syscall: pc.connectionState.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_ice_connection_state".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get ICE connection state. JS syscall: pc.iceConnectionState.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_signaling_state".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get signaling state. JS syscall: pc.signalingState.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_stats".into(),
+                params: vec![BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get connection statistics. Returns stats as string. JS syscall: pc.getStats(). WASM parses the result.".into(),
+            },
+
+            // -- Data channels --
+            BuiltinFn {
+                name: "rtc_create_data_channel".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "label".into(), ty: string_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a data channel. Returns channel ID. JS syscall: pc.createDataChannel().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_data_channel_send".into(),
+                params: vec![
+                    BuiltinParam { name: "channel_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Send string data on a data channel. JS syscall: dc.send().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_data_channel_close".into(),
+                params: vec![BuiltinParam { name: "channel_id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Close a data channel. JS syscall: dc.close().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_data_channel_get_state".into(),
+                params: vec![BuiltinParam { name: "channel_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get data channel state (connecting/open/closing/closed). JS syscall: dc.readyState.".into(),
+            },
+
+            // -- Media --
+            BuiltinFn {
+                name: "rtc_get_user_media".into(),
+                params: vec![
+                    BuiltinParam { name: "audio".into(), ty: bool_ty.clone() },
+                    BuiltinParam { name: "video".into(), ty: bool_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get user camera/mic stream. Returns stream ID. JS syscall: navigator.mediaDevices.getUserMedia().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_display_media".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get screen share stream. Returns stream ID. JS syscall: navigator.mediaDevices.getDisplayMedia().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_add_track".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "track_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "stream_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Add a media track to the peer connection. Returns sender ID. JS syscall: pc.addTrack().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_remove_track".into(),
+                params: vec![
+                    BuiltinParam { name: "peer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "sender_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Remove a media track from the peer connection. JS syscall: pc.removeTrack().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_stop_track".into(),
+                params: vec![BuiltinParam { name: "track_id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Stop a media track. JS syscall: track.stop().".into(),
+            },
+            BuiltinFn {
+                name: "rtc_set_track_enabled".into(),
+                params: vec![
+                    BuiltinParam { name: "track_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "enabled".into(), ty: bool_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Enable/disable a media track (mute/unmute). JS syscall: track.enabled = bool.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_get_track_kind".into(),
+                params: vec![BuiltinParam { name: "track_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get track kind ('audio' or 'video'). JS syscall: track.kind.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_attach_stream".into(),
+                params: vec![
+                    BuiltinParam { name: "element_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "stream_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Attach a media stream to a video/audio element. JS syscall: el.srcObject = stream.".into(),
+            },
+
+            // -- WASM-internal signaling helpers (no JS) --
+            BuiltinFn {
+                name: "rtc_parse_sdp".into(),
+                params: vec![BuiltinParam { name: "sdp".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Parse SDP string into structured format. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_filter_codecs".into(),
+                params: vec![
+                    BuiltinParam { name: "sdp".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "codecs".into(), ty: string_array_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Filter SDP to only include specified codecs. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "rtc_set_bandwidth".into(),
+                params: vec![
+                    BuiltinParam { name: "sdp".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "audio_kbps".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "video_kbps".into(), ty: i32_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Modify SDP to set bandwidth limits. Pure WASM SDP manipulation — no JS.".into(),
+            },
+        ];
+
+        for f in fns { self.register_fn(f); }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2991,5 +3398,212 @@ mod tests {
         assert!(lib.lookup_fn("does_not_exist").is_none());
         assert!(lib.lookup_method("Vec", "nonexistent_method").is_none());
         assert!(lib.lookup_method("NoSuchType", "anything").is_none());
+    }
+
+    // -- WebRTC (rtc) functions ------------------------------------------------
+
+    #[test]
+    fn rtc_types_are_registered() {
+        let lib = stdlib();
+        for name in &["RtcConfig", "RtcStats", "DataChannelConfig", "MediaConstraints"] {
+            assert!(
+                lib.lookup_type(name).is_some(),
+                "expected RTC type `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn rtc_peer_lifecycle_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "rtc_create_peer",
+            "rtc_create_offer",
+            "rtc_create_answer",
+            "rtc_set_local_description",
+            "rtc_set_remote_description",
+            "rtc_add_ice_candidate",
+            "rtc_close",
+            "rtc_get_connection_state",
+            "rtc_get_ice_connection_state",
+            "rtc_get_signaling_state",
+            "rtc_get_stats",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected RTC function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn rtc_data_channel_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "rtc_create_data_channel",
+            "rtc_data_channel_send",
+            "rtc_data_channel_close",
+            "rtc_data_channel_get_state",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected RTC data channel function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn rtc_media_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "rtc_get_user_media",
+            "rtc_get_display_media",
+            "rtc_add_track",
+            "rtc_remove_track",
+            "rtc_stop_track",
+            "rtc_set_track_enabled",
+            "rtc_get_track_kind",
+            "rtc_attach_stream",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected RTC media function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn rtc_wasm_internal_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "rtc_parse_sdp",
+            "rtc_filter_codecs",
+            "rtc_set_bandwidth",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected WASM-internal RTC function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn rtc_create_peer_takes_ice_servers() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_create_peer").unwrap();
+        assert_eq!(f.params.len(), 1);
+        assert_eq!(f.params[0].name, "ice_servers");
+        match &f.return_type {
+            Type::Named(n) => assert_eq!(n, "i32"),
+            other => panic!("expected i32 return type, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rtc_set_local_description_takes_three_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_set_local_description").unwrap();
+        assert_eq!(f.params.len(), 3);
+        assert_eq!(f.params[0].name, "peer_id");
+        assert_eq!(f.params[1].name, "sdp_type");
+        assert_eq!(f.params[2].name, "sdp");
+    }
+
+    #[test]
+    fn rtc_add_ice_candidate_takes_three_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_add_ice_candidate").unwrap();
+        assert_eq!(f.params.len(), 3);
+        assert_eq!(f.params[0].name, "peer_id");
+        assert_eq!(f.params[1].name, "candidate");
+        assert_eq!(f.params[2].name, "sdp_mid");
+    }
+
+    #[test]
+    fn rtc_get_user_media_takes_audio_video_bools() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_get_user_media").unwrap();
+        assert_eq!(f.params.len(), 2);
+        assert_eq!(f.params[0].name, "audio");
+        assert_eq!(f.params[1].name, "video");
+        match &f.params[0].ty {
+            Type::Named(n) => assert_eq!(n, "bool"),
+            other => panic!("expected bool param type, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rtc_filter_codecs_takes_sdp_and_codecs_array() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_filter_codecs").unwrap();
+        assert_eq!(f.params.len(), 2);
+        assert_eq!(f.params[0].name, "sdp");
+        assert_eq!(f.params[1].name, "codecs");
+        match &f.params[1].ty {
+            Type::Array(_) => {},
+            other => panic!("expected array param type for codecs, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rtc_set_bandwidth_takes_sdp_and_kbps() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_set_bandwidth").unwrap();
+        assert_eq!(f.params.len(), 3);
+        assert_eq!(f.params[0].name, "sdp");
+        assert_eq!(f.params[1].name, "audio_kbps");
+        assert_eq!(f.params[2].name, "video_kbps");
+    }
+
+    #[test]
+    fn rtc_stats_type_has_get_method() {
+        let lib = stdlib();
+        let get = lib.lookup_method("RtcStats", "get")
+            .expect("RtcStats.get should exist");
+        assert_eq!(get.params.len(), 1);
+        assert_eq!(get.params[0].name, "key");
+        assert!(get.takes_self);
+        assert!(!get.self_mutable);
+    }
+
+    #[test]
+    fn rtc_functions_are_not_methods() {
+        let lib = stdlib();
+        let rtc_fns = [
+            "rtc_create_peer", "rtc_create_offer", "rtc_close",
+            "rtc_create_data_channel", "rtc_data_channel_send",
+            "rtc_get_user_media", "rtc_parse_sdp",
+        ];
+        for name in &rtc_fns {
+            let f = lib.lookup_fn(name).expect(name);
+            assert!(!f.takes_self, "{} should not take self", name);
+            assert!(!f.self_mutable, "{} should not be self_mutable", name);
+        }
+    }
+
+    #[test]
+    fn rtc_create_data_channel_returns_i32() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_create_data_channel").unwrap();
+        match &f.return_type {
+            Type::Named(n) => assert_eq!(n, "i32"),
+            other => panic!("expected i32 return, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn rtc_get_display_media_takes_no_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("rtc_get_display_media").unwrap();
+        assert_eq!(f.params.len(), 0);
     }
 }

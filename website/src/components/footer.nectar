@@ -18,9 +18,9 @@ component Footer() {
                 </div>
                 <div class="footer-col">
                     <h3>"Community"</h3>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang">"GitHub"</a>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/issues">"Issues"</a>
-                    <a href="https://github.com/BlakeBurnette/nectar-lang/discussions">"Discussions"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang">"GitHub"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/issues">"Issues"</a>
+                    <a href="https://github.com/HibiscusConsulting/nectar-lang/discussions">"Discussions"</a>
                 </div>
             </div>
             <div class="footer-bottom">

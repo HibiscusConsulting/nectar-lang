@@ -411,7 +411,55 @@ impl SsrCodegen {
                     self.generate_template_ssr(child, comp_name, false);
                 }
             }
+            TemplateNode::Outlet => {
+                self.line("__html += '<div id=\"__nectar_outlet\"></div>';");
+            }
+            TemplateNode::Layout(layout_node) => {
+                self.generate_layout_ssr(layout_node, comp_name);
+            }
         }
+    }
+
+    fn generate_layout_ssr(&mut self, node: &LayoutNode, comp_name: &str) {
+        let (tag, style, children) = match node {
+            LayoutNode::Stack { gap, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                ("section", format!("display:flex;flex-direction:column;gap:{}px", g), children)
+            }
+            LayoutNode::Row { gap, align, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                let a = align.as_deref().unwrap_or("stretch");
+                ("div", format!("display:flex;flex-direction:row;gap:{}px;align-items:{}", g, a), children)
+            }
+            LayoutNode::Grid { cols, rows: _, gap, children, .. } => {
+                let c = cols.as_deref().unwrap_or("1");
+                let g = gap.as_deref().unwrap_or("0");
+                ("div", format!("display:grid;grid-template-columns:repeat({},1fr);gap:{}px", c, g), children)
+            }
+            LayoutNode::Center { max_width, children, .. } => {
+                let mw = max_width.as_deref().unwrap_or("none");
+                ("div", format!("display:flex;justify-content:center;align-items:center;max-width:{}px;margin:0 auto", mw), children)
+            }
+            LayoutNode::Cluster { gap, children, .. } => {
+                let g = gap.as_deref().unwrap_or("0");
+                ("div", format!("display:flex;flex-wrap:wrap;gap:{}px", g), children)
+            }
+            LayoutNode::Sidebar { side, width, children, .. } => {
+                let s = side.as_deref().unwrap_or("left");
+                let w = width.as_deref().unwrap_or("300");
+                let cols = if s == "right" { format!("1fr {}px", w) } else { format!("{}px 1fr", w) };
+                ("div", format!("display:grid;grid-template-columns:{}", cols), children)
+            }
+            LayoutNode::Switcher { threshold, children, .. } => {
+                let t = threshold.as_deref().unwrap_or("600");
+                ("div", format!("display:flex;flex-wrap:wrap;--threshold:{}px", t), children)
+            }
+        };
+        self.line(&format!("__html += '<{} style=\"{}\">';", tag, self.escape_js_string(&style)));
+        for child in children {
+            self.generate_template_ssr(child, comp_name, false);
+        }
+        self.line(&format!("__html += '</{}>'; ", tag));
     }
 
     fn generate_router(&mut self, router: &RouterDef) {
@@ -621,5 +669,1133 @@ impl SsrCodegen {
 
     fn line(&mut self, s: &str) {
         self.emit(s);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::*;
+    use crate::critical_css::CriticalCssResult;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 0, 0)
+    }
+
+    fn empty_render() -> RenderBlock {
+        RenderBlock {
+            body: TemplateNode::Fragment(vec![]),
+            span: span(),
+        }
+    }
+
+    fn empty_component(name: &str) -> Component {
+        Component {
+            name: name.to_string(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: empty_render(),
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        }
+    }
+
+    fn make_css_result() -> CriticalCssResult {
+        CriticalCssResult {
+            critical_css: "body { margin: 0; }".to_string(),
+            deferred_css: ".lazy { display: none; }".to_string(),
+            skeleton_css: ".skeleton { opacity: 0.5; }".to_string(),
+        }
+    }
+
+    // ---- SsrCodegen::new() and generate() with empty program ----
+
+    #[test]
+    fn test_new_generates_empty_program() {
+        let mut codegen = SsrCodegen::new();
+        let program = Program { items: vec![] };
+        let output = codegen.generate(&program);
+
+        assert!(output.contains("// Nectar SSR Module"));
+        assert!(output.contains("'use strict';"));
+        assert!(output.contains("require('stream')"));
+        assert!(output.contains("__escapeHtml"));
+        assert!(output.contains("const __nectarState = {};"));
+        assert!(output.contains("function __serializeState()"));
+        assert!(output.contains("function renderApp(componentName, props, url)"));
+        assert!(output.contains("function renderToStream(componentName, props, url)"));
+        assert!(output.contains("module.exports.renderApp = renderApp;"));
+        assert!(output.contains("module.exports.renderToStream = renderToStream;"));
+        assert!(output.contains("module.exports.__serializeState = __serializeState;"));
+        // Without critical CSS, renderApp should use simple path
+        assert!(output.contains("return html + __serializeState();"));
+        // Should NOT contain critical CSS helpers
+        assert!(!output.contains("__criticalStyleTag"));
+        assert!(!output.contains("__deferredStyleLink"));
+    }
+
+    // ---- SsrCodegen::with_critical_css() and generate() ----
+
+    #[test]
+    fn test_with_critical_css_generates_critical_tags() {
+        let css_result = make_css_result();
+        let mut codegen = SsrCodegen::with_critical_css(css_result);
+        let program = Program { items: vec![] };
+        let output = codegen.generate(&program);
+
+        assert!(output.contains("// --- Critical CSS (inlined by nectar build --critical-css) ---"));
+        assert!(output.contains("const __nectarSkeletonCss ="));
+        assert!(output.contains("const __nectarCriticalCss ="));
+        assert!(output.contains("function __criticalStyleTag()"));
+        assert!(output.contains("data-nectar-critical"));
+        assert!(output.contains("function __deferredStyleLink()"));
+        assert!(output.contains("styles.css"));
+        assert!(output.contains("function __criticalLoadedScript()"));
+        assert!(output.contains("window.__nectarCriticalLoaded = true;"));
+        // renderApp should include critical CSS calls
+        assert!(output.contains("return __criticalStyleTag() + html + __serializeState() + __deferredStyleLink() + __criticalLoadedScript();"));
+        // Module exports should include critical CSS functions
+        assert!(output.contains("module.exports.__criticalStyleTag"));
+        assert!(output.contains("module.exports.__deferredStyleLink"));
+        assert!(output.contains("module.exports.__criticalLoadedScript"));
+    }
+
+    // ---- deferred_css_content() ----
+
+    #[test]
+    fn test_deferred_css_content_none() {
+        let codegen = SsrCodegen::new();
+        assert!(codegen.deferred_css_content().is_none());
+    }
+
+    #[test]
+    fn test_deferred_css_content_some() {
+        let codegen = SsrCodegen::with_critical_css(make_css_result());
+        let content = codegen.deferred_css_content();
+        assert!(content.is_some());
+        assert_eq!(content.unwrap(), ".lazy { display: none; }");
+    }
+
+    // ---- generate_component() ----
+
+    #[test]
+    fn test_generate_component_basic() {
+        let mut codegen = SsrCodegen::new();
+        let comp = empty_component("MyButton");
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("// === Component: MyButton ==="));
+        assert!(output.contains("function render_MyButton(props)"));
+        assert!(output.contains("let __html = '';"));
+        assert!(output.contains("return __html;"));
+        assert!(output.contains("module.exports.render_MyButton = render_MyButton;"));
+    }
+
+    #[test]
+    fn test_generate_component_with_props() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Card");
+        comp.props = vec![
+            Prop {
+                name: "title".to_string(),
+                ty: Type::Named("String".to_string()),
+                default: Some(Expr::StringLit("Hello".to_string())),
+            },
+            Prop {
+                name: "count".to_string(),
+                ty: Type::Named("i32".to_string()),
+                default: None,
+            },
+        ];
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("const title = props['title'] !== undefined ? props['title'] : 'Hello';"));
+        assert!(output.contains("const count = props['count'] !== undefined ? props['count'] : undefined;"));
+    }
+
+    #[test]
+    fn test_generate_component_with_state() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Counter");
+        comp.state = vec![StateField {
+            name: "count".to_string(),
+            ty: Some(Type::Named("i32".to_string())),
+            mutable: true,
+            secret: false,
+            atomic: false,
+            initializer: Expr::Integer(0),
+            ownership: Ownership::Owned,
+        }];
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("const count = 0;"));
+    }
+
+    #[test]
+    fn test_generate_component_with_element_and_attributes() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("App");
+        comp.render = RenderBlock {
+            body: TemplateNode::Element(Element {
+                tag: "div".to_string(),
+                attributes: vec![
+                    Attribute::Static {
+                        name: "class".to_string(),
+                        value: "container".to_string(),
+                    },
+                    Attribute::Dynamic {
+                        name: "id".to_string(),
+                        value: Expr::Ident("myId".to_string()),
+                    },
+                    Attribute::Aria {
+                        name: "aria-label".to_string(),
+                        value: Expr::StringLit("main content".to_string()),
+                    },
+                    Attribute::Role {
+                        value: "main".to_string(),
+                    },
+                    Attribute::Bind {
+                        property: "value".to_string(),
+                        signal: "inputVal".to_string(),
+                    },
+                    Attribute::EventHandler {
+                        event: "click".to_string(),
+                        handler: Expr::Ident("handleClick".to_string()),
+                    },
+                ],
+                children: vec![
+                    TemplateNode::TextLiteral("Hello World".to_string()),
+                    TemplateNode::Expression(Box::new(Expr::Ident("name".to_string()))),
+                ],
+                span: span(),
+            }),
+            span: span(),
+        };
+
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        // Root element has hydration marker
+        assert!(output.contains("data-nectar-hydrate=\"App\""));
+        // Static attribute
+        assert!(output.contains("class=\"container\""));
+        // Dynamic attribute
+        assert!(output.contains("id=\"' + __escapeHtml(myId) + '\""));
+        // Aria attribute
+        assert!(output.contains("aria-label=\"' + __escapeHtml('main content') + '\""));
+        // Role attribute
+        assert!(output.contains("role=\"main\""));
+        // Bind attribute
+        assert!(output.contains("value=\"' + __escapeHtml(inputVal) + '\""));
+        // Event handler NOT rendered
+        assert!(!output.contains("click"));
+        // Text literal
+        assert!(output.contains("Hello World"));
+        // Expression wrapped in span
+        assert!(output.contains("data-nectar-key"));
+        assert!(output.contains("__escapeHtml(name)"));
+        // Closing tag
+        assert!(output.contains("</div>"));
+    }
+
+    #[test]
+    fn test_generate_component_void_element() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Img");
+        comp.render = RenderBlock {
+            body: TemplateNode::Element(Element {
+                tag: "img".to_string(),
+                attributes: vec![Attribute::Static {
+                    name: "src".to_string(),
+                    value: "photo.png".to_string(),
+                }],
+                children: vec![],
+                span: span(),
+            }),
+            span: span(),
+        };
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        // Void element should NOT have closing tag
+        assert!(!output.contains("</img>"));
+        assert!(output.contains("src=\"photo.png\""));
+    }
+
+    #[test]
+    fn test_generate_component_link_node() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Nav");
+        comp.render = RenderBlock {
+            body: TemplateNode::Link {
+                to: Expr::StringLit("/about".to_string()),
+                children: vec![TemplateNode::TextLiteral("About".to_string())],
+            },
+            span: span(),
+        };
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("<a href=\""));
+        assert!(output.contains("__escapeHtml('/about')"));
+        assert!(output.contains("About"));
+        assert!(output.contains("</a>"));
+    }
+
+    #[test]
+    fn test_generate_component_fragment() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Frag");
+        comp.render = RenderBlock {
+            body: TemplateNode::Fragment(vec![
+                TemplateNode::TextLiteral("One".to_string()),
+                TemplateNode::TextLiteral("Two".to_string()),
+            ]),
+            span: span(),
+        };
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("One"));
+        assert!(output.contains("Two"));
+    }
+
+    #[test]
+    fn test_generate_component_with_skeleton() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Skel");
+        comp.skeleton = Some(SkeletonDef {
+            body: RenderBlock {
+                body: TemplateNode::TextLiteral("Loading...".to_string()),
+                span: span(),
+            },
+            span: span(),
+        });
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("data-nectar-skeleton=\"true\""));
+        assert!(output.contains("class=\"nectar-skeleton\""));
+        assert!(output.contains("Loading..."));
+        assert!(output.contains("nectar-skeleton-pulse"));
+    }
+
+    // ---- generate_store() ----
+
+    #[test]
+    fn test_generate_store() {
+        let mut codegen = SsrCodegen::new();
+        let store = StoreDef {
+            name: "AppStore".to_string(),
+            signals: vec![
+                StateField {
+                    name: "count".to_string(),
+                    ty: Some(Type::Named("i32".to_string())),
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                },
+                StateField {
+                    name: "name".to_string(),
+                    ty: Some(Type::Named("String".to_string())),
+                    mutable: true,
+                    secret: false,
+                    atomic: false,
+                    initializer: Expr::StringLit("default".to_string()),
+                    ownership: Ownership::Owned,
+                },
+            ],
+            actions: vec![],
+            computed: vec![
+                ComputedDef {
+                    name: "double_count".to_string(),
+                    return_type: Some(Type::Named("i32".to_string())),
+                    body: Block {
+                        stmts: vec![],
+                        span: span(),
+                    },
+                    span: span(),
+                },
+            ],
+            effects: vec![],
+            selectors: vec![],
+            is_pub: true,
+            span: span(),
+        };
+
+        codegen.generate_store(&store);
+        let output = &codegen.output;
+
+        assert!(output.contains("// === Store: AppStore ==="));
+        assert!(output.contains("__nectarState['AppStore'] = {};"));
+        assert!(output.contains("function __initStore_AppStore()"));
+        assert!(output.contains("__nectarState['AppStore']['count'] = 0;"));
+        assert!(output.contains("__nectarState['AppStore']['name'] = 'default';"));
+        assert!(output.contains("__initStore_AppStore();"));
+        assert!(output.contains("function __store_AppStore_get_double_count()"));
+        assert!(output.contains("return __nectarState['AppStore']['double_count'];"));
+    }
+
+    // ---- generate_router() ----
+
+    #[test]
+    fn test_generate_router_static_routes() {
+        let mut codegen = SsrCodegen::new();
+        let router = RouterDef {
+            name: "AppRouter".to_string(),
+            routes: vec![
+                RouteDef {
+                    path: "/".to_string(),
+                    params: vec![],
+                    component: "Home".to_string(),
+                    guard: None,
+                    transition: None,
+                    span: span(),
+                },
+                RouteDef {
+                    path: "/about".to_string(),
+                    params: vec![],
+                    component: "About".to_string(),
+                    guard: None,
+                    transition: None,
+                    span: span(),
+                },
+            ],
+            fallback: None,
+            layout: None,
+            transition: None,
+            span: span(),
+        };
+
+        codegen.generate_router(&router);
+        let output = &codegen.output;
+
+        assert!(output.contains("// === Router: AppRouter ==="));
+        assert!(output.contains("function render_AppRouter(props)"));
+        assert!(output.contains("const url = props.__url || '/';"));
+        assert!(output.contains("if (url === '/')"));
+        assert!(output.contains("__html = render_Home(props);"));
+        assert!(output.contains("else if (url === '/about')"));
+        assert!(output.contains("__html = render_About(props);"));
+        assert!(output.contains("return __html;"));
+        assert!(output.contains("module.exports.render_AppRouter = render_AppRouter;"));
+    }
+
+    #[test]
+    fn test_generate_router_parameterized_route() {
+        let mut codegen = SsrCodegen::new();
+        let router = RouterDef {
+            name: "R".to_string(),
+            routes: vec![RouteDef {
+                path: "/user/:id".to_string(),
+                params: vec!["id".to_string()],
+                component: "UserProfile".to_string(),
+                guard: None,
+                transition: None,
+                span: span(),
+            }],
+            fallback: None,
+            layout: None,
+            transition: None,
+            span: span(),
+        };
+
+        codegen.generate_router(&router);
+        let output = &codegen.output;
+
+        // Parameterized route should use regex
+        assert!(output.contains(".test(url)"));
+        assert!(output.contains("render_UserProfile(props)"));
+    }
+
+    #[test]
+    fn test_generate_router_with_guard() {
+        let mut codegen = SsrCodegen::new();
+        let router = RouterDef {
+            name: "R".to_string(),
+            routes: vec![RouteDef {
+                path: "/admin".to_string(),
+                params: vec![],
+                component: "Admin".to_string(),
+                guard: Some(Expr::Ident("isLoggedIn".to_string())),
+                transition: None,
+                span: span(),
+            }],
+            fallback: None,
+            layout: None,
+            transition: None,
+            span: span(),
+        };
+
+        codegen.generate_router(&router);
+        let output = &codegen.output;
+
+        assert!(output.contains("if (isLoggedIn)"));
+        assert!(output.contains("__html = render_Admin(props);"));
+    }
+
+    #[test]
+    fn test_generate_router_with_fallback() {
+        let mut codegen = SsrCodegen::new();
+        let router = RouterDef {
+            name: "R".to_string(),
+            routes: vec![RouteDef {
+                path: "/".to_string(),
+                params: vec![],
+                component: "Home".to_string(),
+                guard: None,
+                transition: None,
+                span: span(),
+            }],
+            fallback: Some(Box::new(TemplateNode::TextLiteral("Not Found".to_string()))),
+            layout: None,
+            transition: None,
+            span: span(),
+        };
+
+        codegen.generate_router(&router);
+        let output = &codegen.output;
+
+        assert!(output.contains("else {"));
+        assert!(output.contains("data-nectar-hydrate=\"__fallback\""));
+        assert!(output.contains("Not Found"));
+    }
+
+    // ---- expr_to_js() ----
+
+    #[test]
+    fn test_expr_to_js_integer() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.expr_to_js(&Expr::Integer(42)), "42");
+        assert_eq!(codegen.expr_to_js(&Expr::Integer(-7)), "-7");
+    }
+
+    #[test]
+    fn test_expr_to_js_float() {
+        let codegen = SsrCodegen::new();
+        let result = codegen.expr_to_js(&Expr::Float(3.14));
+        assert!(result.starts_with("3.14"));
+    }
+
+    #[test]
+    fn test_expr_to_js_string_lit() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.expr_to_js(&Expr::StringLit("hello".to_string())), "'hello'");
+    }
+
+    #[test]
+    fn test_expr_to_js_string_lit_with_escapes() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(
+            codegen.expr_to_js(&Expr::StringLit("it's a \"test\"\nline".to_string())),
+            "'it\\'s a \"test\"\\nline'"
+        );
+    }
+
+    #[test]
+    fn test_expr_to_js_bool() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.expr_to_js(&Expr::Bool(true)), "true");
+        assert_eq!(codegen.expr_to_js(&Expr::Bool(false)), "false");
+    }
+
+    #[test]
+    fn test_expr_to_js_ident() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.expr_to_js(&Expr::Ident("foo".to_string())), "foo");
+    }
+
+    #[test]
+    fn test_expr_to_js_self_expr() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.expr_to_js(&Expr::SelfExpr), "this");
+    }
+
+    #[test]
+    fn test_expr_to_js_binary_all_ops() {
+        let codegen = SsrCodegen::new();
+        let left = Box::new(Expr::Ident("a".to_string()));
+        let right = Box::new(Expr::Ident("b".to_string()));
+
+        let cases = vec![
+            (BinOp::Add, "(a + b)"),
+            (BinOp::Sub, "(a - b)"),
+            (BinOp::Mul, "(a * b)"),
+            (BinOp::Div, "(a / b)"),
+            (BinOp::Mod, "(a % b)"),
+            (BinOp::Eq, "(a === b)"),
+            (BinOp::Neq, "(a !== b)"),
+            (BinOp::Lt, "(a < b)"),
+            (BinOp::Gt, "(a > b)"),
+            (BinOp::Lte, "(a <= b)"),
+            (BinOp::Gte, "(a >= b)"),
+            (BinOp::And, "(a && b)"),
+            (BinOp::Or, "(a || b)"),
+        ];
+
+        for (op, expected) in cases {
+            let expr = Expr::Binary {
+                op,
+                left: left.clone(),
+                right: right.clone(),
+            };
+            assert_eq!(codegen.expr_to_js(&expr), expected);
+        }
+    }
+
+    #[test]
+    fn test_expr_to_js_unary_neg() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Integer(5)),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(-5)");
+    }
+
+    #[test]
+    fn test_expr_to_js_unary_not() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Unary {
+            op: UnaryOp::Not,
+            operand: Box::new(Expr::Bool(true)),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(!true)");
+    }
+
+    #[test]
+    fn test_expr_to_js_field_access() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Ident("user".to_string())),
+            field: "name".to_string(),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "user.name");
+    }
+
+    #[test]
+    fn test_expr_to_js_method_call() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("list".to_string())),
+            method: "push".to_string(),
+            args: vec![Expr::Integer(1), Expr::Integer(2)],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "list.push(1, 2)");
+    }
+
+    #[test]
+    fn test_expr_to_js_method_call_no_args() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("obj".to_string())),
+            method: "toString".to_string(),
+            args: vec![],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "obj.toString()");
+    }
+
+    #[test]
+    fn test_expr_to_js_fn_call() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("alert".to_string())),
+            args: vec![Expr::StringLit("hi".to_string())],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "alert('hi')");
+    }
+
+    #[test]
+    fn test_expr_to_js_fn_call_no_args() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("doStuff".to_string())),
+            args: vec![],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "doStuff()");
+    }
+
+    #[test]
+    fn test_expr_to_js_index() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Index {
+            object: Box::new(Expr::Ident("arr".to_string())),
+            index: Box::new(Expr::Integer(3)),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "arr[3]");
+    }
+
+    #[test]
+    fn test_expr_to_js_if_with_else() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                span: span(),
+            },
+            else_block: Some(Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(2))],
+                span: span(),
+            }),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(true ? 1 : 2)");
+    }
+
+    #[test]
+    fn test_expr_to_js_if_without_else() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                span: span(),
+            },
+            else_block: None,
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(true ? 1 : undefined)");
+    }
+
+    #[test]
+    fn test_expr_to_js_if_empty_blocks() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: Block {
+                stmts: vec![],
+                span: span(),
+            },
+            else_block: Some(Block {
+                stmts: vec![],
+                span: span(),
+            }),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(true ? undefined : undefined)");
+    }
+
+    #[test]
+    fn test_expr_to_js_struct_init() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::StructInit {
+            name: "Point".to_string(),
+            fields: vec![
+                ("x".to_string(), Expr::Integer(10)),
+                ("y".to_string(), Expr::Integer(20)),
+            ],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "/* Point */ { x: 10, y: 20 }");
+    }
+
+    #[test]
+    fn test_expr_to_js_closure() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Closure {
+            params: vec![
+                ("x".to_string(), Some(Type::Named("i32".to_string()))),
+                ("y".to_string(), None),
+            ],
+            body: Box::new(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(Expr::Ident("x".to_string())),
+                right: Box::new(Expr::Ident("y".to_string())),
+            }),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(x, y) => (x + y)");
+    }
+
+    #[test]
+    fn test_expr_to_js_closure_no_params() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Closure {
+            params: vec![],
+            body: Box::new(Expr::Integer(42)),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "() => 42");
+    }
+
+    #[test]
+    fn test_expr_to_js_fallback() {
+        let codegen = SsrCodegen::new();
+        // Use an unsupported expression type to test the fallback branch
+        let expr = Expr::Await(Box::new(Expr::Ident("promise".to_string())));
+        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+    }
+
+    #[test]
+    fn test_expr_to_js_match_fallback() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("x".to_string())),
+            arms: vec![],
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+    }
+
+    #[test]
+    fn test_expr_to_js_for_fallback() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::For {
+            binding: "x".to_string(),
+            iterator: Box::new(Expr::Ident("items".to_string())),
+            body: Block { stmts: vec![], span: span() },
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+    }
+
+    // ---- stmt_to_js() ----
+
+    #[test]
+    fn test_stmt_to_js_expr() {
+        let codegen = SsrCodegen::new();
+        let stmt = Stmt::Expr(Expr::Integer(99));
+        assert_eq!(codegen.stmt_to_js(&stmt), "99");
+    }
+
+    #[test]
+    fn test_stmt_to_js_return_some() {
+        let codegen = SsrCodegen::new();
+        let stmt = Stmt::Return(Some(Expr::StringLit("ok".to_string())));
+        assert_eq!(codegen.stmt_to_js(&stmt), "'ok'");
+    }
+
+    #[test]
+    fn test_stmt_to_js_return_none() {
+        let codegen = SsrCodegen::new();
+        let stmt = Stmt::Return(None);
+        assert_eq!(codegen.stmt_to_js(&stmt), "undefined");
+    }
+
+    #[test]
+    fn test_stmt_to_js_let() {
+        let codegen = SsrCodegen::new();
+        let stmt = Stmt::Let {
+            name: "x".to_string(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Integer(1),
+            ownership: Ownership::Owned,
+        };
+        assert_eq!(codegen.stmt_to_js(&stmt), "undefined");
+    }
+
+    // ---- route_path_to_regex() ----
+
+    #[test]
+    fn test_route_path_to_regex_static() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.route_path_to_regex("/about"), "/^\\/about$/");
+    }
+
+    #[test]
+    fn test_route_path_to_regex_parameterized() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.route_path_to_regex("/user/:id"), "/^\\/user\\/[^/]+$/");
+    }
+
+    #[test]
+    fn test_route_path_to_regex_multiple_params() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(
+            codegen.route_path_to_regex("/org/:orgId/user/:userId"),
+            "/^\\/org\\/[^/]+\\/user\\/[^/]+$/"
+        );
+    }
+
+    #[test]
+    fn test_route_path_to_regex_wildcard() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.route_path_to_regex("/admin/*"), "/^\\/admin\\/.*$/");
+    }
+
+    #[test]
+    fn test_route_path_to_regex_root() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.route_path_to_regex("/"), "/^$/");
+    }
+
+    // ---- escape_js_string() ----
+
+    #[test]
+    fn test_escape_js_string_backslash() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.escape_js_string("a\\b"), "a\\\\b");
+    }
+
+    #[test]
+    fn test_escape_js_string_quote() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.escape_js_string("it's"), "it\\'s");
+    }
+
+    #[test]
+    fn test_escape_js_string_newline() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.escape_js_string("a\nb"), "a\\nb");
+    }
+
+    #[test]
+    fn test_escape_js_string_carriage_return() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(codegen.escape_js_string("a\rb"), "a\\rb");
+    }
+
+    #[test]
+    fn test_escape_js_string_combined() {
+        let codegen = SsrCodegen::new();
+        assert_eq!(
+            codegen.escape_js_string("line1\nline2\r\\end'"),
+            "line1\\nline2\\r\\\\end\\'"
+        );
+    }
+
+    // ---- LazyComponent handled as Component ----
+
+    #[test]
+    fn test_lazy_component_in_program() {
+        let mut codegen = SsrCodegen::new();
+        let program = Program {
+            items: vec![Item::LazyComponent(LazyComponentDef {
+                component: empty_component("LazyWidget"),
+                span: span(),
+            })],
+        };
+        let output = codegen.generate(&program);
+        assert!(output.contains("function render_LazyWidget(props)"));
+        assert!(output.contains("module.exports.render_LazyWidget"));
+    }
+
+    // ---- Store in full program ----
+
+    #[test]
+    fn test_store_in_program() {
+        let mut codegen = SsrCodegen::new();
+        let program = Program {
+            items: vec![Item::Store(StoreDef {
+                name: "TestStore".to_string(),
+                signals: vec![],
+                actions: vec![],
+                computed: vec![],
+                effects: vec![],
+                selectors: vec![],
+                is_pub: false,
+                span: span(),
+            })],
+        };
+        let output = codegen.generate(&program);
+        assert!(output.contains("// === Store: TestStore ==="));
+    }
+
+    // ---- Router in full program ----
+
+    #[test]
+    fn test_router_in_program() {
+        let mut codegen = SsrCodegen::new();
+        let program = Program {
+            items: vec![Item::Router(RouterDef {
+                name: "MainRouter".to_string(),
+                routes: vec![],
+                fallback: None,
+                layout: None,
+                transition: None,
+                span: span(),
+            })],
+        };
+        let output = codegen.generate(&program);
+        assert!(output.contains("// === Router: MainRouter ==="));
+    }
+
+    // ---- Unhandled item types are skipped ----
+
+    #[test]
+    fn test_unhandled_items_skipped() {
+        let mut codegen = SsrCodegen::new();
+        let program = Program {
+            items: vec![Item::Struct(StructDef {
+                name: "Foo".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                fields: vec![],
+                trait_bounds: vec![],
+                is_pub: false,
+                span: span(),
+            })],
+        };
+        let output = codegen.generate(&program);
+        // Should still have boilerplate but no component/store/router
+        assert!(output.contains("'use strict';"));
+        assert!(!output.contains("// === Component"));
+        assert!(!output.contains("// === Store"));
+        assert!(!output.contains("// === Router"));
+    }
+
+    // ---- next_key() increments ----
+
+    #[test]
+    fn test_next_key_increments() {
+        let mut codegen = SsrCodegen::new();
+        assert_eq!(codegen.next_key(), 0);
+        assert_eq!(codegen.next_key(), 1);
+        assert_eq!(codegen.next_key(), 2);
+    }
+
+    // ---- Indentation ----
+
+    #[test]
+    fn test_indentation() {
+        let mut codegen = SsrCodegen::new();
+        codegen.indent = 2;
+        codegen.line("test");
+        assert!(codegen.output.contains("    test\n")); // 2 * 2 spaces
+    }
+
+    // ---- Nested elements (children rendered, closing tag) ----
+
+    #[test]
+    fn test_nested_elements() {
+        let mut codegen = SsrCodegen::new();
+        let mut comp = empty_component("Nested");
+        comp.render = RenderBlock {
+            body: TemplateNode::Element(Element {
+                tag: "div".to_string(),
+                attributes: vec![],
+                children: vec![TemplateNode::Element(Element {
+                    tag: "span".to_string(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::TextLiteral("inner".to_string())],
+                    span: span(),
+                })],
+                span: span(),
+            }),
+            span: span(),
+        };
+        codegen.generate_component(&comp);
+        let output = &codegen.output;
+
+        assert!(output.contains("<div"));
+        assert!(output.contains("<span"));
+        assert!(output.contains("inner"));
+        assert!(output.contains("</span>"));
+        assert!(output.contains("</div>"));
+    }
+
+    // ---- All void elements don't get closing tags ----
+
+    #[test]
+    fn test_all_void_elements() {
+        let void_tags = [
+            "area", "base", "br", "col", "embed", "hr", "img",
+            "input", "link", "meta", "param", "source", "track", "wbr",
+        ];
+        for tag in &void_tags {
+            let mut codegen = SsrCodegen::new();
+            let mut comp = empty_component("VoidTest");
+            comp.render = RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: tag.to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: span(),
+                }),
+                span: span(),
+            };
+            codegen.generate_component(&comp);
+            let output = &codegen.output;
+            assert!(
+                !output.contains(&format!("</{}>", tag)),
+                "void element {} should not have a closing tag",
+                tag
+            );
+        }
+    }
+
+    // ---- Critical CSS escaping in generate() ----
+
+    #[test]
+    fn test_critical_css_escapes_special_chars() {
+        let css_result = CriticalCssResult {
+            critical_css: "body { font-family: 'Helvetica'; }".to_string(),
+            deferred_css: "".to_string(),
+            skeleton_css: "div {\n  color: red;\n}".to_string(),
+        };
+        let mut codegen = SsrCodegen::with_critical_css(css_result);
+        let program = Program { items: vec![] };
+        let output = codegen.generate(&program);
+
+        // Single quotes and newlines should be escaped in JS string constants
+        assert!(output.contains("__nectarSkeletonCss = '"));
+        assert!(output.contains("__nectarCriticalCss = '"));
+        // Newlines from skeleton_css should be escaped
+        assert!(output.contains("\\n"));
+    }
+
+    // ---- expr_to_js with Return stmt in if block ----
+
+    #[test]
+    fn test_expr_to_js_if_with_return_stmt() {
+        let codegen = SsrCodegen::new();
+        let expr = Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: Block {
+                stmts: vec![Stmt::Return(Some(Expr::Integer(42)))],
+                span: span(),
+            },
+            else_block: None,
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "(true ? 42 : undefined)");
+    }
+
+    // ---- Complex nested expression ----
+
+    #[test]
+    fn test_expr_to_js_complex_nested() {
+        let codegen = SsrCodegen::new();
+        // user.items[0].name
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Index {
+                object: Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("user".to_string())),
+                    field: "items".to_string(),
+                }),
+                index: Box::new(Expr::Integer(0)),
+            }),
+            field: "name".to_string(),
+        };
+        assert_eq!(codegen.expr_to_js(&expr), "user.items[0].name");
+    }
+
+    // ---- emit_escape_util ----
+
+    #[test]
+    fn test_emit_escape_util_content() {
+        let mut codegen = SsrCodegen::new();
+        codegen.emit_escape_util();
+        let output = &codegen.output;
+
+        assert!(output.contains("function __escapeHtml(str)"));
+        assert!(output.contains("if (str == null) return '';"));
+        assert!(output.contains(".replace(/&/g, '&amp;')"));
+        assert!(output.contains(".replace(/</g, '&lt;')"));
+        assert!(output.contains(".replace(/>/g, '&gt;')"));
+        assert!(output.contains(".replace(/\"/g, '&quot;')"));
+        assert!(output.contains(".replace(/'/g, '&#x27;');"));
     }
 }

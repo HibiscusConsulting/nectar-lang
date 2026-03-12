@@ -21,7 +21,22 @@ This document is the complete reference for the Nectar programming language. It 
 13. [Templates](#templates)
 14. [Agents](#agents)
 15. [Routers](#routers)
-16. [Testing](#testing)
+16. [Contracts](#contracts)
+17. [Pages](#pages)
+18. [Forms](#forms)
+19. [Channels](#channels)
+20. [Auth](#auth)
+21. [Payment](#payment)
+22. [Upload](#upload)
+23. [Db](#db)
+24. [Cache](#cache)
+25. [Embed](#embed)
+26. [Pdf](#pdf)
+27. [App (PWA)](#app-pwa)
+28. [Theme](#theme)
+29. [Breakpoints](#breakpoints)
+30. [Animations](#animations)
+31. [Testing](#testing)
 
 ---
 
@@ -47,14 +62,19 @@ The following identifiers are reserved keywords in Nectar:
 | **Control Flow** | `if`, `else`, `match`, `for`, `in`, `while`, `return`, `yield` |
 | **Async/Concurrency** | `async`, `await`, `fetch`, `spawn`, `channel`, `select`, `parallel`, `stream`, `suspend` |
 | **AI** | `prompt`, `tool` |
-| **Routing** | `route`, `fallback`, `guard`, `navigate` |
-| **Components** | `render`, `style`, `transition`, `animate`, `skeleton` |
+| **Routing** | `route`, `fallback`, `guard`, `navigate`, `layout`, `outlet` |
+| **Components** | `render`, `style`, `transition`, `animate` |
+| **Accessibility** | `a11y`, `manual`, `hybrid` |
 | **Stores** | `action`, `effect`, `computed` |
+| **Domain Keywords** | `page`, `form`, `field`, `contract`, `auth`, `payment`, `upload`, `db`, `cache`, `embed`, `pdf`, `app`, `theme`, `crypto` |
+| **Domain Sub-blocks** | `meta`, `schema`, `permissions`, `manifest`, `offline`, `push`, `query`, `mutation`, `gesture`, `breakpoint`, `fluid` |
+| **Animations** | `spring`, `keyframes`, `stagger` |
 | **Error Handling** | `try`, `catch` |
 | **Testing** | `assert`, `assert_eq`, `expect` |
 | **Values** | `true`, `false`, `self`, `Self` |
-| **Types** | `i32`, `i64`, `f32`, `f64`, `u32`, `u64`, `bool`, `String` |
-| **Other** | `as`, `where`, `derive`, `Link`, `Fragment` |
+| **Types** | `i32`, `i64`, `f32`, `f64`, `u32`, `u64`, `bool`, `String`, `secret` |
+| **Other** | `as`, `where`, `derive`, `Link`, `must_use`, `chunk`, `atomic`, `virtual` |
+| **Component Blocks** | `skeleton`, `error_boundary`, `Fragment` (parsed as special identifiers, not reserved tokens) |
 
 ### Operators and Symbols
 
@@ -602,6 +622,77 @@ component List<T>(items: [T]) where T: Display {
     }
 }
 ```
+
+### Accessibility (a11y)
+
+By default, all components get automatic accessibility support — the compiler injects ARIA attributes, roles, keyboard handlers, and focus styles.
+
+```nectar
+// Default: a11y auto (compiler generates everything)
+component SearchBox(placeholder: String) {
+    render {
+        <input type="text" placeholder={placeholder} />
+    }
+}
+
+// Opt out entirely
+component CustomWidget() {
+    a11y manual;
+    render {
+        <div role="slider" aria-valuenow="50" tabindex="0">
+            // Developer handles all a11y
+        </div>
+    }
+}
+
+// Hybrid: developer overrides specific attrs, compiler fills the rest
+component ToggleButton(active: bool) {
+    a11y hybrid;
+    render {
+        <button aria-pressed={active}>
+            // Compiler auto-adds focus styles, keyboard handling
+        </button>
+    }
+}
+```
+
+### Layout Primitives
+
+Language-level layout constructs that compile to semantic HTML + CSS at build time. Zero runtime cost — pure compile-time sugar.
+
+```nectar
+component Dashboard() {
+    render {
+        <Stack gap="24">
+            <Row gap="16" align="center">
+                <h1>"Dashboard"</h1>
+                <Button label="Refresh" />
+            </Row>
+            <Grid cols="3" gap="16">
+                <Card title="Users" />
+                <Card title="Revenue" />
+                <Card title="Orders" />
+            </Grid>
+            <Sidebar side="left" width="250">
+                <NavMenu />
+                <MainContent />
+            </Sidebar>
+        </Stack>
+    }
+}
+```
+
+Available layout primitives:
+
+| Primitive | Compiles to | Attributes |
+|---|---|---|
+| `<Stack>` | `<section>` with `flex-direction:column` | `gap` |
+| `<Row>` | `<div>` with `flex-direction:row` | `gap`, `align` |
+| `<Grid>` | `<div>` with `display:grid` | `cols`, `rows`, `gap` |
+| `<Center>` | `<div>` with `margin:0 auto` | `max_width` |
+| `<Cluster>` | `<div>` with `flex-wrap:wrap` | `gap` |
+| `<Sidebar>` | `<div>` with `flex` + sidebar sizing | `side`, `width` |
+| `<Switcher>` | `<div>` with `flex-wrap` + threshold | `threshold` |
 
 ### Lazy Components
 
@@ -1615,6 +1706,46 @@ The fallback component renders when no route matches:
 fallback => NotFound,
 ```
 
+### Router Layouts
+
+Persistent layout shells where only the outlet content swaps on navigation:
+
+```nectar
+router AppRouter {
+    layout {
+        <Stack>
+            <NavBar />
+            <Outlet />
+            <Footer />
+        </Stack>
+    }
+
+    route "/" => Home,
+    route "/about" => About,
+    route "/settings" => Settings,
+    fallback => NotFound,
+}
+```
+
+`<Outlet />` marks where routed content renders. The surrounding layout (NavBar, Footer) persists across navigation — no re-render, no flicker.
+
+### View Transitions
+
+Animate between page navigations with the `transition` keyword:
+
+```nectar
+router AppRouter {
+    transition "fade";  // Default transition for all routes
+
+    route "/" => Home,
+    route "/about" => About transition "slide-left",  // Per-route override
+    route "/settings" => Settings,
+    fallback => NotFound,
+}
+```
+
+Transitions are WASM-internal — the animation math and DOM orchestration happen through the command buffer.
+
 ### Programmatic Navigation
 
 Navigate from code:
@@ -1622,6 +1753,530 @@ Navigate from code:
 ```nectar
 navigate("/user/42");
 ```
+
+---
+
+## Contracts
+
+Contracts define type-safe API boundaries. The compiler validates that API responses match the contract at compile time, and the runtime validates at the wire level.
+
+### Contract Definition
+
+```nectar
+contract UserResponse {
+    id: i32,
+    name: String,
+    email: String,
+    role: enum { Admin, User, Guest },
+    avatar: String?,    // ? = nullable (Option<String>)
+}
+```
+
+Fields can be any type, including inline enums. The `?` suffix makes a field nullable (wraps in `Option<T>`).
+
+Contracts can be bound to `channel` definitions (`channel ChatRoom -> ChatMessage`) and `cache` queries (`query get_users() : fetch(...) -> UserResponse`).
+
+---
+
+## Pages
+
+Pages are SEO-optimized components with meta tags, structured data, and server-rendering support.
+
+### Page Definition
+
+```nectar
+page BlogPost(slug: String) {
+    signal post: Option<Post> = None;
+
+    meta {
+        title: f"Blog - {self.post.title}",
+        description: self.post.excerpt,
+        og_image: self.post.cover_image,
+        og_type: "article",
+    }
+
+    schema {
+        type: "Article",
+        headline: self.post.title,
+        author: self.post.author,
+    }
+
+    async fn load(&mut self) {
+        self.post = Some(await fetch(f"/api/posts/{slug}").json());
+    }
+
+    style { .post { max-width: "800px"; margin: "0 auto"; } }
+
+    render {
+        <article class="post">
+            <h1>{self.post.title}</h1>
+            <p>{self.post.body}</p>
+        </article>
+    }
+}
+```
+
+### Page Blocks
+
+- **`meta`** — title, description, Open Graph tags, canonical URL
+- **`schema`** — JSON-LD structured data (auto-generated)
+- **`permissions`** — capability restrictions
+- **`gesture`** — gesture handlers (swipe, pinch, etc.)
+- **state, signals, methods, style, render** — same as components
+
+Build modes: `nectar build --ssr` for server rendering, `nectar build --ssg` for static generation.
+
+---
+
+## Forms
+
+Declarative forms with built-in validation. No form libraries needed.
+
+### Form Definition
+
+```nectar
+form ContactForm {
+    field name: String {
+        label: "Full Name",
+        placeholder: "Jane Doe",
+        required,
+        min_length: 2,
+        max_length: 100,
+    }
+
+    field email: String {
+        label: "Email",
+        required,
+        email,
+    }
+
+    field website: Option<String> {
+        label: "Website",
+        url,
+    }
+
+    async fn on_submit(&mut self) {
+        await fetch("/api/contact", { method: "POST", body: self.values() });
+    }
+
+    render {
+        <form on:submit={self.on_submit}>
+            {self.render_fields()}
+            <button type="submit" disabled={!self.is_valid()}>"Send"</button>
+        </form>
+    }
+}
+```
+
+### Built-in Validators
+
+| Validator | Syntax | Purpose |
+|---|---|---|
+| `required` | `required` or `required: "message"` | Field must not be empty |
+| `min_length` | `min_length: 2` | Minimum string length |
+| `max_length` | `max_length: 100` | Maximum string length |
+| `pattern` | `pattern: "^[a-z]+$"` | Regex pattern match |
+| `email` | `email` | Valid email format |
+| `url` | `url` | Valid URL format |
+| `validate` | `validate: custom_fn` | Custom validation function |
+
+### Automatic Features
+
+- `self.is_valid()` — returns true when all fields pass validation
+- `self.values()` — returns form data
+- `self.reset()` — resets all fields
+- Dirty tracking and per-field error state are automatic
+
+---
+
+## Channels
+
+WebSocket connections with automatic reconnection and type-safe messages.
+
+### Channel Definition
+
+```nectar
+channel ChatRoom -> ChatMessage {
+    url: f"wss://api.example.com/ws/chat",
+    reconnect: true,
+    heartbeat: 30000,
+
+    on_connect {
+        println("Connected");
+    }
+
+    on_message {
+        ChatStore::add_message(message);
+    }
+
+    on_disconnect {
+        println("Disconnected");
+    }
+
+    fn send_text(&mut self, text: String) {
+        self.send(ChatMessage { user: "me", text: text, timestamp: now() });
+    }
+}
+```
+
+### Channel Options
+
+- **`-> ContractName`** — binds message types to a contract
+- **`url`** — WebSocket URL (expression)
+- **`reconnect`** — auto-reconnect on disconnect (boolean)
+- **`heartbeat`** — keepalive interval in milliseconds (integer)
+- **Lifecycle handlers** — `on_connect`, `on_message`, `on_disconnect`
+- **Methods** — regular `fn` or `async fn`
+
+---
+
+## Auth
+
+Declarative OAuth/authentication with session management.
+
+### Auth Definition
+
+```nectar
+auth AppAuth {
+    provider "google" {
+        client_id: env("GOOGLE_CLIENT_ID"),
+        scopes: ["openid", "email", "profile"],
+    }
+
+    provider "github" {
+        client_id: env("GITHUB_CLIENT_ID"),
+        scopes: ["user:email"],
+    }
+
+    session: "cookie",
+
+    fn on_login(&mut self) { navigate("/dashboard"); }
+    fn on_logout(&mut self) { navigate("/"); }
+    fn on_error(&mut self) { println("Auth error"); }
+}
+```
+
+### Auth Options
+
+- **`provider "name" { ... }`** — OAuth provider config with `client_id` and `scopes`
+- **`session`** — session storage strategy (`"cookie"` or `"local"`)
+- **Lifecycle hooks** — `on_login`, `on_logout`, `on_error`
+
+---
+
+## Payment
+
+PCI-compliant payment processing via sandboxed iframes.
+
+### Payment Definition
+
+```nectar
+payment Checkout {
+    provider: "stripe",
+    public_key: env("STRIPE_PUBLIC_KEY"),
+    sandbox: true,
+
+    async fn on_success(&mut self) {
+        await fetch("/api/orders/confirm", { method: "POST" });
+        navigate("/thank-you");
+    }
+
+    fn on_error(&mut self) {
+        println("Payment failed");
+    }
+}
+```
+
+Card data never touches component state. The compiler guarantees payment data isolation through sandboxed iframes.
+
+---
+
+## Upload
+
+File uploads with progress tracking, validation, and chunked transfer.
+
+### Upload Definition
+
+```nectar
+upload AvatarUpload {
+    endpoint: "/api/upload/avatar",
+    max_size: 5242880,
+    accept: ["image/png", "image/jpeg", "image/webp"],
+    chunked: true,
+
+    fn on_progress(&mut self) { /* track progress */ }
+    async fn on_complete(&mut self) { /* handle result */ }
+    fn on_error(&mut self) { /* handle error */ }
+}
+```
+
+### Upload Options
+
+- **`endpoint`** — upload URL (expression)
+- **`max_size`** — maximum file size in bytes (integer)
+- **`accept`** — allowed MIME types (string array)
+- **`chunked`** — enable chunked/resumable uploads (boolean)
+- **Lifecycle hooks** — `on_progress`, `on_complete`, `on_error`
+
+---
+
+## Db
+
+Client-side database abstraction over IndexedDB with declarative schema.
+
+### Db Definition
+
+```nectar
+db AppDatabase {
+    version: 1,
+
+    store "users" {
+        key: "id",
+        index "by_email" => "email",
+        index "by_name" => "name",
+    }
+
+    store "posts" {
+        key: "id",
+        index "by_author" => "authorId",
+    }
+}
+```
+
+### Store Options
+
+- **`version`** — schema version (integer, triggers migration on change)
+- **`store "name" { ... }`** — object store definition
+  - **`key`** — primary key field (string, defaults to `"id"`)
+  - **`index "name" => "field"`** — index definitions
+
+---
+
+## Cache
+
+Data caching with stale-while-revalidate, TTL, and optimistic updates.
+
+### Cache Definition
+
+```nectar
+cache ApiCache {
+    strategy: "stale-while-revalidate",
+    ttl: 300,
+    persist: true,
+    max_entries: 100,
+
+    query get_users() : fetch("/api/users") -> UserResponse {
+        ttl: 60,
+        stale: 30,
+        invalidate_on: ["user_created"],
+    }
+
+    mutation create_user(data: UserInput) : fetch("/api/users", { method: "POST", body: data }) {
+        optimistic: true,
+        rollback_on_error: true,
+        invalidate: ["get_users"],
+    }
+}
+```
+
+### Query Options
+
+- **`ttl`** — time-to-live in seconds (integer)
+- **`stale`** — stale-while-revalidate window (integer)
+- **`invalidate_on`** — events that bust the cache (string array)
+- **`-> ContractName`** — type binding for response validation
+
+### Mutation Options
+
+- **`optimistic`** — apply changes before server confirms (boolean)
+- **`rollback_on_error`** — revert optimistic update on failure (boolean)
+- **`invalidate`** — queries to refetch after mutation (string array)
+
+---
+
+## Embed
+
+Third-party script embedding with security controls.
+
+### Embed Definition
+
+```nectar
+embed Analytics {
+    src: "https://analytics.example.com/script.js",
+    loading: "defer",
+    sandbox: true,
+    integrity: "sha384-abc123...",
+
+    permissions {
+        allow: ["analytics"],
+        deny: ["dom_access", "network"],
+    }
+}
+```
+
+### Embed Options
+
+- **`src`** — script URL (required, expression)
+- **`loading`** — load strategy: `"defer"`, `"async"`, `"lazy"`, `"idle"`
+- **`sandbox`** — isolate script from your DOM (boolean)
+- **`integrity`** — subresource integrity hash (expression)
+- **`permissions`** — capability restrictions
+
+---
+
+## Pdf
+
+PDF generation from render blocks.
+
+### Pdf Definition
+
+```nectar
+pdf Invoice {
+    page_size: "A4",
+    orientation: "portrait",
+    margins: "2cm",
+
+    render {
+        <div class="invoice">
+            <h1>"Invoice #1234"</h1>
+            <table><tr><td>"Item"</td><td>"$100"</td></tr></table>
+        </div>
+    }
+}
+```
+
+Trigger download: `Invoice::download("invoice.pdf");`
+
+---
+
+## App (PWA)
+
+Progressive Web App configuration.
+
+### App Definition
+
+```nectar
+app MyApp {
+    manifest {
+        name: "My Application",
+        short_name: "MyApp",
+        start_url: "/",
+        theme_color: "#4a90d9",
+        display: "standalone",
+    }
+
+    offline {
+        precache: ["/", "/about", "/offline"],
+        strategy: "cache-first",
+        fallback: OfflinePage,
+    }
+
+    push {
+        vapid_key: env("VAPID_PUBLIC_KEY"),
+        on_message: handle_push,
+    }
+}
+```
+
+### App Blocks
+
+- **`manifest`** — key-value pairs for the web app manifest
+- **`offline`** — `precache` (URL array), `strategy` (string), `fallback` (page name)
+- **`push`** — `vapid_key` (expression), `on_message` (function name)
+
+---
+
+## Theme
+
+Design tokens for light/dark modes.
+
+### Theme Definition
+
+```nectar
+theme AppTheme {
+    light {
+        bg: "#ffffff",
+        text: "#1a1a1a",
+        primary: "#4a90d9",
+    }
+
+    dark {
+        bg: "#1a1a1a",
+        text: "#e0e0e0",
+        primary: "#6ab0ff",
+    }
+}
+```
+
+The compiler generates CSS custom properties (`--bg`, `--text`, `--primary`) and a toggle mechanism. Respects `prefers-color-scheme` by default.
+
+Usage in styles: `background: var(--bg);`
+Toggle: `AppTheme::toggle();` or `AppTheme::set("dark");`
+
+---
+
+## Breakpoints
+
+Responsive design breakpoints.
+
+### Breakpoints Definition
+
+```nectar
+breakpoints {
+    mobile: 320,
+    tablet: 768,
+    desktop: 1024,
+    wide: 1440,
+}
+```
+
+Values are pixel widths (integers). Use in styles as `@mobile`, `@tablet`, `@desktop`.
+
+---
+
+## Animations
+
+Three animation primitives.
+
+### Spring
+
+Physics-based animation with configurable stiffness, damping, and mass:
+
+```nectar
+spring MenuSlide {
+    stiffness: 200,
+    damping: 20,
+    mass: 1,
+    properties: ["transform", "opacity"],
+}
+```
+
+### Keyframes
+
+CSS keyframe animations with percentage-based frames:
+
+```nectar
+keyframes FadeIn {
+    0% { opacity: "0", transform: "translateY(10px)" }
+    100% { opacity: "1", transform: "translateY(0)" }
+    duration: "0.3s",
+    easing: "ease-out",
+}
+```
+
+### Stagger
+
+Stagger an animation across multiple elements:
+
+```nectar
+stagger ListReveal {
+    animation: FadeIn,
+    delay: "50ms",
+    selector: ".list-item",
+}
+```
+
+All animations automatically respect `prefers-reduced-motion`.
 
 ---
 

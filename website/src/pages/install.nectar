@@ -28,7 +28,7 @@ page Install() {
                 <div class="method">
                     <h3>"Homebrew (macOS)"</h3>
                     <div class="install-code">
-                        <code>"brew install nectar-lang"</code>
+                        <code>"brew install hibiscus-consulting/tap/nectar"</code>
                     </div>
                 </div>
 
@@ -42,7 +42,7 @@ page Install() {
                 <div class="method">
                     <h3>"From Source"</h3>
                     <div class="install-code">
-                        <code>"git clone https://github.com/BlakeBurnette/nectar-lang.git"</code>
+                        <code>"git clone https://github.com/HibiscusConsulting/nectar-lang.git"</code>
                         <code>"cd nectar-lang && cargo build --release"</code>
                     </div>
                 </div>
