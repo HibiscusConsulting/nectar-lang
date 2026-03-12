@@ -618,18 +618,228 @@ clipboard.paste();  // async, returns String
 clipboard.copy_image(image_data);
 ```
 
-### Feature-Specific
+#### `search::autocomplete` -- Typeahead Search
 
-| Feature | Keyword/Function | When to use |
-|---|---|---|
-| **Theming** | `theme { light {...} dark {...} }` | Light/dark mode toggle |
-| **Auth** | `auth { providers: [google, github] }` | OAuth login flows |
-| **File Upload** | `upload { max_size: "10MB", accept: ["image/*"] }` | File upload with progress |
-| **Local DB** | `db { stores: [...] }` | IndexedDB with typed schema |
-| **Animation** | `spring`, `keyframes`, `stagger` | Physics, CSS, or list animations |
-| **Responsive** | `breakpoints { sm: 640, md: 768 }` + `fluid()` | Responsive layouts |
-| **Shortcuts** | `shortcut "Cmd+S" => self.save` | Keyboard shortcuts |
-| **Drag & Drop** | `draggable` / `droppable` | Drag and drop interfaces |
+Extend a search index with autocomplete and match highlighting:
+
+```nectar
+let index = search::create_index(users, vec!["name", "email"]);
+let suggestions = search::autocomplete(index, "ali", 5);  // top 5 matches
+let highlighted = search::highlight("Alice Smith", "ali"); // "<mark>Ali</mark>ce Smith"
+```
+
+**Replaces:** downshift, react-autosuggest, Algolia InstantSearch
+
+#### `data_table` -- Sortable, Filterable Data Tables
+
+Full-featured data table with sort, filter, paginate, pin, and inline editing — all computed in WASM:
+
+```nectar
+let table = DataTable::new(users, vec![
+    Column { key: "name", label: "Name", sortable: true },
+    Column { key: "email", label: "Email", sortable: true },
+    Column { key: "role", label: "Role", filterable: true },
+]);
+table.sort("name", "asc");
+table.filter(|user| user.active);
+table.paginate(1, 25);
+table.pin_column("name");
+let rows = table.get_visible_rows();
+let csv_export = table.export_csv();
+```
+
+**Replaces:** TanStack Table, AG Grid, react-table, DataTables
+
+#### `datepicker` -- Calendar / Date Range Picker
+
+Calendar widget with date range selection, min/max constraints:
+
+```nectar
+let picker = datepicker::create(DatePickerOptions {
+    mode: "range",
+    format: "yyyy-MM-dd",
+    min_date: "2024-01-01",
+    max_date: "2026-12-31",
+});
+let value = datepicker::get_value(picker);
+datepicker::set_range(picker, "2026-01-01", "2026-06-30");
+```
+
+**Replaces:** react-datepicker, flatpickr, date-fns date picker
+
+#### `chart` -- Declarative Charts
+
+Line, bar, pie, scatter charts — SVG path computation in WASM, rendered via DOM syscalls:
+
+```nectar
+let line = chart::line(points, ChartOptions {
+    width: 800, height: 400,
+    title: "Revenue", animate: true,
+});
+chart::update(line, new_points);
+
+let pie = chart::pie(vec![
+    PieSlice { label: "Desktop", value: 65.0, color: "#3b82f6" },
+    PieSlice { label: "Mobile", value: 35.0, color: "#f97316" },
+], ChartOptions { width: 400, height: 400, title: "Traffic", animate: true });
+```
+
+**Replaces:** Chart.js, D3, Recharts, Victory, Nivo
+
+#### `editor` -- Rich Text Editor
+
+WYSIWYG and markdown editing with contenteditable, all text processing in WASM:
+
+```nectar
+let ed = editor::create(EditorOptions {
+    mode: "wysiwyg",  // or "markdown"
+    placeholder: "Start typing...",
+});
+let html = editor::get_content(ed);
+let md = editor::get_markdown(ed);
+editor::insert(ed, "**bold text**");
+```
+
+**Replaces:** TipTap, ProseMirror, Slate, Quill
+
+#### `image` -- Client-Side Image Processing
+
+Crop, resize, compress images in pure WASM before upload — no server round-trip:
+
+```nectar
+let cropped = image::crop(data, 0, 0, 200, 200);
+let resized = image::resize(cropped, 100, 100);
+let compressed = image::compress(resized, 0.8);  // 80% quality
+let base64 = image::to_base64(compressed);
+```
+
+**Replaces:** browser-image-compression, cropperjs, sharp (client-side)
+
+#### `csv` -- CSV/Data Import/Export
+
+Parse and generate CSV entirely in WASM:
+
+```nectar
+let rows = csv::parse("name,email\nAlice,alice@example.com");
+// rows = [["name","email"], ["Alice","alice@example.com"]]
+
+let output = csv::stringify(rows);
+let typed = csv::parse_typed::<User>(input);
+let exported = csv::export(users, vec!["name", "email"]);
+```
+
+**Replaces:** PapaParse, csv-parser, SheetJS (basic CSV)
+
+#### `maps` -- Interactive Maps
+
+Tile-based map rendering with markers, all coordinate math in WASM:
+
+```nectar
+let map = maps::create(container, MapOptions {
+    center_lat: 37.7749, center_lng: -122.4194,
+    zoom: 13, tile_url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+});
+let marker = maps::add_marker(map, 37.7749, -122.4194, "San Francisco");
+maps::set_zoom(map, 15);
+```
+
+**Replaces:** Leaflet, Mapbox GL, Google Maps SDK
+
+#### `syntax` -- Syntax Highlighting
+
+Tokenize and highlight code in WASM, outputs span-wrapped HTML:
+
+```nectar
+let highlighted = syntax::highlight(code, "nectar");
+let with_lines = syntax::highlight_lines(code, "rust", vec![3, 5, 7]);
+// Returns HTML with <span class="kw">, <span class="fn">, etc.
+```
+
+**Replaces:** Prism, Shiki, highlight.js
+
+#### `media` -- Video/Audio Player
+
+Media player state machine in WASM, video/audio elements via DOM syscalls:
+
+```nectar
+let player = media::create_player("video.mp4", MediaOptions {
+    controls: true, autoplay: false,
+    loop_playback: false, captions_src: "subs.vtt",
+});
+media::play(player);
+media::seek(player, 30.0);
+let time = media::get_current_time(player);
+```
+
+**Replaces:** Video.js, Plyr, react-player
+
+#### `qr` -- QR Code Generation
+
+QR algorithm runs in pure WASM, outputs SVG or pixel buffer:
+
+```nectar
+let svg = qr::generate("https://buildnectar.com", 256);  // SVG string
+let png = qr::generate_png("https://buildnectar.com", 256);  // pixel buffer
+```
+
+**Replaces:** qrcode, qrcode-generator, jsQR (generation)
+
+#### `share` -- Web Share API
+
+Native share dialog (uses one browser API syscall):
+
+```nectar
+if share::can_share() {
+    share::native("Check this out", "Nectar is amazing", "https://buildnectar.com");
+}
+```
+
+**Replaces:** react-share, Web Share API boilerplate
+
+#### `wizard` -- Multi-Step Wizard
+
+Step-by-step form/workflow state machine, pure WASM:
+
+```nectar
+let wiz = wizard::create(vec![
+    WizardStep { name: "Account", validator: validate_account },
+    WizardStep { name: "Profile", validator: validate_profile },
+    WizardStep { name: "Confirm", validator: validate_confirm },
+]);
+wizard::next(wiz);      // advance if current step validates
+wizard::prev(wiz);      // go back
+let step = wizard::get_current_step(wiz);
+let data = wizard::get_data(wiz);
+```
+
+**Replaces:** react-step-wizard, multi-step form libraries
+
+#### `combobox` -- Multi-Select Combobox
+
+Filterable dropdown with multi-select, state managed in WASM:
+
+```nectar
+let cb = combobox::create(vec!["JavaScript", "Rust", "Python", "Go"]);
+combobox::set_filter(cb, "ru");       // filters to "Rust"
+let selected = combobox::get_selected(cb);  // ["Rust"]
+```
+
+**Replaces:** react-select, downshift, headless UI combobox
+
+### Feature-Specific (Keyword + Std Lib)
+
+These features are available both as language keywords (for declarative config) and as std lib functions (for programmatic use):
+
+| Feature | Keyword | Std Lib Functions | When to use |
+|---|---|---|---|
+| **Theming** | `theme { light {...} dark {...} }` | `theme::init()`, `theme::toggle()`, `theme::set()`, `theme::current()` | Light/dark mode toggle |
+| **Auth** | `auth { providers: [...] }` | `auth::init()`, `auth::login()`, `auth::logout()`, `auth::get_user()` | OAuth login flows |
+| **File Upload** | `upload { max_size: ... }` | `upload::init()`, `upload::start()`, `upload::cancel()` | File upload with progress |
+| **Local DB** | `db { stores: [...] }` | `db::open()`, `db::put()`, `db::get()`, `db::delete()`, `db::query()` | IndexedDB with typed schema |
+| **Animation** | `spring`, `keyframes`, `stagger` | `animate::spring()`, `animate::keyframes()`, `animate::stagger()`, `animate::cancel()` | Physics, CSS, or list animations |
+| **Responsive** | `breakpoints { ... }` + `fluid()` | `responsive::register_breakpoints()`, `responsive::get_breakpoint()`, `responsive::fluid()` | Responsive layouts |
+| **Shortcuts** | `shortcut "Cmd+S" => self.save` | Component-level | Keyboard shortcuts |
+| **Drag & Drop** | `draggable` / `droppable` | Template-level | Drag and drop interfaces |
 
 ---
 

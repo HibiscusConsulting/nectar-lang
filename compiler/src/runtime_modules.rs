@@ -194,7 +194,13 @@ fn check_expr(expr: &Expr, modules: &mut HashSet<String>) {
                         "db" => { modules.insert("db".to_string()); }
                         "animate" => { modules.insert("animate".to_string()); }
                         "responsive" => { modules.insert("responsive".to_string()); }
-                        _ => {} // collections, url, mask, search, pagination = pure WASM
+                        "share" => { modules.insert("share".to_string()); }
+                        // Pure WASM namespaces — no JS runtime modules needed:
+                        // collections, url, mask, search, pagination, data_table,
+                        // datepicker, skeleton, toast, combobox, chart, editor,
+                        // image, csv, maps, syntax, media, qr, wizard,
+                        // debounce, throttle
+                        _ => {}
                     }
                 }
             }

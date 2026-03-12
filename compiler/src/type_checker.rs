@@ -995,6 +995,462 @@ impl TypeChecker {
             });
         }
 
+        // Register toast namespace functions (pure WASM — DOM syscalls)
+        {
+            self.fn_sigs.insert("toast::success".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("toast::error".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("toast::warning".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("toast::info".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("toast::dismiss".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("toast::dismiss_all".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register DataTable<T> type and methods (pure WASM computation)
+        {
+            let mut column_fields = HashMap::new();
+            column_fields.insert("name".to_string(), Ty::String_);
+            column_fields.insert("label".to_string(), Ty::String_);
+            self.structs.insert("Column".to_string(), StructInfo { fields: column_fields });
+
+            let mut page_fields = HashMap::new();
+            page_fields.insert("items".to_string(), Ty::Array(Box::new(Ty::Error)));
+            page_fields.insert("current_page".to_string(), Ty::I32);
+            page_fields.insert("total_pages".to_string(), Ty::I32);
+            page_fields.insert("total_items".to_string(), Ty::I32);
+            self.structs.insert("Page".to_string(), StructInfo { fields: page_fields });
+
+            self.fn_sigs.insert("DataTable::new".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::Struct("Column".to_string())))],
+                ret: Box::new(Ty::Struct("DataTable".to_string())),
+            });
+            self.fn_sigs.insert("DataTable::sort".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("DataTable::filter".to_string(), Ty::Function {
+                params: vec![Ty::Function { params: vec![Ty::Error], ret: Box::new(Ty::Bool) }],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("DataTable::paginate".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("DataTable::pin_column".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("DataTable::edit_cell".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_, Ty::Error],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("DataTable::get_visible_rows".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+            });
+            self.fn_sigs.insert("DataTable::export_csv".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register datepicker namespace functions (pure WASM — DOM syscalls)
+        {
+            let mut dp_options_fields = HashMap::new();
+            dp_options_fields.insert("format".to_string(), Ty::String_);
+            dp_options_fields.insert("placeholder".to_string(), Ty::String_);
+            self.structs.insert("DatePickerOptions".to_string(), StructInfo { fields: dp_options_fields });
+
+            self.fn_sigs.insert("datepicker::create".to_string(), Ty::Function {
+                params: vec![Ty::Struct("DatePickerOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("datepicker::get_value".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("datepicker::set_value".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("datepicker::set_range".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("datepicker::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register skeleton namespace functions (pure WASM — DOM syscalls)
+        {
+            self.fn_sigs.insert("skeleton::text".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("skeleton::circle".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("skeleton::rect".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("skeleton::card".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("skeleton::avatar".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("skeleton::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register pagination namespace functions (pure WASM computation)
+        {
+            self.fn_sigs.insert("pagination::paginate".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Struct("Page".to_string())),
+            });
+            self.fn_sigs.insert("pagination::page_numbers".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+            });
+            self.fn_sigs.insert("pagination::has_next".to_string(), Ty::Function {
+                params: vec![Ty::Struct("Page".to_string())],
+                ret: Box::new(Ty::Bool),
+            });
+            self.fn_sigs.insert("pagination::has_prev".to_string(), Ty::Function {
+                params: vec![Ty::Struct("Page".to_string())],
+                ret: Box::new(Ty::Bool),
+            });
+        }
+
+        // Extend search namespace with autocomplete and highlight (pure WASM)
+        {
+            self.fn_sigs.insert("search::autocomplete".to_string(), Ty::Function {
+                params: vec![Ty::Struct("SearchIndex".to_string()), Ty::String_, Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+            });
+            self.fn_sigs.insert("search::highlight".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register combobox namespace functions (pure WASM — DOM syscalls)
+        {
+            self.fn_sigs.insert("combobox::create".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::String_))],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("combobox::get_selected".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::String_))),
+            });
+            self.fn_sigs.insert("combobox::set_filter".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("combobox::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register chart namespace functions and types (pure WASM — SVG/Canvas via DOM syscalls)
+        {
+            let mut point_fields = HashMap::new();
+            point_fields.insert("x".to_string(), Ty::F64);
+            point_fields.insert("y".to_string(), Ty::F64);
+            self.structs.insert("Point".to_string(), StructInfo { fields: point_fields });
+
+            let mut bar_fields = HashMap::new();
+            bar_fields.insert("label".to_string(), Ty::String_);
+            bar_fields.insert("value".to_string(), Ty::F64);
+            self.structs.insert("BarData".to_string(), StructInfo { fields: bar_fields });
+
+            let mut pie_fields = HashMap::new();
+            pie_fields.insert("label".to_string(), Ty::String_);
+            pie_fields.insert("value".to_string(), Ty::F64);
+            pie_fields.insert("color".to_string(), Ty::String_);
+            self.structs.insert("PieSlice".to_string(), StructInfo { fields: pie_fields });
+
+            let mut chart_opts_fields = HashMap::new();
+            chart_opts_fields.insert("width".to_string(), Ty::I32);
+            chart_opts_fields.insert("height".to_string(), Ty::I32);
+            chart_opts_fields.insert("title".to_string(), Ty::String_);
+            chart_opts_fields.insert("animate".to_string(), Ty::Bool);
+            self.structs.insert("ChartOptions".to_string(), StructInfo { fields: chart_opts_fields });
+
+            self.fn_sigs.insert("chart::line".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Struct("Point".to_string()))), Ty::Struct("ChartOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("chart::bar".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Struct("BarData".to_string()))), Ty::Struct("ChartOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("chart::pie".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Struct("PieSlice".to_string()))), Ty::Struct("ChartOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("chart::scatter".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Struct("Point".to_string()))), Ty::Struct("ChartOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("chart::update".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::Array(Box::new(Ty::Struct("Point".to_string())))],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("chart::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register editor namespace functions (pure WASM — contenteditable via DOM syscalls)
+        {
+            let mut editor_opts_fields = HashMap::new();
+            editor_opts_fields.insert("mode".to_string(), Ty::String_);
+            editor_opts_fields.insert("placeholder".to_string(), Ty::String_);
+            self.structs.insert("EditorOptions".to_string(), StructInfo { fields: editor_opts_fields });
+
+            self.fn_sigs.insert("editor::create".to_string(), Ty::Function {
+                params: vec![Ty::Struct("EditorOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("editor::get_content".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("editor::set_content".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("editor::get_markdown".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("editor::insert".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("editor::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register image namespace functions (pure WASM pixel manipulation)
+        {
+            self.fn_sigs.insert("image::crop".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+            });
+            self.fn_sigs.insert("image::resize".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+            });
+            self.fn_sigs.insert("image::compress".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::F64],
+                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+            });
+            self.fn_sigs.insert("image::to_base64".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::I32))],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register csv namespace functions (pure WASM string processing)
+        {
+            self.fn_sigs.insert("csv::parse".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))),
+            });
+            self.fn_sigs.insert("csv::stringify".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("csv::parse_typed".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+            });
+            self.fn_sigs.insert("csv::export".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::String_))],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register maps namespace functions and types (pure WASM — tile rendering via DOM syscalls)
+        {
+            let mut map_opts_fields = HashMap::new();
+            map_opts_fields.insert("center_lat".to_string(), Ty::F64);
+            map_opts_fields.insert("center_lng".to_string(), Ty::F64);
+            map_opts_fields.insert("zoom".to_string(), Ty::I32);
+            map_opts_fields.insert("tile_url".to_string(), Ty::String_);
+            self.structs.insert("MapOptions".to_string(), StructInfo { fields: map_opts_fields });
+
+            self.fn_sigs.insert("maps::create".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::Struct("MapOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("maps::add_marker".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::F64, Ty::F64, Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("maps::remove_marker".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("maps::set_center".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::F64, Ty::F64],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("maps::set_zoom".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("maps::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register syntax namespace functions (pure WASM tokenizer)
+        {
+            self.fn_sigs.insert("syntax::highlight".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("syntax::highlight_lines".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_, Ty::Array(Box::new(Ty::I32))],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register media namespace functions (pure WASM — DOM syscalls for audio/video)
+        {
+            let mut media_opts_fields = HashMap::new();
+            media_opts_fields.insert("controls".to_string(), Ty::Bool);
+            media_opts_fields.insert("autoplay".to_string(), Ty::Bool);
+            media_opts_fields.insert("loop_playback".to_string(), Ty::Bool);
+            media_opts_fields.insert("captions_src".to_string(), Ty::String_);
+            self.structs.insert("MediaOptions".to_string(), StructInfo { fields: media_opts_fields });
+
+            self.fn_sigs.insert("media::create_player".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::Struct("MediaOptions".to_string())],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("media::play".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("media::pause".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("media::seek".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::F64],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("media::get_duration".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::F64),
+            });
+            self.fn_sigs.insert("media::get_current_time".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::F64),
+            });
+            self.fn_sigs.insert("media::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
+        // Register qr namespace functions (pure WASM — QR algorithm in WASM)
+        {
+            self.fn_sigs.insert("qr::generate".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("qr::generate_png".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::I32],
+                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+            });
+        }
+
+        // Register share namespace functions (WASM logic + navigator.share JS syscall)
+        {
+            self.fn_sigs.insert("share::native".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Bool),
+            });
+            self.fn_sigs.insert("share::can_share".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::Bool),
+            });
+        }
+
+        // Register wizard namespace functions and WizardStep type (pure WASM state machine)
+        {
+            let mut wizard_step_fields = HashMap::new();
+            wizard_step_fields.insert("name".to_string(), Ty::String_);
+            wizard_step_fields.insert("validator".to_string(), Ty::Function { params: vec![], ret: Box::new(Ty::Bool) });
+            self.structs.insert("WizardStep".to_string(), StructInfo { fields: wizard_step_fields });
+
+            self.fn_sigs.insert("wizard::create".to_string(), Ty::Function {
+                params: vec![Ty::Array(Box::new(Ty::Struct("WizardStep".to_string())))],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("wizard::next".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Bool),
+            });
+            self.fn_sigs.insert("wizard::prev".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Bool),
+            });
+            self.fn_sigs.insert("wizard::get_current_step".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("wizard::validate_step".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Bool),
+            });
+            self.fn_sigs.insert("wizard::get_data".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("wizard::destroy".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
         for item in &program.items {
             match item {
                 Item::Struct(s) => {

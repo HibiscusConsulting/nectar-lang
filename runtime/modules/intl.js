@@ -22,17 +22,12 @@ export const wasmImports = {
         new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
       );
     },
-    formatRelativeTime(timestampMs) {
-      const diff = Date.now() - Number(timestampMs);
-      const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-      const seconds = Math.floor(diff / 1000);
-      if (Math.abs(seconds) < 60) return NectarRuntime.__allocString(rtf.format(-seconds, 'second'));
-      const minutes = Math.floor(seconds / 60);
-      if (Math.abs(minutes) < 60) return NectarRuntime.__allocString(rtf.format(-minutes, 'minute'));
-      const hours = Math.floor(minutes / 60);
-      if (Math.abs(hours) < 24) return NectarRuntime.__allocString(rtf.format(-hours, 'hour'));
-      const days = Math.floor(hours / 24);
-      return NectarRuntime.__allocString(rtf.format(-days, 'day'));
+    // WASM pre-computes (value, unit) — JS only calls Intl.RelativeTimeFormat.format()
+    formatRelativeTime(value, unitPtr, unitLen, localePtr, localeLen) {
+      const unit = NectarRuntime.__getString(unitPtr, unitLen);
+      const locale = NectarRuntime.__getString(localePtr, localeLen) || 'en';
+      const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+      return NectarRuntime.__allocString(rtf.format(value, unit));
     },
   },
 };

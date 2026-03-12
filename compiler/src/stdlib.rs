@@ -98,6 +98,23 @@ impl StdLib {
         stdlib.register_db_functions();
         stdlib.register_animate_functions();
         stdlib.register_responsive_functions();
+        stdlib.register_toast_functions();
+        stdlib.register_data_table_type();
+        stdlib.register_datepicker_functions();
+        stdlib.register_debounce_throttle_functions();
+        stdlib.register_skeleton_functions();
+        stdlib.register_pagination_functions();
+        stdlib.register_combobox_functions();
+        stdlib.register_chart_functions();
+        stdlib.register_editor_functions();
+        stdlib.register_image_functions();
+        stdlib.register_csv_functions();
+        stdlib.register_maps_functions();
+        stdlib.register_syntax_functions();
+        stdlib.register_media_functions();
+        stdlib.register_qr_functions();
+        stdlib.register_share_functions();
+        stdlib.register_wizard_functions();
 
         stdlib
     }
@@ -1777,6 +1794,1015 @@ impl StdLib {
                 return_type: string_ty.clone(),
                 takes_self: false, self_mutable: false,
                 description: "Generate a fluid CSS value that scales between min and max. JS runtime bridge.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Toast notifications ------------------------------------------------
+    // Pure WASM — creates DOM elements via existing core DOM syscalls.
+    fn register_toast_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "toast_success".into(),
+                params: vec![BuiltinParam { name: "msg".into(), ty: string_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show a success toast notification. Returns toast ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "toast_error".into(),
+                params: vec![BuiltinParam { name: "msg".into(), ty: string_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show an error toast notification. Returns toast ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "toast_warning".into(),
+                params: vec![BuiltinParam { name: "msg".into(), ty: string_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show a warning toast notification. Returns toast ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "toast_info".into(),
+                params: vec![BuiltinParam { name: "msg".into(), ty: string_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show an info toast notification. Returns toast ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "toast_dismiss".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Dismiss a specific toast by ID. Pure WASM — removes DOM element via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "toast_dismiss_all".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Dismiss all active toasts. Pure WASM — removes DOM elements via syscalls.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- DataTable<T> -------------------------------------------------------
+    // Pure WASM computation for data table operations.
+    fn register_data_table_type(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let t = Type::Named("T".into());
+        let any_array = Type::Array(Box::new(Type::Named("Any".into())));
+        let fn_ty = Type::Named("Fn".into());
+
+        // Register Column type
+        self.register_type(BuiltinType {
+            name: "Column".into(),
+            type_params: vec![],
+            description: "Column definition for DataTable. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        self.register_type(BuiltinType {
+            name: "DataTable".into(),
+            type_params: vec!["T".into()],
+            description: "A sortable, filterable, paginated data table. Pure WASM computation.".into(),
+            methods: vec![
+                BuiltinFn {
+                    name: "sort".into(),
+                    params: vec![
+                        BuiltinParam { name: "column".into(), ty: string_ty.clone() },
+                        BuiltinParam { name: "direction".into(), ty: string_ty.clone() },
+                    ],
+                    return_type: Type::Named("Unit".into()),
+                    takes_self: true, self_mutable: true,
+                    description: "Sort the table by a column. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "filter".into(),
+                    params: vec![BuiltinParam { name: "predicate".into(), ty: fn_ty.clone() }],
+                    return_type: Type::Named("Unit".into()),
+                    takes_self: true, self_mutable: true,
+                    description: "Filter rows by a predicate function. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "paginate".into(),
+                    params: vec![
+                        BuiltinParam { name: "page".into(), ty: i32_ty.clone() },
+                        BuiltinParam { name: "per_page".into(), ty: i32_ty.clone() },
+                    ],
+                    return_type: Type::Named("Unit".into()),
+                    takes_self: true, self_mutable: true,
+                    description: "Set pagination parameters. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "pin_column".into(),
+                    params: vec![BuiltinParam { name: "name".into(), ty: string_ty.clone() }],
+                    return_type: Type::Named("Unit".into()),
+                    takes_self: true, self_mutable: true,
+                    description: "Pin a column so it stays visible during horizontal scroll. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "edit_cell".into(),
+                    params: vec![
+                        BuiltinParam { name: "row".into(), ty: i32_ty.clone() },
+                        BuiltinParam { name: "column".into(), ty: string_ty.clone() },
+                        BuiltinParam { name: "value".into(), ty: t.clone() },
+                    ],
+                    return_type: Type::Named("Unit".into()),
+                    takes_self: true, self_mutable: true,
+                    description: "Edit a cell value in-place. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "get_visible_rows".into(),
+                    params: vec![],
+                    return_type: any_array.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Get the currently visible (filtered, sorted, paginated) rows. Pure WASM.".into(),
+                },
+                BuiltinFn {
+                    name: "export_csv".into(),
+                    params: vec![],
+                    return_type: string_ty.clone(),
+                    takes_self: true, self_mutable: false,
+                    description: "Export the table data as a CSV string. Pure WASM.".into(),
+                },
+            ],
+            variants: vec![],
+        });
+
+        // DataTable constructor
+        let fns = vec![
+            BuiltinFn {
+                name: "DataTable_new".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "columns".into(), ty: Type::Array(Box::new(Type::Named("Column".into()))) },
+                ],
+                return_type: Type::Named("DataTable".into()),
+                takes_self: false, self_mutable: false,
+                description: "Create a new DataTable with data and column definitions. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Datepicker ---------------------------------------------------------
+    // Pure WASM — renders calendar via DOM syscalls.
+    fn register_datepicker_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register DatePickerOptions type
+        self.register_type(BuiltinType {
+            name: "DatePickerOptions".into(),
+            type_params: vec![],
+            description: "Options for creating a date picker. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "datepicker_create".into(),
+                params: vec![BuiltinParam { name: "options".into(), ty: Type::Named("DatePickerOptions".into()) }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a date picker widget. Returns ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "datepicker_get_value".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the currently selected date as a string. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "datepicker_set_value".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "date".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the selected date. Pure WASM — updates DOM via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "datepicker_set_range".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "min".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "max".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the allowed date range. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "datepicker_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a date picker widget and remove its DOM elements. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Debounce / Throttle ------------------------------------------------
+    // Pure WASM — uses timer syscall from core.
+    fn register_debounce_throttle_functions(&mut self) {
+        let i32_ty = Type::Named("i32".into());
+        let fn_ty = Type::Named("Fn".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "debounce".into(),
+                params: vec![
+                    BuiltinParam { name: "callback".into(), ty: fn_ty.clone() },
+                    BuiltinParam { name: "delay_ms".into(), ty: i32_ty.clone() },
+                ],
+                return_type: fn_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Debounce a callback — delays invocation until after delay_ms of inactivity. Pure WASM — uses timer syscall.".into(),
+            },
+            BuiltinFn {
+                name: "throttle".into(),
+                params: vec![
+                    BuiltinParam { name: "callback".into(), ty: fn_ty.clone() },
+                    BuiltinParam { name: "interval_ms".into(), ty: i32_ty.clone() },
+                ],
+                return_type: fn_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Throttle a callback — invokes at most once per interval_ms. Pure WASM — uses timer syscall.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Skeleton loaders ---------------------------------------------------
+    // Pure WASM — creates shimmer placeholder elements via DOM syscalls.
+    fn register_skeleton_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "skeleton_text".into(),
+                params: vec![BuiltinParam { name: "lines".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a text skeleton placeholder. Returns element ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "skeleton_circle".into(),
+                params: vec![BuiltinParam { name: "size".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a circular skeleton placeholder. Returns element ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "skeleton_rect".into(),
+                params: vec![
+                    BuiltinParam { name: "width".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "height".into(), ty: string_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a rectangular skeleton placeholder. Returns element ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "skeleton_card".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a card-shaped skeleton placeholder. Returns element ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "skeleton_avatar".into(),
+                params: vec![BuiltinParam { name: "size".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create an avatar skeleton placeholder. Returns element ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "skeleton_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a skeleton placeholder and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Pagination ---------------------------------------------------------
+    // Pure WASM computation for paginating data.
+    fn register_pagination_functions(&mut self) {
+        let i32_ty = Type::Named("i32".into());
+        let bool_ty = Type::Named("bool".into());
+        let any_array = Type::Array(Box::new(Type::Named("Any".into())));
+        let i32_array = Type::Array(Box::new(i32_ty.clone()));
+
+        // Register Page<T> type
+        self.register_type(BuiltinType {
+            name: "Page".into(),
+            type_params: vec!["T".into()],
+            description: "A page of paginated results with metadata. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "pagination_paginate".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "page".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "per_page".into(), ty: i32_ty.clone() },
+                ],
+                return_type: Type::Named("Page".into()),
+                takes_self: false, self_mutable: false,
+                description: "Paginate an array of items. Returns a Page with items and metadata. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "pagination_page_numbers".into(),
+                params: vec![
+                    BuiltinParam { name: "current".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "total".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Generate page number array for pagination UI. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "pagination_has_next".into(),
+                params: vec![BuiltinParam { name: "page".into(), ty: Type::Named("Page".into()) }],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Check if there is a next page. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "pagination_has_prev".into(),
+                params: vec![BuiltinParam { name: "page".into(), ty: Type::Named("Page".into()) }],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Check if there is a previous page. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Combobox -----------------------------------------------------------
+    // Pure WASM — renders via DOM syscalls.
+    fn register_combobox_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+        let string_array = Type::Array(Box::new(string_ty.clone()));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "combobox_create".into(),
+                params: vec![BuiltinParam { name: "options".into(), ty: string_array.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a combobox widget. Returns ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "combobox_get_selected".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: string_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get selected items from the combobox. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "combobox_set_filter".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "query".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Apply a filter query to narrow the combobox options. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "combobox_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a combobox widget and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Chart --------------------------------------------------------------
+    // Pure WASM — renders to SVG/Canvas via DOM syscalls.
+    fn register_chart_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let f64_ty = Type::Named("f64".into());
+        let unit_ty = Type::Named("Unit".into());
+        let bool_ty = Type::Named("bool".into());
+
+        // Register chart-related types
+        self.register_type(BuiltinType {
+            name: "Point".into(),
+            type_params: vec![],
+            description: "A 2D point with x and y coordinates. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        self.register_type(BuiltinType {
+            name: "BarData".into(),
+            type_params: vec![],
+            description: "Data for a bar chart entry with label and value. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        self.register_type(BuiltinType {
+            name: "PieSlice".into(),
+            type_params: vec![],
+            description: "Data for a pie chart slice with label, value, and color. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        self.register_type(BuiltinType {
+            name: "ChartOptions".into(),
+            type_params: vec![],
+            description: "Options for chart rendering: width, height, title, animate. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let point_array = Type::Array(Box::new(Type::Named("Point".into())));
+        let bar_array = Type::Array(Box::new(Type::Named("BarData".into())));
+        let pie_array = Type::Array(Box::new(Type::Named("PieSlice".into())));
+        let chart_opts = Type::Named("ChartOptions".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "chart_line".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: point_array.clone() },
+                    BuiltinParam { name: "options".into(), ty: chart_opts.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a line chart. Returns chart ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "chart_bar".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: bar_array.clone() },
+                    BuiltinParam { name: "options".into(), ty: chart_opts.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a bar chart. Returns chart ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "chart_pie".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: pie_array.clone() },
+                    BuiltinParam { name: "options".into(), ty: chart_opts.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a pie chart. Returns chart ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "chart_scatter".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: point_array.clone() },
+                    BuiltinParam { name: "options".into(), ty: chart_opts.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a scatter chart. Returns chart ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "chart_update".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "data".into(), ty: point_array.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Update chart data. Pure WASM — re-renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "chart_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a chart and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Rich text editor ---------------------------------------------------
+    // Pure WASM — manages contenteditable via DOM syscalls.
+    fn register_editor_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register EditorOptions type
+        self.register_type(BuiltinType {
+            name: "EditorOptions".into(),
+            type_params: vec![],
+            description: "Options for creating a rich text editor: mode, placeholder. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "editor_create".into(),
+                params: vec![BuiltinParam { name: "options".into(), ty: Type::Named("EditorOptions".into()) }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a rich text editor. Returns editor ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "editor_get_content".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the editor content as HTML. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "editor_set_content".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "content".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the editor content. Pure WASM — updates DOM via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "editor_get_markdown".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the editor content as Markdown. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "editor_insert".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "text".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Insert text at the current cursor position. Pure WASM — updates DOM via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "editor_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy an editor and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Image manipulation -------------------------------------------------
+    // Pure WASM pixel manipulation — no browser APIs needed.
+    fn register_image_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let f32_ty = Type::Named("f32".into());
+        let bytes_ty = Type::Array(Box::new(Type::Named("u8".into())));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "image_crop".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: bytes_ty.clone() },
+                    BuiltinParam { name: "x".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "y".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "w".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "h".into(), ty: i32_ty.clone() },
+                ],
+                return_type: bytes_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Crop an image to the specified rectangle. Pure WASM pixel manipulation.".into(),
+            },
+            BuiltinFn {
+                name: "image_resize".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: bytes_ty.clone() },
+                    BuiltinParam { name: "width".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "height".into(), ty: i32_ty.clone() },
+                ],
+                return_type: bytes_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Resize an image to the specified dimensions. Pure WASM pixel manipulation.".into(),
+            },
+            BuiltinFn {
+                name: "image_compress".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: bytes_ty.clone() },
+                    BuiltinParam { name: "quality".into(), ty: f32_ty.clone() },
+                ],
+                return_type: bytes_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Compress an image with the given quality (0.0 to 1.0). Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "image_to_base64".into(),
+                params: vec![BuiltinParam { name: "data".into(), ty: bytes_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Encode image data as a base64 string. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- CSV parsing and generation -----------------------------------------
+    // Pure WASM string processing.
+    fn register_csv_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let string_array = Type::Array(Box::new(string_ty.clone()));
+        let row_array = Type::Array(Box::new(string_array.clone()));
+        let any_array = Type::Array(Box::new(Type::Named("Any".into())));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "csv_parse".into(),
+                params: vec![BuiltinParam { name: "input".into(), ty: string_ty.clone() }],
+                return_type: row_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Parse a CSV string into a 2D array of strings. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "csv_stringify".into(),
+                params: vec![BuiltinParam { name: "rows".into(), ty: row_array.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Convert a 2D array of strings into a CSV string. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "csv_parse_typed".into(),
+                params: vec![BuiltinParam { name: "input".into(), ty: string_ty.clone() }],
+                return_type: any_array.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Parse a CSV string into typed objects (generic). Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "csv_export".into(),
+                params: vec![
+                    BuiltinParam { name: "items".into(), ty: any_array.clone() },
+                    BuiltinParam { name: "columns".into(), ty: Type::Array(Box::new(string_ty.clone())) },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Export typed objects to CSV with specified columns. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Maps ---------------------------------------------------------------
+    // Pure WASM — tile-based map rendering via DOM syscalls.
+    fn register_maps_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let f64_ty = Type::Named("f64".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register MapOptions type
+        self.register_type(BuiltinType {
+            name: "MapOptions".into(),
+            type_params: vec![],
+            description: "Options for creating a map: center_lat, center_lng, zoom, tile_url. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "maps_create".into(),
+                params: vec![
+                    BuiltinParam { name: "container".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "options".into(), ty: Type::Named("MapOptions".into()) },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a map widget in the given container. Returns map ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "maps_add_marker".into(),
+                params: vec![
+                    BuiltinParam { name: "map".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "lat".into(), ty: f64_ty.clone() },
+                    BuiltinParam { name: "lng".into(), ty: f64_ty.clone() },
+                    BuiltinParam { name: "label".into(), ty: string_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Add a marker to the map. Returns marker ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "maps_remove_marker".into(),
+                params: vec![
+                    BuiltinParam { name: "map".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "marker".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Remove a marker from the map. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "maps_set_center".into(),
+                params: vec![
+                    BuiltinParam { name: "map".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "lat".into(), ty: f64_ty.clone() },
+                    BuiltinParam { name: "lng".into(), ty: f64_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the map center position. Pure WASM — updates DOM via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "maps_set_zoom".into(),
+                params: vec![
+                    BuiltinParam { name: "map".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "level".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the map zoom level. Pure WASM — updates DOM via syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "maps_destroy".into(),
+                params: vec![BuiltinParam { name: "map".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a map widget and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Syntax highlighting ------------------------------------------------
+    // Pure WASM — tokenizes code and wraps in span tags.
+    fn register_syntax_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_array = Type::Array(Box::new(Type::Named("i32".into())));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "syntax_highlight".into(),
+                params: vec![
+                    BuiltinParam { name: "code".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "language".into(), ty: string_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Syntax-highlight code and return HTML with span class names. Pure WASM tokenizer.".into(),
+            },
+            BuiltinFn {
+                name: "syntax_highlight_lines".into(),
+                params: vec![
+                    BuiltinParam { name: "code".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "language".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "lines".into(), ty: i32_array.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Syntax-highlight specific lines of code. Returns HTML string. Pure WASM tokenizer.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Media player -------------------------------------------------------
+    // Pure WASM state management — uses DOM syscalls for video/audio elements.
+    fn register_media_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let f64_ty = Type::Named("f64".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register MediaOptions type
+        self.register_type(BuiltinType {
+            name: "MediaOptions".into(),
+            type_params: vec![],
+            description: "Options for media player: controls, autoplay, loop_playback, captions_src. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            BuiltinFn {
+                name: "media_create_player".into(),
+                params: vec![
+                    BuiltinParam { name: "src".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "options".into(), ty: Type::Named("MediaOptions".into()) },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a media player for audio or video. Returns player ID. Pure WASM — renders via DOM syscalls.".into(),
+            },
+            BuiltinFn {
+                name: "media_play".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Start playback. Pure WASM — invokes DOM syscall.".into(),
+            },
+            BuiltinFn {
+                name: "media_pause".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Pause playback. Pure WASM — invokes DOM syscall.".into(),
+            },
+            BuiltinFn {
+                name: "media_seek".into(),
+                params: vec![
+                    BuiltinParam { name: "id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "time".into(), ty: f64_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Seek to a specific time in seconds. Pure WASM — invokes DOM syscall.".into(),
+            },
+            BuiltinFn {
+                name: "media_get_duration".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: f64_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the total duration of the media in seconds. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "media_get_current_time".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: f64_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the current playback time in seconds. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "media_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a media player and remove from DOM. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- QR code generation -------------------------------------------------
+    // Pure WASM — QR code algorithm runs in WASM, outputs SVG or pixel buffer.
+    fn register_qr_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let bytes_ty = Type::Array(Box::new(Type::Named("u8".into())));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "qr_generate".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "size".into(), ty: i32_ty.clone() },
+                ],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Generate a QR code as an SVG string. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "qr_generate_png".into(),
+                params: vec![
+                    BuiltinParam { name: "data".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "size".into(), ty: i32_ty.clone() },
+                ],
+                return_type: bytes_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Generate a QR code as a PNG pixel buffer. Pure WASM.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Share --------------------------------------------------------------
+    // WASM logic with one JS syscall (navigator.share).
+    fn register_share_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let bool_ty = Type::Named("bool".into());
+
+        let fns = vec![
+            BuiltinFn {
+                name: "share_native".into(),
+                params: vec![
+                    BuiltinParam { name: "title".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "text".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                ],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Trigger native share dialog (navigator.share). WASM logic + one JS syscall.".into(),
+            },
+            BuiltinFn {
+                name: "share_can_share".into(),
+                params: vec![],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Check if native sharing is available. WASM logic + one JS syscall.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
+    // -- Wizard (multi-step forms) ------------------------------------------
+    // Pure WASM state machine.
+    fn register_wizard_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let bool_ty = Type::Named("bool".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register WizardStep type
+        self.register_type(BuiltinType {
+            name: "WizardStep".into(),
+            type_params: vec![],
+            description: "A step in a wizard with name and validator. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let step_array = Type::Array(Box::new(Type::Named("WizardStep".into())));
+
+        let fns = vec![
+            BuiltinFn {
+                name: "wizard_create".into(),
+                params: vec![BuiltinParam { name: "steps".into(), ty: step_array.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a multi-step wizard. Returns wizard ID. Pure WASM state machine.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_next".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Advance to the next step. Returns false if already at last step. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_prev".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Go back to the previous step. Returns false if already at first step. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_get_current_step".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get the index of the current step. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_validate_step".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: bool_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Validate the current step using its validator function. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_get_data".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get all wizard data as a JSON string. Pure WASM.".into(),
+            },
+            BuiltinFn {
+                name: "wizard_destroy".into(),
+                params: vec![BuiltinParam { name: "id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a wizard and free its resources. Pure WASM.".into(),
             },
         ];
         for f in fns { self.register_fn(f); }

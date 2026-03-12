@@ -449,7 +449,7 @@ impl WasmCodegen {
         self.line(";; Standard library — format (thin Intl bridge for locale data)");
         self.line("(import \"intl\" \"formatNumber\" (func $intl_format_number (param f64 i32 i32) (result i32)))");
         self.line("(import \"intl\" \"formatCurrency\" (func $intl_format_currency (param f64 i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"intl\" \"formatRelativeTime\" (func $intl_format_relative_time (param i64) (result i32)))");
+        self.line("(import \"intl\" \"formatRelativeTime\" (func $intl_format_relative_time (param i32 i32 i32 i32 i32) (result i32)))");
 
         // Allocator (bump allocator for now)
         self.line("");
