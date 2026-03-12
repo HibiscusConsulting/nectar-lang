@@ -1,8 +1,8 @@
-//! Source map generation (v3 format) for Arc -> WAT/WASM compilation.
+//! Source map generation (v3 format) for Nectar -> WAT/WASM compilation.
 //!
 //! Produces a JSON source map that maps generated WebAssembly text positions
-//! back to the original `.arc` source files, enabling browser devtools to
-//! show Arc source during debugging.
+//! back to the original `.nectar` source files, enabling browser devtools to
+//! show Nectar source during debugging.
 
 use serde::Serialize;
 
@@ -271,8 +271,8 @@ mod tests {
     #[test]
     fn test_add_source_deduplicates() {
         let mut sm = SourceMap::new();
-        let idx1 = sm.add_source("app.arc");
-        let idx2 = sm.add_source("app.arc");
+        let idx1 = sm.add_source("app.nectar");
+        let idx2 = sm.add_source("app.nectar");
         assert_eq!(idx1, idx2);
         assert_eq!(sm.sources.len(), 1);
     }
@@ -280,13 +280,13 @@ mod tests {
     #[test]
     fn test_add_mapping_basic() {
         let mut sm = SourceMap::new();
-        sm.add_mapping(0, 0, 0, 0, "app.arc");
-        sm.add_mapping(1, 4, 3, 2, "app.arc");
+        sm.add_mapping(0, 0, 0, 0, "app.nectar");
+        sm.add_mapping(1, 4, 3, 2, "app.nectar");
 
         let json = sm.to_json();
         assert!(json.contains("\"version\": 3"));
         assert!(json.contains("\"sources\""));
-        assert!(json.contains("app.arc"));
+        assert!(json.contains("app.nectar"));
         // Mappings should be non-empty
         assert!(!json.contains("\"mappings\": \"\""));
     }
@@ -294,8 +294,8 @@ mod tests {
     #[test]
     fn test_to_json_valid_structure() {
         let mut sm = SourceMap::new();
-        sm.add_mapping(0, 0, 1, 0, "main.arc");
-        sm.add_mapping_with_name(0, 10, 1, 4, "main.arc", "counter");
+        sm.add_mapping(0, 0, 1, 0, "main.nectar");
+        sm.add_mapping_with_name(0, 10, 1, 4, "main.nectar", "counter");
 
         let json = sm.to_json();
         // Should parse as valid JSON

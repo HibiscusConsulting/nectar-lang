@@ -1,4 +1,4 @@
-# Arc
+# Nectar
 
 **A programming language that compiles to WebAssembly, built for the next era of web development.**
 
@@ -7,15 +7,15 @@
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![WASM](https://img.shields.io/badge/target-WebAssembly-654ff0.svg)
 
-Arc combines Rust's ownership model and type safety with React-like declarative UI primitives, compiling everything to WebAssembly for near-native performance. No garbage collector. No virtual DOM. No runtime overhead. Just fine-grained reactive signals that surgically update exactly the DOM nodes that changed -- in O(1) time.
+Nectar combines Rust's ownership model and type safety with React-like declarative UI primitives, compiling everything to WebAssembly for near-native performance. No garbage collector. No virtual DOM. No runtime overhead. Just fine-grained reactive signals that surgically update exactly the DOM nodes that changed -- in O(1) time.
 
 ---
 
-## Why Arc?
+## Why Nectar?
 
-Modern web development forces you to choose: **safety** (Rust, but no UI story), **developer experience** (React, but runtime bloat and GC pauses), or **performance** (hand-written WASM, but painful). Arc eliminates the trade-off.
+Modern web development forces you to choose: **safety** (Rust, but no UI story), **developer experience** (React, but runtime bloat and GC pauses), or **performance** (hand-written WASM, but painful). Nectar eliminates the trade-off.
 
-| | Rust | React/Svelte | Arc |
+| | Rust | React/Svelte | Nectar |
 |---|---|---|---|
 | Memory safety | Ownership + borrow checker | GC | Ownership + borrow checker |
 | Reactivity | Manual | Virtual DOM / compiler magic | Fine-grained signals (O(1)) |
@@ -24,7 +24,7 @@ Modern web development forces you to choose: **safety** (Rust, but no UI story),
 | AI integration | None | Library | First-class (`agent`, `tool`, `prompt`) |
 | Bundle size | N/A | 40-150 KB runtime | ~0 KB runtime overhead |
 
-Arc was designed from the ground up with these principles:
+Nectar was designed from the ground up with these principles:
 
 - **No GC, ever.** Ownership and borrowing at the language level means predictable, zero-pause memory management.
 - **O(1) reactive updates.** Signals track dependencies at compile time. When state changes, only the exact DOM nodes that depend on it are updated -- no diffing, no reconciliation.
@@ -38,22 +38,22 @@ Arc was designed from the ground up with these principles:
 ### Install from source
 
 ```bash
-git clone https://github.com/BlakeBurnette/arc-lang.git
-cd arc-lang
+git clone https://github.com/BlakeBurnette/nectar-lang.git
+cd nectar-lang
 cargo build --release
 ```
 
-The compiler binary is at `./target/release/arc`.
+The compiler binary is at `./target/release/nectar`.
 
 ### Hello World
 
-Create `hello.arc`:
+Create `hello.nectar`:
 
-```arc
+```nectar
 component Hello(name: String) {
     render {
         <div>
-            <h1>"Hello from Arc!"</h1>
+            <h1>"Hello from Nectar!"</h1>
             <p>{name}</p>
         </div>
     }
@@ -64,13 +64,13 @@ component Hello(name: String) {
 
 ```bash
 # Compile to WebAssembly text format (.wat)
-./target/release/arc build hello.arc
+./target/release/nectar build hello.nectar
 
 # Compile to binary WebAssembly (.wasm)
-./target/release/arc build hello.arc --emit-wasm
+./target/release/nectar build hello.nectar --emit-wasm
 
 # Start the dev server with hot reload
-./target/release/arc dev --src . --port 3000
+./target/release/nectar dev --src . --port 3000
 ```
 
 ---
@@ -79,11 +79,11 @@ component Hello(name: String) {
 
 ### Variables & Types
 
-Arc has a Rust-like type system with ownership semantics. Variables are immutable by default.
+Nectar has a Rust-like type system with ownership semantics. Variables are immutable by default.
 
-```arc
+```nectar
 // Immutable binding
-let name: String = "Arc";
+let name: String = "Nectar";
 let age: u32 = 1;
 let pi: f64 = 3.14159;
 let active: bool = true;
@@ -113,7 +113,7 @@ let mr: &mut String = &mut b; // mutable borrow
 
 ### Functions
 
-```arc
+```nectar
 fn add(a: i32, b: i32) -> i32 {
     a + b
 }
@@ -137,7 +137,7 @@ fn longest<'a>(a: &'a String, b: &'a String) -> &'a String {
 
 Components are first-class UI primitives with props, state, methods, scoped styles, and a render block.
 
-```arc
+```nectar
 component Counter(initial: i32) {
     let mut count: i32 = initial;
 
@@ -183,7 +183,7 @@ Components support:
 
 Stores are global reactive state containers, inspired by Flux/Redux but with fine-grained signal reactivity.
 
-```arc
+```nectar
 struct User {
     id: u32,
     name: String,
@@ -257,7 +257,7 @@ component Dashboard() {
 
 ### Structs & Enums
 
-```arc
+```nectar
 struct Todo {
     id: u32,
     text: String,
@@ -281,14 +281,14 @@ enum AuthStatus {
 // Struct instantiation
 let todo = Todo {
     id: 0,
-    text: "Learn Arc",
+    text: "Learn Nectar",
     done: false,
 };
 ```
 
 ### Traits
 
-```arc
+```nectar
 trait Display {
     fn to_string(&self) -> String;
 }
@@ -312,7 +312,7 @@ impl Display for Todo {
 
 ### Generics
 
-```arc
+```nectar
 fn first<T>(items: [T]) -> &T {
     &items[0]
 }
@@ -338,9 +338,9 @@ fn compare<T>(a: &T, b: &T) -> bool where T: Eq {
 
 ### Pattern Matching & Destructuring
 
-Arc supports exhaustive pattern matching with the `match` expression. The compiler checks that all variants are covered.
+Nectar supports exhaustive pattern matching with the `match` expression. The compiler checks that all variants are covered.
 
-```arc
+```nectar
 // Match on enums
 match status {
     AuthStatus::LoggedOut => println("Not logged in"),
@@ -371,7 +371,7 @@ match filter {
 
 ### Closures & Iterators
 
-```arc
+```nectar
 // Closure syntax
 let double = fn(x: i32) -> i32 { x * 2 };
 
@@ -391,7 +391,7 @@ for todo in &mut self.todos {
 
 ### Error Handling
 
-```arc
+```nectar
 // Option type
 let user: Option<User> = None;
 
@@ -424,7 +424,7 @@ try {
 
 ### String Interpolation
 
-```arc
+```nectar
 // Using format()
 let greeting = format("Hello, {}!", name);
 
@@ -443,7 +443,7 @@ render {
 
 `fetch` is a first-class language construct, not a library import.
 
-```arc
+```nectar
 // GET request
 let response = await fetch("https://jsonplaceholder.typicode.com/posts");
 let posts: [Post] = response.json();
@@ -473,7 +473,7 @@ async action fetch_posts(&mut self) {
 
 ### Concurrency
 
-```arc
+```nectar
 // Spawn a task on a Web Worker
 spawn {
     let result = heavy_computation();
@@ -499,7 +499,7 @@ let results = parallel {
 
 The `agent` keyword defines a component that wraps LLM interaction with tool calling and streaming.
 
-```arc
+```nectar
 agent ChatBot {
     prompt system = "You are a helpful coding assistant.";
 
@@ -550,7 +550,7 @@ agent ChatBot {
 
 ### Routing & Navigation
 
-```arc
+```nectar
 // Define routes
 router AppRouter {
     route "/" => Home,
@@ -577,7 +577,7 @@ fn go_home(&self) {
 
 ### Animations & Transitions
 
-```arc
+```nectar
 component AnimatedCard() {
     // CSS transitions on state changes
     transition opacity 300ms ease-in-out;
@@ -605,9 +605,9 @@ component AnimatedCard() {
 
 ### Accessibility
 
-Arc has first-class support for ARIA attributes, roles, and focus management.
+Nectar has first-class support for ARIA attributes, roles, and focus management.
 
-```arc
+```nectar
 component Modal(title: String) {
     render {
         <div role="dialog" aria-label={self.title}>
@@ -627,7 +627,7 @@ The runtime provides built-in helpers: `setAriaAttribute`, `setRole`, `manageFoc
 
 Two-way data binding with the `bind:` directive keeps signals and form inputs in sync automatically.
 
-```arc
+```nectar
 component LoginForm() {
     let mut email: String = "";
     let mut password: String = "";
@@ -646,7 +646,7 @@ component LoginForm() {
 
 ### Modules & Imports
 
-```arc
+```nectar
 // Import from standard library
 use std::string;
 
@@ -660,7 +660,7 @@ use crate::components::UserCard as Card;
 use crate::utils::*;
 
 // Module declarations
-mod auth;           // loads auth.arc from the same directory
+mod auth;           // loads auth.nectar from the same directory
 mod components {    // inline module
     pub component Button(label: String) {
         render {
@@ -672,7 +672,7 @@ mod components {    // inline module
 
 ### Testing
 
-```arc
+```nectar
 test "addition works" {
     assert_eq(2 + 2, 4);
 }
@@ -697,31 +697,31 @@ test "async fetch" {
 Run tests with:
 
 ```bash
-arc test my_tests.arc
-arc test my_tests.arc --filter "todo"
+nectar test my_tests.nectar
+nectar test my_tests.nectar --filter "todo"
 ```
 
 ---
 
 ## Toolchain
 
-All tools are subcommands of the single `arc` binary.
+All tools are subcommands of the single `nectar` binary.
 
-### `arc build`
+### `nectar build`
 
-Compile `.arc` source files to WebAssembly.
+Compile `.nectar` source files to WebAssembly.
 
 ```bash
-arc build app.arc                    # Output app.wat (text format)
-arc build app.arc --emit-wasm        # Output app.wasm (binary)
-arc build app.arc -o out.wasm --emit-wasm
-arc build app.arc --ssr              # Output app.ssr.js (server-side rendering)
-arc build app.arc --hydrate          # Output app.hydrate.wat (hydration bundle)
-arc build app.arc -O1                # Basic optimization (const fold + DCE)
-arc build app.arc -O2                # Full optimization (+ tree shaking + WASM opts)
-arc build app.arc --emit-tokens      # Debug: print token stream
-arc build app.arc --emit-ast         # Debug: print AST
-arc build app.arc --no-check         # Skip borrow checker and type checker
+nectar build app.nectar                    # Output app.wat (text format)
+nectar build app.nectar --emit-wasm        # Output app.wasm (binary)
+nectar build app.nectar -o out.wasm --emit-wasm
+nectar build app.nectar --ssr              # Output app.ssr.js (server-side rendering)
+nectar build app.nectar --hydrate          # Output app.hydrate.wat (hydration bundle)
+nectar build app.nectar -O1                # Basic optimization (const fold + DCE)
+nectar build app.nectar -O2                # Full optimization (+ tree shaking + WASM opts)
+nectar build app.nectar --emit-tokens      # Debug: print token stream
+nectar build app.nectar --emit-ast         # Debug: print AST
+nectar build app.nectar --no-check         # Skip borrow checker and type checker
 ```
 
 | Flag | Description |
@@ -735,27 +735,27 @@ arc build app.arc --no-check         # Skip borrow checker and type checker
 | `--no-check` | Skip borrow checking and type checking |
 | `-O`, `--optimize` | Optimization level: `0` (none), `1` (const fold + DCE), `2` (all passes) |
 
-### `arc test`
+### `nectar test`
 
 Compile and run `test` blocks.
 
 ```bash
-arc test tests.arc
-arc test tests.arc --filter "auth"
+nectar test tests.nectar
+nectar test tests.nectar --filter "auth"
 ```
 
 | Flag | Description |
 |---|---|
 | `--filter` | Run only tests whose name contains the given pattern |
 
-### `arc fmt`
+### `nectar fmt`
 
-Format Arc source files.
+Format Nectar source files.
 
 ```bash
-arc fmt app.arc                 # Format in place
-arc fmt app.arc --check         # Check formatting (exit 1 if changes needed)
-arc fmt --stdin                 # Read from stdin, write to stdout
+nectar fmt app.nectar                 # Format in place
+nectar fmt app.nectar --check         # Check formatting (exit 1 if changes needed)
+nectar fmt --stdin                 # Read from stdin, write to stdout
 ```
 
 | Flag | Description |
@@ -763,27 +763,27 @@ arc fmt --stdin                 # Read from stdin, write to stdout
 | `--check` | Check without writing; exits with code 1 if reformatting is needed |
 | `--stdin` | Read source from stdin instead of a file |
 
-### `arc lint`
+### `nectar lint`
 
-Run static analysis on Arc source files.
+Run static analysis on Nectar source files.
 
 ```bash
-arc lint app.arc
-arc lint app.arc --fix          # Auto-fix warnings where possible
+nectar lint app.nectar
+nectar lint app.nectar --fix          # Auto-fix warnings where possible
 ```
 
 | Flag | Description |
 |---|---|
 | `--fix` | Attempt to auto-fix lint warnings |
 
-### `arc dev`
+### `nectar dev`
 
 Start a development server with hot reload. The server watches for file changes, recompiles, and pushes updates to the browser via WebSocket -- preserving signal state across reloads.
 
 ```bash
-arc dev                            # Defaults: src=., port=3000, build-dir=./build
-arc dev --src ./src --port 8080
-arc dev --build-dir ./dist
+nectar dev                            # Defaults: src=., port=3000, build-dir=./build
+nectar dev --src ./src --port 8080
+nectar dev --build-dir ./dist
 ```
 
 | Flag | Description |
@@ -792,20 +792,20 @@ arc dev --build-dir ./dist
 | `--port`, `-p` | Port to serve on (default: `3000`) |
 | `--build-dir` | Build output directory (default: `./build`) |
 
-### `arc init` / `arc add` / `arc install`
+### `nectar init` / `nectar add` / `nectar install`
 
 Package management commands.
 
 ```bash
-arc init                           # Create Arc.toml in current directory
-arc init --name my-project         # Create with a specific project name
+nectar init                           # Create Nectar.toml in current directory
+nectar init --name my-project         # Create with a specific project name
 
-arc add router                     # Add a dependency (latest version)
-arc add router --version "^1.0"    # Add with version constraint
-arc add utils --path ../utils      # Add a local path dependency
-arc add ui --features "dark,icons" # Add with features
+nectar add router                     # Add a dependency (latest version)
+nectar add router --version "^1.0"    # Add with version constraint
+nectar add utils --path ../utils      # Add a local path dependency
+nectar add ui --features "dark,icons" # Add with features
 
-arc install                        # Resolve and download all dependencies
+nectar install                        # Resolve and download all dependencies
 ```
 
 ### `--lsp`
@@ -813,7 +813,7 @@ arc install                        # Resolve and download all dependencies
 Start the Language Server Protocol server for editor integration (completion, diagnostics, go-to-definition).
 
 ```bash
-arc --lsp
+nectar --lsp
 ```
 
 ---
@@ -825,7 +825,7 @@ arc --lsp
 ```
                                 ┌──────────────┐
                                 │  Source Code  │
-                                │   (.arc)      │
+                                │   (.nectar)      │
                                 └──────┬───────┘
                                        │
                                        v
@@ -868,7 +868,7 @@ arc --lsp
 
 | Module | File | Description |
 |---|---|---|
-| **Lexer** | `lexer.rs` | Tokenizes Arc source into a stream of typed tokens |
+| **Lexer** | `lexer.rs` | Tokenizes Nectar source into a stream of typed tokens |
 | **Tokens** | `token.rs` | Token type definitions and span tracking |
 | **AST** | `ast.rs` | Abstract syntax tree node definitions for the full grammar |
 | **Parser** | `parser.rs` | Recursive descent parser with error recovery |
@@ -884,13 +884,13 @@ arc --lsp
 | **Tree Shake** | `tree_shake.rs` | Removes unused functions, structs, and components |
 | **WASM Opt** | `wasm_opt.rs` | Peephole optimizations on generated WAT |
 | **Sourcemap** | `sourcemap.rs` | Source map generation for debugging |
-| **Formatter** | `formatter.rs` | Code formatter for `arc fmt` |
-| **Linter** | `linter.rs` | Static analysis rules for `arc lint` |
+| **Formatter** | `formatter.rs` | Code formatter for `nectar fmt` |
+| **Linter** | `linter.rs` | Static analysis rules for `nectar lint` |
 | **LSP** | `lsp.rs` | Language Server Protocol implementation |
 | **Dev Server** | `devserver.rs` | Development server with file watching and hot reload |
 | **Module Resolver** | `module_resolver.rs` | Resolves `mod` and `use` paths to files |
 | **Module Loader** | `module_loader.rs` | Loads and merges multi-file projects |
-| **Package** | `package.rs` | `Arc.toml` manifest parsing and lockfile management |
+| **Package** | `package.rs` | `Nectar.toml` manifest parsing and lockfile management |
 | **Registry** | `registry.rs` | Package registry client for dependency downloads |
 | **Resolver** | `resolver.rs` | Dependency version resolution |
 | **Stdlib** | `stdlib.rs` | Built-in standard library definitions |
@@ -899,41 +899,41 @@ arc --lsp
 
 ## Runtime
 
-Arc compiles to WebAssembly, which cannot directly access the DOM or browser APIs. The **runtime bridge** (`runtime/`) is a set of lightweight JavaScript modules that provide the host functions WASM imports at instantiation.
+Nectar compiles to WebAssembly, which cannot directly access the DOM or browser APIs. The **runtime bridge** (`runtime/`) is a set of lightweight JavaScript modules that provide the host functions WASM imports at instantiation.
 
-The runtime is intentionally minimal -- there is no virtual DOM, no diffing algorithm, and no framework overhead. Arc uses fine-grained reactivity (signals) to surgically update only the DOM nodes that depend on changed state.
+The runtime is intentionally minimal -- there is no virtual DOM, no diffing algorithm, and no framework overhead. Nectar uses fine-grained reactivity (signals) to surgically update only the DOM nodes that depend on changed state.
 
 | Runtime Module | Purpose |
 |---|---|
-| `arc-runtime.js` | Core DOM bridge (`createElement`, `setText`, `appendChild`, `setAttribute`, `addEventListener`), signal/effect reactivity engine, HTTP fetch bridge, Web Worker concurrency, AI/LLM interaction, WebSocket/SSE streaming, router, accessibility helpers, and Web API bindings (localStorage, clipboard, timers, IntersectionObserver, etc.) |
-| `arc-ssr-runtime.js` | Node.js server-side rendering -- provides a mock DOM that collects HTML strings instead of creating real nodes. Exports `renderToString()` and `renderToStream()`. |
-| `arc-hydration.js` | Attaches interactivity to server-rendered HTML. Walks existing DOM nodes, matches hydration markers, and binds signals and event handlers without recreating the tree. |
-| `arc-hot-reload.js` | Development-mode hot module replacement. Connects to the dev server via WebSocket, swaps WASM modules on file change, and preserves signal state across reloads. |
-| `arc-test-runner.js` | Executes compiled test WASM modules in Node.js and reports pass/fail results. |
-| `arc-test-renderer.js` | Virtual DOM test renderer for component testing -- mount components, query by text/role/attribute, simulate clicks and input. |
+| `nectar-runtime.js` | Core DOM bridge (`createElement`, `setText`, `appendChild`, `setAttribute`, `addEventListener`), signal/effect reactivity engine, HTTP fetch bridge, Web Worker concurrency, AI/LLM interaction, WebSocket/SSE streaming, router, accessibility helpers, and Web API bindings (localStorage, clipboard, timers, IntersectionObserver, etc.) |
+| `nectar-ssr-runtime.js` | Node.js server-side rendering -- provides a mock DOM that collects HTML strings instead of creating real nodes. Exports `renderToString()` and `renderToStream()`. |
+| `nectar-hydration.js` | Attaches interactivity to server-rendered HTML. Walks existing DOM nodes, matches hydration markers, and binds signals and event handlers without recreating the tree. |
+| `nectar-hot-reload.js` | Development-mode hot module replacement. Connects to the dev server via WebSocket, swaps WASM modules on file change, and preserves signal state across reloads. |
+| `nectar-test-runner.js` | Executes compiled test WASM modules in Node.js and reports pass/fail results. |
+| `nectar-test-renderer.js` | Virtual DOM test renderer for component testing -- mount components, query by text/role/attribute, simulate clicks and input. |
 
 ---
 
 ## Examples
 
-The `examples/` directory contains complete programs demonstrating Arc's features.
+The `examples/` directory contains complete programs demonstrating Nectar's features.
 
 | File | Description |
 |---|---|
-| [`hello.arc`](examples/hello.arc) | Hello World -- components, props, render templates |
-| [`counter.arc`](examples/counter.arc) | Interactive counter -- state, signals, event handlers, ownership |
-| [`todo.arc`](examples/todo.arc) | Todo app -- structs, enums, ownership, collections, pattern matching |
-| [`store.arc`](examples/store.arc) | Global stores -- signals, actions, computed values, effects, async actions |
-| [`app.arc`](examples/app.arc) | Full application -- routing, scoped styles, route guards, `<Link>` navigation |
-| [`api.arc`](examples/api.arc) | API communication -- fetch, async/await, GET/POST/DELETE, error handling |
-| [`ai-chat.arc`](examples/ai-chat.arc) | AI chat interface -- `agent` keyword, tool definitions, streaming responses |
+| [`hello.nectar`](examples/hello.nectar) | Hello World -- components, props, render templates |
+| [`counter.nectar`](examples/counter.nectar) | Interactive counter -- state, signals, event handlers, ownership |
+| [`todo.nectar`](examples/todo.nectar) | Todo app -- structs, enums, ownership, collections, pattern matching |
+| [`store.nectar`](examples/store.nectar) | Global stores -- signals, actions, computed values, effects, async actions |
+| [`app.nectar`](examples/app.nectar) | Full application -- routing, scoped styles, route guards, `<Link>` navigation |
+| [`api.nectar`](examples/api.nectar) | API communication -- fetch, async/await, GET/POST/DELETE, error handling |
+| [`ai-chat.nectar`](examples/ai-chat.nectar) | AI chat interface -- `agent` keyword, tool definitions, streaming responses |
 
 Compile any example:
 
 ```bash
-arc build examples/counter.arc --emit-wasm
-arc build examples/app.arc --ssr
-arc build examples/todo.arc -O2 --emit-wasm
+nectar build examples/counter.nectar --emit-wasm
+nectar build examples/app.nectar --ssr
+nectar build examples/todo.nectar -O2 --emit-wasm
 ```
 
 ---
@@ -943,8 +943,8 @@ arc build examples/todo.arc -O2 --emit-wasm
 ### Building from source
 
 ```bash
-git clone https://github.com/BlakeBurnette/arc-lang.git
-cd arc-lang
+git clone https://github.com/BlakeBurnette/nectar-lang.git
+cd nectar-lang
 cargo build
 ```
 
@@ -957,7 +957,7 @@ cargo test
 ### Project structure
 
 ```
-arc-lang/
+nectar-lang/
   compiler/
     src/
       main.rs          # CLI entry point
@@ -967,20 +967,20 @@ arc-lang/
       codegen.rs       # WASM code generation
       ...              # (see Architecture section)
   runtime/
-    arc-runtime.js     # Browser runtime bridge
-    arc-ssr-runtime.js # SSR runtime
-    arc-hydration.js   # Hydration runtime
-    arc-hot-reload.js  # HMR client
-    arc-test-runner.js # Test execution
-    arc-test-renderer.js # Component test renderer
+    nectar-runtime.js     # Browser runtime bridge
+    nectar-ssr-runtime.js # SSR runtime
+    nectar-hydration.js   # Hydration runtime
+    nectar-hot-reload.js  # HMR client
+    nectar-test-runner.js # Test execution
+    nectar-test-renderer.js # Component test renderer
   examples/
-    hello.arc
-    counter.arc
-    todo.arc
-    store.arc
-    app.arc
-    api.arc
-    ai-chat.arc
+    hello.nectar
+    counter.nectar
+    todo.nectar
+    store.nectar
+    app.nectar
+    api.nectar
+    ai-chat.nectar
 ```
 
 ### How to contribute

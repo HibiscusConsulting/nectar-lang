@@ -1,4 +1,4 @@
-// API Communication in Arc
+// API Communication in Nectar
 // Demonstrates: fetch, async/await, JSON handling, error handling
 
 struct Post {

@@ -1,6 +1,6 @@
 use crate::ast::*;
 
-/// Generates WebAssembly Text Format (WAT) from an Arc AST.
+/// Generates WebAssembly Text Format (WAT) from a Nectar AST.
 ///
 /// This is the initial codegen backend. We emit WAT first for readability
 /// and debugging, then can convert to binary .wasm via wat2wasm or a
@@ -419,6 +419,26 @@ impl WasmCodegen {
 
         // Inject transitions for this component
         self.generate_transition_injection(comp_name, &comp.transitions);
+
+        // If the component has a skeleton, mount placeholder first and replace on first signal change
+        if let Some(ref skel) = comp.skeleton {
+            self.line(";; skeleton — mount placeholder, replace on first signal change");
+            self.line("(block $skeleton_done");
+            self.indent += 1;
+
+            // Mount the skeleton template into $root
+            self.generate_template(&skel.body.body, "$root");
+
+            // Create an effect that watches component signals; on first change,
+            // clear skeleton, render real content, and break out
+            self.line(";; effect: watch signals, swap skeleton for real content on change");
+            self.line("call $skeleton_mount");
+            self.line("(local.get $root)");
+            self.line("call $skeleton_replace");
+
+            self.indent -= 1;
+            self.line(") ;; end $skeleton_done");
+        }
 
         // If the component has an error boundary, wrap the render in a try/catch
         if let Some(ref eb) = comp.error_boundary {

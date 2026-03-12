@@ -1,23 +1,23 @@
 /**
- * Arc Hydration Runtime — attaches interactivity to server-rendered HTML.
+ * Nectar Hydration Runtime — attaches interactivity to server-rendered HTML.
  *
  * Instead of creating DOM from scratch, the hydration runtime walks the
- * existing server-rendered DOM, matches elements bearing `data-arc-hydrate`
- * and `data-arc-key` markers to their component definitions, and attaches
+ * existing server-rendered DOM, matches elements bearing `data-nectar-hydrate`
+ * and `data-nectar-key` markers to their component definitions, and attaches
  * signal bindings and event handlers to the pre-existing nodes.
  *
  * After hydration the app becomes fully interactive with the same
- * fine-grained reactivity as a client-rendered Arc app.
+ * fine-grained reactivity as a client-rendered Nectar app.
  */
 
 // --- Event delegation ---
 
-/** Map of data-arc-key -> { event -> handler } for delegated events */
+/** Map of data-nectar-key -> { event -> handler } for delegated events */
 const __delegatedHandlers = new Map();
 
 /**
  * Single root-level event listener that dispatches to the correct handler
- * based on the nearest `data-arc-key` attribute on the event target.
+ * based on the nearest `data-nectar-key` attribute on the event target.
  */
 function __initEventDelegation(root) {
   const DELEGATED_EVENTS = [
@@ -30,7 +30,7 @@ function __initEventDelegation(root) {
     root.addEventListener(eventName, (event) => {
       let target = event.target;
       while (target && target !== root) {
-        const key = target.getAttribute('data-arc-key');
+        const key = target.getAttribute('data-nectar-key');
         if (key !== null) {
           const handlers = __delegatedHandlers.get(key);
           if (handlers && handlers[eventName]) {
@@ -44,7 +44,7 @@ function __initEventDelegation(root) {
   }
 }
 
-// --- Signal / reactivity integration (from arc-runtime.js) ---
+// --- Signal / reactivity integration (from nectar-runtime.js) ---
 
 /** Reference to the runtime's Signal class, injected during hydrate() */
 let Signal = null;
@@ -63,13 +63,13 @@ function __createEffect(fn) {
 /**
  * Hydrate a server-rendered DOM tree, attaching component interactivity.
  *
- * @param {object} wasmModule — instantiated Arc WASM module (or JS runtime bridge)
+ * @param {object} wasmModule — instantiated Nectar WASM module (or JS runtime bridge)
  * @param {HTMLElement} rootElement — the DOM root containing server-rendered HTML
  */
 function hydrate(wasmModule, rootElement) {
   // Restore store state from the server-serialized blob
-  if (window.__ARC_STATE__) {
-    _restoreStoreState(wasmModule, window.__ARC_STATE__);
+  if (window.__NECTAR_STATE__) {
+    _restoreStoreState(wasmModule, window.__NECTAR_STATE__);
   }
 
   // Grab runtime primitives from the module if available
@@ -80,9 +80,9 @@ function hydrate(wasmModule, rootElement) {
   __initEventDelegation(rootElement);
 
   // Walk the DOM and find all hydration roots
-  const hydrateRoots = rootElement.querySelectorAll('[data-arc-hydrate]');
+  const hydrateRoots = rootElement.querySelectorAll('[data-nectar-hydrate]');
   for (const el of hydrateRoots) {
-    const componentName = el.getAttribute('data-arc-hydrate');
+    const componentName = el.getAttribute('data-nectar-hydrate');
     _hydrateComponent(wasmModule, el, componentName);
   }
 }
@@ -97,7 +97,7 @@ function _hydrateComponent(wasmModule, element, componentName) {
     || wasmModule[componentName + '_mount'];
 
   if (!descriptor) {
-    console.warn(`[arc-hydrate] No hydration descriptor for component: ${componentName}`);
+    console.warn(`[nectar-hydrate] No hydration descriptor for component: ${componentName}`);
     return;
   }
 
@@ -108,7 +108,7 @@ function _hydrateComponent(wasmModule, element, componentName) {
   }
 
   // Otherwise, walk the keyed elements and attach bindings
-  const keyedElements = element.querySelectorAll('[data-arc-key]');
+  const keyedElements = element.querySelectorAll('[data-nectar-key]');
   for (const keyedEl of keyedElements) {
     hydrateElement(wasmModule, keyedEl, componentName);
   }
@@ -119,11 +119,11 @@ function _hydrateComponent(wasmModule, element, componentName) {
  * hydration key.
  *
  * @param {object} wasmModule
- * @param {HTMLElement} element — the DOM node with a `data-arc-key`
+ * @param {HTMLElement} element — the DOM node with a `data-nectar-key`
  * @param {string} componentName
  */
 function hydrateElement(wasmModule, element, componentName) {
-  const key = element.getAttribute('data-arc-key');
+  const key = element.getAttribute('data-nectar-key');
   if (key === null) return;
 
   // Look up bindings for this key from the module
@@ -200,5 +200,5 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 if (typeof window !== 'undefined') {
-  window.__arcHydrate = { hydrate, hydrateElement };
+  window.__nectarHydrate = { hydrate, hydrateElement };
 }

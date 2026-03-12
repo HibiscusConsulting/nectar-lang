@@ -1,7 +1,7 @@
 /**
- * Arc Hot Reload Client — development-mode module hot replacement.
+ * Nectar Hot Reload Client — development-mode module hot replacement.
  *
- * Connects to the Arc dev server via WebSocket, listens for file-change
+ * Connects to the Nectar dev server via WebSocket, listens for file-change
  * notifications, and swaps WASM modules or CSS without a full page reload.
  * Signal state is serialized before the swap and restored afterward so that
  * application state survives a hot reload.
@@ -11,7 +11,7 @@ export class HotReloadClient {
   /**
    * @param {object} options
    * @param {string}   options.url       - WebSocket URL (default: ws://localhost:3000)
-   * @param {object}   options.runtime   - Reference to the ArcRuntime instance
+   * @param {object}   options.runtime   - Reference to the NectarRuntime instance
    * @param {function} [options.onReload] - Optional callback after a successful reload
    * @param {function} [options.onError]  - Optional callback on reload failure
    */
@@ -19,7 +19,7 @@ export class HotReloadClient {
     this.url = options.url || 'ws://localhost:3000';
     this.runtime = options.runtime || null;
     this.onReload = options.onReload || (() => {});
-    this.onError = options.onError || ((err) => console.error('[arc-hot-reload]', err));
+    this.onError = options.onError || ((err) => console.error('[nectar-hot-reload]', err));
 
     /** @type {WebSocket|null} */
     this._ws = null;
@@ -52,7 +52,7 @@ export class HotReloadClient {
     }
 
     this._ws.onopen = () => {
-      console.log('[arc-hot-reload] connected to', this.url);
+      console.log('[nectar-hot-reload] connected to', this.url);
       this._reconnectDelay = 1000; // reset backoff
     };
 
@@ -65,7 +65,7 @@ export class HotReloadClient {
     };
 
     this._ws.onclose = () => {
-      console.log('[arc-hot-reload] disconnected, will reconnect...');
+      console.log('[nectar-hot-reload] disconnected, will reconnect...');
       this._scheduleReconnect();
     };
   }
@@ -94,7 +94,7 @@ export class HotReloadClient {
     try {
       message = JSON.parse(data);
     } catch {
-      console.warn('[arc-hot-reload] received non-JSON message:', data);
+      console.warn('[nectar-hot-reload] received non-JSON message:', data);
       return;
     }
 
@@ -109,7 +109,7 @@ export class HotReloadClient {
         this.onError(new Error(message.message || 'Dev server error'));
         break;
       default:
-        console.log('[arc-hot-reload] unknown message type:', message.type);
+        console.log('[nectar-hot-reload] unknown message type:', message.type);
     }
   }
 
@@ -125,7 +125,7 @@ export class HotReloadClient {
    */
   async _handleReload(message) {
     const files = message.files || [];
-    console.log('[arc-hot-reload] reloading:', files);
+    console.log('[nectar-hot-reload] reloading:', files);
 
     for (const filePath of files) {
       try {
@@ -158,7 +158,7 @@ export class HotReloadClient {
         // Step 4: Restore signal state.
         this._restoreSignals(savedState);
 
-        console.log('[arc-hot-reload] reloaded:', filePath);
+        console.log('[nectar-hot-reload] reloaded:', filePath);
         this.onReload({ file: filePath });
       } catch (err) {
         this.onError(err);
@@ -171,7 +171,7 @@ export class HotReloadClient {
   // -----------------------------------------------------------------------
 
   /**
-   * Swap the WASM module inside the running ArcRuntime without a full
+   * Swap the WASM module inside the running NectarRuntime without a full
    * page reload. The new module is instantiated with the same import
    * object, and its exported `$init` (or similar entry point) is called.
    *
@@ -322,19 +322,19 @@ export class HotReloadClient {
   }
 
   /**
-   * Replace a scoped style tag in the document. Arc components have
-   * `<style data-arc-scope="ComponentName">` tags; we find and replace them.
+   * Replace a scoped style tag in the document. Nectar components have
+   * `<style data-nectar-scope="ComponentName">` tags; we find and replace them.
    *
    * @param {string} scope - Component scope identifier.
    * @param {string} cssText - New CSS text.
    */
   _injectScopedStyle(scope, cssText) {
     // Find existing style tag for this scope.
-    let styleEl = document.querySelector(`style[data-arc-scope="${scope}"]`);
+    let styleEl = document.querySelector(`style[data-nectar-scope="${scope}"]`);
 
     if (!styleEl) {
       styleEl = document.createElement('style');
-      styleEl.setAttribute('data-arc-scope', scope);
+      styleEl.setAttribute('data-nectar-scope', scope);
       document.head.appendChild(styleEl);
     }
 
@@ -353,7 +353,7 @@ export class HotReloadClient {
     for (const link of links) {
       if (link.href && link.href.includes(fileName)) {
         const url = new URL(link.href);
-        url.searchParams.set('_arc_reload', Date.now().toString());
+        url.searchParams.set('_nectar_reload', Date.now().toString());
         link.href = url.toString();
       }
     }
@@ -364,7 +364,7 @@ export class HotReloadClient {
   // -----------------------------------------------------------------------
 
   /**
-   * Convert a source file path (e.g., "src/app.arc") to a .wasm URL
+   * Convert a source file path (e.g., "src/app.nectar") to a .wasm URL
    * served by the dev server (e.g., "/app.wasm").
    */
   _sourceToWasmUrl(filePath) {

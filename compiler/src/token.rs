@@ -1,4 +1,4 @@
-/// Token types for the Arc language
+/// Token types for the Nectar language
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     // Literals

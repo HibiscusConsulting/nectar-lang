@@ -1,6 +1,6 @@
-//! Arc package manifest parsing and lockfile support.
+//! Nectar package manifest parsing and lockfile support.
 //!
-//! Handles `Arc.toml` manifests (similar to Cargo.toml) and `Arc.lock` lockfiles
+//! Handles `Nectar.toml` manifests (similar to Cargo.toml) and `Nectar.lock` lockfiles
 //! for reproducible builds.
 
 use std::collections::BTreeMap;
@@ -11,12 +11,12 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
-// Arc.toml manifest
+// Nectar.toml manifest
 // ---------------------------------------------------------------------------
 
-/// Top-level manifest parsed from `Arc.toml`.
+/// Top-level manifest parsed from `Nectar.toml`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArcManifest {
+pub struct NectarManifest {
     pub package: PackageInfo,
 
     #[serde(default)]
@@ -44,9 +44,9 @@ pub struct PackageInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DependencySpec {
-    /// Short form: `arc-ui = "1.0"`
+    /// Short form: `nectar-ui = "1.0"`
     Simple(String),
-    /// Table form: `arc-ui = { version = "1.0", features = ["3d"] }`
+    /// Table form: `nectar-ui = { version = "1.0", features = ["3d"] }`
     Detailed(DetailedDependency),
 }
 
@@ -96,12 +96,12 @@ impl Dependency {
 }
 
 // ---------------------------------------------------------------------------
-// Arc.lock lockfile
+// Nectar.lock lockfile
 // ---------------------------------------------------------------------------
 
 /// Lockfile that pins exact resolved versions for reproducible builds.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ArcLockfile {
+pub struct NectarLockfile {
     /// Lockfile format version.
     #[serde(default = "default_lock_version")]
     pub version: u32,
@@ -131,31 +131,31 @@ pub struct LockedPackage {
 // Parsing helpers
 // ---------------------------------------------------------------------------
 
-/// Parse an `Arc.toml` manifest from a file path.
-pub fn parse_manifest(path: &str) -> Result<ArcManifest> {
+/// Parse an `Nectar.toml` manifest from a file path.
+pub fn parse_manifest(path: &str) -> Result<NectarManifest> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("failed to read manifest at {}", path))?;
-    let manifest: ArcManifest =
+    let manifest: NectarManifest =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path))?;
     Ok(manifest)
 }
 
-/// Parse an `Arc.lock` lockfile from a file path.  Returns `Ok(None)` if the
+/// Parse an `Nectar.lock` lockfile from a file path.  Returns `Ok(None)` if the
 /// file does not exist.
-pub fn parse_lockfile(path: &str) -> Result<Option<ArcLockfile>> {
+pub fn parse_lockfile(path: &str) -> Result<Option<NectarLockfile>> {
     let p = Path::new(path);
     if !p.exists() {
         return Ok(None);
     }
     let content = fs::read_to_string(p)
         .with_context(|| format!("failed to read lockfile at {}", path))?;
-    let lockfile: ArcLockfile =
+    let lockfile: NectarLockfile =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path))?;
     Ok(Some(lockfile))
 }
 
-/// Serialize an `ArcLockfile` and write it to disk.
-pub fn write_lockfile(path: &str, lockfile: &ArcLockfile) -> Result<()> {
+/// Serialize an `NectarLockfile` and write it to disk.
+pub fn write_lockfile(path: &str, lockfile: &NectarLockfile) -> Result<()> {
     let content =
         toml::to_string_pretty(lockfile).context("failed to serialize lockfile")?;
     fs::write(path, content).with_context(|| format!("failed to write lockfile to {}", path))?;
@@ -163,7 +163,7 @@ pub fn write_lockfile(path: &str, lockfile: &ArcLockfile) -> Result<()> {
 }
 
 /// Return a list of `Dependency` values from the manifest (regular deps only).
-pub fn collect_dependencies(manifest: &ArcManifest) -> Vec<Dependency> {
+pub fn collect_dependencies(manifest: &NectarManifest) -> Vec<Dependency> {
     manifest
         .dependencies
         .iter()
@@ -172,7 +172,7 @@ pub fn collect_dependencies(manifest: &ArcManifest) -> Vec<Dependency> {
 }
 
 /// Return a list of `Dependency` values from the manifest (dev deps only).
-pub fn collect_dev_dependencies(manifest: &ArcManifest) -> Vec<Dependency> {
+pub fn collect_dev_dependencies(manifest: &NectarManifest) -> Vec<Dependency> {
     manifest
         .dev_dependencies
         .iter()
@@ -180,7 +180,7 @@ pub fn collect_dev_dependencies(manifest: &ArcManifest) -> Vec<Dependency> {
         .collect()
 }
 
-/// Generate a default `Arc.toml` for `arc init`.
+/// Generate a default `Nectar.toml` for `nectar init`.
 pub fn default_manifest(name: &str) -> String {
     format!(
         r#"[package]

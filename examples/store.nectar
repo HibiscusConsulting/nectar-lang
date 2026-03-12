@@ -1,4 +1,4 @@
-// Global Store in Arc
+// Global Store in Nectar
 // Demonstrates: Flux-like global state, actions, computed values, effects
 
 struct User {

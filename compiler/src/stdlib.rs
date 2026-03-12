@@ -1,6 +1,6 @@
-//! Arc Standard Library
+//! Nectar Standard Library
 //!
-//! Defines built-in types and functions available to every Arc program.
+//! Defines built-in types and functions available to every Nectar program.
 //! The type checker and codegen consult this module to resolve standard
 //! library names without requiring explicit imports.
 
@@ -15,7 +15,7 @@ use crate::ast::Type;
 /// A built-in type registered in the standard library.
 #[derive(Debug, Clone)]
 pub struct BuiltinType {
-    /// The type name as it appears in Arc source code (e.g. "Vec").
+    /// The type name as it appears in Nectar source code (e.g. "Vec").
     pub name: String,
     /// Number of generic type parameters (e.g. Vec<T> = 1, HashMap<K,V> = 2).
     pub type_params: Vec<String>,
@@ -62,7 +62,7 @@ pub struct BuiltinParam {
 // StdLib — the registry
 // ---------------------------------------------------------------------------
 
-/// Registry of all built-in types and free functions available in Arc.
+/// Registry of all built-in types and free functions available in Nectar.
 #[derive(Debug)]
 pub struct StdLib {
     types: HashMap<String, BuiltinType>,
@@ -904,7 +904,7 @@ impl StdLib {
     }
 
     // -- Web API bindings -----------------------------------------------------
-    // These register the signatures for web-platform APIs that Arc programs can
+    // These register the signatures for web-platform APIs that Nectar programs can
     // call directly. Codegen maps these names to WASM imports from the
     // `webapi` module in the JS runtime.
     fn register_web_api_functions(&mut self) {

@@ -1,4 +1,4 @@
-# Arc Examples Guide
+# Nectar Examples Guide
 
 This document walks through each example program in the `examples/` directory, explaining the concepts demonstrated and how they fit together.
 
@@ -6,51 +6,54 @@ This document walks through each example program in the `examples/` directory, e
 
 ## Table of Contents
 
-1. [hello.arc -- Hello World](#helloarc----hello-world)
-2. [counter.arc -- Stateful Counter](#counterarc----stateful-counter)
-3. [todo.arc -- Todo Application](#todoarc----todo-application)
-4. [api.arc -- API Communication](#apiarc----api-communication)
-5. [store.arc -- Global State Management](#storearc----global-state-management)
-6. [app.arc -- Routed Application with Styles](#apparc----routed-application-with-styles)
-7. [ai-chat.arc -- AI Chat Interface](#ai-chatarc----ai-chat-interface)
+1. [hello.nectar -- Hello World](#helloarc----hello-world)
+2. [counter.nectar -- Stateful Counter](#counterarc----stateful-counter)
+3. [todo.nectar -- Todo Application](#todoarc----todo-application)
+4. [api.nectar -- API Communication](#apiarc----api-communication)
+5. [store.nectar -- Global State Management](#storearc----global-state-management)
+6. [app.nectar -- Routed Application with Styles](#apparc----routed-application-with-styles)
+7. [ai-chat.nectar -- AI Chat Interface](#ai-chatarc----ai-chat-interface)
+8. [tests.nectar -- Comprehensive Test Patterns](#testsarc----comprehensive-test-patterns)
+9. [component-tests.nectar -- Component Testing Patterns](#component-testsarc----component-testing-patterns)
+10. [agent-tests.nectar -- Agent Testing Patterns](#agent-testsarc----agent-testing-patterns)
 
 ---
 
-## hello.arc -- Hello World
+## hello.nectar -- Hello World
 
 **Concepts**: components, props, render templates
 
-```arc
+```nectar
 component Hello(name: String) {
     render {
         <div>
-            <h1>"Hello from Arc!"</h1>
+            <h1>"Hello from Nectar!"</h1>
             <p>{name}</p>
         </div>
     }
 }
 ```
 
-This is the simplest possible Arc program. It demonstrates:
+This is the simplest possible Nectar program. It demonstrates:
 
 - **Component declaration**: `component Hello(...)` defines a reusable UI building block. The component name must be PascalCase.
 - **Props**: `name: String` declares a property that the parent passes in when using `<Hello name="World" />`.
 - **Render block**: Every component must have a `render { ... }` block that describes its DOM output.
-- **Template syntax**: Arc uses a JSX-like syntax. Static text is written in double quotes (`"Hello from Arc!"`), and dynamic expressions are wrapped in curly braces (`{name}`).
+- **Template syntax**: Nectar uses a JSX-like syntax. Static text is written in double quotes (`"Hello from Nectar!"`), and dynamic expressions are wrapped in curly braces (`{name}`).
 
 **To compile and run:**
 
 ```sh
-arc build examples/hello.arc --emit-wasm
+nectar build examples/hello.nectar --emit-wasm
 ```
 
 ---
 
-## counter.arc -- Stateful Counter
+## counter.nectar -- Stateful Counter
 
 **Concepts**: mutable state, methods, event handlers, ownership
 
-```arc
+```nectar
 component Counter(initial: i32) {
     let mut count: i32 = initial;
 
@@ -77,12 +80,12 @@ This example introduces interactivity:
 
 - **Mutable state**: `let mut count: i32 = initial;` declares a state variable that can change over time. The initial value comes from the `initial` prop.
 - **Methods**: `fn increment(&mut self)` and `fn decrement(&mut self)` are component methods. They take `&mut self` (a mutable borrow of the component) because they modify `self.count`.
-- **Event handlers**: `on:click={self.increment}` binds the button's click event to the method. Arc's reactivity system ensures that when `self.count` changes, only the `<span>` displaying the count is updated in the DOM -- no virtual DOM diffing is needed.
-- **Ownership**: The `&mut self` parameter signals that these methods borrow the component mutably. Arc's borrow checker ensures you cannot hold other borrows while calling these methods.
+- **Event handlers**: `on:click={self.increment}` binds the button's click event to the method. Nectar's reactivity system ensures that when `self.count` changes, only the `<span>` displaying the count is updated in the DOM -- no virtual DOM diffing is needed.
+- **Ownership**: The `&mut self` parameter signals that these methods borrow the component mutably. Nectar's borrow checker ensures you cannot hold other borrows while calling these methods.
 
 ---
 
-## todo.arc -- Todo Application
+## todo.nectar -- Todo Application
 
 **Concepts**: structs, enums, ownership, collections, pattern matching, closures
 
@@ -90,7 +93,7 @@ This is a more complete application demonstrating data modeling and business log
 
 ### Data Model
 
-```arc
+```nectar
 struct Todo {
     id: u32,
     text: String,
@@ -109,7 +112,7 @@ enum Filter {
 
 ### Component State
 
-```arc
+```nectar
 component TodoApp() {
     let mut todos: [Todo] = [];
     let mut next_id: u32 = 0;
@@ -123,7 +126,7 @@ The component maintains three pieces of state:
 
 ### Adding Todos
 
-```arc
+```nectar
     fn add_todo(&mut self, text: String) {
         let todo = Todo {
             id: self.next_id,
@@ -135,11 +138,11 @@ The component maintains three pieces of state:
     }
 ```
 
-Key ownership concept: when `todo` is pushed into `self.todos`, ownership is **moved**. The local variable `todo` is no longer accessible after the push. This is how Arc prevents use-after-free bugs at compile time.
+Key ownership concept: when `todo` is pushed into `self.todos`, ownership is **moved**. The local variable `todo` is no longer accessible after the push. This is how Nectar prevents use-after-free bugs at compile time.
 
 ### Toggling Completion
 
-```arc
+```nectar
     fn toggle(&mut self, id: u32) {
         for todo in &mut self.todos {
             if todo.id == id {
@@ -153,7 +156,7 @@ The `&mut self.todos` borrows the array mutably, giving each `todo` in the loop 
 
 ### Filtering with Pattern Matching
 
-```arc
+```nectar
     fn visible_todos(&self) -> [&Todo] {
         match self.filter {
             Filter::All => &self.todos,
@@ -169,7 +172,7 @@ The `&mut self.todos` borrows the array mutably, giving each `todo` in the loop 
 
 ---
 
-## api.arc -- API Communication
+## api.nectar -- API Communication
 
 **Concepts**: stores, async actions, HTTP fetch, error handling, computed values
 
@@ -177,7 +180,7 @@ This example shows how to build a data-driven application that communicates with
 
 ### Data Types
 
-```arc
+```nectar
 struct Post {
     id: u32,
     title: String,
@@ -193,7 +196,7 @@ struct ApiError {
 
 ### Store with Async Actions
 
-```arc
+```nectar
 store PostService {
     signal posts: [Post] = [];
     signal loading: bool = false;
@@ -204,7 +207,7 @@ The store uses three signals to track loading state, data, and errors. Any compo
 
 ### GET Request
 
-```arc
+```nectar
     async action fetch_posts(&mut self) {
         self.loading = true;
         self.error = None;
@@ -230,7 +233,7 @@ The store uses three signals to track loading state, data, and errors. Any compo
 
 ### POST Request with Body
 
-```arc
+```nectar
     async action create_post(&mut self, title: String, body: String) {
         self.loading = true;
 
@@ -247,7 +250,7 @@ The second argument to `fetch` is an options object with `method`, `headers`, an
 
 ### Computed Values
 
-```arc
+```nectar
     computed post_count(&self) -> u32 {
         self.posts.len()
     }
@@ -257,7 +260,7 @@ Computed values are derived from signals and cached. `post_count` automatically 
 
 ### Using the Store from a Component
 
-```arc
+```nectar
 component PostList() {
     render {
         <div>
@@ -282,7 +285,7 @@ Components access store state via `StoreName::get_field()` and dispatch actions 
 
 ---
 
-## store.arc -- Global State Management
+## store.nectar -- Global State Management
 
 **Concepts**: Flux/Redux pattern, multiple stores, auth flow, effects
 
@@ -290,7 +293,7 @@ This example demonstrates more advanced store patterns.
 
 ### Auth Store with Multiple States
 
-```arc
+```nectar
 enum AuthStatus {
     LoggedOut,
     Loading,
@@ -307,7 +310,7 @@ The auth status is modeled as an enum with four states. This is more robust than
 
 ### Async Login Flow
 
-```arc
+```nectar
     async action login(&mut self, email: String, password: String) {
         self.status = AuthStatus::Loading;
 
@@ -331,7 +334,7 @@ The login action transitions through `Loading` to either `LoggedIn` or `Error`, 
 
 ### Computed Values
 
-```arc
+```nectar
     computed is_logged_in(&self) -> bool {
         match self.status {
             AuthStatus::LoggedIn(_) => true,
@@ -344,7 +347,7 @@ This computed value can be used as a route guard or in conditional rendering. It
 
 ### Effects (Side Effects)
 
-```arc
+```nectar
     effect on_auth_change(&self) {
         match self.status {
             AuthStatus::LoggedIn(user) => {
@@ -364,7 +367,7 @@ Effects run automatically whenever their signal dependencies change. They are us
 
 The example also defines a `CounterStore` to show that applications can have multiple independent stores:
 
-```arc
+```nectar
 store CounterStore {
     signal count: i32 = 0;
     signal step: i32 = 1;
@@ -383,7 +386,7 @@ Components can read from and dispatch to any number of stores simultaneously.
 
 ---
 
-## app.arc -- Routed Application with Styles
+## app.nectar -- Routed Application with Styles
 
 **Concepts**: router definition, parameterized routes, guards, scoped CSS, Link navigation, programmatic navigation
 
@@ -391,7 +394,7 @@ This is the most architecturally complete example, showing how to build a multi-
 
 ### Store for Route Guards
 
-```arc
+```nectar
 store AuthStore {
     signal is_logged_in: bool = false;
     signal username: String = "";
@@ -407,7 +410,7 @@ store AuthStore {
 
 Each component declares its own CSS that is automatically scoped:
 
-```arc
+```nectar
 component NavBar() {
     style {
         .navbar {
@@ -443,7 +446,7 @@ Key style features:
 
 `<Link to="/path">` creates client-side navigation links that update the URL and mount the corresponding component without a full page reload:
 
-```arc
+```nectar
 <Link to="/">"Home"</Link>
 <Link to="/about">"About"</Link>
 <Link to="/user/42">"Profile"</Link>
@@ -453,7 +456,7 @@ Key style features:
 
 Components can receive route parameters as props:
 
-```arc
+```nectar
 component UserProfile(id: String) {
     signal user_name: String = "Loading...";
 
@@ -472,7 +475,7 @@ The `id` parameter is extracted from the URL pattern `/user/:id`.
 
 Components can navigate programmatically using the `navigate()` function:
 
-```arc
+```nectar
 component NotFound() {
     fn go_home(&self) {
         navigate("/");
@@ -491,7 +494,7 @@ component NotFound() {
 
 The router maps URL patterns to components:
 
-```arc
+```nectar
 router AppRouter {
     route "/" => Home,
     route "/about" => About,
@@ -510,15 +513,15 @@ Key routing features:
 
 ---
 
-## ai-chat.arc -- AI Chat Interface
+## ai-chat.nectar -- AI Chat Interface
 
 **Concepts**: agents, system prompts, tool definitions, streaming, reactive UI
 
-This example demonstrates Arc's first-class AI interaction primitives.
+This example demonstrates Nectar's first-class AI interaction primitives.
 
 ### Agent Declaration
 
-```arc
+```nectar
 agent ChatBot {
     prompt system = "You are a helpful coding assistant.";
 
@@ -536,7 +539,7 @@ The `agent` keyword defines a special component type that wraps LLM interaction.
 
 ### Tool Definitions
 
-```arc
+```nectar
     tool search_docs(query: String) -> String {
         let results = await fetch(format("https://api.example.com/search?q={}", query));
         return results.json().summary;
@@ -568,7 +571,7 @@ When the AI decides to call a tool, the runtime:
 
 ### Streaming Chat
 
-```arc
+```nectar
     fn send(&mut self) {
         let msg = Message { role: "user", content: self.input };
         self.messages.push(msg);
@@ -581,7 +584,7 @@ When the AI decides to call a tool, the runtime:
 
 `ai::chat_stream` initiates a streaming completion. Tokens arrive one at a time, and the UI updates reactively:
 
-```arc
+```nectar
     fn on_stream_token(&mut self, token: String) {
         let last = self.messages.len() - 1;
         if self.messages[last].role == "assistant" {
@@ -596,7 +599,7 @@ Each incoming token triggers a signal update, which triggers a DOM update, givin
 
 ### Reactive Chat UI
 
-```arc
+```nectar
     render {
         <div class="chat">
             <div class="messages">
@@ -632,22 +635,400 @@ The entire chat interface is reactive. When a new message is added or a streamin
 
 ---
 
+## tests.nectar -- Comprehensive Test Patterns
+
+**Concepts**: test blocks, assertions, testing functions, structs, enums, pattern matching, ownership, async, error handling, computed values, closures
+
+This file demonstrates every major testing pattern in Nectar. Tests are defined with `test "name" { ... }` blocks and use `assert()` and `assert_eq()` for verification.
+
+### Basic Assertions
+
+```nectar
+test "assert with boolean condition" {
+    assert(true);
+    assert(1 + 1 == 2);
+    assert(10 > 5);
+}
+
+test "assert_eq with custom message" {
+    let result = fibonacci(6);
+    assert_eq(result, 8, "6th fibonacci number should be 8");
+}
+```
+
+- **`assert(condition)`** verifies a boolean expression is true.
+- **`assert_eq(left, right)`** verifies two values are equal.
+- Both accept an optional trailing message string for better failure diagnostics.
+
+### Testing Functions (Pure Logic)
+
+```nectar
+test "fibonacci sequence" {
+    assert_eq(fibonacci(0), 0);
+    assert_eq(fibonacci(1), 1);
+    assert_eq(fibonacci(10), 55);
+}
+```
+
+Pure functions are the simplest to test. Call the function, check the return value. No setup or teardown needed.
+
+### Testing Structs and Enums
+
+```nectar
+test "struct methods" {
+    let origin = Point::new(0.0, 0.0);
+    let target = Point::new(3.0, 4.0);
+    let dist = origin.distance(&target);
+    assert_eq(dist, 5.0);
+}
+
+test "enum method — shape areas" {
+    let circle = Shape::Circle(1.0);
+    assert(circle.area() > 3.14);
+    assert(circle.area() < 3.15);
+}
+```
+
+Construct instances, call methods, and verify results. Enum tests should cover each variant.
+
+### Testing Pattern Matching
+
+```nectar
+test "match on enum variants" {
+    let shape = Shape::Circle(2.0);
+    let label = match shape {
+        Shape::Circle(r) => format("circle with radius {}", r),
+        Shape::Rectangle(w, h) => format("{}x{} rectangle", w, h),
+        Shape::Triangle(_, _, _) => "triangle",
+    };
+    assert_eq(label, "circle with radius 2");
+}
+```
+
+Verify that `match` arms bind variables correctly and that wildcard patterns work as expected.
+
+### Testing Ownership and Borrowing
+
+```nectar
+test "borrowing preserves original" {
+    let data = [1, 2, 3];
+    let borrowed = &data;
+    assert_eq(borrowed.len(), 3);
+    assert_eq(data.len(), 3);  // still accessible
+}
+
+test "mutable borrow allows modification" {
+    let mut items: [i32] = [1, 2, 3];
+    let borrowed = &mut items;
+    borrowed.push(4);
+    assert_eq(items.len(), 4);
+}
+```
+
+Tests can verify that ownership moves and borrows behave correctly at runtime. Immutable borrows preserve access to the original; mutable borrows allow modification.
+
+### Testing Async Operations
+
+```nectar
+test "async fetch returns response" {
+    let response = await fetch("https://api.example.com/users/1");
+    assert(response.status == 200 || response.status == 0);
+}
+```
+
+The test runner stubs HTTP imports, so `await fetch(...)` resolves immediately. This verifies that async/await syntax works in test blocks without hitting real endpoints.
+
+### Testing Error Handling
+
+```nectar
+test "try/catch captures error" {
+    let result = try {
+        let val = divide(10.0, 0.0);
+        match val {
+            Result::Ok(v) => v,
+            Result::Err(e) => { throw e; }
+        }
+    } catch err {
+        -1.0
+    };
+    assert_eq(result, -1.0);
+}
+```
+
+Use `try { ... } catch err { ... }` to verify that error paths produce the expected fallback values.
+
+### Testing Computed Values (Stores)
+
+```nectar
+test "store computed values reflect state" {
+    assert_eq(TestCounterStore::double_count(), 0);
+    TestCounterStore::increment();
+    assert_eq(TestCounterStore::double_count(), 2);
+    assert(TestCounterStore::is_positive());
+}
+```
+
+Store signals and computed values can be tested by dispatching actions and checking the derived state.
+
+### Testing Closures
+
+```nectar
+test "closure captures value" {
+    let multiplier = 3;
+    let triple = fn(x: i32) -> i32 { x * multiplier };
+    assert_eq(triple(5), 15);
+}
+
+test "closure as filter predicate" {
+    let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let evens = numbers.iter().filter(fn(n: &i32) -> bool { n % 2 == 0 });
+    assert_eq(evens.len(), 5);
+}
+```
+
+Closures capture variables from their surrounding scope. They work naturally as arguments to higher-order functions like `filter`, `map`, and `sort`.
+
+---
+
+## component-tests.nectar -- Component Testing Patterns
+
+**Concepts**: test renderer, mounting, click simulation, props, signals, conditional rendering, list rendering, event handlers, store integration
+
+This file uses Nectar's test renderer to mount components into a virtual DOM and verify their behavior without a browser.
+
+### Mounting and Checking Initial Render
+
+```nectar
+test "greeting renders with default prop" {
+    let el = render(<Greeting />);
+    let heading = el.findByText("Hello, World!");
+    assert(heading.exists());
+}
+
+test "counter renders initial value" {
+    let el = render(<Counter />);
+    let display = el.findByRole("counter");
+    assert_eq(display.getText(), "0");
+}
+```
+
+`render(<Component />)` returns a `TestElement` that provides query methods:
+
+- **`findByText(text)`** -- find a descendant containing the given text
+- **`findByRole(role)`** -- find by ARIA role attribute
+- **`findByAttribute(name, value)`** -- find by any attribute
+
+### Simulating Clicks and Verifying State Changes
+
+```nectar
+test "counter increments on click" {
+    let el = render(<Counter />);
+    let inc_btn = el.findByText("+1");
+    let display = el.findByRole("counter");
+
+    inc_btn.click();
+    assert_eq(display.getText(), "1");
+}
+```
+
+Call `.click()` on a `TestElement` to dispatch a click event. The component's reactive state updates, and subsequent queries reflect the new DOM.
+
+### Testing Props with Default Values
+
+```nectar
+test "default props are applied" {
+    let el = render(<Greeting />);
+    let heading = el.findByText("Hello, World!");
+    assert(heading.exists());
+}
+
+test "explicit props override defaults" {
+    let el = render(<Counter initial={100} />);
+    let display = el.findByRole("counter");
+    assert_eq(display.getText(), "100");
+}
+```
+
+Components with `prop_name: Type = default` apply the default when no value is passed. Explicit values override the default.
+
+### Testing Signal Updates and DOM Reactivity
+
+```nectar
+test "theme toggle updates displayed text" {
+    let el = render(<ThemeToggle />);
+    let status = el.findByRole("status");
+    assert_eq(status.getText(), "Light Mode");
+
+    let toggle_btn = el.findByText("Toggle Theme");
+    toggle_btn.click();
+    assert_eq(status.getText(), "Dark Mode");
+}
+```
+
+After a click triggers a signal update, all DOM queries return the updated content. No manual "flush" or "tick" is needed -- the test renderer processes updates synchronously.
+
+### Testing Conditional Rendering
+
+```nectar
+test "conditional rendering shows message when true" {
+    let el = render(<ConditionalMessage show={true} />);
+    let message = el.findByText("This message is visible");
+    assert(message.exists());
+}
+```
+
+Conditional `{if ... { ... }}` blocks in templates are tested by mounting with different props and verifying which elements are present.
+
+### Testing List Rendering
+
+```nectar
+test "number list renders all items" {
+    let el = render(<NumberList items={[10, 20, 30]} />);
+    assert(el.findByText("10").exists());
+    assert(el.findByText("20").exists());
+    assert(el.findByText("30").exists());
+}
+```
+
+`{for item in collection { ... }}` loops produce one element per item. Verify each rendered item exists in the virtual DOM.
+
+### Testing Event Handlers
+
+```nectar
+test "todo list add button creates item" {
+    let el = render(<TodoList />);
+    let input = el.findByAttribute("placeholder", "What needs to be done?");
+    let add_btn = el.findByText("Add");
+
+    input.type("Buy groceries");
+    add_btn.click();
+
+    let todo = el.findByText("Buy groceries");
+    assert(todo.exists());
+}
+```
+
+Use `.type(text)` to simulate text input and `.click()` to trigger buttons. Then query the DOM to verify the handler's effect.
+
+### Testing Store Integration from Components
+
+```nectar
+test "store counter increment updates display" {
+    let el = render(<StoreCounter />);
+    let inc_btn = el.findByText("+1");
+    let display = el.findByRole("display");
+
+    inc_btn.click();
+    assert_eq(display.getText(), "Store count: 1");
+}
+```
+
+Components that read from stores via `StoreName::get_field()` and dispatch via `StoreName::action()` can be tested end-to-end. The test renderer processes store updates synchronously.
+
+---
+
+## agent-tests.nectar -- Agent Testing Patterns
+
+**Concepts**: tool registration, tool dispatch, message history, AI response mocking, streaming
+
+This file tests AI agents -- their tool definitions, message management, and mocked AI interactions.
+
+### Testing Tool Registration
+
+```nectar
+test "agent registers expected tools" {
+    let tools = TestAssistant::get_registered_tools();
+    assert_eq(tools.len(), 3);
+    assert_eq(tools[0].name, "search_docs");
+    assert_eq(tools[1].name, "calculate");
+    assert_eq(tools[2].name, "get_weather");
+}
+```
+
+`AgentName::get_registered_tools()` returns metadata about all `tool` blocks defined in the agent, including parameter names, types, and return types.
+
+### Testing Tool Dispatch with Typed Args
+
+```nectar
+test "dispatch search_docs tool" {
+    TestAssistant::clear_history();
+    let result = await TestAssistant::dispatch_tool("search_docs", {
+        query: "nectar language tutorial",
+    });
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log[0], "search_docs: arc language tutorial");
+}
+```
+
+`dispatch_tool(name, args)` invokes a tool by name with a typed argument object. This simulates what the runtime does when the AI model requests a tool call.
+
+### Testing Message History Management
+
+```nectar
+test "messages preserve role and content" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("What is Nectar?");
+    TestAssistant::add_assistant_message("Nectar is a programming language.");
+
+    let messages = TestAssistant::get_messages();
+    assert_eq(messages[0].role, "user");
+    assert_eq(messages[1].role, "assistant");
+}
+```
+
+Agent state (messages, tool call logs) is managed through methods defined in the agent. Tests verify the history tracks roles, ordering, and content correctly.
+
+### Mocking AI Responses
+
+```nectar
+test "mock chat_complete returns canned response" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("What is 2+2?");
+    ai::mock_response("The answer is 4.");
+
+    let response = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(response.content, "The answer is 4.");
+}
+```
+
+The `ai::mock_response()` function installs a canned response that `ai::chat_complete` returns instead of calling a real LLM. Use `ai::mock_tool_call()` to simulate the AI requesting a tool, and `ai::mock_stream()` to test token-by-token streaming.
+
+---
+
 ## Running the Examples
 
 All examples can be compiled from the repository root:
 
 ```sh
 # Compile to WAT (human-readable)
-arc build examples/hello.arc
+nectar build examples/hello.nectar
 
 # Compile to binary WASM
-arc build examples/counter.arc --emit-wasm
+nectar build examples/counter.nectar --emit-wasm
 
 # Compile with optimizations
-arc build examples/app.arc --emit-wasm -O2
+nectar build examples/app.nectar --emit-wasm -O2
 
 # Start the dev server for interactive development
-arc dev --src examples --port 3000
+nectar dev --src examples --port 3000
 ```
 
 For the AI chat example, you will need an LLM API endpoint at `/api/chat` that accepts OpenAI-compatible requests. The runtime handles the streaming protocol automatically.
+
+### Running Tests
+
+```sh
+# Run all tests in a file
+nectar test examples/tests.nectar
+
+# Run with verbose output
+nectar test examples/tests.nectar --verbose
+
+# Filter tests by name
+nectar test examples/tests.nectar --filter "fibonacci"
+nectar test examples/component-tests.nectar --filter "counter"
+nectar test examples/agent-tests.nectar --filter "tool"
+
+# Run all test files at once
+nectar test examples/tests.nectar examples/component-tests.nectar examples/agent-tests.nectar
+```

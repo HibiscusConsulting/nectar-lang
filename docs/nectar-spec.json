@@ -1,0 +1,619 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nectar Language Specification",
+  "version": "1.0.0",
+  "description": "Machine-readable specification for the Nectar programming language. Designed for AI code-generation systems to look up syntax, semantics, and idiomatic patterns.",
+
+  "keywords": {
+    "declarations": {
+      "fn": { "context": ["top-level", "impl", "component", "agent"], "description": "Declare a function or method" },
+      "component": { "context": ["top-level"], "description": "Declare a UI component" },
+      "struct": { "context": ["top-level", "mod"], "description": "Declare a struct type" },
+      "enum": { "context": ["top-level", "mod"], "description": "Declare an enum type" },
+      "impl": { "context": ["top-level"], "description": "Add methods to a type or implement a trait" },
+      "trait": { "context": ["top-level"], "description": "Declare a trait (interface)" },
+      "store": { "context": ["top-level"], "description": "Declare a global reactive state store" },
+      "agent": { "context": ["top-level"], "description": "Declare an AI agent with tools and prompts" },
+      "router": { "context": ["top-level"], "description": "Declare a URL router mapping paths to components" },
+      "mod": { "context": ["top-level"], "description": "Declare a module (external file or inline block)" },
+      "use": { "context": ["top-level", "mod"], "description": "Import items from other modules" },
+      "pub": { "context": ["before fn, struct, enum, store, field"], "description": "Mark an item as publicly visible" },
+      "test": { "context": ["top-level"], "description": "Declare a named test block" },
+      "lazy": { "context": ["before component"], "description": "Mark a component as lazy-loaded (code-split)" }
+    },
+    "variables": {
+      "let": { "context": ["function body", "component body", "block"], "description": "Bind a value to a name (immutable by default)" },
+      "mut": { "context": ["after let", "after &"], "description": "Make a binding or borrow mutable" },
+      "signal": { "context": ["component body", "store body", "agent body"], "description": "Declare a reactive variable that triggers re-renders on change" },
+      "own": { "context": ["before expression"], "description": "Explicitly mark owned transfer" },
+      "ref": { "context": ["patterns"], "description": "Bind by reference in a pattern" }
+    },
+    "control_flow": {
+      "if": { "context": ["expression", "template"], "description": "Conditional expression/rendering" },
+      "else": { "context": ["after if block"], "description": "Alternative branch of if" },
+      "match": { "context": ["expression", "template"], "description": "Pattern matching expression" },
+      "for": { "context": ["expression", "template"], "description": "Iterate over a collection" },
+      "in": { "context": ["for loop"], "description": "Separates binding from iterator in for loops" },
+      "while": { "context": ["expression"], "description": "Loop while condition is true" },
+      "return": { "context": ["function body"], "description": "Return a value from a function" },
+      "yield": { "context": ["stream body"], "description": "Emit a value from a stream" }
+    },
+    "async_concurrency": {
+      "async": { "context": ["before fn", "before action"], "description": "Mark a function or action as asynchronous" },
+      "await": { "context": ["before expression"], "description": "Await an async operation" },
+      "fetch": { "context": ["expression"], "description": "First-class HTTP request" },
+      "spawn": { "context": ["expression"], "description": "Run work on a background thread" },
+      "channel": { "context": ["expression"], "description": "Create a typed communication channel" },
+      "parallel": { "context": ["expression"], "description": "Run multiple expressions concurrently" },
+      "stream": { "context": ["for loop source"], "description": "Iterate over async data as it arrives" },
+      "suspend": { "context": ["template expression"], "description": "Show fallback while async content loads" }
+    },
+    "ai": {
+      "prompt": { "context": ["agent body", "expression"], "description": "Define system prompt or create a prompt template" },
+      "tool": { "context": ["agent body"], "description": "Define a function the AI can invoke" }
+    },
+    "routing": {
+      "route": { "context": ["router body"], "description": "Map a URL path to a component" },
+      "fallback": { "context": ["router body"], "description": "Component to render when no route matches" },
+      "guard": { "context": ["after route component"], "description": "Conditional expression protecting a route" },
+      "navigate": { "context": ["expression"], "description": "Programmatic client-side navigation" }
+    },
+    "component_blocks": {
+      "render": { "context": ["component body", "agent body"], "description": "Template block that produces the UI" },
+      "style": { "context": ["component body"], "description": "Scoped CSS style block" },
+      "transition": { "context": ["component body"], "description": "CSS transition declarations" },
+      "animate": { "context": ["expression"], "description": "Trigger a named animation on an element" },
+      "skeleton": { "context": ["component body"], "description": "Placeholder UI shown while data loads" }
+    },
+    "store_blocks": {
+      "action": { "context": ["store body"], "description": "Method that can mutate store state" },
+      "effect": { "context": ["store body"], "description": "Side effect that runs when signal dependencies change" },
+      "computed": { "context": ["store body"], "description": "Cached derived value from signals" }
+    },
+    "error_handling": {
+      "try": { "context": ["expression"], "description": "Begin a try/catch block" },
+      "catch": { "context": ["after try block"], "description": "Handle errors from a try block" }
+    },
+    "testing": {
+      "assert": { "context": ["expression"], "description": "Assert a condition is true" },
+      "assert_eq": { "context": ["expression"], "description": "Assert two values are equal" }
+    },
+    "values": {
+      "true": { "context": ["expression"], "description": "Boolean true literal" },
+      "false": { "context": ["expression"], "description": "Boolean false literal" },
+      "self": { "context": ["method body"], "description": "Reference to the current instance" },
+      "Self": { "context": ["impl block", "trait body"], "description": "The enclosing type" }
+    },
+    "other": {
+      "as": { "context": ["use statement"], "description": "Alias in imports" },
+      "where": { "context": ["after fn/component/struct params"], "description": "Trait bounds clause" },
+      "Link": { "context": ["template"], "description": "Client-side navigation element" },
+      "Fragment": { "context": ["template"], "description": "Group elements without a wrapper node" }
+    }
+  },
+
+  "ast_nodes": {
+    "Program": {
+      "description": "Top-level program node containing all items",
+      "fields": { "items": "[Item]" }
+    },
+    "Item": {
+      "description": "A top-level declaration",
+      "variants": ["Function", "Component", "Struct", "Enum", "Impl", "Trait", "Use", "Mod", "Store", "Agent", "Router", "LazyComponent", "Test"]
+    },
+    "Function": {
+      "description": "Function or method definition",
+      "fields": {
+        "name": "String",
+        "lifetimes": "[String] — e.g. ['a, 'b]",
+        "type_params": "[String] — e.g. [T, U]",
+        "params": "[Param]",
+        "return_type": "Option<Type>",
+        "trait_bounds": "[TraitBound] — where clauses",
+        "body": "Block",
+        "is_pub": "bool"
+      },
+      "syntax": "pub fn name<'a, T>(param: Type) -> ReturnType where T: Trait { body }",
+      "example": "fn add(a: i32, b: i32) -> i32 { a + b }"
+    },
+    "Component": {
+      "description": "UI component — first-class reactive UI primitive",
+      "fields": {
+        "name": "String",
+        "type_params": "[String]",
+        "props": "[Prop] — declared as parameters in parens after name",
+        "state": "[StateField] — let/let mut/signal declarations",
+        "methods": "[Function] — fn blocks inside component",
+        "styles": "[StyleBlock] — scoped CSS",
+        "transitions": "[TransitionDef]",
+        "trait_bounds": "[TraitBound]",
+        "render": "RenderBlock — required, the template output",
+        "skeleton": "Option<SkeletonDef> — loading placeholder",
+        "error_boundary": "Option<ErrorBoundary>"
+      },
+      "block_order": ["props (in parens)", "state (let/let mut/signal)", "methods (fn)", "style", "transition", "skeleton", "error_boundary", "render"],
+      "syntax": "component Name<T>(prop: Type = default) where T: Trait { state; methods; style {}; transition {}; skeleton {}; error_boundary {}; render {} }",
+      "example": "component Counter(initial: i32 = 0) {\n  let mut count: i32 = initial;\n  fn increment(&mut self) { self.count = self.count + 1; }\n  render {\n    <div>\n      <span>{self.count}</span>\n      <button on:click={self.increment}>\"+1\"</button>\n    </div>\n  }\n}"
+    },
+    "Prop": {
+      "description": "Component property (immutable, passed from parent)",
+      "fields": { "name": "String", "ty": "Type", "default": "Option<Expr>" },
+      "syntax": "name: Type = default_value",
+      "example": "label: String, disabled: bool = false"
+    },
+    "StateField": {
+      "description": "Component or store state variable",
+      "fields": { "name": "String", "ty": "Option<Type>", "mutable": "bool", "initializer": "Expr", "ownership": "Ownership" },
+      "syntax_let": "let mut name: Type = value;",
+      "syntax_signal": "signal name: Type = value;"
+    },
+    "RenderBlock": {
+      "description": "Template tree that produces DOM output",
+      "fields": { "body": "TemplateNode" },
+      "syntax": "render { <template-nodes /> }"
+    },
+    "TemplateNode": {
+      "description": "A node in the template tree",
+      "variants": {
+        "Element": { "fields": { "tag": "String", "attributes": "[Attribute]", "children": "[TemplateNode]" } },
+        "TextLiteral": { "fields": { "value": "String" }, "syntax": "\"text content\"" },
+        "Expression": { "fields": { "expr": "Expr" }, "syntax": "{expression}" },
+        "Fragment": { "fields": { "children": "[TemplateNode]" }, "syntax": "<Fragment>children</Fragment>" },
+        "Link": { "fields": { "to": "Expr", "children": "[TemplateNode]" }, "syntax": "<Link to=\"/path\">\"text\"</Link>" }
+      }
+    },
+    "Attribute": {
+      "description": "Element attribute",
+      "variants": {
+        "Static": { "fields": { "name": "String", "value": "String" }, "syntax": "name=\"value\"" },
+        "Dynamic": { "fields": { "name": "String", "value": "Expr" }, "syntax": "name={expr}" },
+        "EventHandler": { "fields": { "event": "String", "handler": "Expr" }, "syntax": "on:event={handler}" },
+        "Aria": { "fields": { "name": "String", "value": "Expr" }, "syntax": "aria-name={expr}" },
+        "Role": { "fields": { "value": "String" }, "syntax": "role=\"value\"" },
+        "Bind": { "fields": { "property": "String", "signal": "String" }, "syntax": "bind:property={signal_name}" }
+      }
+    },
+    "StructDef": {
+      "description": "Named struct with typed fields",
+      "fields": { "name": "String", "lifetimes": "[String]", "type_params": "[String]", "fields": "[Field]", "trait_bounds": "[TraitBound]", "is_pub": "bool" },
+      "syntax": "pub struct Name<'a, T> where T: Trait { pub field: Type, }",
+      "example": "struct User { id: u32, name: String, email: String }"
+    },
+    "EnumDef": {
+      "description": "Enum with variants that may carry data",
+      "fields": { "name": "String", "type_params": "[String]", "variants": "[Variant]", "is_pub": "bool" },
+      "syntax": "pub enum Name<T> { Variant1, Variant2(Type), Variant3(T, U) }",
+      "example": "enum AuthStatus { LoggedOut, Loading, LoggedIn(User), Error(String) }"
+    },
+    "Variant": {
+      "fields": { "name": "String", "fields": "[Type] — positional data carried by variant" }
+    },
+    "Field": {
+      "fields": { "name": "String", "ty": "Type", "is_pub": "bool" }
+    },
+    "ImplBlock": {
+      "description": "Add methods to a type, optionally implementing a trait",
+      "fields": { "target": "String", "trait_impls": "[String]", "methods": "[Function]" },
+      "syntax_inherent": "impl TypeName { fn method(&self) { ... } }",
+      "syntax_trait": "impl TraitName for TypeName { fn method(&self) { ... } }",
+      "example": "impl Display for User {\n  fn to_string(&self) -> String { f\"User({self.name})\" }\n}"
+    },
+    "TraitDef": {
+      "description": "Interface definition with optional default method bodies",
+      "fields": { "name": "String", "type_params": "[String]", "methods": "[TraitMethod]" },
+      "syntax": "trait Name<T> { fn method(&self) -> Type; fn with_default(&self) { ... } }",
+      "example": "trait Display { fn to_string(&self) -> String; }"
+    },
+    "TraitMethod": {
+      "fields": { "name": "String", "params": "[Param]", "return_type": "Option<Type>", "default_body": "Option<Block>" }
+    },
+    "TraitBound": {
+      "fields": { "type_param": "String", "trait_name": "String" },
+      "syntax": "where T: Display"
+    },
+    "StoreDef": {
+      "description": "Global reactive state container (Flux/Redux-like)",
+      "fields": {
+        "name": "String",
+        "signals": "[StateField]",
+        "actions": "[ActionDef]",
+        "computed": "[ComputedDef]",
+        "effects": "[EffectDef]",
+        "is_pub": "bool"
+      },
+      "block_order": ["signal", "action", "computed", "effect"],
+      "syntax": "store Name { signal field: Type = value; action name(&mut self) { ... } computed name(&self) -> Type { expr } effect name(&self) { ... } }",
+      "example": "store CounterStore {\n  signal count: i32 = 0;\n  action increment(&mut self) { self.count = self.count + 1; }\n  computed double(&self) -> i32 { self.count * 2 }\n  effect log(&self) { println(self.count); }\n}"
+    },
+    "ActionDef": {
+      "description": "Store method that mutates state",
+      "fields": { "name": "String", "params": "[Param]", "body": "Block", "is_async": "bool" },
+      "syntax_sync": "action name(&mut self, param: Type) { body }",
+      "syntax_async": "async action name(&mut self, param: Type) { body }"
+    },
+    "ComputedDef": {
+      "description": "Cached derived value from signals",
+      "fields": { "name": "String", "return_type": "Option<Type>", "body": "Block" },
+      "syntax": "computed name(&self) -> Type { expr }"
+    },
+    "EffectDef": {
+      "description": "Side effect that auto-runs when signal dependencies change",
+      "fields": { "name": "String", "body": "Block" },
+      "syntax": "effect name(&self) { body }"
+    },
+    "AgentDef": {
+      "description": "AI agent wrapping LLM interaction with tools and UI",
+      "fields": {
+        "name": "String",
+        "system_prompt": "Option<String>",
+        "tools": "[ToolDef]",
+        "state": "[StateField]",
+        "methods": "[Function]",
+        "render": "Option<RenderBlock>"
+      },
+      "block_order": ["prompt", "signal/state", "tool", "fn methods", "render"],
+      "syntax": "agent Name { prompt system = \"...\"; signal field: Type = val; tool name(p: T) -> R { ... } fn method(&mut self) { ... } render { ... } }",
+      "example": "agent Assistant {\n  prompt system = \"You are a helpful assistant.\";\n  signal messages: [Message] = [];\n  tool search(query: String) -> String { await fetch(f\"https://api.example.com/search?q={query}\").json().summary }\n  render {\n    <div>\n      {for msg in self.messages { <p>{msg.content}</p> }}\n    </div>\n  }\n}"
+    },
+    "ToolDef": {
+      "description": "Function exposed for AI to call",
+      "fields": { "name": "String", "description": "Option<String>", "params": "[Param]", "return_type": "Option<Type>", "body": "Block" },
+      "syntax": "tool name(param: Type) -> ReturnType { body }"
+    },
+    "RouterDef": {
+      "description": "URL router mapping paths to components",
+      "fields": { "name": "String", "routes": "[RouteDef]", "fallback": "Option<TemplateNode>" },
+      "syntax": "router Name { route \"/path\" => Component, route \"/path/:param\" => Component guard { expr }, fallback => NotFoundComponent }",
+      "example": "router AppRouter {\n  route \"/\" => Home,\n  route \"/user/:id\" => UserProfile,\n  route \"/admin/*\" => Admin guard { AuthStore::is_logged_in() },\n  fallback => NotFound,\n}"
+    },
+    "RouteDef": {
+      "fields": { "path": "String", "params": "[String] — extracted from :param segments", "component": "String", "guard": "Option<Expr>" },
+      "path_patterns": {
+        "static": "\"/about\" — matches exactly",
+        "parameterized": "\"/user/:id\" — captures named param",
+        "wildcard": "\"/admin/*\" — matches any sub-path"
+      }
+    },
+    "LazyComponentDef": {
+      "description": "Code-split component loaded on first render",
+      "fields": { "component": "Component" },
+      "syntax": "lazy component Name(props) { ... }"
+    },
+    "TestDef": {
+      "description": "Named test block",
+      "fields": { "name": "String", "body": "Block" },
+      "syntax": "test \"description\" { body }",
+      "example": "test \"addition\" { assert_eq(add(2, 3), 5); }"
+    },
+    "StyleBlock": {
+      "description": "Scoped CSS inside a component",
+      "fields": { "selector": "String", "properties": "[(String, String)]" },
+      "syntax": "style { .selector { property: \"value\"; } }"
+    },
+    "TransitionDef": {
+      "description": "CSS transition declaration",
+      "fields": { "property": "String", "duration": "String", "easing": "String" },
+      "syntax": "transition { property: \"duration easing\"; }"
+    },
+    "SkeletonDef": {
+      "description": "Loading placeholder UI rendered during SSR and before data arrives",
+      "fields": { "body": "RenderBlock" },
+      "syntax": "skeleton { <template /> }"
+    },
+    "ErrorBoundary": {
+      "description": "Catches render errors and shows fallback UI",
+      "fields": { "fallback": "RenderBlock", "body": "RenderBlock" },
+      "syntax": "error_boundary { fallback { <fallback-ui /> } { <risky-content /> } }"
+    },
+    "ModDef": {
+      "description": "Module declaration — external file or inline",
+      "fields": { "name": "String", "items": "Option<[Item]>", "is_external": "bool" },
+      "syntax_external": "mod name;",
+      "syntax_inline": "mod name { items }"
+    },
+    "UsePath": {
+      "description": "Import path",
+      "fields": { "segments": "[String]", "alias": "Option<String>", "glob": "bool", "group": "Option<[UseGroupItem]>" },
+      "syntax_single": "use path::to::Item;",
+      "syntax_alias": "use path::to::Item as Alias;",
+      "syntax_glob": "use path::to::*;",
+      "syntax_group": "use path::to::{A, B as C};"
+    },
+    "Block": {
+      "description": "Sequence of statements; the last expression is the block's value",
+      "fields": { "stmts": "[Stmt]" }
+    },
+    "Stmt": {
+      "variants": {
+        "Let": { "fields": { "name": "String", "ty": "Option<Type>", "mutable": "bool", "value": "Expr", "ownership": "Ownership" }, "syntax": "let mut name: Type = expr;" },
+        "Signal": { "fields": { "name": "String", "ty": "Option<Type>", "value": "Expr" }, "syntax": "signal name: Type = expr;" },
+        "LetDestructure": { "fields": { "pattern": "Pattern", "ty": "Option<Type>", "value": "Expr" }, "syntax": "let (a, b) = expr; / let Name { f, .. } = expr;" },
+        "Expr": { "fields": { "expr": "Expr" }, "syntax": "expression;" },
+        "Return": { "fields": { "value": "Option<Expr>" }, "syntax": "return expr;" },
+        "Yield": { "fields": { "value": "Expr" }, "syntax": "yield expr;" }
+      }
+    },
+    "Param": {
+      "fields": { "name": "String", "ty": "Type", "ownership": "Ownership" },
+      "self_forms": ["self (takes ownership)", "&self (immutable borrow)", "&mut self (mutable borrow)"]
+    }
+  },
+
+  "type_system": {
+    "primitive_types": {
+      "i32": { "description": "32-bit signed integer", "size": "4 bytes" },
+      "i64": { "description": "64-bit signed integer (default for integer literals)", "size": "8 bytes" },
+      "u32": { "description": "32-bit unsigned integer", "size": "4 bytes" },
+      "u64": { "description": "64-bit unsigned integer", "size": "8 bytes" },
+      "f32": { "description": "32-bit floating point", "size": "4 bytes" },
+      "f64": { "description": "64-bit floating point (default for float literals)", "size": "8 bytes" },
+      "bool": { "description": "Boolean true/false", "size": "1 byte" },
+      "String": { "description": "UTF-8 string", "size": "variable" }
+    },
+    "compound_types": {
+      "Array": { "syntax": "[T]", "example": "[i32]", "description": "Homogeneous collection" },
+      "Tuple": { "syntax": "(T, U, ...)", "example": "(i32, String)", "description": "Fixed-size heterogeneous collection" },
+      "Option": { "syntax": "Option<T>", "values": ["Some(value)", "None"], "description": "Nullable/optional value" },
+      "Result": { "syntax": "Result<T, E>", "values": ["Ok(value)", "Err(error)"], "description": "Success or failure" }
+    },
+    "reference_types": {
+      "immutable_borrow": { "syntax": "&T", "example": "&i32" },
+      "mutable_borrow": { "syntax": "&mut T", "example": "&mut i32" },
+      "lifetime_borrow": { "syntax": "&'a T", "example": "&'a i32" },
+      "lifetime_mutable_borrow": { "syntax": "&'a mut T", "example": "&'a mut i32" }
+    },
+    "generic_types": {
+      "syntax": "Name<T, U>",
+      "example": "Vec<i32>, HashMap<String, User>",
+      "description": "Parameterized types with angle brackets"
+    },
+    "function_types": {
+      "syntax": "fn(ParamTypes) -> ReturnType",
+      "example": "fn(i32) -> bool"
+    },
+    "ownership": {
+      "rules": [
+        "Every value has exactly one owner",
+        "When the owner goes out of scope, the value is dropped",
+        "Ownership can be transferred (moved) via assignment",
+        "Values can be borrowed immutably (&) — multiple simultaneous borrows allowed",
+        "Values can be borrowed mutably (&mut) — only one mutable borrow at a time, no concurrent immutable borrows"
+      ],
+      "ownership_enum": ["Owned", "Borrowed", "MutBorrowed"]
+    },
+    "generics": {
+      "declaration": "fn name<T>(...) or component Name<T>(...) or struct Name<T> { ... }",
+      "trait_bounds": "where T: TraitName",
+      "lifetime_params": "<'a, 'b> — declared before type params"
+    }
+  },
+
+  "expressions": {
+    "Integer": { "syntax": "42", "type": "i64 (default)", "example": "let x = 42;" },
+    "Float": { "syntax": "3.14", "type": "f64 (default)", "example": "let pi = 3.14;" },
+    "StringLit": { "syntax": "\"text\"", "type": "String", "example": "let s = \"hello\";" },
+    "Bool": { "syntax": "true / false", "type": "bool", "example": "let active = true;" },
+    "Ident": { "syntax": "variable_name", "description": "Variable reference", "example": "count" },
+    "SelfExpr": { "syntax": "self", "description": "Reference to current instance in methods" },
+    "Binary": {
+      "syntax": "left op right",
+      "operators": {
+        "arithmetic": ["+", "-", "*", "/", "%"],
+        "comparison": ["==", "!=", "<", ">", "<=", ">="],
+        "logical": ["&&", "||"]
+      },
+      "example": "a + b, x == 0, flag && ready"
+    },
+    "Unary": {
+      "syntax": "op operand",
+      "operators": ["-", "!"],
+      "example": "-x, !done"
+    },
+    "FieldAccess": { "syntax": "object.field", "example": "user.name" },
+    "MethodCall": { "syntax": "object.method(args)", "example": "items.push(42)" },
+    "FnCall": { "syntax": "callee(args)", "example": "add(1, 2), Module::func(arg)" },
+    "Index": { "syntax": "object[index]", "example": "items[0]" },
+    "If": {
+      "syntax": "if condition { then } else { otherwise }",
+      "note": "Produces a value — can be used in let bindings",
+      "example": "let max = if a > b { a } else { b };"
+    },
+    "Match": {
+      "syntax": "match subject { Pattern => expr, ... }",
+      "example": "match status { Some(v) => v, None => 0 }"
+    },
+    "For": {
+      "syntax": "for binding in iterator { body }",
+      "example": "for item in items { process(item); }"
+    },
+    "While": {
+      "syntax": "while condition { body }",
+      "example": "while count < 10 { count = count + 1; }"
+    },
+    "Block": {
+      "syntax": "{ stmts; last_expr }",
+      "note": "Last expression is the block's value",
+      "example": "let r = { let x = 1; let y = 2; x + y };"
+    },
+    "Borrow": { "syntax": "&expr", "example": "&value" },
+    "BorrowMut": { "syntax": "&mut expr", "example": "&mut value" },
+    "StructInit": {
+      "syntax": "Name { field: value, ... }",
+      "example": "User { id: 1, name: \"Alice\", email: \"a@b.com\" }"
+    },
+    "Assign": { "syntax": "target = value", "example": "self.count = self.count + 1;" },
+    "Await": { "syntax": "await expr", "example": "let data = await fetch(url);" },
+    "Fetch": {
+      "syntax_simple": "fetch(url)",
+      "syntax_options": "fetch(url, { method: \"POST\", headers: { ... }, body: data })",
+      "example": "let resp = fetch(\"https://api.example.com/users\");"
+    },
+    "Closure": {
+      "syntax": "|params| body  or  |params| { stmts }",
+      "example_typed": "|a: i32, b: i32| a + b",
+      "example_inferred": "|x| x * 2",
+      "example_no_params": "|| println(\"hello\")"
+    },
+    "PromptTemplate": {
+      "syntax": "prompt \"template with {interpolation}\"",
+      "example": "prompt \"Summarize: {document}\""
+    },
+    "Navigate": { "syntax": "navigate(path_expr)", "example": "navigate(\"/user/42\");" },
+    "Stream": {
+      "syntax": "for binding in stream source { body }",
+      "example": "for chunk in stream fetch(\"https://api.example.com/stream\") { process(chunk); }"
+    },
+    "Suspend": {
+      "syntax": "suspend(fallback_element) { content }",
+      "example": "suspend(<LoadingSpinner />) { <HeavyComponent /> }"
+    },
+    "Spawn": { "syntax": "spawn { expr }", "example": "spawn { heavy_computation() }" },
+    "Channel": { "syntax": "channel<Type>()", "example": "let ch = channel<i32>();" },
+    "Send": { "syntax": "channel.send(value)", "example": "ch.send(42);" },
+    "Receive": { "syntax": "channel.recv()", "example": "let val = ch.recv();" },
+    "Parallel": {
+      "syntax": "parallel { expr1, expr2, ... }",
+      "example": "parallel { fetch_users(), fetch_posts() }"
+    },
+    "TryCatch": {
+      "syntax": "try { body } catch binding { handler }",
+      "example": "try { parse(input)? } catch err { log(err); }"
+    },
+    "Try": {
+      "syntax": "expr?",
+      "description": "Unwrap Result/Option, propagate error on failure",
+      "example": "let config = parse_toml(text)?;"
+    },
+    "Assert": {
+      "syntax": "assert(condition) or assert(condition, \"message\")",
+      "example": "assert(x > 0);"
+    },
+    "AssertEq": {
+      "syntax": "assert_eq(left, right) or assert_eq(left, right, \"message\")",
+      "example": "assert_eq(result, 42);"
+    },
+    "Animate": { "syntax": "animate(target, \"animation_name\")", "example": "animate(element, \"fadeIn\");" },
+    "FormatString": {
+      "syntax": "f\"text {expr} more text {expr2}\"",
+      "example": "f\"Hello {name}, you have {count} items\""
+    }
+  },
+
+  "patterns": {
+    "Wildcard": { "syntax": "_", "description": "Matches anything, discards value" },
+    "Ident": { "syntax": "name", "description": "Binds matched value to a name" },
+    "Literal": { "syntax": "42 / \"hello\" / true", "description": "Matches a specific literal value" },
+    "Variant": { "syntax": "VariantName(pattern, ...)", "example": "Some(value), AuthStatus::LoggedIn(user)" },
+    "Tuple": { "syntax": "(p1, p2, ...)", "example": "let (x, y) = point;" },
+    "Struct": { "syntax": "Name { field, field2, .. }", "note": ".. ignores remaining fields", "example": "let User { name, age, .. } = user;" },
+    "Array": { "syntax": "[p1, p2, ..]", "note": ".. ignores remaining elements", "example": "let [first, second, ..] = items;" }
+  },
+
+  "component_structure": {
+    "description": "Full anatomy of a component declaration",
+    "sections": [
+      { "name": "props", "location": "parentheses after component name", "required": false, "syntax": "component Name(prop: Type = default)" },
+      { "name": "type_params", "location": "angle brackets after name, before parens", "required": false, "syntax": "component Name<T>(items: [T]) where T: Display" },
+      { "name": "state", "location": "component body, before methods", "required": false, "forms": ["let name: Type = value;", "let mut name: Type = value;", "signal name: Type = value;"] },
+      { "name": "methods", "location": "component body", "required": false, "syntax": "fn name(&self / &mut self, params) -> Type { body }" },
+      { "name": "style", "location": "component body", "required": false, "syntax": "style { .selector { property: \"value\"; } }" },
+      { "name": "transition", "location": "component body", "required": false, "syntax": "transition { property: \"duration easing\"; }" },
+      { "name": "skeleton", "location": "component body", "required": false, "syntax": "skeleton { <placeholder-template /> }" },
+      { "name": "error_boundary", "location": "component body", "required": false, "syntax": "error_boundary { fallback { <error-ui /> } { <content /> } }" },
+      { "name": "render", "location": "component body, typically last", "required": true, "syntax": "render { <template /> }" }
+    ],
+    "full_example": "component UserCard<T>(user: T, show_email: bool = true) where T: Display {\n  signal expanded: bool = false;\n\n  fn toggle(&mut self) {\n    self.expanded = !self.expanded;\n  }\n\n  style {\n    .card { padding: \"16px\"; border-radius: \"8px\"; }\n  }\n\n  transition {\n    opacity: \"0.3s ease\";\n  }\n\n  skeleton {\n    <div class=\"nectar-skeleton nectar-skeleton-rect\" />\n  }\n\n  render {\n    <div class=\"card\">\n      <h2>{user.to_string()}</h2>\n      {if show_email { <p>{user.email}</p> }}\n      <button on:click={self.toggle}>{if self.expanded { \"Less\" } else { \"More\" }}</button>\n    </div>\n  }\n}"
+  },
+
+  "store_structure": {
+    "description": "Full anatomy of a store declaration",
+    "sections": [
+      { "name": "signal", "required": true, "syntax": "signal name: Type = initial_value;" },
+      { "name": "action", "required": false, "syntax": "action name(&mut self, params) { body }", "note": "Can be prefixed with async" },
+      { "name": "computed", "required": false, "syntax": "computed name(&self) -> Type { expr }" },
+      { "name": "effect", "required": false, "syntax": "effect name(&self) { body }" }
+    ],
+    "usage_from_component": "StoreName::action_name() or StoreName::computed_name() or StoreName::signal_name",
+    "full_example": "store AuthStore {\n  signal user: Option<User> = None;\n  signal status: AuthStatus = AuthStatus::LoggedOut;\n\n  async action login(&mut self, email: String, password: String) {\n    self.status = AuthStatus::Loading;\n    let resp = await fetch(\"/api/login\", { method: \"POST\", body: { email: email, password: password } });\n    self.user = Some(resp.json());\n    self.status = AuthStatus::LoggedIn(self.user);\n  }\n\n  action logout(&mut self) {\n    self.user = None;\n    self.status = AuthStatus::LoggedOut;\n  }\n\n  computed is_logged_in(&self) -> bool {\n    match self.status { AuthStatus::LoggedIn(_) => true, _ => false }\n  }\n\n  effect on_status_change(&self) {\n    println(f\"Auth status: {self.status}\");\n  }\n}"
+  },
+
+  "agent_structure": {
+    "description": "Full anatomy of an agent declaration",
+    "sections": [
+      { "name": "prompt", "required": false, "syntax": "prompt system = \"system prompt text\";" },
+      { "name": "state", "required": false, "syntax": "signal name: Type = value;" },
+      { "name": "tool", "required": false, "syntax": "tool name(param: Type) -> ReturnType { body }" },
+      { "name": "methods", "required": false, "syntax": "fn name(&mut self) { body }" },
+      { "name": "render", "required": false, "syntax": "render { <template /> }" }
+    ],
+    "full_example": "agent CodeHelper {\n  prompt system = \"You are a coding assistant. Help users write Arc code.\";\n\n  signal messages: [Message] = [];\n  signal input: String = \"\";\n\n  tool search_docs(query: String) -> String {\n    let r = await fetch(f\"https://docs.example.com/search?q={query}\");\n    return r.json().summary;\n  }\n\n  tool run_code(code: String) -> String {\n    let r = await fetch(\"/api/execute\", { method: \"POST\", body: { code: code } });\n    return r.json().output;\n  }\n\n  fn send(&mut self) {\n    self.messages.push(Message { role: \"user\", content: self.input });\n    self.input = \"\";\n  }\n\n  render {\n    <div class=\"chat\">\n      {for msg in self.messages { <div class={msg.role}>{msg.content}</div> }}\n      <input bind:value={input} on:submit={self.send} />\n    </div>\n  }\n}"
+  },
+
+  "router_structure": {
+    "description": "Full anatomy of a router declaration",
+    "sections": [
+      { "name": "route", "required": true, "syntax": "route \"/path\" => ComponentName," },
+      { "name": "route with params", "required": false, "syntax": "route \"/path/:param\" => ComponentName," },
+      { "name": "route with guard", "required": false, "syntax": "route \"/path\" => ComponentName guard { boolean_expr }," },
+      { "name": "fallback", "required": false, "syntax": "fallback => ComponentName," }
+    ],
+    "full_example": "router AppRouter {\n  route \"/\" => Home,\n  route \"/about\" => About,\n  route \"/user/:id\" => UserProfile,\n  route \"/settings\" => Settings guard { AuthStore::is_logged_in() },\n  route \"/admin/*\" => AdminPanel guard { AuthStore::is_admin() },\n  fallback => NotFound,\n}"
+  },
+
+  "template_syntax": {
+    "elements": {
+      "html_element": "<tag attr=\"static\" dynamic={expr}>children</tag>",
+      "self_closing": "<tag attr=\"val\" />",
+      "component_element": "<ComponentName prop={value} />",
+      "fragment": "<Fragment>children</Fragment>",
+      "link": "<Link to=\"/path\">\"text\"</Link>"
+    },
+    "attributes": {
+      "static": "name=\"string_value\"",
+      "dynamic": "name={expression}",
+      "event_handler": "on:event={handler_expr}",
+      "two_way_bind": "bind:property={signal_name}",
+      "aria": "aria-name={expr} or aria-name=\"string\"",
+      "role": "role=\"value\""
+    },
+    "content": {
+      "text": "\"string literal\"",
+      "expression": "{expr}",
+      "conditional": "{if cond { <A /> } else { <B /> }}",
+      "loop": "{for item in collection { <li>{item}</li> }}",
+      "match": "{match expr { Pattern => <A />, _ => <B /> }}"
+    },
+    "common_events": ["click", "submit", "change", "input", "mouseover", "mouseout", "keydown", "keyup", "focus", "blur"]
+  },
+
+  "common_patterns": {
+    "counter_component": {
+      "description": "Basic stateful component with event handlers",
+      "code": "component Counter(initial: i32 = 0) {\n  let mut count: i32 = initial;\n\n  fn increment(&mut self) { self.count = self.count + 1; }\n  fn decrement(&mut self) { self.count = self.count - 1; }\n\n  render {\n    <div>\n      <button on:click={self.decrement}>\"-\"</button>\n      <span>{self.count}</span>\n      <button on:click={self.increment}>\"+\"</button>\n    </div>\n  }\n}"
+    },
+    "form_with_binding": {
+      "description": "Form using two-way binding",
+      "code": "component SearchForm() {\n  signal query: String = \"\";\n  signal results: [Result] = [];\n\n  async fn search(&mut self) {\n    let resp = await fetch(f\"https://api.example.com/search?q={self.query}\");\n    self.results = resp.json();\n  }\n\n  render {\n    <form on:submit={self.search}>\n      <input bind:value={query} placeholder=\"Search...\" />\n      <button>\"Search\"</button>\n    </form>\n    <ul>\n      {for r in self.results { <li>{r.title}</li> }}\n    </ul>\n  }\n}"
+    },
+    "async_data_loading": {
+      "description": "Component that fetches data with loading state",
+      "code": "component UserList() {\n  signal users: [User] = [];\n  signal loading: bool = true;\n\n  async fn load(&mut self) {\n    let resp = await fetch(\"https://api.example.com/users\");\n    self.users = resp.json();\n    self.loading = false;\n  }\n\n  render {\n    <div>\n      {if self.loading {\n        <p>\"Loading...\"</p>\n      } else {\n        <ul>\n          {for user in self.users { <li>{user.name}</li> }}\n        </ul>\n      }}\n    </div>\n  }\n}"
+    },
+    "store_with_component": {
+      "description": "Global store consumed by a component",
+      "code": "store TodoStore {\n  signal todos: [Todo] = [];\n  signal filter: Filter = Filter::All;\n\n  action add(&mut self, text: String) {\n    self.todos.push(Todo { id: self.todos.len(), text: text, done: false });\n  }\n\n  action toggle(&mut self, id: u32) {\n    for todo in &mut self.todos {\n      if todo.id == id { todo.done = !todo.done; }\n    }\n  }\n\n  computed visible(&self) -> [Todo] {\n    match self.filter {\n      Filter::All => self.todos,\n      Filter::Active => self.todos.filter(|t| !t.done),\n      Filter::Completed => self.todos.filter(|t| t.done),\n    }\n  }\n}\n\ncomponent TodoApp() {\n  signal input: String = \"\";\n\n  fn add(&mut self) {\n    TodoStore::add(self.input);\n    self.input = \"\";\n  }\n\n  render {\n    <div>\n      <input bind:value={input} on:submit={self.add} />\n      <ul>\n        {for todo in TodoStore::visible() {\n          <li on:click={|| TodoStore::toggle(todo.id)}>{todo.text}</li>\n        }}\n      </ul>\n    </div>\n  }\n}"
+    },
+    "generic_component": {
+      "description": "Component with type parameters and trait bounds",
+      "code": "component DataTable<T>(items: [T], columns: [String]) where T: Display {\n  render {\n    <table>\n      <thead><tr>{for col in columns { <th>{col}</th> }}</tr></thead>\n      <tbody>\n        {for item in items { <tr><td>{item.to_string()}</td></tr> }}\n      </tbody>\n    </table>\n  }\n}"
+    },
+    "error_handling_pattern": {
+      "description": "Try/catch with ? operator",
+      "code": "async fn load_config() -> Result<Config, String> {\n  let text = read_file(\"config.toml\")?;\n  let config = parse_toml(text)?;\n  return Ok(config);\n}\n\ncomponent App() {\n  signal config: Option<Config> = None;\n  signal error: Option<String> = None;\n\n  async fn init(&mut self) {\n    try {\n      self.config = Some(await load_config()?);\n    } catch err {\n      self.error = Some(f\"Failed to load: {err}\");\n    }\n  }\n\n  render {\n    <div>\n      {match self.error {\n        Some(e) => <div class=\"error\">{e}</div>,\n        None => match self.config {\n          Some(c) => <ConfigView config={c} />,\n          None => <p>\"Loading...\"</p>,\n        },\n      }}\n    </div>\n  }\n}"
+    },
+    "full_app_skeleton": {
+      "description": "Complete app with router, store, and components",
+      "code": "use models::{User, AuthStatus};\n\nstore AuthStore {\n  signal user: Option<User> = None;\n  signal status: AuthStatus = AuthStatus::LoggedOut;\n\n  async action login(&mut self, email: String, pass: String) {\n    self.status = AuthStatus::Loading;\n    let resp = await fetch(\"/api/login\", { method: \"POST\", body: { email: email, password: pass } });\n    self.user = Some(resp.json());\n    self.status = AuthStatus::LoggedIn(self.user);\n  }\n\n  computed is_logged_in(&self) -> bool {\n    match self.status { AuthStatus::LoggedIn(_) => true, _ => false }\n  }\n}\n\ncomponent Home() {\n  render { <h1>\"Welcome to Nectar\"</h1> }\n}\n\ncomponent Dashboard() {\n  render { <h1>\"Dashboard\"</h1> }\n}\n\ncomponent NotFound() {\n  render { <h1>\"404 — Not Found\"</h1> }\n}\n\nrouter AppRouter {\n  route \"/\" => Home,\n  route \"/dashboard\" => Dashboard guard { AuthStore::is_logged_in() },\n  fallback => NotFound,\n}"
+    }
+  }
+}

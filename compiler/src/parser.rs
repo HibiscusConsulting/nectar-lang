@@ -291,6 +291,7 @@ impl Parser {
         let mut styles = Vec::new();
         let mut transitions = Vec::new();
         let mut render = None;
+        let mut skeleton = None;
         let mut error_boundary = None;
 
         while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
@@ -313,10 +314,13 @@ impl Parser {
                 TokenKind::Render => {
                     render = Some(self.parse_render_block()?);
                 }
+                TokenKind::Ident(ref id) if id == "skeleton" => {
+                    skeleton = Some(self.parse_skeleton_block()?);
+                }
                 TokenKind::Ident(ref id) if id == "error_boundary" => {
                     error_boundary = Some(self.parse_error_boundary()?);
                 }
-                _ => return Err(self.error("Expected let, signal, fn, style, transition, render, or error_boundary in component")),
+                _ => return Err(self.error("Expected let, signal, fn, style, transition, render, skeleton, or error_boundary in component")),
             }
         }
 
@@ -327,7 +331,16 @@ impl Parser {
             span,
         })?;
 
-        Ok(Component { name, type_params, props, state, methods, styles, transitions, trait_bounds, render, error_boundary, span })
+        Ok(Component { name, type_params, props, state, methods, styles, transitions, trait_bounds, render, skeleton, error_boundary, span })
+    }
+
+    /// Parse `skeleton { <template_node> }` — placeholder UI shown while loading
+    fn parse_skeleton_block(&mut self) -> Result<SkeletonDef, ParseError> {
+        let span = self.current_span();
+        // The identifier "skeleton" has already been peeked; consume it.
+        self.advance();
+        let body = self.parse_render_block_inline()?;
+        Ok(SkeletonDef { body, span })
     }
 
     /// Parse `error_boundary { fallback { ... } body { ... } }`

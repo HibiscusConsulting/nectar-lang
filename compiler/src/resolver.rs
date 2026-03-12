@@ -1,4 +1,4 @@
-//! Dependency resolver for Arc packages.
+//! Dependency resolver for Nectar packages.
 //!
 //! Performs semver-aware version resolution, detects circular dependencies, and
 //! picks the highest compatible version when multiple constraints overlap.
@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use semver::{Version, VersionReq};
 
-use crate::package::{ArcManifest, Dependency, collect_dependencies};
+use crate::package::{NectarManifest, Dependency, collect_dependencies};
 use crate::registry::RegistryClient;
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ impl<'a> Resolver<'a> {
 
     /// Walk the dependency graph of `manifest` and return a flat, de-duplicated
     /// list of resolved dependencies in topological order.
-    pub fn resolve(&self, manifest: &ArcManifest) -> Result<Vec<ResolvedDependency>> {
+    pub fn resolve(&self, manifest: &NectarManifest) -> Result<Vec<ResolvedDependency>> {
         let deps = collect_dependencies(manifest);
 
         // Track which packages we have resolved so far: name -> resolved info.
@@ -101,11 +101,11 @@ impl<'a> Resolver<'a> {
         // Resolve this package.
         let resolved_dep = self.resolve_single(dep)?;
 
-        // If the resolved package itself has an Arc.toml (e.g. local path dep),
+        // If the resolved package itself has an Nectar.toml (e.g. local path dep),
         // recurse into its transitive dependencies.
         let transitive_manifest = match &resolved_dep.source {
             DependencySource::Local { path } => {
-                let manifest_path = path.join("Arc.toml");
+                let manifest_path = path.join("Nectar.toml");
                 if manifest_path.exists() {
                     Some(crate::package::parse_manifest(
                         &manifest_path.to_string_lossy(),
@@ -115,7 +115,7 @@ impl<'a> Resolver<'a> {
                 }
             }
             DependencySource::Registry { cache_path } => {
-                let manifest_path = cache_path.join("Arc.toml");
+                let manifest_path = cache_path.join("Nectar.toml");
                 if manifest_path.exists() {
                     Some(crate::package::parse_manifest(
                         &manifest_path.to_string_lossy(),
@@ -220,10 +220,10 @@ pub fn pick_best_version(versions: &[String], req: &VersionReq) -> Option<Versio
     candidates.into_iter().last()
 }
 
-/// Try to read the version from a local package's `Arc.toml`.
+/// Try to read the version from a local package's `Nectar.toml`.
 fn local_manifest_version(path: &Path) -> Option<Version> {
-    let manifest_path = path.join("Arc.toml");
+    let manifest_path = path.join("Nectar.toml");
     let content = std::fs::read_to_string(manifest_path).ok()?;
-    let manifest: crate::package::ArcManifest = toml::from_str(&content).ok()?;
+    let manifest: crate::package::NectarManifest = toml::from_str(&content).ok()?;
     Version::parse(&manifest.package.version).ok()
 }

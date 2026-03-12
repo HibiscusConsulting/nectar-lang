@@ -87,7 +87,24 @@ pub struct Component {
     pub transitions: Vec<TransitionDef>,
     pub trait_bounds: Vec<TraitBound>,
     pub render: RenderBlock,
+    pub skeleton: Option<SkeletonDef>,
     pub error_boundary: Option<ErrorBoundary>,
+    pub span: Span,
+}
+
+/// Skeleton definition — placeholder UI shown while data is loading
+///
+/// ```nectar
+/// skeleton {
+///     <div class="skeleton">
+///         <div class="skeleton-avatar" />
+///         <div class="skeleton-line" style="width: 60%" />
+///     </div>
+/// }
+/// ```
+#[derive(Debug)]
+pub struct SkeletonDef {
+    pub body: RenderBlock,
     pub span: Span,
 }
 
@@ -211,7 +228,7 @@ pub struct ImplBlock {
 
 /// Store — global reactive state container (Flux/Redux-like)
 ///
-/// ```arc
+/// ```nectar
 /// store AppStore {
 ///     signal count: i32 = 0;
 ///     signal user: Option<User> = None;
@@ -276,7 +293,7 @@ pub struct EffectDef {
 
 /// AI Agent — a component that wraps an LLM interaction
 ///
-/// ```arc
+/// ```nectar
 /// agent Assistant {
 ///     prompt system = "You are a helpful assistant.";
 ///
@@ -321,7 +338,7 @@ pub struct ToolDef {
 
 /// Router definition — maps URL paths to components
 ///
-/// ```arc
+/// ```nectar
 /// router AppRouter {
 ///     route "/" => Home,
 ///     route "/about" => About,
@@ -350,7 +367,7 @@ pub struct RouteDef {
 
 /// Lazy-loaded component — only fetched/compiled when first rendered
 ///
-/// ```arc
+/// ```nectar
 /// lazy component HeavyChart(data: [f64]) {
 ///     render {
 ///         <canvas />

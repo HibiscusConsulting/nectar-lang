@@ -1,11 +1,11 @@
 /**
- * Arc SSR Runtime Bridge — Node.js runtime for server-side rendering.
+ * Nectar SSR Runtime Bridge — Node.js runtime for server-side rendering.
  *
- * Provides a DOM-free environment where Arc WASM modules can execute
+ * Provides a DOM-free environment where Nectar WASM modules can execute
  * and produce HTML strings instead of manipulating a real DOM.
  *
  * Usage:
- *   const { renderToString, renderToStream } = require('./arc-ssr-runtime');
+ *   const { renderToString, renderToStream } = require('./nectar-ssr-runtime');
  *   const html = await renderToString('./app.wasm', 'App', { title: 'Hello' });
  */
 
@@ -222,7 +222,7 @@ function escapeAttr(str) {
 // --- Public API ---
 
 /**
- * Load an Arc WASM module and render a component to an HTML string.
+ * Load an Nectar WASM module and render a component to an HTML string.
  *
  * @param {string} wasmPath — path to the compiled .wasm file
  * @param {string} componentName — name of the component to render
@@ -255,13 +255,13 @@ async function renderToString(wasmPath, componentName, props) {
   const html = imports.__serialize(rootId);
 
   // Add hydration state
-  const stateScript = '<script>window.__ARC_STATE__ = {}</script>';
+  const stateScript = '<script>window.__NECTAR_STATE__ = {}</script>';
 
   return html + stateScript;
 }
 
 /**
- * Load an Arc WASM module and render a component as a readable stream.
+ * Load an Nectar WASM module and render a component as a readable stream.
  *
  * @param {string} wasmPath — path to the compiled .wasm file
  * @param {string} componentName — name of the component to render

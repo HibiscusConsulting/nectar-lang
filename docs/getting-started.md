@@ -1,12 +1,12 @@
-# Getting Started with Arc
+# Getting Started with Nectar
 
-This guide walks you through installing Arc, writing your first program, and building a complete application.
+This guide walks you through installing Nectar, writing your first program, and building a complete application.
 
 ---
 
 ## Prerequisites
 
-Arc's compiler is written in Rust. You need:
+Nectar's compiler is written in Rust. You need:
 
 - **Rust toolchain** (1.70 or later) -- install from [rustup.rs](https://rustup.rs)
 - **A modern web browser** -- for viewing compiled output (Chrome, Firefox, Safari, or Edge)
@@ -24,15 +24,15 @@ cargo --version
 
 ### Build from Source
 
-Clone the Arc repository and build the compiler:
+Clone the Nectar repository and build the compiler:
 
 ```sh
-git clone https://github.com/example/arc-lang.git
-cd arc-lang
+git clone https://github.com/example/nectar-lang.git
+cd nectar-lang
 cargo build --release
 ```
 
-The compiled binary is at `target/release/arc`. Add it to your PATH:
+The compiled binary is at `target/release/nectar`. Add it to your PATH:
 
 ```sh
 export PATH="$PWD/target/release:$PATH"
@@ -41,20 +41,20 @@ export PATH="$PWD/target/release:$PATH"
 Verify the installation:
 
 ```sh
-arc --version
+nectar --version
 ```
 
 ---
 
-## Your First Arc Program
+## Your First Nectar Program
 
-Create a file called `hello.arc`:
+Create a file called `hello.nectar`:
 
-```arc
+```nectar
 component Hello(name: String) {
     render {
         <div>
-            <h1>"Hello from Arc!"</h1>
+            <h1>"Hello from Nectar!"</h1>
             <p>{name}</p>
         </div>
     }
@@ -68,13 +68,13 @@ This defines a `Hello` component that takes a `name` prop and renders it inside 
 Compile to WebAssembly Text Format (WAT):
 
 ```sh
-arc build hello.arc
+nectar build hello.nectar
 ```
 
 This produces `hello.wat`. To compile directly to binary WebAssembly:
 
 ```sh
-arc build hello.arc --emit-wasm
+nectar build hello.nectar --emit-wasm
 ```
 
 This produces `hello.wasm`.
@@ -86,24 +86,24 @@ Create an `index.html` file:
 ```html
 <!DOCTYPE html>
 <html>
-<head><title>My Arc App</title></head>
+<head><title>My Nectar App</title></head>
 <body>
   <div id="app"></div>
-  <script src="arc-runtime.js"></script>
+  <script src="nectar-runtime.js"></script>
   <script>
-    const runtime = new ArcRuntime();
+    const runtime = new NectarRuntime();
     runtime.mount('hello.wasm', document.getElementById('app'));
   </script>
 </body>
 </html>
 ```
 
-Copy `runtime/arc-runtime.js` alongside your HTML file, serve it with any static server, and open it in a browser.
+Copy `runtime/nectar-runtime.js` alongside your HTML file, serve it with any static server, and open it in a browser.
 
 Or use the built-in dev server:
 
 ```sh
-arc dev --src . --port 3000
+nectar dev --src . --port 3000
 ```
 
 Open `http://localhost:3000` to see your component.
@@ -112,9 +112,9 @@ Open `http://localhost:3000` to see your component.
 
 ## Adding State and Reactivity
 
-Let's build a counter. Create `counter.arc`:
+Let's build a counter. Create `counter.nectar`:
 
-```arc
+```nectar
 component Counter(initial: i32) {
     let mut count: i32 = initial;
 
@@ -147,16 +147,16 @@ Key concepts:
 Compile and run:
 
 ```sh
-arc build counter.arc --emit-wasm
+nectar build counter.nectar --emit-wasm
 ```
 
 ---
 
 ## Handling Events
 
-Arc uses the `on:event` syntax for DOM events. The handler is any expression, typically a method reference:
+Nectar uses the `on:event` syntax for DOM events. The handler is any expression, typically a method reference:
 
-```arc
+```nectar
 component Form() {
     let mut value: String = "";
 
@@ -184,9 +184,9 @@ Common events: `click`, `submit`, `input`, `change`, `mouseover`, `mouseout`, `k
 
 ## Fetching Data from an API
 
-Arc has first-class support for HTTP communication via the `fetch` keyword:
+Nectar has first-class support for HTTP communication via the `fetch` keyword:
 
-```arc
+```nectar
 struct Post {
     id: u32,
     title: String,
@@ -253,11 +253,11 @@ Key concepts:
 
 ## Building a Complete Todo App
 
-Let's walk through `todo.arc`, a complete todo application demonstrating structs, enums, ownership, and components.
+Let's walk through `todo.nectar`, a complete todo application demonstrating structs, enums, ownership, and components.
 
 ### Step 1: Define Data Types
 
-```arc
+```nectar
 struct Todo {
     id: u32,
     text: String,
@@ -275,7 +275,7 @@ enum Filter {
 
 ### Step 2: Build the Component
 
-```arc
+```nectar
 component TodoApp() {
     let mut todos: [Todo] = [];
     let mut next_id: u32 = 0;
@@ -286,7 +286,7 @@ The component maintains a list of todos, a counter for generating unique IDs, an
 
 ### Step 3: Add Business Logic
 
-```arc
+```nectar
     fn add_todo(&mut self, text: String) {
         let todo = Todo {
             id: self.next_id,
@@ -311,7 +311,7 @@ Notice the ownership semantics: `todo` is **moved** into the `todos` array -- th
 
 ### Step 4: Filter with Pattern Matching
 
-```arc
+```nectar
     fn visible_todos(&self) -> [&Todo] {
         match self.filter {
             Filter::All => &self.todos,
@@ -325,10 +325,10 @@ Pattern matching on `self.filter` returns the appropriate subset. The return typ
 
 ### Step 5: Render the UI
 
-```arc
+```nectar
     render {
         <div>
-            <h1>"Arc Todo"</h1>
+            <h1>"Nectar Todo"</h1>
             <div>
                 <input placeholder="What needs to be done?" />
                 <button on:click={self.add_todo}>"Add"</button>
@@ -346,22 +346,22 @@ The template renders the filtered todo list. Thanks to fine-grained reactivity, 
 ### Compile and Run
 
 ```sh
-arc build todo.arc --emit-wasm
-arc dev --port 3000
+nectar build todo.nectar --emit-wasm
+nectar dev --port 3000
 ```
 
 ---
 
 ## Initializing a Project
 
-For larger projects, use `arc init` to create a project with dependency management:
+For larger projects, use `nectar init` to create a project with dependency management:
 
 ```sh
 mkdir my-app && cd my-app
-arc init --name my-app
+nectar init --name my-app
 ```
 
-This creates an `Arc.toml` manifest:
+This creates an `Nectar.toml` manifest:
 
 ```toml
 [package]
@@ -374,14 +374,14 @@ version = "0.1.0"
 Add dependencies:
 
 ```sh
-arc add ui-components --version "^1.0"
-arc install
+nectar add ui-components --version "^1.0"
+nectar install
 ```
 
 Build the project:
 
 ```sh
-arc build src/main.arc --emit-wasm -O2
+nectar build src/main.nectar --emit-wasm -O2
 ```
 
 ---

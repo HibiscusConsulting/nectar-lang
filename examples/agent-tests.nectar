@@ -1,0 +1,415 @@
+// =============================================================================
+// agent-tests.nectar — Agent testing patterns for Nectar
+//
+// These tests verify AI agent behavior: tool registration, tool dispatch,
+// message history management, and mocked AI responses.
+//
+// Run with:   nectar test examples/agent-tests.nectar
+// Filter:     nectar test examples/agent-tests.nectar --filter "tool"
+// =============================================================================
+
+// ---------------------------------------------------------------------------
+// Data types used across tests
+// ---------------------------------------------------------------------------
+
+struct Message {
+    role: String,
+    content: String,
+}
+
+struct SearchResult {
+    title: String,
+    url: String,
+    snippet: String,
+}
+
+struct WeatherData {
+    city: String,
+    temp_f: f64,
+    condition: String,
+}
+
+struct CalculationResult {
+    expression: String,
+    answer: f64,
+}
+
+// ---------------------------------------------------------------------------
+// Agent under test
+// ---------------------------------------------------------------------------
+
+agent TestAssistant {
+    prompt system = "You are a helpful assistant for testing purposes.";
+
+    signal messages: [Message] = [];
+    signal streaming: bool = false;
+    signal tool_call_log: [String] = [];
+
+    tool search_docs(query: String) -> String {
+        self.tool_call_log.push(format("search_docs: {}", query));
+        let results = await fetch(format("https://api.example.com/search?q={}", query));
+        return results.json().summary;
+    }
+
+    tool calculate(expression: String) -> String {
+        self.tool_call_log.push(format("calculate: {}", expression));
+        let result = await fetch("https://api.example.com/calculate", {
+            method: "POST",
+            body: format("{\"expr\": \"{}\"}", expression),
+        });
+        return result.json().answer;
+    }
+
+    tool get_weather(city: String) -> String {
+        self.tool_call_log.push(format("get_weather: {}", city));
+        let result = await fetch(format("https://api.example.com/weather?city={}", city));
+        return format("Weather in {}: {}", city, result.json().forecast);
+    }
+
+    fn add_user_message(&mut self, content: String) {
+        self.messages.push(Message { role: "user", content: content });
+    }
+
+    fn add_assistant_message(&mut self, content: String) {
+        self.messages.push(Message { role: "assistant", content: content });
+    }
+
+    fn clear_history(&mut self) {
+        self.messages = [];
+        self.tool_call_log = [];
+    }
+
+    fn message_count(&self) -> u32 {
+        self.messages.len()
+    }
+
+    fn last_message(&self) -> Option<&Message> {
+        if self.messages.len() > 0 {
+            Some(&self.messages[self.messages.len() - 1])
+        } else {
+            None
+        }
+    }
+
+    render {
+        <div class="assistant">
+            <div class="messages">
+                {for msg in &self.messages {
+                    <div class={msg.role}>
+                        <span class="role-label">{msg.role}</span>
+                        <div class="content">{msg.content}</div>
+                    </div>
+                }}
+            </div>
+            <div class="input-area">
+                <input placeholder="Ask a question..." />
+                <button on:click={self.clear_history}>"Clear"</button>
+            </div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// A minimal agent with no tools (edge case)
+// ---------------------------------------------------------------------------
+
+agent SimpleResponder {
+    prompt system = "You respond with exactly what the user said, reversed.";
+
+    signal messages: [Message] = [];
+
+    fn add_message(&mut self, role: String, content: String) {
+        self.messages.push(Message { role: role, content: content });
+    }
+
+    fn message_count(&self) -> u32 {
+        self.messages.len()
+    }
+
+    render {
+        <div class="responder">
+            {for msg in &self.messages {
+                <p>{format("{}: {}", msg.role, msg.content)}</p>
+            }}
+        </div>
+    }
+}
+
+// ===========================================================================
+// 1. Testing Tool Registration
+// ===========================================================================
+
+test "agent has system prompt" {
+    // Verify the agent's system prompt is set correctly.
+    // The runtime exposes the prompt via the agent's compiled metadata.
+    assert_eq(TestAssistant::get_system_prompt(), "You are a helpful assistant for testing purposes.");
+}
+
+test "agent registers expected tools" {
+    let tools = TestAssistant::get_registered_tools();
+    assert_eq(tools.len(), 3);
+
+    // Verify each tool name
+    assert_eq(tools[0].name, "search_docs");
+    assert_eq(tools[1].name, "calculate");
+    assert_eq(tools[2].name, "get_weather");
+}
+
+test "tool has correct parameter types" {
+    let tools = TestAssistant::get_registered_tools();
+
+    // search_docs takes a single String parameter
+    let search_tool = tools[0];
+    assert_eq(search_tool.params.len(), 1);
+    assert_eq(search_tool.params[0].name, "query");
+    assert_eq(search_tool.params[0].ty, "String");
+
+    // calculate takes a single String parameter
+    let calc_tool = tools[1];
+    assert_eq(calc_tool.params.len(), 1);
+    assert_eq(calc_tool.params[0].name, "expression");
+
+    // get_weather takes a single String parameter
+    let weather_tool = tools[2];
+    assert_eq(weather_tool.params.len(), 1);
+    assert_eq(weather_tool.params[0].name, "city");
+}
+
+test "tool return types are String" {
+    let tools = TestAssistant::get_registered_tools();
+    for tool in &tools {
+        assert_eq(tool.return_type, "String");
+    }
+}
+
+test "agent with no tools registers empty list" {
+    let tools = SimpleResponder::get_registered_tools();
+    assert_eq(tools.len(), 0);
+}
+
+// ===========================================================================
+// 2. Testing Tool Dispatch with Typed Args
+// ===========================================================================
+
+test "dispatch search_docs tool" {
+    let el = render(<TestAssistant />);
+    TestAssistant::clear_history();
+
+    // Simulate the runtime dispatching a tool call
+    let result = await TestAssistant::dispatch_tool("search_docs", {
+        query: "nectar language tutorial",
+    });
+
+    // Verify the tool was invoked (logged in tool_call_log)
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log.len(), 1);
+    assert_eq(log[0], "search_docs: arc language tutorial");
+}
+
+test "dispatch calculate tool" {
+    let el = render(<TestAssistant />);
+    TestAssistant::clear_history();
+
+    let result = await TestAssistant::dispatch_tool("calculate", {
+        expression: "2 + 2",
+    });
+
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log.len(), 1);
+    assert_eq(log[0], "calculate: 2 + 2");
+}
+
+test "dispatch get_weather tool" {
+    let el = render(<TestAssistant />);
+    TestAssistant::clear_history();
+
+    let result = await TestAssistant::dispatch_tool("get_weather", {
+        city: "San Francisco",
+    });
+
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log.len(), 1);
+    assert_eq(log[0], "get_weather: San Francisco");
+}
+
+test "dispatch multiple tools in sequence" {
+    let el = render(<TestAssistant />);
+    TestAssistant::clear_history();
+
+    await TestAssistant::dispatch_tool("search_docs", { query: "ownership" });
+    await TestAssistant::dispatch_tool("calculate", { expression: "10 * 5" });
+    await TestAssistant::dispatch_tool("get_weather", { city: "Tokyo" });
+
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log.len(), 3);
+    assert_eq(log[0], "search_docs: ownership");
+    assert_eq(log[1], "calculate: 10 * 5");
+    assert_eq(log[2], "get_weather: Tokyo");
+}
+
+// ===========================================================================
+// 3. Testing Message History Management
+// ===========================================================================
+
+test "agent starts with empty history" {
+    TestAssistant::clear_history();
+    assert_eq(TestAssistant::message_count(), 0);
+}
+
+test "adding user message increases count" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("Hello!");
+    assert_eq(TestAssistant::message_count(), 1);
+}
+
+test "messages preserve role and content" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("What is Nectar?");
+    TestAssistant::add_assistant_message("Nectar is a programming language.");
+
+    assert_eq(TestAssistant::message_count(), 2);
+
+    let messages = TestAssistant::get_messages();
+    assert_eq(messages[0].role, "user");
+    assert_eq(messages[0].content, "What is Nectar?");
+    assert_eq(messages[1].role, "assistant");
+    assert_eq(messages[1].content, "Nectar is a programming language.");
+}
+
+test "clear_history resets all state" {
+    TestAssistant::add_user_message("message 1");
+    TestAssistant::add_user_message("message 2");
+    assert(TestAssistant::message_count() > 0);
+
+    TestAssistant::clear_history();
+    assert_eq(TestAssistant::message_count(), 0);
+    assert_eq(TestAssistant::get_tool_call_log().len(), 0);
+}
+
+test "last_message returns most recent" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("first");
+    TestAssistant::add_assistant_message("second");
+    TestAssistant::add_user_message("third");
+
+    let last = TestAssistant::last_message();
+    match last {
+        Some(msg) => {
+            assert_eq(msg.role, "user");
+            assert_eq(msg.content, "third");
+        }
+        None => assert(false, "expected a message"),
+    }
+}
+
+test "last_message returns None when empty" {
+    TestAssistant::clear_history();
+    let last = TestAssistant::last_message();
+    assert_eq(last, None);
+}
+
+test "conversation flow — alternating roles" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("Hello");
+    TestAssistant::add_assistant_message("Hi there!");
+    TestAssistant::add_user_message("How are you?");
+    TestAssistant::add_assistant_message("I'm doing well, thanks!");
+
+    let messages = TestAssistant::get_messages();
+    assert_eq(messages.len(), 4);
+    assert_eq(messages[0].role, "user");
+    assert_eq(messages[1].role, "assistant");
+    assert_eq(messages[2].role, "user");
+    assert_eq(messages[3].role, "assistant");
+}
+
+test "simple responder tracks messages" {
+    SimpleResponder::add_message("user", "hello");
+    SimpleResponder::add_message("assistant", "olleh");
+    assert_eq(SimpleResponder::message_count(), 2);
+}
+
+// ===========================================================================
+// 4. Mocking AI Responses
+// ===========================================================================
+
+test "mock chat_complete returns canned response" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("What is 2+2?");
+
+    // Use ai::mock to install a canned response for the next completion
+    ai::mock_response("The answer is 4.");
+
+    // Trigger a completion (the mock intercepts the actual API call)
+    let response = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(response.content, "The answer is 4.");
+}
+
+test "mock chat_complete with tool call" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("What's the weather in Paris?");
+
+    // Mock a response that includes a tool call
+    ai::mock_tool_call("get_weather", { city: "Paris" });
+
+    let response = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(response.tool_calls.len(), 1);
+    assert_eq(response.tool_calls[0].name, "get_weather");
+    assert_eq(response.tool_calls[0].args.city, "Paris");
+}
+
+test "mock sequential responses" {
+    TestAssistant::clear_history();
+
+    // Queue multiple mock responses in order
+    ai::mock_response("First response.");
+    ai::mock_response("Second response.");
+
+    TestAssistant::add_user_message("Question 1");
+    let r1 = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(r1.content, "First response.");
+
+    TestAssistant::add_assistant_message(r1.content);
+    TestAssistant::add_user_message("Question 2");
+    let r2 = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(r2.content, "Second response.");
+}
+
+test "mock streaming tokens" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("Tell me a story.");
+
+    // Mock a stream that yields tokens one at a time
+    ai::mock_stream(["Once", " upon", " a", " time"]);
+
+    let mut collected = "";
+    for chunk in stream ai::chat_stream(TestAssistant::get_messages()) {
+        collected = collected + chunk;
+    }
+    assert_eq(collected, "Once upon a time");
+}
+
+test "agent render shows messages" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("Hello agent");
+    TestAssistant::add_assistant_message("Hello human");
+
+    let el = render(<TestAssistant />);
+    let user_msg = el.findByText("Hello agent");
+    assert(user_msg.exists());
+    let assistant_msg = el.findByText("Hello human");
+    assert(assistant_msg.exists());
+}
+
+test "agent clear button resets UI" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message("Some message");
+
+    let el = render(<TestAssistant />);
+    assert(el.findByText("Some message").exists());
+
+    let clear_btn = el.findByText("Clear");
+    clear_btn.click();
+
+    assert_eq(TestAssistant::message_count(), 0);
+}

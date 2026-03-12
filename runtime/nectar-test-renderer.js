@@ -1,9 +1,9 @@
 /**
- * Arc Component Test Renderer — a virtual DOM test renderer for
+ * Nectar Component Test Renderer — a virtual DOM test renderer for
  * component testing in Node.js.
  *
  * Usage:
- *   import { render } from './arc-test-renderer.js';
+ *   import { render } from './nectar-test-renderer.js';
  *   const el = await render('./component.wasm', { title: 'Hello' });
  *   const heading = el.findByText('Hello');
  *   heading.click();
@@ -219,7 +219,7 @@ export class TestElement {
 // ---------------------------------------------------------------------------
 
 /**
- * Render an Arc component into a virtual DOM for testing.
+ * Render an Nectar component into a virtual DOM for testing.
  * @param {string|Uint8Array} componentWasm - Path to .wasm file or raw bytes
  * @param {object} props - Props to pass to the component
  * @returns {Promise<TestElement>}

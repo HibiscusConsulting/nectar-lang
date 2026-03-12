@@ -1,7 +1,7 @@
 /**
- * Arc Runtime — minimal DOM bridge for Arc-compiled WebAssembly modules.
+ * Arc Runtime — minimal DOM bridge for Nectar-compiled WebAssembly modules.
  *
- * This provides the host functions that Arc WASM modules import:
+ * This provides the host functions that Nectar WASM modules import:
  * - dom.createElement
  * - dom.setText
  * - dom.appendChild
@@ -9,7 +9,7 @@
  * - dom.setAttribute
  *
  * The runtime is intentionally minimal — no virtual DOM, no diffing.
- * Arc uses fine-grained reactivity (signals) to surgically update
+ * Nectar uses fine-grained reactivity (signals) to surgically update
  * only the DOM nodes that depend on changed state.
  */
 
@@ -372,7 +372,7 @@ class WorkerPool {
 // --- Agent Manager: manages AI agent tool registry, message history, streaming ---
 
 /**
- * AgentManager handles the coordination between AI agents compiled from Arc
+ * AgentManager handles the coordination between AI agents compiled from Nectar
  * and the LLM runtime. It manages:
  * - Tool registry (name -> WASM function index mapping)
  * - Message history per agent
@@ -497,7 +497,7 @@ function hashString(str) {
 }
 
 /**
- * Router manages client-side routing for Arc applications.
+ * Router manages client-side routing for Nectar applications.
  * Supports:
  *  - Static routes: "/about"
  *  - Parameterized routes: "/user/:id"
@@ -654,7 +654,7 @@ class Router {
 
 // --- Runtime class ---
 
-class ArcRuntime {
+class NectarRuntime {
   constructor() {
     this.instance = null;
     this.memory = null;
@@ -706,7 +706,7 @@ class ArcRuntime {
   }
 
   /**
-   * Load and instantiate an Arc-compiled .wasm module
+   * Load and instantiate a Nectar-compiled .wasm module
    */
   async mount(wasmUrl, rootElement) {
     const importObject = {
@@ -832,7 +832,7 @@ class ArcRuntime {
               mountFn(rootHandle);
             }
           } catch (err) {
-            console.error("[Arc ErrorBoundary] Component render failed:", err);
+            console.error("[Nectar ErrorBoundary] Component render failed:", err);
 
             // Clear failed render
             while (root.firstChild) {
@@ -846,7 +846,7 @@ class ArcRuntime {
             }
 
             // Store retry info so the boundary can be reset
-            root.__arcErrorBoundary = {
+            root.__nectarErrorBoundary = {
               error: err,
               mountFnIdx,
               fallbackFnIdx,
@@ -858,13 +858,109 @@ class ArcRuntime {
                   const retryMount = this.instance.exports[`__handler_${mountFnIdx}`];
                   if (retryMount) retryMount(rootHandle);
                 } catch (retryErr) {
-                  console.error("[Arc ErrorBoundary] Retry failed:", retryErr);
+                  console.error("[Nectar ErrorBoundary] Retry failed:", retryErr);
                   const retryFallback = this.instance.exports[`__handler_${fallbackFnIdx}`];
                   if (retryFallback) retryFallback(rootHandle);
                 }
               },
             };
           }
+        },
+      },
+      // --- Skeleton screen support ---
+      skeleton: {
+        /**
+         * skeleton.mount(rootHandle, skeletonFnIdx)
+         * Renders the skeleton placeholder into the root element and injects
+         * built-in shimmer animation CSS.
+         */
+        mount: (rootHandle, skeletonFnIdx) => {
+          const root = this.elements.get(rootHandle);
+          if (!root) return;
+
+          // Inject skeleton shimmer CSS if not already present
+          if (!document.getElementById("__nectar-skeleton-styles")) {
+            const style = document.createElement("style");
+            style.id = "__nectar-skeleton-styles";
+            style.textContent = `
+              .nectar-skeleton {
+                animation: nectar-skeleton-pulse 1.5s ease-in-out infinite;
+              }
+              .nectar-skeleton [class*="skeleton-"] {
+                background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+                background-size: 200% 100%;
+                animation: nectar-skeleton-shimmer 1.5s ease-in-out infinite;
+                border-radius: 4px;
+              }
+              @keyframes nectar-skeleton-pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.4; }
+                100% { opacity: 1; }
+              }
+              @keyframes nectar-skeleton-shimmer {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+
+          // Mark the root so we know a skeleton is active
+          root.setAttribute("data-nectar-skeleton", "true");
+          root.classList.add("nectar-skeleton");
+
+          // Render the skeleton template into the root
+          const skeletonFn =
+            this.instance.exports[`__handler_${skeletonFnIdx}`];
+          if (skeletonFn) {
+            skeletonFn(rootHandle);
+          }
+        },
+
+        /**
+         * skeleton.replace(rootHandle, contentFnIdx)
+         * Fades out the skeleton, clears it, renders the real content, and fades in.
+         */
+        replace: (rootHandle, contentFnIdx) => {
+          const root = this.elements.get(rootHandle);
+          if (!root) return;
+
+          // Fade out the skeleton content
+          root.style.transition = "opacity 0.2s ease-out";
+          root.style.opacity = "0";
+
+          const doReplace = () => {
+            // Clear skeleton content
+            while (root.firstChild) {
+              root.removeChild(root.firstChild);
+            }
+            root.removeAttribute("data-nectar-skeleton");
+            root.classList.remove("nectar-skeleton");
+
+            // Render the real content
+            const contentFn =
+              this.instance.exports[`__handler_${contentFnIdx}`];
+            if (contentFn) {
+              contentFn(rootHandle);
+            }
+
+            // Fade in the real content
+            root.style.opacity = "0";
+            requestAnimationFrame(() => {
+              root.style.transition = "opacity 0.3s ease-in";
+              root.style.opacity = "1";
+            });
+          };
+
+          // Wait for fade-out to finish, then swap
+          root.addEventListener("transitionend", doReplace, { once: true });
+
+          // Safety fallback — if transitionend doesn't fire within 300ms, force swap
+          setTimeout(() => {
+            if (root.getAttribute("data-nectar-skeleton") === "true") {
+              doReplace();
+            }
+          }, 300);
         },
       },
       // --- String module: format string support ---
@@ -1304,16 +1400,47 @@ class ArcRuntime {
       // --- Style module: scoped CSS injection from WASM ---
       style: {
         /**
+         * Check if critical CSS has already been inlined by SSR.
+         * When `nectar build --critical-css` is used, the server injects critical
+         * styles into `<head>` and sets `window.__nectarCriticalLoaded = true`.
+         * This method lets WASM code query that flag to avoid double-injection.
+         *
+         * Returns 1 (i32) if critical styles are already present, 0 otherwise.
+         */
+        isCriticalLoaded: () => {
+          if (typeof window !== "undefined" && window.__nectarCriticalLoaded) {
+            return 1;
+          }
+          return 0;
+        },
+
+        /**
          * Inject scoped CSS for a component.
-         * All selectors are prefixed with [data-arc-HASH] to scope them.
+         * All selectors are prefixed with [data-nectar-HASH] to scope them.
          * Returns a scope ID (as i32 pointer to the scope string in memory).
+         *
+         * If critical CSS was already inlined by the server (detected via
+         * `window.__nectarCriticalLoaded` and a matching `<style data-nectar-critical>`
+         * tag in the document), this function skips injection for components
+         * whose styles are already present in the critical style block.
          */
         injectStyles: (componentNamePtr, componentNameLen, cssPtr, cssLen) => {
           const name = this.readString(componentNamePtr, componentNameLen);
           const css = this.readString(cssPtr, cssLen);
 
           // Generate a unique scope ID from the component name
-          const scopeId = "arc-" + hashString(name);
+          const scopeId = "nectar-" + hashString(name);
+
+          // If critical CSS was inlined by SSR, check if this component's
+          // styles are already present to avoid double-injection.
+          if (typeof window !== "undefined" && window.__nectarCriticalLoaded) {
+            const criticalTag = document.querySelector("style[data-nectar-critical]");
+            if (criticalTag && criticalTag.textContent.indexOf(scopeId) !== -1) {
+              // Styles already inlined — just return the scope ID
+              const { ptr } = this.writeString(scopeId);
+              return ptr;
+            }
+          }
 
           // Scope all selectors with [data-SCOPE_ID] attribute
           const scoped = css.replace(/([^{}]+)\{/g, (match, selector) => {
@@ -1329,14 +1456,14 @@ class ArcRuntime {
           if (typeof document !== "undefined") {
             // Remove any existing style for this component (hot reload)
             const existingStyle = document.querySelector(
-              `style[data-arc-component="${name}"]`
+              `style[data-nectar-component="${name}"]`
             );
             if (existingStyle) {
               existingStyle.remove();
             }
 
             const styleEl = document.createElement("style");
-            styleEl.setAttribute("data-arc-component", name);
+            styleEl.setAttribute("data-nectar-component", name);
             styleEl.textContent = scoped;
             document.head.appendChild(styleEl);
           }
@@ -1720,7 +1847,7 @@ class ArcRuntime {
         // priority: 0 = polite, 1 = assertive
         announceToScreenReader: (textPtr, textLen, priority) => {
           const text = this.readString(textPtr, textLen);
-          const regionId = priority === 1 ? "__arc_a11y_live_assertive" : "__arc_a11y_live_polite";
+          const regionId = priority === 1 ? "__nectar_a11y_live_assertive" : "__nectar_a11y_live_polite";
           let region = document.getElementById(regionId);
           if (!region) {
             region = document.createElement("div");
@@ -1939,11 +2066,47 @@ class ArcRuntime {
           return 0;
         },
       },
+
+      // --- Service Worker ---
+      sw: {
+        register: () => {
+          if (typeof window !== "undefined" && window.NectarSW) {
+            window.NectarSW.register();
+          } else if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/nectar-sw.js").catch((err) => {
+              console.error("[Nectar SW] Registration failed:", err);
+            });
+          }
+        },
+
+        precache: (urlPtr, urlLen) => {
+          const url = this.readString(urlPtr, urlLen);
+          if (typeof navigator !== "undefined" && navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: "nectar:precache",
+              urls: [url],
+            });
+          }
+          // Also store for compile-time manifest generation
+          if (!this._precacheUrls) this._precacheUrls = [];
+          this._precacheUrls.push(url);
+        },
+
+        isOffline: () => {
+          if (typeof window !== "undefined" && window.NectarSW) {
+            return window.NectarSW.isOffline ? 1 : 0;
+          }
+          if (typeof navigator !== "undefined") {
+            return navigator.onLine ? 0 : 1;
+          }
+          return 0;
+        },
+      },
     };
 
     // Create hidden aria-live regions for screen reader announcements
     if (typeof document !== "undefined") {
-      for (const [id, level] of [["__arc_a11y_live_polite", "polite"], ["__arc_a11y_live_assertive", "assertive"]]) {
+      for (const [id, level] of [["__nectar_a11y_live_polite", "polite"], ["__nectar_a11y_live_assertive", "assertive"]]) {
         if (!document.getElementById(id)) {
           const region = document.createElement("div");
           region.id = id;
@@ -2021,7 +2184,7 @@ class ArcRuntime {
 // Export for use
 if (typeof module !== "undefined") {
   module.exports = {
-    ArcRuntime,
+    NectarRuntime,
     AgentManager,
     WorkerPool,
     Router,
@@ -2034,7 +2197,7 @@ if (typeof module !== "undefined") {
   };
 }
 if (typeof window !== "undefined") {
-  window.ArcRuntime = ArcRuntime;
+  window.NectarRuntime = NectarRuntime;
   window.AgentManager = AgentManager;
   window.Router = Router;
   window.createEffect = createEffect;

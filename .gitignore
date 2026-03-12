@@ -7,4 +7,4 @@
 *.wasm
 *.wat
 node_modules/
-Arc.lock
+Nectar.lock

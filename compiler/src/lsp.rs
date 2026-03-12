@@ -1,4 +1,4 @@
-//! Language Server Protocol (LSP) implementation for Arc.
+//! Language Server Protocol (LSP) implementation for Nectar.
 //!
 //! Communicates over stdin/stdout using JSON-RPC as specified by the LSP spec.
 //! Provides completions, hover info, go-to-definition, and diagnostics by
@@ -166,7 +166,7 @@ struct DocumentState {
 // LSP Server
 // ---------------------------------------------------------------------------
 
-/// The Arc Language Server. Call `run()` to start the stdin/stdout loop.
+/// The Nectar Language Server. Call `run()` to start the stdin/stdout loop.
 pub struct LspServer {
     documents: HashMap<String, DocumentState>,
 }
@@ -244,7 +244,7 @@ impl LspServer {
                         "definitionProvider": true
                     },
                     "serverInfo": {
-                        "name": "arc-lsp",
+                        "name": "nectar-lsp",
                         "version": "0.1.0"
                     }
                 });
@@ -482,7 +482,7 @@ impl LspServer {
                             .collect();
                         let sig = format!("fn {}({}){}", f.name, params.join(", "), ret);
                         return Some(serde_json::json!({
-                            "contents": { "kind": "markdown", "value": format!("```arc\n{}\n```", sig) }
+                            "contents": { "kind": "markdown", "value": format!("```nectar\n{}\n```", sig) }
                         }));
                     }
                 }
@@ -495,7 +495,7 @@ impl LspServer {
                             .collect();
                         let sig = format!("component {}({})", c.name, props.join(", "));
                         return Some(serde_json::json!({
-                            "contents": { "kind": "markdown", "value": format!("```arc\n{}\n```", sig) }
+                            "contents": { "kind": "markdown", "value": format!("```nectar\n{}\n```", sig) }
                         }));
                     }
                 }
@@ -508,7 +508,7 @@ impl LspServer {
                             .collect();
                         let sig = format!("struct {} {{\n{}\n}}", s.name, fields.join(",\n"));
                         return Some(serde_json::json!({
-                            "contents": { "kind": "markdown", "value": format!("```arc\n{}\n```", sig) }
+                            "contents": { "kind": "markdown", "value": format!("```nectar\n{}\n```", sig) }
                         }));
                     }
                 }
@@ -525,7 +525,7 @@ impl LspServer {
                     return Some(serde_json::json!({
                         "contents": {
                             "kind": "markdown",
-                            "value": format!("```arc\n{}: {}\n```", ident, ty)
+                            "value": format!("```nectar\n{}: {}\n```", ident, ty)
                         }
                     }));
                 }
@@ -613,7 +613,7 @@ impl LspServer {
                             end: Position { line: e.line.saturating_sub(1), character: e.col },
                         },
                         severity: 1, // Error
-                        source: "arc-lexer".to_string(),
+                        source: "nectar-lexer".to_string(),
                         message: e.message.clone(),
                     });
                 }
@@ -633,7 +633,7 @@ impl LspServer {
                                 },
                             },
                             severity: 1,
-                            source: "arc-parser".to_string(),
+                            source: "nectar-parser".to_string(),
                             message: e.message.clone(),
                         });
                     }
@@ -659,7 +659,7 @@ impl LspServer {
                         },
                     },
                     severity: 1,
-                    source: "arc-borrow".to_string(),
+                    source: "nectar-borrow".to_string(),
                     message: err.message.clone(),
                 });
             }
@@ -674,7 +674,7 @@ impl LspServer {
                         end: Position { line: 0, character: 1 },
                     },
                     severity: 1,
-                    source: "arc-types".to_string(),
+                    source: "nectar-types".to_string(),
                     message: format!("{}", err),
                 });
             }
@@ -826,7 +826,7 @@ mod tests {
         let server = LspServer::new();
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
-                uri: "file:///test.arc".to_string(),
+                uri: "file:///test.nectar".to_string(),
             },
             position: Position { line: 0, character: 0 },
         };

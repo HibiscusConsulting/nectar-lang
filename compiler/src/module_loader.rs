@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_compile_single_file() {
         let dir = tempfile::TempDir::new().unwrap();
-        let main_file = dir.path().join("main.arc");
+        let main_file = dir.path().join("main.nectar");
         fs::write(&main_file, "fn main() -> i32 { 42 }").unwrap();
 
         let program = ModuleLoader::compile_project(&main_file).unwrap();
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn test_compile_with_inline_mod() {
         let dir = tempfile::TempDir::new().unwrap();
-        let main_file = dir.path().join("main.arc");
+        let main_file = dir.path().join("main.nectar");
         fs::write(
             &main_file,
             "mod utils {\n  pub fn helper() -> i32 { 1 }\n}\nfn main() -> i32 { 0 }",
@@ -240,15 +240,15 @@ mod tests {
     fn test_compile_with_external_mod() {
         let dir = tempfile::TempDir::new().unwrap();
 
-        // Create utils.arc
+        // Create utils.nectar
         fs::write(
-            dir.path().join("utils.arc"),
+            dir.path().join("utils.nectar"),
             "pub fn helper() -> i32 { 1 }",
         )
         .unwrap();
 
-        // Create main.arc that references it
-        let main_file = dir.path().join("main.arc");
+        // Create main.nectar that references it
+        let main_file = dir.path().join("main.nectar");
         fs::write(&main_file, "mod utils;\nfn main() -> i32 { 0 }").unwrap();
 
         let program = ModuleLoader::compile_project(&main_file).unwrap();
@@ -268,15 +268,15 @@ mod tests {
     fn test_compile_with_mod_dir() {
         let dir = tempfile::TempDir::new().unwrap();
 
-        // Create mymod/mod.arc
+        // Create mymod/mod.nectar
         fs::create_dir_all(dir.path().join("mymod")).unwrap();
         fs::write(
-            dir.path().join("mymod").join("mod.arc"),
+            dir.path().join("mymod").join("mod.nectar"),
             "pub fn greet() -> i32 { 42 }",
         )
         .unwrap();
 
-        let main_file = dir.path().join("main.arc");
+        let main_file = dir.path().join("main.nectar");
         fs::write(&main_file, "mod mymod;\nfn main() -> i32 { 0 }").unwrap();
 
         let program = ModuleLoader::compile_project(&main_file).unwrap();
@@ -287,11 +287,11 @@ mod tests {
     fn test_circular_dependency_detected() {
         let dir = tempfile::TempDir::new().unwrap();
 
-        // a.arc loads b, b.arc loads a
-        fs::write(dir.path().join("a.arc"), "mod b;").unwrap();
-        fs::write(dir.path().join("b.arc"), "mod a;").unwrap();
+        // a.nectar loads b, b.nectar loads a
+        fs::write(dir.path().join("a.nectar"), "mod b;").unwrap();
+        fs::write(dir.path().join("b.nectar"), "mod a;").unwrap();
 
-        let main_file = dir.path().join("a.arc");
+        let main_file = dir.path().join("a.nectar");
         let result = ModuleLoader::compile_project(&main_file);
         assert!(result.is_err());
         let err = result.unwrap_err();

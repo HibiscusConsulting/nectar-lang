@@ -1,6 +1,6 @@
 # Arc Architecture & Internals
 
-This document describes the internal architecture of the Arc compiler and runtime for contributors who want to understand, modify, or extend the system.
+This document describes the internal architecture of the Nectar compiler and runtime for contributors who want to understand, modify, or extend the system.
 
 ---
 
@@ -23,10 +23,10 @@ This document describes the internal architecture of the Arc compiler and runtim
 
 ## Compiler Pipeline Overview
 
-Arc's compiler is a traditional multi-pass compiler written in Rust. Source code flows through the following stages:
+Nectar's compiler is a traditional multi-pass compiler written in Rust. Source code flows through the following stages:
 
 ```
-                    Arc Source (.arc)
+                    Arc Source (.nectar)
                          |
                     +----v----+
                     |  Lexer  |  tokenize()
@@ -92,7 +92,7 @@ All compiler modules live in `compiler/src/`:
 | SSR codegen | `ssr.rs` | AST to server-side JS |
 | Module resolver | `module_resolver.rs` | File path resolution for modules |
 | Module loader | `module_loader.rs` | Multi-file compilation |
-| Package manager | `package.rs` | Arc.toml parsing, lockfile |
+| Package manager | `package.rs` | Nectar.toml parsing, lockfile |
 | Registry client | `registry.rs` | Dependency download |
 | Dependency resolver | `resolver.rs` | Version resolution |
 | Formatter | `formatter.rs` | Canonical source formatting |
@@ -268,7 +268,7 @@ Arc implements a simplified version of Rust's borrow checker to catch memory saf
 
 Every value has a single owner. When a value is assigned to a new binding, ownership is **moved** and the original binding becomes invalid:
 
-```arc
+```nectar
 let a = create_data();
 let b = a;          // ownership moves to b
 // a is no longer valid
@@ -320,7 +320,7 @@ When functions have lifetime parameters (e.g., `<'a>`), the checker validates th
 
 **File**: `compiler/src/type_checker.rs`
 
-Arc uses Hindley-Milner type inference with unification.
+Nectar uses Hindley-Milner type inference with unification.
 
 ### Internal Type Representation
 
@@ -391,7 +391,7 @@ The optimizer runs after type checking and before code generation. It operates o
 
 Evaluates compile-time constant expressions:
 
-```arc
+```nectar
 // Before optimization
 let x = 2 + 3 * 4;
 
@@ -439,7 +439,7 @@ arc: wasm optimization: 12 patterns optimized, 340 bytes saved
 
 **File**: `compiler/src/codegen.rs`
 
-The primary code generator emits WebAssembly Text Format (WAT). WAT is human-readable and can be converted to binary WASM by external tools or Arc's built-in binary emitter.
+The primary code generator emits WebAssembly Text Format (WAT). WAT is human-readable and can be converted to binary WASM by external tools or Nectar's built-in binary emitter.
 
 ### Architecture
 
@@ -543,13 +543,13 @@ Function bodies are compiled to WASM bytecode opcodes:
 
 ## Runtime Bridge
 
-**File**: `runtime/arc-runtime.js`
+**File**: `runtime/nectar-runtime.js`
 
 The JavaScript runtime provides host functions that WASM modules import. It bridges the gap between WASM's linear memory model and browser APIs.
 
 ### Initialization Flow
 
-1. `ArcRuntime.mount(wasmUrl, rootElement)` is called with the `.wasm` URL and a root DOM element
+1. `NectarRuntime.mount(wasmUrl, rootElement)` is called with the `.wasm` URL and a root DOM element
 2. The runtime creates a `WebAssembly.Memory` and builds the import object with all host function modules
 3. The WASM module is instantiated with the import object
 4. Store `*_init` exports are called to initialize global stores
@@ -627,8 +627,8 @@ The hydration bundle (`--hydrate`) generates a lightweight client module that:
 
 When the parser encounters `mod foo;`, the module loader searches for:
 
-1. `./foo.arc` (sibling file)
-2. `./foo/mod.arc` (directory module)
+1. `./foo.nectar` (sibling file)
+2. `./foo/mod.nectar` (directory module)
 
 relative to the file containing the `mod` declaration.
 
@@ -643,12 +643,12 @@ The `ModuleLoader` performs multi-file compilation:
 
 ### Dependency Graph
 
-For packages with `Arc.toml`, the resolver builds a dependency graph:
+For packages with `Nectar.toml`, the resolver builds a dependency graph:
 
-1. Parse `Arc.toml` to get declared dependencies
+1. Parse `Nectar.toml` to get declared dependencies
 2. Resolve version constraints against the registry
-3. Download packages to the local cache (`~/.arc/cache/`)
-4. Write `Arc.lock` with pinned versions
+3. Download packages to the local cache (`~/.nectar/cache/`)
+4. Write `Nectar.lock` with pinned versions
 5. Make dependency source files available for module loading
 
 ---
@@ -657,8 +657,8 @@ For packages with `Arc.toml`, the resolver builds a dependency graph:
 
 **File**: `compiler/src/sourcemap.rs`
 
-The source map module generates debug mapping information that connects WASM bytecode positions back to Arc source locations. This enables:
+The source map module generates debug mapping information that connects WASM bytecode positions back to Nectar source locations. This enables:
 
-- Browser DevTools to show Arc source when debugging WASM
-- Error stack traces with Arc file names and line numbers
-- Breakpoint setting in Arc source files
+- Browser DevTools to show Nectar source when debugging WASM
+- Error stack traces with Nectar file names and line numbers
+- Breakpoint setting in Nectar source files

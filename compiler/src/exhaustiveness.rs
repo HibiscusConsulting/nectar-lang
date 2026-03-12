@@ -1,4 +1,4 @@
-//! Match exhaustiveness and redundancy checking for the Arc language.
+//! Match exhaustiveness and redundancy checking for the Nectar language.
 //!
 //! This module implements a simplified version of Rust's pattern usefulness
 //! algorithm.  For enum types it verifies that every variant appears in at

@@ -1,4 +1,4 @@
-// AI Chat Interface — demonstrates Arc's first-class AI interaction primitives
+// AI Chat Interface — demonstrates Nectar's first-class AI interaction primitives
 //
 // The `agent` keyword defines a component that wraps LLM interaction.
 // Tools are functions the AI can call, and the render block provides

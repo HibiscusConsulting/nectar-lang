@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arc vs React — Side-by-Side Comparison</title>
+<title>Nectar vs React — Side-by-Side Comparison</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -12,7 +12,7 @@
     --text: #e6edf3;
     --muted: #8b949e;
     --accent-react: #61dafb;
-    --accent-arc: #f97316;
+    --accent-nectar: #f97316;
     --green: #3fb950;
     --red: #f85149;
     --yellow: #d29922;
@@ -43,7 +43,7 @@
   }
   .hero h1 .react { color: var(--accent-react); }
   .hero h1 .vs { color: var(--muted); font-weight: 400; font-size: 2rem; margin: 0 12px; }
-  .hero h1 .arc { color: var(--accent-arc); }
+  .hero h1 .nectar { color: var(--accent-nectar); }
   .hero p {
     color: var(--muted);
     font-size: 1.15rem;
@@ -74,7 +74,7 @@
     letter-spacing: 0.5px;
   }
   .stat.react-stat .value { color: var(--accent-react); }
-  .stat.arc-stat .value { color: var(--accent-arc); }
+  .stat.nectar-stat .value { color: var(--accent-nectar); }
   .stat.neutral .value { color: var(--green); }
 
   /* Section */
@@ -102,9 +102,9 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-  .badge.advantage-arc {
+  .badge.advantage-nectar {
     background: rgba(249,115,22,0.15);
-    color: var(--accent-arc);
+    color: var(--accent-nectar);
   }
   .badge.advantage-react {
     background: rgba(97,218,251,0.15);
@@ -149,9 +149,9 @@
     background: rgba(97,218,251,0.06);
     color: var(--accent-react);
   }
-  .code-panel.arc .code-panel-header {
+  .code-panel.nectar .code-panel-header {
     background: rgba(249,115,22,0.06);
-    color: var(--accent-arc);
+    color: var(--accent-nectar);
   }
   .code-panel-header .loc {
     font-weight: 400;
@@ -190,9 +190,9 @@
     font-size: 0.85rem;
     line-height: 1.5;
   }
-  .callout.arc-wins {
+  .callout.nectar-wins {
     background: rgba(249,115,22,0.08);
-    border-left: 3px solid var(--accent-arc);
+    border-left: 3px solid var(--accent-nectar);
   }
   .callout.react-wins {
     background: rgba(97,218,251,0.08);
@@ -247,7 +247,7 @@
     font-size: 0.85rem;
   }
   .footer a {
-    color: var(--accent-arc);
+    color: var(--accent-nectar);
     text-decoration: none;
   }
   .footer a:hover { text-decoration: underline; }
@@ -258,9 +258,9 @@
 <!-- Hero -->
 <div class="hero">
   <h1>
-    <span class="react">React</span><span class="vs">vs</span><span class="arc">Arc</span>
+    <span class="react">React</span><span class="vs">vs</span><span class="nectar">Arc</span>
   </h1>
-  <p>The same apps, built two ways. See how Arc's ownership model, fine-grained signals, and WebAssembly compilation compare to React's virtual DOM and JavaScript runtime.</p>
+  <p>The same apps, built two ways. See how Nectar's ownership model, fine-grained signals, and WebAssembly compilation compare to React's virtual DOM and JavaScript runtime.</p>
 </div>
 
 <!-- Stats -->
@@ -269,9 +269,9 @@
     <div class="value">42 KB</div>
     <div class="label">React runtime (gzip)</div>
   </div>
-  <div class="stat arc-stat">
+  <div class="stat nectar-stat">
     <div class="value">3.8 KB</div>
-    <div class="label">Arc runtime (gzip)</div>
+    <div class="label">Nectar runtime (gzip)</div>
   </div>
   <div class="stat neutral">
     <div class="value">11x</div>
@@ -281,22 +281,22 @@
     <div class="value">~4 ms</div>
     <div class="label">React re-render (1k items)</div>
   </div>
-  <div class="stat arc-stat">
+  <div class="stat nectar-stat">
     <div class="value">~0.3 ms</div>
-    <div class="label">Arc signal update (1k items)</div>
+    <div class="label">Nectar signal update (1k items)</div>
   </div>
   <div class="stat neutral">
     <div class="value">0</div>
-    <div class="label">GC pauses (Arc)</div>
+    <div class="label">GC pauses (Nectar)</div>
   </div>
 </div>
 
 <!-- ===== Comparison 1: Counter ===== -->
 <div class="section">
   <div class="section-header">
-    <span class="badge advantage-arc">Arc advantage</span>
+    <span class="badge advantage-nectar">Nectar advantage</span>
     <h2>1. Counter Component</h2>
-    <p>The simplest component — state, events, render. Notice how Arc eliminates the hook ceremony and runtime overhead.</p>
+    <p>The simplest component — state, events, render. Notice how Nectar eliminates the hook ceremony and runtime overhead.</p>
   </div>
   <div class="comparison">
 
@@ -331,10 +331,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>counter.arc — Arc</span>
+        <span>counter.nectar — Arc</span>
         <span class="loc">17 lines</span>
       </div>
 <pre>
@@ -365,8 +365,8 @@
     </div>
   </div>
 
-  <div class="callout arc-wins">
-    <strong><span class="arrow">&#9654;</span> Why Arc wins here:</strong>
+  <div class="callout nectar-wins">
+    <strong><span class="arrow">&#9654;</span> Why Nectar wins here:</strong>
     No <code>useState</code> / <code>setCount</code> ceremony. State is just <code>let mut</code>.
     Methods are real functions, not closures recreated every render.
     The signal system patches exactly the one <code>&lt;span&gt;</code> that displays <code>count</code> — no tree diffing.
@@ -376,9 +376,9 @@
 <!-- ===== Comparison 2: Todo App ===== -->
 <div class="section">
   <div class="section-header">
-    <span class="badge advantage-arc">Arc advantage</span>
+    <span class="badge advantage-nectar">Nectar advantage</span>
     <h2>2. Todo App — Structs, Enums, Filtering</h2>
-    <p>A real-world CRUD component. React needs <code>useCallback</code>, <code>useMemo</code>, and careful reference management. Arc just uses ownership.</p>
+    <p>A real-world CRUD component. React needs <code>useCallback</code>, <code>useMemo</code>, and careful reference management. Nectar just uses ownership.</p>
   </div>
   <div class="comparison">
 
@@ -454,10 +454,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>todo.arc — Arc</span>
+        <span>todo.nectar — Arc</span>
         <span class="loc">46 lines</span>
       </div>
 <pre>
@@ -505,7 +505,7 @@
 
     <span class="kw">render</span> {
         <span class="tag">&lt;div&gt;</span>
-            <span class="tag">&lt;h1&gt;</span><span class="str">"Arc Todo"</span><span class="tag">&lt;/h1&gt;</span>
+            <span class="tag">&lt;h1&gt;</span><span class="str">"Nectar Todo"</span><span class="tag">&lt;/h1&gt;</span>
             <span class="tag">&lt;input</span> <span class="attr">placeholder</span>=<span class="str">"What needs to be done?"</span> <span class="tag">/&gt;</span>
             <span class="tag">&lt;button</span> <span class="attr">on:click</span>={<span class="var">self</span>.<span class="fn">add_todo</span>}<span class="tag">&gt;</span><span class="str">"Add"</span><span class="tag">&lt;/button&gt;</span>
             <span class="tag">&lt;ul&gt;</span>{<span class="var">self</span>.<span class="fn">visible_todos</span>()}<span class="tag">&lt;/ul&gt;</span>
@@ -516,10 +516,10 @@
     </div>
   </div>
 
-  <div class="callout arc-wins">
+  <div class="callout nectar-wins">
     <strong><span class="arrow">&#9654;</span> Key differences:</strong>
     React needs <code>useCallback</code> + dependency arrays to avoid stale closures and unnecessary re-renders.
-    Arc's methods are <em>real methods</em> with <code>&amp;mut self</code> — the borrow checker guarantees correctness at compile time.
+    Nectar's methods are <em>real methods</em> with <code>&amp;mut self</code> — the borrow checker guarantees correctness at compile time.
     <code>match</code> on an <code>enum</code> is exhaustive — add a variant and the compiler catches every missed case. React's string filter has no such safety net.
   </div>
 </div>
@@ -527,9 +527,9 @@
 <!-- ===== Comparison 3: Global State ===== -->
 <div class="section">
   <div class="section-header">
-    <span class="badge advantage-arc">Arc advantage</span>
+    <span class="badge advantage-nectar">Nectar advantage</span>
     <h2>3. Global State Management</h2>
-    <p>React needs Redux/Zustand/Context + 50 lines of boilerplate. Arc has <code>store</code> as a first-class keyword.</p>
+    <p>React needs Redux/Zustand/Context + 50 lines of boilerplate. Nectar has <code>store</code> as a first-class keyword.</p>
   </div>
   <div class="comparison">
 
@@ -580,10 +580,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>auth.arc — Arc</span>
+        <span>auth.nectar — Arc</span>
         <span class="loc">32 lines, one file</span>
       </div>
 <pre>
@@ -632,7 +632,7 @@
     </div>
   </div>
 
-  <div class="callout arc-wins">
+  <div class="callout nectar-wins">
     <strong><span class="arrow">&#9654;</span> What's eliminated:</strong>
     No Redux, no slices, no thunks, no Provider tree, no <code>useSelector</code>/<code>useDispatch</code>.
     <code>store</code> is a language primitive with built-in <code>signal</code>, <code>action</code>, <code>computed</code>, and <code>effect</code>.
@@ -643,9 +643,9 @@
 <!-- ===== Comparison 4: Data Fetching ===== -->
 <div class="section">
   <div class="section-header">
-    <span class="badge advantage-arc">Arc advantage</span>
+    <span class="badge advantage-nectar">Nectar advantage</span>
     <h2>4. Async Data Fetching + Error Handling</h2>
-    <p>React's hook rules make async code awkward. Arc uses Rust's <code>Result</code> type and <code>?</code> operator.</p>
+    <p>React's hook rules make async code awkward. Nectar uses Rust's <code>Result</code> type and <code>?</code> operator.</p>
   </div>
   <div class="comparison">
 
@@ -686,10 +686,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>posts.arc — Arc</span>
+        <span>posts.nectar — Arc</span>
         <span class="loc">25 lines</span>
       </div>
 <pre>
@@ -726,10 +726,10 @@
     </div>
   </div>
 
-  <div class="callout arc-wins">
+  <div class="callout nectar-wins">
     <strong><span class="arrow">&#9654;</span> Error handling:</strong>
     React: errors are thrown strings caught in try/catch — no type, no structure, easy to forget.
-    Arc: errors are <code>Option&lt;ApiError&gt;</code> — a typed struct. The compiler forces you to handle both cases in <code>match</code>.
+    Nectar: errors are <code>Option&lt;ApiError&gt;</code> — a typed struct. The compiler forces you to handle both cases in <code>match</code>.
     No <code>useEffect</code> dance, no dependency arrays, no stale closure bugs.
   </div>
 </div>
@@ -737,9 +737,9 @@
 <!-- ===== Comparison 5: AI Integration ===== -->
 <div class="section">
   <div class="section-header">
-    <span class="badge advantage-arc">Arc advantage</span>
+    <span class="badge advantage-nectar">Nectar advantage</span>
     <h2>5. AI-Native: Agent + Prompt + Tool</h2>
-    <p>Arc has first-class keywords for AI interaction. React requires third-party SDKs and manual plumbing.</p>
+    <p>Nectar has first-class keywords for AI interaction. React requires third-party SDKs and manual plumbing.</p>
   </div>
   <div class="comparison">
 
@@ -805,10 +805,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>weather_agent.arc — Arc</span>
+        <span>weather_agent.nectar — Arc</span>
         <span class="loc">28 lines</span>
       </div>
 <pre>
@@ -850,10 +850,10 @@
     </div>
   </div>
 
-  <div class="callout arc-wins">
+  <div class="callout nectar-wins">
     <strong><span class="arrow">&#9654;</span> AI as a first-class citizen:</strong>
     <code>agent</code>, <code>tool</code>, and <code>prompt</code> are language keywords, not library imports.
-    The Arc runtime handles the tool-use loop automatically — call <code>agent.chat()</code> and get back the final answer.
+    The Nectar runtime handles the tool-use loop automatically — call <code>agent.chat()</code> and get back the final answer.
     Tool parameters are typed and validated at compile time. No JSON schema objects, no manual dispatch.
   </div>
 </div>
@@ -863,7 +863,7 @@
   <div class="section-header">
     <span class="badge equal">Comparable</span>
     <h2>6. Routing</h2>
-    <p>Both approaches are declarative. Arc bakes it in; React needs react-router.</p>
+    <p>Both approaches are declarative. Nectar bakes it in; React needs react-router.</p>
   </div>
   <div class="comparison">
 
@@ -897,10 +897,10 @@
 </pre>
     </div>
 
-    <!-- Arc -->
-    <div class="code-panel arc">
+    <!-- Nectar -->
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>app.arc — Arc</span>
+        <span>app.nectar — Arc</span>
         <span class="loc">16 lines, zero deps</span>
       </div>
 <pre>
@@ -927,7 +927,7 @@
 
   <div class="callout neutral-note">
     <strong><span class="arrow">&#9654;</span> Similar DX, different tradeoffs:</strong>
-    Both are declarative. React Router is mature and battle-tested. Arc's <code>router</code> keyword means zero extra dependencies, and <code>guard:</code> is compiled — a typo in the guard function name is a compile error, not a runtime 404.
+    Both are declarative. React Router is mature and battle-tested. Nectar's <code>router</code> keyword means zero extra dependencies, and <code>guard:</code> is compiled — a typo in the guard function name is a compile error, not a runtime 404.
   </div>
 </div>
 
@@ -941,7 +941,7 @@
       <tr>
         <th style="width:40%">Feature</th>
         <th style="width:30%">React (JS)</th>
-        <th style="width:30%">Arc (WASM)</th>
+        <th style="width:30%">Nectar (WASM)</th>
       </tr>
     </thead>
     <tbody>
@@ -993,7 +993,7 @@
       <tr>
         <td>SSR</td>
         <td><span class="check">&#10003;</span> Next.js / Remix</td>
-        <td><span class="check">&#10003;</span> Built-in <code>arc ssr</code></td>
+        <td><span class="check">&#10003;</span> Built-in <code>nectar ssr</code></td>
       </tr>
       <tr>
         <td>Concurrency</td>
@@ -1066,9 +1066,9 @@
   GC collects old VDOM tree      <span class="ann">&lt;-- GC pause</span>
 </pre>
     </div>
-    <div class="code-panel arc">
+    <div class="code-panel nectar">
       <div class="code-panel-header">
-        <span>Arc Update Cycle</span>
+        <span>Nectar Update Cycle</span>
       </div>
 <pre style="color: var(--muted); line-height: 2;">
   self.count = self.count + 1
@@ -1094,11 +1094,11 @@
 <!-- Footer -->
 <div class="footer">
   <p>
-    Arc is open source under the MIT license.
-    <a href="https://github.com/BlakeBurnette/arc-lang">github.com/BlakeBurnette/arc-lang</a>
+    Nectar is open source under the MIT license.
+    <a href="https://github.com/BlakeBurnette/nectar-lang">github.com/BlakeBurnette/nectar-lang</a>
   </p>
   <p style="margin-top: 8px;">
-    React is maintained by Meta. Arc is a new language — these comparisons reflect architectural differences, not a value judgment.
+    React is maintained by Meta. Nectar is a new language — these comparisons reflect architectural differences, not a value judgment.
     Both are valid choices depending on your needs.
   </p>
 </div>

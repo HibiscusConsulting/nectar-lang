@@ -1,4 +1,4 @@
-/// Code formatter for the Arc language.
+/// Code formatter for the Nectar language.
 ///
 /// Produces canonical, deterministic source text from a parsed AST.
 /// Configurable indent size, line width, trailing commas, and
@@ -215,6 +215,14 @@ impl Formatter {
         for t in &c.transitions {
             self.push_indent();
             self.push(&format!("transition {} {}ms {};\n", t.property, t.duration, t.easing));
+        }
+        if let Some(skel) = &c.skeleton {
+            self.push_indent();
+            self.push("skeleton {\n");
+            self.inc();
+            self.format_template_node(&skel.body.body);
+            self.dec();
+            self.push_line("}");
         }
         self.push_indent();
         self.push("render {\n");
@@ -1337,6 +1345,7 @@ mod tests {
                     span: dummy_span(),
                 },
                 trait_bounds: vec![],
+                skeleton: None,
                 error_boundary: None,
                 span: dummy_span(),
             })],

@@ -1,14 +1,16 @@
 /**
- * Arc Test Runner — executes compiled test WASM modules and reports results.
+ * Nectar Test Runner — executes compiled test WASM modules and reports results.
  *
  * Usage:
- *   import { TestRunner } from './arc-test-runner.js';
+ *   import { TestRunner } from './nectar-test-runner.js';
  *   const runner = new TestRunner();
  *   const results = await runner.run('./my-tests.wasm');
  *   console.log(results);
  */
 
 import { readFile } from 'node:fs/promises';
+import { watch, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 /**
  * @typedef {Object} TestResult
@@ -41,7 +43,7 @@ export class TestRunner {
   }
 
   /**
-   * Load and execute a compiled Arc test WASM module.
+   * Load and execute a compiled Nectar test WASM module.
    * @param {string} wasmPath - Path to the .wasm file
    * @returns {Promise<TestResults>}
    */
@@ -204,6 +206,73 @@ export class TestRunner {
   }
 
   /**
+   * Watch a .wasm file (or source directory) and re-run tests on every change.
+   *
+   * @param {string} wasmPath - Path to the .wasm file to test
+   * @param {Object} [options] - Runner options (verbose, filter)
+   * @param {string} [options.sourceDir] - Directory to watch instead of the .wasm file itself
+   * @returns {{ stop: () => void }} Handle with a `stop()` method to tear down the watcher
+   */
+  static watch(wasmPath, options = {}) {
+    const DEBOUNCE_MS = 200;
+    const watchTarget = options.sourceDir ?? wasmPath;
+    const recursive = (() => {
+      try { return statSync(watchTarget).isDirectory(); } catch { return false; }
+    })();
+
+    let debounceTimer = null;
+    let running = false;
+
+    const executeRun = async () => {
+      if (running) return;
+      running = true;
+      try {
+        // Clear console and print run header with timestamp
+        process.stdout.write('\x1Bc');
+        const ts = new Date().toLocaleTimeString();
+        console.log(`\x1b[90m[${ts}]\x1b[0m Running tests...\n`);
+
+        const runner = new TestRunner({ verbose: true, filter: options.filter ?? null });
+        const results = await runner.run(wasmPath);
+        TestRunner.report(results);
+      } catch (err) {
+        console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      } finally {
+        running = false;
+      }
+    };
+
+    const scheduleRun = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(executeRun, DEBOUNCE_MS);
+    };
+
+    // Initial run
+    executeRun();
+
+    const watcher = watch(watchTarget, { recursive }, (_eventType, _filename) => {
+      scheduleRun();
+    });
+
+    console.log(`\x1b[90mWatching ${watchTarget} for changes. Press Ctrl+C to stop.\x1b[0m\n`);
+
+    const stop = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      watcher.close();
+    };
+
+    // Stop gracefully on SIGINT
+    const onSigint = () => {
+      console.log('\nStopping watch mode.');
+      stop();
+      process.exit(0);
+    };
+    process.on('SIGINT', onSigint);
+
+    return { stop };
+  }
+
+  /**
    * Print a formatted test report to the console.
    * @param {TestResults} results
    */
@@ -225,23 +294,30 @@ export class TestRunner {
   }
 }
 
-// CLI entry point: run as `node arc-test-runner.js <path.wasm>`
-if (process.argv[1]?.endsWith('arc-test-runner.js')) {
+// CLI entry point: run as `node nectar-test-runner.js <path.wasm>`
+if (process.argv[1]?.endsWith('nectar-test-runner.js')) {
   const wasmPath = process.argv[2];
   if (!wasmPath) {
-    console.error('Usage: node arc-test-runner.js <path.wasm> [--filter <pattern>]');
+    console.error('Usage: node nectar-test-runner.js <path.wasm> [--filter <pattern>] [--watch] [--source-dir <dir>]');
     process.exit(1);
   }
 
   const filterIdx = process.argv.indexOf('--filter');
   const filter = filterIdx !== -1 ? process.argv[filterIdx + 1] : null;
+  const watchMode = process.argv.includes('--watch');
+  const srcDirIdx = process.argv.indexOf('--source-dir');
+  const sourceDir = srcDirIdx !== -1 ? process.argv[srcDirIdx + 1] : null;
 
-  const runner = new TestRunner({ verbose: true, filter });
-  runner.run(wasmPath).then((results) => {
-    TestRunner.report(results);
-    process.exit(results.failed > 0 ? 1 : 0);
-  }).catch((err) => {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
-  });
+  if (watchMode) {
+    TestRunner.watch(wasmPath, { filter, sourceDir });
+  } else {
+    const runner = new TestRunner({ verbose: true, filter });
+    runner.run(wasmPath).then((results) => {
+      TestRunner.report(results);
+      process.exit(results.failed > 0 ? 1 : 0);
+    }).catch((err) => {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    });
+  }
 }

@@ -1859,7 +1859,7 @@ impl TypeChecker {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-/// Run Hindley-Milner-style type inference and checking on an Arc program.
+/// Run Hindley-Milner-style type inference and checking on an Nectar program.
 ///
 /// Returns a `TypedProgram` with all types fully resolved, or a list of
 /// `TypeError`s if the program is ill-typed.
@@ -2358,6 +2358,7 @@ mod tests {
                 body: TemplateNode::TextLiteral("hello".into()),
                 span: span(),
             },
+            skeleton: None,
             error_boundary: None,
             span: span(),
         })]);

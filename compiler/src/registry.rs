@@ -1,7 +1,7 @@
-//! Registry client for Arc packages.
+//! Registry client for Nectar packages.
 //!
 //! Currently supports local (path) dependencies and a stub for a future
-//! HTTP-based registry. Downloaded packages are cached under `~/.arc/cache/`.
+//! HTTP-based registry. Downloaded packages are cached under `~/.nectar/cache/`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -25,19 +25,19 @@ pub struct PackageMetadata {
 /// Configuration for the registry client.
 #[derive(Debug, Clone)]
 pub struct RegistryConfig {
-    /// Base URL of the Arc package registry.
+    /// Base URL of the Nectar package registry.
     pub registry_url: String,
-    /// Local cache directory (defaults to `~/.arc/cache`).
+    /// Local cache directory (defaults to `~/.nectar/cache`).
     pub cache_dir: PathBuf,
 }
 
 impl Default for RegistryConfig {
     fn default() -> Self {
         let cache_dir = dirs::home_dir()
-            .map(|h| h.join(".arc").join("cache"))
-            .unwrap_or_else(|| PathBuf::from(".arc/cache"));
+            .map(|h| h.join(".nectar").join("cache"))
+            .unwrap_or_else(|| PathBuf::from(".nectar/cache"));
         Self {
-            registry_url: "https://registry.arclang.org".to_string(),
+            registry_url: "https://registry.nectarlang.org".to_string(),
             cache_dir,
         }
     }
@@ -47,7 +47,7 @@ impl Default for RegistryConfig {
 // Client
 // ---------------------------------------------------------------------------
 
-/// Client for interacting with the Arc package registry and local cache.
+/// Client for interacting with the Nectar package registry and local cache.
 pub struct RegistryClient {
     config: RegistryConfig,
 }
@@ -136,7 +136,7 @@ impl RegistryClient {
         Ok(())
     }
 
-    /// Install a local package into the cache (useful for `arc publish` in the
+    /// Install a local package into the cache (useful for `nectar publish` in the
     /// future or for seeding the cache in tests).
     pub fn cache_local_package(
         &self,
@@ -165,7 +165,7 @@ impl RegistryClient {
     // -----------------------------------------------------------------------
 
     /// Read the local index file for a package. The index is a simple text file
-    /// at `~/.arc/cache/{name}/index` with one version per line.
+    /// at `~/.nectar/cache/{name}/index` with one version per line.
     fn read_cached_index(&self, name: &str) -> Result<Option<PackageMetadata>> {
         let index_path = self.config.cache_dir.join(name).join("index");
         if !index_path.exists() {

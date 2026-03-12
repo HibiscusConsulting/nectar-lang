@@ -1,4 +1,4 @@
-// Todo App in Arc
+// Todo App in Nectar
 // Demonstrates: structs, enums, ownership, collections, components
 
 struct Todo {
@@ -47,7 +47,7 @@ component TodoApp() {
 
     render {
         <div>
-            <h1>"Arc Todo"</h1>
+            <h1>"Nectar Todo"</h1>
             <div>
                 <input placeholder="What needs to be done?" />
                 <button on:click={self.add_todo}>"Add"</button>

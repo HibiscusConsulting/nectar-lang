@@ -1,6 +1,6 @@
-# Arc Runtime API Reference
+# Nectar Runtime API Reference
 
-This document describes every WASM import module and function provided by the Arc runtime (`arc-runtime.js`). These are the host functions that compiled Arc modules call to interact with the browser environment.
+This document describes every WASM import module and function provided by the Nectar runtime (`nectar-runtime.js`). These are the host functions that compiled Arc modules call to interact with the browser environment.
 
 ---
 
@@ -20,6 +20,7 @@ This document describes every WASM import module and function provided by the Ar
 12. [webapi](#webapi) -- Web platform APIs
 13. [string](#string) -- String operations
 14. [test](#test) -- Testing support
+15. [sw](#sw) -- Service worker
 
 ---
 
@@ -114,7 +115,7 @@ Wraps a component mount in an error boundary. Attempts to mount the component us
 
 ## signal
 
-Reactive state management primitives. Signals are the foundation of Arc's fine-grained reactivity system.
+Reactive state management primitives. Signals are the foundation of Nectar's fine-grained reactivity system.
 
 ### create
 
@@ -388,7 +389,7 @@ Closes a WebSocket connection.
 streaming.yield(dataPtr: i32, dataLen: i32)
 ```
 
-Emits a value from a WASM-originated stream. Used internally when Arc code uses the `yield` statement inside a streaming context.
+Emits a value from a WASM-originated stream. Used internally when Nectar code uses the `yield` statement inside a streaming context.
 
 ---
 
@@ -486,6 +487,16 @@ Registers a route pattern with a mount function index. The pattern supports:
 
 Scoped CSS injection and management.
 
+### isCriticalLoaded
+
+```
+style.isCriticalLoaded() -> i32
+```
+
+Checks whether critical CSS has already been inlined by the server during SSR with `--critical-css`. Returns `1` if `window.__nectarCriticalLoaded` is set, `0` otherwise.
+
+This is used internally by the runtime to avoid double-injecting styles that the SSR pass has already inlined in a `<style data-nectar-critical>` tag.
+
 ### injectStyles
 
 ```
@@ -495,9 +506,10 @@ style.injectStyles(componentNamePtr: i32, componentNameLen: i32, cssPtr: i32, cs
 Injects scoped CSS for a component. The runtime:
 
 1. Generates a unique scope ID from the component name (hash-based)
-2. Prefixes all CSS selectors with `[data-arc-HASH]` for scoping
-3. Creates a `<style>` element in the document head
-4. Removes any existing style for the same component (supporting hot reload)
+2. **If critical CSS was inlined by SSR** (`window.__nectarCriticalLoaded` is set), checks whether this component's scoped styles already exist in the `<style data-nectar-critical>` tag. If so, skips injection and returns the scope ID immediately -- avoiding double-injection of styles.
+3. Prefixes all CSS selectors with `[data-nectar-HASH]` for scoping
+4. Creates a `<style>` element in the document head
+5. Removes any existing style for the same component (supporting hot reload)
 
 Returns a pointer to the scope ID string in WASM memory.
 
@@ -507,7 +519,7 @@ Returns a pointer to the scope ID string in WASM memory.
 style.applyScope(elementHandle: i32, scopeIdPtr: i32, scopeIdLen: i32)
 ```
 
-Applies a scope ID to a DOM element by setting a `data-arc-HASH` attribute. This ensures the scoped CSS selectors match only elements within this component.
+Applies a scope ID to a DOM element by setting a `data-nectar-HASH` attribute. This ensures the scoped CSS selectors match only elements within this component.
 
 ---
 
@@ -779,3 +791,62 @@ Reports a test as failed with an error message.
 Prints the test summary (total passed, total failed).
 
 Note: The current test runner validates tests through the full compilation pipeline (lex, parse, borrow check, type check, codegen) rather than executing WASM. Tests that compile without errors are reported as passing.
+
+---
+
+## sw
+
+Service worker management for offline-first applications. Arc ships a built-in service worker (`nectar-service-worker.js`) and client registration script (`nectar-sw-register.js`).
+
+### register
+
+```
+sw.register()
+```
+
+Registers the Arc service worker at `/nectar-sw.js`. If the `NectarSW` client library is loaded on the page, delegates to it for update detection and lifecycle management. Otherwise, performs a direct `navigator.serviceWorker.register()` call.
+
+### precache
+
+```
+sw.precache(urlPtr: i32, urlLen: i32)
+```
+
+Adds a URL to the precache list. If a service worker is already active, sends it a message to cache the URL immediately. The URL is also stored on the runtime instance for compile-time manifest generation.
+
+**Parameters:**
+- `urlPtr` -- pointer to the URL string in WASM memory
+- `urlLen` -- length of the URL string
+
+### isOffline
+
+```
+sw.isOffline() -> i32
+```
+
+Returns the current offline status. Uses `NectarSW.isOffline` if the client library is loaded, otherwise falls back to `navigator.onLine`.
+
+**Returns:**
+- `1` if the browser is offline
+- `0` if the browser is online
+
+### Service Worker Features
+
+The built-in service worker (`nectar-service-worker.js`) provides:
+
+- **Cache-first for app shell** -- HTML, CSS, JS, images, and fonts are served from cache when available
+- **Network-first for API calls** -- requests to `/api/*` try the network first, falling back to cached responses
+- **Aggressive WASM caching** -- `.wasm` files are stored in a dedicated cache and served cache-first
+- **Offline fallback** -- navigation requests that fail show a cached offline page
+- **Auto-versioning** -- the `CACHE_VERSION` constant is stamped by the compiler at build time; old caches are purged on activation
+
+### Client Registration Script
+
+The client script (`nectar-sw-register.js`) exposes a global `NectarSW` object:
+
+- `NectarSW.register(swUrl?)` -- registers the service worker (default path: `/nectar-sw.js`)
+- `NectarSW.update()` -- forces a waiting service worker to activate (triggers page reload)
+- `NectarSW.updateAvailable` -- boolean, true when a new version is waiting
+- `NectarSW.isOffline` -- boolean, reactive offline status
+- `NectarSW.on("update", fn)` -- listen for update availability
+- `NectarSW.on("offline", fn)` -- listen for online/offline state changes

@@ -1,4 +1,4 @@
-// Example: A routed Arc app with scoped styles
+// Example: A routed Nectar app with scoped styles
 //
 // Demonstrates:
 //   - Router definition with parameterized routes and guards
@@ -75,7 +75,7 @@ component Home() {
 
     render {
         <div class="home">
-            <h1>"Welcome to Arc"</h1>
+            <h1>"Welcome to Nectar"</h1>
             <p>"A language that compiles to WebAssembly with built-in routing and scoped styles."</p>
         </div>
     }
@@ -99,8 +99,8 @@ component About() {
 
     render {
         <div class="about">
-            <h2>"About Arc"</h2>
-            <p>"Arc is a systems-level UI language with fine-grained reactivity, ownership semantics, and first-class routing."</p>
+            <h2>"About Nectar"</h2>
+            <p>"Nectar is a systems-level UI language with fine-grained reactivity, ownership semantics, and first-class routing."</p>
         </div>
     }
 }

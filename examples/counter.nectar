@@ -1,4 +1,4 @@
-// Counter in Arc
+// Counter in Nectar
 // Demonstrates: state, signals, event handlers, ownership
 
 component Counter(initial: i32) {

@@ -192,7 +192,7 @@ impl StringIntern {
 
 // ── WasmBinaryEmitter ───────────────────────────────────────────────────────
 
-/// Emits binary .wasm format directly from an Arc AST, with no WAT text
+/// Emits binary .wasm format directly from a Nectar AST, with no WAT text
 /// intermediate. Implements the WebAssembly 1.0 binary spec.
 pub struct WasmBinaryEmitter {
     /// De-duplicated function type signatures

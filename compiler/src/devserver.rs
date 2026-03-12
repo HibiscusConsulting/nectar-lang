@@ -1,7 +1,7 @@
-//! Development server for Arc.
+//! Development server for Nectar.
 //!
-//! Serves compiled `.wasm` files and the Arc runtime JS from a build directory,
-//! watches `.arc` source files for changes using filesystem polling, and
+//! Serves compiled `.wasm` files and the Nectar runtime JS from a build directory,
+//! watches `.nectar` source files for changes using filesystem polling, and
 //! notifies connected hot-reload clients via a minimal WebSocket implementation.
 
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ use std::time::{Duration, SystemTime};
 struct FileWatcher {
     /// Directory to watch.
     root: PathBuf,
-    /// Extension filter (e.g., "arc").
+    /// Extension filter (e.g., "nectar").
     extension: String,
     /// Last-known modification times.
     timestamps: HashMap<PathBuf, SystemTime>,
@@ -224,12 +224,12 @@ fn http_response(status: u16, content_type: &str, body: &[u8]) -> Vec<u8> {
 // DevServer
 // ---------------------------------------------------------------------------
 
-/// The Arc development server.
+/// The Nectar development server.
 ///
 /// Serves static build artifacts, watches for source changes, recompiles,
 /// and pushes reload notifications to connected WebSocket clients.
 pub struct DevServer {
-    /// Directory containing `.arc` source files.
+    /// Directory containing `.nectar` source files.
     source_dir: PathBuf,
     /// Directory containing build artifacts (`.wasm`, `.js`).
     build_dir: PathBuf,
@@ -253,8 +253,8 @@ impl DevServer {
     pub fn start(&self, port: u16) -> io::Result<()> {
         let addr = format!("127.0.0.1:{}", port);
         let listener = TcpListener::bind(&addr)?;
-        println!("arc dev: serving on http://{}", addr);
-        println!("arc dev: watching {} for changes", self.source_dir.display());
+        println!("nectar dev: serving on http://{}", addr);
+        println!("nectar dev: watching {} for changes", self.source_dir.display());
 
         // Spawn the file-watcher thread.
         let ws_clients = Arc::clone(&self.ws_clients);
@@ -272,12 +272,12 @@ impl DevServer {
                     let ws_clients = Arc::clone(&self.ws_clients);
                     thread::spawn(move || {
                         if let Err(e) = Self::handle_connection(stream, &build_dir, ws_clients) {
-                            eprintln!("arc dev: connection error: {}", e);
+                            eprintln!("nectar dev: connection error: {}", e);
                         }
                     });
                 }
                 Err(e) => {
-                    eprintln!("arc dev: accept error: {}", e);
+                    eprintln!("nectar dev: accept error: {}", e);
                 }
             }
         }
@@ -377,7 +377,7 @@ impl DevServer {
         build_dir: PathBuf,
         ws_clients: Arc<Mutex<Vec<TcpStream>>>,
     ) {
-        let mut watcher = FileWatcher::new(source_dir.clone(), "arc", Duration::from_millis(500));
+        let mut watcher = FileWatcher::new(source_dir.clone(), "nectar", Duration::from_millis(500));
 
         loop {
             thread::sleep(watcher.interval());
@@ -387,7 +387,7 @@ impl DevServer {
             }
 
             println!(
-                "arc dev: {} file(s) changed, recompiling...",
+                "nectar dev: {} file(s) changed, recompiling...",
                 changed.len()
             );
             for path in &changed {
@@ -399,10 +399,10 @@ impl DevServer {
             for path in &changed {
                 match Self::compile_file(path, &build_dir) {
                     Ok(output_name) => {
-                        println!("arc dev: compiled -> {}", output_name);
+                        println!("nectar dev: compiled -> {}", output_name);
                     }
                     Err(e) => {
-                        eprintln!("arc dev: compile error: {}", e);
+                        eprintln!("nectar dev: compile error: {}", e);
                         any_error = true;
                     }
                 }
@@ -415,7 +415,7 @@ impl DevServer {
         }
     }
 
-    /// Compile a single `.arc` file to `.wasm` in the build directory.
+    /// Compile a single `.nectar` file to `.wasm` in the build directory.
     fn compile_file(source_path: &Path, build_dir: &Path) -> Result<String, String> {
         let source = fs::read_to_string(source_path)
             .map_err(|e| format!("Failed to read {}: {}", source_path.display(), e))?;
@@ -522,9 +522,9 @@ mod tests {
 
     #[test]
     fn test_file_watcher_empty_dir() {
-        let tmp = std::env::temp_dir().join("arc_test_watcher");
+        let tmp = std::env::temp_dir().join("nectar_test_watcher");
         let _ = fs::create_dir_all(&tmp);
-        let mut watcher = FileWatcher::new(tmp.clone(), "arc", Duration::from_millis(100));
+        let mut watcher = FileWatcher::new(tmp.clone(), "nectar", Duration::from_millis(100));
         let changed = watcher.poll();
         assert!(changed.is_empty());
         let _ = fs::remove_dir_all(&tmp);

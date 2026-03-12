@@ -1,4 +1,4 @@
-/// Static analysis linter for the Arc language.
+/// Static analysis linter for the Nectar language.
 ///
 /// Runs a configurable set of lint rules over a parsed AST and returns
 /// a list of warnings with file positions.

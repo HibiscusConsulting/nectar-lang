@@ -34,8 +34,8 @@ impl ModuleResolver {
     /// Resolve a module path (e.g. `["math", "vec3"]`) to a file system path.
     ///
     /// Tries two conventions:
-    ///   1. `<root>/math/vec3.arc`
-    ///   2. `<root>/math/vec3/mod.arc`
+    ///   1. `<root>/math/vec3.nectar`
+    ///   2. `<root>/math/vec3/mod.nectar`
     pub fn resolve_module(&self, path: &[String]) -> Result<PathBuf, ModuleResolveError> {
         self.resolve_module_from(&self.root_dir, path)
     }
@@ -60,14 +60,14 @@ impl ModuleResolver {
 
         let last = &path[path.len() - 1];
 
-        // Try `<dir>/<last>.arc`
-        let file_path = dir.join(format!("{}.arc", last));
+        // Try `<dir>/<last>.nectar`
+        let file_path = dir.join(format!("{}.nectar", last));
         if file_path.exists() {
             return Ok(file_path);
         }
 
-        // Try `<dir>/<last>/mod.arc`
-        let mod_path = dir.join(last).join("mod.arc");
+        // Try `<dir>/<last>/mod.nectar`
+        let mod_path = dir.join(last).join("mod.nectar");
         if mod_path.exists() {
             return Ok(mod_path);
         }
@@ -115,16 +115,16 @@ mod tests {
     fn setup_test_dir() -> tempfile::TempDir {
         let dir = tempfile::TempDir::new().unwrap();
 
-        // Create foo.arc
-        fs::write(dir.path().join("foo.arc"), "pub fn hello() {}").unwrap();
+        // Create foo.nectar
+        fs::write(dir.path().join("foo.nectar"), "pub fn hello() {}").unwrap();
 
-        // Create bar/mod.arc
+        // Create bar/mod.nectar
         fs::create_dir_all(dir.path().join("bar")).unwrap();
-        fs::write(dir.path().join("bar").join("mod.arc"), "pub fn world() {}").unwrap();
+        fs::write(dir.path().join("bar").join("mod.nectar"), "pub fn world() {}").unwrap();
 
-        // Create math/vec3.arc
+        // Create math/vec3.nectar
         fs::create_dir_all(dir.path().join("math")).unwrap();
-        fs::write(dir.path().join("math").join("vec3.arc"), "pub struct Vec3 {}").unwrap();
+        fs::write(dir.path().join("math").join("vec3.nectar"), "pub struct Vec3 {}").unwrap();
 
         dir
     }
@@ -136,18 +136,18 @@ mod tests {
 
         let result = resolver.resolve_module(&["foo".to_string()]);
         assert!(result.is_ok());
-        assert!(result.unwrap().ends_with("foo.arc"));
+        assert!(result.unwrap().ends_with("foo.nectar"));
     }
 
     #[test]
-    fn test_resolve_mod_arc() {
+    fn test_resolve_mod_nectar() {
         let dir = setup_test_dir();
         let resolver = ModuleResolver::new(dir.path().to_path_buf());
 
         let result = resolver.resolve_module(&["bar".to_string()]);
         assert!(result.is_ok());
         let path = result.unwrap();
-        assert!(path.ends_with("mod.arc"));
+        assert!(path.ends_with("mod.nectar"));
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
 
         let result = resolver.resolve_module(&["math".to_string(), "vec3".to_string()]);
         assert!(result.is_ok());
-        assert!(result.unwrap().ends_with("vec3.arc"));
+        assert!(result.unwrap().ends_with("vec3.nectar"));
     }
 
     #[test]
@@ -174,7 +174,7 @@ mod tests {
         let dir = setup_test_dir();
         let mut resolver = ModuleResolver::new(dir.path().to_path_buf());
 
-        let path = dir.path().join("foo.arc");
+        let path = dir.path().join("foo.nectar");
         assert!(resolver.mark_loaded(&path)); // first time
         assert!(!resolver.mark_loaded(&path)); // second time = circular
         assert!(resolver.is_loaded(&path));
@@ -185,7 +185,7 @@ mod tests {
         let dir = setup_test_dir();
         let resolver = ModuleResolver::new(dir.path().to_path_buf());
 
-        let content = resolver.load_module(&dir.path().join("foo.arc")).unwrap();
+        let content = resolver.load_module(&dir.path().join("foo.nectar")).unwrap();
         assert_eq!(content, "pub fn hello() {}");
     }
 }
