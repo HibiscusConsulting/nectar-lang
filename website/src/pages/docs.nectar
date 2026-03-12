@@ -1,0 +1,89 @@
+// docs.nectar — Documentation hub
+
+page Docs() {
+    meta {
+        title: "Nectar Documentation",
+        description: "Learn how to build frontend applications with Nectar. Guides, API reference, and examples.",
+        canonical: "/docs",
+    }
+
+    render {
+        <main class="docs-page">
+            <Nav />
+
+            <div class="docs-layout">
+                <aside class="docs-sidebar">
+                    <h3>"Getting Started"</h3>
+                    <a href="/docs/installation">"Installation"</a>
+                    <a href="/docs/hello-world">"Hello World"</a>
+                    <a href="/docs/project-structure">"Project Structure"</a>
+
+                    <h3>"Core Concepts"</h3>
+                    <a href="/docs/components">"Components"</a>
+                    <a href="/docs/state">"State & Signals"</a>
+                    <a href="/docs/routing">"Routing"</a>
+                    <a href="/docs/styling">"Styling"</a>
+
+                    <h3>"Safety"</h3>
+                    <a href="/docs/contracts">"API Contracts"</a>
+                    <a href="/docs/security">"Security"</a>
+                    <a href="/docs/error-handling">"Error Handling"</a>
+
+                    <h3>"Features"</h3>
+                    <a href="/docs/forms">"Forms"</a>
+                    <a href="/docs/seo">"SEO & AAIO"</a>
+                    <a href="/docs/pwa">"PWA & Mobile"</a>
+                    <a href="/docs/realtime">"Real-time Channels"</a>
+                    <a href="/docs/concurrency">"Concurrency"</a>
+
+                    <h3>"Toolchain"</h3>
+                    <a href="/docs/cli">"CLI Reference"</a>
+                    <a href="/docs/build-targets">"Build Targets"</a>
+                    <a href="/docs/testing">"Testing"</a>
+                </aside>
+
+                <div class="docs-content">
+                    <h1>"Nectar Documentation"</h1>
+                    <p>"Nectar is a compiled-to-WASM frontend language. It replaces JavaScript, React, and their entire ecosystem with a single compiler that produces safe, fast, native-feeling web applications."</p>
+
+                    <h2>"Why Nectar?"</h2>
+                    <p>"Every web framework makes trade-offs. Nectar eliminates them:"</p>
+
+                    <div class="doc-cards">
+                        <div class="doc-card">
+                            <h3>"Security by default"</h3>
+                            <p>"XSS is structurally impossible. No innerHTML, no eval, no prototype chain. Secret types prevent accidental leaks. Capabilities restrict component access."</p>
+                        </div>
+                        <div class="doc-card">
+                            <h3>"SEO without SSR servers"</h3>
+                            <p>"The page keyword pre-renders HTML at build time. JSON-LD, sitemaps, and meta tags are compiler outputs, not afterthoughts."</p>
+                        </div>
+                        <div class="doc-card">
+                            <h3>"Mobile without frameworks"</h3>
+                            <p>"PWA manifest, gestures, haptic feedback, camera access — all language constructs. Build once, deploy as PWA, TWA, or Capacitor app."</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .docs-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .docs-layout { display: grid; grid-template-columns: 250px 1fr; max-width: 1200px; margin: 0 auto; }
+        .docs-sidebar { padding: 2rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+        .docs-sidebar h3 { color: #e94560; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2rem; margin-bottom: 0.5rem; }
+        .docs-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0; font-size: 0.95rem; }
+        .docs-sidebar a:hover { color: #ffffff; }
+        .docs-content { padding: 3rem; }
+        .docs-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; }
+        .docs-content h2 { font-size: 1.8rem; color: #ffffff; margin-top: 2rem; margin-bottom: 1rem; }
+        .docs-content p { color: #a0a0b0; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .doc-card { background: #16213e; padding: 1.5rem; border-radius: 8px; border: 1px solid #2a2a4e; }
+        .doc-card h3 { color: #ffffff; margin-bottom: 0.5rem; }
+        .doc-card p { color: #a0a0b0; font-size: 0.9rem; }
+    }
+}

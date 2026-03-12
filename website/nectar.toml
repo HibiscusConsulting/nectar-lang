@@ -1,0 +1,9 @@
+[package]
+name = "buildnectar-website"
+version = "0.1.0"
+description = "The official Nectar language website — built with Nectar"
+
+[build]
+entry = "src/app.nectar"
+target = "ssg"
+output = "dist"

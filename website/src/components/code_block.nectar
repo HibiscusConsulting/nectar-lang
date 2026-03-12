@@ -1,0 +1,32 @@
+// code_block.nectar — Syntax-highlighted code display
+
+component CodeBlock(code: String, language: String) {
+    render {
+        <div class="code-block">
+            <div class="code-header">
+                <span class="code-lang">{language}</span>
+            </div>
+            <pre><code>{code}</code></pre>
+        </div>
+    }
+
+    style {
+        .code-block {
+            background: #0d1117;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+            border: 1px solid #2a2a4e;
+        }
+        .code-header {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0.5rem 1rem;
+            background: #161b22;
+            border-bottom: 1px solid #2a2a4e;
+        }
+        .code-lang { font-size: 0.8rem; color: #8b949e; }
+        pre { padding: 1.5rem; margin: 0; overflow-x: auto; }
+        code { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #e6edf3; line-height: 1.6; }
+    }
+}

@@ -1,0 +1,80 @@
+// install.nectar — Download and installation page
+
+page Install() {
+    meta {
+        title: "Install Nectar — Get Started in 30 Seconds",
+        description: "Install the Nectar compiler via curl, Homebrew, or cargo. Pre-built binaries for macOS, Linux, and Windows.",
+        canonical: "/install",
+    }
+
+    render {
+        <main class="install-page">
+            <Nav />
+
+            <section class="install-hero">
+                <h1>"Install Nectar"</h1>
+                <p>"Get started in 30 seconds."</p>
+            </section>
+
+            <section class="install-methods">
+                <div class="method">
+                    <h2>"Recommended"</h2>
+                    <h3>"Shell (macOS / Linux)"</h3>
+                    <div class="install-code">
+                        <code>"curl -fsSL https://buildnectar.com/install.sh | sh"</code>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <h3>"Homebrew (macOS)"</h3>
+                    <div class="install-code">
+                        <code>"brew install nectar-lang"</code>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <h3>"Cargo (Rust)"</h3>
+                    <div class="install-code">
+                        <code>"cargo install nectar-lang"</code>
+                    </div>
+                </div>
+
+                <div class="method">
+                    <h3>"From Source"</h3>
+                    <div class="install-code">
+                        <code>"git clone https://github.com/BlakeBurnette/nectar-lang.git"</code>
+                        <code>"cd nectar-lang && cargo build --release"</code>
+                    </div>
+                </div>
+            </section>
+
+            <section class="quickstart">
+                <h2>"Quick Start"</h2>
+                <div class="install-code">
+                    <code>"nectar init my-app"</code>
+                    <code>"cd my-app"</code>
+                    <code>"nectar dev"</code>
+                </div>
+                <p>"Open http://localhost:3000 and start building."</p>
+            </section>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .install-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .install-hero { text-align: center; padding: 6rem 2rem 3rem; }
+        .install-hero h1 { font-size: 3rem; color: #ffffff; }
+        .install-hero p { font-size: 1.3rem; color: #a0a0b0; }
+        .install-methods { max-width: 700px; margin: 0 auto; padding: 2rem; }
+        .method { margin-bottom: 2rem; }
+        .method h2 { color: #e94560; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; }
+        .method h3 { color: #ffffff; margin-bottom: 0.5rem; }
+        .install-code { background: #0d1117; padding: 1rem 1.5rem; border-radius: 8px; border: 1px solid #2a2a4e; margin-bottom: 1rem; }
+        .install-code code { display: block; color: #58a6ff; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.3rem; }
+        .quickstart { max-width: 700px; margin: 0 auto; padding: 3rem 2rem; }
+        .quickstart h2 { color: #ffffff; margin-bottom: 1rem; }
+        .quickstart p { color: #a0a0b0; margin-top: 1rem; }
+    }
+}

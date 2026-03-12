@@ -1,0 +1,30 @@
+// app.nectar — buildnectar.com main application
+//
+// This website is built with Nectar, proving the language works
+// for real-world production use.
+
+app BuildNectar {
+    manifest {
+        name: "Nectar — Build Better Frontends",
+        short_name: "Nectar",
+        theme_color: "#1a1a2e",
+        background_color: "#1a1a2e",
+        display: "minimal-ui",
+    }
+
+    offline {
+        precache: ["/", "/docs", "/install", "/examples"],
+        strategy: "stale-while-revalidate",
+        fallback: OfflinePage,
+    }
+
+    router SiteRouter {
+        route "/" => Home,
+        route "/docs" => Docs,
+        route "/docs/:section" => DocsSection,
+        route "/install" => Install,
+        route "/examples" => Examples,
+        route "/playground" => Playground,
+        fallback => NotFound,
+    }
+}

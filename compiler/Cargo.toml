@@ -2,7 +2,12 @@
 name = "nectar-lang"
 version = "0.1.0"
 edition = "2024"
-description = "The Nectar programming language — ownership-based, component-oriented, compiles to WebAssembly"
+description = "A compiled-to-WASM frontend language with built-in security, SEO, and mobile support"
+license = "MIT"
+repository = "https://github.com/BlakeBurnette/nectar-lang"
+homepage = "https://buildnectar.com"
+keywords = ["wasm", "frontend", "compiler", "language", "web"]
+categories = ["compilers", "wasm", "web-programming"]
 
 [[bin]]
 name = "nectar"

@@ -1,0 +1,97 @@
+// examples.nectar — Code examples showcase
+
+page Examples() {
+    meta {
+        title: "Nectar Examples — See the Language in Action",
+        description: "Browse real Nectar code examples: components, forms, real-time channels, PWA apps, and more.",
+        canonical: "/examples",
+    }
+
+    render {
+        <main class="examples-page">
+            <Nav />
+
+            <section class="examples-hero">
+                <h1>"Examples"</h1>
+                <p>"Real Nectar code. No pseudocode. No hand-waving."</p>
+            </section>
+
+            <section class="examples-grid">
+                <div class="example-card">
+                    <h3>"Hello World"</h3>
+                    <p>"The simplest Nectar component."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/hello.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Counter"</h3>
+                    <p>"Reactive state with signals."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/counter.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Todo App"</h3>
+                    <p>"Full CRUD with state management."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/todo.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"API Contracts"</h3>
+                    <p>"Type-safe API boundaries."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/contracts.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Security"</h3>
+                    <p>"Secret types and permissions."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/security.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"PWA"</h3>
+                    <p>"Mobile-native Progressive Web App."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/pwa-app.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"SEO"</h3>
+                    <p>"Pages with meta, structured data."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/seo.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Forms"</h3>
+                    <p>"Declarative form handling."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/forms.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Real-time"</h3>
+                    <p>"WebSocket channels."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/realtime.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Concurrency"</h3>
+                    <p>"Spawn and parallel execution."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/concurrency.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"Error Handling"</h3>
+                    <p>"Exhaustive Result/Option matching."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/error-handling.nectar">"View source"</a>
+                </div>
+                <div class="example-card">
+                    <h3>"AI Agent"</h3>
+                    <p>"LLM integration with tools."</p>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/blob/main/examples/ai-chat.nectar">"View source"</a>
+                </div>
+            </section>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .examples-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .examples-hero { text-align: center; padding: 6rem 2rem 3rem; }
+        .examples-hero h1 { font-size: 3rem; color: #ffffff; }
+        .examples-hero p { font-size: 1.3rem; color: #a0a0b0; }
+        .examples-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        .example-card { background: #16213e; padding: 1.5rem; border-radius: 8px; border: 1px solid #2a2a4e; }
+        .example-card h3 { color: #ffffff; margin-bottom: 0.5rem; }
+        .example-card p { color: #a0a0b0; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .example-card a { color: #e94560; text-decoration: none; font-size: 0.9rem; }
+    }
+}

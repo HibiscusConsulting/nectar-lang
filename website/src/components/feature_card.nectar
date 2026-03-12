@@ -1,0 +1,28 @@
+// feature_card.nectar — Feature showcase card
+
+component FeatureCard(title: String, description: String, icon: String) {
+    render {
+        <div class="feature-card">
+            <div class="feature-icon">{icon}</div>
+            <h3>{title}</h3>
+            <p>{description}</p>
+        </div>
+    }
+
+    style {
+        .feature-card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 2rem;
+            border: 1px solid #2a2a4e;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .feature-card:hover {
+            border-color: #e94560;
+            transform: translateY(-2px);
+        }
+        .feature-icon { font-size: 2rem; margin-bottom: 1rem; }
+        h3 { color: #ffffff; margin-bottom: 0.5rem; }
+        p { color: #a0a0b0; line-height: 1.6; }
+    }
+}

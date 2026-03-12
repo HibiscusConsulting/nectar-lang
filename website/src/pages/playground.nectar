@@ -1,0 +1,32 @@
+// playground.nectar — Interactive code playground (future feature)
+
+page Playground() {
+    meta {
+        title: "Nectar Playground — Try Nectar in Your Browser",
+        description: "Write and run Nectar code directly in your browser. No installation required.",
+        canonical: "/playground",
+    }
+
+    render {
+        <main class="playground-page">
+            <Nav />
+
+            <section class="coming-soon">
+                <h1>"Playground"</h1>
+                <p>"Try Nectar in your browser. Coming soon."</p>
+                <p>"In the meantime:"</p>
+                <a href="/install" class="btn btn-primary">"Install Nectar"</a>
+            </section>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .playground-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .coming-soon { text-align: center; padding: 10rem 2rem; }
+        .coming-soon h1 { font-size: 3rem; color: #ffffff; margin-bottom: 1rem; }
+        .coming-soon p { color: #a0a0b0; font-size: 1.2rem; margin-bottom: 1rem; }
+        .btn-primary { display: inline-block; padding: 0.8rem 2rem; background: #e94560; color: #ffffff; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 1rem; }
+    }
+}

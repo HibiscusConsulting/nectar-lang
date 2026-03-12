@@ -1,0 +1,49 @@
+// nav.nectar — Site navigation
+
+component Nav() {
+    let current_path: String = "/";
+
+    render {
+        <nav class="site-nav">
+            <a href="/" class="logo">
+                <span class="logo-text">"nectar"</span>
+            </a>
+            <div class="nav-links">
+                <a href="/docs">"Docs"</a>
+                <a href="/install">"Install"</a>
+                <a href="/examples">"Examples"</a>
+                <a href="/playground">"Playground"</a>
+                <a href="https://github.com/BlakeBurnette/nectar-lang" class="github">"GitHub"</a>
+            </div>
+        </nav>
+    }
+
+    style {
+        .site-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: #1a1a2e;
+            border-bottom: 1px solid #2a2a4e;
+        }
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #e94560;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+        .nav-links a {
+            color: #a0a0b0;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .nav-links a:hover {
+            color: #ffffff;
+        }
+    }
+}

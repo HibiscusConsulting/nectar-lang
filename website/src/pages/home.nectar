@@ -1,0 +1,126 @@
+// home.nectar — Landing page for buildnectar.com
+
+page Home() {
+    meta {
+        title: "Nectar — The Frontend Language That Compiles to WASM",
+        description: "Nectar is a compiled-to-WASM frontend language. Zero JavaScript dependencies. XSS impossible. Built-in SEO, PWA, forms, and real-time support.",
+        canonical: "/",
+        structured_data: Schema.SoftwareApplication {
+            name: "Nectar",
+            application_category: "DeveloperApplication",
+            operating_system: "Cross-platform",
+        },
+    }
+
+    render {
+        <main class="home">
+            <section class="hero">
+                <h1>"The frontend language that"<br />"compiles to WASM"</h1>
+                <p class="subtitle">
+                    "Zero JavaScript dependencies. XSS impossible. SEO built in."<br />
+                    "Not a framework. A language."
+                </p>
+                <div class="hero-actions">
+                    <a href="/install" class="btn btn-primary">"Install Nectar"</a>
+                    <a href="/docs" class="btn btn-secondary">"Read the Docs"</a>
+                </div>
+                <div class="install-snippet">
+                    <code>"curl -fsSL https://buildnectar.com/install.sh | sh"</code>
+                </div>
+            </section>
+
+            <section class="features">
+                <h2>"Why Nectar?"</h2>
+                <div class="feature-grid">
+                    <FeatureCard
+                        title="XSS Impossible"
+                        description="No innerHTML. No eval. No document.write. The mechanism doesn't exist in WASM. XSS is structurally impossible."
+                        icon="shield" />
+                    <FeatureCard
+                        title="Zero Dependencies"
+                        description="Nectar compiles to a flat WASM binary. No node_modules. No transitive deps. No supply chain attacks."
+                        icon="package" />
+                    <FeatureCard
+                        title="SEO Built In"
+                        description="The page keyword pre-renders static HTML at build time. JSON-LD, sitemaps, and meta tags are automatic."
+                        icon="search" />
+                    <FeatureCard
+                        title="Mobile Native"
+                        description="PWA manifest, gestures, haptic feedback, camera, and biometric auth are language constructs, not libraries."
+                        icon="smartphone" />
+                    <FeatureCard
+                        title="Type-Safe APIs"
+                        description="Contracts validate API responses at compile time, runtime, and wire level. Frontend/backend mismatch is impossible."
+                        icon="check" />
+                    <FeatureCard
+                        title="Forms in 3 Lines"
+                        description="Declarative form keyword with built-in validation, dirty tracking, and error states. No Formik. No React Hook Form."
+                        icon="edit" />
+                </div>
+            </section>
+
+            <section class="comparison">
+                <h2>"React vs Nectar"</h2>
+                <div class="compare-grid">
+                    <div class="compare-col">
+                        <h3>"React"</h3>
+                        <p>"100KB+ before your code"</p>
+                        <p>"XSS if you forget"</p>
+                        <p>"SEO requires Next.js"</p>
+                        <p>"1,000+ npm dependencies"</p>
+                        <p>"Runtime type checking (maybe)"</p>
+                        <p>"Forms need a library"</p>
+                    </div>
+                    <div class="compare-col highlight">
+                        <h3>"Nectar"</h3>
+                        <p>"Flat WASM binary"</p>
+                        <p>"XSS is impossible"</p>
+                        <p>"SEO is built in"</p>
+                        <p>"Zero dependencies"</p>
+                        <p>"Compile-time safety"</p>
+                        <p>"Forms are a keyword"</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cta">
+                <h2>"Ready to build something better?"</h2>
+                <a href="/install" class="btn btn-primary btn-large">"Get Started"</a>
+            </section>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .home { color: #e0e0e0; background: #1a1a2e; }
+        .hero {
+            text-align: center;
+            padding: 8rem 2rem 6rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hero h1 { font-size: 3.5rem; color: #ffffff; line-height: 1.2; margin-bottom: 1.5rem; }
+        .subtitle { font-size: 1.3rem; color: #a0a0b0; line-height: 1.6; margin-bottom: 2rem; }
+        .hero-actions { display: flex; gap: 1rem; justify-content: center; margin-bottom: 2rem; }
+        .btn { padding: 0.8rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; }
+        .btn-primary { background: #e94560; color: #ffffff; }
+        .btn-primary:hover { background: #d63851; }
+        .btn-secondary { background: transparent; color: #e94560; border: 2px solid #e94560; }
+        .btn-large { font-size: 1.3rem; padding: 1rem 3rem; }
+        .install-snippet { background: #0d1117; padding: 1rem 2rem; border-radius: 8px; display: inline-block; border: 1px solid #2a2a4e; }
+        .install-snippet code { color: #58a6ff; font-family: 'JetBrains Mono', monospace; }
+        .features { padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; }
+        .features h2 { text-align: center; font-size: 2.5rem; color: #ffffff; margin-bottom: 3rem; }
+        .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+        .comparison { padding: 6rem 2rem; background: #0f0f1a; }
+        .comparison h2 { text-align: center; font-size: 2.5rem; color: #ffffff; margin-bottom: 3rem; }
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 800px; margin: 0 auto; }
+        .compare-col { padding: 2rem; border-radius: 12px; background: #1a1a2e; }
+        .compare-col.highlight { border: 2px solid #e94560; }
+        .compare-col h3 { margin-bottom: 1rem; color: #ffffff; }
+        .compare-col p { margin-bottom: 0.5rem; color: #a0a0b0; }
+        .cta { text-align: center; padding: 6rem 2rem; }
+        .cta h2 { font-size: 2.5rem; color: #ffffff; margin-bottom: 2rem; }
+    }
+}

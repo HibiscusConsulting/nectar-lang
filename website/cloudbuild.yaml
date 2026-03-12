@@ -1,0 +1,33 @@
+# Cloud Build config for buildnectar.com
+# Triggers on push to main, deploys to Cloud Run
+
+steps:
+  # Build the container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/buildnectar-website', '-f', 'website/Dockerfile', '.']
+
+  # Push to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/buildnectar-website']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'buildnectar-website'
+      - '--image=gcr.io/$PROJECT_ID/buildnectar-website'
+      - '--platform=managed'
+      - '--region=us-central1'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=256Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=10'
+
+images:
+  - 'gcr.io/$PROJECT_ID/buildnectar-website'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

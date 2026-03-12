@@ -1,0 +1,50 @@
+// footer.nectar — Site footer
+
+component Footer() {
+    render {
+        <footer class="site-footer">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h3>"Nectar"</h3>
+                    <p>"A compiled-to-WASM frontend language."</p>
+                    <p>"Zero JavaScript. Maximum safety."</p>
+                </div>
+                <div class="footer-col">
+                    <h3>"Resources"</h3>
+                    <a href="/docs">"Documentation"</a>
+                    <a href="/install">"Install"</a>
+                    <a href="/examples">"Examples"</a>
+                    <a href="/playground">"Playground"</a>
+                </div>
+                <div class="footer-col">
+                    <h3>"Community"</h3>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang">"GitHub"</a>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/issues">"Issues"</a>
+                    <a href="https://github.com/BlakeBurnette/nectar-lang/discussions">"Discussions"</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>"Built with Nectar. Obviously."</p>
+            </div>
+        </footer>
+    }
+
+    style {
+        .site-footer {
+            background: #0f0f1a;
+            padding: 4rem 2rem 2rem;
+            color: #a0a0b0;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .footer-col h3 { color: #ffffff; margin-bottom: 1rem; }
+        .footer-col a { display: block; color: #a0a0b0; text-decoration: none; margin-bottom: 0.5rem; }
+        .footer-col a:hover { color: #e94560; }
+        .footer-bottom { text-align: center; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #2a2a4e; font-size: 0.9rem; }
+    }
+}
