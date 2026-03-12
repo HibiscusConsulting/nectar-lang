@@ -935,6 +935,7 @@ impl TypeChecker {
                 Item::Auth(_) => { /* auth type checking TODO */ }
                 Item::Upload(_) => { /* upload type checking TODO */ }
                 Item::Db(_) => { /* db type checking TODO */ }
+                Item::Cache(_) => { /* cache type checking TODO */ }
             }
         }
 

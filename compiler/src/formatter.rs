@@ -219,6 +219,7 @@ impl Formatter {
             Item::Auth(_) => {}
             Item::Upload(_) => {}
             Item::Db(_) => {}
+            Item::Cache(_) => {}
         }
     }
 

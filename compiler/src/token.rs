@@ -114,6 +114,11 @@ pub enum TokenKind {
     Db,
     Trace,
     Flag,
+    Cache,
+    Query,
+    Mutation,
+    Invalidate,
+    Optimistic,
 
     // Types
     I32,

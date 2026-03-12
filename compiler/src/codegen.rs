@@ -351,6 +351,15 @@ impl WasmCodegen {
         self.line(";; Feature flag imports");
         self.line("(import \"flags\" \"isEnabled\" (func $flag_is_enabled (param i32 i32) (result i32)))");
 
+        // Cache runtime imports
+        self.line("");
+        self.line(";; Cache runtime imports");
+        self.line("(import \"cache\" \"init\" (func $cache_init (param i32 i32 i32 i32)))");
+        self.line("(import \"cache\" \"registerQuery\" (func $cache_register_query (param i32 i32 i32 i32)))");
+        self.line("(import \"cache\" \"registerMutation\" (func $cache_register_mutation (param i32 i32 i32 i32)))");
+        self.line("(import \"cache\" \"get\" (func $cache_get (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"cache\" \"invalidate\" (func $cache_invalidate (param i32 i32)))");
+
         // Allocator (bump allocator for now)
         self.line("");
         self.line("(global $heap_ptr (mut i32) (i32.const 1024))");
@@ -446,6 +455,7 @@ impl WasmCodegen {
             Item::Upload(upload) => self.generate_upload(upload),
             Item::Embed(embed) => self.generate_embed(embed),
             Item::Pdf(pdf) => self.generate_pdf(pdf),
+            Item::Cache(cache) => self.generate_cache(cache),
             _ => {
                 self.line(&format!(";; TODO: codegen for {:?}", std::mem::discriminant(item)));
             }
@@ -1328,6 +1338,130 @@ impl WasmCodegen {
         }
         for method in &upload.methods {
             self.generate_function(method);
+        }
+    }
+
+    fn generate_cache(&mut self, cache: &CacheDef) {
+        self.line(&format!(";; === Cache: {} ===", cache.name));
+
+        let name_offset = self.store_string(&cache.name);
+        let name_len = cache.name.len();
+
+        // Build config JSON
+        let mut config = String::from("{");
+        if let Some(ref strategy) = cache.strategy {
+            config.push_str(&format!("\"strategy\":\"{}\"", strategy));
+        }
+        if let Some(ttl) = cache.default_ttl {
+            if config.len() > 1 { config.push(','); }
+            config.push_str(&format!("\"ttl\":{}", ttl));
+        }
+        if cache.persist {
+            if config.len() > 1 { config.push(','); }
+            config.push_str("\"persist\":true");
+        }
+        if let Some(max) = cache.max_entries {
+            if config.len() > 1 { config.push(','); }
+            config.push_str(&format!("\"max_entries\":{}", max));
+        }
+        config.push('}');
+
+        let config_offset = self.store_string(&config);
+        let config_len = config.len();
+
+        // Emit cache init function
+        self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
+        self.indent += 1;
+        self.line(&format!("i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("i32.const {}  ;; name len", name_len));
+        self.line(&format!("i32.const {}  ;; config ptr", config_offset));
+        self.line(&format!("i32.const {}  ;; config len", config_len));
+        self.line("call $cache_init");
+        self.indent -= 1;
+        self.line(")");
+
+        // Register queries
+        for query in &cache.queries {
+            let q_name_offset = self.store_string(&query.name);
+            let q_name_len = query.name.len();
+
+            let mut q_config = String::from("{");
+            if let Some(ttl) = query.ttl {
+                q_config.push_str(&format!("\"ttl\":{}", ttl));
+            }
+            if let Some(stale) = query.stale {
+                if q_config.len() > 1 { q_config.push(','); }
+                q_config.push_str(&format!("\"stale\":{}", stale));
+            }
+            if let Some(ref contract) = query.contract {
+                if q_config.len() > 1 { q_config.push(','); }
+                q_config.push_str(&format!("\"contract\":\"{}\"", contract));
+            }
+            if !query.invalidate_on.is_empty() {
+                if q_config.len() > 1 { q_config.push(','); }
+                q_config.push_str("\"invalidate_on\":[");
+                for (i, event) in query.invalidate_on.iter().enumerate() {
+                    if i > 0 { q_config.push(','); }
+                    q_config.push('"');
+                    q_config.push_str(event);
+                    q_config.push('"');
+                }
+                q_config.push(']');
+            }
+            q_config.push('}');
+
+            let q_config_offset = self.store_string(&q_config);
+            let q_config_len = q_config.len();
+
+            self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
+            self.indent += 1;
+            self.line(&format!("i32.const {}  ;; query name ptr", q_name_offset));
+            self.line(&format!("i32.const {}  ;; query name len", q_name_len));
+            self.line(&format!("i32.const {}  ;; query config ptr", q_config_offset));
+            self.line(&format!("i32.const {}  ;; query config len", q_config_len));
+            self.line("call $cache_register_query");
+            self.indent -= 1;
+            self.line(")");
+        }
+
+        // Register mutations
+        for mutation in &cache.mutations {
+            let m_name_offset = self.store_string(&mutation.name);
+            let m_name_len = mutation.name.len();
+
+            let mut m_config = String::from("{");
+            if mutation.optimistic {
+                m_config.push_str("\"optimistic\":true");
+            }
+            if mutation.rollback_on_error {
+                if m_config.len() > 1 { m_config.push(','); }
+                m_config.push_str("\"rollback_on_error\":true");
+            }
+            if !mutation.invalidate.is_empty() {
+                if m_config.len() > 1 { m_config.push(','); }
+                m_config.push_str("\"invalidate\":[");
+                for (i, name) in mutation.invalidate.iter().enumerate() {
+                    if i > 0 { m_config.push(','); }
+                    m_config.push('"');
+                    m_config.push_str(name);
+                    m_config.push('"');
+                }
+                m_config.push(']');
+            }
+            m_config.push('}');
+
+            let m_config_offset = self.store_string(&m_config);
+            let m_config_len = m_config.len();
+
+            self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
+            self.indent += 1;
+            self.line(&format!("i32.const {}  ;; mutation name ptr", m_name_offset));
+            self.line(&format!("i32.const {}  ;; mutation name len", m_name_len));
+            self.line(&format!("i32.const {}  ;; mutation config ptr", m_config_offset));
+            self.line(&format!("i32.const {}  ;; mutation config len", m_config_len));
+            self.line("call $cache_register_mutation");
+            self.indent -= 1;
+            self.line(")");
         }
     }
 

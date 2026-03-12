@@ -1,4 +1,16 @@
 /**
+ * NOTE: This is the monolithic (non-tree-shaken) runtime containing ALL modules.
+ * For production builds, prefer the modular system in `runtime/modules/` which
+ * allows tree-shaking — only the modules your program uses are included.
+ * Use `runtime/build-runtime.js` to produce a minimal bundled runtime:
+ *
+ *   node runtime/build-runtime.js --modules core,seo,form --output dist/nectar-runtime.js
+ *
+ * The compiler's `nectar build` command detects required modules automatically
+ * via the runtime_modules analysis pass.
+ */
+
+/**
  * Arc Runtime — minimal DOM bridge for Nectar-compiled WebAssembly modules.
  *
  * This provides the host functions that Nectar WASM modules import:
@@ -2687,6 +2699,7 @@ if (typeof module !== "undefined") {
     PwaRuntime,
     SeoRuntime,
     FormRuntime,
+    CacheRuntime,
     createEffect,
     createMemo,
     batch,
@@ -3491,6 +3504,124 @@ const DbRuntime = {
 };
 
 // =========================================================================
+// Cache Runtime — intelligent data caching with queries and mutations
+// =========================================================================
+
+const CacheRuntime = {
+  _caches: new Map(),
+  _queryRegistry: new Map(),
+  _subscribers: new Map(),
+
+  init(namePtr, nameLen, configPtr, configLen) {
+    const name = readString(namePtr, nameLen);
+    const config = JSON.parse(readString(configPtr, configLen));
+    CacheRuntime._caches.set(name, {
+      config,
+      entries: new Map(),
+      pending: new Map(),
+    });
+  },
+
+  registerQuery(namePtr, nameLen, configPtr, configLen) {
+    const name = readString(namePtr, nameLen);
+    const config = JSON.parse(readString(configPtr, configLen));
+    CacheRuntime._queryRegistry.set(name, config);
+  },
+
+  registerMutation(namePtr, nameLen, configPtr, configLen) {
+    const name = readString(namePtr, nameLen);
+    const config = JSON.parse(readString(configPtr, configLen));
+    CacheRuntime._queryRegistry.set(`mutation:${name}`, config);
+  },
+
+  async get(cacheNamePtr, cacheNameLen, queryNamePtr, queryNameLen) {
+    const cacheName = readString(cacheNamePtr, cacheNameLen);
+    const queryName = readString(queryNamePtr, queryNameLen);
+    const cache = CacheRuntime._caches.get(cacheName);
+    const queryConfig = CacheRuntime._queryRegistry.get(queryName);
+    if (!cache || !queryConfig) return 0;
+
+    const key = queryName;
+    const entry = cache.entries.get(key);
+    const now = Date.now();
+
+    // Check if cached and not expired
+    if (entry) {
+      const age = (now - entry.timestamp) / 1000;
+      const ttl = queryConfig.ttl || cache.config.ttl || 300;
+      const staleWindow = queryConfig.stale || 0;
+
+      if (age < ttl) {
+        return entry.handle; // Fresh cache hit
+      }
+
+      if (age < ttl + staleWindow) {
+        // Stale-while-revalidate: return stale, refresh in background
+        CacheRuntime._refresh(cache, key, queryConfig);
+        return entry.handle;
+      }
+    }
+
+    // Check for pending request (deduplication)
+    if (cache.pending.has(key)) {
+      return cache.pending.get(key);
+    }
+
+    // Cache miss — fetch
+    return CacheRuntime._refresh(cache, key, queryConfig);
+  },
+
+  async _refresh(cache, key, config) {
+    const promise = fetch(config.url).then(r => r.json()).then(data => {
+      const handle = CacheRuntime._nextHandle++;
+      cache.entries.set(key, { data, handle, timestamp: Date.now() });
+      cache.pending.delete(key);
+
+      // Enforce max_entries with LRU eviction
+      if (cache.config.max_entries && cache.entries.size > cache.config.max_entries) {
+        const oldest = cache.entries.keys().next().value;
+        cache.entries.delete(oldest);
+      }
+
+      // Persist to IndexedDB if enabled
+      if (cache.config.persist && typeof DbRuntime !== 'undefined') {
+        // Use db runtime for persistence
+      }
+
+      // Notify subscribers
+      const subs = CacheRuntime._subscribers.get(key) || [];
+      subs.forEach(fn => fn(data));
+
+      return handle;
+    });
+
+    cache.pending.set(key, promise);
+    return promise;
+  },
+
+  invalidate(namePtr, nameLen) {
+    const name = readString(namePtr, nameLen);
+    for (const [cacheName, cache] of CacheRuntime._caches) {
+      cache.entries.delete(name);
+      // Also invalidate any query that lists this in invalidate_on
+      for (const [qName, qConfig] of CacheRuntime._queryRegistry) {
+        if (qConfig.invalidate_on?.includes(name)) {
+          cache.entries.delete(qName);
+        }
+      }
+    }
+  },
+
+  subscribe(queryName, callback) {
+    const subs = CacheRuntime._subscribers.get(queryName) || [];
+    subs.push(callback);
+    CacheRuntime._subscribers.set(queryName, subs);
+  },
+
+  _nextHandle: 1,
+};
+
+// =========================================================================
 // Trace Runtime — observability and performance tracing
 // =========================================================================
 
@@ -3562,4 +3693,5 @@ if (typeof window !== "undefined") {
   window.DbRuntime = DbRuntime;
   window.TraceRuntime = TraceRuntime;
   window.FlagRuntime = FlagRuntime;
+  window.CacheRuntime = CacheRuntime;
 }

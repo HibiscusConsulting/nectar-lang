@@ -25,6 +25,7 @@ mod linter;
 mod module_resolver;
 mod module_loader;
 mod critical_css;
+mod runtime_modules;
 
 use std::fs;
 use std::io::Read as _;
@@ -910,6 +911,11 @@ fn compile(
     if opt != optimizer::OptimizationLevel::None {
         eprintln!("nectar: optimization (O{}): {}", opt_level, opt_stats);
     }
+
+    // Detect required runtime modules for tree-shaken runtime bundling
+    let required_modules = runtime_modules::detect_required_modules(&program);
+    let modules_str = runtime_modules::modules_to_string(&required_modules);
+    eprintln!("nectar: runtime modules: {} ({} of 22)", modules_str, required_modules.len());
 
     if ssr {
         // SSR JavaScript module output

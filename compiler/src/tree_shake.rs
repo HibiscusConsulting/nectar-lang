@@ -75,7 +75,7 @@ pub fn shake(program: &mut Program, entry_points: &[String], stats: &mut ShakeSt
 
     // Also keep Use items (imports) and Test items always.
     for (i, item) in program.items.iter().enumerate() {
-        if matches!(item, Item::Use(_) | Item::Test(_) | Item::Contract(_) | Item::App(_) | Item::Page(_) | Item::Form(_) | Item::Channel(_) | Item::Embed(_) | Item::Pdf(_) | Item::Payment(_) | Item::Auth(_) | Item::Upload(_) | Item::Db(_)) {
+        if matches!(item, Item::Use(_) | Item::Test(_) | Item::Contract(_) | Item::App(_) | Item::Page(_) | Item::Form(_) | Item::Channel(_) | Item::Embed(_) | Item::Pdf(_) | Item::Payment(_) | Item::Auth(_) | Item::Upload(_) | Item::Db(_) | Item::Cache(_)) {
             // Always keep these
             reachable.insert(i);
         }
@@ -133,6 +133,7 @@ fn item_name(item: &Item) -> Option<String> {
         Item::Auth(a) => Some(a.name.clone()),
         Item::Upload(u) => Some(u.name.clone()),
         Item::Db(d) => Some(d.name.clone()),
+        Item::Cache(c) => Some(c.name.clone()),
     }
 }
 
@@ -253,6 +254,7 @@ fn collect_item_deps(item: &Item, deps: &mut HashSet<String>) {
                 collect_expr_deps(&u.endpoint, deps);
             }
             Item::Db(_) => {}
+            Item::Cache(_) => {}
             Item::App(app) => {
                 if let Some(ref router) = app.router {
                     for route in &router.routes {

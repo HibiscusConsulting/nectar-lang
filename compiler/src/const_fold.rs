@@ -95,6 +95,7 @@ fn fold_item(item: &mut Item, stats: &mut FoldStats) {
             Item::Auth(_) => {}
             Item::Upload(_) => {}
             Item::Db(_) => {}
+            Item::Cache(_) => {}
             Item::Channel(ch) => {
                 for method in &mut ch.methods {
                     fold_function(method, stats);

@@ -101,6 +101,7 @@ impl Parser {
                         | TokenKind::Auth
                         | TokenKind::Upload
                         | TokenKind::Db
+                        | TokenKind::Cache
                         | TokenKind::Pub => break,
                         _ => { self.advance(); }
                     }
@@ -186,6 +187,7 @@ impl Parser {
             TokenKind::Auth => Ok(Item::Auth(self.parse_auth(is_pub)?)),
             TokenKind::Upload => Ok(Item::Upload(self.parse_upload(is_pub)?)),
             TokenKind::Db => Ok(Item::Db(self.parse_db(is_pub)?)),
+            TokenKind::Cache => Ok(Item::Cache(self.parse_cache(is_pub)?)),
             TokenKind::MustUse => {
                 // must_use fn ...
                 self.advance();
@@ -197,7 +199,7 @@ impl Parser {
                 Ok(Item::LazyComponent(self.parse_lazy_component()?))
             }
             TokenKind::Test => Ok(Item::Test(self.parse_test_def()?)),
-            _ => Err(self.error("Expected item (fn, component, struct, enum, impl, trait, use, mod, store, agent, router, contract, app, page, form, channel, embed, pdf, payment, auth, upload, lazy, test)")),
+            _ => Err(self.error("Expected item (fn, component, struct, enum, impl, trait, use, mod, store, agent, router, contract, app, page, form, channel, embed, pdf, payment, auth, upload, cache, lazy, test)")),
         }
     }
 
@@ -3312,6 +3314,205 @@ impl Parser {
         }
         self.expect(&TokenKind::RightBrace)?;
         Ok(UploadDef { name, endpoint, max_size, accept, chunked, on_progress, on_complete, on_error, methods, is_pub, span })
+    }
+
+    fn parse_cache(&mut self, is_pub: bool) -> Result<CacheDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::Cache)?;
+        let name = self.expect_ident()?;
+        self.expect(&TokenKind::LeftBrace)?;
+
+        let mut strategy = None;
+        let mut default_ttl = None;
+        let mut persist = false;
+        let mut max_entries = None;
+        let mut queries = vec![];
+        let mut mutations = vec![];
+
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            match self.peek_kind() {
+                TokenKind::Query => {
+                    queries.push(self.parse_cache_query()?);
+                }
+                TokenKind::Mutation => {
+                    mutations.push(self.parse_cache_mutation()?);
+                }
+                _ => {
+                    let key = self.expect_ident()?;
+                    self.expect(&TokenKind::Colon)?;
+                    match key.as_str() {
+                        "strategy" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                strategy = Some(s.clone());
+                                self.advance();
+                            }
+                        }
+                        "ttl" => {
+                            if let TokenKind::Integer(n) = self.peek_kind() {
+                                default_ttl = Some(n as u64);
+                                self.advance();
+                            }
+                        }
+                        "persist" => {
+                            if let TokenKind::Ident(v) = self.peek_kind() {
+                                persist = v == "true";
+                                self.advance();
+                            }
+                        }
+                        "max_entries" => {
+                            if let TokenKind::Integer(n) = self.peek_kind() {
+                                max_entries = Some(n as u64);
+                                self.advance();
+                            }
+                        }
+                        _ => { self.advance(); }
+                    }
+                    self.match_token(&TokenKind::Comma);
+                }
+            }
+        }
+
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(CacheDef { name, strategy, default_ttl, persist, max_entries, queries, mutations, is_pub, span })
+    }
+
+    fn parse_cache_query(&mut self) -> Result<CacheQueryDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::Query)?;
+        let name = self.expect_ident()?;
+
+        // Optional params: query user(id: String)
+        let params = if self.match_token(&TokenKind::LeftParen) {
+            let p = self.parse_params()?;
+            self.expect(&TokenKind::RightParen)?;
+            p
+        } else {
+            vec![]
+        };
+
+        self.expect(&TokenKind::Colon)?;
+
+        // Parse fetch expression
+        let fetch_expr = self.parse_expr()?;
+
+        // Optional contract binding: -> ContractName
+        let contract = if self.match_token(&TokenKind::Arrow) {
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
+
+        let mut ttl = None;
+        let mut stale = None;
+        let mut invalidate_on = vec![];
+
+        // Optional config block
+        if self.match_token(&TokenKind::LeftBrace) {
+            while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                let key = self.expect_ident()?;
+                self.expect(&TokenKind::Colon)?;
+                match key.as_str() {
+                    "ttl" => {
+                        if let TokenKind::Integer(n) = self.peek_kind() {
+                            ttl = Some(n as u64);
+                            self.advance();
+                        }
+                    }
+                    "stale" => {
+                        if let TokenKind::Integer(n) = self.peek_kind() {
+                            stale = Some(n as u64);
+                            self.advance();
+                        }
+                    }
+                    "invalidate_on" => {
+                        // Parse string array: ["event1", "event2"]
+                        if self.match_token(&TokenKind::LeftBracket) {
+                            while !self.check(&TokenKind::RightBracket) && !self.is_at_end() {
+                                if let TokenKind::StringLit(s) = self.peek_kind() {
+                                    invalidate_on.push(s.clone());
+                                    self.advance();
+                                }
+                                self.match_token(&TokenKind::Comma);
+                            }
+                            self.expect(&TokenKind::RightBracket)?;
+                        }
+                    }
+                    _ => { self.advance(); }
+                }
+                self.match_token(&TokenKind::Comma);
+            }
+            self.expect(&TokenKind::RightBrace)?;
+        }
+
+        self.match_token(&TokenKind::Comma);
+
+        Ok(CacheQueryDef { name, params, fetch_expr, contract, ttl, stale, invalidate_on, span })
+    }
+
+    fn parse_cache_mutation(&mut self) -> Result<CacheMutationDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::Mutation)?;
+        let name = self.expect_ident()?;
+
+        let params = if self.match_token(&TokenKind::LeftParen) {
+            let p = self.parse_params()?;
+            self.expect(&TokenKind::RightParen)?;
+            p
+        } else {
+            vec![]
+        };
+
+        self.expect(&TokenKind::Colon)?;
+        let fetch_expr = self.parse_expr()?;
+
+        let mut optimistic = false;
+        let mut rollback_on_error = false;
+        let mut invalidate = vec![];
+
+        if self.match_token(&TokenKind::LeftBrace) {
+            while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                let key = self.expect_ident()?;
+                match key.as_str() {
+                    "optimistic" => {
+                        self.expect(&TokenKind::Colon)?;
+                        if let TokenKind::Ident(v) = self.peek_kind() {
+                            optimistic = v == "true";
+                            self.advance();
+                        }
+                    }
+                    "rollback_on_error" => {
+                        self.expect(&TokenKind::Colon)?;
+                        if let TokenKind::Ident(v) = self.peek_kind() {
+                            rollback_on_error = v == "true";
+                            self.advance();
+                        }
+                    }
+                    "invalidate" => {
+                        self.expect(&TokenKind::Colon)?;
+                        if self.match_token(&TokenKind::LeftBracket) {
+                            while !self.check(&TokenKind::RightBracket) && !self.is_at_end() {
+                                if let TokenKind::StringLit(s) = self.peek_kind() {
+                                    invalidate.push(s.clone());
+                                    self.advance();
+                                }
+                                self.match_token(&TokenKind::Comma);
+                            }
+                            self.expect(&TokenKind::RightBracket)?;
+                        }
+                    }
+                    _ => {
+                        self.expect(&TokenKind::Colon)?;
+                        self.advance();
+                    }
+                }
+                self.match_token(&TokenKind::Comma);
+            }
+            self.expect(&TokenKind::RightBrace)?;
+        }
+
+        self.match_token(&TokenKind::Comma);
+
+        Ok(CacheMutationDef { name, params, fetch_expr, optimistic, rollback_on_error, invalidate, span })
     }
 
     fn parse_db(&mut self, is_pub: bool) -> Result<DbDef, ParseError> {

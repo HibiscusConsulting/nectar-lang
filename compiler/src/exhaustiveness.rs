@@ -643,6 +643,7 @@ fn walk_item(item: &Item, enums: &HashMap<String, EnumInfo>, errors: &mut Vec<Ex
         Item::Auth(_) => {}
         Item::Upload(_) => {}
         Item::Db(_) => {}
+        Item::Cache(_) => {}
     }
 }
 

@@ -59,6 +59,8 @@ pub enum Item {
     Upload(UploadDef),
     /// Local database definition (IndexedDB abstraction)
     Db(DbDef),
+    /// Cache definition — intelligent data caching with queries and mutations
+    Cache(CacheDef),
 }
 
 /// Contract definition — an API boundary type that generates:
@@ -352,6 +354,43 @@ pub struct DbStoreDef {
     pub name: String,
     pub key: String,
     pub indexes: Vec<(String, String)>,  // (name, key_path)
+    pub span: Span,
+}
+
+/// Cache definition — intelligent data caching with queries and mutations
+#[derive(Debug, Clone)]
+pub struct CacheDef {
+    pub name: String,
+    pub strategy: Option<String>,        // "stale-while-revalidate", "cache-first", "network-first"
+    pub default_ttl: Option<u64>,        // seconds
+    pub persist: bool,                    // use IndexedDB for persistence
+    pub max_entries: Option<u64>,
+    pub queries: Vec<CacheQueryDef>,
+    pub mutations: Vec<CacheMutationDef>,
+    pub is_pub: bool,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheQueryDef {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub fetch_expr: Expr,                // the fetch(...) expression
+    pub contract: Option<String>,        // -> ContractName
+    pub ttl: Option<u64>,
+    pub stale: Option<u64>,              // stale-while-revalidate window
+    pub invalidate_on: Vec<String>,      // event names
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheMutationDef {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub fetch_expr: Expr,
+    pub optimistic: bool,
+    pub rollback_on_error: bool,
+    pub invalidate: Vec<String>,         // query names to invalidate
     pub span: Span,
 }
 

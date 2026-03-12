@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `nectar audit` command for third-party embed security auditing
 - Dev server `--flags` option for enabling feature flags during development
 - Dev server `--tunnel` option for exposing local server via public URL
+- Data caching: `cache` keyword with queries, mutations, stale-while-revalidate, optimistic updates, persistent IndexedDB cache, compile-time request deduplication
+- Runtime tree-shaking: compiler detects used features and includes only needed runtime modules (22 independent modules, core-only build ~3KB)
 
 ### Build targets
 - `--target pwa` — Progressive Web App

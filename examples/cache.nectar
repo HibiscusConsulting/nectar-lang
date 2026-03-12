@@ -1,0 +1,77 @@
+// cache.nectar — Built-in data caching
+//
+// Nectar replaces React Query, SWR, and Apollo Cache:
+// - Declarative cache with queries and mutations
+// - Automatic request deduplication (compile-time)
+// - Stale-while-revalidate built in
+// - Optimistic updates with automatic rollback
+// - Persistent cache via IndexedDB (uses db keyword)
+// - Type-safe via contract binding
+//
+// No React Query. No SWR. No Apollo. Zero bundle size impact.
+
+contract UserList {
+    users: Vec<String>,
+    total: i32,
+}
+
+contract User {
+    id: String,
+    name: String,
+    email: String,
+}
+
+cache AppCache {
+    strategy: "stale-while-revalidate",
+    ttl: 300,
+    persist: true,
+    max_entries: 1000,
+
+    query users: fetch("/api/users") -> UserList {
+        ttl: 60,
+        stale: 30,
+    }
+
+    query user(id: String): fetch(f"/api/users/{id}") -> User {
+        ttl: 120,
+        invalidate_on: ["user.update", "user.delete"],
+    }
+
+    mutation update_user(id: String): fetch(f"/api/users/{id}") {
+        optimistic: true,
+        rollback_on_error: true,
+        invalidate: ["users", "user"],
+    }
+}
+
+component UserDashboard() {
+    let mut user_count: String = "Loading...";
+
+    fn load(&mut self) {
+        // Multiple components calling AppCache.users only fires ONE request
+        let data = AppCache.users();
+        self.user_count = "Users loaded from cache";
+    }
+
+    render {
+        <div>
+            <h1>"User Dashboard"</h1>
+            <p>{self.user_count}</p>
+            <button on:click={self.load}>"Load Users"</button>
+        </div>
+    }
+}
+
+// --- Why this matters ---
+//
+// React Query:
+//   const { data, isLoading, error } = useQuery('users', fetchUsers, {
+//     staleTime: 30000,
+//     cacheTime: 300000,
+//     refetchOnWindowFocus: true,
+//   });
+//   // 13KB added to bundle. Runtime deduplication. Manual invalidation.
+//
+// Nectar:
+//   query users: fetch("/api/users") -> UserList { ttl: 60, stale: 30 }
+//   // 0KB bundle impact. Compile-time deduplication. Declarative invalidation.

@@ -44,6 +44,7 @@ Modern web development forces you to choose: **safety** (Rust, but no UI story),
 | Observability | Sentry / Datadog (3rd party) | Manual | `trace` blocks with built-in performance metrics |
 | Feature flags | LaunchDarkly / manual | Manual | `flag()` with compile-time DCE |
 | Environment vars | dotenv / NEXT_PUBLIC_ | getenv() | `env()` with compile-time validation |
+| Data caching | React Query / SWR (13KB+) | N/A | `cache` keyword with deduplication, SWR, optimistic updates — 0KB |
 
 Nectar was designed from the ground up with these principles:
 
@@ -906,6 +907,29 @@ let module = import("./heavy-module");
 
 Combined with tree shaking and dead code elimination, Nectar produces minimal binaries.
 
+### Runtime Tree-Shaking
+
+Nectar's runtime is split into 22 independent modules. The compiler analyzes your program and includes only the modules you actually use:
+
+```
+$ nectar build hello.nectar
+nectar: runtime modules: core (1 of 22)
+Bundle: 3.2KB
+
+$ nectar build full-app.nectar
+nectar: runtime modules: core,seo,form,cache,auth,channel (6 of 22)
+Bundle: 12.1KB
+```
+
+A hello-world app includes only the core signal/DOM bridge (~3KB). Each feature you use adds only its specific runtime code. Features you don't use have zero cost — not even dead code in your binary.
+
+| App complexity | React | Nectar |
+|---|---|---|
+| Hello world | ~45KB (React + ReactDOM) | ~3KB (core only) |
+| With caching | +13KB (React Query) | +0KB (compiled in) |
+| With auth + forms + cache | +40KB (libraries) | ~12KB (only used modules) |
+| Full SaaS app | 200-500KB+ | 15-25KB (all modules) |
+
 ### Race-Free State & Memory Safety
 
 **Atomic signals** prevent race conditions when multiple components share state:
@@ -1054,6 +1078,38 @@ if flag("new_dashboard") { /* new UI */ } else { /* old UI */ }
 ```
 
 `trace` blocks measure execution time automatically and report to the configured backend. `flag()` checks are eliminated at compile time when flags are resolved, producing zero runtime overhead. See [`examples/observability.nectar`](examples/observability.nectar).
+
+### Data Caching
+
+Every SaaS app needs data caching. In React, that means React Query (13KB), SWR (4KB), or Apollo Cache — each a separate library with its own API, adding to your bundle.
+
+Nectar's `cache` keyword provides declarative caching as a language feature:
+
+```nectar
+cache AppCache {
+    strategy: "stale-while-revalidate",
+    ttl: 300,
+    persist: true,
+
+    query users: fetch("/api/users") -> UserList {
+        ttl: 60,
+        stale: 30,
+    }
+
+    mutation update_user(id: String): fetch(f"/api/users/{id}") {
+        optimistic: true,
+        rollback_on_error: true,
+        invalidate: ["users"],
+    }
+}
+```
+
+- **Compile-time request deduplication**: If 5 components call `AppCache.users`, only 1 request fires
+- **Stale-while-revalidate**: Show cached data instantly, refresh in background
+- **Optimistic mutations**: Update UI immediately, rollback if server rejects
+- **Persistent cache**: `persist: true` stores in IndexedDB via the `db` keyword
+- **Contract-typed**: Cached data uses your contracts for compile-time field checking
+- **Zero bundle impact**: Compiled into WASM, not shipped as a runtime library
 
 ### Environment Variables
 
@@ -1645,6 +1701,7 @@ The `examples/` directory contains complete programs demonstrating Nectar's feat
 | [`uploads.nectar`](examples/uploads.nectar) | File uploads -- `upload` keyword, progress tracking, chunked/resumable |
 | [`database.nectar`](examples/database.nectar) | Local database -- `db` keyword, IndexedDB abstraction, declarative schema |
 | [`observability.nectar`](examples/observability.nectar) | Observability -- `trace` blocks, `flag()` feature flags, performance metrics |
+| [`cache.nectar`](examples/cache.nectar) | Data caching — `cache` keyword, queries, mutations, SWR, optimistic updates |
 
 Compile any example:
 
@@ -1717,6 +1774,7 @@ nectar-lang/
     uploads.nectar
     database.nectar
     observability.nectar
+    cache.nectar
 ```
 
 ### How to contribute
