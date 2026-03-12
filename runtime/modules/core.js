@@ -517,26 +517,15 @@ export const wasmImports = {
     },
   },
 
-  // ── Payment — sandboxed iframe + postMessage ───────────────────────────
+  // ── Payment — only processPayment needs JS (contentWindow.postMessage) ─
+  // initProvider → use dom.loadScript. createCheckout → WASM uses
+  // dom.createElement + SET_ATTR/SET_STYLE/APPEND_CHILD opcodes.
   payment: {
-    initProvider(namePtr, nameLen, keyPtr, keyLen, cbIdx) {
-      const script = document.createElement('script');
-      script.src = R.__getString(namePtr, nameLen);
-      script.onload = () => R.__cb(cbIdx);
-      document.head.appendChild(script);
-    },
-    createCheckout(optsPtr, optsLen, containerElId, cbIdx) {
-      const iframe = document.createElement('iframe');
-      iframe.sandbox = 'allow-scripts allow-forms allow-same-origin';
-      iframe.style.cssText = 'border:none;width:100%;height:400px;';
-      R.__getElement(containerElId).appendChild(iframe);
-      return R.__registerObject(iframe);
-    },
-    processPayment(iframeId, cbIdx) {
+    processPayment(elId, msgPtr, msgLen, cbIdx) {
       window.addEventListener('message', (e) => {
-        R.__cbData(cbIdx, R.__allocString(JSON.stringify(e.data)));
+        R.__cbData(cbIdx, R.__allocString(typeof e.data === 'string' ? e.data : ''));
       }, { once: true });
-      R.__getObject(iframeId).contentWindow.postMessage({ action: 'process' }, '*');
+      R.__getElement(elId).contentWindow.postMessage(R.__getString(msgPtr, msgLen), '*');
     },
   },
 

@@ -201,12 +201,10 @@ impl WasmCodegen {
         self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32 i32)))");
         self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
 
-        // ── Payment — iframe + postMessage ───────────────────────────────────
+        // ── Payment — only processPayment (contentWindow.postMessage) ────────
         self.line("");
-        self.line(";; Payment — browser script/iframe/postMessage APIs");
-        self.line("(import \"payment\" \"initProvider\" (func $payment_init (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"payment\" \"createCheckout\" (func $payment_create_checkout (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"payment\" \"processPayment\" (func $payment_process (param i32 i32) (result i32)))");
+        self.line(";; Payment — browser contentWindow.postMessage API");
+        self.line("(import \"payment\" \"processPayment\" (func $payment_processPayment (param i32 i32 i32 i32)))");
 
         // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
         self.line("");
