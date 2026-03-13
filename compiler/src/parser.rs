@@ -3060,6 +3060,7 @@ impl Parser {
                         selector.push_str(s);
                         selector.push('"');
                     }
+                    TokenKind::Hash => selector.push('#'),
                     _ => {
                         if !selector.is_empty() && !selector.ends_with(' ') {
                             selector.push(' ');
@@ -3090,13 +3091,62 @@ impl Parser {
                 self.expect(&TokenKind::Colon)?;
 
                 let value = if let TokenKind::StringLit(_) = self.peek_kind() {
+                    // Quoted CSS value (backward compatible)
                     if let TokenKind::StringLit(s) = self.advance().kind {
                         s
                     } else {
                         unreachable!()
                     }
                 } else {
-                    return Err(self.error("Expected string literal for CSS property value"));
+                    // Unquoted CSS value: collect tokens until `;` or `}`
+                    let mut val = String::new();
+                    while !self.check(&TokenKind::Semicolon)
+                          && !self.check(&TokenKind::RightBrace)
+                          && !self.is_at_end()
+                    {
+                        let tok = self.advance();
+                        match &tok.kind {
+                            TokenKind::Ident(s) => {
+                                if !val.is_empty() && !val.ends_with(' ') && !val.ends_with('(') && !val.ends_with('#') && !val.ends_with('-') {
+                                    val.push(' ');
+                                }
+                                val.push_str(s);
+                            }
+                            TokenKind::Hash => val.push('#'),
+                            TokenKind::Integer(n) => val.push_str(&n.to_string()),
+                            TokenKind::Float(f) => val.push_str(&f.to_string()),
+                            TokenKind::Dot => val.push('.'),
+                            TokenKind::Comma => val.push_str(", "),
+                            TokenKind::LeftParen => val.push('('),
+                            TokenKind::RightParen => val.push(')'),
+                            TokenKind::Minus => val.push('-'),
+                            TokenKind::Plus => val.push('+'),
+                            TokenKind::Star => val.push('*'),
+                            TokenKind::Slash => val.push('/'),
+                            TokenKind::Percent => val.push('%'),
+                            TokenKind::Colon => val.push(':'),
+                            TokenKind::StringLit(s) => {
+                                val.push('"');
+                                val.push_str(s);
+                                val.push('"');
+                            }
+                            TokenKind::Lifetime(s) => {
+                                // 'JetBrains in CSS font-family — lifetime token starts with '
+                                val.push('\'');
+                                val.push_str(s);
+                            }
+                            TokenKind::SingleQuote => {
+                                // Closing ' in CSS single-quoted strings
+                                val.push('\'');
+                            }
+                            _ => {
+                                if !val.is_empty() && !val.ends_with(' ') {
+                                    val.push(' ');
+                                }
+                            }
+                        }
+                    }
+                    val.trim().to_string()
                 };
 
                 self.expect(&TokenKind::Semicolon)?;

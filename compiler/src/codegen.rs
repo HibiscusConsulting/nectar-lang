@@ -121,6 +121,7 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"print\" (func $dom_print (param i32)))");
         self.line("(import \"dom\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"reloadModule\" (func $dom_reloadModule (param i32 i32 i32)))");
+        self.line("(import \"dom\" \"injectStyles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
 
         // ── Timer — browser timer APIs ───────────────────────────────────────
         self.line("");
@@ -2257,7 +2258,7 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; css ptr", css_offset));
         self.line(&format!("i32.const {} ;; css len", css.len()));
         self.line("call $style_injectStyles");
-        self.line(";; scope ID returned on stack for use with applyScope");
+        self.line("drop ;; discard scope ID");
     }
 
     fn generate_transition_injection(&mut self, comp_name: &str, transitions: &[TransitionDef]) {

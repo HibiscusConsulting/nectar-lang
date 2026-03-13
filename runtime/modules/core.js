@@ -336,6 +336,14 @@ export const wasmImports = {
       a.click();
       URL.revokeObjectURL(url);
     },
+
+    injectStyles(namePtr, nameLen, cssPtr, cssLen) {
+      const css = R.__getString(cssPtr, cssLen);
+      const el = document.createElement('style');
+      el.textContent = css;
+      document.head.appendChild(el);
+      return 0;
+    },
   },
 
   // ── Timers ───────────────────────────────────────────────────────────────
