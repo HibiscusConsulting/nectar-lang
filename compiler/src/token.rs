@@ -5,6 +5,7 @@ pub enum TokenKind {
     Integer(i64),
     Float(f64),
     StringLit(String),
+    #[allow(dead_code)]
     Bool(bool),
 
     // Identifiers & keywords
@@ -185,8 +186,11 @@ pub enum TokenKind {
     QuestionMark, // ?
 
     // JSX-like
+    #[allow(dead_code)]
     TagOpen,     // <ident
+    #[allow(dead_code)]
     TagClose,    // </ident>
+    #[allow(dead_code)]
     TagSelfClose,// />
     On,          // on:
 

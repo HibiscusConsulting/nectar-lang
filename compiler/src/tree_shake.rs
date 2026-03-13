@@ -248,7 +248,7 @@ fn collect_item_deps(item: &Item, deps: &mut HashSet<String>) {
         Item::Use(_) | Item::Test(_) | Item::Trait(_) | Item::Mod(_) => {}
             Item::Contract(_) => {}
             Item::Embed(_) => {}
-            Item::Pdf(pdf) => {
+            Item::Pdf(_pdf) => {
                 // Pdf render blocks can reference components
             }
             Item::Payment(_) => {}
@@ -471,8 +471,18 @@ fn collect_template_deps(node: &TemplateNode, deps: &mut HashSet<String>) {
         TemplateNode::Fragment(children) => {
             for child in children { collect_template_deps(child, deps); }
         }
-        TemplateNode::Link { to, children } => {
+        TemplateNode::Link { to, attributes, children } => {
             collect_expr_deps(to, deps);
+            for attr in attributes {
+                match attr {
+                    Attribute::Dynamic { value, .. }
+                    | Attribute::Aria { value, .. }
+                    | Attribute::EventHandler { handler: value, .. } => {
+                        collect_expr_deps(value, deps);
+                    }
+                    _ => {}
+                }
+            }
             for child in children { collect_template_deps(child, deps); }
         }
         TemplateNode::TextLiteral(_) => {}
@@ -1721,6 +1731,7 @@ mod tests {
     fn test_collect_template_deps_link() {
         let template = TemplateNode::Link {
             to: Expr::Ident("dest".to_string()),
+            attributes: vec![],
             children: vec![TemplateNode::TextLiteral("Go".to_string())],
         };
         let mut deps = std::collections::HashSet::new();

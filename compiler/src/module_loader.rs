@@ -15,6 +15,7 @@ use crate::token::Span;
 pub struct ModuleLoader {
     resolver: ModuleResolver,
     /// Parsed modules keyed by their canonical file path.
+    #[allow(dead_code)]
     modules: HashMap<PathBuf, Vec<Item>>,
 }
 
@@ -192,6 +193,7 @@ pub fn collect_imports(program: &Program) -> HashMap<String, (Vec<String>, Strin
 }
 
 /// Find all public items in a list of items.
+#[allow(dead_code)]
 pub fn public_items(items: &[Item]) -> Vec<&str> {
     let mut names = Vec::new();
     for item in items {

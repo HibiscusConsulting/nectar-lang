@@ -129,6 +129,7 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
                         "share" => { ns.insert("share".to_string()); }
                         "storage" => { ns.insert("webapi".to_string()); }
                         "rtc" => { ns.insert("rtc".to_string()); }
+                        "gpu" => { ns.insert("gpu".to_string()); }
                         _ => {} // std lib namespaces are pure WASM — no JS imports
                     }
                 }
@@ -136,6 +137,7 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
             // Detect rtc_ prefixed bare function calls
             if let Expr::Ident(ref name) = **callee {
                 if name.starts_with("rtc_") { ns.insert("rtc".to_string()); }
+                if name.starts_with("gpu_") { ns.insert("gpu".to_string()); }
             }
             check_expr(callee, ns);
             for arg in args { check_expr(arg, ns); }
@@ -1375,5 +1377,50 @@ mod tests {
         });
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("rtc"), "rtc.create_peer should trigger rtc namespace");
+    }
+
+    // --- GPU / WebGPU namespace detection ---
+
+    #[test]
+    fn test_gpu_function_call_detects_gpu_namespace() {
+        let program = program_with_component_method(Expr::FnCall {
+            callee: Box::new(Expr::Ident("gpu_request_adapter".to_string())),
+            args: vec![],
+        });
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("gpu"), "gpu_request_adapter should trigger gpu namespace");
+    }
+
+    #[test]
+    fn test_gpu_render_call_detects_gpu_namespace() {
+        let program = program_with_component_method(Expr::FnCall {
+            callee: Box::new(Expr::Ident("gpu_begin_render_pass".to_string())),
+            args: vec![],
+        });
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("gpu"), "gpu_begin_render_pass should trigger gpu namespace");
+    }
+
+    #[test]
+    fn test_gpu_math_call_detects_gpu_namespace() {
+        let program = program_with_component_method(Expr::FnCall {
+            callee: Box::new(Expr::Ident("gpu_mat4_perspective".to_string())),
+            args: vec![],
+        });
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("gpu"), "gpu_mat4_perspective should trigger gpu namespace");
+    }
+
+    #[test]
+    fn test_gpu_field_access_detects_gpu_namespace() {
+        let program = program_with_component_method(Expr::FnCall {
+            callee: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("gpu".to_string())),
+                field: "request_adapter".to_string(),
+            }),
+            args: vec![],
+        });
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("gpu"), "gpu.request_adapter should trigger gpu namespace");
     }
 }

@@ -93,7 +93,7 @@ const NectarRuntime = {
 
   __init(instance) {
     this.__instance = instance;
-    this.__memory = instance.exports.memory;
+    this.__memory = instance.exports.memory || this.__memory;
   },
 };
 
@@ -102,7 +102,7 @@ const R = NectarRuntime;
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  WASM IMPORTS — organized by namespace to match codegen.rs import declarations
-//  16 namespaces. Every function calls a browser API WASM physically cannot.
+//  17 namespaces. Every function calls a browser API WASM physically cannot.
 // ══════════════════════════════════════════════════════════════════════════════
 
 export const name = 'core';
@@ -245,6 +245,11 @@ export const wasmImports = {
         R.__cb(cbIdx);
       });
     },
+
+    // Direct DOM operations for component mount (not batched through flush)
+    setText(elId, ptr, len) { R.__getElement(elId).textContent = R.__getString(ptr, len); },
+    appendChild(parentId, childId) { R.__getElement(parentId).appendChild(R.__getElement(childId)); },
+    setAttribute(elId, nPtr, nLen, vPtr, vLen) { R.__getElement(elId).setAttribute(R.__getString(nPtr, nLen), R.__getString(vPtr, vLen)); },
 
     setTitle(ptr, len) { document.title = R.__getString(ptr, len); },
 
@@ -734,14 +739,110 @@ export const wasmImports = {
     setTrackEnabled(trackId, enabled) { R.__objects[trackId].enabled = !!enabled; },
     getTrackKind(trackId) { return R.__allocString(R.__objects[trackId].kind); },
   },
+
+  // ── GPU — WebGPU syscall bridges ────────────────────────────────────────
+  gpu: (() => {
+    const __gpuObjects = new Map();
+    let __gpuNextId = 1;
+    function __gpuStore(obj) { const id = __gpuNextId++; __gpuObjects.set(id, obj); return id; }
+    function __gpuGet(id) { return __gpuObjects.get(id); }
+    function __gpuDelete(id) { __gpuObjects.delete(id); }
+
+    return {
+      // ── Initialization ──
+      requestAdapter(optsPtr, cbIdx) {
+        const opts = optsPtr ? R.__readOpts(optsPtr) : {};
+        navigator.gpu.requestAdapter(opts).then(a => R.__cbData(cbIdx, __gpuStore(a)));
+      },
+      requestDevice(adapterId, optsPtr, cbIdx) {
+        const opts = optsPtr ? R.__readOpts(optsPtr) : {};
+        __gpuGet(adapterId).requestDevice(opts).then(d => R.__cbData(cbIdx, __gpuStore(d)));
+      },
+      configureCanvas(canvasElId, deviceId, fmtPtr, fmtLen) {
+        const ctx = R.__getElement(canvasElId).getContext('webgpu');
+        ctx.configure({ device: __gpuGet(deviceId), format: R.__getString(fmtPtr, fmtLen) });
+        return __gpuStore(ctx);
+      },
+
+      // ── Resource Creation ──
+      createBuffer(deviceId, size, usage) {
+        return __gpuStore(__gpuGet(deviceId).createBuffer({ size, usage }));
+      },
+      writeBuffer(deviceId, bufferId, dataPtr, dataLen, offset) {
+        const data = new Float32Array(R.__memory.buffer, dataPtr, dataLen >>> 2);
+        __gpuGet(deviceId).queue.writeBuffer(__gpuGet(bufferId), offset, data);
+      },
+      createShaderModule(deviceId, codePtr, codeLen) {
+        return __gpuStore(__gpuGet(deviceId).createShaderModule({ code: R.__getString(codePtr, codeLen) }));
+      },
+      createRenderPipeline(deviceId, descPtr) {
+        return __gpuStore(__gpuGet(deviceId).createRenderPipeline(R.__readOpts(descPtr)));
+      },
+      createTexture(deviceId, descPtr) {
+        return __gpuStore(__gpuGet(deviceId).createTexture(R.__readOpts(descPtr)));
+      },
+
+      // ── Rendering ──
+      beginRenderPass(deviceId, descPtr) {
+        const encoder = __gpuGet(deviceId).createCommandEncoder();
+        const pass = encoder.beginRenderPass(R.__readOpts(descPtr));
+        const eid = __gpuStore(encoder);
+        __gpuObjects.set(eid + 0.5, pass); // store pass alongside encoder
+        return eid;
+      },
+      setPipeline(encoderId, pipelineId) {
+        __gpuObjects.get(encoderId + 0.5).setPipeline(__gpuGet(pipelineId));
+      },
+      setVertexBuffer(encoderId, slot, bufferId) {
+        __gpuObjects.get(encoderId + 0.5).setVertexBuffer(slot, __gpuGet(bufferId));
+      },
+      draw(encoderId, vertexCount, instanceCount, firstVertex, firstInstance) {
+        __gpuObjects.get(encoderId + 0.5).draw(vertexCount, instanceCount, firstVertex, firstInstance);
+      },
+      submitRenderPass(encoderId, deviceId) {
+        __gpuObjects.get(encoderId + 0.5).end();
+        const cmdBuf = __gpuGet(encoderId).finish();
+        __gpuGet(deviceId).queue.submit([cmdBuf]);
+        __gpuDelete(encoderId + 0.5);
+        __gpuDelete(encoderId);
+      },
+
+      // ── Canvas Frame ──
+      getCurrentTexture(canvasCtxId) {
+        return __gpuStore(__gpuGet(canvasCtxId).getCurrentTexture());
+      },
+      createTextureView(textureId) {
+        return __gpuStore(__gpuGet(textureId).createView());
+      },
+
+      // ── Cleanup ──
+      destroyBuffer(bufferId) { __gpuGet(bufferId).destroy(); __gpuDelete(bufferId); },
+      destroyTexture(textureId) { __gpuGet(textureId).destroy(); __gpuDelete(textureId); },
+
+      // ── Query ──
+      getPreferredFormat() {
+        return R.__allocString(navigator.gpu.getPreferredCanvasFormat());
+      },
+      getAdapterInfo(adapterId, cbIdx) {
+        __gpuGet(adapterId).requestAdapterInfo().then(info => {
+          R.__cbData(cbIdx, R.__allocString(JSON.stringify(info)));
+        });
+      },
+    };
+  })(),
 };
 
 // ── WASM instantiation helper ────────────────────────────────────────────────
 export async function instantiate(wasmUrl, extraImports = {}) {
-  const merged = {};
+  const memory = (extraImports.env && extraImports.env.memory) || new WebAssembly.Memory({ initial: 16 });
+  const merged = { env: { memory } };
   for (const [ns, fns] of Object.entries(wasmImports)) {
     merged[ns] = { ...fns, ...(extraImports[ns] || {}) };
   }
+  for (const [ns, fns] of Object.entries(extraImports)) {
+    if (!merged[ns]) merged[ns] = fns;
+  }
+  R.__memory = memory;
   const { instance } = await WebAssembly.instantiateStreaming(fetch(wasmUrl), merged);
   NectarRuntime.__init(instance);
   return instance;

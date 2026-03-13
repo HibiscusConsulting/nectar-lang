@@ -391,14 +391,29 @@ impl SsrCodegen {
                     key, js
                 ));
             }
-            TemplateNode::Link { to, children } => {
+            TemplateNode::Link { to, attributes, children } => {
                 let key = self.next_key();
                 let href_js = self.expr_to_js(to);
 
                 self.line(&format!(
-                    "__html += '<a href=\"' + __escapeHtml({}) + '\" data-nectar-key=\"{}\">';",
+                    "__html += '<a href=\"' + __escapeHtml({}) + '\" data-nectar-key=\"{}\"",
                     href_js, key
                 ));
+
+                // Emit additional attributes (class, style, etc.)
+                for attr in attributes {
+                    match attr {
+                        Attribute::Static { name, value } => {
+                            self.line(&format!(
+                                " + ' {}=\"' + __escapeHtml('{}') + '\"'",
+                                name, value
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.line(" + '>';");
 
                 for child in children {
                     self.generate_template_ssr(child, comp_name, false);
@@ -675,7 +690,6 @@ impl SsrCodegen {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::*;
     use crate::critical_css::CriticalCssResult;
     use crate::token::Span;
 
@@ -945,6 +959,7 @@ mod tests {
         comp.render = RenderBlock {
             body: TemplateNode::Link {
                 to: Expr::StringLit("/about".to_string()),
+                attributes: vec![],
                 children: vec![TemplateNode::TextLiteral("About".to_string())],
             },
             span: span(),
