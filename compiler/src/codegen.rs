@@ -40,6 +40,10 @@ pub struct WasmCodegen {
     signal_updaters: Vec<(String, String, String)>,
     /// Names of components defined in this program (for detecting component instantiation)
     known_components: Vec<String>,
+    /// Prop names for the current component being generated (String props passed as ptr+len pairs)
+    component_props: Vec<String>,
+    /// Map from component name to its prop list (for passing props at instantiation sites)
+    component_prop_defs: Vec<(String, Vec<String>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +74,8 @@ impl WasmCodegen {
             component_name: String::new(),
             signal_updaters: Vec::new(),
             known_components: Vec::new(),
+            component_props: Vec::new(),
+            component_prop_defs: Vec::new(),
         }
     }
 
@@ -359,8 +365,16 @@ impl WasmCodegen {
         // Pre-collect component names so template codegen can detect component instantiation
         for item in &program.items {
             match item {
-                Item::Component(c) => self.known_components.push(c.name.clone()),
-                Item::LazyComponent(lc) => self.known_components.push(lc.component.name.clone()),
+                Item::Component(c) => {
+                    self.known_components.push(c.name.clone());
+                    let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((c.name.clone(), prop_names));
+                },
+                Item::LazyComponent(lc) => {
+                    self.known_components.push(lc.component.name.clone());
+                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
+                },
                 Item::Page(p) => self.known_components.push(p.name.clone()),
                 _ => {}
             }
@@ -779,13 +793,23 @@ impl WasmCodegen {
         }
         self.signal_updaters.clear();
 
-        // Generate the init/mount function
-        self.emit(&format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)"));
+        // Generate the init/mount function with prop parameters
+        // String props are passed as (ptr, len) pairs in WASM
+        let prop_names: Vec<String> = comp.props.iter().map(|p| p.name.clone()).collect();
+        let mut sig = format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)");
+        for prop in &prop_names {
+            sig.push_str(&format!(" (param $prop_{}_ptr i32) (param $prop_{}_len i32)", prop, prop));
+        }
+        sig.push(')');
+        // Remove trailing ) — the emit/indent system will close it
+        sig.pop();
+        self.emit(&sig);
         self.indent += 1;
 
-        // Track component fields for self.field resolution in component context
+        // Track component fields and props for self.field / prop resolution
         self.in_component_mount = true;
         self.component_fields = comp.state.iter().map(|s| s.name.clone()).collect();
+        self.component_props = prop_names;
         self.component_name = comp_name.clone();
 
         // Enable deferred template locals — generate template code into a
@@ -802,10 +826,22 @@ impl WasmCodegen {
         // Temporarily redirect output
         self.output = String::new();
 
-        // Re-resolve root: call dom_getRoot to register the root element
-        // before createElement starts allocating IDs that could collide.
-        self.line("call $dom_getRoot");
-        self.line("local.set $root");
+        // Only call dom_getRoot for the root/entry component (called from JS).
+        // Child components receive a valid $root from the parent's createElement.
+        // We detect root vs child: child components get a $root > 0 from parent.
+        // The entry component is called from JS with a placeholder value, so we
+        // use dom_getRoot to register and resolve the actual #app element.
+        // We use a simple heuristic: if $root <= 1, re-resolve via dom_getRoot.
+        self.line("local.get $root");
+        self.line("i32.const 1");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.line("  ;; child component — $root is already a valid element ID from parent");
+        self.line("else");
+        self.line("  ;; root component — resolve the #app element");
+        self.line("  call $dom_getRoot");
+        self.line("  local.set $root");
+        self.line("end");
 
         // Initialize signals via runtime — use atomic operations for atomic signals
         for state in &comp.state {
@@ -2353,8 +2389,37 @@ impl WasmCodegen {
                     self.line(&format!("local.get {}", parent));
                     self.line(&format!("local.get {}", container_var));
                     self.line("call $dom_appendChild");
-                    // Mount the child component into the container
+                    // Mount the child component into the container, passing props
                     self.line(&format!("local.get {}", container_var));
+
+                    // Look up expected props for this component and pass values from attributes
+                    let prop_defs: Vec<String> = self.component_prop_defs.iter()
+                        .find(|(name, _)| name == &comp_name)
+                        .map(|(_, props)| props.clone())
+                        .unwrap_or_default();
+
+                    // Build a map of attribute values from the element
+                    let attr_map: Vec<(String, String)> = el.attributes.iter()
+                        .filter_map(|attr| match attr {
+                            Attribute::Static { name, value } => Some((name.clone(), value.clone())),
+                            _ => None,
+                        })
+                        .collect();
+
+                    for prop_name in &prop_defs {
+                        // Find the attribute value for this prop
+                        if let Some((_, value)) = attr_map.iter().find(|(n, _)| n == prop_name) {
+                            let offset = self.store_string(value);
+                            self.line(&format!("i32.const {} ;; prop {} ptr", offset, prop_name));
+                            self.line(&format!("i32.const {} ;; prop {} len", value.len(), prop_name));
+                        } else {
+                            // No value provided — pass empty string
+                            let offset = self.store_string("");
+                            self.line(&format!("i32.const {} ;; prop {} (default empty)", offset, prop_name));
+                            self.line("i32.const 0");
+                        }
+                    }
+
                     self.line(&format!("call ${}_mount", comp_name));
                     return;
                 }
@@ -2502,32 +2567,49 @@ impl WasmCodegen {
                 self.line("call $dom_createElement");
                 self.line(&format!("local.set {}", var));
 
-                // Detect if this is a self.field expression bound to a signal
-                let signal_field = if let Expr::FieldAccess { object, field } = expr.as_ref() {
-                    if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
-                        && self.component_fields.contains(field) {
-                        Some(field.clone())
+                // Detect if this is a prop reference (Ident matching a component prop)
+                let prop_name = if let Expr::Ident(name) = expr.as_ref() {
+                    if self.in_component_mount && self.component_props.contains(name) {
+                        Some(name.clone())
                     } else { None }
                 } else { None };
 
-                // Set initial text: get signal value, convert to string, setText
-                self.generate_expr(expr);
-                if signal_field.is_some() {
-                    // generate_expr already emits signal_get for self.field
+                // Detect if this is a self.field expression bound to a signal
+                let signal_field = if prop_name.is_none() {
+                    if let Expr::FieldAccess { object, field } = expr.as_ref() {
+                        if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                            && self.component_fields.contains(field) {
+                            Some(field.clone())
+                        } else { None }
+                    } else { None }
+                } else { None };
+
+                if let Some(ref pname) = prop_name {
+                    // Prop reference — string is already available as ptr+len params
+                    self.line(&format!("local.get {}", var));
+                    self.line(&format!("local.get $prop_{}_ptr", pname));
+                    self.line(&format!("local.get $prop_{}_len", pname));
+                    self.line("call $dom_setText");
                 } else {
-                    self.line("call $signal_get");
+                    // Set initial text: get signal value, convert to string, setText
+                    self.generate_expr(expr);
+                    if signal_field.is_some() {
+                        // generate_expr already emits signal_get for self.field
+                    } else {
+                        self.line("call $signal_get");
+                    }
+                    self.line("call $string_fromI32");
+                    let ptr_var = format!("$dyn_ptr_{}", self.next_label());
+                    let len_var = format!("$dyn_len_{}", self.next_label());
+                    self.emit_template_local(&ptr_var);
+                    self.emit_template_local(&len_var);
+                    self.line(&format!("local.set {}", len_var));
+                    self.line(&format!("local.set {}", ptr_var));
+                    self.line(&format!("local.get {}", var));
+                    self.line(&format!("local.get {}", ptr_var));
+                    self.line(&format!("local.get {}", len_var));
+                    self.line("call $dom_setText");
                 }
-                self.line("call $string_fromI32");
-                let ptr_var = format!("$dyn_ptr_{}", self.next_label());
-                let len_var = format!("$dyn_len_{}", self.next_label());
-                self.emit_template_local(&ptr_var);
-                self.emit_template_local(&len_var);
-                self.line(&format!("local.set {}", len_var));
-                self.line(&format!("local.set {}", ptr_var));
-                self.line(&format!("local.get {}", var));
-                self.line(&format!("local.get {}", ptr_var));
-                self.line(&format!("local.get {}", len_var));
-                self.line("call $dom_setText");
 
                 // If bound to a signal, register a reactive updater
                 if let Some(ref field) = signal_field {
