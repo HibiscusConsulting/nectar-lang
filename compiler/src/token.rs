@@ -184,6 +184,8 @@ pub enum TokenKind {
     StarEquals,
     SlashEquals,
     QuestionMark, // ?
+    Hash,         // #
+    SingleQuote,  // '
 
     // JSX-like
     #[allow(dead_code)]

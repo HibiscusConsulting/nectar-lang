@@ -61,6 +61,7 @@ impl Lexer {
             ';' => TokenKind::Semicolon,
             '.' => TokenKind::Dot,
             '?' => TokenKind::QuestionMark,
+            '#' => TokenKind::Hash,
             '%' => TokenKind::Percent,
             '&' => {
                 if self.match_char('&') {
@@ -146,14 +147,11 @@ impl Lexer {
             '\'' => {
                 // Lifetime: 'a, 'b, 'static, etc.
                 // If the next character is alphabetic, lex as a lifetime token.
+                // Also used as single-quote in CSS values (handled by parser).
                 if !self.is_eof() && self.peek().is_ascii_alphabetic() {
                     self.read_lifetime()
                 } else {
-                    return Err(LexError {
-                        message: "Expected lifetime name after '".into(),
-                        line,
-                        col,
-                    });
+                    TokenKind::SingleQuote
                 }
             }
             '"' => self.read_string()?,
@@ -848,10 +846,11 @@ mod tests {
     }
 
     #[test]
-    fn test_lifetime_error_bare_quote() {
+    fn test_single_quote_token() {
         let mut lexer = Lexer::new("'");
-        let result = lexer.tokenize();
-        assert!(result.is_err());
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2); // SingleQuote + EOF
+        assert!(matches!(tokens[0].kind, TokenKind::SingleQuote));
     }
 
     #[test]
