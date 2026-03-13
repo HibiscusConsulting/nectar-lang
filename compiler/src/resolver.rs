@@ -22,6 +22,7 @@ pub struct ResolvedDependency {
     pub name: String,
     pub version: Version,
     pub source: DependencySource,
+    #[allow(dead_code)]
     pub features: Vec<String>,
 }
 

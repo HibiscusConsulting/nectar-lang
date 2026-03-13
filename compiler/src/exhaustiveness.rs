@@ -1222,6 +1222,7 @@ mod tests {
     // Test: walk_expr coverage for various expression types
     // -----------------------------------------------------------------------
 
+    #[allow(dead_code)]
     fn make_match_inside(expr: Expr) -> Item {
         // Wraps an expression in a function so walk_item processes it
         wrap_in_fn(expr)

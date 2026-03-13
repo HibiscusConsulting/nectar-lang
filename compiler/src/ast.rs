@@ -82,6 +82,7 @@ pub struct ContractDef {
     pub name: String,
     pub fields: Vec<ContractField>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -92,6 +93,7 @@ pub struct ContractField {
     pub name: String,
     pub ty: Type,
     pub nullable: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -113,12 +115,14 @@ pub struct AppDef {
     pub router: Option<RouterDef>,
     pub a11y: Option<A11yMode>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct ManifestDef {
     pub entries: Vec<(String, Expr)>,  // name-value pairs
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -126,14 +130,18 @@ pub struct ManifestDef {
 pub struct OfflineDef {
     pub precache: Vec<String>,
     pub strategy: String,
+    #[allow(dead_code)]
     pub fallback: Option<String>,  // component name
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct PushDef {
     pub vapid_key: Option<Expr>,
+    #[allow(dead_code)]
     pub on_message: Option<String>,  // handler function name
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -162,6 +170,7 @@ pub struct MetaDef {
     pub og_image: Option<Expr>,
     pub structured_data: Vec<StructuredDataDef>,
     pub extra: Vec<(String, Expr)>,  // arbitrary meta key-value pairs
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -170,6 +179,7 @@ pub struct MetaDef {
 pub struct StructuredDataDef {
     pub schema_type: String,   // e.g. "Article", "Organization", "Product"
     pub fields: Vec<(String, Expr)>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -179,9 +189,12 @@ pub struct FormDef {
     pub name: String,
     pub fields: Vec<FormFieldDef>,
     pub on_submit: Option<String>,  // handler function name
+    #[allow(dead_code)]
     pub steps: Vec<FormStep>,       // for multi-step forms, empty if single-step
     pub methods: Vec<Function>,
+    #[allow(dead_code)]
     pub styles: Vec<StyleBlock>,
+    #[allow(dead_code)]
     pub render: Option<RenderBlock>,
     pub is_pub: bool,
     pub span: Span,
@@ -195,6 +208,7 @@ pub struct FormFieldDef {
     pub label: Option<Expr>,
     pub placeholder: Option<Expr>,
     pub default_value: Option<Expr>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -202,6 +216,7 @@ pub struct FormFieldDef {
 pub struct ValidatorDef {
     pub kind: ValidatorKind,
     pub message: Option<Expr>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -220,8 +235,11 @@ pub enum ValidatorKind {
 
 #[derive(Debug, Clone)]
 pub struct FormStep {
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub fields: Vec<String>,  // field names in this step
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -252,6 +270,7 @@ pub struct ChannelDef {
     pub heartbeat_interval: Option<u64>,
     pub methods: Vec<Function>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -272,8 +291,10 @@ pub struct EmbedDef {
     pub loading: Option<String>,     // "defer", "async", "lazy", "idle"
     pub sandbox: bool,
     pub integrity: Option<Expr>,     // SRI hash
+    #[allow(dead_code)]
     pub permissions: Option<PermissionsDef>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -291,11 +312,14 @@ pub struct EmbedDef {
 #[derive(Debug, Clone)]
 pub struct PdfDef {
     pub name: String,
+    #[allow(dead_code)]
     pub render: RenderBlock,
     pub page_size: Option<String>,   // "A4", "letter", etc.
     pub orientation: Option<String>, // "portrait", "landscape"
+    #[allow(dead_code)]
     pub margins: Option<Expr>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -310,6 +334,7 @@ pub struct PaymentDef {
     pub on_error: Option<Function>,
     pub methods: Vec<Function>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -325,6 +350,7 @@ pub struct AuthDef {
     pub session_storage: Option<String>, // "cookie", "local", "session"
     pub methods: Vec<Function>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -332,8 +358,10 @@ pub struct AuthDef {
 #[derive(Debug, Clone)]
 pub struct AuthProvider {
     pub name: String,      // "google", "github", "email"
+    #[allow(dead_code)]
     pub client_id: Option<Expr>,
     pub scopes: Vec<String>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -350,6 +378,7 @@ pub struct UploadDef {
     pub on_error: Option<Function>,
     pub methods: Vec<Function>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -358,17 +387,23 @@ pub struct UploadDef {
 pub struct DbDef {
     pub name: String,
     pub version: Option<u32>,
+    #[allow(dead_code)]
     pub stores: Vec<DbStoreDef>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 /// A single object store within a database definition
 #[derive(Debug, Clone)]
 pub struct DbStoreDef {
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub key: String,
+    #[allow(dead_code)]
     pub indexes: Vec<(String, String)>,  // (name, key_path)
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -383,29 +418,35 @@ pub struct CacheDef {
     pub queries: Vec<CacheQueryDef>,
     pub mutations: Vec<CacheMutationDef>,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct CacheQueryDef {
     pub name: String,
+    #[allow(dead_code)]
     pub params: Vec<Param>,
     pub fetch_expr: Expr,                // the fetch(...) expression
     pub contract: Option<String>,        // -> ContractName
     pub ttl: Option<u64>,
     pub stale: Option<u64>,              // stale-while-revalidate window
     pub invalidate_on: Vec<String>,      // event names
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct CacheMutationDef {
     pub name: String,
+    #[allow(dead_code)]
     pub params: Vec<Param>,
+    #[allow(dead_code)]
     pub fetch_expr: Expr,
     pub optimistic: bool,
     pub rollback_on_error: bool,
     pub invalidate: Vec<String>,         // query names to invalidate
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -413,6 +454,7 @@ pub struct CacheMutationDef {
 #[derive(Debug, Clone)]
 pub struct BreakpointsDef {
     pub breakpoints: Vec<(String, u32)>,  // name -> pixels
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -425,6 +467,7 @@ pub struct ThemeDef {
     pub dark_auto: bool,              // dark: auto
     pub primary: Option<Expr>,        // for full auto mode
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -434,6 +477,7 @@ pub struct AnimationBlockDef {
     pub name: String,
     pub kind: AnimationKind,
     pub is_pub: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -462,7 +506,9 @@ pub enum AnimationKind {
 #[derive(Debug, Clone)]
 pub struct ShortcutDef {
     pub keys: String,
+    #[allow(dead_code)]
     pub body: Block,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -471,7 +517,9 @@ pub struct ShortcutDef {
 pub struct GestureDef {
     pub gesture_type: String,   // swipe_left, swipe_right, long_press, pinch, etc.
     pub target: Option<String>, // on:element_name, or None for the component root
+    #[allow(dead_code)]
     pub body: Block,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -558,6 +606,7 @@ pub struct PermissionsDef {
     pub network: Vec<String>,      // allowed URL patterns
     pub storage: Vec<String>,      // allowed storage keys
     pub capabilities: Vec<String>, // camera, geolocation, etc.
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -574,6 +623,7 @@ pub struct PermissionsDef {
 #[derive(Debug, Clone)]
 pub struct SkeletonDef {
     pub body: RenderBlock,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -582,6 +632,7 @@ pub struct SkeletonDef {
 pub struct ErrorBoundary {
     pub fallback: RenderBlock,
     pub body: RenderBlock,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -603,6 +654,7 @@ pub struct StateField {
     /// Whether this signal uses atomic operations for race-free concurrent access
     pub atomic: bool,
     pub initializer: Expr,
+    #[allow(dead_code)]
     pub ownership: Ownership,
 }
 
@@ -617,6 +669,7 @@ pub enum Ownership {
 #[derive(Debug, Clone)]
 pub struct RenderBlock {
     pub body: TemplateNode,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -627,8 +680,8 @@ pub enum TemplateNode {
     TextLiteral(String),
     Expression(Box<Expr>),
     Fragment(Vec<TemplateNode>),
-    /// <Link to="/about">About</Link>
-    Link { to: Expr, children: Vec<TemplateNode> },
+    /// <Link to="/about" class="btn">About</Link>
+    Link { to: Expr, attributes: Vec<Attribute>, children: Vec<TemplateNode> },
     /// <Outlet /> — marks where routed content renders inside a layout
     Outlet,
     /// Layout primitives — compile-time sugar for semantic HTML + CSS
@@ -646,6 +699,7 @@ pub struct Element {
 /// Layout primitives — compile to semantic HTML + CSS at codegen time.
 /// Zero runtime cost — pure syntactic sugar.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum LayoutNode {
     /// `<Stack gap="16">` → column flexbox
     Stack { gap: Option<String>, children: Vec<TemplateNode>, span: Span },
@@ -765,8 +819,10 @@ pub struct StoreDef {
 #[derive(Debug)]
 pub struct SelectorDef {
     pub name: String,
+    #[allow(dead_code)]
     pub deps: Vec<String>,     // store/signal names this derives from
     pub body: Expr,            // computation expression
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -777,6 +833,7 @@ pub struct ActionDef {
     pub params: Vec<Param>,
     pub body: Block,
     pub is_async: bool,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -794,6 +851,7 @@ pub struct ComputedDef {
 pub struct EffectDef {
     pub name: String,
     pub body: Block,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -828,6 +886,7 @@ pub struct AgentDef {
     pub state: Vec<StateField>,
     pub methods: Vec<Function>,
     pub render: Option<RenderBlock>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -839,6 +898,7 @@ pub struct ToolDef {
     pub params: Vec<Param>,
     pub return_type: Option<Type>,
     pub body: Block,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -859,9 +919,12 @@ pub struct RouterDef {
     pub routes: Vec<RouteDef>,
     pub fallback: Option<Box<TemplateNode>>,
     /// Persistent layout shell — content renders into `<Outlet />`
+    #[allow(dead_code)]
     pub layout: Option<RenderBlock>,
     /// Default transition for all routes (can be overridden per-route)
+    #[allow(dead_code)]
     pub transition: Option<String>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -873,7 +936,9 @@ pub struct RouteDef {
     pub component: String,        // component to render
     pub guard: Option<Expr>,      // optional auth/permission guard
     /// Per-route transition override: "fade", "slide-left", "slide-right", "none"
+    #[allow(dead_code)]
     pub transition: Option<String>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -897,6 +962,7 @@ pub struct LazyComponentDef {
 pub struct StyleBlock {
     pub selector: String,
     pub properties: Vec<(String, String)>,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
@@ -906,11 +972,13 @@ pub struct TransitionDef {
     pub property: String,
     pub duration: String,
     pub easing: String,
+    #[allow(dead_code)]
     pub span: Span,
 }
 
 /// Animation definition — keyframe animation
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct AnimationDef {
     pub name: String,
     pub keyframes: Vec<Keyframe>,
@@ -922,6 +990,7 @@ pub struct AnimationDef {
 
 /// A single keyframe in a keyframe animation
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Keyframe {
     pub offset: f64,
     pub properties: Vec<(String, String)>,

@@ -19,6 +19,7 @@ pub struct PackageMetadata {
     pub name: String,
     /// All published version strings (e.g. `["1.0.0", "1.1.0", "2.0.0"]`).
     pub versions: Vec<String>,
+    #[allow(dead_code)]
     pub description: Option<String>,
 }
 

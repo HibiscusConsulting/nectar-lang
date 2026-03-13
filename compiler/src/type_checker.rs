@@ -164,6 +164,7 @@ impl fmt::Display for TypeError {
 #[derive(Debug)]
 pub struct TypedProgram {
     /// All types created during inference, fully substituted.
+    #[allow(dead_code)]
     pub types: Vec<Ty>,
     /// Map from variable name to its resolved type (top-level scope snapshot).
     pub bindings: HashMap<String, Ty>,
@@ -426,6 +427,7 @@ struct StructInfo {
 
 #[derive(Debug, Clone)]
 struct ComponentInfo {
+    #[allow(dead_code)]
     props: HashMap<String, Ty>,
 }
 
@@ -464,6 +466,7 @@ struct TypeChecker {
     /// contracts (vs plain structs). Contracts generate runtime validators
     /// and content hashes; field access checking reuses the `structs` map.
     contracts: std::collections::HashSet<String>,
+    #[allow(dead_code)]
     warnings: Vec<TypeWarning>,
     /// Names of functions marked `must_use` — their return values must not be
     /// silently discarded.
@@ -471,6 +474,7 @@ struct TypeChecker {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct TypeWarning {
     message: String,
     span: Span,
@@ -1692,6 +1696,7 @@ impl TypeChecker {
     }
 
     /// Look up the variant names for a given enum type.
+    #[allow(dead_code)]
     pub fn get_enum_variants(&self, name: &str) -> Option<Vec<String>> {
         self.enum_defs.get(name).cloned()
     }
@@ -1890,7 +1895,7 @@ impl TypeChecker {
         store_mutators: &mut std::collections::HashMap<String, Vec<String>>,
     ) {
         match expr {
-            Expr::MethodCall { object, method, args, .. } => {
+            Expr::MethodCall { object, method: _method, args, .. } => {
                 // Pattern: StoreName.dispatch(...) or StoreName.some_action(...)
                 if let Expr::Ident(store_name) = object.as_ref() {
                     // Heuristic: if calling a method on a PascalCase name, assume it's a store mutation
@@ -1986,8 +1991,20 @@ impl TypeChecker {
         }
 
         for param in &func.params {
-            let ty = self.ast_type_to_ty(&param.ty);
-            body_env.insert(param.name.clone(), ty);
+            if param.name == "self" {
+                // For `self` parameters, preserve the concrete struct type from
+                // the enclosing component/store/impl rather than converting the
+                // `Self` type annotation (which would produce Ty::Enum("Self")).
+                if let Some(self_ty) = env.lookup("self") {
+                    body_env.insert("self".to_string(), self_ty.clone());
+                } else {
+                    let ty = self.ast_type_to_ty(&param.ty);
+                    body_env.insert(param.name.clone(), ty);
+                }
+            } else {
+                let ty = self.ast_type_to_ty(&param.ty);
+                body_env.insert(param.name.clone(), ty);
+            }
         }
 
         let body_ty = self.infer_block(&func.body, &mut body_env);
@@ -2011,10 +2028,18 @@ impl TypeChecker {
     fn check_component(&mut self, comp: &Component, env: &mut TypeEnv) {
         let mut comp_env = env.child();
 
+        // Register `self` so that self.field works inside methods.
+        comp_env.insert("self".to_string(), Ty::Struct(comp.name.clone()));
+
+        // Collect all fields (props + state) for struct registry so
+        // resolve_field_access can find them via self.field.
+        let mut fields = HashMap::new();
+
         // Props are available as local bindings.
         for prop in &comp.props {
             let ty = self.ast_type_to_ty(&prop.ty);
-            comp_env.insert(prop.name.clone(), ty);
+            comp_env.insert(prop.name.clone(), ty.clone());
+            fields.insert(prop.name.clone(), ty);
         }
 
         // State fields.
@@ -2032,8 +2057,13 @@ impl TypeChecker {
             } else {
                 base_ty
             };
-            comp_env.insert(state.name.clone(), ty);
+            comp_env.insert(state.name.clone(), ty.clone());
+            fields.insert(state.name.clone(), ty);
         }
+
+        // Register component fields in struct registry for field access resolution.
+        self.structs
+            .insert(comp.name.clone(), StructInfo { fields });
 
         // Check render block for secret safety — secret values must not appear
         // in template expressions.
@@ -5977,7 +6007,7 @@ mod coverage_type_checker_tests {
     fn infer_let_destructure_tuple() {
         let prog = program(vec![
             Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6003,7 +6033,7 @@ mod coverage_type_checker_tests {
     fn infer_let_destructure_array() {
         let prog = program(vec![
             Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6169,7 +6199,7 @@ mod coverage_type_checker_tests {
     fn field_access_on_tuple() {
         let prog = program(vec![
             Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6257,7 +6287,7 @@ mod coverage_type_checker_tests {
     fn iterator_fold() {
         let prog = program(vec![
             Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6304,7 +6334,7 @@ mod coverage_type_checker_tests {
         for method in &["any", "all"] {
             let prog = program(vec![
                 Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                    Stmt::Expr(Expr::Integer(0)),
+                    Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
                 ])),
                 Item::Function(func("main", vec![
                     Stmt::Let {
@@ -6340,7 +6370,7 @@ mod coverage_type_checker_tests {
     fn iterator_enumerate() {
         let prog = program(vec![
             Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6372,10 +6402,10 @@ mod coverage_type_checker_tests {
     fn iterator_zip() {
         let prog = program(vec![
             Item::Function(func_ret("make_arr_i32", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_i32".into())), args: vec![] }),
             ])),
             Item::Function(func_ret("make_arr_str", Type::Array(Box::new(Type::Named("String".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_str".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6421,7 +6451,7 @@ mod coverage_type_checker_tests {
     fn iterator_count() {
         let prog = program(vec![
             Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::Integer(0)),
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
             ])),
             Item::Function(func("main", vec![
                 Stmt::Let {
@@ -6454,7 +6484,7 @@ mod coverage_type_checker_tests {
         for method in &["take", "skip"] {
             let prog = program(vec![
                 Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                    Stmt::Expr(Expr::Integer(0)),
+                    Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
                 ])),
                 Item::Function(func("main", vec![
                     Stmt::Let {
@@ -6858,5 +6888,162 @@ mod coverage_type_checker_tests {
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn component_self_field_access() {
+        let prog = program(vec![Item::Component(Component {
+            name: "Counter".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![StateField {
+                name: "count".into(),
+                ty: Some(Type::Named("i32".into())),
+                mutable: true,
+                secret: false,
+                atomic: false,
+                initializer: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![Function {
+                name: "increment".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Expr(Expr::Assign {
+                    target: Box::new(Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "count".into(),
+                    }),
+                    value: Box::new(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "count".into(),
+                        }),
+                        right: Box::new(Expr::Integer(1)),
+                    }),
+                })]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: "div".into(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::Expression(Box::new(
+                        Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "count".into(),
+                        },
+                    ))],
+                    span: span(),
+                }),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "component self.field should type-check: {:?}", result.err());
+    }
+
+    #[test]
+    fn component_self_prop_access() {
+        let prog = program(vec![Item::Component(Component {
+            name: "Greeting".into(),
+            type_params: vec![],
+            props: vec![Prop {
+                name: "name".into(),
+                ty: Type::Named("String".into()),
+                default: None,
+            }],
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Expression(Box::new(
+                    Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "name".into(),
+                    },
+                )),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "component self.prop should type-check: {:?}", result.err());
+    }
+
+    #[test]
+    fn component_self_field_access_end_to_end() {
+        // End-to-end: parse source → type check, ensuring self.field works
+        // through the full pipeline (not just constructed AST).
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            component Counter {
+                let count: i32 = 0;
+                fn increment(&mut self) {
+                    self.count = self.count + 1;
+                }
+                render {
+                    <div>{self.count}</div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut p = parser::Parser::new(tokens);
+        let prog = p.parse_program().unwrap();
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "self.field end-to-end should type-check: {:?}", result.err());
+    }
+
+    #[test]
+    fn component_mut_self_field_access_end_to_end() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            component Counter {
+                let count: i32 = 0;
+                fn increment(mut self) {
+                    self.count = self.count + 1;
+                }
+                render {
+                    <div>{self.count}</div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut p = parser::Parser::new(tokens);
+        let prog = p.parse_program().unwrap();
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "mut self field access should type-check: {:?}", result.err());
     }
 }

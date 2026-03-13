@@ -10,6 +10,7 @@ const WASM_VERSION: [u8; 4] = [0x01, 0x00, 0x00, 0x00]; // version 1
 const SECTION_TYPE: u8 = 1;
 const SECTION_IMPORT: u8 = 2;
 const SECTION_FUNCTION: u8 = 3;
+#[allow(dead_code)]
 const SECTION_MEMORY: u8 = 5;
 const SECTION_GLOBAL: u8 = 6;
 const SECTION_EXPORT: u8 = 7;
@@ -28,9 +29,11 @@ const TYPE_FUNC: u8 = 0x60;
 // Import/export kinds
 const KIND_FUNC: u8 = 0x00;
 const KIND_MEMORY: u8 = 0x02;
+#[allow(dead_code)]
 const KIND_GLOBAL: u8 = 0x03;
 
 // Global mutability
+#[allow(dead_code)]
 const GLOBAL_CONST: u8 = 0x00;
 const GLOBAL_MUT: u8 = 0x01;
 
@@ -38,9 +41,11 @@ const GLOBAL_MUT: u8 = 0x01;
 const LIMITS_MIN_ONLY: u8 = 0x00;
 
 // WASM opcodes
+#[allow(dead_code)]
 const OP_UNREACHABLE: u8 = 0x00;
 const OP_NOP: u8 = 0x01;
 const OP_BLOCK: u8 = 0x02;
+#[allow(dead_code)]
 const OP_LOOP: u8 = 0x03;
 const OP_IF: u8 = 0x04;
 const OP_ELSE: u8 = 0x05;
@@ -52,13 +57,17 @@ const OP_CALL: u8 = 0x10;
 const OP_DROP: u8 = 0x1A;
 const OP_LOCAL_GET: u8 = 0x20;
 const OP_LOCAL_SET: u8 = 0x21;
+#[allow(dead_code)]
 const OP_LOCAL_TEE: u8 = 0x22;
 const OP_GLOBAL_GET: u8 = 0x23;
 const OP_GLOBAL_SET: u8 = 0x24;
 const OP_I32_LOAD: u8 = 0x28;
+#[allow(dead_code)]
 const OP_I32_STORE: u8 = 0x36;
 const OP_I32_CONST: u8 = 0x41;
+#[allow(dead_code)]
 const OP_I64_CONST: u8 = 0x42;
+#[allow(dead_code)]
 const OP_F32_CONST: u8 = 0x43;
 const OP_F64_CONST: u8 = 0x44;
 const OP_I32_EQZ: u8 = 0x45;
@@ -772,6 +781,7 @@ struct CodegenCtx<'a> {
     local_map: &'a HashMap<String, u32>,
     func_index: &'a HashMap<String, u32>,
     strings: &'a mut StringIntern,
+    #[allow(dead_code)]
     heap_ptr_global_idx: u32,
 }
 

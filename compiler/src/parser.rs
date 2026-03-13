@@ -9,6 +9,7 @@ pub struct Parser {
 
 /// Synchronization context — tells `synchronize()` what kind of boundary to
 /// look for when skipping over broken tokens.
+#[allow(dead_code)]
 enum SyncContext {
     /// Skip until a token that can start a new top-level item (or EOF).
     TopLevel,
@@ -65,6 +66,7 @@ impl Parser {
 
     /// Advance tokens until we reach a semicolon (consuming it) or a token
     /// that looks like it starts a new statement.
+    #[allow(dead_code)]
     fn recover_to_semicolon(&mut self) {
         self.synchronize(SyncContext::Statement);
     }
@@ -812,6 +814,7 @@ impl Parser {
     }
 
     /// Parse `animate name { 0% { ... } 100% { ... } duration: "0.5s"; easing: "ease-in"; }`
+    #[allow(dead_code)]
     fn parse_animate_block(&mut self) -> Result<AnimationDef, ParseError> {
         let span = self.current_span();
         self.expect(&TokenKind::Animate)?;
@@ -1068,7 +1071,7 @@ impl Parser {
 
     /// Parse <Link to="..." > ... </Link> as a TemplateNode::Link
     fn parse_link_element(&mut self) -> Result<TemplateNode, ParseError> {
-        // "Link" tag name already consumed; parse the `to` attribute
+        // "Link" tag name already consumed; parse the `to` attribute first
         let to_attr_name = self.expect_ident()?;
         if to_attr_name != "to" {
             return Err(self.error("Link element requires a 'to' attribute"));
@@ -1090,10 +1093,70 @@ impl Parser {
             return Err(self.error("Expected string or expression for Link 'to' attribute"));
         };
 
+        // Parse additional attributes (class, style, aria-*, etc.)
+        let mut attributes = Vec::new();
+        while !self.check(&TokenKind::RightAngle)
+            && !self.check(&TokenKind::Slash)
+            && !self.is_at_end()
+        {
+            let attr_name = self.expect_ident()?;
+
+            if attr_name == "on" && self.match_token(&TokenKind::Colon) {
+                let event = self.expect_ident()?;
+                self.expect(&TokenKind::Equals)?;
+                self.expect(&TokenKind::LeftBrace)?;
+                let handler = self.parse_expr()?;
+                self.expect(&TokenKind::RightBrace)?;
+                attributes.push(Attribute::EventHandler { event, handler });
+            } else if attr_name == "aria" && self.match_token(&TokenKind::Minus) {
+                let aria_suffix = self.expect_ident()?;
+                let aria_name = format!("aria-{}", aria_suffix);
+                self.expect(&TokenKind::Equals)?;
+                if self.check(&TokenKind::LeftBrace) {
+                    self.advance();
+                    let value = self.parse_expr()?;
+                    self.expect(&TokenKind::RightBrace)?;
+                    attributes.push(Attribute::Aria { name: aria_name, value });
+                } else if let TokenKind::StringLit(_) = self.peek_kind() {
+                    if let TokenKind::StringLit(s) = self.advance().kind {
+                        attributes.push(Attribute::Aria {
+                            name: aria_name,
+                            value: Expr::StringLit(s),
+                        });
+                    }
+                } else {
+                    return Err(self.error("Expected aria attribute value"));
+                }
+            } else if attr_name == "role" {
+                self.expect(&TokenKind::Equals)?;
+                if let TokenKind::StringLit(_) = self.peek_kind() {
+                    if let TokenKind::StringLit(s) = self.advance().kind {
+                        attributes.push(Attribute::Role { value: s });
+                    }
+                } else {
+                    return Err(self.error("Expected string value for role attribute"));
+                }
+            } else {
+                self.expect(&TokenKind::Equals)?;
+                if self.check(&TokenKind::LeftBrace) {
+                    self.advance();
+                    let value = self.parse_expr()?;
+                    self.expect(&TokenKind::RightBrace)?;
+                    attributes.push(Attribute::Dynamic { name: attr_name, value });
+                } else if let TokenKind::StringLit(_) = self.peek_kind() {
+                    if let TokenKind::StringLit(s) = self.advance().kind {
+                        attributes.push(Attribute::Static { name: attr_name, value: s });
+                    }
+                } else {
+                    return Err(self.error("Expected attribute value"));
+                }
+            }
+        }
+
         // Self-closing: <Link to="/" />
         if self.match_token(&TokenKind::Slash) {
             self.expect(&TokenKind::RightAngle)?;
-            return Ok(TemplateNode::Link { to, children: vec![] });
+            return Ok(TemplateNode::Link { to, attributes, children: vec![] });
         }
 
         self.expect(&TokenKind::RightAngle)?;
@@ -1115,7 +1178,7 @@ impl Parser {
         }
         self.expect(&TokenKind::RightAngle)?;
 
-        Ok(TemplateNode::Link { to, children })
+        Ok(TemplateNode::Link { to, attributes, children })
     }
 
     /// Parse layout primitive elements: Stack, Row, Grid, Center, Cluster, Sidebar, Switcher
@@ -1780,14 +1843,19 @@ impl Parser {
         let mut params = Vec::new();
 
         while !self.check(&TokenKind::RightParen) {
-            // Handle &self, &mut self, self
-            if self.check(&TokenKind::Ampersand) || self.check(&TokenKind::SelfKw) {
+            // Handle &self, &mut self, self, mut self
+            let is_mut_self = self.check(&TokenKind::Mut)
+                && self.tokens.get(self.pos + 1).map(|t| &t.kind) == Some(&TokenKind::SelfKw);
+            if self.check(&TokenKind::Ampersand) || self.check(&TokenKind::SelfKw) || is_mut_self {
                 let ownership = if self.match_token(&TokenKind::Ampersand) {
                     if self.match_token(&TokenKind::Mut) {
                         Ownership::MutBorrowed
                     } else {
                         Ownership::Borrowed
                     }
+                } else if self.match_token(&TokenKind::Mut) {
+                    // mut self — treat as owned (mutable)
+                    Ownership::Owned
                 } else {
                     Ownership::Owned
                 };
@@ -2543,7 +2611,7 @@ impl Parser {
             }
             // Keyword tokens that double as stdlib namespace prefixes (crypto::sha256, etc.)
             TokenKind::Crypto | TokenKind::Cache | TokenKind::Db | TokenKind::Auth => {
-                let span = self.current_span();
+                let _span = self.current_span();
                 let name = match self.peek_kind() {
                     TokenKind::Crypto => "crypto",
                     TokenKind::Cache => "cache",
@@ -4199,6 +4267,7 @@ impl Parser {
                     TokenKind::Flag => Some("flag"),
                     TokenKind::Trace => Some("trace"),
                     TokenKind::Env => Some("env"),
+                    TokenKind::Style => Some("style"),
                     _ => None,
                 };
                 if let Some(name) = name {
@@ -5887,6 +5956,30 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_mut_self_parameter() {
+        let prog = parse(r#"
+            component Counter {
+                let count: i32 = 0;
+                fn increment(mut self) {
+                    self.count = self.count + 1;
+                }
+                render {
+                    <div>{self.count}</div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "Counter");
+            assert_eq!(c.methods.len(), 1);
+            assert_eq!(c.methods[0].params.len(), 1);
+            assert_eq!(c.methods[0].params[0].name, "self");
+            assert_eq!(c.methods[0].params[0].ownership, Ownership::Owned);
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
     fn test_parse_component_with_permissions() {
         let prog = parse(r#"
             component Secure {
@@ -7154,6 +7247,76 @@ mod tests {
                 assert!(matches!(to, Expr::Ident(_)));
             } else {
                 panic!("Expected Link");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_link_with_class_attribute() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <Link to="/about" class="btn btn-primary">"Go"</Link>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Link { to, attributes, children } = &c.render.body {
+                assert!(matches!(to, Expr::StringLit(_)));
+                assert_eq!(attributes.len(), 1);
+                match &attributes[0] {
+                    Attribute::Static { name, value } => {
+                        assert_eq!(name, "class");
+                        assert_eq!(value, "btn btn-primary");
+                    }
+                    _ => panic!("Expected Static attribute"),
+                }
+                assert_eq!(children.len(), 1);
+            } else {
+                panic!("Expected Link");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_link_with_multiple_attributes() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <Link to="/page" class="nav-link" style="color: red" />
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Link { attributes, .. } = &c.render.body {
+                assert_eq!(attributes.len(), 2);
+            } else {
+                panic!("Expected Link");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_style_attribute_on_element() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <div style="color: red; font-size: 16px">"hello"</div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.attributes.len(), 1);
+                match &el.attributes[0] {
+                    Attribute::Static { name, value } => {
+                        assert_eq!(name, "style");
+                        assert_eq!(value, "color: red; font-size: 16px");
+                    }
+                    _ => panic!("Expected Static attribute for style"),
+                }
+            } else {
+                panic!("Expected Element");
             }
         }
     }

@@ -21,8 +21,10 @@ pub enum BorrowErrorKind {
     DoubleMutBorrow,
     MutBorrowWhileImmBorrowed,
     ImmBorrowWhileMutBorrowed,
+    #[allow(dead_code)]
     BorrowOutlivesScope,
     AssignWhileBorrowed,
+    #[allow(dead_code)]
     LifetimeViolation,
     MissingLifetimeAnnotation,
 }
@@ -64,8 +66,10 @@ struct BorrowInfo {
     /// Whether the borrow is mutable.
     mutable: bool,
     /// The scope depth at which the borrow was created.
+    #[allow(dead_code)]
     scope_depth: usize,
     /// Optional named lifetime for this borrow (e.g., `'a`).
+    #[allow(dead_code)]
     lifetime: Option<String>,
 }
 
@@ -393,7 +397,6 @@ impl Checker {
                 self.check_expr(value, enclosing_span);
                 self.declare_pattern_bindings(pattern);
             }
-            _ => {}
         }
     }
 

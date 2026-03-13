@@ -24,6 +24,20 @@ pub struct WasmCodegen {
     needs_func_table: bool,
     /// Names of closure functions (for the table)
     closure_func_names: Vec<String>,
+    /// When true, template local declarations are deferred to template_locals
+    /// instead of being emitted inline
+    defer_template_locals: bool,
+    /// Deferred template local declarations
+    template_locals: Vec<String>,
+    /// When inside a component context, self.field compiles to signal
+    /// global.get/set instead of struct pointer dereference
+    in_component_mount: bool,
+    /// Field names available as signals in the current component
+    component_fields: Vec<String>,
+    /// Current component name (for global signal variable naming)
+    component_name: String,
+    /// Deferred signal→DOM updater functions: (func_name, global_el_name, signal_global_name)
+    signal_updaters: Vec<(String, String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +61,12 @@ impl WasmCodegen {
             closure_functions: Vec::new(),
             needs_func_table: false,
             closure_func_names: Vec::new(),
+            defer_template_locals: false,
+            template_locals: Vec::new(),
+            in_component_mount: false,
+            component_fields: Vec::new(),
+            component_name: String::new(),
+            signal_updaters: Vec::new(),
         }
     }
 
@@ -67,6 +87,9 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"getElementById\" (func $dom_getElementById (param i32 i32) (result i32)))");
         self.line("(import \"dom\" \"querySelector\" (func $dom_querySelector (param i32 i32) (result i32)))");
         self.line("(import \"dom\" \"createElement\" (func $dom_createElement (param i32 i32) (result i32)))");
+        self.line("(import \"dom\" \"setText\" (func $dom_setText (param i32 i32 i32)))");
+        self.line("(import \"dom\" \"appendChild\" (func $dom_appendChild (param i32 i32)))");
+        self.line("(import \"dom\" \"setAttribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"createTextNode\" (func $dom_createTextNode (param i32 i32) (result i32)))");
         self.line("(import \"dom\" \"getBody\" (func $dom_getBody (result i32)))");
         self.line("(import \"dom\" \"getHead\" (func $dom_getHead (result i32)))");
@@ -280,6 +303,29 @@ impl WasmCodegen {
         self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
         self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
 
+        // ── GPU — WebGPU rendering, buffers, shaders, textures ───────────────
+        self.line("");
+        self.line(";; GPU — browser WebGPU APIs (adapter, device, buffers, pipelines, rendering)");
+        self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"requestDevice\" (func $gpu_requestDevice (param i32) (result i32)))");
+        self.line("(import \"gpu\" \"configureCanvas\" (func $gpu_configureCanvas (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createBuffer\" (func $gpu_createBuffer (param i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"writeBuffer\" (func $gpu_writeBuffer (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"gpu\" \"createShaderModule\" (func $gpu_createShaderModule (param i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createRenderPipeline\" (func $gpu_createRenderPipeline (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createTexture\" (func $gpu_createTexture (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"beginRenderPass\" (func $gpu_beginRenderPass (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"setPipeline\" (func $gpu_setPipeline (param i32 i32)))");
+        self.line("(import \"gpu\" \"setVertexBuffer\" (func $gpu_setVertexBuffer (param i32 i32 i32)))");
+        self.line("(import \"gpu\" \"draw\" (func $gpu_draw (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"gpu\" \"submitRenderPass\" (func $gpu_submitRenderPass (param i32 i32)))");
+        self.line("(import \"gpu\" \"getCurrentTexture\" (func $gpu_getCurrentTexture (param i32) (result i32)))");
+        self.line("(import \"gpu\" \"createTextureView\" (func $gpu_createTextureView (param i32) (result i32)))");
+        self.line("(import \"gpu\" \"destroyBuffer\" (func $gpu_destroyBuffer (param i32)))");
+        self.line("(import \"gpu\" \"destroyTexture\" (func $gpu_destroyTexture (param i32)))");
+        self.line("(import \"gpu\" \"getPreferredFormat\" (func $gpu_getPreferredFormat (result i32)))");
+        self.line("(import \"gpu\" \"getAdapterInfo\" (func $gpu_getAdapterInfo (param i32) (result i32)))");
+
         // ── WASM-internal (no JS imports) ────────────────────────────────────
         // signal, string, flags, cache, permissions, form, lifecycle, contract,
         // gesture (math), shortcuts, virtual scroll, style injection, animation,
@@ -333,8 +379,9 @@ impl WasmCodegen {
             self.closure_functions = closures;
         }
 
-        // Emit function table for indirect calls (closures)
-        if self.needs_func_table {
+        // Emit function table for indirect calls (closures + signal effects)
+        // Always needed because signal runtime uses call_indirect
+        {
             self.line("");
             self.line(";; Function table for indirect closure calls");
             let names: Vec<String> = self.closure_func_names.clone();
@@ -656,10 +703,14 @@ impl WasmCodegen {
     fn generate_function(&mut self, func: &Function) {
         self.locals.clear();
 
-        let params: Vec<String> = func.params.iter()
+        let has_self = func.params.iter().any(|p| p.name == "self");
+        let mut params: Vec<String> = Vec::new();
+        if has_self {
+            params.push("(param $self i32)".into());
+        }
+        params.extend(func.params.iter()
             .filter(|p| p.name != "self")
-            .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty)))
-            .collect();
+            .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))));
 
         let ret = func.return_type.as_ref()
             .map(|t| format!(" (result {})", self.type_to_wasm(t)))
@@ -706,14 +757,40 @@ impl WasmCodegen {
             self.line(&format!(";; chunk registration: preload \"{}\" at offset {}", chunk_name, offset));
         }
 
+        // Emit globals for component signal IDs and dynamic element IDs
+        for state in &comp.state {
+            self.line(&format!("(global $__sig_{}_{} (mut i32) (i32.const -1))", comp_name, state.name));
+            self.line(&format!("(global $__dyn_el_{}_{} (mut i32) (i32.const -1))", comp_name, state.name));
+        }
+        self.signal_updaters.clear();
+
         // Generate the init/mount function
         self.emit(&format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)"));
         self.indent += 1;
 
-        // Each state field becomes a signal (returns signal ID)
-        for state in &comp.state {
-            self.line(&format!("(local ${} i32) ;; signal ID for {}", state.name, state.name));
-        }
+        // Track component fields for self.field resolution in component context
+        self.in_component_mount = true;
+        self.component_fields = comp.state.iter().map(|s| s.name.clone()).collect();
+        self.component_name = comp_name.clone();
+
+        // Enable deferred template locals — generate template code into a
+        // separate buffer so we can emit all locals before any instructions.
+        self.defer_template_locals = true;
+        self.template_locals.clear();
+        let output_before = self.output.len();
+
+        // Generate all template-related code (may produce deferred locals)
+        // We save the output position, generate, then splice locals before it.
+        let saved_output = std::mem::take(&mut self.output);
+        let mut template_output = String::new();
+
+        // Temporarily redirect output
+        self.output = String::new();
+
+        // Re-resolve root: call dom_getRoot to register the root element
+        // before createElement starts allocating IDs that could collide.
+        self.line("call $dom_getRoot");
+        self.line("local.set $root");
 
         // Initialize signals via runtime — use atomic operations for atomic signals
         for state in &comp.state {
@@ -724,7 +801,7 @@ impl WasmCodegen {
             } else {
                 self.line("call $signal_create");
             }
-            self.line(&format!("local.set ${}", state.name));
+            self.line(&format!("global.set $__sig_{}_{}", comp_name, state.name));
         }
 
         // Emit permission metadata and register allowed patterns
@@ -784,6 +861,21 @@ impl WasmCodegen {
         // Generate the DOM tree from the render block
         self.generate_template(&comp.render.body, "$root");
 
+        // Capture the generated template code
+        template_output = std::mem::take(&mut self.output);
+
+        // Restore original output and emit: locals first, then template code
+        self.output = saved_output;
+
+        // Emit all deferred template locals
+        for local_decl in std::mem::take(&mut self.template_locals) {
+            self.line(&local_decl);
+        }
+        self.defer_template_locals = false;
+
+        // Append the template code
+        self.output.push_str(&template_output);
+
         // a11y defaults to auto — enhance unless explicitly set to manual
         let a11y_mode = comp.a11y.as_ref().unwrap_or(&A11yMode::Auto);
         if matches!(a11y_mode, A11yMode::Auto | A11yMode::Hybrid) {
@@ -805,9 +897,15 @@ impl WasmCodegen {
         self.line(")");
 
         // Generate event handler trampolines as exported functions
+        // (keep in_component_mount=true so self.field resolves to signals)
         for (i, method) in comp.methods.iter().enumerate() {
+            let has_self = method.params.iter().any(|p| p.name == "self");
             self.line("");
-            self.emit(&format!("(func $__handler_{} (export \"__handler_{}\")", i, i));
+            if has_self {
+                self.emit(&format!("(func $__handler_{} (export \"__handler_{}\") (param $self i32)", i, i));
+            } else {
+                self.emit(&format!("(func $__handler_{} (export \"__handler_{}\")", i, i));
+            }
             self.indent += 1;
 
             // Re-read signal values, execute handler body, write back
@@ -816,6 +914,35 @@ impl WasmCodegen {
                 self.generate_stmt(stmt);
             }
 
+            self.indent -= 1;
+            self.line(")");
+        }
+
+        // Generate __callback dispatcher — the runtime calls __callback(idx)
+        // and we route to the correct __handler_N function.
+        if !comp.methods.is_empty() {
+            self.line("");
+            self.emit("(func $__callback (export \"__callback\") (param $idx i32)");
+            self.indent += 1;
+            for (i, _method) in comp.methods.iter().enumerate() {
+                self.line(&format!("local.get $idx"));
+                self.line(&format!("i32.const {}", i));
+                self.line("i32.eq");
+                self.line("if");
+                self.indent += 1;
+                // Handler trampolines that take $self need a value — pass 0
+                // since component state is in signals, not struct memory
+                let has_self = _method.params.iter().any(|p| p.name == "self");
+                if has_self {
+                    self.line("i32.const 0");
+                    self.line(&format!("call $__handler_{}", i));
+                } else {
+                    self.line(&format!("call $__handler_{}", i));
+                }
+                self.line("return");
+                self.indent -= 1;
+                self.line("end");
+            }
             self.indent -= 1;
             self.line(")");
         }
@@ -845,6 +972,34 @@ impl WasmCodegen {
             self.line(&format!("i32.const {}", comp_name.len()));
             self.line("call $lifecycle_register_cleanup");
         }
+
+        // Emit signal→DOM updater functions (WASM-internal, called via call_indirect)
+        for (func_name, global_el, sig_global) in self.signal_updaters.clone() {
+            self.line("");
+            self.emit(&format!("(func {} ;; reactive DOM updater", func_name));
+            self.indent += 1;
+            self.line("(local $ptr i32)");
+            self.line("(local $len i32)");
+            // Read current signal value
+            self.line(&format!("global.get {}", sig_global));
+            self.line("call $signal_get");
+            // Convert to string
+            self.line("call $string_fromI32");
+            self.line("local.set $len");
+            self.line("local.set $ptr");
+            // Update DOM element text
+            self.line(&format!("global.get {}", global_el));
+            self.line("local.get $ptr");
+            self.line("local.get $len");
+            self.line("call $dom_setText");
+            self.indent -= 1;
+            self.line(")");
+        }
+
+        // Reset component context
+        self.in_component_mount = false;
+        self.component_fields.clear();
+        self.component_name.clear();
     }
 
     fn generate_page(&mut self, page: &PageDef) {
@@ -2154,11 +2309,21 @@ impl WasmCodegen {
         self.line(")");
     }
 
+    /// Emit a local declaration, or defer it if we're in deferred mode.
+    fn emit_template_local(&mut self, var: &str) {
+        let decl = format!("(local {} i32)", var);
+        if self.defer_template_locals {
+            self.template_locals.push(decl);
+        } else {
+            self.line(&decl);
+        }
+    }
+
     fn generate_template(&mut self, node: &TemplateNode, parent: &str) {
         match node {
             TemplateNode::Element(el) => {
                 let var = format!("$el_{}", self.next_label());
-                self.line(&format!("(local {} i32)", var));
+                self.emit_template_local(&var);
 
                 // Create element
                 // Store tag string in linear memory and pass ptr + len
@@ -2179,7 +2344,7 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", name.len()));
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
-                            // Would call dom_setAttribute but simplified for now
+                            self.line("call $dom_setAttr");
                         }
                         Attribute::EventHandler { event, .. } => {
                             let event_offset = self.store_string(event);
@@ -2281,7 +2446,7 @@ impl WasmCodegen {
             }
             TemplateNode::TextLiteral(text) => {
                 let var = format!("$text_{}", self.next_label());
-                self.line(&format!("(local {} i32)", var));
+                self.emit_template_local(&var);
                 let text_offset = self.store_string(text);
                 self.line(&format!(";; text: \"{}\"", text));
                 self.line(&format!("local.get {}", parent));
@@ -2291,12 +2456,71 @@ impl WasmCodegen {
             }
             TemplateNode::Expression(expr) => {
                 self.line(";; dynamic expression");
+                let var = format!("$dyn_{}", self.next_label());
+                self.emit_template_local(&var);
+                // Create a <span> to hold the dynamic text
+                let tag_offset = self.store_string("span");
+                self.line(&format!("i32.const {}", tag_offset));
+                self.line("i32.const 4");
+                self.line("call $dom_createElement");
+                self.line(&format!("local.set {}", var));
+
+                // Detect if this is a self.field expression bound to a signal
+                let signal_field = if let Expr::FieldAccess { object, field } = expr.as_ref() {
+                    if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                        && self.component_fields.contains(field) {
+                        Some(field.clone())
+                    } else { None }
+                } else { None };
+
+                // Set initial text: get signal value, convert to string, setText
                 self.generate_expr(expr);
-                // Result on stack would be used to set text content
+                if signal_field.is_some() {
+                    // generate_expr already emits signal_get for self.field
+                } else {
+                    self.line("call $signal_get");
+                }
+                self.line("call $string_fromI32");
+                let ptr_var = format!("$dyn_ptr_{}", self.next_label());
+                let len_var = format!("$dyn_len_{}", self.next_label());
+                self.emit_template_local(&ptr_var);
+                self.emit_template_local(&len_var);
+                self.line(&format!("local.set {}", len_var));
+                self.line(&format!("local.set {}", ptr_var));
+                self.line(&format!("local.get {}", var));
+                self.line(&format!("local.get {}", ptr_var));
+                self.line(&format!("local.get {}", len_var));
+                self.line("call $dom_setText");
+
+                // If bound to a signal, register a reactive updater
+                if let Some(ref field) = signal_field {
+                    let global_el = format!("$__dyn_el_{}_{}", self.component_name, field);
+                    let sig_global = format!("$__sig_{}_{}", self.component_name, field);
+                    let func_name = format!("$__update_{}_{}", self.component_name, field);
+
+                    // Store element ID in global so updater function can find it
+                    self.line(&format!("local.get {}", var));
+                    self.line(&format!("global.set {}", global_el));
+
+                    // Subscribe: signal_subscribe(signal_id, table_index)
+                    let table_idx = self.closure_func_names.len();
+                    self.closure_func_names.push(func_name.clone());
+                    self.line(&format!("global.get {}", sig_global));
+                    self.line(&format!("i32.const {}", table_idx));
+                    self.line("call $signal_subscribe");
+
+                    // Record updater to emit later (after mount function)
+                    self.signal_updaters.push((func_name, global_el, sig_global));
+                }
+
+                // Append to parent
+                self.line(&format!("local.get {}", parent));
+                self.line(&format!("local.get {}", var));
+                self.line("call $dom_appendChild");
             }
-            TemplateNode::Link { to, children } => {
+            TemplateNode::Link { to, attributes, children } => {
                 let var = format!("$link_{}", self.next_label());
-                self.line(&format!("(local {} i32)", var));
+                self.emit_template_local(&var);
 
                 // Create an <a> element for the link
                 let tag_offset = self.store_string("a");
@@ -2313,6 +2537,61 @@ impl WasmCodegen {
                 let href_offset = self.store_string("href");
                 self.line(&format!("i32.const {} ;; href attr name ptr", href_offset));
                 self.line("i32.const 4 ;; href attr name len");
+
+                // Generate additional attributes (class, style, aria-*, etc.)
+                for attr in attributes {
+                    match attr {
+                        Attribute::Static { name, value } => {
+                            let name_offset = self.store_string(name);
+                            let val_offset = self.store_string(value);
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("i32.const {}", name_offset));
+                            self.line(&format!("i32.const {}", name.len()));
+                            self.line(&format!("i32.const {}", val_offset));
+                            self.line(&format!("i32.const {}", value.len()));
+                        }
+                        Attribute::EventHandler { event, .. } => {
+                            let event_offset = self.store_string(event);
+                            self.line(&format!(";; event handler: {}", event));
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("i32.const {}", event_offset));
+                            self.line(&format!("i32.const {}", event.len()));
+                            self.line("i32.const 0 ;; handler func index");
+                            self.line("call $dom_addEventListener");
+                        }
+                        Attribute::Aria { name, value } => {
+                            let name_offset = self.store_string(name);
+                            self.line(&format!(";; aria attribute: {}", name));
+                            match value {
+                                Expr::StringLit(s) => {
+                                    let val_offset = self.store_string(s);
+                                    self.line(&format!("local.get {}", var));
+                                    self.line(&format!("i32.const {}", name_offset));
+                                    self.line(&format!("i32.const {}", name.len()));
+                                    self.line(&format!("i32.const {}", val_offset));
+                                    self.line(&format!("i32.const {}", s.len()));
+                                    self.line("call $a11y_setAriaAttribute");
+                                }
+                                _ => {
+                                    self.line(&format!("local.get {}", var));
+                                    self.line(&format!("i32.const {}", name_offset));
+                                    self.line(&format!("i32.const {}", name.len()));
+                                    self.generate_expr(value);
+                                    self.line("call $a11y_setAriaAttribute");
+                                }
+                            }
+                        }
+                        Attribute::Role { value } => {
+                            let val_offset = self.store_string(value);
+                            self.line(&format!(";; role attribute: {}", value));
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("i32.const {}", val_offset));
+                            self.line(&format!("i32.const {}", value.len()));
+                            self.line("call $a11y_setRole");
+                        }
+                        _ => {}
+                    }
+                }
 
                 // Add click handler that calls router.navigate instead of default navigation
                 let click_offset = self.store_string("click");
@@ -2340,7 +2619,7 @@ impl WasmCodegen {
             TemplateNode::Outlet => {
                 // Outlet renders into a container div with a well-known ID
                 let var = format!("$el_{}", self.next_label());
-                self.line(&format!("(local {} i32)", var));
+                self.emit_template_local(&var);
                 let tag_offset = self.store_string("div");
                 self.line(&format!("i32.const {}", tag_offset));
                 self.line(&format!("i32.const {}", "div".len()));
@@ -2409,7 +2688,7 @@ impl WasmCodegen {
         };
 
         let var = format!("$el_{}", self.next_label());
-        self.line(&format!("(local {} i32)", var));
+        self.emit_template_local(&var);
         self.line(&format!(";; layout: <{}> style=\"{}\"", tag, style));
         let tag_offset = self.store_string(tag);
         self.line(&format!("i32.const {}", tag_offset));
@@ -2476,9 +2755,19 @@ impl WasmCodegen {
                 self.line("return");
             }
             Stmt::Expr(expr) => {
+                // Assignments to signal fields produce no value (signal_set is void)
+                let is_signal_assign = if let Expr::Assign { target, .. } = expr {
+                    if let Expr::FieldAccess { object, field } = target.as_ref() {
+                        self.in_component_mount
+                            && matches!(object.as_ref(), Expr::SelfExpr)
+                            && self.component_fields.contains(field)
+                    } else { false }
+                } else { false };
                 self.generate_expr(expr);
-                // Drop result if not used
-                self.line("drop");
+                if !is_signal_assign {
+                    // Drop result if not used
+                    self.line("drop");
+                }
             }
             Stmt::Yield(expr) => {
                 self.line(";; yield — emit value from stream");
@@ -2665,10 +2954,18 @@ impl WasmCodegen {
                 }
             }
             Expr::FieldAccess { object, field } => {
-                self.generate_expr(object);
-                self.line(&format!(";; field access: .{}", field));
-                // TODO: calculate field offset from struct layout
-                self.line("i32.load");
+                if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                    && self.component_fields.contains(field) {
+                    // In component context, self.field reads the signal value
+                    self.line(&format!(";; self.{} (signal)", field));
+                    self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
+                    self.line("call $signal_get");
+                } else {
+                    self.generate_expr(object);
+                    self.line(&format!(";; field access: .{}", field));
+                    // TODO: calculate field offset from struct layout
+                    self.line("i32.load");
+                }
             }
             Expr::MethodCall { object, method, args } => {
                 self.generate_iterator_method(object, method, args);
@@ -2697,9 +2994,22 @@ impl WasmCodegen {
                 self.line(")");
             }
             Expr::Assign { target, value } => {
-                self.generate_expr(value);
-                if let Expr::Ident(name) = target.as_ref() {
-                    self.line(&format!("local.set ${}", name));
+                if let Expr::FieldAccess { object, field } = target.as_ref() {
+                    if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                        && self.component_fields.contains(field) {
+                        // self.field = value → signal_set(signal_id, value)
+                        self.line(&format!(";; self.{} = ... (signal set)", field));
+                        self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
+                        self.generate_expr(value);
+                        self.line("call $signal_set");
+                    } else {
+                        self.generate_expr(value);
+                    }
+                } else {
+                    self.generate_expr(value);
+                    if let Expr::Ident(name) = target.as_ref() {
+                        self.line(&format!("local.set ${}", name));
+                    }
                 }
             }
             Expr::Await(inner) => {
@@ -3106,7 +3416,7 @@ impl WasmCodegen {
         // Simple approach: write digits to scratch buffer, reverse, allocate
         self.emit("(func $string_fromI32 (param $val i32) (result i32 i32)");
         self.indent += 1;
-        self.line("(local $ptr i32) (local $len i32) (local $neg i32) (local $buf i32) (local $n i32)");
+        self.line("(local $ptr i32) (local $len i32) (local $neg i32) (local $buf i32) (local $n i32) (local $i i32)");
         self.line("i32.const 32");
         self.line("call $alloc");
         self.line("local.set $buf");
@@ -3175,8 +3485,7 @@ impl WasmCodegen {
         self.line("  i32.const 45"); // '-'
         self.line("  i32.store8");
         self.line("end");
-        // Reverse copy digits
-        self.line("(local $i i32)");
+        // Reverse copy digits (local $i already declared above)
         self.line("i32.const 0");
         self.line("local.set $i");
         self.line("block $rdone");
@@ -5355,7 +5664,7 @@ impl WasmCodegen {
         self.line("end");
         // If match, return enabled value
         self.line("local.get $match");
-        self.line("if (result i32)");
+        self.line("if");
         self.indent += 1;
         self.line("local.get $addr");
         self.line("i32.load offset=60");
@@ -5635,13 +5944,14 @@ mod tests {
 #[cfg(test)]
 mod iterator_codegen_tests {
     use super::*;
-    use crate::ast::*;
     use crate::token::Span;
 
+    #[allow(dead_code)]
     fn span() -> Span {
         Span::new(0, 0, 1, 1)
     }
 
+    #[allow(dead_code)]
     fn block(stmts: Vec<Stmt>) -> Block {
         Block { stmts, span: span() }
     }
@@ -6617,6 +6927,7 @@ mod coverage_codegen_tests {
         codegen.generate(&program)
     }
 
+    #[allow(dead_code)]
     fn parse(src: &str) -> Program {
         let mut lexer = Lexer::new(src);
         let tokens = lexer.tokenize().unwrap();
@@ -6626,10 +6937,12 @@ mod coverage_codegen_tests {
         program
     }
 
+    #[allow(dead_code)]
     fn span() -> Span {
         Span::new(0, 0, 1, 1)
     }
 
+    #[allow(dead_code)]
     fn block(stmts: Vec<Stmt>) -> Block {
         Block { stmts, span: span() }
     }
@@ -6645,7 +6958,7 @@ mod coverage_codegen_tests {
             "\"dom\"", "\"timer\"", "\"webapi\"", "\"http\"", "\"observe\"",
             "\"ws\"", "\"db\"", "\"worker\"", "\"pwa\"", "\"hardware\"",
             "\"payment\"", "\"auth\"", "\"upload\"", "\"time\"", "\"streaming\"",
-            "\"rtc\"",
+            "\"rtc\"", "\"gpu\"",
         ];
         for ns in &namespaces {
             assert!(wat.contains(ns), "missing import namespace: {}", ns);
@@ -6736,6 +7049,79 @@ mod coverage_codegen_tests {
         ];
         for import in &imports {
             assert!(wat.contains(import), "missing RTC state query import: {}", import);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // GPU import verification
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gpu_initialization_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$gpu_requestAdapter",
+            "$gpu_requestDevice",
+            "$gpu_getPreferredFormat",
+            "$gpu_getAdapterInfo",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing GPU initialization import: {}", import);
+        }
+    }
+
+    #[test]
+    fn gpu_resource_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$gpu_createBuffer",
+            "$gpu_writeBuffer",
+            "$gpu_createShaderModule",
+            "$gpu_createRenderPipeline",
+            "$gpu_createTexture",
+            "$gpu_createTextureView",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing GPU resource import: {}", import);
+        }
+    }
+
+    #[test]
+    fn gpu_rendering_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$gpu_beginRenderPass",
+            "$gpu_setPipeline",
+            "$gpu_setVertexBuffer",
+            "$gpu_draw",
+            "$gpu_submitRenderPass",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing GPU rendering import: {}", import);
+        }
+    }
+
+    #[test]
+    fn gpu_canvas_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$gpu_configureCanvas",
+            "$gpu_getCurrentTexture",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing GPU canvas import: {}", import);
+        }
+    }
+
+    #[test]
+    fn gpu_cleanup_imports_present() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        let imports = [
+            "$gpu_destroyBuffer",
+            "$gpu_destroyTexture",
+        ];
+        for import in &imports {
+            assert!(wat.contains(import), "missing GPU cleanup import: {}", import);
         }
     }
 
@@ -8748,6 +9134,7 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         let link = TemplateNode::Link {
             to: Expr::StringLit("/about".into()),
+            attributes: vec![],
             children: vec![TemplateNode::TextLiteral("About".into())],
         };
         codegen.generate_template(&link, "$root");

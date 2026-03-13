@@ -14,6 +14,7 @@ pub struct FormatterOptions {
     /// Maximum line width before breaking (default: 100).
     pub max_line_width: usize,
     /// Append trailing commas in multi-line lists (default: true).
+    #[allow(dead_code)]
     pub trailing_commas: bool,
     /// Expressions shorter than this stay on one line (default: 60).
     pub single_line_threshold: usize,
@@ -1197,11 +1198,20 @@ impl Formatter {
                     self.format_template_node(child);
                 }
             }
-            TemplateNode::Link { to, children } => {
+            TemplateNode::Link { to, attributes, children } => {
                 self.push_indent();
                 self.push("<Link to={");
                 self.push(&self.format_expr_to_string(to));
-                self.push("}>");
+                self.push("}");
+                for attr in attributes {
+                    match attr {
+                        Attribute::Static { name, value } => {
+                            self.push(&format!(" {}=\"{}\"", name, value));
+                        }
+                        _ => {}
+                    }
+                }
+                self.push(">");
                 self.newline();
                 self.inc();
                 for child in children {
@@ -1528,7 +1538,7 @@ mod tests {
             max_line_width: 40,
             ..Default::default()
         };
-        let mut fmt = Formatter::new(opts);
+        let fmt = Formatter::new(opts);
 
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("some_very_long_variable_name".to_string())),
@@ -3472,6 +3482,7 @@ mod tests {
             render: RenderBlock {
                 body: TemplateNode::Link {
                     to: Expr::StringLit("/about".to_string()),
+                    attributes: vec![],
                     children: vec![TemplateNode::TextLiteral("About".to_string())],
                 },
                 span: dummy_span(),

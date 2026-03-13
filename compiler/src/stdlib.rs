@@ -20,6 +20,7 @@ pub struct BuiltinType {
     /// Number of generic type parameters (e.g. Vec<T> = 1, HashMap<K,V> = 2).
     pub type_params: Vec<String>,
     /// Human-readable description.
+    #[allow(dead_code)]
     pub description: String,
     /// Methods available on this type.
     pub methods: Vec<BuiltinFn>,
@@ -31,6 +32,7 @@ pub struct BuiltinType {
 #[derive(Debug, Clone)]
 pub struct BuiltinVariant {
     pub name: String,
+    #[allow(dead_code)]
     pub fields: Vec<Type>,
 }
 
@@ -48,6 +50,7 @@ pub struct BuiltinFn {
     /// Whether `self` is taken mutably.
     pub self_mutable: bool,
     /// Human-readable description.
+    #[allow(dead_code)]
     pub description: String,
 }
 
@@ -116,6 +119,7 @@ impl StdLib {
         stdlib.register_share_functions();
         stdlib.register_wizard_functions();
         stdlib.register_rtc_functions();
+        stdlib.register_gpu_functions();
 
         stdlib
     }
@@ -138,11 +142,13 @@ impl StdLib {
     }
 
     /// Return an iterator over all registered type names.
+    #[allow(dead_code)]
     pub fn type_names(&self) -> impl Iterator<Item = &str> {
         self.types.keys().map(|s| s.as_str())
     }
 
     /// Return an iterator over all registered free-function names.
+    #[allow(dead_code)]
     pub fn function_names(&self) -> impl Iterator<Item = &str> {
         self.functions.keys().map(|s| s.as_str())
     }
@@ -1448,7 +1454,7 @@ impl StdLib {
         let string_ty = Type::Named("String".into());
         let i32_ty = Type::Named("i32".into());
         let any_array = Type::Array(Box::new(Type::Named("Any".into())));
-        let bool_ty = Type::Named("bool".into());
+        let _bool_ty = Type::Named("bool".into());
 
         let fns = vec![
             BuiltinFn {
@@ -1527,7 +1533,7 @@ impl StdLib {
     fn register_url_functions(&mut self) {
         let string_ty = Type::Named("String".into());
         let option_string = Type::Named("Option".into()); // Option<String>
-        let bool_ty = Type::Named("bool".into());
+        let _bool_ty = Type::Named("bool".into());
 
         // Register Url struct type
         self.register_type(BuiltinType {
@@ -2325,11 +2331,11 @@ impl StdLib {
     // -- Chart --------------------------------------------------------------
     // Pure WASM — renders to SVG/Canvas via DOM syscalls.
     fn register_chart_functions(&mut self) {
-        let string_ty = Type::Named("String".into());
+        let _string_ty = Type::Named("String".into());
         let i32_ty = Type::Named("i32".into());
-        let f64_ty = Type::Named("f64".into());
+        let _f64_ty = Type::Named("f64".into());
         let unit_ty = Type::Named("Unit".into());
-        let bool_ty = Type::Named("bool".into());
+        let _bool_ty = Type::Named("bool".into());
 
         // Register chart-related types
         self.register_type(BuiltinType {
@@ -3214,6 +3220,464 @@ impl StdLib {
 
         for f in fns { self.register_fn(f); }
     }
+
+    fn register_gpu_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let f32_ty = Type::Named("f32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        // Register GPU handle types
+        self.register_type(BuiltinType {
+            name: "GpuAdapter".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU adapter. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuDevice".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU device. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuBuffer".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU buffer. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuShaderModule".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU shader module. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuRenderPipeline".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU render pipeline. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuTexture".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU texture. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuTextureView".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU texture view. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuCanvasContext".into(),
+            type_params: vec![],
+            description: "Handle to a WebGPU canvas context. JS syscall bridge.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        // Register math types with methods — pure WASM
+        self.register_type(BuiltinType {
+            name: "Vec2".into(),
+            type_params: vec![],
+            description: "2D vector for GPU math. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "Vec3".into(),
+            type_params: vec![],
+            description: "3D vector for GPU math. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "Vec4".into(),
+            type_params: vec![],
+            description: "4D vector for GPU math. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "Mat4".into(),
+            type_params: vec![],
+            description: "4x4 matrix for GPU math. Pure WASM.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        // Register enum-like types
+        self.register_type(BuiltinType {
+            name: "GpuVertexFormat".into(),
+            type_params: vec![],
+            description: "Vertex format enum for WebGPU pipelines.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuBufferUsage".into(),
+            type_params: vec![],
+            description: "Buffer usage flags for WebGPU buffers.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+        self.register_type(BuiltinType {
+            name: "GpuPrimitiveTopology".into(),
+            type_params: vec![],
+            description: "Primitive topology enum for WebGPU pipelines.".into(),
+            methods: vec![],
+            variants: vec![],
+        });
+
+        let fns = vec![
+            // -- JS syscall bridges (19 functions) --
+            BuiltinFn {
+                name: "gpu_request_adapter".into(),
+                params: vec![BuiltinParam { name: "power_preference".into(), ty: string_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Request a GPU adapter. Returns adapter ID. JS syscall: navigator.gpu.requestAdapter().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_request_device".into(),
+                params: vec![BuiltinParam { name: "adapter_id".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Request a GPU device from adapter. Returns device ID. JS syscall: adapter.requestDevice().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_configure_canvas".into(),
+                params: vec![
+                    BuiltinParam { name: "canvas_el_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Configure a canvas for WebGPU rendering. Returns context ID. JS syscall: canvas.getContext('webgpu').".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_buffer".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "size".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "usage".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a GPU buffer. Returns buffer ID. JS syscall: device.createBuffer().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_write_buffer".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "buffer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "data_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "data_len".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "offset".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Write data to a GPU buffer. JS syscall: device.queue.writeBuffer().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_shader_module".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "code".into(), ty: string_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a shader module from WGSL code. Returns module ID. JS syscall: device.createShaderModule().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_render_pipeline".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a render pipeline. Returns pipeline ID. JS syscall: device.createRenderPipeline().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_texture".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a texture. Returns texture ID. JS syscall: device.createTexture().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_begin_render_pass".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Begin a render pass. Returns encoder ID. JS syscall: commandEncoder.beginRenderPass().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_set_pipeline".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "pipeline_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set the render pipeline on a pass encoder. JS syscall: passEncoder.setPipeline().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_set_vertex_buffer".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "slot".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "buffer_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set a vertex buffer on a pass encoder. JS syscall: passEncoder.setVertexBuffer().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_draw".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "vertex_count".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "instance_count".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "first_vertex".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "first_instance".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Issue a draw call. JS syscall: passEncoder.draw().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_submit_render_pass".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "End and submit a render pass. JS syscall: device.queue.submit().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_get_current_texture".into(),
+                params: vec![BuiltinParam { name: "canvas_ctx_id".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get current texture from canvas context. Returns texture ID. JS syscall: ctx.getCurrentTexture().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_texture_view".into(),
+                params: vec![BuiltinParam { name: "texture_id".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a texture view. Returns view ID. JS syscall: texture.createView().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_destroy_buffer".into(),
+                params: vec![BuiltinParam { name: "buffer_id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a GPU buffer. JS syscall: buffer.destroy().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_destroy_texture".into(),
+                params: vec![BuiltinParam { name: "texture_id".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Destroy a GPU texture. JS syscall: texture.destroy().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_get_preferred_format".into(),
+                params: vec![],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get preferred canvas format. JS syscall: navigator.gpu.getPreferredCanvasFormat().".into(),
+            },
+            BuiltinFn {
+                name: "gpu_get_adapter_info".into(),
+                params: vec![BuiltinParam { name: "adapter_id".into(), ty: i32_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get adapter info as JSON string. JS syscall: adapter.requestAdapterInfo().".into(),
+            },
+
+            // -- Pure WASM functions (no JS bridge) --
+            BuiltinFn {
+                name: "gpu_vertex_buffer_data".into(),
+                params: vec![
+                    BuiltinParam { name: "data_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "data_len".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Pack vertex buffer data for upload. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage_vertex".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return VERTEX buffer usage constant (0x0020). Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage_index".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return INDEX buffer usage constant (0x0010). Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage_uniform".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return UNIFORM buffer usage constant (0x0040). Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage_copy_dst".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return COPY_DST buffer usage constant (0x0008). Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage".into(),
+                params: vec![
+                    BuiltinParam { name: "flags".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "flags2".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Combine buffer usage flags with bitwise OR. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_identity".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return a 4x4 identity matrix pointer. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_perspective".into(),
+                params: vec![
+                    BuiltinParam { name: "fovy".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "aspect".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "near".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "far".into(), ty: f32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a perspective projection matrix. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_look_at".into(),
+                params: vec![
+                    BuiltinParam { name: "eye_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "center_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "up_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a look-at view matrix. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_rotate".into(),
+                params: vec![
+                    BuiltinParam { name: "mat_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "angle".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "axis_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Rotate a matrix by angle around axis. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_translate".into(),
+                params: vec![
+                    BuiltinParam { name: "mat_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "v_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Translate a matrix by a vector. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_scale".into(),
+                params: vec![
+                    BuiltinParam { name: "mat_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "v_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Scale a matrix by a vector. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_mat4_multiply".into(),
+                params: vec![
+                    BuiltinParam { name: "a_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "b_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Multiply two 4x4 matrices. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_vec3_new".into(),
+                params: vec![
+                    BuiltinParam { name: "x".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "y".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "z".into(), ty: f32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a new Vec3. Returns pointer. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_vec3_normalize".into(),
+                params: vec![BuiltinParam { name: "v_ptr".into(), ty: i32_ty.clone() }],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Normalize a Vec3. Returns pointer. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_vec3_cross".into(),
+                params: vec![
+                    BuiltinParam { name: "a_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "b_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Cross product of two Vec3s. Returns pointer. Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_vec3_dot".into(),
+                params: vec![
+                    BuiltinParam { name: "a_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "b_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: f32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Dot product of two Vec3s. Returns f32. Pure WASM — no JS bridge.".into(),
+            },
+        ];
+
+        for f in fns { self.register_fn(f); }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3605,5 +4069,232 @@ mod tests {
         let lib = stdlib();
         let f = lib.lookup_fn("rtc_get_display_media").unwrap();
         assert_eq!(f.params.len(), 0);
+    }
+
+    // --- GPU / WebGPU ---
+
+    #[test]
+    fn gpu_types_are_registered() {
+        let lib = stdlib();
+        for name in &[
+            "GpuAdapter", "GpuDevice", "GpuBuffer", "GpuShaderModule",
+            "GpuRenderPipeline", "GpuTexture", "GpuTextureView", "GpuCanvasContext",
+            "Vec2", "Vec3", "Vec4", "Mat4",
+            "GpuVertexFormat", "GpuBufferUsage", "GpuPrimitiveTopology",
+        ] {
+            assert!(
+                lib.lookup_type(name).is_some(),
+                "expected GPU type `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_initialization_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_request_adapter",
+            "gpu_request_device",
+            "gpu_get_preferred_format",
+            "gpu_get_adapter_info",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_resource_creation_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_create_buffer",
+            "gpu_write_buffer",
+            "gpu_create_shader_module",
+            "gpu_create_render_pipeline",
+            "gpu_create_texture",
+            "gpu_create_texture_view",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU resource function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_rendering_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_begin_render_pass",
+            "gpu_set_pipeline",
+            "gpu_set_vertex_buffer",
+            "gpu_draw",
+            "gpu_submit_render_pass",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU rendering function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_canvas_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_configure_canvas",
+            "gpu_get_current_texture",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU canvas function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_cleanup_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_destroy_buffer",
+            "gpu_destroy_texture",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU cleanup function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_wasm_internal_math_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_mat4_identity",
+            "gpu_mat4_perspective",
+            "gpu_mat4_look_at",
+            "gpu_mat4_rotate",
+            "gpu_mat4_translate",
+            "gpu_mat4_scale",
+            "gpu_mat4_multiply",
+            "gpu_vec3_new",
+            "gpu_vec3_normalize",
+            "gpu_vec3_cross",
+            "gpu_vec3_dot",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected WASM-internal GPU math function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_wasm_internal_buffer_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_vertex_buffer_data",
+            "gpu_buffer_usage_vertex",
+            "gpu_buffer_usage_index",
+            "gpu_buffer_usage_uniform",
+            "gpu_buffer_usage_copy_dst",
+            "gpu_buffer_usage",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected WASM-internal GPU buffer function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_request_adapter_takes_string_returns_i32() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_request_adapter").unwrap();
+        assert_eq!(f.params.len(), 1);
+        assert_eq!(f.params[0].name, "power_preference");
+        match &f.params[0].ty {
+            Type::Named(n) => assert_eq!(n, "String"),
+            other => panic!("expected String param type, got {:?}", other),
+        }
+        match &f.return_type {
+            Type::Named(n) => assert_eq!(n, "i32"),
+            other => panic!("expected i32 return type, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn gpu_create_buffer_takes_three_i32_returns_i32() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_create_buffer").unwrap();
+        assert_eq!(f.params.len(), 3);
+        assert_eq!(f.params[0].name, "device_id");
+        assert_eq!(f.params[1].name, "size");
+        assert_eq!(f.params[2].name, "usage");
+        match &f.return_type {
+            Type::Named(n) => assert_eq!(n, "i32"),
+            other => panic!("expected i32 return type, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn gpu_draw_takes_five_i32_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_draw").unwrap();
+        assert_eq!(f.params.len(), 5);
+        assert_eq!(f.params[0].name, "encoder_id");
+        assert_eq!(f.params[1].name, "vertex_count");
+        assert_eq!(f.params[2].name, "instance_count");
+        assert_eq!(f.params[3].name, "first_vertex");
+        assert_eq!(f.params[4].name, "first_instance");
+    }
+
+    #[test]
+    fn gpu_functions_are_not_methods() {
+        let lib = stdlib();
+        let gpu_fns = [
+            "gpu_request_adapter", "gpu_request_device", "gpu_create_buffer",
+            "gpu_draw", "gpu_destroy_buffer", "gpu_mat4_identity",
+            "gpu_vec3_new",
+        ];
+        for name in &gpu_fns {
+            let f = lib.lookup_fn(name).expect(name);
+            assert!(!f.takes_self, "{} should not take self", name);
+            assert!(!f.self_mutable, "{} should not be self_mutable", name);
+        }
+    }
+
+    #[test]
+    fn gpu_mat4_perspective_takes_four_f32() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_mat4_perspective").unwrap();
+        assert_eq!(f.params.len(), 4);
+        assert_eq!(f.params[0].name, "fovy");
+        assert_eq!(f.params[1].name, "aspect");
+        assert_eq!(f.params[2].name, "near");
+        assert_eq!(f.params[3].name, "far");
+        for p in &f.params {
+            match &p.ty {
+                Type::Named(n) => assert_eq!(n, "f32"),
+                other => panic!("expected f32 param type for {}, got {:?}", p.name, other),
+            }
+        }
     }
 }
