@@ -2180,11 +2180,14 @@ impl WasmCodegen {
         for (i, route) in router.routes.iter().enumerate() {
             self.line(&format!(";; route: {} => {}", route.path, route.component));
             let path_offset = self.store_string(&route.path);
+            // Add the route mount function to the function table and use its table index
+            let func_name = format!("$__route_mount_{}", i);
+            let table_idx = self.closure_func_names.len();
+            self.closure_func_names.push(func_name);
             self.line(&format!("i32.const {} ;; path ptr", path_offset));
             self.line(&format!("i32.const {} ;; path len", route.path.len()));
-            self.line(&format!("i32.const {} ;; mount fn index for {}", i, route.component));
+            self.line(&format!("i32.const {} ;; table index for {}", table_idx, route.component));
             self.line("call $router_registerRoute");
-            let _ = i;
         }
 
         // Initialize the router (triggers initial route match)
