@@ -250,6 +250,7 @@ export const wasmImports = {
     setText(elId, ptr, len) { R.__getElement(elId).textContent = R.__getString(ptr, len); },
     appendChild(parentId, childId) { R.__getElement(parentId).appendChild(R.__getElement(childId)); },
     setAttribute(elId, nPtr, nLen, vPtr, vLen) { R.__getElement(elId).setAttribute(R.__getString(nPtr, nLen), R.__getString(vPtr, vLen)); },
+    setStyle(elId, pPtr, pLen, vPtr, vLen) { R.__getElement(elId).style.setProperty(R.__getString(pPtr, pLen), R.__getString(vPtr, vLen)); },
 
     setTitle(ptr, len) { document.title = R.__getString(ptr, len); },
 
