@@ -3547,7 +3547,7 @@ impl WasmCodegen {
 
     fn emit_alloc_function(&mut self) {
         self.line(";; Simple bump allocator");
-        self.emit("(func $alloc (param $size i32) (result i32)");
+        self.emit("(func $alloc (export \"alloc\") (param $size i32) (result i32)");
         self.indent += 1;
         self.line("(local $ptr i32)");
         self.line("global.get $heap_ptr");
