@@ -60,8 +60,10 @@ const NectarRuntime = {
   },
   __allocString(str) {
     const bytes = this.__encoder.encode(str);
-    const ptr = this.__instance.exports.alloc(bytes.length);
-    new Uint8Array(this.__memory.buffer, ptr, bytes.length).set(bytes);
+    const ptr = this.__instance.exports.alloc(bytes.length + 1);
+    const view = new Uint8Array(this.__memory.buffer, ptr, bytes.length + 1);
+    view.set(bytes);
+    view[bytes.length] = 0;
     return ptr;
   },
   __allocStringWithLen(str) {
