@@ -2245,7 +2245,29 @@ impl WasmCodegen {
             ));
             self.indent += 1;
             self.line(";; fallback route component");
-            self.generate_template(fallback, "$root");
+            // If the fallback is a component reference (Ident matching known component),
+            // call its mount function directly instead of treating it as an expression
+            let mut handled = false;
+            if let TemplateNode::Expression(expr) = fallback.as_ref() {
+                if let Expr::Ident(name) = expr.as_ref() {
+                    if self.known_components.contains(name) {
+                        self.line("local.get $root");
+                        let prop_defs: Vec<String> = self.component_prop_defs.iter()
+                            .find(|(n, _)| n == name)
+                            .map(|(_, props)| props.clone())
+                            .unwrap_or_default();
+                        for _ in &prop_defs {
+                            self.line("i32.const 0");
+                            self.line("i32.const 0");
+                        }
+                        self.line(&format!("call ${}_mount", name));
+                        handled = true;
+                    }
+                }
+            }
+            if !handled {
+                self.generate_template(fallback, "$root");
+            }
             self.indent -= 1;
             self.line(")");
         }
@@ -4058,6 +4080,95 @@ impl WasmCodegen {
         self.line("global.get $__route_count  i32.const 1  i32.add  global.set $__route_count");
         self.indent -= 1;
         self.line(")");
+
+        // Router container element ID — set during router_init
+        self.line("(global $__router_container (mut i32) (i32.const 0))");
+        // Scratch area for pathname from JS (JS writes path bytes here, then calls navigate)
+        self.line("(global $__router_path_scratch i32 (i32.const 458752))"); // 448KB offset
+
+        // router_init: register the container, read pathname via scratch area
+        // The routes_config param is ignored (we use the route table directly)
+        self.emit("(func $router_init (param $cfg_ptr i32) (param $cfg_len i32)");
+        self.indent += 1;
+        self.line("(local $path_ptr i32) (local $path_len i32)");
+        self.line(";; Router container is the root element");
+        self.line("call $dom_getRoot");
+        self.line("global.set $__router_container");
+        self.line(";; Get current pathname from browser (returned as ptr into WASM memory)");
+        self.line("call $webapi_getLocationPathname");
+        self.line("local.set $path_ptr");
+        self.line("i32.const 0  local.set $path_len");
+        self.line("block $end  loop $measure");
+        self.line("  local.get $path_ptr  local.get $path_len  i32.add  i32.load8_u");
+        self.line("  i32.eqz  br_if $end");
+        self.line("  local.get $path_len  i32.const 1  i32.add  local.set $path_len");
+        self.line("  local.get $path_len  i32.const 4096  i32.ge_u  br_if $end");
+        self.line("  br $measure");
+        self.line("end  end");
+        self.line(";; Navigate to the current path");
+        self.line("local.get $path_ptr");
+        self.line("local.get $path_len");
+        self.line("call $router_navigate");
+        self.indent -= 1;
+        self.line(")");
+
+        // router_navigate: match path against route table, pushState, mount component
+        // Uses call_indirect to call the matching __route_mount_N function
+        self.emit("(func $router_navigate (export \"__router_navigate\") (param $path_ptr i32) (param $path_len i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $addr i32) (local $rpath_ptr i32) (local $rpath_len i32) (local $cb_idx i32)");
+        self.line(";; Push browser history state");
+        self.line("local.get $path_ptr");
+        self.line("local.get $path_len");
+        self.line("call $webapi_pushState");
+        self.line(";; Scan route table for matching path");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $i  global.get $__route_count  i32.ge_u  br_if $done");
+        self.line("    global.get $__route_base  local.get $i  i32.const 32  i32.mul  i32.add  local.set $addr");
+        self.line("    local.get $addr  i32.load  local.set $rpath_ptr");
+        self.line("    local.get $addr  i32.const 4  i32.add  i32.load  local.set $rpath_len");
+        self.line("    local.get $addr  i32.const 16  i32.add  i32.load  local.set $cb_idx");
+        self.line("    ;; Compare path lengths first");
+        self.line("    local.get $path_len  local.get $rpath_len  i32.eq");
+        self.line("    if");
+        self.line("      ;; Compare path bytes");
+        self.line("      local.get $path_ptr  local.get $rpath_ptr  local.get $path_len  call $mem_compare");
+        self.line("      i32.const 1  i32.eq");
+        self.line("      if");
+        self.line("        ;; Match found — call the mount function via table");
+        self.line("        global.get $__router_container");
+        self.line("        local.get $cb_idx");
+        self.line("        call_indirect (type $__effect_type_i32)");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // mem_compare: compare two byte sequences, return 1 if equal
+        self.emit("(func $mem_compare (param $a i32) (param $b i32) (param $len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32)");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $ne");
+        self.line("  loop $cmp");
+        self.line("    local.get $i  local.get $len  i32.ge_u  br_if $ne");
+        self.line("    local.get $a  local.get $i  i32.add  i32.load8_u");
+        self.line("    local.get $b  local.get $i  i32.add  i32.load8_u");
+        self.line("    i32.ne  if  i32.const 0  return  end");
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("    br $cmp");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 1");
+        self.indent -= 1;
+        self.line(")");
     }
 
     /// Pure-WASM crypto runtime. All algorithms in linear memory, zero JS.
@@ -4471,6 +4582,8 @@ impl WasmCodegen {
 
         // Type for effect callbacks: (func) — no params, no results
         self.line("(type $__effect_type (func))");
+        // Type for route mount callbacks: (func (param i32)) — takes root element ID
+        self.line("(type $__effect_type_i32 (func (param i32)))");
 
         // $signal_create (param $initial i32) (result i32)
         self.line("");
