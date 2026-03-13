@@ -38,6 +38,8 @@ pub struct WasmCodegen {
     component_name: String,
     /// Deferred signal→DOM updater functions: (func_name, global_el_name, signal_global_name)
     signal_updaters: Vec<(String, String, String)>,
+    /// Names of components defined in this program (for detecting component instantiation)
+    known_components: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +69,7 @@ impl WasmCodegen {
             component_fields: Vec::new(),
             component_name: String::new(),
             signal_updaters: Vec::new(),
+            known_components: Vec::new(),
         }
     }
 
@@ -90,6 +93,7 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"setText\" (func $dom_setText (param i32 i32 i32)))");
         self.line("(import \"dom\" \"appendChild\" (func $dom_appendChild (param i32 i32)))");
         self.line("(import \"dom\" \"setAttribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"dom\" \"setStyle\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"createTextNode\" (func $dom_createTextNode (param i32 i32) (result i32)))");
         self.line("(import \"dom\" \"getBody\" (func $dom_getBody (result i32)))");
         self.line("(import \"dom\" \"getHead\" (func $dom_getHead (result i32)))");
@@ -350,6 +354,16 @@ impl WasmCodegen {
         self.emit_flags_runtime();
         self.emit_ai_runtime();
         self.emit_a11y_runtime();
+
+        // Pre-collect component names so template codegen can detect component instantiation
+        for item in &program.items {
+            match item {
+                Item::Component(c) => self.known_components.push(c.name.clone()),
+                Item::LazyComponent(lc) => self.known_components.push(lc.component.name.clone()),
+                Item::Page(p) => self.known_components.push(p.name.clone()),
+                _ => {}
+            }
+        }
 
         // Collect test definitions for the test runner
         let mut test_defs: Vec<(&str, usize)> = Vec::new();
@@ -2322,6 +2336,28 @@ impl WasmCodegen {
     fn generate_template(&mut self, node: &TemplateNode, parent: &str) {
         match node {
             TemplateNode::Element(el) => {
+                // Check if this is a component instantiation
+                if self.known_components.contains(&el.tag) {
+                    let comp_name = el.tag.clone();
+                    self.line(&format!(";; component instantiation: <{} />", comp_name));
+                    let container_var = format!("$comp_{}", self.next_label());
+                    self.emit_template_local(&container_var);
+                    // Create a container div for the child component
+                    let tag_offset = self.store_string("div");
+                    self.line(&format!("i32.const {}", tag_offset));
+                    self.line("i32.const 3");
+                    self.line("call $dom_createElement");
+                    self.line(&format!("local.set {}", container_var));
+                    // Append container to parent
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("local.get {}", container_var));
+                    self.line("call $dom_appendChild");
+                    // Mount the child component into the container
+                    self.line(&format!("local.get {}", container_var));
+                    self.line(&format!("call ${}_mount", comp_name));
+                    return;
+                }
+
                 let var = format!("$el_{}", self.next_label());
                 self.emit_template_local(&var);
 
@@ -2645,30 +2681,60 @@ impl WasmCodegen {
         }
     }
 
-    /// Generate code for layout primitives — compile to semantic HTML + inline styles
+    /// Generate code for layout primitives — individual style properties.
+    /// Emits both native names (direction, gap, align, justify) for the native runtime
+    /// and CSS names (flex-direction, gap, align-items) for web compatibility.
     fn generate_layout_node(&mut self, node: &LayoutNode, parent: &str) {
-        let (tag, style, children) = match node {
+        // Collect tag, styles, and children from the layout node
+        let mut styles: Vec<(String, String)> = Vec::new();
+
+        let (tag, children) = match node {
             LayoutNode::Stack { gap, children, .. } => {
                 let g = gap.as_deref().unwrap_or("0");
-                ("section", format!("display:flex;flex-direction:column;gap:{}px", g), children)
+                styles.push(("display".into(), "flex".into()));
+                styles.push(("flex-direction".into(), "column".into()));
+                styles.push(("direction".into(), "vertical".into()));
+                styles.push(("gap".into(), format!("{}px", g)));
+                ("section", children)
             }
             LayoutNode::Row { gap, align, children, .. } => {
                 let g = gap.as_deref().unwrap_or("0");
                 let a = align.as_deref().unwrap_or("stretch");
-                ("div", format!("display:flex;flex-direction:row;gap:{}px;align-items:{}", g, a), children)
+                styles.push(("display".into(), "flex".into()));
+                styles.push(("flex-direction".into(), "row".into()));
+                styles.push(("direction".into(), "horizontal".into()));
+                styles.push(("gap".into(), format!("{}px", g)));
+                styles.push(("align-items".into(), a.into()));
+                styles.push(("align".into(), a.into()));
+                ("div", children)
             }
             LayoutNode::Grid { cols, rows: _, gap, children, .. } => {
                 let c = cols.as_deref().unwrap_or("1");
                 let g = gap.as_deref().unwrap_or("0");
-                ("div", format!("display:grid;grid-template-columns:repeat({},1fr);gap:{}px", c, g), children)
+                styles.push(("display".into(), "grid".into()));
+                styles.push(("grid-template-columns".into(), format!("repeat({},1fr)", c)));
+                styles.push(("gap".into(), format!("{}px", g)));
+                ("div", children)
             }
             LayoutNode::Center { max_width, children, .. } => {
                 let mw = max_width.as_deref().unwrap_or("none");
-                ("div", format!("display:flex;justify-content:center;align-items:center;max-width:{}px;margin:0 auto", mw), children)
+                styles.push(("display".into(), "flex".into()));
+                styles.push(("justify-content".into(), "center".into()));
+                styles.push(("justify".into(), "center".into()));
+                styles.push(("align-items".into(), "center".into()));
+                styles.push(("align".into(), "center".into()));
+                styles.push(("max-width".into(), format!("{}px", mw)));
+                ("div", children)
             }
             LayoutNode::Cluster { gap, children, .. } => {
                 let g = gap.as_deref().unwrap_or("0");
-                ("div", format!("display:flex;flex-wrap:wrap;gap:{}px", g), children)
+                styles.push(("display".into(), "flex".into()));
+                styles.push(("flex-direction".into(), "row".into()));
+                styles.push(("direction".into(), "horizontal".into()));
+                styles.push(("flex-wrap".into(), "wrap".into()));
+                styles.push(("wrap".into(), "true".into()));
+                styles.push(("gap".into(), format!("{}px", g)));
+                ("div", children)
             }
             LayoutNode::Sidebar { side, width, children, .. } => {
                 let s = side.as_deref().unwrap_or("left");
@@ -2678,33 +2744,33 @@ impl WasmCodegen {
                 } else {
                     format!("{}px 1fr", w)
                 };
-                ("div", format!("display:grid;grid-template-columns:{}", cols), children)
+                styles.push(("display".into(), "grid".into()));
+                styles.push(("grid-template-columns".into(), cols));
+                ("div", children)
             }
-            LayoutNode::Switcher { threshold, children, .. } => {
-                let t = threshold.as_deref().unwrap_or("600");
-                // Uses flexbox with a basis that triggers wrapping
-                ("div", format!("display:flex;flex-wrap:wrap;--threshold:{}px", t), children)
+            LayoutNode::Switcher { threshold: _, children, .. } => {
+                styles.push(("display".into(), "flex".into()));
+                styles.push(("flex-direction".into(), "row".into()));
+                styles.push(("direction".into(), "horizontal".into()));
+                styles.push(("flex-wrap".into(), "wrap".into()));
+                styles.push(("wrap".into(), "true".into()));
+                ("div", children)
             }
         };
 
         let var = format!("$el_{}", self.next_label());
         self.emit_template_local(&var);
-        self.line(&format!(";; layout: <{}> style=\"{}\"", tag, style));
+        self.line(&format!(";; layout: <{}>", tag));
         let tag_offset = self.store_string(tag);
         self.line(&format!("i32.const {}", tag_offset));
         self.line(&format!("i32.const {}", tag.len()));
         self.line("call $dom_createElement");
         self.line(&format!("local.set {}", var));
 
-        // Set inline style
-        let style_name = self.store_string("style");
-        let style_val = self.store_string(&style);
-        self.line(&format!("local.get {}", var));
-        self.line(&format!("i32.const {} ;; \"style\" ptr", style_name));
-        self.line(&format!("i32.const {} ;; \"style\" len", "style".len()));
-        self.line(&format!("i32.const {} ;; style value ptr", style_val));
-        self.line(&format!("i32.const {} ;; style value len", style.len()));
-        self.line("call $dom_setAttr");
+        // Set individual style properties
+        for (prop, val) in &styles {
+            self.emit_set_style(&var, prop, val);
+        }
 
         // Render children
         for child in children {
@@ -2715,6 +2781,18 @@ impl WasmCodegen {
         self.line(&format!("local.get {}", parent));
         self.line(&format!("local.get {}", var));
         self.line("call $dom_appendChild");
+    }
+
+    /// Emit a dom_setStyle call for one property on an element.
+    fn emit_set_style(&mut self, var: &str, prop: &str, val: &str) {
+        let prop_offset = self.store_string(prop);
+        let val_offset = self.store_string(val);
+        self.line(&format!("local.get {}", var));
+        self.line(&format!("i32.const {} ;; \"{}\" ptr", prop_offset, prop));
+        self.line(&format!("i32.const {} ;; \"{}\" len", prop.len(), prop));
+        self.line(&format!("i32.const {} ;; \"{}\" ptr", val_offset, val));
+        self.line(&format!("i32.const {} ;; \"{}\" len", val.len(), val));
+        self.line("call $dom_setStyle");
     }
 
     fn generate_struct_layout(&mut self, s: &StructDef) {
@@ -8368,9 +8446,10 @@ mod coverage_codegen_tests {
         );
         let output = codegen.output.clone();
         assert!(output.contains("dom_createElement"), "should create element");
-        assert!(output.contains("flex-direction:column"), "should use column flex");
-        assert!(output.contains("gap:16px"), "should have gap");
-        assert!(output.contains("dom_setAttr"), "should set style");
+        assert!(output.contains("\"column\""), "should use column flex-direction");
+        assert!(output.contains("\"vertical\""), "should set native direction");
+        assert!(output.contains("\"16px\""), "should have gap");
+        assert!(output.contains("dom_setStyle"), "should set style");
     }
 
     #[test]
@@ -8388,9 +8467,9 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("display:grid"), "should use CSS grid");
-        assert!(output.contains("repeat(3,1fr)"), "should have 3 columns");
-        assert!(output.contains("gap:8px"), "should have gap");
+        assert!(output.contains("\"grid\""), "should use CSS grid");
+        assert!(output.contains("\"repeat(3,1fr)\""), "should have 3 columns");
+        assert!(output.contains("\"8px\""), "should have gap");
     }
 
     #[test]
@@ -8406,8 +8485,8 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("justify-content:center"), "should center content");
-        assert!(output.contains("max-width:800px"), "should have max width");
+        assert!(output.contains("\"center\""), "should center content");
+        assert!(output.contains("\"800px\""), "should have max width");
     }
 
     #[test]
@@ -8458,9 +8537,10 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("flex-direction:row"), "should use row flex");
-        assert!(output.contains("align-items:center"), "should center align");
-        assert!(output.contains("gap:12px"), "should have gap");
+        assert!(output.contains("\"row\""), "should use row flex-direction");
+        assert!(output.contains("\"horizontal\""), "should set native direction");
+        assert!(output.contains("\"center\""), "should center align");
+        assert!(output.contains("\"12px\""), "should have gap");
     }
 
     #[test]
@@ -8476,8 +8556,8 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("flex-wrap:wrap"), "should enable wrapping");
-        assert!(output.contains("gap:8px"), "should have gap");
+        assert!(output.contains("\"wrap\""), "should enable wrapping");
+        assert!(output.contains("\"8px\""), "should have gap");
     }
 
     #[test]
@@ -8493,8 +8573,8 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("--threshold:480px"), "should set threshold custom property");
-        assert!(output.contains("flex-wrap:wrap"), "should enable wrapping");
+        assert!(output.contains("\"wrap\""), "should enable wrapping");
+        assert!(output.contains("\"horizontal\""), "should set native direction");
     }
 
     #[test]
