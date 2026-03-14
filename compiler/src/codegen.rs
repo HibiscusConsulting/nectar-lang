@@ -80,6 +80,36 @@ pub struct WasmCodegen {
     /// Populated during generate_struct_layout, used for struct construction
     /// and field access codegen.
     struct_layouts: HashMap<String, Vec<(String, u32)>>,
+    /// Handler method parameter bindings (non-self params that receive $__callback_data).
+    /// When a handler method has a second parameter (e.g., `product: Product`), it is
+    /// pushed here so that `Expr::Ident("product")` resolves to `local.get $product`
+    /// and `Expr::FieldAccess` on `product` emits a struct field load from the pointer.
+    handler_param_bindings: Vec<String>,
+    /// Deferred conditional block updaters for reactive {if ...} template blocks.
+    /// Each entry: (func_name, container_global, last_val_global, signal_globals, condition_expr, then_children, else_children)
+    /// The updater re-evaluates the condition and mounts/clears the container.
+    cond_updaters: Vec<CondUpdater>,
+}
+
+/// Describes a reactive conditional block updater.
+#[derive(Clone)]
+struct CondUpdater {
+    /// Name of the updater function (e.g. $__cond_update_Counter_0)
+    func_name: String,
+    /// Name of the mount function (e.g. $__cond_mount_Counter_0)
+    mount_func_name: String,
+    /// Global holding the container element ID
+    container_global: String,
+    /// Global holding the last evaluated condition value (0 or 1)
+    last_val_global: String,
+    /// Signal globals this condition depends on
+    signal_globals: Vec<String>,
+    /// The condition expression to re-evaluate
+    condition: Expr,
+    /// Children to render when condition is true
+    then_children: Vec<TemplateNode>,
+    /// Children to render when condition is false (optional)
+    else_children: Option<Vec<TemplateNode>>,
 }
 
 /// The kind of a top-level keyword definition.
@@ -133,6 +163,8 @@ impl WasmCodegen {
             for_loop_bindings: Vec::new(),
             string_state_fields: Vec::new(),
             struct_layouts: HashMap::new(),
+            handler_param_bindings: Vec::new(),
+            cond_updaters: Vec::new(),
         }
     }
 
@@ -1093,6 +1125,7 @@ impl WasmCodegen {
             self.line(&format!("(global $__prop_{}_{}_len (mut i32) (i32.const 0))", comp_name, prop.name));
         }
         self.signal_updaters.clear();
+        self.cond_updaters.clear();
 
         // Generate the init/mount function with prop parameters
         // String props are passed as (ptr, len) pairs in WASM
@@ -1361,6 +1394,14 @@ impl WasmCodegen {
             // Utility local for array/object/struct allocation
             self.emit_template_local("$__arr_tmp");
 
+            // Register non-self parameters as handler param bindings so that
+            // field access on them (e.g., product.name) resolves to struct
+            // field loads from the callback data pointer.
+            self.handler_param_bindings.clear();
+            for p in method.params.iter().filter(|p| p.name != "self") {
+                self.handler_param_bindings.push(p.name.clone());
+            }
+
             // Generate handler body — $self is available as a parameter
             self.in_handler_body = true;
             self.line(";; event handler trampoline");
@@ -1368,6 +1409,7 @@ impl WasmCodegen {
                 self.generate_stmt(stmt);
             }
             self.in_handler_body = false;
+            self.handler_param_bindings.clear();
 
             // Hoist all deferred locals before the body
             let body_output = std::mem::take(&mut self.output);
@@ -1412,10 +1454,14 @@ impl WasmCodegen {
                     // is 0 (the default), for for-loop parameterized callbacks it
                     // contains the captured item pointer (e.g., product ptr).
                     self.line("global.get $__callback_data");
-                    self.line(&format!("call ${handler_name}"));
-                } else {
-                    self.line(&format!("call ${handler_name}"));
                 }
+                // Pass $__callback_data for each non-self parameter so handler
+                // methods can access the captured item (e.g., product struct ptr).
+                for p in _method.params.iter().filter(|p| p.name != "self") {
+                    self.line(&format!(";; pass callback data as ${}", p.name));
+                    self.line("global.get $__callback_data");
+                }
+                self.line(&format!("call ${handler_name}"));
                 // Record end time and compute delta for this handler
                 self.line("call $timer_now");
                 self.line("local.set $__t1");
@@ -1517,6 +1563,144 @@ impl WasmCodegen {
             self.line(")");
         }
 
+        // Emit reactive conditional block globals and updater functions
+        for cond in &self.cond_updaters.clone() {
+            // Globals: container element ID + last condition value
+            self.line(&format!("(global {} (mut i32) (i32.const -1))", cond.container_global));
+            self.line(&format!("(global {} (mut i32) (i32.const 0))", cond.last_val_global));
+        }
+
+        for cond in self.cond_updaters.clone() {
+            // Save signal_updaters so children inside the cond block don't leak
+            // updater registrations into the main component's updater list.
+            let saved_signal_updaters = std::mem::take(&mut self.signal_updaters);
+
+            // Emit mount function: renders children into the container
+            self.line("");
+            self.emit(&format!("(func {} ;; reactive cond mount", cond.mount_func_name));
+            self.indent += 1;
+
+            // Enable deferred locals for the mount function body
+            let saved_defer = self.defer_template_locals;
+            let saved_locals = std::mem::take(&mut self.template_locals);
+            self.defer_template_locals = true;
+            self.template_locals.clear();
+            let saved_output = std::mem::take(&mut self.output);
+            self.output = String::new();
+
+            // We need a local to hold the container element ID
+            self.emit_template_local("$__cond_parent");
+            self.line(&format!("global.get {}", cond.container_global));
+            self.line("local.set $__cond_parent");
+
+            for child in &cond.then_children {
+                self.generate_template(child, "$__cond_parent");
+            }
+
+            let mount_body = std::mem::take(&mut self.output);
+            self.output = saved_output;
+            // Emit locals first, then body
+            for local_decl in std::mem::take(&mut self.template_locals) {
+                self.line(&local_decl);
+            }
+            self.defer_template_locals = saved_defer;
+            self.template_locals = saved_locals;
+            self.output.push_str(&mount_body);
+
+            // Collect any signal updaters created by children inside this cond block
+            let cond_updaters_inner = std::mem::take(&mut self.signal_updaters);
+
+            // Restore the outer signal_updaters
+            self.signal_updaters = saved_signal_updaters;
+
+            // Close the mount function
+            self.indent -= 1;
+            self.line(")");
+
+            // Emit globals for the inner updaters (must be at module level, after function close)
+            for (func_name, global_el, _, _) in &cond_updaters_inner {
+                self.line(&format!("(global {} (mut i32) (i32.const -1))", global_el));
+                self.closure_func_names.push(func_name.clone());
+            }
+
+            // Emit updater functions for the inner updaters
+            for (func_name, global_el, sig_global, expr_opt) in &cond_updaters_inner {
+                self.line("");
+                self.emit(&format!("(func {} ;; reactive DOM updater (inside cond)", func_name));
+                self.indent += 1;
+                self.line("(local $ptr i32)");
+                self.line("(local $len i32)");
+                if let Some(wrapped_expr) = expr_opt {
+                    self.generate_expr(wrapped_expr);
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                } else {
+                    self.line(&format!("global.get {}", sig_global));
+                    self.line("call $signal_get");
+                    self.line("call $string_fromI32");
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                }
+                self.line(&format!("global.get {}", global_el));
+                self.line("local.get $ptr");
+                self.line("local.get $len");
+                self.line("call $dom_setText");
+                self.indent -= 1;
+                self.line(")");
+            }
+
+            // Emit updater function: re-evaluates condition, mounts or clears
+            self.line("");
+            self.emit(&format!("(func {} ;; reactive cond updater", cond.func_name));
+            self.indent += 1;
+            self.line("(local $new_val i32)");
+
+            // Re-evaluate the condition
+            self.generate_expr(&cond.condition);
+            self.line("i32.const 0");
+            self.line("i32.ne  ;; normalize to 0 or 1");
+            self.line("local.set $new_val");
+
+            // Compare with last value — only act if changed
+            self.line("local.get $new_val");
+            self.line(&format!("global.get {}", cond.last_val_global));
+            self.line("i32.eq");
+            self.line("if");
+            self.line("  return ;; condition unchanged, nothing to do");
+            self.line("end");
+
+            // Update last value
+            self.line("local.get $new_val");
+            self.line(&format!("global.set {}", cond.last_val_global));
+
+            // If new_val is true: clear container then mount children
+            self.line("local.get $new_val");
+            self.line("if");
+            self.indent += 1;
+            // Clear container first (in case there was else content)
+            let empty_offset = self.store_string("");
+            self.line(&format!("global.get {}", cond.container_global));
+            self.line(&format!("i32.const {}", empty_offset));
+            self.line("i32.const 0");
+            self.line("call $dom_mount ;; clear container");
+            // Call mount function to render children
+            self.line(&format!("call {}", cond.mount_func_name));
+            self.indent -= 1;
+            self.line("else");
+            self.indent += 1;
+            // Condition is false: clear the container
+            let empty_offset2 = self.store_string("");
+            self.line(&format!("global.get {}", cond.container_global));
+            self.line(&format!("i32.const {}", empty_offset2));
+            self.line("i32.const 0");
+            self.line("call $dom_mount ;; clear container");
+            self.indent -= 1;
+            self.line("end");
+
+            self.indent -= 1;
+            self.line(")");
+        }
+
         // Reset component context
         self.in_component_mount = false;
         self.component_fields.clear();
@@ -1607,12 +1791,19 @@ impl WasmCodegen {
             }
             self.emit_template_local("$__arr_tmp");
 
+            // Register non-self parameters as handler param bindings
+            self.handler_param_bindings.clear();
+            for p in method.params.iter().filter(|p| p.name != "self") {
+                self.handler_param_bindings.push(p.name.clone());
+            }
+
             self.in_handler_body = true;
             self.line(";; event handler trampoline");
             for stmt in &method.body.stmts {
                 self.generate_stmt(stmt);
             }
             self.in_handler_body = false;
+            self.handler_param_bindings.clear();
 
             let body_output = std::mem::take(&mut self.output);
             self.output = saved_output;
@@ -3766,27 +3957,125 @@ impl WasmCodegen {
                 self.generate_layout_node(layout_node, parent);
             }
             TemplateNode::TemplateIf { condition, then_children, else_children } => {
-                self.line(";; template if");
-                self.generate_expr(condition);
-                // Use WAT if/else/end instead of manual br_if labels — labels must be
-                // declared with block/loop/if before they can be branched to.
-                self.line("if");
-                self.indent += 1;
-                for child in then_children {
-                    self.generate_template(child, parent);
-                }
-                self.indent -= 1;
-                if let Some(else_nodes) = else_children {
-                    if !else_nodes.is_empty() {
-                        self.line("else");
-                        self.indent += 1;
-                        for child in else_nodes {
-                            self.generate_template(child, parent);
-                        }
-                        self.indent -= 1;
+                // Check if condition depends on component signals for reactive updates
+                let signal_fields = if self.in_component_mount {
+                    self.extract_signal_fields_from_expr(condition)
+                } else {
+                    Vec::new()
+                };
+
+                if signal_fields.is_empty() {
+                    // Static condition — no signal dependency, emit simple if/else
+                    self.line(";; template if (static)");
+                    self.generate_expr(condition);
+                    self.line("if");
+                    self.indent += 1;
+                    for child in then_children {
+                        self.generate_template(child, parent);
                     }
+                    self.indent -= 1;
+                    if let Some(else_nodes) = else_children {
+                        if !else_nodes.is_empty() {
+                            self.line("else");
+                            self.indent += 1;
+                            for child in else_nodes {
+                                self.generate_template(child, parent);
+                            }
+                            self.indent -= 1;
+                        }
+                    }
+                    self.line("end ;; template if");
+                } else {
+                    // Reactive condition — depends on signals, create container + updater
+                    let uid = self.next_label();
+                    let comp = self.component_name.clone();
+                    let container_var = format!("$cond_container_{}", uid);
+                    let container_global = format!("$__cond_el_{}_{}", comp, uid);
+                    let last_val_global = format!("$__cond_val_{}_{}", comp, uid);
+                    let func_name = format!("$__cond_update_{}_{}", comp, uid);
+                    let mount_func_name = format!("$__cond_mount_{}_{}", comp, uid);
+
+                    self.emit_template_local(&container_var);
+
+                    // Create a container <div> as the placeholder for reactive content
+                    self.line(&format!(";; reactive template if — container for cond block {}", uid));
+                    let tag_offset = self.store_string("div");
+                    self.line(&format!("i32.const {}", tag_offset));
+                    self.line(&format!("i32.const {}", "div".len()));
+                    self.line("call $dom_createElement");
+                    self.line(&format!("local.set {}", container_var));
+
+                    // Set a data attribute so we can identify it for debugging
+                    let attr_name = self.store_string("data-cond");
+                    let attr_val_str = format!("{}", uid);
+                    let attr_val = self.store_string(&attr_val_str);
+                    self.line(&format!("local.get {}", container_var));
+                    self.line(&format!("i32.const {}", attr_name));
+                    self.line(&format!("i32.const {}", "data-cond".len()));
+                    self.line(&format!("i32.const {}", attr_val));
+                    self.line(&format!("i32.const {}", attr_val_str.len()));
+                    self.line("call $dom_setAttr");
+
+                    // Append container to parent
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("local.get {}", container_var));
+                    self.line("call $dom_appendChild");
+
+                    // Store container ID in global for the updater
+                    self.line(&format!("local.get {}", container_var));
+                    self.line(&format!("global.set {}", container_global));
+
+                    // Evaluate condition at mount time and store last value
+                    self.generate_expr(condition);
+                    self.line(&format!("global.set {}", last_val_global));
+
+                    // If condition is initially true, generate children into container
+                    self.line(&format!("global.get {}", last_val_global));
+                    self.line("if");
+                    self.indent += 1;
+                    for child in then_children {
+                        self.generate_template(child, &container_var);
+                    }
+                    self.indent -= 1;
+                    if let Some(else_nodes) = else_children {
+                        if !else_nodes.is_empty() {
+                            self.line("else");
+                            self.indent += 1;
+                            for child in else_nodes {
+                                self.generate_template(child, &container_var);
+                            }
+                            self.indent -= 1;
+                        }
+                    }
+                    self.line("end ;; initial cond eval");
+
+                    // Subscribe the updater to all referenced signals
+                    let sig_globals: Vec<String> = signal_fields.iter()
+                        .map(|f| format!("$__sig_{}_{}", comp, f))
+                        .collect();
+
+                    let table_idx = self.closure_func_names.len();
+                    self.closure_func_names.push(func_name.clone());
+                    self.needs_func_table = true;
+
+                    for sig_global in &sig_globals {
+                        self.line(&format!("global.get {}", sig_global));
+                        self.line(&format!("i32.const {}", table_idx));
+                        self.line("call $signal_subscribe");
+                    }
+
+                    // Record the cond updater for deferred emission
+                    self.cond_updaters.push(CondUpdater {
+                        func_name,
+                        mount_func_name,
+                        container_global: container_global.clone(),
+                        last_val_global: last_val_global.clone(),
+                        signal_globals: sig_globals,
+                        condition: *condition.clone(),
+                        then_children: then_children.clone(),
+                        else_children: else_children.clone(),
+                    });
                 }
-                self.line("end ;; template if");
             }
             TemplateNode::TemplateFor { binding, iterator, children } => {
                 // Generate a WASM block/loop that iterates over an array.
@@ -4191,9 +4480,12 @@ impl WasmCodegen {
                     // None is the absence of a value — represented as 0 (null pointer)
                     "None" => self.line("i32.const 0 ;; None"),
                     _ => {
-                        // For-loop binding variable — resolve to the loop-local variable
+                        // For-loop binding or handler param — resolve to the local variable
                         if self.for_loop_bindings.contains(name) {
                             self.line(&format!(";; for-loop binding: {}", name));
+                            self.line(&format!("local.get ${}", name));
+                        } else if self.handler_param_bindings.contains(name) {
+                            self.line(&format!(";; handler param binding: {}", name));
                             self.line(&format!("local.get ${}", name));
                         }
                         // Keyword definition instances (auth AppAuth {}, cache AppCache {}, etc.)
@@ -4418,11 +4710,19 @@ impl WasmCodegen {
                     self.line(&format!("global.get $__prop_{}_{}_ptr", self.component_name, field));
                     self.line(&format!("global.get $__prop_{}_{}_len", self.component_name, field));
                 } else if let Expr::Ident(obj_name) = object.as_ref() {
-                    if self.for_loop_bindings.contains(obj_name) {
-                        // For-loop binding field access: item.name → load field from struct pointer.
+                    if self.for_loop_bindings.contains(obj_name)
+                        || self.handler_param_bindings.contains(obj_name) {
+                        // Struct pointer field access: item.name → load field from struct pointer.
                         // The binding variable holds a pointer to the struct in linear memory.
+                        // This applies to both for-loop bindings and handler method parameters
+                        // that receive $__callback_data (captured item pointers).
                         // Field offset is resolved by name from struct layouts.
-                        self.line(&format!(";; for-loop field access: {}.{}", obj_name, field));
+                        let access_kind = if self.for_loop_bindings.contains(obj_name) {
+                            "for-loop"
+                        } else {
+                            "handler param"
+                        };
+                        self.line(&format!(";; {} field access: {}.{}", access_kind, obj_name, field));
                         self.line(&format!("local.get ${}", obj_name));
                         // Look up the field offset from any matching struct layout
                         let offset = self.struct_layouts.values()
@@ -7769,9 +8069,6 @@ impl WasmCodegen {
                 self.line("i32.const 1");
                 self.line("i32.add");
                 self.line("i32.store ;; updated length");
-
-                // Return the array pointer
-                self.line(&format!("local.get $__push_arr_{lbl}"));
             }
             "contains" => {
                 let lbl = self.next_label();
@@ -19725,6 +20022,84 @@ mod parameterized_callback_tests {
         assert!(cb_section.contains("global.get $__callback_data"),
             "Cart__callback should use $__callback_data for $self parameter");
     }
+
+    #[test]
+    fn test_handler_with_extra_param_declares_param() {
+        // Handler methods with a non-self parameter should declare it in the trampoline
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop {
+                fn add_to_cart(&mut self, product: Product) { return; }
+                render { <button on:click={self.add_to_cart}>"Add"</button> }
+            }
+        "#;
+        let wat = compile(src);
+
+        // The handler trampoline should have a $product parameter
+        assert!(wat.contains("(param $product i32)"),
+            "handler trampoline should declare extra param $product");
+    }
+
+    #[test]
+    fn test_handler_dispatcher_passes_callback_data_for_extra_param() {
+        // The per-component callback dispatcher should pass $__callback_data
+        // for each non-self parameter
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop {
+                fn add_to_cart(&mut self, product: Product) { return; }
+                render { <button on:click={self.add_to_cart}>"Add"</button> }
+            }
+        "#;
+        let wat = compile(src);
+
+        // Find the Shop__callback function
+        let cb_fn_marker = "(func $Shop__callback";
+        let cb_start = wat.find(cb_fn_marker)
+            .expect("Shop__callback function must exist");
+        let cb_section = &wat[cb_start..];
+        let cb_end = cb_section[1..].find("\n  (func ").unwrap_or(cb_section.len() - 1);
+        let cb_section = &cb_section[..cb_end + 1];
+
+        // Should pass $__callback_data twice: once as $self and once as $product
+        let count = cb_section.matches("global.get $__callback_data").count();
+        assert!(count >= 2,
+            "Shop__callback should pass $__callback_data for both $self and $product, found {} occurrences", count);
+        assert!(cb_section.contains("pass callback data as $product"),
+            "Shop__callback should have comment about passing callback data as $product");
+    }
+
+    #[test]
+    fn test_handler_param_field_access_emits_struct_load() {
+        // When a handler body accesses product.name, it should emit
+        // local.get $product + i32.load for struct field access
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop {
+                fn add_to_cart(&mut self, product: Product) {
+                    let x = product.price;
+                }
+                render { <button on:click={self.add_to_cart}>"Add"</button> }
+            }
+        "#;
+        let wat = compile(src);
+
+        // The handler trampoline should contain a handler param field access
+        assert!(wat.contains(";; handler param field access: product.price"),
+            "should emit handler param field access comment for product.price");
+        // Should do local.get $product to read the struct pointer
+        let handler_marker = "(func $Shop__handler_0";
+        let handler_start = wat.find(handler_marker)
+            .expect("Shop__handler_0 must exist");
+        let handler_section = &wat[handler_start..];
+        let handler_end = handler_section[1..].find("\n  (func ").unwrap_or(handler_section.len() - 1);
+        let handler_section = &handler_section[..handler_end + 1];
+
+        assert!(handler_section.contains("local.get $product"),
+            "handler body should read $product local for field access");
+        assert!(handler_section.contains("i32.load"),
+            "handler body should load field from struct pointer");
+    }
 }
 
 #[cfg(test)]
@@ -20281,5 +20656,222 @@ mod db_and_auth_codegen_tests {
             "__init_all should call auth register");
         assert!(wat.contains("call $AppDB_init"),
             "__init_all should call db init");
+    }
+}
+
+#[cfg(test)]
+mod reactive_cond_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    /// Reactive template if: signal-dependent conditions create a container, updater, and mount function
+    #[test]
+    fn test_reactive_template_if_emits_cond_updater() {
+        let src = r#"
+            component Panel() {
+                let mut visible: Int = 0;
+                fn toggle(self) {
+                    self.visible = 1;
+                }
+                render {
+                    <div>
+                        {if self.visible == 1 {
+                            <span>"shown"</span>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Should emit a cond container global
+        assert!(
+            wat.contains("$__cond_el_Panel_"),
+            "should emit cond container global: {}",
+            wat.lines().filter(|l| l.contains("cond")).collect::<Vec<_>>().join("\n")
+        );
+        // Should emit a cond last-value global
+        assert!(
+            wat.contains("$__cond_val_Panel_"),
+            "should emit cond last-value global"
+        );
+        // Should emit a cond updater function
+        assert!(
+            wat.contains("reactive cond updater"),
+            "should emit reactive cond updater function"
+        );
+        // Should emit a cond mount function
+        assert!(
+            wat.contains("reactive cond mount"),
+            "should emit reactive cond mount function"
+        );
+        // Should subscribe the updater to the signal
+        assert!(
+            wat.contains("signal_subscribe"),
+            "should subscribe updater to signal"
+        );
+        // The updater should call dom_mount to clear the container
+        assert!(
+            wat.contains("call $dom_mount ;; clear container"),
+            "updater should clear container via dom_mount"
+        );
+    }
+
+    /// Static template if (no signal dependency) should NOT create a reactive container
+    #[test]
+    fn test_static_template_if_no_reactive_container() {
+        let src = r#"
+            component Panel() {
+                let mut count: Int = 0;
+                render {
+                    <div>
+                        {if 1 == 1 {
+                            <span>"always"</span>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Static condition should NOT create cond updater
+        assert!(
+            !wat.contains("reactive cond updater"),
+            "static template if should not create reactive cond updater"
+        );
+        // Should have "template if (static)" comment
+        assert!(
+            wat.contains("template if (static)"),
+            "static template if should have static comment"
+        );
+    }
+
+    /// Reactive template if: updater function is in the function table for call_indirect
+    #[test]
+    fn test_reactive_template_if_updater_in_function_table() {
+        let src = r#"
+            component Cart() {
+                let mut show_cart: Int = 0;
+                fn toggle_cart(self) {
+                    self.show_cart = 1;
+                }
+                render {
+                    <div>
+                        {if self.show_cart == 1 {
+                            <div>"Cart Panel"</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // The function table should contain the cond updater
+        assert!(
+            wat.contains("$__cond_update_Cart_"),
+            "function table should contain cond updater"
+        );
+        // Should have the elem section referencing the updater
+        assert!(
+            wat.contains("(elem (i32.const 0)"),
+            "should have elem section for function table"
+        );
+    }
+
+    /// Reactive template if with else branch
+    #[test]
+    fn test_reactive_template_if_else_initial_eval() {
+        let src = r#"
+            component Toggle() {
+                let mut active: Int = 0;
+                fn activate(self) {
+                    self.active = 1;
+                }
+                render {
+                    <div>
+                        {if self.active == 1 {
+                            <span>"ON"</span>
+                        } else {
+                            <span>"OFF"</span>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Should have initial condition evaluation
+        assert!(
+            wat.contains("initial cond eval"),
+            "should evaluate condition at mount time"
+        );
+        // Should have the data-cond attribute for debugging
+        assert!(
+            wat.contains("data-cond"),
+            "container should have data-cond attribute"
+        );
+        // Should have reactive updater
+        assert!(
+            wat.contains("reactive cond updater"),
+            "should emit reactive cond updater for if/else"
+        );
+    }
+
+    /// Reactive template if: condition change detection (new_val vs last_val comparison)
+    #[test]
+    fn test_reactive_template_if_change_detection() {
+        let src = r#"
+            component Modal() {
+                let mut open: Int = 0;
+                fn show(self) {
+                    self.open = 1;
+                }
+                render {
+                    <div>
+                        {if self.open == 1 {
+                            <div>"modal content"</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // The updater should compare new value with last value
+        assert!(
+            wat.contains("condition unchanged"),
+            "updater should check if condition unchanged"
+        );
+        // The updater should normalize to 0/1
+        assert!(
+            wat.contains("i32.ne  ;; normalize to 0 or 1"),
+            "updater should normalize condition to boolean"
+        );
     }
 }
