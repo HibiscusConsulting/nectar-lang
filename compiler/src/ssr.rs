@@ -446,7 +446,7 @@ impl SsrCodegen {
                 }
                 self.line("}");
             }
-            TemplateNode::TemplateFor { binding, iterator, children } => {
+            TemplateNode::TemplateFor { binding, iterator, children, .. } => {
                 let iter_js = self.expr_to_js(iterator);
                 self.line(&format!("for (const {} of {}) {{", binding, iter_js));
                 for child in children {

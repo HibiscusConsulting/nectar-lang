@@ -26,6 +26,9 @@ mod module_resolver;
 mod module_loader;
 mod critical_css;
 mod runtime_modules;
+mod ssr_server;
+mod contract_infer;
+mod contract_verify;
 
 use std::fs;
 use std::io::Read as _;
@@ -40,7 +43,7 @@ use crate::package::{DependencySpec, DetailedDependency};
 use crate::registry::RegistryClient;
 use crate::resolver::Resolver;
 
-#[derive(ClapParser)]
+#[derive(ClapParser, Debug)]
 #[command(name = "nectar", version, about = "The Nectar programming language compiler")]
 struct Cli {
     #[command(subcommand)]
@@ -91,7 +94,7 @@ struct Cli {
     lsp: bool,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Initialize a new Nectar project (creates Nectar.toml)
     Init {
@@ -210,6 +213,19 @@ enum Commands {
         /// Source file to check (.nectar)
         input: PathBuf,
     },
+    /// Start the SSR server (serves pre-rendered HTML from compiled WASM)
+    Serve {
+        /// Path to the compiled .wasm file
+        input: PathBuf,
+
+        /// Port to listen on (default: 8080)
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
+
+        /// Directory for static assets (core.js, images, etc.)
+        #[arg(long = "static-dir")]
+        static_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -258,6 +274,16 @@ fn main() -> anyhow::Result<()> {
         Some(Commands::Fmt { input, check, stdin }) => cmd_fmt(input, check, stdin),
         Some(Commands::Lint { input, fix }) => cmd_lint(&input, fix),
         Some(Commands::Check { input }) => cmd_check(&input),
+        Some(Commands::Serve { input, port, static_dir }) => {
+            let config = ssr_server::SsrServerConfig {
+                wasm_path: input,
+                port,
+                static_dir,
+                api_base_url: std::env::var("NECTAR_API_BASE_URL").ok(),
+                api_token: std::env::var("NECTAR_API_TOKEN").ok(),
+            };
+            ssr_server::serve(config)
+        }
         Some(Commands::Dev { src, build_dir, port, tunnel }) => {
             if tunnel {
                 // TODO: integrate cloudflared/ngrok tunnel for public URL
@@ -1521,6 +1547,57 @@ mod tests {
             assert!(result.is_err());
             let msg = format!("{}", result.unwrap_err());
             assert!(msg.contains("already exists"));
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // serve: CLI argument parsing
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn serve_command_parses() {
+        // Verify the Serve variant can be constructed and its fields are correct
+        use clap::Parser as ClapParser;
+        let cli = Cli::try_parse_from(["nectar", "serve", "app.wasm", "--port", "9090"]);
+        assert!(cli.is_ok(), "serve command should parse: {:?}", cli);
+        let cli = cli.unwrap();
+        match cli.command {
+            Some(Commands::Serve { input, port, static_dir }) => {
+                assert_eq!(input, PathBuf::from("app.wasm"));
+                assert_eq!(port, 9090);
+                assert!(static_dir.is_none());
+            }
+            other => panic!("expected Serve command, got {:?}", other.map(|_| "other")),
+        }
+    }
+
+    #[test]
+    fn serve_command_with_static_dir() {
+        use clap::Parser as ClapParser;
+        let cli = Cli::try_parse_from([
+            "nectar", "serve", "app.wasm",
+            "--port", "8080",
+            "--static-dir", "./public"
+        ]).unwrap();
+        match cli.command {
+            Some(Commands::Serve { input, port, static_dir }) => {
+                assert_eq!(input, PathBuf::from("app.wasm"));
+                assert_eq!(port, 8080);
+                assert_eq!(static_dir, Some(PathBuf::from("./public")));
+            }
+            _ => panic!("expected Serve command"),
+        }
+    }
+
+    #[test]
+    fn serve_command_default_port() {
+        use clap::Parser as ClapParser;
+        let cli = Cli::try_parse_from(["nectar", "serve", "app.wasm"]).unwrap();
+        match cli.command {
+            Some(Commands::Serve { port, .. }) => {
+                assert_eq!(port, 8080, "default port should be 8080");
+            }
+            _ => panic!("expected Serve command"),
         }
     }
 }
