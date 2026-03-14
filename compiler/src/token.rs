@@ -162,6 +162,7 @@ pub enum TokenKind {
     ColonColon,
     Semicolon,
     Dot,
+    DotDot,      // ..
     Arrow,       // ->
     FatArrow,    // =>
     Ampersand,   // &

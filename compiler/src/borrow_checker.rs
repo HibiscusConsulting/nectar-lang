@@ -747,6 +747,10 @@ impl Checker {
             Expr::Flag { name, .. } => {
                 self.check_expr(name, span);
             }
+            Expr::Range { start, end } => {
+                self.check_expr(start, span);
+                self.check_expr(end, span);
+            }
             Expr::VirtualList { items, item_height, template, .. } => {
                 self.check_expr(items, span);
                 self.check_expr(item_height, span);
@@ -4209,5 +4213,33 @@ mod coverage_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "Ok/Err constructors should not be marked moved: {:?}", result);
+    }
+
+    #[test]
+    fn range_expression_borrows() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "start".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "end".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(10),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Range {
+                start: Box::new(Expr::Ident("start".into())),
+                end: Box::new(Expr::Ident("end".into())),
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Range expression should pass borrow check: {:?}", result);
     }
 }

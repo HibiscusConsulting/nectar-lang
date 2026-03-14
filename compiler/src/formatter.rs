@@ -1101,6 +1101,9 @@ impl Formatter {
             Expr::Flag { name, .. } => {
                 format!("flag({})", self.format_expr_inner(name, depth))
             }
+            Expr::Range { start, end } => {
+                format!("{}..{}", self.format_expr_inner(start, depth), self.format_expr_inner(end, depth))
+            }
             Expr::VirtualList { items, item_height, template, .. } => {
                 format!("virtual_list({}, {}, {})", self.format_expr_inner(items, depth), self.format_expr_inner(item_height, depth), self.format_expr_inner(template, depth))
             }
@@ -4231,5 +4234,25 @@ mod tests {
         };
         let result = format_program(&program);
         assert!(result.contains("secret password"), "secret keyword should appear before param name, got: {}", result);
+    }
+
+    #[test]
+    fn test_format_range_expression() {
+        let formatter = Formatter::new(FormatterOptions::default());
+        let result = formatter.format_expr_inner(&Expr::Range {
+            start: Box::new(Expr::Integer(0)),
+            end: Box::new(Expr::Integer(10)),
+        }, 0);
+        assert_eq!(result, "0..10");
+    }
+
+    #[test]
+    fn test_format_range_with_idents() {
+        let formatter = Formatter::new(FormatterOptions::default());
+        let result = formatter.format_expr_inner(&Expr::Range {
+            start: Box::new(Expr::Ident("start".into())),
+            end: Box::new(Expr::Ident("end".into())),
+        }, 0);
+        assert_eq!(result, "start..end");
     }
 }

@@ -1313,6 +1313,13 @@ pub enum Expr {
         buffer: Option<u32>,
         span: Span,
     },
+
+    /// Range expression — `start..end`
+    /// Produces an integer range [start, end) for use in for loops
+    Range {
+        start: Box<Expr>,
+        end: Box<Expr>,
+    },
 }
 
 /// A segment in a format string expression.

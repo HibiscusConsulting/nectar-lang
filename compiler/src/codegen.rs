@@ -4078,89 +4078,147 @@ impl WasmCodegen {
                 }
             }
             TemplateNode::TemplateFor { binding, iterator, children } => {
-                // Generate a WASM block/loop that iterates over an array.
-                // Vec layout: [length: i32, capacity: i32, data_ptr: i32] = 12 byte header
-                // Data region: contiguous i32 elements at data_ptr
-                let loop_id = self.next_label();
-                let arr_var = format!("$for_arr_{}", loop_id);
-                let idx_var = format!("$for_idx_{}", loop_id);
-                let len_var = format!("$for_len_{}", loop_id);
-                let data_var = format!("$for_data_{}", loop_id);
-                let binding_var = format!("${}", binding);
-                let block_label = format!("$for_break_{}", loop_id);
-                let loop_label = format!("$for_cont_{}", loop_id);
+                // Check if iterator is a Range expression (start..end)
+                if let Expr::Range { start, end } = iterator.as_ref() {
+                    // Range-based for loop: iterates i32 values [start, end)
+                    let loop_id = self.next_label();
+                    let idx_var = format!("${}", binding);
+                    let end_var = format!("$for_end_{}", loop_id);
+                    let block_label = format!("$for_break_{}", loop_id);
+                    let loop_label = format!("$for_cont_{}", loop_id);
 
-                self.emit_template_local(&arr_var);
-                self.emit_template_local(&idx_var);
-                self.emit_template_local(&len_var);
-                self.emit_template_local(&data_var);
-                self.emit_template_local(&binding_var);
+                    self.emit_template_local(&idx_var);
+                    self.emit_template_local(&end_var);
 
-                self.line(&format!(";; template for {} in ...", binding));
+                    self.line(&format!(";; template for {} in range", binding));
 
-                // Evaluate iterator expression — pushes array pointer onto stack
-                self.generate_expr(iterator);
-                self.line(&format!("local.set {}", arr_var));
+                    // Evaluate start and end expressions
+                    self.generate_expr(start);
+                    self.line(&format!("local.set {}", idx_var));
+                    self.generate_expr(end);
+                    self.line(&format!("local.set {}", end_var));
 
-                // Load array length from header offset 0
-                self.line(&format!("local.get {}", arr_var));
-                self.line("i32.load ;; array length");
-                self.line(&format!("local.set {}", len_var));
+                    // block $for_break { loop $for_cont {
+                    self.line(&format!("block {} ;; for break", block_label));
+                    self.indent += 1;
+                    self.line(&format!("loop {} ;; for continue", loop_label));
+                    self.indent += 1;
 
-                // Load data_ptr from header offset 8
-                self.line(&format!("local.get {}", arr_var));
-                self.line("i32.load offset=8 ;; data_ptr");
-                self.line(&format!("local.set {}", data_var));
+                    // br_if $for_break (idx >= end)
+                    self.line(&format!("local.get {}", idx_var));
+                    self.line(&format!("local.get {}", end_var));
+                    self.line("i32.ge_s");
+                    self.line(&format!("br_if {}", block_label));
 
-                // Initialize index to 0
-                self.line("i32.const 0");
-                self.line(&format!("local.set {}", idx_var));
+                    // Push binding name so child expression resolution works
+                    self.for_loop_bindings.push(binding.clone());
 
-                // block $for_break { loop $for_cont {
-                self.line(&format!("block {} ;; for break", block_label));
-                self.indent += 1;
-                self.line(&format!("loop {} ;; for continue", loop_label));
-                self.indent += 1;
+                    // Generate child template nodes
+                    for child in children {
+                        self.generate_template(child, parent);
+                    }
 
-                // br_if $for_break (idx >= len)
-                self.line(&format!("local.get {}", idx_var));
-                self.line(&format!("local.get {}", len_var));
-                self.line("i32.ge_u");
-                self.line(&format!("br_if {}", block_label));
+                    // Pop binding
+                    self.for_loop_bindings.pop();
 
-                // Load current element: data_ptr + idx * 4
-                self.line(&format!("local.get {}", data_var));
-                self.line(&format!("local.get {}", idx_var));
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line("i32.load");
-                self.line(&format!("local.set {}", binding_var));
+                    // Increment index
+                    self.line(&format!("local.get {}", idx_var));
+                    self.line("i32.const 1");
+                    self.line("i32.add");
+                    self.line(&format!("local.set {}", idx_var));
 
-                // Push binding name so child expression resolution works
-                self.for_loop_bindings.push(binding.clone());
+                    // Branch back to loop start
+                    self.line(&format!("br {}", loop_label));
 
-                // Generate child template nodes
-                for child in children {
-                    self.generate_template(child, parent);
+                    self.indent -= 1;
+                    self.line("end ;; for continue");
+                    self.indent -= 1;
+                    self.line("end ;; for break");
+                } else {
+                    // Array-based for loop
+                    // Vec layout: [length: i32, capacity: i32, data_ptr: i32] = 12 byte header
+                    // Data region: contiguous i32 elements at data_ptr
+                    let loop_id = self.next_label();
+                    let arr_var = format!("$for_arr_{}", loop_id);
+                    let idx_var = format!("$for_idx_{}", loop_id);
+                    let len_var = format!("$for_len_{}", loop_id);
+                    let data_var = format!("$for_data_{}", loop_id);
+                    let binding_var = format!("${}", binding);
+                    let block_label = format!("$for_break_{}", loop_id);
+                    let loop_label = format!("$for_cont_{}", loop_id);
+
+                    self.emit_template_local(&arr_var);
+                    self.emit_template_local(&idx_var);
+                    self.emit_template_local(&len_var);
+                    self.emit_template_local(&data_var);
+                    self.emit_template_local(&binding_var);
+
+                    self.line(&format!(";; template for {} in ...", binding));
+
+                    // Evaluate iterator expression — pushes array pointer onto stack
+                    self.generate_expr(iterator);
+                    self.line(&format!("local.set {}", arr_var));
+
+                    // Load array length from header offset 0
+                    self.line(&format!("local.get {}", arr_var));
+                    self.line("i32.load ;; array length");
+                    self.line(&format!("local.set {}", len_var));
+
+                    // Load data_ptr from header offset 8
+                    self.line(&format!("local.get {}", arr_var));
+                    self.line("i32.load offset=8 ;; data_ptr");
+                    self.line(&format!("local.set {}", data_var));
+
+                    // Initialize index to 0
+                    self.line("i32.const 0");
+                    self.line(&format!("local.set {}", idx_var));
+
+                    // block $for_break { loop $for_cont {
+                    self.line(&format!("block {} ;; for break", block_label));
+                    self.indent += 1;
+                    self.line(&format!("loop {} ;; for continue", loop_label));
+                    self.indent += 1;
+
+                    // br_if $for_break (idx >= len)
+                    self.line(&format!("local.get {}", idx_var));
+                    self.line(&format!("local.get {}", len_var));
+                    self.line("i32.ge_u");
+                    self.line(&format!("br_if {}", block_label));
+
+                    // Load current element: data_ptr + idx * 4
+                    self.line(&format!("local.get {}", data_var));
+                    self.line(&format!("local.get {}", idx_var));
+                    self.line("i32.const 4");
+                    self.line("i32.mul");
+                    self.line("i32.add");
+                    self.line("i32.load");
+                    self.line(&format!("local.set {}", binding_var));
+
+                    // Push binding name so child expression resolution works
+                    self.for_loop_bindings.push(binding.clone());
+
+                    // Generate child template nodes
+                    for child in children {
+                        self.generate_template(child, parent);
+                    }
+
+                    // Pop binding
+                    self.for_loop_bindings.pop();
+
+                    // Increment index
+                    self.line(&format!("local.get {}", idx_var));
+                    self.line("i32.const 1");
+                    self.line("i32.add");
+                    self.line(&format!("local.set {}", idx_var));
+
+                    // Branch back to loop start
+                    self.line(&format!("br {}", loop_label));
+
+                    self.indent -= 1;
+                    self.line("end ;; for continue");
+                    self.indent -= 1;
+                    self.line("end ;; for break");
                 }
-
-                // Pop binding
-                self.for_loop_bindings.pop();
-
-                // Increment index
-                self.line(&format!("local.get {}", idx_var));
-                self.line("i32.const 1");
-                self.line("i32.add");
-                self.line(&format!("local.set {}", idx_var));
-
-                // Branch back to loop start
-                self.line(&format!("br {}", loop_label));
-
-                self.indent -= 1;
-                self.line("end ;; for continue");
-                self.indent -= 1;
-                self.line("end ;; for break");
             }
             TemplateNode::TemplateMatch { subject, arms } => {
                 self.line(";; template match");
@@ -5139,6 +5197,11 @@ impl WasmCodegen {
                 self.line(";; flag — feature flag check");
                 self.generate_expr(name);
                 self.line("call $flag_is_enabled");
+            }
+            Expr::Range { start, end } => {
+                self.line(";; range expression — pushes start and end onto stack");
+                self.generate_expr(start);
+                self.generate_expr(end);
             }
             Expr::VirtualList { items, item_height, template, buffer, .. } => {
                 self.line(";; virtual list — create virtualized list for large datasets");
@@ -20873,5 +20936,48 @@ mod reactive_cond_tests {
             wat.contains("i32.ne  ;; normalize to 0 or 1"),
             "updater should normalize condition to boolean"
         );
+    }
+
+    #[test]
+    fn test_range_for_loop_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        let node = TemplateNode::TemplateFor {
+            binding: "i".to_string(),
+            iterator: Box::new(Expr::Range {
+                start: Box::new(Expr::Integer(0)),
+                end: Box::new(Expr::Integer(10)),
+            }),
+            children: vec![
+                TemplateNode::TextLiteral("item".to_string()),
+            ],
+        };
+        codegen.generate_template(&node, "$root");
+        let mut out = String::new();
+        for local in &codegen.template_locals {
+            out.push_str(local);
+            out.push('\n');
+        }
+        out.push_str(&codegen.output);
+
+        // Should use range-based iteration, not array-based
+        assert!(out.contains("template for i in range"), "should emit range for comment");
+        assert!(out.contains("i32.ge_s"), "should use signed comparison for range");
+        // Should NOT load array length or data_ptr
+        assert!(!out.contains("array length"), "should not load array length for range");
+    }
+
+    #[test]
+    fn test_range_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Range {
+            start: Box::new(Expr::Integer(5)),
+            end: Box::new(Expr::Integer(20)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("range expression"), "should emit range expression comment");
+        assert!(output.contains("i32.const 5"), "should push start value");
+        assert!(output.contains("i32.const 20"), "should push end value");
     }
 }

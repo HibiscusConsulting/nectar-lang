@@ -3201,6 +3201,11 @@ impl TypeChecker {
                 self.infer_expr(name, env);
                 Ty::Bool
             }
+            Expr::Range { start, end } => {
+                self.infer_expr(start, env);
+                self.infer_expr(end, env);
+                Ty::I32
+            }
             Expr::VirtualList { items, item_height, template, .. } => {
                 self.infer_expr(items, env);
                 self.infer_expr(item_height, env);
@@ -8668,5 +8673,17 @@ mod coverage_type_checker_tests {
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "zero-arg impl method with &self should work: {:?}", result.err());
+    }
+
+    #[test]
+    fn infer_range_expr() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Range {
+                start: Box::new(Expr::Integer(0)),
+                end: Box::new(Expr::Integer(10)),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Range expression should type-check: {:?}", result.err());
     }
 }
