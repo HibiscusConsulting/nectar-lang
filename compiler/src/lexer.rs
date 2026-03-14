@@ -59,7 +59,13 @@ impl Lexer {
             ']' => TokenKind::RightBracket,
             ',' => TokenKind::Comma,
             ';' => TokenKind::Semicolon,
-            '.' => TokenKind::Dot,
+            '.' => {
+                if self.match_char('.') {
+                    TokenKind::DotDot
+                } else {
+                    TokenKind::Dot
+                }
+            }
             '?' => TokenKind::QuestionMark,
             '#' => TokenKind::Hash,
             '%' => TokenKind::Percent,
@@ -1060,5 +1066,35 @@ mod tests {
         // Should parse the tokens before the comment, then EOF
         assert_eq!(tokens.last().unwrap().kind, TokenKind::Eof);
         assert!(tokens.len() > 1);
+    }
+
+    #[test]
+    fn test_dot_dot_token() {
+        let mut lexer = Lexer::new("0..10");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Integer(0));
+        assert_eq!(tokens[1].kind, TokenKind::DotDot);
+        assert_eq!(tokens[2].kind, TokenKind::Integer(10));
+    }
+
+    #[test]
+    fn test_dot_dot_vs_single_dot() {
+        let mut lexer = Lexer::new("a.b 0..10");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("a".into()));
+        assert_eq!(tokens[1].kind, TokenKind::Dot);
+        assert_eq!(tokens[2].kind, TokenKind::Ident("b".into()));
+        assert_eq!(tokens[3].kind, TokenKind::Integer(0));
+        assert_eq!(tokens[4].kind, TokenKind::DotDot);
+        assert_eq!(tokens[5].kind, TokenKind::Integer(10));
+    }
+
+    #[test]
+    fn test_dot_dot_with_expressions() {
+        let mut lexer = Lexer::new("start..end");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("start".into()));
+        assert_eq!(tokens[1].kind, TokenKind::DotDot);
+        assert_eq!(tokens[2].kind, TokenKind::Ident("end".into()));
     }
 }

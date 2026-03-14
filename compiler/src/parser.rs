@@ -2292,7 +2292,7 @@ impl Parser {
     }
 
     fn parse_assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.parse_or()?;
+        let expr = self.parse_range()?;
 
         if self.match_token(&TokenKind::Equals) {
             let value = self.parse_assignment()?;
@@ -2315,6 +2315,18 @@ impl Parser {
             });
         }
 
+        Ok(expr)
+    }
+
+    fn parse_range(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.parse_or()?;
+        if self.match_token(&TokenKind::DotDot) {
+            let end = self.parse_or()?;
+            return Ok(Expr::Range {
+                start: Box::new(expr),
+                end: Box::new(end),
+            });
+        }
         Ok(expr)
     }
 
@@ -3225,10 +3237,9 @@ impl Parser {
             // Array pattern: [a, b, ..]
             let mut patterns = Vec::new();
             while !self.check(&TokenKind::RightBracket) {
-                if self.check(&TokenKind::Dot) {
+                if self.check(&TokenKind::DotDot) {
                     // Rest pattern ".."
-                    self.advance(); // first dot
-                    self.expect(&TokenKind::Dot)?; // second dot
+                    self.advance(); // consume ..
                     // Rest elements are signaled by a trailing Wildcard
                     patterns.push(Pattern::Wildcard);
                     break;
@@ -3271,9 +3282,8 @@ impl Parser {
 
         while !self.check(&TokenKind::RightBrace) {
             // Check for ".." rest pattern
-            if self.check(&TokenKind::Dot) {
-                self.advance(); // first dot
-                self.expect(&TokenKind::Dot)?; // second dot
+            if self.check(&TokenKind::DotDot) {
+                self.advance(); // consume ..
                 rest = true;
                 // Allow trailing comma
                 self.match_token(&TokenKind::Comma);
@@ -10095,6 +10105,68 @@ component PostList() {
                 assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty()));
                 assert!(matches!(&el.attributes[1], Attribute::Static { name, value } if name == "type" && value == "text"));
                 assert!(matches!(&el.attributes[2], Attribute::Static { name, value } if name == "readonly" && value.is_empty()));
+            } else {
+                panic!("Expected Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_range_expression() {
+        let expr = parse_expr("0..10");
+        if let Expr::Range { start, end } = expr {
+            assert!(matches!(*start, Expr::Integer(0)));
+            assert!(matches!(*end, Expr::Integer(10)));
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_parse_range_with_idents() {
+        let expr = parse_expr("start..end");
+        if let Expr::Range { start, end } = expr {
+            assert!(matches!(*start, Expr::Ident(ref s) if s == "start"));
+            assert!(matches!(*end, Expr::Ident(ref s) if s == "end"));
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_parse_range_with_field_access() {
+        let expr = parse_expr("self.start..self.end");
+        if let Expr::Range { start, end } = expr {
+            assert!(matches!(*start, Expr::FieldAccess { .. }));
+            assert!(matches!(*end, Expr::FieldAccess { .. }));
+        } else {
+            panic!("Expected Range expression, got {:?}", expr);
+        }
+    }
+
+    #[test]
+    fn test_parse_template_for_range() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <div>
+                        {for i in 0..10 {
+                            <span>{i}</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                if let TemplateNode::TemplateFor { binding, iterator, .. } = &el.children[0] {
+                    assert_eq!(binding, "i");
+                    assert!(matches!(iterator.as_ref(), Expr::Range { .. }));
+                } else {
+                    panic!("Expected TemplateFor");
+                }
             } else {
                 panic!("Expected Element");
             }
