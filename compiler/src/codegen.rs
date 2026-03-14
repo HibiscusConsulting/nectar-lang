@@ -1,5 +1,6 @@
 use crate::ast::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Generates WebAssembly Text Format (WAT) from a Nectar AST.
 ///
@@ -93,6 +94,12 @@ pub struct WasmCodegen {
     /// Each entry records everything needed to emit a batch-render function that
     /// renders the next 20 items when the IntersectionObserver fires.
     lazy_batches: Vec<LazyBatch>,
+    /// Runtime categories that the program actually uses — populated by a
+    /// pre-scan of the AST so that unused runtime helpers are not emitted.
+    /// Categories: "crypto", "chart", "datepicker", "mask", "skeleton",
+    /// "toast", "debounce", "throttle", "bigdecimal", "search",
+    /// "pagination", "csv", "collections"
+    used_runtime_categories: HashSet<String>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -191,10 +198,294 @@ impl WasmCodegen {
             handler_param_bindings: Vec::new(),
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
+            used_runtime_categories: HashSet::new(),
+        }
+    }
+
+    /// Pre-scan the AST to determine which runtime categories are actually
+    /// used by the program. This enables tree-shaking of unused runtime
+    /// helpers (crypto, chart, datepicker, etc.) from the WASM output.
+    fn scan_program_for_runtime_deps(&mut self, program: &Program) {
+        for item in &program.items {
+            self.scan_item_for_runtime_deps(item);
+        }
+    }
+
+    fn scan_component_for_runtime_deps(&mut self, c: &Component) {
+        for method in &c.methods {
+            self.scan_block_for_runtime_deps(&method.body);
+        }
+        for field in &c.state {
+            self.scan_expr_for_runtime_deps(&field.initializer);
+        }
+        self.scan_template_for_runtime_deps(&c.render.body);
+    }
+
+    fn scan_item_for_runtime_deps(&mut self, item: &Item) {
+        match item {
+            Item::Function(f) => self.scan_block_for_runtime_deps(&f.body),
+            Item::Component(c) => self.scan_component_for_runtime_deps(c),
+            Item::LazyComponent(lc) => self.scan_component_for_runtime_deps(&lc.component),
+            Item::Page(p) => {
+                for method in &p.methods {
+                    self.scan_block_for_runtime_deps(&method.body);
+                }
+                for field in &p.state {
+                    self.scan_expr_for_runtime_deps(&field.initializer);
+                }
+                self.scan_template_for_runtime_deps(&p.render.body);
+            }
+            Item::Store(s) => {
+                for sig in &s.signals {
+                    self.scan_expr_for_runtime_deps(&sig.initializer);
+                }
+                for action in &s.actions {
+                    self.scan_block_for_runtime_deps(&action.body);
+                }
+            }
+            Item::Agent(a) => {
+                for method in &a.methods {
+                    self.scan_block_for_runtime_deps(&method.body);
+                }
+                for tool in &a.tools {
+                    self.scan_block_for_runtime_deps(&tool.body);
+                }
+            }
+            Item::Test(t) => self.scan_block_for_runtime_deps(&t.body),
+            _ => {}
+        }
+    }
+
+    fn scan_block_for_runtime_deps(&mut self, block: &Block) {
+        for stmt in &block.stmts {
+            self.scan_stmt_for_runtime_deps(stmt);
+        }
+    }
+
+    fn scan_stmt_for_runtime_deps(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Let { value, .. } | Stmt::Signal { value, .. }
+            | Stmt::LetDestructure { value, .. } => {
+                self.scan_expr_for_runtime_deps(value);
+            }
+            Stmt::Expr(e) => self.scan_expr_for_runtime_deps(e),
+            Stmt::Return(Some(e)) | Stmt::Yield(e) => self.scan_expr_for_runtime_deps(e),
+            Stmt::Return(None) => {}
+        }
+    }
+
+    fn scan_expr_for_runtime_deps(&mut self, expr: &Expr) {
+        match expr {
+            Expr::FnCall { callee, args } => {
+                if let Expr::Ident(name) = callee.as_ref() {
+                    self.check_runtime_category_from_call(name);
+                }
+                if let Expr::FieldAccess { object, field } = callee.as_ref() {
+                    if let Expr::Ident(obj_name) = object.as_ref() {
+                        let qualified = format!("{}::{}", obj_name, field);
+                        self.check_runtime_category_from_call(&qualified);
+                    }
+                }
+                self.scan_expr_for_runtime_deps(callee);
+                for arg in args { self.scan_expr_for_runtime_deps(arg); }
+            }
+            Expr::MethodCall { object, method, args } => {
+                if let Expr::Ident(obj_name) = object.as_ref() {
+                    let qualified = format!("{}::{}", obj_name, method);
+                    self.check_runtime_category_from_call(&qualified);
+                    self.check_runtime_category_from_call(obj_name);
+                }
+                self.check_runtime_category_from_call(method);
+                self.scan_expr_for_runtime_deps(object);
+                for arg in args { self.scan_expr_for_runtime_deps(arg); }
+            }
+            Expr::Binary { left, right, .. } => {
+                self.scan_expr_for_runtime_deps(left);
+                self.scan_expr_for_runtime_deps(right);
+            }
+            Expr::Unary { operand, .. } => self.scan_expr_for_runtime_deps(operand),
+            Expr::FieldAccess { object, .. } => self.scan_expr_for_runtime_deps(object),
+            Expr::Index { object, index } => {
+                self.scan_expr_for_runtime_deps(object);
+                self.scan_expr_for_runtime_deps(index);
+            }
+            Expr::If { condition, then_block, else_block, .. } => {
+                self.scan_expr_for_runtime_deps(condition);
+                self.scan_block_for_runtime_deps(then_block);
+                if let Some(eb) = else_block { self.scan_block_for_runtime_deps(eb); }
+            }
+            Expr::Block(block) => self.scan_block_for_runtime_deps(block),
+            Expr::ArrayLit(elems) => {
+                for e in elems { self.scan_expr_for_runtime_deps(e); }
+            }
+            Expr::Closure { body, .. } => self.scan_expr_for_runtime_deps(body),
+            Expr::Match { subject, arms } => {
+                self.scan_expr_for_runtime_deps(subject);
+                for arm in arms {
+                    if let Some(ref guard) = arm.guard {
+                        self.scan_expr_for_runtime_deps(guard);
+                    }
+                    self.scan_expr_for_runtime_deps(&arm.body);
+                }
+            }
+            Expr::FormatString { parts, .. } => {
+                for part in parts {
+                    if let FormatPart::Expression(e) = part {
+                        self.scan_expr_for_runtime_deps(e);
+                    }
+                }
+            }
+            Expr::Ident(name) => {
+                self.check_runtime_category_from_call(name);
+            }
+            Expr::Assign { target, value } => {
+                self.scan_expr_for_runtime_deps(target);
+                self.scan_expr_for_runtime_deps(value);
+            }
+            Expr::Await(e) | Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Try(e)
+            | Expr::Navigate { path: e } | Expr::Stream { source: e } => {
+                self.scan_expr_for_runtime_deps(e);
+            }
+            Expr::Fetch { url, options, .. } => {
+                self.scan_expr_for_runtime_deps(url);
+                if let Some(opts) = options { self.scan_expr_for_runtime_deps(opts); }
+            }
+            Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
+                for (_, e) in fields { self.scan_expr_for_runtime_deps(e); }
+            }
+            Expr::TryCatch { body, catch_body, .. } => {
+                self.scan_expr_for_runtime_deps(body);
+                self.scan_expr_for_runtime_deps(catch_body);
+            }
+            Expr::Suspend { fallback, body } | Expr::Send { channel: fallback, value: body } => {
+                self.scan_expr_for_runtime_deps(fallback);
+                self.scan_expr_for_runtime_deps(body);
+            }
+            Expr::For { iterator, body, .. } | Expr::While { condition: iterator, body } => {
+                self.scan_expr_for_runtime_deps(iterator);
+                self.scan_block_for_runtime_deps(body);
+            }
+            Expr::Spawn { body, .. } | Expr::Trace { body, .. } => {
+                self.scan_block_for_runtime_deps(body);
+            }
+            Expr::Parallel { tasks, .. } => {
+                for t in tasks { self.scan_expr_for_runtime_deps(t); }
+            }
+            Expr::Assert { condition, .. } => self.scan_expr_for_runtime_deps(condition),
+            Expr::AssertEq { left, right, .. } => {
+                self.scan_expr_for_runtime_deps(left);
+                self.scan_expr_for_runtime_deps(right);
+            }
+            Expr::Receive { channel } => self.scan_expr_for_runtime_deps(channel),
+            Expr::Animate { target, .. } => self.scan_expr_for_runtime_deps(target),
+            Expr::DynamicImport { path, .. } | Expr::Download { data: path, .. }
+            | Expr::Env { name: path, .. } | Expr::Flag { name: path, .. } => {
+                self.scan_expr_for_runtime_deps(path);
+            }
+            Expr::VirtualList { items, item_height, template, .. } => {
+                self.scan_expr_for_runtime_deps(items);
+                self.scan_expr_for_runtime_deps(item_height);
+                self.scan_expr_for_runtime_deps(template);
+            }
+            Expr::Range { start, end } => {
+                self.scan_expr_for_runtime_deps(start);
+                self.scan_expr_for_runtime_deps(end);
+            }
+            _ => {}
+        }
+    }
+
+    fn scan_template_for_runtime_deps(&mut self, node: &TemplateNode) {
+        match node {
+            TemplateNode::Element(el) => {
+                for child in &el.children { self.scan_template_for_runtime_deps(child); }
+                for attr in &el.attributes {
+                    match attr {
+                        Attribute::Dynamic { value, .. } | Attribute::Aria { value, .. } => {
+                            self.scan_expr_for_runtime_deps(value);
+                        }
+                        Attribute::EventHandler { handler, .. } => {
+                            self.scan_expr_for_runtime_deps(handler);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            TemplateNode::TextLiteral(_) | TemplateNode::Outlet => {}
+            TemplateNode::Expression(e) => self.scan_expr_for_runtime_deps(e),
+            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+                self.scan_expr_for_runtime_deps(condition);
+                for child in then_children { self.scan_template_for_runtime_deps(child); }
+                if let Some(eb) = else_children {
+                    for child in eb { self.scan_template_for_runtime_deps(child); }
+                }
+            }
+            TemplateNode::TemplateFor { iterator, children, .. } => {
+                self.scan_expr_for_runtime_deps(iterator);
+                for child in children { self.scan_template_for_runtime_deps(child); }
+            }
+            TemplateNode::Fragment(children) => {
+                for child in children { self.scan_template_for_runtime_deps(child); }
+            }
+            TemplateNode::Link { to, children, attributes, .. } => {
+                self.scan_expr_for_runtime_deps(to);
+                for child in children { self.scan_template_for_runtime_deps(child); }
+                for attr in attributes {
+                    if let Attribute::Dynamic { value, .. } = attr {
+                        self.scan_expr_for_runtime_deps(value);
+                    }
+                }
+            }
+            TemplateNode::Layout(layout) => {
+                let children = match layout {
+                    LayoutNode::Stack { children, .. } | LayoutNode::Row { children, .. }
+                    | LayoutNode::Grid { children, .. } | LayoutNode::Center { children, .. }
+                    | LayoutNode::Cluster { children, .. } | LayoutNode::Sidebar { children, .. }
+                    | LayoutNode::Switcher { children, .. } => children,
+                };
+                for child in children { self.scan_template_for_runtime_deps(child); }
+            }
+            TemplateNode::TemplateMatch { subject, arms } => {
+                self.scan_expr_for_runtime_deps(subject);
+                for arm in arms {
+                    for child in &arm.body { self.scan_template_for_runtime_deps(child); }
+                }
+            }
+        }
+    }
+
+    /// Check if a call name implies usage of a particular runtime category.
+    fn check_runtime_category_from_call(&mut self, name: &str) {
+        let categories: &[(&str, &[&str])] = &[
+            ("crypto", &["crypto"]),
+            ("chart", &["chart"]),
+            ("datepicker", &["datepicker", "DatePicker"]),
+            ("mask", &["mask"]),
+            ("skeleton", &["skeleton"]),
+            ("toast", &["toast"]),
+            ("debounce", &["debounce"]),
+            ("throttle", &["throttle"]),
+            ("bigdecimal", &["bigdecimal", "BigDecimal"]),
+            ("search", &["search"]),
+            ("pagination", &["pagination", "Pagination"]),
+            ("csv", &["csv"]),
+            ("collections", &["Map", "Set", "map", "set"]),
+        ];
+        for (category, prefixes) in categories {
+            for prefix in *prefixes {
+                if name.starts_with(prefix) || name.contains(&format!("::{}", prefix)) {
+                    self.used_runtime_categories.insert(category.to_string());
+                    return;
+                }
+            }
         }
     }
 
     pub fn generate(&mut self, program: &Program) -> String {
+        // Pre-scan the AST to determine which optional runtime categories
+        // are actually used. This enables tree-shaking unused helpers.
+        self.scan_program_for_runtime_deps(program);
+
         self.emit("(module");
         self.indent += 1;
 
@@ -498,6 +789,7 @@ impl WasmCodegen {
         // Element ID for a timing display element — if set, callback dispatchers
         // will call dom_setText to update it with the timing after each handler.
         self.line("(global $__timing_display_el (mut i32) (i32.const 0))");
+        self.line("(global $__timing_display_op_el (mut i32) (i32.const 0))");
         self.line("");
         // Callback data table for parameterized event handlers in for-loops.
         // Base address at 308000. Each entry is 8 bytes: [handler_idx: i32, data_ptr: i32].
@@ -506,12 +798,12 @@ impl WasmCodegen {
         self.line("(global $__cb_data_table_base i32 (i32.const 308000))");
         self.line("(global $__cb_data_count (mut i32) (i32.const 0))");
         self.line("");
+        // Always-emit: core infrastructure needed by every program
         self.emit_alloc_function();
         self.emit_cb_data_register();
         self.emit_event_data_ptr_export();
         self.emit_string_runtime();
         self.emit_internal_runtimes();
-        self.emit_crypto_runtime();
         self.emit_signal_runtime();
         self.emit_gesture_runtime();
         self.emit_flags_runtime();
@@ -519,18 +811,48 @@ impl WasmCodegen {
         self.emit_a11y_runtime();
         self.emit_time_runtime();
         self.emit_format_runtime();
-        self.emit_collections_runtime();
-        self.emit_csv_runtime();
-        self.emit_bigdecimal_runtime();
-        self.emit_search_runtime();
-        self.emit_pagination_runtime();
-        self.emit_debounce_runtime();
-        self.emit_throttle_runtime();
-        self.emit_toast_runtime();
-        self.emit_skeleton_runtime();
-        self.emit_mask_runtime();
-        self.emit_chart_runtime();
-        self.emit_datepicker_runtime();
+
+        // Conditionally emit runtime helpers based on AST pre-scan.
+        // Only emit categories that the program actually references.
+        if self.used_runtime_categories.contains("crypto") {
+            self.emit_crypto_runtime();
+        }
+        if self.used_runtime_categories.contains("collections") {
+            self.emit_collections_runtime();
+        }
+        if self.used_runtime_categories.contains("csv") {
+            self.emit_csv_runtime();
+        }
+        if self.used_runtime_categories.contains("bigdecimal") {
+            self.emit_bigdecimal_runtime();
+        }
+        if self.used_runtime_categories.contains("search") {
+            self.emit_search_runtime();
+        }
+        if self.used_runtime_categories.contains("pagination") {
+            self.emit_pagination_runtime();
+        }
+        if self.used_runtime_categories.contains("debounce") {
+            self.emit_debounce_runtime();
+        }
+        if self.used_runtime_categories.contains("throttle") {
+            self.emit_throttle_runtime();
+        }
+        if self.used_runtime_categories.contains("toast") {
+            self.emit_toast_runtime();
+        }
+        if self.used_runtime_categories.contains("skeleton") {
+            self.emit_skeleton_runtime();
+        }
+        if self.used_runtime_categories.contains("mask") {
+            self.emit_mask_runtime();
+        }
+        if self.used_runtime_categories.contains("chart") {
+            self.emit_chart_runtime();
+        }
+        if self.used_runtime_categories.contains("datepicker") {
+            self.emit_datepicker_runtime();
+        }
 
         // Pre-collect component names so template codegen can detect component instantiation
         for item in &program.items {
@@ -745,8 +1067,7 @@ impl WasmCodegen {
             Item::Agent(a) => self.generate_agent(a),
             Item::Router(r) => self.generate_router(r),
             Item::LazyComponent(lc) => {
-                self.line(&format!(";; lazy component {}", lc.component.name));
-                self.generate_component(&lc.component);
+                self.generate_lazy_component(lc);
             }
             Item::Contract(c) => self.generate_contract(c),
             Item::Test(test) => self.generate_test(test),
@@ -1539,11 +1860,11 @@ impl WasmCodegen {
                 self.line("call $format_timing_ms");
                 self.line("global.set $__last_handler_time_len");
                 self.line("global.set $__last_handler_time_ptr");
-                // If a timing display element is registered, update it directly
-                self.line("global.get $__timing_display_el");
+                // Update the handler op timing display element
+                self.line("global.get $__timing_display_op_el");
                 self.line("if");
                 self.indent += 1;
-                self.line("global.get $__timing_display_el");
+                self.line("global.get $__timing_display_op_el");
                 self.line("global.get $__last_handler_time_ptr");
                 self.line("global.get $__last_handler_time_len");
                 self.line("call $dom_setText");
@@ -3739,11 +4060,16 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
                             self.line("call $dom_setAttr");
-                            // Auto-register timing display element when id="timing-display"
+                            // Auto-register timing display elements
                             if name == "id" && value == "timing-display" {
-                                self.line(&format!(";; auto-register timing display element"));
+                                self.line(";; auto-register initial load timing element");
                                 self.line(&format!("local.get {}", var));
                                 self.line("call $set_timing_display");
+                            }
+                            if name == "id" && value == "timing-display-op" {
+                                self.line(";; auto-register handler op timing element");
+                                self.line(&format!("local.get {}", var));
+                                self.line("global.set $__timing_display_op_el");
                             }
                         }
                         Attribute::Dynamic { name, value } => {
@@ -14599,7 +14925,7 @@ mod tests {
 
     #[test]
     fn test_bigdecimal_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { bigdecimal_new(0); return 0; }");
         assert!(wat.contains("func $bigdecimal_new"), "WAT should contain $bigdecimal_new");
         assert!(wat.contains("func $bigdecimal_add"), "WAT should contain $bigdecimal_add");
         assert!(wat.contains("func $bigdecimal_sub"), "WAT should contain $bigdecimal_sub");
@@ -14612,14 +14938,14 @@ mod tests {
 
     #[test]
     fn test_bigdecimal_mul_maintains_scale() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { bigdecimal_mul(0, 0); return 0; }");
         // $bigdecimal_mul should divide by 10000 after multiplying to maintain 4-decimal scale
         assert!(wat.contains("i64.const 10000"), "BigDecimal ops should use scale factor 10000");
     }
 
     #[test]
     fn test_search_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { search_contains(0, 0); return 0; }");
         assert!(wat.contains("func $search_contains"), "WAT should contain $search_contains");
         assert!(wat.contains("func $search_starts_with"), "WAT should contain $search_starts_with");
         assert!(wat.contains("func $search_ends_with"), "WAT should contain $search_ends_with");
@@ -14628,7 +14954,7 @@ mod tests {
 
     #[test]
     fn test_search_case_insensitive_lowering() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { search_fuzzy(0, 0); return 0; }");
         // Case-insensitive search uses OR 0x20 (i32.const 32) to lowercase ASCII A-Z
         // and checks range 65-90 (A-Z)
         assert!(wat.contains("i32.const 65"), "Search should check ASCII 'A' boundary");
@@ -14637,7 +14963,7 @@ mod tests {
 
     #[test]
     fn test_pagination_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { pagination_total_pages(0, 0); return 0; }");
         assert!(wat.contains("func $pagination_total_pages"), "WAT should contain $pagination_total_pages");
         assert!(wat.contains("func $pagination_offset"), "WAT should contain $pagination_offset");
         assert!(wat.contains("func $pagination_has_next"), "WAT should contain $pagination_has_next");
@@ -14647,7 +14973,7 @@ mod tests {
 
     #[test]
     fn test_pagination_clamp_bounds() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { pagination_clamp(0, 0); return 0; }");
         // $pagination_clamp should clamp to [1, total_pages] — verify it has the lower bound check
         // The function should contain comparisons against constant 1
         let clamp_section = wat.split("func $pagination_clamp").nth(1).unwrap_or("");
@@ -14658,7 +14984,7 @@ mod tests {
 
     #[test]
     fn test_debounce_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { debounce_create(0); return 0; }");
         assert!(wat.contains("func $debounce_create"), "WAT should contain $debounce_create");
         assert!(wat.contains("func $debounce_call"), "WAT should contain $debounce_call");
         assert!(wat.contains("func $debounce_cancel"), "WAT should contain $debounce_cancel");
@@ -14666,7 +14992,7 @@ mod tests {
 
     #[test]
     fn test_debounce_uses_timer_syscalls() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { debounce_call(0); return 0; }");
         let debounce_section = wat.split("func $debounce_call").nth(1).unwrap_or("");
         assert!(debounce_section.contains("call $timer_clearTimeout"), "debounce_call should clear pending timer");
         assert!(debounce_section.contains("call $timer_setTimeout"), "debounce_call should set new timer");
@@ -14674,7 +15000,7 @@ mod tests {
 
     #[test]
     fn test_debounce_state_layout() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { debounce_create(0); return 0; }");
         let create_section = wat.split("func $debounce_create").nth(1).unwrap_or("");
         // Allocates 8 bytes for state
         assert!(create_section.contains("i32.const 8"), "debounce_create should allocate 8 bytes");
@@ -14685,7 +15011,7 @@ mod tests {
 
     #[test]
     fn test_throttle_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { throttle_create(0); return 0; }");
         assert!(wat.contains("func $throttle_create"), "WAT should contain $throttle_create");
         assert!(wat.contains("func $throttle_call"), "WAT should contain $throttle_call");
         assert!(wat.contains("func $throttle_reset"), "WAT should contain $throttle_reset");
@@ -14693,7 +15019,7 @@ mod tests {
 
     #[test]
     fn test_throttle_uses_timer_now() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { throttle_call(0); return 0; }");
         let throttle_section = wat.split("func $throttle_call").nth(1).unwrap_or("");
         assert!(throttle_section.contains("call $timer_now"), "throttle_call should call timer_now");
         assert!(throttle_section.contains("i32.trunc_f64_s"), "throttle_call should truncate f64 to i32");
@@ -14702,7 +15028,7 @@ mod tests {
 
     #[test]
     fn test_throttle_state_layout() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { throttle_create(0); return 0; }");
         let create_section = wat.split("func $throttle_create").nth(1).unwrap_or("");
         assert!(create_section.contains("i32.const 8"), "throttle_create should allocate 8 bytes");
         assert!(create_section.contains("call $alloc"), "throttle_create should call $alloc");
@@ -14710,7 +15036,7 @@ mod tests {
 
     #[test]
     fn test_toast_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { toast_show(0); return 0; }");
         assert!(wat.contains("func $toast_show"), "WAT should contain $toast_show");
         assert!(wat.contains("func $toast_success"), "WAT should contain $toast_success");
         assert!(wat.contains("func $toast_error"), "WAT should contain $toast_error");
@@ -14722,7 +15048,7 @@ mod tests {
 
     #[test]
     fn test_toast_uses_dom_syscalls() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { toast_show(0); return 0; }");
         let toast_section = wat.split("func $toast_show").nth(1).unwrap_or("");
         assert!(toast_section.contains("call $dom_createElement"), "toast_show should create element");
         assert!(toast_section.contains("call $dom_setText"), "toast_show should set text");
@@ -14733,14 +15059,14 @@ mod tests {
 
     #[test]
     fn test_toast_success_duration() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { toast_success(0); return 0; }");
         let success_section = wat.split("func $toast_success").nth(1).unwrap_or("");
         assert!(success_section.contains("i32.const 3000"), "toast_success should use 3000ms duration");
     }
 
     #[test]
     fn test_skeleton_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { skeleton_text(0); return 0; }");
         assert!(wat.contains("func $skeleton_text"), "WAT should contain $skeleton_text");
         assert!(wat.contains("func $skeleton_circle"), "WAT should contain $skeleton_circle");
         assert!(wat.contains("func $skeleton_rect"), "WAT should contain $skeleton_rect");
@@ -14751,7 +15077,7 @@ mod tests {
 
     #[test]
     fn test_skeleton_text_creates_loop() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { skeleton_text(0); return 0; }");
         let text_section = wat.split("func $skeleton_text").nth(1).unwrap_or("");
         assert!(text_section.contains("loop $lp"), "skeleton_text should loop to create N lines");
         assert!(text_section.contains("call $dom_createElement"), "skeleton_text should create elements");
@@ -14760,14 +15086,14 @@ mod tests {
 
     #[test]
     fn test_skeleton_circle_border_radius() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { skeleton_circle(0); return 0; }");
         let circle_section = wat.split("func $skeleton_circle").nth(1).unwrap_or("");
         assert!(circle_section.contains("call $dom_setStyle"), "skeleton_circle should set styles");
     }
 
     #[test]
     fn test_skeleton_destroy_hides_element() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { skeleton_destroy(0); return 0; }");
         let destroy_section = wat.split("func $skeleton_destroy").nth(1).unwrap_or("");
         assert!(destroy_section.contains("call $dom_setStyle"), "skeleton_destroy should set display:none");
     }
@@ -14776,7 +15102,7 @@ mod tests {
 
     #[test]
     fn test_mask_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { mask_apply(0, 0); return 0; }");
         assert!(wat.contains("func $mask_apply"), "WAT should contain $mask_apply");
         assert!(wat.contains("func $mask_phone"), "WAT should contain $mask_phone");
         assert!(wat.contains("func $mask_credit_card"), "WAT should contain $mask_credit_card");
@@ -14787,7 +15113,7 @@ mod tests {
 
     #[test]
     fn test_mask_apply_uses_pattern_matching() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { mask_apply(0, 0); return 0; }");
         let mask_section = wat.split("func $mask_apply").nth(1).unwrap_or("");
         // '#' = ASCII 35 for digit matching
         assert!(mask_section.contains("i32.const 35"), "mask_apply should check for '#' pattern char");
@@ -14801,14 +15127,14 @@ mod tests {
 
     #[test]
     fn test_mask_phone_calls_mask_apply() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { mask_phone(0, 0); return 0; }");
         let phone_section = wat.split("func $mask_phone").nth(1).unwrap_or("");
         assert!(phone_section.contains("call $mask_apply"), "mask_phone should delegate to mask_apply");
     }
 
     #[test]
     fn test_mask_strip_filters_non_alphanumeric() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { mask_strip(0, 0); return 0; }");
         let strip_section = wat.split("func $mask_strip").nth(1).unwrap_or("");
         // Should check for digit range (48-57), uppercase (65-90), lowercase (97-122)
         assert!(strip_section.contains("i32.const 48"), "mask_strip should check digit lower bound");
@@ -14820,7 +15146,7 @@ mod tests {
 
     #[test]
     fn test_chart_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { chart_bar(0); return 0; }");
         assert!(wat.contains("func $chart_bar"), "WAT should contain $chart_bar");
         assert!(wat.contains("func $chart_line"), "WAT should contain $chart_line");
         assert!(wat.contains("func $chart_pie"), "WAT should contain $chart_pie");
@@ -14831,7 +15157,7 @@ mod tests {
 
     #[test]
     fn test_chart_bar_creates_svg_rects() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { chart_bar(0); return 0; }");
         let bar_section = wat.split("func $chart_bar").nth(1).unwrap_or("");
         assert!(bar_section.contains("call $dom_createElement"), "chart_bar should create SVG elements");
         assert!(bar_section.contains("call $dom_setAttr"), "chart_bar should set attributes on elements");
@@ -14841,7 +15167,7 @@ mod tests {
 
     #[test]
     fn test_chart_line_creates_polyline() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { chart_line(0); return 0; }");
         let line_section = wat.split("func $chart_line").nth(1).unwrap_or("");
         assert!(line_section.contains("call $string_concat"), "chart_line should build points string via concat");
         assert!(line_section.contains("call $dom_createElement"), "chart_line should create SVG elements");
@@ -14849,7 +15175,7 @@ mod tests {
 
     #[test]
     fn test_chart_destroy_hides_element() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { chart_destroy(0); return 0; }");
         let destroy_section = wat.split("func $chart_destroy").nth(1).unwrap_or("");
         assert!(destroy_section.contains("call $dom_setStyle"), "chart_destroy should hide element via style");
     }
@@ -14858,7 +15184,7 @@ mod tests {
 
     #[test]
     fn test_datepicker_runtime_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { datepicker_create(0); return 0; }");
         assert!(wat.contains("func $datepicker_is_leap_year"), "WAT should contain $datepicker_is_leap_year");
         assert!(wat.contains("func $datepicker_days_in_month"), "WAT should contain $datepicker_days_in_month");
         assert!(wat.contains("func $datepicker_day_of_week"), "WAT should contain $datepicker_day_of_week");
@@ -14872,7 +15198,7 @@ mod tests {
 
     #[test]
     fn test_datepicker_leap_year_logic() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { datepicker_is_leap_year(0); return 0; }");
         let leap_section = wat.split("func $datepicker_is_leap_year").nth(1).unwrap_or("");
         // Should check divisibility by 400, 100, and 4
         assert!(leap_section.contains("i32.const 400"), "leap year should check mod 400");
@@ -14882,7 +15208,7 @@ mod tests {
 
     #[test]
     fn test_datepicker_days_in_month_handles_february() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { datepicker_days_in_month(0, 0); return 0; }");
         let dim_section = wat.split("func $datepicker_days_in_month").nth(1).unwrap_or("");
         assert!(dim_section.contains("i32.const 28"), "days_in_month should return 28 for non-leap Feb");
         assert!(dim_section.contains("i32.const 29"), "days_in_month should return 29 for leap Feb");
@@ -14891,11 +15217,114 @@ mod tests {
 
     #[test]
     fn test_datepicker_compare_returns_neg1_0_1() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { datepicker_compare(0, 0); return 0; }");
         let cmp_section = wat.split("func $datepicker_compare").nth(1).unwrap_or("");
         assert!(cmp_section.contains("i32.const -1"), "compare should return -1");
         assert!(cmp_section.contains("i32.const 0"), "compare should return 0");
         assert!(cmp_section.contains("i32.const 1"), "compare should return 1");
+    }
+
+    // -- Tree-shaking: verify unused runtimes are NOT emitted --
+
+    #[test]
+    fn tree_shake_no_crypto_when_unused() {
+        let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(!wat.contains("func $crypto_sha256"), "crypto runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_chart_when_unused() {
+        let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(!wat.contains("func $chart_bar"), "chart runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_datepicker_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $datepicker_create"), "datepicker runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_toast_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $toast_show"), "toast runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_csv_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $csv_parse"), "csv runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_collections_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $map_create"), "collections runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_bigdecimal_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $bigdecimal_new"), "bigdecimal runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_mask_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $mask_apply"), "mask runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_skeleton_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $skeleton_text"), "skeleton runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_debounce_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $debounce_create"), "debounce runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_throttle_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $throttle_create"), "throttle runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_search_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $search_contains"), "search runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_no_pagination_when_unused() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(!wat.contains("func $pagination_total_pages"), "pagination runtime should not be emitted when unused");
+    }
+
+    #[test]
+    fn tree_shake_core_always_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $alloc"), "alloc should always be emitted");
+        assert!(wat.contains("func $string_concat"), "string runtime should always be emitted");
+    }
+
+    // -- Lazy component: verify lazy_mount is generated through generate_item --
+
+    #[test]
+    fn lazy_component_via_generate_item() {
+        let src = r#"
+            lazy component HeavyWidget {
+                render {
+                    <div>"loaded"</div>
+                }
+            }
+        "#;
+        let wat = compile(src);
+        assert!(wat.contains("Lazy Component: HeavyWidget"), "should emit lazy component marker");
+        assert!(wat.contains("lazy_mount"), "should generate lazy_mount wrapper");
     }
 
 }
@@ -19168,7 +19597,7 @@ mod coverage_codegen_tests {
 
     #[test]
     fn crypto_runtime_emitted_in_wat() {
-        let wat = compile("pub fn main() -> i32 { return 0; }");
+        let wat = compile("pub fn main() -> i32 { crypto_sha256(0, 0); return 0; }");
         assert!(wat.contains("$crypto_sha256_block"), "WAT should contain SHA-256 block transform");
         assert!(wat.contains("$crypto_sha256"), "WAT should contain SHA-256 function");
         assert!(wat.contains("$crypto_hmac_sha256"), "WAT should contain HMAC-SHA256");
@@ -20768,7 +21197,7 @@ mod format_collections_csv_runtime_tests {
 
     #[test]
     fn test_map_create_and_set_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { map_create(); return 0; }");
         assert!(wat.contains("(func $map_create (result i32)"),
             "map_create must be emitted with correct signature");
         assert!(wat.contains("(func $map_set (param $map i32) (param $k_ptr i32) (param $k_len i32) (param $val i32)"),
@@ -20777,7 +21206,7 @@ mod format_collections_csv_runtime_tests {
 
     #[test]
     fn test_map_get_has_delete_keys_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { map_get(0, 0, 0); return 0; }");
         assert!(wat.contains("(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
             "map_get must be emitted with correct signature");
         assert!(wat.contains("(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
@@ -20790,7 +21219,7 @@ mod format_collections_csv_runtime_tests {
 
     #[test]
     fn test_set_create_add_has_delete_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { set_create(); return 0; }");
         assert!(wat.contains("(func $set_create (result i32)"),
             "set_create must be emitted");
         assert!(wat.contains("(func $set_add (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
@@ -20805,7 +21234,7 @@ mod format_collections_csv_runtime_tests {
 
     #[test]
     fn test_csv_parse_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { csv_parse(0, 0); return 0; }");
         assert!(wat.contains("(func $csv_parse (param $ptr i32) (param $len i32) (result i32)"),
             "csv_parse must be emitted with correct signature");
         // Should handle newlines and commas
@@ -20817,7 +21246,7 @@ mod format_collections_csv_runtime_tests {
 
     #[test]
     fn test_csv_stringify_emitted() {
-        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let wat = compile("pub fn noop() -> i32 { csv_stringify(0); return 0; }");
         assert!(wat.contains("(func $csv_stringify (param $arr i32) (result i32 i32)"),
             "csv_stringify must be emitted with correct signature");
         assert!(wat.contains("call $string_concat"),

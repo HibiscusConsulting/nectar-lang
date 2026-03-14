@@ -991,8 +991,13 @@ impl Parser {
                         then_children,
                         else_children,
                     })
-                } else if self.check(&TokenKind::For) {
-                    self.advance();
+                } else if self.check(&TokenKind::Lazy) || self.check(&TokenKind::For) {
+                    // {lazy for x in expr { ... }} or {for x in expr { ... }}
+                    let lazy = self.check(&TokenKind::Lazy);
+                    if lazy {
+                        self.advance(); // consume `lazy`
+                    }
+                    self.expect(&TokenKind::For)?;
                     let binding = self.expect_ident()?;
                     self.expect(&TokenKind::In)?;
                     let iterator = self.parse_expr()?;
@@ -1007,6 +1012,7 @@ impl Parser {
                         binding,
                         iterator: Box::new(iterator),
                         children,
+                        lazy,
                     })
                 } else if self.check(&TokenKind::Match) {
                     // {match subject { Pattern => <template>, ... }}

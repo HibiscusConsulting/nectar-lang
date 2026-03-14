@@ -693,10 +693,13 @@ pub enum TemplateNode {
         else_children: Option<Vec<TemplateNode>>,
     },
     /// {for binding in iterator { <template> }}
+    /// When `lazy` is true, items are rendered in batches as the user scrolls
+    /// using IntersectionObserver (progressive/lazy rendering).
     TemplateFor {
         binding: String,
         iterator: Box<Expr>,
         children: Vec<TemplateNode>,
+        lazy: bool,
     },
     /// {match subject { Pattern => <template>, ... }}
     TemplateMatch {
