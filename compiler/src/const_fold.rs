@@ -190,6 +190,9 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
         Expr::Match { subject, arms, .. } => {
             fold_expr(subject, stats);
             for arm in arms {
+                if let Some(guard) = &mut arm.guard {
+                    fold_expr(guard, stats);
+                }
                 fold_expr(&mut arm.body, stats);
             }
         }
@@ -259,6 +262,12 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
         }
         Expr::Flag { name, .. } => {
             fold_expr(name, stats);
+        }
+        Expr::ArrayLit(elements) => {
+            for e in elements { fold_expr(e, stats); }
+        }
+        Expr::ObjectLit { fields } => {
+            for (_, v) in fields { fold_expr(v, stats); }
         }
         // Leaf nodes — nothing to fold further into
         Expr::Integer(_) | Expr::Float(_) | Expr::StringLit(_) | Expr::Bool(_)
@@ -1092,6 +1101,7 @@ mod tests {
             subject: Box::new(foldable_expr()),
             arms: vec![MatchArm {
                 pattern: Pattern::Wildcard,
+                guard: None,
                 body: foldable_expr(),
             }],
         };
@@ -1637,6 +1647,91 @@ mod tests {
     #[test]
     fn test_fold_inside_receive() {
         let mut expr = Expr::Receive { channel: Box::new(foldable_expr()) };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 1);
+    }
+
+    #[test]
+    fn test_fold_inside_match_guard() {
+        let mut expr = Expr::Match {
+            subject: Box::new(foldable_expr()),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: Some(foldable_expr()),
+                body: foldable_expr(),
+            }],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        // subject + guard + body = 3 folds
+        assert_eq!(stats.constants_folded, 3);
+    }
+
+    #[test]
+    fn test_fold_inside_array_lit() {
+        let mut expr = Expr::ArrayLit(vec![foldable_expr(), foldable_expr()]);
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_inside_object_lit() {
+        let mut expr = Expr::ObjectLit {
+            fields: vec![
+                ("x".into(), foldable_expr()),
+                ("y".into(), foldable_expr()),
+            ],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2);
+    }
+
+    #[test]
+    fn test_fold_empty_array_lit() {
+        let mut expr = Expr::ArrayLit(vec![]);
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    #[test]
+    fn test_fold_empty_object_lit() {
+        let mut expr = Expr::ObjectLit { fields: vec![] };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 0);
+    }
+
+    #[test]
+    fn test_fold_match_guard() {
+        let mut expr = Expr::Match {
+            subject: Box::new(Expr::Ident("x".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Ident("n".into()),
+                    guard: Some(foldable_expr()),
+                    body: foldable_expr(),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                },
+            ],
+        };
+        let mut stats = FoldStats::default();
+        fold_expr(&mut expr, &mut stats);
+        assert_eq!(stats.constants_folded, 2, "Should fold guard and body");
+    }
+
+    #[test]
+    fn test_fold_nested_array_lit() {
+        let mut expr = Expr::ArrayLit(vec![
+            Expr::ArrayLit(vec![foldable_expr()]),
+        ]);
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
         assert_eq!(stats.constants_folded, 1);

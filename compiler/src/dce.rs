@@ -242,7 +242,18 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
         }
         Expr::Match { subject, arms, .. } => {
             collect_references_in_expr(subject, refs);
-            for arm in arms { collect_references_in_expr(&arm.body, refs); }
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    collect_references_in_expr(guard, refs);
+                }
+                collect_references_in_expr(&arm.body, refs);
+            }
+        }
+        Expr::ArrayLit(elements) => {
+            for e in elements { collect_references_in_expr(e, refs); }
+        }
+        Expr::ObjectLit { fields } => {
+            for (_, v) in fields { collect_references_in_expr(v, refs); }
         }
         Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Await(e)
         | Expr::Stream { source: e } | Expr::Navigate { path: e }
@@ -1117,6 +1128,7 @@ mod tests {
             subject: Box::new(Expr::Ident("subj".to_string())),
             arms: vec![MatchArm {
                 pattern: Pattern::Wildcard,
+                guard: None,
                 body: Expr::Ident("arm_body".to_string()),
             }],
         }, &mut refs);
@@ -1402,5 +1414,74 @@ mod tests {
             value: Expr::Ident("sig_dep".to_string()),
         }, &mut refs);
         assert!(refs.contains("sig_dep"));
+    }
+
+    #[test]
+    fn test_collect_refs_array_lit() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::ArrayLit(vec![
+            Expr::Ident("a".to_string()),
+            Expr::Ident("b".to_string()),
+        ]), &mut refs);
+        assert!(refs.contains("a"));
+        assert!(refs.contains("b"));
+    }
+
+    #[test]
+    fn test_collect_refs_object_lit() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::ObjectLit {
+            fields: vec![
+                ("x".into(), Expr::Ident("val1".to_string())),
+                ("y".into(), Expr::Ident("val2".to_string())),
+            ],
+        }, &mut refs);
+        assert!(refs.contains("val1"));
+        assert!(refs.contains("val2"));
+    }
+
+    #[test]
+    fn test_collect_refs_match_with_guard() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("subj".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Ident("n".to_string()),
+                guard: Some(Expr::Ident("guard_var".to_string())),
+                body: Expr::Ident("arm_body".to_string()),
+            }],
+        }, &mut refs);
+        assert!(refs.contains("subj"));
+        assert!(refs.contains("guard_var"));
+        assert!(refs.contains("arm_body"));
+    }
+
+    #[test]
+    fn test_collect_refs_empty_array_lit() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::ArrayLit(vec![]), &mut refs);
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_collect_refs_empty_object_lit() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::ObjectLit { fields: vec![] }, &mut refs);
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_collect_refs_match_no_guard() {
+        let mut refs = std::collections::HashSet::new();
+        collect_references_in_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("x".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: None,
+                body: Expr::Integer(0),
+            }],
+        }, &mut refs);
+        assert!(refs.contains("x"));
+        assert_eq!(refs.len(), 1);
     }
 }

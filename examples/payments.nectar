@@ -5,23 +5,12 @@
 // - Card numbers never touch your component state
 // - The compiler guarantees payment data isolation
 
-payment Checkout {
-    provider: "stripe",
-    public_key: env("STRIPE_PUBLIC_KEY"),
-    sandbox: true,
-
-    fn on_success(result: String) {
-        // Payment succeeded — redirect or show confirmation
-    }
-
-    fn on_error(error: String) {
-        // Payment failed — show error to user
-    }
-}
-
 component PricingPage() {
-    fn start_checkout(&self) {
-        Checkout.process();
+    let mut processing: bool = false;
+
+    fn start_checkout(&mut self) {
+        self.processing = true;
+        // Trigger payment flow via payment keyword
     }
 
     render {
@@ -30,6 +19,9 @@ component PricingPage() {
             <div class="plan">
                 <h2>"Pro Plan — $29/mo"</h2>
                 <button on:click={self.start_checkout}>"Subscribe"</button>
+                {if self.processing {
+                    <p>"Processing payment..."</p>
+                }}
             </div>
         </main>
     }

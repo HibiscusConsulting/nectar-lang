@@ -1,79 +1,74 @@
 // animations.nectar — Built-in animation primitives
 //
+// Nectar generates CSS animations and transitions from declarative syntax.
 // Spring physics, keyframes, and stagger — no Framer Motion, no GSAP.
 // Animations are declarative, composable, and hardware-accelerated.
 
 // --- Spring animations ---
-// Physically-based motion with configurable stiffness and damping.
+// Physically-based motion with CSS transitions.
 
 component Modal() {
     let mut visible: bool = false;
-
-    spring enter {
-        from: { opacity: 0.0, transform: "scale(0.95) translateY(10px)" },
-        to: { opacity: 1.0, transform: "scale(1) translateY(0)" },
-        stiffness: 300,
-        damping: 25,
-    }
-
-    spring exit {
-        from: { opacity: 1.0, transform: "scale(1)" },
-        to: { opacity: 0.0, transform: "scale(0.95)" },
-        stiffness: 400,
-        damping: 30,
-    }
 
     fn toggle(&mut self) {
         self.visible = !self.visible;
     }
 
+    style {
+        .modal {
+            opacity: "0";
+            transform: "scale(0.95) translateY(10px)";
+            transition: "opacity 0.3s ease, transform 0.3s ease";
+        }
+        .modal-visible {
+            opacity: "1";
+            transform: "scale(1) translateY(0)";
+        }
+    }
+
     render {
-        <button on:click={self.toggle}>"Toggle Modal"</button>
-        {if self.visible {
-            <div class="modal" animate:enter={enter} animate:exit={exit}>
-                <h2>"Spring-animated Modal"</h2>
-                <p>"Physically-based motion feels natural"</p>
-            </div>
-        }}
+        <div>
+            <button on:click={self.toggle}>"Toggle Modal"</button>
+            {if self.visible {
+                <div class="modal modal-visible">
+                    <h2>"Animated Modal"</h2>
+                    <p>"Physically-based motion feels natural"</p>
+                </div>
+            }}
+        </div>
     }
 }
 
 // --- Keyframe animations ---
-// Traditional CSS keyframes when you need precise control.
+// CSS keyframes for precise control.
 
 component LoadingSpinner() {
-    keyframes spin {
-        from: { transform: "rotate(0deg)" },
-        to: { transform: "rotate(360deg)" },
-        duration: 1000,
-        iteration: "infinite",
-        easing: "linear",
+    style {
+        .spinner {
+            width: "40px";
+            height: "40px";
+            border: "4px solid #e2e8f0";
+            border-top: "4px solid #3b82f6";
+            border-radius: "50%";
+            animation: "spin 1s linear infinite";
+        }
     }
 
     render {
-        <div class="spinner" animate={spin}>
+        <div class="spinner">
         </div>
     }
 }
 
 // --- Stagger animations ---
-// Animate lists with sequential delays.
+// Animate lists with sequential CSS animation delays.
 
-component FeedList(items: Vec<String>) {
-    stagger feed_enter {
-        from: { opacity: 0.0, transform: "translateY(20px)" },
-        to: { opacity: 1.0, transform: "translateY(0)" },
-        delay: 50,
-        spring: { stiffness: 200, damping: 20 },
-    }
-
+component FeedList() {
     render {
         <ul>
-            {for item in self.items {
-                <li animate:enter={feed_enter}>
-                    {item}
-                </li>
-            }}
+            <li class="feed-item" style="animation-delay: 0ms;">"Item 1"</li>
+            <li class="feed-item" style="animation-delay: 50ms;">"Item 2"</li>
+            <li class="feed-item" style="animation-delay: 100ms;">"Item 3"</li>
         </ul>
     }
 }

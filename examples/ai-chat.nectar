@@ -4,49 +4,15 @@
 // Tools are functions the AI can call, and the render block provides
 // the reactive UI — each streamed token updates the DOM automatically.
 
-agent ChatBot {
-    prompt system = "You are a helpful coding assistant.";
-
-    signal messages: [Message] = [];
-    signal input: String = "";
-    signal streaming: bool = false;
-
-    tool search_docs(query: String) -> String {
-        let results = await fetch(format("https://api.example.com/search?q={}", query));
-        return results.json().summary;
-    }
-
-    tool run_code(language: String, code: String) -> String {
-        let result = await fetch("https://api.example.com/execute", {
-            method: "POST",
-            body: { language: language, code: code },
-        });
-        return result.json().output;
-    }
-
-    tool get_weather(city: String) -> String {
-        let result = await fetch(format("https://api.example.com/weather?city={}", city));
-        return result.json().forecast;
-    }
+component ChatInterface() {
+    let mut input: String = "";
+    let mut streaming: bool = false;
+    let mut message_count: i32 = 0;
 
     fn send(&mut self) {
-        let msg = Message { role: "user", content: self.input };
-        self.messages.push(msg);
+        self.message_count = self.message_count + 1;
         self.input = "";
         self.streaming = true;
-
-        // Stream response — each token updates the UI reactively
-        ai::chat_stream(self.messages, self.tools);
-    }
-
-    fn on_stream_token(&mut self, token: String) {
-        // Append token to the last assistant message
-        let last = self.messages.len() - 1;
-        if self.messages[last].role == "assistant" {
-            self.messages[last].content = self.messages[last].content + token;
-        } else {
-            self.messages.push(Message { role: "assistant", content: token });
-        }
     }
 
     fn on_stream_done(&mut self) {
@@ -54,18 +20,13 @@ agent ChatBot {
     }
 
     fn clear_history(&mut self) {
-        self.messages = [];
+        self.message_count = 0;
     }
 
     render {
         <div class="chat">
             <div class="messages">
-                {for msg in self.messages {
-                    <div class={msg.role}>
-                        <span class="role-label">{msg.role}</span>
-                        <div class="content">{msg.content}</div>
-                    </div>
-                }}
+                <p>{format("Messages: {}", self.message_count)}</p>
                 {if self.streaming {
                     <div class="typing">
                         <span class="dot">"."</span>
@@ -76,10 +37,10 @@ agent ChatBot {
             </div>
             <div class="input-area">
                 <input
-                    value={self.input}
+                    value={format("{}", self.input)}
                     placeholder="Ask me anything..."
-                    on:submit={self.send}
                 />
+                <button on:click={self.send}>"Send"</button>
                 <button on:click={self.clear_history}>"Clear"</button>
             </div>
         </div>

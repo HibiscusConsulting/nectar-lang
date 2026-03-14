@@ -1,221 +1,38 @@
-// Example: A routed Nectar app with scoped styles
+// Example: A Nectar app with routing
 //
 // Demonstrates:
-//   - Router definition with parameterized routes and guards
-//   - Scoped CSS styles within components
+//   - Router definition
 //   - <Link> navigation elements
-//   - Programmatic navigation via navigate()
-
-use std::string;
-
-// --- Auth store (used as a route guard) ---
-
-store AuthStore {
-    signal is_logged_in: bool = false;
-    signal username: String = "";
-
-    action login(&mut self, user: String) {
-        self.is_logged_in = true;
-        self.username = user;
-    }
-
-    action logout(&mut self) {
-        self.is_logged_in = false;
-        self.username = "";
-    }
-}
-
-// --- Components ---
-
-component NavBar() {
-    style {
-        .navbar {
-            display: "flex";
-            gap: "16px";
-            padding: "12px 24px";
-            background: "#1e293b";
-            color: "white";
-        }
-        .navbar a {
-            color: "#93c5fd";
-            text-decoration: "none";
-            font-weight: "500";
-        }
-        .navbar a:hover {
-            color: "#bfdbfe";
-            text-decoration: "underline";
-        }
-    }
-
-    render {
-        <nav class="navbar">
-            <Link to="/">"Home"</Link>
-            <Link to="/about">"About"</Link>
-            <Link to="/user/42">"Profile"</Link>
-            <Link to="/admin">"Admin"</Link>
-        </nav>
-    }
-}
 
 component Home() {
-    style {
-        .home {
-            padding: "32px";
-            text-align: "center";
-        }
-        .home h1 {
-            font-size: "2rem";
-            color: "#1e293b";
-        }
-        .home p {
-            color: "#64748b";
-            margin-top: "8px";
-        }
-    }
-
     render {
         <div class="home">
             <h1>"Welcome to Nectar"</h1>
-            <p>"A language that compiles to WebAssembly with built-in routing and scoped styles."</p>
+            <p>"A language that compiles to WebAssembly."</p>
         </div>
     }
 }
 
 component About() {
-    style {
-        .about {
-            padding: "32px";
-            max-width: "600px";
-            margin: "0 auto";
-        }
-        .about h2 {
-            color: "#334155";
-        }
-        .about p {
-            line-height: "1.6";
-            color: "#475569";
-        }
-    }
-
     render {
         <div class="about">
             <h2>"About Nectar"</h2>
-            <p>"Nectar is a systems-level UI language with fine-grained reactivity, ownership semantics, and first-class routing."</p>
-        </div>
-    }
-}
-
-component UserProfile(id: String) {
-    signal user_name: String = "Loading...";
-
-    style {
-        .profile {
-            padding: "32px";
-        }
-        .profile-card {
-            border: "1px solid #e2e8f0";
-            border-radius: "8px";
-            padding: "24px";
-            max-width: "400px";
-        }
-        .profile-card h2 {
-            margin-bottom: "8px";
-        }
-        .profile-card .id-badge {
-            background: "#eff6ff";
-            color: "#1d4ed8";
-            padding: "4px 12px";
-            border-radius: "12px";
-            font-size: "0.875rem";
-        }
-    }
-
-    render {
-        <div class="profile">
-            <div class="profile-card">
-                <h2>{self.user_name}</h2>
-                <span class="id-badge">{format("User ID: {}", self.id)}</span>
-            </div>
-        </div>
-    }
-}
-
-component AdminPanel() {
-    style {
-        .admin {
-            padding: "32px";
-            background: "#fef2f2";
-            min-height: "200px";
-        }
-        .admin h2 {
-            color: "#991b1b";
-        }
-        .admin p {
-            color: "#b91c1c";
-        }
-    }
-
-    render {
-        <div class="admin">
-            <h2>"Admin Dashboard"</h2>
-            <p>"This route is protected by a guard. Only logged-in users can see this."</p>
+            <p>"Nectar is a systems-level UI language."</p>
         </div>
     }
 }
 
 component NotFound() {
-    style {
-        .not-found {
-            padding: "64px";
-            text-align: "center";
-        }
-        .not-found h1 {
-            font-size: "4rem";
-            color: "#cbd5e1";
-        }
-        .not-found p {
-            color: "#94a3b8";
-        }
-    }
-
-    fn go_home(&self) {
-        navigate("/");
-    }
-
     render {
         <div class="not-found">
             <h1>"404"</h1>
             <p>"Page not found."</p>
-            <button on:click={self.go_home}>"Go Home"</button>
         </div>
     }
 }
-
-// --- App shell with router ---
-
-component App() {
-    style {
-        .app {
-            font-family: "system-ui, -apple-system, sans-serif";
-            min-height: "100vh";
-            background: "#f8fafc";
-        }
-    }
-
-    render {
-        <div class="app">
-            <NavBar />
-            <div id="outlet" />
-        </div>
-    }
-}
-
-// --- Router definition ---
 
 router AppRouter {
     route "/" => Home,
     route "/about" => About,
-    route "/user/:id" => UserProfile,
-    route "/admin/*" => AdminPanel guard { AuthStore::is_logged_in() },
     fallback => NotFound,
 }

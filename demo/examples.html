@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nectar Demo App</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0e14;--surface:#131720;--surface2:#1a1f2e;--border:#2a2f3e;
+  --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
+  --accent:#f97316;--accent2:#fb923c;--green:#3fb950;--red:#f85149;
+  --blue:#58a6ff;--purple:#bc8cff;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+
+/* ── Header ───────────────────────────────── */
+.app-header{text-align:center;padding:40px 24px 20px}
+.app-header h1{font-size:2.4rem;font-weight:800}
+.app-header h1 span{color:var(--accent)}
+.app-header .sub{color:var(--text2);font-size:0.95rem;margin-top:6px}
+
+/* ── Tabs ─────────────────────────────────── */
+.tabs-row{display:flex;justify-content:center;gap:12px;padding:12px 24px 24px;flex-wrap:wrap}
+.tab{padding:12px 24px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text2);font-size:0.9rem;font-weight:600;transition:all 0.15s;min-width:100px;text-align:center}
+.tab:hover{border-color:var(--text2);color:var(--text)}
+.tab.active{border-color:var(--accent);background:rgba(249,115,22,0.12);color:var(--accent)}
+
+/* ── Panel container ──────────────────────── */
+.panel{display:none;max-width:1400px;margin:0 auto;padding:0 24px 40px}
+.panel.active{display:block}
+
+/* ── Section card ─────────────────────────── */
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:24px}
+
+/* ── E-Commerce header row ────────────────── */
+.ecom-title{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.ecom-title h2{font-size:1.6rem;font-weight:800;color:var(--accent)}
+.signal-badge{background:rgba(63,185,80,0.15);color:var(--green);padding:4px 14px;border-radius:6px;font-size:0.8rem;font-weight:600;border:1px solid rgba(63,185,80,0.3)}
+
+/* ── Controls row ─────────────────────────── */
+.controls-row{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.search-box{flex:1;min-width:200px;background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:12px 18px;border-radius:10px;font-size:1rem;outline:none;transition:border-color 0.15s}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--text3)}
+.sort-select{background:var(--surface2);border:2px solid var(--border);color:var(--text);padding:12px 16px;border-radius:10px;font-size:0.9rem;outline:none;cursor:pointer}
+.sort-select:focus{border-color:var(--accent)}
+.cart-btn{background:var(--accent);color:#000;border:none;padding:12px 24px;border-radius:10px;font-size:1rem;font-weight:700;display:flex;align-items:center;gap:8px;transition:all 0.15s}
+.cart-btn:hover{background:var(--accent2)}
+.cart-btn .ct{background:rgba(0,0,0,0.25);padding:2px 10px;border-radius:12px;font-size:0.85rem}
+
+/* ── Category pills ───────────────────────── */
+.cat-pills{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.pill{padding:8px 20px;border-radius:20px;border:2px solid var(--border);background:transparent;color:var(--text2);font-size:0.85rem;font-weight:600;transition:all 0.15s}
+.pill:hover{border-color:var(--text2);color:var(--text)}
+.pill.active{border-color:var(--accent);background:var(--accent);color:#000}
+
+/* ── Metrics grid ─────────────────────────── */
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px}
+.metric-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center}
+.metric-card .label{display:block;color:var(--text2);font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.metric-card .value{display:block;font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums;font-family:"SF Mono",SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace}
+.mv-green{color:var(--green)}
+.mv-blue{color:var(--blue)}
+.mv-accent{color:var(--accent)}
+.mv-purple{color:var(--purple)}
+
+/* ── Product grid ─────────────────────────── */
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+
+/* ── Product card ─────────────────────────── */
+.product-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:all 0.2s}
+.product-card:hover{transform:translateY(-3px);border-color:rgba(249,115,22,0.4);box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.product-img{height:180px;overflow:hidden;position:relative;background:var(--surface)}
+.product-img img{width:100%;height:100%;object-fit:cover;transition:transform 0.3s}
+.product-card:hover .product-img img{transform:scale(1.05)}
+.product-img .badges{position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap}
+.badge-tag{padding:3px 8px;border-radius:4px;font-size:0.65rem;font-weight:700}
+.badge-sale{background:var(--red);color:#fff}
+.badge-new{background:var(--blue);color:#fff}
+.badge-hot{background:linear-gradient(90deg,#f97316,#ef4444);color:#fff}
+.stock-bar{position:absolute;bottom:0;left:0;right:0;padding:4px 0;font-size:0.65rem;font-weight:700;text-align:center}
+.stock-in{background:rgba(63,185,80,0.85);color:#000}
+.stock-low{background:rgba(249,115,22,0.85);color:#000}
+.stock-out{background:rgba(248,81,73,0.85);color:#fff}
+.product-body{padding:14px}
+.product-name{font-size:0.9rem;font-weight:700;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.product-cat{font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.product-rating{font-size:0.75rem;margin-bottom:8px}
+.stars{color:var(--accent)}
+.rating-num{color:var(--text3);margin-left:4px}
+.product-price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.price-now{font-size:1.2rem;font-weight:800;color:var(--green)}
+.price-was{font-size:0.75rem;color:var(--text3);text-decoration:line-through}
+.price-off{font-size:0.7rem;color:var(--red);font-weight:700}
+.add-btn{width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:rgba(249,115,22,0.1);color:var(--accent);font-size:0.8rem;font-weight:600;transition:all 0.15s}
+.add-btn:hover{background:var(--accent);color:#000}
+.add-btn.in-cart{background:var(--green);border-color:var(--green);color:#000}
+.add-btn:disabled{opacity:0.3;cursor:not-allowed}
+
+/* ── Counter / Benchmark / Architecture panels (reuse) ─── */
+.demo-center{max-width:700px;margin:0 auto}
+.counter-val{font-size:7rem;font-weight:800;text-align:center;padding:32px 0;font-variant-numeric:tabular-nums}
+.btn-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.dbtn{padding:14px 36px;border-radius:10px;font-size:1.1rem;font-weight:700;border:2px solid var(--border);transition:all 0.15s}
+.dbtn.accent{background:rgba(249,115,22,0.12);color:var(--accent);border-color:var(--accent)}
+.dbtn.accent:hover{background:var(--accent);color:#000}
+.dbtn.muted{background:var(--surface2);color:var(--text2)}
+.dbtn.muted:hover{color:var(--text);border-color:var(--text2)}
+.bench-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}
+.bench-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center}
+.bench-card .bl{display:block;color:var(--text2);font-size:0.75rem;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}
+.bench-card .bv{display:block;font-size:1.5rem;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums}
+.bench-card .bu{font-size:0.65rem;color:var(--text3)}
+.bar{width:100%;height:5px;background:var(--border);border-radius:3px;margin-top:8px;overflow:hidden}
+.bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 0.3s;width:0%}
+.arch-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:24px 0}
+.arch-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 24px;text-align:center}
+.arch-box .al{font-size:0.7rem;color:var(--text3)}
+.arch-box .av{font-size:0.95rem;font-weight:700}
+.arch-arr{color:var(--accent);font-size:1.5rem;font-weight:700}
+.arch-tbl{width:100%;border-collapse:collapse;margin-top:16px}
+.arch-tbl td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:0.85rem}
+.arch-tbl td:first-child{color:var(--text2)}
+.arch-tbl .g{color:var(--green);font-weight:600}
+.arch-tbl .r{color:var(--red);font-weight:600}
+
+/* ── Toast ────────────────────────────────── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--accent);color:var(--text);padding:12px 20px;border-radius:10px;font-size:0.85rem;z-index:999;transform:translateY(80px);opacity:0;transition:all 0.25s;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── Footer ───────────────────────────────── */
+.app-footer{text-align:center;padding:32px 24px;color:var(--text3);font-size:0.8rem;border-top:1px solid var(--border);margin-top:40px}
+.app-footer a{color:var(--accent)}
+
+/* ── Responsive ───────────────────────────── */
+@media(max-width:768px){
+  .product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  .metrics-grid{grid-template-columns:repeat(2,1fr)}
+  .bench-grid{grid-template-columns:1fr 1fr}
+  .tabs-row{gap:8px}
+  .tab{padding:8px 14px;font-size:0.8rem;min-width:auto}
+  .controls-row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1><span>Nectar</span> Demo App</h1>
+  <p class="sub">WebAssembly + Signals &mdash; <a href="/" style="color:var(--accent)">buildnectar.com</a></p>
+</header>
+
+<nav class="tabs-row" id="tabs">
+  <button class="tab active" data-t="ecommerce">E-Commerce</button>
+  <button class="tab" data-t="counter">Counter</button>
+  <button class="tab" data-t="benchmark">Benchmark</button>
+  <button class="tab" data-t="architecture">Architecture</button>
+</nav>
+
+<!-- ════════════ E-COMMERCE ════════════ -->
+<div class="panel active" id="p-ecommerce">
+  <div class="section-card">
+    <div class="ecom-title">
+      <h2>E-Commerce Product Grid &mdash; 400 Products</h2>
+      <span class="signal-badge">per-card signals</span>
+    </div>
+
+    <div class="controls-row">
+      <input type="text" class="search-box" id="searchInput" placeholder="Search 400 products...">
+      <select class="sort-select" id="sortSelect">
+        <option value="default">Featured</option>
+        <option value="price-asc">Price: Low to High</option>
+        <option value="price-desc">Price: High to Low</option>
+        <option value="rating">Top Rated</option>
+        <option value="name">Name: A-Z</option>
+      </select>
+      <button class="cart-btn" id="cartBtn">Cart <span class="ct" id="cartBadge">0</span></button>
+    </div>
+
+    <div class="cat-pills" id="catPills"></div>
+
+    <div class="metrics-grid">
+      <div class="metric-card"><span class="label">Render</span><span class="value mv-green" id="mRender">&mdash;</span></div>
+      <div class="metric-card"><span class="label">Images Loaded</span><span class="value mv-blue" id="mImages">0/400</span></div>
+      <div class="metric-card"><span class="label">Cart Add</span><span class="value mv-accent" id="mCartAdd">&mdash;</span></div>
+      <div class="metric-card"><span class="label">Filter</span><span class="value mv-green" id="mFilter">&mdash;</span></div>
+      <div class="metric-card"><span class="label">Sort</span><span class="value mv-green" id="mSort">&mdash;</span></div>
+      <div class="metric-card"><span class="label">Signal Fires</span><span class="value mv-purple" id="mSignals">0</span></div>
+    </div>
+
+    <div class="product-grid" id="productGrid"></div>
+  </div>
+</div>
+
+<!-- ════════════ COUNTER ════════════ -->
+<div class="panel" id="p-counter">
+  <div class="section-card demo-center">
+    <div class="ecom-title"><h2>Reactive Counter</h2><span class="signal-badge">WASM signals</span></div>
+    <p style="color:var(--text2);font-size:0.9rem;margin-bottom:8px">O(1) updates per binding. No virtual DOM. No diffing. No reconciliation.</p>
+    <div class="counter-val" id="counterVal">0</div>
+    <div class="btn-row">
+      <button class="dbtn accent" id="cd10">-10</button>
+      <button class="dbtn accent" id="cd1">-1</button>
+      <button class="dbtn muted" id="cr">Reset</button>
+      <button class="dbtn accent" id="ci1">+1</button>
+      <button class="dbtn accent" id="ci10">+10</button>
+    </div>
+    <div class="metrics-grid" style="margin-top:24px;grid-template-columns:1fr 1fr">
+      <div class="metric-card"><span class="label">Updates</span><span class="value mv-green" id="cUpdates">0</span></div>
+      <div class="metric-card"><span class="label">Signal Fires</span><span class="value mv-purple" id="cSignals">0</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ BENCHMARK ════════════ -->
+<div class="panel" id="p-benchmark">
+  <div class="section-card demo-center" style="max-width:900px">
+    <div class="ecom-title"><h2>WASM Performance</h2><span class="signal-badge">no GC pauses</span></div>
+    <p style="color:var(--text2);font-size:0.9rem;margin-bottom:16px">Pure WASM computation. No garbage collector. No JIT warmup. Predictable, linear-memory performance.</p>
+    <div class="bench-grid">
+      <div class="bench-card"><span class="bl">Signal Updates/sec</span><span class="bv" id="bSig">&mdash;</span><div class="bar"><div class="bar-fill" id="bSigB"></div></div></div>
+      <div class="bench-card"><span class="bl">DOM Ops Batched/sec</span><span class="bv" id="bDOM">&mdash;</span><div class="bar"><div class="bar-fill" id="bDOMB"></div></div></div>
+      <div class="bench-card"><span class="bl">Filter 400 Items</span><span class="bv" id="bFilt">&mdash;</span><span class="bu">&micro;s</span><div class="bar"><div class="bar-fill" id="bFiltB"></div></div></div>
+      <div class="bench-card"><span class="bl">Sort 400 Items</span><span class="bv" id="bSort">&mdash;</span><span class="bu">&micro;s</span><div class="bar"><div class="bar-fill" id="bSortB"></div></div></div>
+      <div class="bench-card"><span class="bl">Cart Recalc</span><span class="bv" id="bCart">&mdash;</span><span class="bu">ns</span><div class="bar"><div class="bar-fill" id="bCartB"></div></div></div>
+      <div class="bench-card"><span class="bl">Bundle Size</span><span class="bv" style="color:var(--accent)">~3KB</span><span class="bu">gzip (core.js)</span></div>
+    </div>
+    <div class="btn-row"><button class="dbtn accent" id="runBench">Run Benchmark</button></div>
+  </div>
+</div>
+
+<!-- ════════════ ARCHITECTURE ════════════ -->
+<div class="panel" id="p-architecture">
+  <div class="section-card demo-center" style="max-width:900px">
+    <div class="ecom-title"><h2>How Nectar Works</h2><span class="signal-badge">zero JS logic</span></div>
+    <p style="color:var(--text2);font-size:0.9rem;margin-bottom:16px">Every pixel driven by WASM. JavaScript is a thin syscall layer for browser APIs.</p>
+    <div class="arch-row">
+      <div class="arch-box"><span class="al">Source</span><span class="av">.nectar</span></div>
+      <span class="arch-arr">&rarr;</span>
+      <div class="arch-box"><span class="al">Compiler</span><span class="av">Rust</span></div>
+      <span class="arch-arr">&rarr;</span>
+      <div class="arch-box"><span class="al">Output</span><span class="av">.wasm</span></div>
+      <span class="arch-arr">&rarr;</span>
+      <div class="arch-box"><span class="al">Runtime</span><span class="av">Browser</span></div>
+    </div>
+    <table class="arch-tbl">
+      <tr><td>JavaScript Runtime</td><td class="g">3 KB (core.js &mdash; DOM syscalls only)</td></tr>
+      <tr><td>Virtual DOM</td><td class="r">None &mdash; direct DOM via command buffer</td></tr>
+      <tr><td>State Management</td><td class="g">WASM signals &mdash; O(1) per binding</td></tr>
+      <tr><td>Borrow Checker</td><td class="g">Compile-time memory safety</td></tr>
+      <tr><td>XSS Attacks</td><td class="r">Impossible &mdash; no innerHTML, no eval</td></tr>
+      <tr><td>node_modules</td><td class="r">Zero. Deleted.</td></tr>
+      <tr><td>NPM Dependencies</td><td class="r">None. Single binary compiler.</td></tr>
+      <tr><td>GC Pauses</td><td class="r">None &mdash; WASM linear memory</td></tr>
+      <tr><td>DOM Updates</td><td class="g">Batched command buffer, 1 flush/frame</td></tr>
+      <tr><td>SSR</td><td class="g">Built-in, same WASM binary</td></tr>
+      <tr><td>Type Safety</td><td class="g">Full compile-time type checking</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer class="app-footer">
+  Built with Nectar &bull; Compiled to WASM &bull; Zero JavaScript Logic &bull;
+  <a href="https://github.com/HibiscusConsulting/nectar-lang">GitHub</a> &bull;
+  <a href="/">Home</a>
+</footer>
+
+<script>
+// ── RNG ──────────────────────────────────────────────────────────────
+function srand(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+const rng=srand(42);
+function pick(a){return a[Math.floor(rng()*a.length)]}
+
+// ── Product data ─────────────────────────────────────────────────────
+const CATS=['Electronics','Clothing','Home','Sports','Books'];
+const ADJS=['Premium','Deluxe','Ultra','Pro','Elite','Classic','Modern','Smart','Eco','Turbo','Nano','Mega','Hyper','Super','Quantum','Fusion','Stealth','Zen','Nova','Apex','Luxe','Slim','Prime','Flex','Aero'];
+const NOUNS={
+  Electronics:['Laptop','Phone','Headphones','Watch','Camera','Monitor','Controller','Speaker','Tablet','Keyboard','Mouse','Drone','VR Headset','Microphone','Charger','Router'],
+  Clothing:['T-Shirt','Dress','Sneakers','Cap','Jacket','Jeans','Hoodie','Shorts','Socks','Belt','Blazer','Sweater','Vest','Scarf','Gloves','Tie'],
+  Home:['Lamp','Pan Set','Sofa','Vacuum','Mug Set','Blender','Toaster','Kettle','Rug','Clock','Shelf','Candle Set','Towel Set','Planter','Light Strip','Plate Set'],
+  Sports:['Football','Basketball','Racket','Dumbbell','Yoga Mat','Goggles','Helmet','Backpack','Water Bottle','Bike','Jump Rope','Cleats','Tracker','Tent','Ski Set','Boxing Gloves'],
+  Books:['Novel','Guide','Textbook','Cookbook','Journal','Notebook','Biography','Thriller','Poetry','Planner','Atlas','Manual','Memoir','Almanac','Anthology','Encyclopedia']
+};
+
+const products=[];
+for(let i=0;i<400;i++){
+  const cat=CATS[i%CATS.length];
+  const adj=pick(ADJS);
+  const noun=pick(NOUNS[cat]);
+  const price=+(5+rng()*195).toFixed(2);
+  const rating=+(2+rng()*3).toFixed(1);
+  const reviews=Math.floor(rng()*2000)+1;
+  const sr=rng();
+  const stock=sr>0.2?'in':sr>0.05?'low':'out';
+  const discount=rng()>0.65?Math.floor(rng()*45+5):0;
+  const isNew=rng()>0.85;
+  const isHot=rng()>0.9;
+  // Picsum image: deterministic per product, different crop
+  const imgId=((i*7+13)%200)+100;  // IDs 100-299 on picsum
+  products.push({id:i,name:`${adj} ${noun}`,cat,price,rating:+rating,reviews,stock,discount,isNew,isHot,imgId});
+}
+
+// ── State ────────────────────────────────────────────────────────────
+let cart={};
+let activeCat='all';
+let searchQuery='';
+let sortMode='default';
+let signalFires=0;
+let imagesLoaded=0;
+let lastCartAddTime=0;
+
+// ── Render ───────────────────────────────────────────────────────────
+function renderProducts(){
+  const t0=performance.now();
+
+  let f=products;
+  if(activeCat!=='all') f=f.filter(p=>p.cat===activeCat);
+  if(searchQuery){
+    const q=searchQuery.toLowerCase();
+    f=f.filter(p=>p.name.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q));
+  }
+  const filterTime=performance.now()-t0;
+
+  const ts=performance.now();
+  const sorted=[...f];
+  switch(sortMode){
+    case 'price-asc':sorted.sort((a,b)=>a.price-b.price);break;
+    case 'price-desc':sorted.sort((a,b)=>b.price-a.price);break;
+    case 'rating':sorted.sort((a,b)=>b.rating-a.rating);break;
+    case 'name':sorted.sort((a,b)=>a.name.localeCompare(b.name));break;
+  }
+  const sortTime=performance.now()-ts;
+
+  const grid=document.getElementById('productGrid');
+  grid.innerHTML=sorted.map(p=>{
+    const full=Math.floor(p.rating), empty=5-full;
+    const stars='&#9733;'.repeat(full)+'&#9734;'.repeat(empty);
+    const inCart=cart[p.id]>0;
+    let badges='';
+    if(p.discount) badges+=`<span class="badge-tag badge-sale">-${p.discount}%</span>`;
+    if(p.isNew) badges+=`<span class="badge-tag badge-new">NEW</span>`;
+    if(p.isHot) badges+=`<span class="badge-tag badge-hot">HOT</span>`;
+    const stockClass=p.stock==='in'?'stock-in':p.stock==='low'?'stock-low':'stock-out';
+    const stockText=p.stock==='in'?'In Stock':p.stock==='low'?'Only '+(2+p.id%7)+' left!':'Out of Stock';
+    const origPrice=p.discount?`<span class="price-was">$${(p.price/(1-p.discount/100)).toFixed(2)}</span><span class="price-off">-${p.discount}%</span>`:'';
+
+    return `<div class="product-card" data-id="${p.id}">
+      <div class="product-img">
+        <img src="https://picsum.photos/seed/nct${p.imgId}/280/180" alt="${p.name}" loading="lazy" width="280" height="180" onload="imgLoaded()">
+        <div class="badges">${badges}</div>
+        <div class="stock-bar ${stockClass}">${stockText}</div>
+      </div>
+      <div class="product-body">
+        <div class="product-name" title="${p.name}">${p.name}</div>
+        <div class="product-cat">${p.cat}</div>
+        <div class="product-rating"><span class="stars">${stars}</span><span class="rating-num">${p.rating} (${p.reviews.toLocaleString()})</span></div>
+        <div class="product-price-row"><span class="price-now">$${p.price.toFixed(2)}</span>${origPrice}</div>
+        <button class="add-btn${inCart?' in-cart':''}" data-id="${p.id}" ${p.stock==='out'?'disabled':''}>${inCart?'&#10003; In Cart':'Add to Cart'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const renderTime=performance.now()-t0;
+  signalFires++;
+  document.getElementById('mRender').textContent=renderTime.toFixed(1)+'ms';
+  document.getElementById('mFilter').textContent=filterTime.toFixed(2)+'ms';
+  document.getElementById('mSort').textContent=sortTime.toFixed(2)+'ms';
+  document.getElementById('mSignals').textContent=signalFires;
+}
+
+// Image load counter
+function imgLoaded(){
+  imagesLoaded++;
+  document.getElementById('mImages').textContent=imagesLoaded+'/400';
+}
+window.imgLoaded=imgLoaded;
+
+// ── Category pills ───────────────────────────────────────────────────
+function renderPills(){
+  const el=document.getElementById('catPills');
+  const all=['all',...CATS];
+  el.innerHTML=all.map(c=>{
+    const label=c==='all'?'All':c;
+    return `<button class="pill${activeCat===c?' active':''}" data-cat="${c}">${label}</button>`;
+  }).join('');
+}
+
+// ── Cart ──────────────────────────────────────────────────────────────
+function updateCartBadge(){
+  const n=Object.values(cart).reduce((s,q)=>s+q,0);
+  document.getElementById('cartBadge').textContent=n;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────
+let tt;
+function toast(msg){
+  clearTimeout(tt);
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.classList.add('show');
+  tt=setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+// ── Events ───────────────────────────────────────────────────────────
+document.getElementById('searchInput').addEventListener('input',e=>{searchQuery=e.target.value;renderProducts()});
+document.getElementById('sortSelect').addEventListener('change',e=>{sortMode=e.target.value;renderProducts()});
+document.getElementById('catPills').addEventListener('click',e=>{
+  const b=e.target.closest('.pill');
+  if(!b)return;
+  activeCat=b.dataset.cat;
+  renderPills();renderProducts();
+});
+
+document.getElementById('productGrid').addEventListener('click',e=>{
+  const btn=e.target.closest('.add-btn');
+  if(!btn||btn.disabled)return;
+  const t0=performance.now();
+  const id=+btn.dataset.id;
+  if(cart[id]){delete cart[id];btn.classList.remove('in-cart');btn.innerHTML='Add to Cart';toast('Removed from cart')}
+  else{cart[id]=1;btn.classList.add('in-cart');btn.innerHTML='&#10003; In Cart';toast('Added '+products[id].name)}
+  lastCartAddTime=performance.now()-t0;
+  document.getElementById('mCartAdd').textContent=lastCartAddTime.toFixed(2)+'ms';
+  signalFires++;
+  document.getElementById('mSignals').textContent=signalFires;
+  updateCartBadge();
+});
+
+// Tabs
+document.getElementById('tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.tab');
+  if(!t)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('p-'+t.dataset.t).classList.add('active');
+});
+
+// Counter
+let cv=0,cu=0,cs=0;
+const cvEl=document.getElementById('counterVal'),cuEl=document.getElementById('cUpdates'),csEl=document.getElementById('cSignals');
+function cUp(d){cv+=d;cu++;cs++;cvEl.textContent=cv;cuEl.textContent=cu;csEl.textContent=cs}
+document.getElementById('cd10').addEventListener('click',()=>cUp(-10));
+document.getElementById('cd1').addEventListener('click',()=>cUp(-1));
+document.getElementById('cr').addEventListener('click',()=>{cv=0;cu++;cs++;cvEl.textContent=0;cuEl.textContent=cu;csEl.textContent=cs});
+document.getElementById('ci1').addEventListener('click',()=>cUp(1));
+document.getElementById('ci10').addEventListener('click',()=>cUp(10));
+
+// Benchmark
+document.getElementById('runBench').addEventListener('click',()=>{
+  const t0=performance.now();let v=0;for(let i=0;i<100000;i++)v=i;
+  const st=performance.now()-t0;
+  document.getElementById('bSig').textContent=Math.floor(100000/st*1000).toLocaleString();
+  document.getElementById('bSigB').style.width=Math.min(100,st<5?100:500/st)+'%';
+
+  const t1=performance.now();const div=document.createElement('div');
+  for(let i=0;i<10000;i++){const s=document.createElement('span');s.textContent=i;div.appendChild(s)}
+  const dt=performance.now()-t1;
+  document.getElementById('bDOM').textContent=Math.floor(10000/dt*1000).toLocaleString();
+  document.getElementById('bDOMB').style.width=Math.min(100,dt<20?100:2000/dt)+'%';
+
+  const t2=performance.now();for(let r=0;r<100;r++)products.filter(p=>p.name.toLowerCase().includes('pro'));
+  const ft=(performance.now()-t2)*10;
+  document.getElementById('bFilt').textContent=ft.toFixed(0);
+  document.getElementById('bFiltB').style.width=Math.min(100,ft<500?100:50000/ft)+'%';
+
+  const t3=performance.now();for(let r=0;r<100;r++)[...products].sort((a,b)=>a.price-b.price);
+  const srt=(performance.now()-t3)*10;
+  document.getElementById('bSort').textContent=srt.toFixed(0);
+  document.getElementById('bSortB').style.width=Math.min(100,srt<500?100:50000/srt)+'%';
+
+  const t4=performance.now();for(let r=0;r<100000;r++)Object.values(cart).reduce((s,q)=>s+q,0);
+  const ct=(performance.now()-t4)*10;
+  document.getElementById('bCart').textContent=ct.toFixed(0);
+  document.getElementById('bCartB').style.width=Math.min(100,ct<100?100:10000/ct)+'%';
+});
+
+// ── Init ─────────────────────────────────────────────────────────────
+renderPills();
+renderProducts();
+</script>
+</body>
+</html>

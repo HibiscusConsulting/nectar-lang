@@ -432,6 +432,48 @@ impl SsrCodegen {
             TemplateNode::Layout(layout_node) => {
                 self.generate_layout_ssr(layout_node, comp_name);
             }
+            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+                let cond_js = self.expr_to_js(condition);
+                self.line(&format!("if ({}) {{", cond_js));
+                for child in then_children {
+                    self.generate_template_ssr(child, comp_name, false);
+                }
+                if let Some(else_nodes) = else_children {
+                    self.line("} else {");
+                    for child in else_nodes {
+                        self.generate_template_ssr(child, comp_name, false);
+                    }
+                }
+                self.line("}");
+            }
+            TemplateNode::TemplateFor { binding, iterator, children } => {
+                let iter_js = self.expr_to_js(iterator);
+                self.line(&format!("for (const {} of {}) {{", binding, iter_js));
+                for child in children {
+                    self.generate_template_ssr(child, comp_name, false);
+                }
+                self.line("}");
+            }
+            TemplateNode::TemplateMatch { subject, arms } => {
+                let subject_js = self.expr_to_js(subject);
+                self.line(&format!("const __match_subject__ = {};", subject_js));
+                let mut first = true;
+                for arm in arms {
+                    let pattern_js = Self::pattern_to_js_cond("__match_subject__", &arm.pattern);
+                    if first {
+                        self.line(&format!("if ({}) {{", pattern_js));
+                        first = false;
+                    } else {
+                        self.line(&format!("}} else if ({}) {{", pattern_js));
+                    }
+                    for child in &arm.body {
+                        self.generate_template_ssr(child, comp_name, false);
+                    }
+                }
+                if !arms.is_empty() {
+                    self.line("}");
+                }
+            }
         }
     }
 
@@ -544,6 +586,31 @@ impl SsrCodegen {
     }
 
     // --- Helpers ---
+
+    /// Convert a match pattern to a JavaScript boolean condition string.
+    /// Used in the SSR rendering of `{match}` template nodes.
+    fn pattern_to_js_cond(subject: &str, pattern: &Pattern) -> String {
+        match pattern {
+            Pattern::Wildcard | Pattern::Ident(_) => "true".to_string(),
+            Pattern::Literal(expr) => match expr {
+                Expr::Integer(n) => format!("{} === {}", subject, n),
+                Expr::Float(f) => format!("{} === {}", subject, f),
+                Expr::Bool(b) => format!("{} === {}", subject, b),
+                Expr::StringLit(s) => format!("{} === '{}'", subject, s),
+                _ => "true".to_string(),
+            },
+            Pattern::Variant { name, .. } => {
+                if name == "None" {
+                    format!("{} === null || {} === undefined", subject, subject)
+                } else if name == "Some" {
+                    format!("{} !== null && {} !== undefined", subject, subject)
+                } else {
+                    format!(r#"({} && {}.__tag === "{}")"#, subject, subject, name)
+                }
+            }
+            _ => "true".to_string(),
+        }
+    }
 
     /// Convert a Nectar expression to a JavaScript expression string.
     /// This is a simplified conversion for evaluating initial values at SSR time.

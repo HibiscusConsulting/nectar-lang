@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/nectar-edge/nectar-runtime/edge:latest'
+      - '-f'
+      - 'edge/Dockerfile'
+      - '.'
+images:
+  - 'us-central1-docker.pkg.dev/nectar-edge/nectar-runtime/edge:latest'
+options:
+  machineType: 'E2_HIGHCPU_32'
+timeout: '1800s'

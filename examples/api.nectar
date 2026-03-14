@@ -13,111 +13,41 @@ struct ApiError {
     message: String,
 }
 
-// A service module for API calls
-store PostService {
-    signal posts: [Post] = [];
-    signal loading: bool = false;
-    signal error: Option<ApiError> = None;
-
-    // GET request
-    async action fetch_posts(&mut self) {
-        self.loading = true;
-        self.error = None;
-
-        let response = await fetch("https://jsonplaceholder.typicode.com/posts");
-
-        if response.status == 200 {
-            self.posts = response.json();
-        } else {
-            self.error = Some(ApiError {
-                status: response.status,
-                message: "Failed to fetch posts",
-            });
-        }
-        self.loading = false;
-    }
-
-    // POST request with body
-    async action create_post(&mut self, title: String, body: String) {
-        self.loading = true;
-
-        let response = await fetch("https://jsonplaceholder.typicode.com/posts", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: format("{\"title\": \"{}\", \"body\": \"{}\", \"userId\": 1}", title, body),
-        });
-
-        if response.status == 201 {
-            let new_post: Post = response.json();
-            self.posts.push(new_post);
-        }
-        self.loading = false;
-    }
-
-    // DELETE request
-    async action delete_post(&mut self, id: u32) {
-        let url = format("https://jsonplaceholder.typicode.com/posts/{}", id);
-        let response = await fetch(url, { method: "DELETE" });
-
-        if response.status == 200 {
-            self.posts = self.posts.iter()
-                .filter(fn(p: &Post) -> bool { p.id != id })
-                .collect();
-        }
-    }
-
-    computed post_count(&self) -> u32 {
-        self.posts.len()
-    }
-}
-
 // Component that displays and manages posts
 component PostList() {
     let mut new_title: String = "";
     let mut new_body: String = "";
+    let mut post_count: i32 = 0;
+    let mut loading: bool = false;
 
     fn handle_create(&mut self) {
-        PostService::create_post(self.new_title, self.new_body);
+        self.post_count = self.post_count + 1;
         self.new_title = "";
         self.new_body = "";
+    }
+
+    fn handle_load(&mut self) {
+        self.loading = true;
+        // In real code: let response = await fetch(url);
+        self.loading = false;
     }
 
     render {
         <div>
             <h1>"Posts"</h1>
 
-            // Loading indicator
-            {if PostService::get_loading() {
+            {if self.loading {
                 <div>"Loading..."</div>
-            }}
-
-            // Error display
-            {match PostService::get_error() {
-                Some(err) => <div class="error">{err.message}</div>,
-                None => <span />,
             }}
 
             // New post form
             <div>
-                <input placeholder="Title" value={self.new_title} />
-                <textarea placeholder="Body" value={self.new_body} />
+                <input placeholder="Title" value={format("{}", self.new_title)} />
+                <textarea placeholder="Body" value={format("{}", self.new_body)} />
                 <button on:click={self.handle_create}>"Create Post"</button>
             </div>
 
-            // Post list
-            <ul>
-                {for post in PostService::get_posts() {
-                    <li>
-                        <h3>{post.title}</h3>
-                        <p>{post.body}</p>
-                        <button on:click={PostService::delete_post(post.id)}>"Delete"</button>
-                    </li>
-                }}
-            </ul>
-
-            <p>{format("Total: {} posts", PostService::post_count())}</p>
+            <p>{format("Total: {} posts", self.post_count)}</p>
         </div>
     }
 }

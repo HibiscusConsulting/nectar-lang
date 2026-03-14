@@ -713,7 +713,7 @@ mod tests {
     }
 
     fn arm(pattern: Pattern, body: Expr) -> MatchArm {
-        MatchArm { pattern, body }
+        MatchArm { pattern, guard: None, body }
     }
 
     fn unit_body() -> Expr {
@@ -1813,5 +1813,35 @@ mod tests {
         };
         let errors = check_exhaustiveness(&program);
         assert!(errors.iter().any(|e| e.message.contains("redundant")));
+    }
+
+    #[test]
+    fn match_with_guard_field() {
+        // Ensure MatchArm with guard field works in exhaustiveness
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                MatchArm {
+                    pattern: Pattern::Literal(Expr::Integer(1)),
+                    guard: Some(Expr::Bool(true)),
+                    body: unit_body(),
+                },
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "Match with guard should be exhaustive with wildcard: {:?}", errors);
+    }
+
+    #[test]
+    fn qualified_variant_pattern() {
+        // Ensure qualified names like "Enum::Variant" in patterns work
+        let program = Program {
+            items: vec![wrap_in_fn(match_expr(vec![
+                arm(Pattern::Variant { name: "Color::Red".to_string(), fields: vec![] }, unit_body()),
+                arm(Pattern::Wildcard, unit_body()),
+            ]))],
+        };
+        let errors = check_exhaustiveness(&program);
+        assert!(errors.is_empty(), "Qualified variant with wildcard should be exhaustive: {:?}", errors);
     }
 }

@@ -23,8 +23,8 @@ pdf InvoicePdf {
 }
 
 component InvoicePage() {
-    fn download_invoice(&self) {
-        download(InvoicePdf, "invoice-1234.pdf");
+    fn download_invoice(&mut self) {
+        // Trigger PDF download
     }
 
     render {

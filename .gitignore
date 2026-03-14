@@ -8,3 +8,4 @@
 *.wat
 node_modules/
 Nectar.lock
+tarpaulin-report.json

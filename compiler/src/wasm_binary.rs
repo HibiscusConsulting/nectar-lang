@@ -1266,8 +1266,8 @@ mod tests {
             lifetimes: vec![],
             type_params: vec![],
             params: vec![
-                Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
-                Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
+                Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
             ],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
@@ -1647,8 +1647,8 @@ mod tests {
             lifetimes: vec![],
             type_params: vec![],
             params: vec![
-                Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
-                Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
+                Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
             ],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
@@ -2086,8 +2086,8 @@ mod coverage_wasm_binary_tests {
                 lifetimes: vec![],
                 type_params: vec![],
                 params: vec![
-                    Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
-                    Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned },
+                    Param { name: "a".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
+                    Param { name: "b".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
                 ],
                 return_type: Some(Type::Named("i32".into())),
                 trait_bounds: vec![],
@@ -2114,7 +2114,7 @@ mod coverage_wasm_binary_tests {
             name: "negate".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Unary {
@@ -2136,7 +2136,7 @@ mod coverage_wasm_binary_tests {
             name: "logical_not".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Unary {
@@ -2218,7 +2218,7 @@ mod coverage_wasm_binary_tests {
             name: "check".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::If {
@@ -2242,7 +2242,7 @@ mod coverage_wasm_binary_tests {
             name: "check".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::If {
@@ -2311,7 +2311,7 @@ mod coverage_wasm_binary_tests {
             name: "get_elem".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Index {
@@ -2334,7 +2334,7 @@ mod coverage_wasm_binary_tests {
             name: "borrow_test".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![
@@ -2356,7 +2356,7 @@ mod coverage_wasm_binary_tests {
             name: "get_field".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::FieldAccess {
@@ -2414,7 +2414,7 @@ mod coverage_wasm_binary_tests {
             name: "test_method".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::MethodCall {
@@ -2584,7 +2584,7 @@ mod coverage_wasm_binary_tests {
             name: "fmt_expr".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::FormatString {
@@ -2631,7 +2631,7 @@ mod coverage_wasm_binary_tests {
             name: "try_op".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: Some(Type::Named("i32".into())),
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("x".into())))))]),
@@ -2735,7 +2735,7 @@ mod coverage_wasm_binary_tests {
             name: "destructure_test".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "t".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "t".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::LetDestructure {
@@ -2761,7 +2761,7 @@ mod coverage_wasm_binary_tests {
             name: "arr_destructure".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "arr".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::LetDestructure {
@@ -2788,7 +2788,7 @@ mod coverage_wasm_binary_tests {
             name: "struct_destructure".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "s".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "s".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::LetDestructure {
@@ -2818,7 +2818,7 @@ mod coverage_wasm_binary_tests {
             name: "pattern_test".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::LetDestructure {
@@ -2844,7 +2844,7 @@ mod coverage_wasm_binary_tests {
             name: "variant_test".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "v".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::LetDestructure {
@@ -3049,8 +3049,8 @@ mod coverage_wasm_binary_tests {
             lifetimes: vec![],
             type_params: vec![],
             params: vec![
-                Param { name: "a".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned },
-                Param { name: "b".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned },
+                Param { name: "a".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned, secret: false },
+                Param { name: "b".into(), ty: Type::Named("i64".into()), ownership: Ownership::Owned, secret: false },
             ],
             return_type: Some(Type::Named("i64".into())),
             trait_bounds: vec![],
@@ -3072,7 +3072,7 @@ mod coverage_wasm_binary_tests {
             lifetimes: vec![],
             type_params: vec![],
             params: vec![
-                Param { name: "x".into(), ty: Type::Named("f32".into()), ownership: Ownership::Owned },
+                Param { name: "x".into(), ty: Type::Named("f32".into()), ownership: Ownership::Owned, secret: false },
             ],
             return_type: Some(Type::Named("f32".into())),
             trait_bounds: vec![],
@@ -3186,7 +3186,7 @@ mod coverage_wasm_binary_tests {
             name: "assign_field".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+            params: vec![Param { name: "obj".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Assign {

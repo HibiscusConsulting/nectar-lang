@@ -680,6 +680,9 @@ impl Formatter {
             if i > 0 {
                 self.push(", ");
             }
+            if p.secret {
+                self.push("secret ");
+            }
             match p.ownership {
                 Ownership::Borrowed => self.push("&"),
                 Ownership::MutBorrowed => self.push("&mut "),
@@ -902,9 +905,14 @@ impl Formatter {
                 for (arm, pat_str) in arms.iter().zip(pattern_strs.iter()) {
                     let padding = max_pat_len - pat_str.len();
                     let body_str = self.format_expr_inner(&arm.body, depth + 1);
+                    let guard_str = if let Some(guard) = &arm.guard {
+                        format!(" if {}", self.format_expr_inner(guard, depth + 1))
+                    } else {
+                        String::new()
+                    };
                     result.push_str(&format!(
-                        "{}{}{} => {},\n",
-                        next_indent, pat_str, " ".repeat(padding), body_str
+                        "{}{}{}{} => {},\n",
+                        next_indent, pat_str, " ".repeat(padding), guard_str, body_str
                     ));
                 }
                 result.push_str(&format!("{}}}", indent_str));
@@ -1096,6 +1104,36 @@ impl Formatter {
             Expr::VirtualList { items, item_height, template, .. } => {
                 format!("virtual_list({}, {}, {})", self.format_expr_inner(items, depth), self.format_expr_inner(item_height, depth), self.format_expr_inner(template, depth))
             }
+            Expr::ArrayLit(elements) => {
+                let elems: Vec<String> = elements.iter().map(|e| self.format_expr_inner(e, depth)).collect();
+                let one_line = format!("[{}]", elems.join(", "));
+                if self.fits_single_line(&one_line) {
+                    one_line
+                } else {
+                    let mut result = "[\n".to_string();
+                    for e in &elems {
+                        result.push_str(&format!("{}{},\n", next_indent, e));
+                    }
+                    result.push_str(&format!("{}]", indent_str));
+                    result
+                }
+            }
+            Expr::ObjectLit { fields } => {
+                let field_strs: Vec<String> = fields.iter()
+                    .map(|(k, v)| format!("{}: {}", k, self.format_expr_inner(v, depth + 1)))
+                    .collect();
+                let one_line = format!("{{ {} }}", field_strs.join(", "));
+                if self.fits_single_line(&one_line) {
+                    one_line
+                } else {
+                    let mut result = "{\n".to_string();
+                    for f in &field_strs {
+                        result.push_str(&format!("{}{},\n", next_indent, f));
+                    }
+                    result.push_str(&format!("{}}}", indent_str));
+                    result
+                }
+            }
         }
     }
 
@@ -1225,6 +1263,81 @@ impl Formatter {
             }
             TemplateNode::Layout(layout_node) => {
                 self.format_layout_node(layout_node);
+            }
+            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+                self.push_indent();
+                self.push("{if ");
+                self.push(&self.format_expr_to_string(condition));
+                self.push(" {");
+                self.newline();
+                self.inc();
+                for child in then_children {
+                    self.format_template_node(child);
+                }
+                self.dec();
+                if let Some(else_nodes) = else_children {
+                    self.push_indent();
+                    self.push("} else {");
+                    self.newline();
+                    self.inc();
+                    for child in else_nodes {
+                        self.format_template_node(child);
+                    }
+                    self.dec();
+                }
+                self.push_line("}}");
+            }
+            TemplateNode::TemplateFor { binding, iterator, children } => {
+                self.push_indent();
+                self.push(&format!("{{for {} in ", binding));
+                self.push(&self.format_expr_to_string(iterator));
+                self.push(" {");
+                self.newline();
+                self.inc();
+                for child in children {
+                    self.format_template_node(child);
+                }
+                self.dec();
+                self.push_line("}}");
+            }
+            TemplateNode::TemplateMatch { subject, arms } => {
+                self.push_indent();
+                self.push("{match ");
+                let subject_str = self.format_expr_to_string(subject);
+                self.push(&subject_str);
+                self.push(" {");
+                self.newline();
+                self.inc();
+                for arm in arms {
+                    self.push_indent();
+                    self.push(&Self::format_pattern(&arm.pattern));
+                    if let Some(guard) = &arm.guard {
+                        let guard_str = self.format_expr_to_string(guard);
+                        self.push(" if ");
+                        self.push(&guard_str);
+                    }
+                    self.push(" => ");
+                    if arm.body.len() == 1 {
+                        // Single template node: emit inline
+                        for child in &arm.body {
+                            self.format_template_node(child);
+                        }
+                    } else {
+                        self.push("{");
+                        self.newline();
+                        self.inc();
+                        for child in &arm.body {
+                            self.format_template_node(child);
+                        }
+                        self.dec();
+                        self.push_indent();
+                        self.push("}");
+                    }
+                    self.push(",");
+                    self.newline();
+                }
+                self.dec();
+                self.push_line("}}");
             }
         }
     }
@@ -1493,6 +1606,7 @@ mod tests {
             name: name.to_string(),
             ty: Type::Named(ty.to_string()),
             ownership: Ownership::Owned,
+            secret: false,
         }
     }
 
@@ -1661,8 +1775,8 @@ mod tests {
     #[test]
     fn test_function_borrowed_params() {
         let params = vec![
-            Param { name: "x".to_string(), ty: Type::Named("String".to_string()), ownership: Ownership::Borrowed },
-            Param { name: "y".to_string(), ty: Type::Named("Vec".to_string()), ownership: Ownership::MutBorrowed },
+            Param { name: "x".to_string(), ty: Type::Named("String".to_string()), ownership: Ownership::Borrowed, secret: false },
+            Param { name: "y".to_string(), ty: Type::Named("Vec".to_string()), ownership: Ownership::MutBorrowed, secret: false },
         ];
         let f = make_fn("borrow_test", params, None, vec![]);
         let program = Program { items: vec![Item::Function(f)] };
@@ -2357,14 +2471,17 @@ mod tests {
             arms: vec![
                 MatchArm {
                     pattern: Pattern::Literal(Expr::Integer(1)),
+                    guard: None,
                     body: Expr::StringLit("one".to_string()),
                 },
                 MatchArm {
                     pattern: Pattern::Literal(Expr::Integer(2)),
+                    guard: None,
                     body: Expr::StringLit("two".to_string()),
                 },
                 MatchArm {
                     pattern: Pattern::Wildcard,
+                    guard: None,
                     body: Expr::StringLit("other".to_string()),
                 },
             ],
@@ -2387,6 +2504,7 @@ mod tests {
                         name: "Some".to_string(),
                         fields: vec![Pattern::Ident("v".to_string())],
                     },
+                    guard: None,
                     body: Expr::Ident("v".to_string()),
                 },
                 MatchArm {
@@ -2394,6 +2512,7 @@ mod tests {
                         name: "None".to_string(),
                         fields: vec![],
                     },
+                    guard: None,
                     body: Expr::Integer(0),
                 },
             ],
@@ -3876,5 +3995,241 @@ mod tests {
         let result = Formatter::format_pattern(&pat);
         // Falls through to Debug format
         assert!(!result.is_empty());
+    }
+
+    // ── ArrayLit formatting ─────────────────────────────────────────────
+
+    #[test]
+    fn test_format_array_lit() {
+        let fmt = Formatter::new(FormatterOptions::default());
+        let expr = Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2), Expr::Integer(3)]);
+        let result = fmt.format_expr_to_string(&expr);
+        assert!(result.contains("["), "got: {}", result);
+        assert!(result.contains("1"), "got: {}", result);
+        assert!(result.contains("2"), "got: {}", result);
+        assert!(result.contains("3"), "got: {}", result);
+        assert!(result.contains("]"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_empty_array_lit() {
+        let fmt = Formatter::new(FormatterOptions::default());
+        let expr = Expr::ArrayLit(vec![]);
+        let result = fmt.format_expr_to_string(&expr);
+        assert!(result.contains("[]"), "got: {}", result);
+    }
+
+    // ── ObjectLit formatting ────────────────────────────────────────────
+
+    #[test]
+    fn test_format_object_lit() {
+        let fmt = Formatter::new(FormatterOptions::default());
+        let expr = Expr::ObjectLit {
+            fields: vec![
+                ("x".into(), Expr::Integer(1)),
+                ("y".into(), Expr::Integer(2)),
+            ],
+        };
+        let result = fmt.format_expr_to_string(&expr);
+        assert!(result.contains("x:"), "got: {}", result);
+        assert!(result.contains("y:"), "got: {}", result);
+    }
+
+    // ── Match with guard formatting ─────────────────────────────────────
+
+    #[test]
+    fn test_format_match_with_guard() {
+        let fmt = Formatter::new(FormatterOptions::default());
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("x".to_string())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Ident("n".into()),
+                    guard: Some(Expr::Binary {
+                        op: BinOp::Gt,
+                        left: Box::new(Expr::Ident("n".into())),
+                        right: Box::new(Expr::Integer(0)),
+                    }),
+                    body: Expr::Ident("n".into()),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                },
+            ],
+        };
+        let result = fmt.format_expr_to_string(&expr);
+        assert!(result.contains("match x {"), "got: {}", result);
+    }
+
+    // ── TemplateIf / TemplateFor formatting ─────────────────────────────
+
+    fn make_component_with_template(node: TemplateNode) -> Program {
+        Program {
+            items: vec![Item::Component(Component {
+                name: "T".into(),
+                type_params: vec![],
+                props: vec![],
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                transitions: vec![],
+                trait_bounds: vec![],
+                render: RenderBlock { body: node, span: dummy_span() },
+                permissions: None,
+                gestures: vec![],
+                skeleton: None,
+                error_boundary: None,
+                chunk: None,
+                on_destroy: None,
+                a11y: None,
+                shortcuts: vec![],
+                span: dummy_span(),
+            })],
+        }
+    }
+
+    #[test]
+    fn test_format_template_if() {
+        let node = TemplateNode::TemplateIf {
+            condition: Box::new(Expr::Ident("show".into())),
+            then_children: vec![TemplateNode::TextLiteral("hello".into())],
+            else_children: None,
+        };
+        let result = format_program(&make_component_with_template(node));
+        assert!(result.contains("if"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_template_if_with_else() {
+        let node = TemplateNode::TemplateIf {
+            condition: Box::new(Expr::Ident("active".into())),
+            then_children: vec![TemplateNode::TextLiteral("yes".into())],
+            else_children: Some(vec![TemplateNode::TextLiteral("no".into())]),
+        };
+        let result = format_program(&make_component_with_template(node));
+        assert!(result.contains("if"), "got: {}", result);
+        assert!(result.contains("else"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_template_for() {
+        let node = TemplateNode::TemplateFor {
+            binding: "item".into(),
+            iterator: Box::new(Expr::Ident("items".into())),
+            children: vec![TemplateNode::TextLiteral("row".into())],
+        };
+        let result = format_program(&make_component_with_template(node));
+        assert!(result.contains("for"), "got: {}", result);
+        assert!(result.contains("item"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_array_lit_single_element() {
+        let f = Formatter::new(FormatterOptions::default());
+        let result = f.format_expr_inner(&Expr::ArrayLit(vec![Expr::Integer(42)]), 0);
+        assert!(result.contains("42"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_object_lit_single_field() {
+        let f = Formatter::new(FormatterOptions::default());
+        let result = f.format_expr_inner(&Expr::ObjectLit {
+            fields: vec![("name".into(), Expr::StringLit("test".into()))],
+        }, 0);
+        assert!(result.contains("name"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_match_guard_with_complex_expr() {
+        let f = Formatter::new(FormatterOptions::default());
+        let arm = MatchArm {
+            pattern: Pattern::Ident("x".into()),
+            guard: Some(Expr::Binary {
+                op: BinOp::And,
+                left: Box::new(Expr::Binary {
+                    op: BinOp::Gt,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(0)),
+                }),
+                right: Box::new(Expr::Binary {
+                    op: BinOp::Lt,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(100)),
+                }),
+            }),
+            body: Expr::Ident("x".into()),
+        };
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("val".into())),
+            arms: vec![arm],
+        };
+        let result = f.format_expr_inner(&expr, 0);
+        assert!(result.contains("if"), "Match guard should contain 'if': {}", result);
+    }
+
+    #[test]
+    fn test_format_empty_array_lit_brackets() {
+        let f = Formatter::new(FormatterOptions::default());
+        let result = f.format_expr_inner(&Expr::ArrayLit(vec![]), 0);
+        assert!(result.contains("[") && result.contains("]"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_template_if_no_else() {
+        let node = TemplateNode::TemplateIf {
+            condition: Box::new(Expr::Ident("visible".into())),
+            then_children: vec![TemplateNode::TextLiteral("shown".into())],
+            else_children: None,
+        };
+        let result = format_program(&make_component_with_template(node));
+        assert!(result.contains("if"), "got: {}", result);
+        assert!(!result.contains("else"), "Should not contain else: {}", result);
+    }
+
+    #[test]
+    fn test_format_template_for_with_text_children() {
+        let node = TemplateNode::TemplateFor {
+            binding: "i".into(),
+            iterator: Box::new(Expr::Ident("list".into())),
+            children: vec![
+                TemplateNode::TextLiteral("row".into()),
+                TemplateNode::TextLiteral("end".into()),
+            ],
+        };
+        let result = format_program(&make_component_with_template(node));
+        assert!(result.contains("for"), "got: {}", result);
+        assert!(result.contains("li"), "got: {}", result);
+    }
+
+    #[test]
+    fn test_format_secret_param() {
+        let program = Program {
+            items: vec![Item::Function(Function {
+                name: "hash".to_string(),
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "password".to_string(),
+                        ty: Type::Named("String".to_string()),
+                        ownership: Ownership::Owned,
+                        secret: true,
+                    },
+                ],
+                return_type: Some(Type::Named("String".to_string())),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("password".to_string())))],
+                    span: dummy_span(),
+                },
+                is_pub: false,
+                must_use: false,
+                span: dummy_span(),
+                lifetimes: vec![],
+            })],
+        };
+        let result = format_program(&program);
+        assert!(result.contains("secret password"), "secret keyword should appear before param name, got: {}", result);
     }
 }

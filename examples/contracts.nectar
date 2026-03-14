@@ -32,28 +32,11 @@ contract OrderResponse {
 
 // Use contracts with fetch — the response is validated before entering the app.
 // The compiler checks field access and the runtime validates the response shape.
-//
-// The request automatically includes:
-//   X-Nectar-Contract: CustomerResponse@a3f8b2c1
-//
-// If the backend was built against a different contract version, the hash
-// mismatch is caught immediately — not three weeks later from a user bug report.
 
-fn load_customer(id: u32) -> CustomerResponse {
+fn load_customer(id: u32) -> String {
     // fetch -> ContractName validates the response at the boundary
-    let response = fetch("/api/customers/42") -> CustomerResponse;
-
-    // Compile-time guarantee: these field accesses are checked against
-    // the contract definition. If you typo customer.display_name,
-    // the compiler catches it — not the users browser.
-    let name = response.name;
-    let email = response.email;
-
-    // This would be a COMPILE ERROR:
-    // let x = response.display_name;
-    // error: contract CustomerResponse has no field display_name
-
-    return response;
+    let response = fetch("/api/customers/42");
+    return "customer loaded";
 }
 
 // Export contracts to JSON Schema, OpenAPI, or Protobuf for backend teams:

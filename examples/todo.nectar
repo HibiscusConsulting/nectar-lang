@@ -7,54 +7,25 @@ struct Todo {
     done: bool,
 }
 
-enum Filter {
-    All,
-    Active,
-    Completed,
-}
-
 component TodoApp() {
-    let mut todos: [Todo] = [];
     let mut next_id: u32 = 0;
-    let mut filter: Filter = Filter::All;
+    let mut input_text: String = "";
+    let mut total_count: i32 = 0;
 
-    fn add_todo(&mut self, text: String) {
-        let todo = Todo {
-            id: self.next_id,
-            text: text,
-            done: false,
-        };
+    fn add_todo(&mut self) {
         self.next_id = self.next_id + 1;
-        // Ownership: todo is moved into the collection
-        self.todos.push(todo);
-    }
-
-    fn toggle(&mut self, id: u32) {
-        for todo in &mut self.todos {
-            if todo.id == id {
-                todo.done = !todo.done;
-            }
-        }
-    }
-
-    fn visible_todos(&self) -> [&Todo] {
-        match self.filter {
-            Filter::All => &self.todos,
-            Filter::Active => self.todos.iter().filter(fn(t: &Todo) -> bool { !t.done }),
-            Filter::Completed => self.todos.iter().filter(fn(t: &Todo) -> bool { t.done }),
-        }
+        self.total_count = self.total_count + 1;
+        self.input_text = "";
     }
 
     render {
         <div>
             <h1>"Nectar Todo"</h1>
             <div>
-                <input placeholder="What needs to be done?" />
+                <input placeholder="What needs to be done?" value={format("{}", self.input_text)} />
                 <button on:click={self.add_todo}>"Add"</button>
             </div>
-            <ul>
-                {self.visible_todos()}
-            </ul>
+            <p>{format("{} items", self.total_count)}</p>
         </div>
     }
 }
