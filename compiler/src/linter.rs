@@ -1428,10 +1428,12 @@ mod tests {
                                 name: "Some".to_string(),
                                 fields: vec![Pattern::Ident("v".to_string())],
                             },
+                            guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
                         MatchArm {
                             pattern: Pattern::Wildcard,
+                            guard: None,
                             body: Expr::Integer(0),
                         },
                     ],
@@ -1921,9 +1923,9 @@ mod tests {
                 Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
-                        MatchArm { pattern: Pattern::Literal(Expr::Integer(1)), body: Expr::StringLit("one".to_string()) },
-                        MatchArm { pattern: Pattern::Literal(Expr::Integer(2)), body: Expr::StringLit("two".to_string()) },
-                        MatchArm { pattern: Pattern::Wildcard, body: Expr::StringLit("other".to_string()) },
+                        MatchArm { pattern: Pattern::Literal(Expr::Integer(1)), guard: None, body: Expr::StringLit("one".to_string()) },
+                        MatchArm { pattern: Pattern::Literal(Expr::Integer(2)), guard: None, body: Expr::StringLit("two".to_string()) },
+                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::StringLit("other".to_string()) },
                     ],
                 }),
             ]))],
@@ -1942,10 +1944,12 @@ mod tests {
                     arms: vec![
                         MatchArm {
                             pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
                         MatchArm {
                             pattern: Pattern::Variant { name: "None".to_string(), fields: vec![] },
+                            guard: None,
                             body: Expr::Integer(0),
                         },
                     ],
@@ -2081,9 +2085,10 @@ mod tests {
                     arms: vec![
                         MatchArm {
                             pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
-                        MatchArm { pattern: Pattern::Wildcard, body: Expr::Integer(0) },
+                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
                     ],
                 }),
             ]))],
@@ -2131,9 +2136,10 @@ mod tests {
                     arms: vec![
                         MatchArm {
                             pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
-                        MatchArm { pattern: Pattern::Wildcard, body: Expr::Integer(0) },
+                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
                     ],
                 }),
             ]))],
@@ -2392,9 +2398,10 @@ mod tests {
                         arms: vec![
                             MatchArm {
                                 pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                                guard: None,
                                 body: Expr::Ident("v".to_string()),
                             },
-                            MatchArm { pattern: Pattern::Wildcard, body: Expr::Integer(0) },
+                            MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
                         ],
                     },
                     ownership: Ownership::Owned,

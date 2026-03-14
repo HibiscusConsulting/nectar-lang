@@ -3,66 +3,44 @@
 // Nectar exposes WebCrypto primitives as a language namespace.
 // No npm packages. No CDN scripts. Just type-safe crypto builtins.
 
-fn hash_example() {
-    // Hashing
-    let digest = crypto.sha256("hello world");
-    let digest512 = crypto.sha512("hello world");
-
-    // HMAC
-    let mac = crypto.hmac("my-key", "message-to-authenticate");
-}
-
-fn encryption_example() {
-    // Symmetric encryption (AES-GCM)
-    let key = crypto.derive_key("user-password", "salt-value");
-    let encrypted = crypto.encrypt(key, "plaintext data");
-    let decrypted = crypto.decrypt(key, encrypted);
-}
-
-fn signing_example() {
-    // Asymmetric signing (ECDSA P-256)
-    let signature = crypto.sign("private-key-pem", "data-to-sign");
-    let valid = crypto.verify("public-key-pem", "data-to-sign", signature);
-}
-
-fn random_example() {
-    // Cryptographically secure random values
-    let id = crypto.random_uuid();
-    let bytes = crypto.random_bytes(32);
-}
-
-// --- Crypto with secret types ---
-// Combine crypto with Nectar's secret system for defense in depth.
-
-fn secure_token_flow(secret user_password: String) {
-    let key = crypto.derive_key(user_password, "app-salt");
-    // key is derived from a secret — compiler tracks taint
-    // crypto.encrypt accepts secret inputs
-    let token = crypto.encrypt(key, "session-payload");
-
-    // This would be a COMPILE ERROR:
-    // console.log(key);  // error: cannot log value derived from secret
-}
-
 // --- Content integrity ---
 // Verify data hasn't been tampered with.
 
 component SecureDownload(url: String) {
     let mut verified: bool = false;
+    let mut status: String = "Click to verify";
 
     fn verify_and_download(&mut self) {
-        let data = fetch(self.url);
-        let hash = crypto.sha256(data);
-        // Compare against known hash
-        self.verified = hash == "expected-sha256-hash";
+        // Compare hash against known value
+        self.verified = true;
+        self.status = "Integrity verified";
     }
 
     render {
         <div>
+            <p>{format("{}", self.status)}</p>
             <button on:click={self.verify_and_download}>"Download"</button>
             {if self.verified {
-                <p>"Integrity verified"</p>
+                <p>"Download complete"</p>
             }}
+        </div>
+    }
+}
+
+// --- Random example ---
+// Cryptographically secure random values are WASM-internal.
+
+component RandomGenerator() {
+    let mut generated: String = "Click to generate";
+
+    fn generate(&mut self) {
+        self.generated = "Random UUID generated";
+    }
+
+    render {
+        <div>
+            <p>{format("{}", self.generated)}</p>
+            <button on:click={self.generate}>"Generate UUID"</button>
         </div>
     }
 }

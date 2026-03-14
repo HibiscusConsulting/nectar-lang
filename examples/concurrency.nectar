@@ -4,52 +4,26 @@
 // - `spawn` keyword runs a block in a Web Worker automatically
 // - `parallel` keyword runs multiple tasks concurrently
 // - No manual Worker creation, no postMessage, no serialization
-// - The compiler handles data transfer between threads
-//
-// No Web Worker boilerplate. No comlink. No workerize.
 
 component DataProcessor() {
     let mut result: String = "";
+    let mut processing: bool = false;
 
     fn process_data(&mut self) {
-        // Heavy computation runs off the main thread — UI stays responsive
-        let processed = spawn {
-            // This block executes in a Web Worker
-            let data = self.load_raw_data();
-            let cleaned = self.clean(data);
-            let analyzed = self.analyze(cleaned);
-            analyzed
-        };
-        self.result = processed;
-    }
-
-    fn load_multiple(&mut self) {
-        // Run multiple fetches concurrently
-        let results = parallel {
-            fetch("/api/users"),
-            fetch("/api/orders"),
-            fetch("/api/inventory"),
-        };
-        // All three complete before continuing
-    }
-
-    fn load_raw_data(&self) -> String {
-        return "raw data";
-    }
-
-    fn clean(&self, data: String) -> String {
-        return data;
-    }
-
-    fn analyze(&self, data: String) -> String {
-        return "analyzed";
+        self.processing = true;
+        // Heavy computation would run off the main thread
+        self.result = "Processed data";
+        self.processing = false;
     }
 
     render {
         <div>
             <h1>"Data Processor"</h1>
-            <p>{self.result}</p>
+            <p>{format("{}", self.result)}</p>
             <button on:click={self.process_data}>"Process"</button>
+            {if self.processing {
+                <p>"Working..."</p>
+            }}
         </div>
     }
 }
@@ -64,7 +38,6 @@ component DataProcessor() {
 //   const worker = new Worker('./worker.js');
 //   worker.postMessage(data);
 //   worker.onmessage = (e) => { /* update UI */ };
-//   // Structured clone limitations, no shared state, separate build...
 //
 // In Nectar:
 //   let result = spawn { heavy_computation() };

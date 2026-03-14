@@ -686,6 +686,31 @@ pub enum TemplateNode {
     Outlet,
     /// Layout primitives — compile-time sugar for semantic HTML + CSS
     Layout(LayoutNode),
+    /// {if condition { <template> } else { <template> }}
+    TemplateIf {
+        condition: Box<Expr>,
+        then_children: Vec<TemplateNode>,
+        else_children: Option<Vec<TemplateNode>>,
+    },
+    /// {for binding in iterator { <template> }}
+    TemplateFor {
+        binding: String,
+        iterator: Box<Expr>,
+        children: Vec<TemplateNode>,
+    },
+    /// {match subject { Pattern => <template>, ... }}
+    TemplateMatch {
+        subject: Box<Expr>,
+        arms: Vec<TemplateMatchArm>,
+    },
+}
+
+/// A single arm in a `{match}` template expression.
+#[derive(Debug, Clone)]
+pub struct TemplateMatchArm {
+    pub pattern: Pattern,
+    pub guard: Option<Expr>,
+    pub body: Vec<TemplateNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -1046,6 +1071,8 @@ pub struct Param {
     pub name: String,
     pub ty: Type,
     pub ownership: Ownership,
+    /// Whether the parameter is marked `secret` — compile-time only, prevents logging/rendering.
+    pub secret: bool,
 }
 
 /// Block of statements
@@ -1156,6 +1183,14 @@ pub enum Expr {
     // Struct construction
     StructInit {
         name: String,
+        fields: Vec<(String, Expr)>,
+    },
+
+    // Array literal: [1, 2, 3] or []
+    ArrayLit(Vec<Expr>),
+
+    // Object literal: { key: value, ... }
+    ObjectLit {
         fields: Vec<(String, Expr)>,
     },
 
@@ -1305,6 +1340,7 @@ pub enum UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchArm {
     pub pattern: Pattern,
+    pub guard: Option<Expr>,
     pub body: Expr,
 }
 

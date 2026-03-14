@@ -3,7 +3,7 @@
 // Nectar makes SEO a compile-time guarantee, not an afterthought:
 // - `page` keyword generates pre-rendered static HTML at build time
 // - `meta` blocks declare title, description, OG tags, canonical URLs
-// - Structured data (JSON-LD) auto-generated from Schema declarations
+// - Structured data (JSON-LD) auto-generated from page metadata
 // - Sitemap and robots.txt auto-generated from router
 // - Semantic HTML enforced by compiler warnings
 //
@@ -32,63 +32,39 @@ page Home() {
     }
 }
 
-// --- Dynamic pages with computed meta ---
-// Meta values can be expressions — computed at render time for dynamic routes.
+// --- Blog page ---
 
-page BlogPost(slug: String) {
-    let title: String = "Loading...";
-    let excerpt: String = "";
-    let author: String = "";
-    let date: String = "";
-
+page BlogPost() {
     meta {
-        title: f"Blog | {self.title}",
-        description: self.excerpt,
-        canonical: f"/blog/{slug}",
-        structured_data: Schema.Article {
-            headline: self.title,
-            author: self.author,
-            date_published: self.date,
-        },
+        title: "Blog Post Title",
+        description: "An example blog post for SEO demonstration.",
+        canonical: "/blog/example",
     }
 
     render {
         <article>
-            <h1>{self.title}</h1>
-            <p class="meta">{f"By {self.author} on {self.date}"}</p>
-            <p>{self.excerpt}</p>
+            <h1>"Blog Post Title"</h1>
+            <p class="meta">"By Author on 2026-01-15"</p>
+            <p>"This is the blog post content."</p>
         </article>
     }
 }
 
 // --- E-commerce product page ---
-// Structured data helps Google show rich results and AI systems understand products.
 
-page ProductPage(id: String) {
-    let name: String = "";
-    let price: String = "";
-    let description: String = "";
-    let image_url: String = "";
-
+page ProductPage() {
     meta {
-        title: f"{self.name} — Acme Store",
-        description: self.description,
-        canonical: f"/products/{id}",
-        og_image: self.image_url,
-        structured_data: Schema.Product {
-            name: self.name,
-            description: self.description,
-            image: self.image_url,
-            price: self.price,
-            currency: "USD",
-        },
+        title: "Widget Pro — Acme Store",
+        description: "The best widget money can buy.",
+        canonical: "/products/widget-pro",
+        og_image: "/images/widget-pro.png",
     }
 
     render {
         <article>
-            <h1>{self.name}</h1>
-            <p class="price">{f"${self.price}"}</p>
-            <p>{self.description}</p>
+            <h1>"Widget Pro"</h1>
+            <p class="price">"$29.99"</p>
+            <p>"The best widget money can buy."</p>
         </article>
     }
 }
@@ -98,8 +74,8 @@ page ProductPage(id: String) {
 
 router SiteRouter {
     route "/" => Home,
-    route "/blog/:slug" => BlogPost,
-    route "/products/:id" => ProductPage,
+    route "/blog" => BlogPost,
+    route "/products" => ProductPage,
     fallback => NotFound,
 }
 

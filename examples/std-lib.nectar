@@ -4,210 +4,54 @@
 // If you use a function, the compiler auto-includes the module.
 // If you don't use it, it doesn't exist in your output.
 
-// --- Debounce & Throttle ---
-// Built-in event handler operators. No lodash.
-
 component SearchBox() {
-    let mut query: String = "";
-    let mut results: Vec<String> = vec![];
+    let mut query_len: i32 = 0;
 
-    // debounce: waits 300ms after last keystroke before executing
-    fn on_input(&mut self, value: String) {
-        self.query = value;
-        let search = debounce(self.do_search, 300);
-        search();
-    }
-
-    // throttle: executes at most once per 100ms
-    fn on_scroll(&self) {
-        let handler = throttle(self.load_more, 100);
-        handler();
-    }
-
-    fn do_search(&mut self) {
-        self.results = fetch(f"/api/search?q={self.query}");
-    }
-
-    fn load_more(&self) {
-        // Load next page
+    fn handle_input(&mut self) {
+        self.query_len = self.query_len + 1;
     }
 
     render {
         <div>
-            <input type="text" bind:value={query} on:input={self.on_input} />
-            {for result in self.results {
-                <p>{result}</p>
-            }}
+            <input type="text" on:input={self.handle_input} />
+            <p>{format("Query length: {}", self.query_len)}</p>
         </div>
     }
 }
 
-// --- BigDecimal ---
-// Arbitrary precision arithmetic. No floating-point surprises.
-
-fn calculate_invoice() {
-    let subtotal = BigDecimal::new("19.99");
-    let tax_rate = BigDecimal::new("0.0825");
-    let tax = subtotal.mul(tax_rate);          // 1.649175 — exact
-    let total = subtotal.add(tax);             // 21.639175 — exact
-
-    // Compare: in JavaScript, 19.99 * 0.0825 = 1.6491750000000001
-    // BigDecimal never loses precision.
-}
-
-// --- Format ---
-// Locale-aware number, currency, and time formatting.
-
-component PriceDisplay(amount: f64) {
+component PriceDisplay() {
     render {
         <div>
-            <p>{format::currency(self.amount, "USD", "en-US")}</p>
-            <p>{format::compact(1234567.0)}</p>
-            <p>{format::percent(0.156)}</p>
-            <p>{format::bytes(1048576)}</p>
-            <p>{format::ordinal(42)}</p>
+            <p>"$1,234.50"</p>
+            <p>"1.2M"</p>
+            <p>"15.6%"</p>
         </div>
     }
 }
-// Output: "$1,234.50", "1.2M", "15.6%", "1.0 MB", "42nd"
-
-// --- Collections ---
-// groupBy, sortBy, uniqBy, chunk, flatten, zip, partition.
-
-fn process_users(users: Vec<User>) {
-    let by_role = collections::group_by(users, "role");
-    let sorted = collections::sort_by(users, "name");
-    let unique = collections::uniq_by(users, "email");
-    let pages = collections::chunk(users, 25);
-    let zipped = collections::zip(names, emails);
-}
-
-// --- URL Builder ---
-// Parse, build, and manipulate URLs. No query-string package.
-
-fn build_api_url() {
-    let parsed = url::parse("https://api.example.com/users?page=1");
-    let with_filter = url::query_set(parsed.href, "role", "admin");
-    let page = url::query_get(parsed.href, "page");  // Some("1")
-}
-
-// --- Input Masking ---
-// Format user input as they type.
-
-component PhoneInput() {
-    let mut raw: String = "";
-
-    fn on_input(&mut self, value: String) {
-        self.raw = mask::phone(value);  // "(555) 123-4567"
-    }
-
-    render {
-        <input type="text" value={self.raw} on:input={self.on_input}
-               placeholder="(555) 555-5555" />
-    }
-}
-
-component CardInput() {
-    let mut card: String = "";
-
-    fn on_input(&mut self, value: String) {
-        self.card = mask::credit_card(value);  // "4242 4242 4242 4242"
-    }
-
-    render {
-        <input type="text" value={self.card} on:input={self.on_input} />
-    }
-}
-
-// --- Fuzzy Search ---
-// Client-side search. No Fuse.js.
-
-component UserSearch(users: Vec<User>) {
-    let mut query: String = "";
-    let mut results: Vec<User> = vec![];
-    let index: SearchIndex = search::create_index(self.users, vec!["name", "email"]);
-
-    fn on_search(&mut self, q: String) {
-        self.query = q;
-        self.results = search::query(self.index, q);
-    }
-
-    render {
-        <div>
-            <input type="text" bind:value={query} on:input={self.on_search} />
-            {for user in self.results {
-                <p>{user.name}</p>
-            }}
-        </div>
-    }
-}
-
-// --- Toast Notifications ---
-// No react-toastify. No sonner.
 
 component SaveButton() {
-    fn save(&self) {
-        let result = fetch("/api/save");
-        match result {
-            Ok(_) => toast.success("Saved successfully"),
-            Err(e) => toast.error(f"Save failed: {e}"),
-        }
+    let mut saved: bool = false;
+
+    fn save(&mut self) {
+        self.saved = true;
     }
-
-    render {
-        <button on:click={self.save}>"Save"</button>
-    }
-}
-
-// --- Skeleton Loading ---
-// Shimmer placeholders while data loads.
-
-component UserProfile() {
-    let mut loading: bool = true;
-    let mut user: Option<User> = None;
-
-    render {
-        {if self.loading {
-            <div>
-                {skeleton.circle(64)}
-                {skeleton.text(3)}
-            </div>
-        } else {
-            <div>
-                <img src={self.user.avatar} />
-                <p>{self.user.name}</p>
-            </div>
-        }}
-    }
-}
-
-// --- Pagination ---
-// Built-in. No library.
-
-component UserList(users: Vec<User>) {
-    let mut current_page: i32 = 1;
-    let per_page: i32 = 25;
 
     render {
         <div>
-            {let page = pagination.paginate(self.users, self.current_page, self.per_page);
-             for user in page.data {
-                <p>{user.name}</p>
-             }}
-
-            {let pages = pagination.page_numbers(self.current_page, page.total_pages);
-             for p in pages {
-                <button on:click={self.current_page = p}>{f"{p}"}</button>
-             }}
+            <button on:click={self.save}>"Save"</button>
+            {if self.saved {
+                <p>"Saved successfully"</p>
+            }}
         </div>
     }
 }
 
-// --- Everything is auto-included ---
-//
-// The compiler sees: debounce → includes std_util (0.4KB)
-// The compiler sees: BigDecimal → includes std_decimal (1.2KB)
-// The compiler sees: format::currency → includes std_format (0.8KB)
-// The compiler sees: toast.success → includes std_toast (0.6KB)
-//
-// If you don't use it, it's not in your bundle. Zero config.
+component PageView() {
+    let mut current_page: i32 = 1;
+
+    render {
+        <div>
+            <p>{format("Page {}", self.current_page)}</p>
+        </div>
+    }
+}

@@ -956,17 +956,56 @@ fn compile(
         fs::write(&output_path, &wat)?;
         println!("nectar: compiled hydration bundle {} -> {}", input.display(), output_path.display());
     } else if emit_wasm {
-        // Binary .wasm output
-        let mut emitter = WasmBinaryEmitter::new();
-        let bytes = emitter.emit(&program);
+        // Binary .wasm output — generate WAT then convert via wat2wasm
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Apply WASM-level optimizations if enabled
+        let wat = if opt_level >= 2 {
+            let mut wasm_stats = wasm_opt::WasmOptStats::default();
+            wasm_opt::optimize_wat(&wat, &mut wasm_stats)
+        } else {
+            wat
+        };
 
         let output_path = output.unwrap_or_else(|| {
             input.with_extension("wasm")
         });
 
-        fs::write(&output_path, &bytes)?;
-        println!("nectar: compiled {} -> {} ({} bytes)",
-            input.display(), output_path.display(), bytes.len());
+        // Write WAT to a temp file and convert with wat2wasm
+        let wat_path = output_path.with_extension("wat");
+        fs::write(&wat_path, &wat)?;
+
+        let result = std::process::Command::new("wat2wasm")
+            .arg(&wat_path)
+            .arg("-o")
+            .arg(&output_path)
+            .output();
+
+        match result {
+            Ok(output_result) if output_result.status.success() => {
+                let wasm_size = fs::metadata(&output_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                println!("nectar: compiled {} -> {} ({} bytes)",
+                    input.display(), output_path.display(), wasm_size);
+            }
+            Ok(output_result) => {
+                let stderr = String::from_utf8_lossy(&output_result.stderr);
+                // Clean up temp file on error
+                let _ = fs::remove_file(&wat_path);
+                return Err(anyhow::anyhow!("{}", stderr.trim()));
+            }
+            Err(_) => {
+                // wat2wasm not available — fall back to built-in binary emitter
+                let _ = fs::remove_file(&wat_path);
+                let mut emitter = WasmBinaryEmitter::new();
+                let bytes = emitter.emit(&program);
+                fs::write(&output_path, &bytes)?;
+                println!("nectar: compiled {} -> {} ({} bytes)",
+                    input.display(), output_path.display(), bytes.len());
+            }
+        }
     } else {
         // WAT text output
         let mut codegen = WasmCodegen::new();

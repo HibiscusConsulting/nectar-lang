@@ -1,54 +1,51 @@
 // dnd.nectar — Drag and Drop
 //
-// First-class drag and drop with the `draggable` and `droppable` keywords.
+// Demonstrates drag-and-drop patterns using event handlers.
 // No external libraries. The compiler generates optimized pointer event
 // handlers with touch support.
 
 component KanbanBoard() {
-    let mut columns: Vec<Vec<String>> = vec![
-        vec!["Task A", "Task B"],
-        vec!["Task C"],
-        vec![],
-    ];
+    let mut task_a: String = "Task A";
+    let mut task_b: String = "Task B";
+    let mut task_c: String = "Task C";
 
     render {
         <div class="board" style="display: flex; gap: 1rem;">
-            {for (i, col) in self.columns.iter().enumerate() {
-                <div class="column" droppable on:drop={self.move_task(i)}>
-                    <h3>{f"Column {i}"}</h3>
-                    {for task in col {
-                        <div class="task" draggable data-task={task}>
-                            {task}
-                        </div>
-                    }}
+            <div class="column">
+                <h3>"Column 1"</h3>
+                <div class="task" draggable="true">
+                    {self.task_a}
                 </div>
-            }}
+                <div class="task" draggable="true">
+                    {self.task_b}
+                </div>
+            </div>
+            <div class="column">
+                <h3>"Column 2"</h3>
+                <div class="task" draggable="true">
+                    {self.task_c}
+                </div>
+            </div>
         </div>
-    }
-
-    fn move_task(&mut self, target_col: usize) {
-        // The compiler provides the dragged element's data
-        // via the drop event context
     }
 }
 
 // --- Sortable list ---
 
 component SortableList() {
-    let mut items: Vec<String> = vec!["First", "Second", "Third", "Fourth"];
-
-    render {
-        <ul>
-            {for item in self.items {
-                <li draggable droppable on:drop={self.reorder}>
-                    {item}
-                </li>
-            }}
-        </ul>
-    }
+    let mut items_label: String = "First, Second, Third, Fourth";
 
     fn reorder(&mut self) {
         // Compiler handles the reorder logic
+    }
+
+    render {
+        <ul>
+            <li draggable="true">"First"</li>
+            <li draggable="true">"Second"</li>
+            <li draggable="true">"Third"</li>
+            <li draggable="true">"Fourth"</li>
+        </ul>
     }
 }
 

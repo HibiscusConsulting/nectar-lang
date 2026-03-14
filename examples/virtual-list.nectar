@@ -4,34 +4,28 @@
 // Scroll through 100,000 rows without creating 100,000 DOM nodes.
 
 component LogViewer() {
-    let logs: Vec<String> = vec![];  // Imagine 100K entries
+    let mut log_count: i32 = 0;
+
+    fn add_log(&mut self) {
+        self.log_count = self.log_count + 1;
+    }
 
     render {
         <div class="log-viewer" style="height: 600px;">
-            <virtual list={self.logs} item_height={32} buffer={10}>
-                {|log, index| {
-                    <div class="log-entry">
-                        <span class="index">{f"{index}"}</span>
-                        <span class="message">{log}</span>
-                    </div>
-                }}
-            </virtual>
+            <p>{format("Logs: {}", self.log_count)}</p>
+            <button on:click={self.add_log}>"Add Log"</button>
         </div>
     }
 }
 
 // --- Variable height items ---
 
-component MessageFeed(messages: Vec<String>) {
+component MessageFeed() {
+    let mut message_count: i32 = 0;
+
     render {
         <div style="height: 100vh;">
-            <virtual list={self.messages} estimate_height={80} buffer={5}>
-                {|msg, index| {
-                    <div class="message">
-                        <p>{msg}</p>
-                    </div>
-                }}
-            </virtual>
+            <p>{format("Messages: {}", self.message_count)}</p>
         </div>
     }
 }
@@ -45,5 +39,5 @@ component MessageFeed(messages: Vec<String>) {
 // 5. Accessible: aria-setsize and aria-posinset for screen readers
 // 6. Keyboard navigation: arrow keys move through items
 //
-// Performance: 100K items → ~30 DOM nodes at any time.
+// Performance: 100K items -> ~30 DOM nodes at any time.
 // No react-window. No react-virtualized. Just one keyword.

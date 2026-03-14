@@ -10,25 +10,15 @@ component Dashboard() {
 
     fn load_dashboard(&mut self) {
         // Trace block measures execution time automatically
-        let result = trace("dashboard.load") {
-            let users = fetch("/api/users");
-            let orders = fetch("/api/orders");
-            "loaded"
-        };
-        self.data = result;
-    }
-
-    fn process_report(&self) {
-        let report = trace("report.generate") {
-            // Heavy computation — trace captures timing
-            "report data"
-        };
+        let users = fetch("/api/users");
+        let orders = fetch("/api/orders");
+        self.data = "loaded";
     }
 
     render {
         <div>
             <h1>"Dashboard"</h1>
-            <p>{self.data}</p>
+            <p>{format("{}", self.data)}</p>
             <button on:click={self.load_dashboard}>"Load"</button>
         </div>
     }
@@ -36,9 +26,11 @@ component Dashboard() {
 
 // Feature flags for gradual rollouts
 component NewFeature() {
+    let mut enabled: bool = false;
+
     render {
         <div>
-            {if flag("new_dashboard") {
+            {if self.enabled {
                 <h1>"New Dashboard"</h1>
             } else {
                 <h1>"Classic Dashboard"</h1>

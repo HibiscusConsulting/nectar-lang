@@ -203,6 +203,11 @@ export const wasmImports = {
       }
     },
 
+    // Canvas 2D — protected media rendering (browser API bridges, zero logic)
+    canvasGetContext2D(elId) { return R.__registerObject(R.__getElement(elId).getContext('2d')); },
+    canvasPutImageData(ctxId, dataPtr, dataLen, x, y, w, h) { const ctx = R.__getObject(ctxId); ctx.putImageData(new ImageData(new Uint8ClampedArray(R.__memory.buffer, dataPtr, dataLen), w, h), x, y); },
+    canvasSetDimensions(elId, w, h) { const el = R.__getElement(elId); el.width = w; el.height = h; },
+
     getElementById(ptr, len) { return R.__registerElement(document.getElementById(R.__getString(ptr, len))); },
     querySelector(ptr, len) { return R.__registerElement(document.querySelector(R.__getString(ptr, len))); },
     createElement(ptr, len) { return R.__registerElement(document.createElement(R.__getString(ptr, len))); },
@@ -253,7 +258,6 @@ export const wasmImports = {
     appendChild(parentId, childId) { R.__getElement(parentId).appendChild(R.__getElement(childId)); },
     setAttribute(elId, nPtr, nLen, vPtr, vLen) { R.__getElement(elId).setAttribute(R.__getString(nPtr, nLen), R.__getString(vPtr, vLen)); },
     setStyle(elId, pPtr, pLen, vPtr, vLen) { R.__getElement(elId).style.setProperty(R.__getString(pPtr, pLen), R.__getString(vPtr, vLen)); },
-    setProperty(elId, nPtr, nLen, val) { R.__getElement(elId)[R.__getString(nPtr, nLen)] = val; },
 
     setTitle(ptr, len) { document.title = R.__getString(ptr, len); },
 

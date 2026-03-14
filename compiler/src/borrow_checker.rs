@@ -431,17 +431,30 @@ impl Checker {
             Expr::Ident(source_name) => {
                 // Assignment from another variable -- this is a *move* unless
                 // the ownership annotation says otherwise.
-                match ownership {
-                    Ownership::Borrowed => {
-                        self.create_immutable_borrow(name, source_name, span);
-                    }
-                    Ownership::MutBorrowed => {
-                        self.create_mutable_borrow(name, source_name, span);
-                    }
-                    Ownership::Owned => {
-                        // Move.
-                        self.move_var(source_name, name, span);
-                        self.env.declare(name, VarState::Owned);
+                //
+                // Keyword-like constructors (`None`, `Some`, `Ok`, `Err`) are
+                // Copy values / enum constructors; they are never moved out of
+                // the environment.
+                let is_builtin_constructor = matches!(
+                    source_name.as_str(),
+                    "None" | "Some" | "Ok" | "Err" | "true" | "false"
+                );
+                if is_builtin_constructor {
+                    self.check_expr(value, span);
+                    self.env.declare(name, VarState::Owned);
+                } else {
+                    match ownership {
+                        Ownership::Borrowed => {
+                            self.create_immutable_borrow(name, source_name, span);
+                        }
+                        Ownership::MutBorrowed => {
+                            self.create_mutable_borrow(name, source_name, span);
+                        }
+                        Ownership::Owned => {
+                            // Move.
+                            self.move_var(source_name, name, span);
+                            self.env.declare(name, VarState::Owned);
+                        }
                     }
                 }
             }
@@ -457,7 +470,15 @@ impl Checker {
     fn check_expr(&mut self, expr: &Expr, span: Span) {
         match expr {
             Expr::Ident(name) => {
-                self.assert_not_moved(name, span);
+                // Builtin constructors and enum variants are not variables in
+                // the move-tracking environment; skip the moved check.
+                let is_builtin = matches!(
+                    name.as_str(),
+                    "None" | "Some" | "Ok" | "Err" | "true" | "false"
+                ) || name.contains("::");
+                if !is_builtin {
+                    self.assert_not_moved(name, span);
+                }
             }
             Expr::Integer(_)
             | Expr::Float(_)
@@ -520,6 +541,9 @@ impl Checker {
                 for arm in arms {
                     self.env.push_scope();
                     self.declare_pattern_bindings(&arm.pattern);
+                    if let Some(guard) = &arm.guard {
+                        self.check_expr(guard, span);
+                    }
                     self.check_expr(&arm.body, span);
                     self.env.pop_scope();
                 }
@@ -727,6 +751,16 @@ impl Checker {
                 self.check_expr(items, span);
                 self.check_expr(item_height, span);
                 self.check_expr(template, span);
+            }
+            Expr::ArrayLit(elements) => {
+                for elem in elements {
+                    self.check_expr(elem, span);
+                }
+            }
+            Expr::ObjectLit { fields } => {
+                for (_key, value) in fields {
+                    self.check_expr(value, span);
+                }
             }
         }
     }
@@ -1415,7 +1449,8 @@ mod tests {
                             inner: Box::new(Type::Named("i32".to_string())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                     Param {
                         name: "b".to_string(),
                         ty: Type::Reference {
@@ -1424,7 +1459,8 @@ mod tests {
                             inner: Box::new(Type::Named("i32".to_string())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -1465,7 +1501,8 @@ mod tests {
                         inner: Box::new(Type::Named("i32".to_string())),
                     },
                     ownership: Ownership::Borrowed,
-                }],
+                    secret: false,
+}],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: None,
@@ -1504,7 +1541,8 @@ mod tests {
                             inner: Box::new(Type::Named("i32".to_string())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                     Param {
                         name: "b".to_string(),
                         ty: Type::Reference {
@@ -1513,7 +1551,8 @@ mod tests {
                             inner: Box::new(Type::Named("i32".to_string())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -1773,6 +1812,7 @@ mod comprehensive_borrow_tests {
                 arms: vec![
                     MatchArm {
                         pattern: Pattern::Literal(int_lit(1)),
+                        guard: None,
                         body: Expr::Block(Block {
                             stmts: vec![Stmt::Let {
                                 name: "a".into(), ty: None, mutable: false, secret: false,
@@ -1784,6 +1824,7 @@ mod comprehensive_borrow_tests {
                     },
                     MatchArm {
                         pattern: Pattern::Wildcard,
+                        guard: None,
                         body: Expr::Integer(0),
                     },
                 ],
@@ -2400,7 +2441,8 @@ mod comprehensive_borrow_tests {
                             inner: Box::new(Type::Named("Foo".into())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -2434,12 +2476,14 @@ mod comprehensive_borrow_tests {
                         name: "a".into(),
                         ty: Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                     Param {
                         name: "b".into(),
                         ty: Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Named("i32".into())), // value, not reference
                 trait_bounds: vec![],
@@ -2581,12 +2625,14 @@ mod coverage_tests {
                                 inner: Box::new(Type::Named("i32".into())),
                             },
                             ownership: Ownership::Borrowed,
-                        },
+                            secret: false,
+},
                         Param {
                             name: "b".into(),
                             ty: Type::Named("i32".into()),
                             ownership: Ownership::MutBorrowed,
-                        },
+                            secret: false,
+},
                     ],
                     return_type: None,
                     default_body: Some(Block {
@@ -2642,7 +2688,8 @@ mod coverage_tests {
                         inner: Box::new(Type::Named("i32".into())),
                     },
                     ownership: Ownership::Borrowed,
-                }],
+                    secret: false,
+}],
                 return_type: None,
                 trait_bounds: vec![],
                 body: Block {
@@ -2680,7 +2727,8 @@ mod coverage_tests {
                             inner: Box::new(Type::Named("i32".into())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                     Param {
                         name: "b".into(),
                         ty: Type::Reference {
@@ -2689,7 +2737,8 @@ mod coverage_tests {
                             inner: Box::new(Type::Named("i32".into())),
                         },
                         ownership: Ownership::Borrowed,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -3763,6 +3812,7 @@ mod coverage_tests {
                 subject: Box::new(int_lit(1)),
                 arms: vec![MatchArm {
                     pattern: Pattern::Ident("val".into()),
+                    guard: None,
                     body: ident("val"),
                 }],
             }),
@@ -3962,5 +4012,202 @@ mod coverage_tests {
         let result = check(&prog);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::UseAfterMove);
+    }
+
+    // ── ArrayLit borrow checking ────────────────────────────────────────
+
+    #[test]
+    fn array_lit_checks_elements() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::ArrayLit(vec![ident("x"), ident("x")])),
+        ]);
+        // integers are Copy, so using x twice is fine
+        let result = check(&prog);
+        assert!(result.is_ok(), "Array with Copy elements should pass: {:?}", result);
+    }
+
+    #[test]
+    fn array_lit_simple() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::ArrayLit(vec![int_lit(1), int_lit(2), int_lit(3)])),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Array of literals should pass: {:?}", result);
+    }
+
+    // ── ObjectLit borrow checking ───────────────────────────────────────
+
+    #[test]
+    fn object_lit_checks_fields() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::ObjectLit {
+                fields: vec![
+                    ("a".into(), int_lit(1)),
+                    ("b".into(), int_lit(2)),
+                ],
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Object literal with literals should pass: {:?}", result);
+    }
+
+    // ── Match guard borrow checking ─────────────────────────────────────
+
+    #[test]
+    fn match_guard_borrow_check() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::Match {
+                subject: Box::new(int_lit(1)),
+                arms: vec![
+                    MatchArm {
+                        pattern: Pattern::Ident("n".into()),
+                        guard: Some(Expr::Binary {
+                            op: BinOp::Gt,
+                            left: Box::new(ident("n")),
+                            right: Box::new(int_lit(0)),
+                        }),
+                        body: int_lit(10),
+                    },
+                    MatchArm {
+                        pattern: Pattern::Wildcard,
+                        guard: None,
+                        body: int_lit(0),
+                    },
+                ],
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Match with guard should pass borrow check: {:?}", result);
+    }
+
+    #[test]
+    fn object_lit_simple() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::ObjectLit {
+                fields: vec![
+                    ("a".into(), int_lit(1)),
+                ],
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Single-field ObjectLit should pass: {:?}", result);
+    }
+
+    #[test]
+    fn match_no_guard_borrow_check() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(5), ownership: Ownership::Owned },
+            Stmt::Expr(Expr::Match {
+                subject: Box::new(ident("x")),
+                arms: vec![
+                    MatchArm {
+                        pattern: Pattern::Wildcard,
+                        guard: None,
+                        body: int_lit(0),
+                    },
+                ],
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Simple match should pass: {:?}", result);
+    }
+
+    #[test]
+    fn empty_array_lit() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::ArrayLit(vec![])),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Empty array should pass: {:?}", result);
+    }
+
+    #[test]
+    fn empty_object_lit() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::ObjectLit { fields: vec![] }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Empty object should pass: {:?}", result);
+    }
+
+    // ── Fix: None/Some/Ok/Err are not moveable ────────────────────────────
+
+    /// `None` assigned to a binding and then used again must not produce a
+    /// "use of moved value" error.  `None` is a built-in constructor/constant,
+    /// not a user variable, so it is exempt from move semantics.
+    #[test]
+    fn none_not_treated_as_moved() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "missing".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("None".into()),
+                ownership: Ownership::Owned,
+            },
+            // Using None again after binding — must not error.
+            Stmt::Expr(Expr::Binary {
+                op: crate::ast::BinOp::Eq,
+                left: Box::new(Expr::Ident("missing".into())),
+                right: Box::new(Expr::Ident("None".into())),
+            }),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "None used after binding should not be 'moved': {:?}", result);
+    }
+
+    /// `Some(x)` constructor is not a variable; it should not be marked moved.
+    #[test]
+    fn some_constructor_not_treated_as_moved() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("None".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("None".into()),
+                ownership: Ownership::Owned,
+            },
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "None can be bound multiple times: {:?}", result);
+    }
+
+    /// `Ok` and `Err` constructors must not be treated as moved variables.
+    #[test]
+    fn ok_err_constructors_not_moved() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "r1".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("Ok".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "r2".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("Err".into()),
+                ownership: Ownership::Owned,
+            },
+            // Both Ok and Err should still be usable as identifiers.
+            Stmt::Expr(Expr::Ident("Ok".into())),
+            Stmt::Expr(Expr::Ident("Err".into())),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Ok/Err constructors should not be marked moved: {:?}", result);
     }
 }

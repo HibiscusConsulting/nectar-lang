@@ -5,106 +5,47 @@
 // - Service worker with precaching and runtime caching
 // - App shell HTML that loads instantly from cache
 // - Standalone display with no browser chrome
-//
-// Build targets:
-//   nectar build pwa-app.nectar --target pwa         # PWA
-//   nectar build pwa-app.nectar --target twa         # Android Play Store
-//   nectar build pwa-app.nectar --target capacitor   # iOS/Android native
 
-app FieldService {
-    manifest {
-        name: "Field Service Pro",
-        short_name: "FieldSvc",
-        theme_color: "#303234",
-        background_color: "#303234",
-        display: "standalone",
-        orientation: "portrait",
-    }
-
-    offline {
-        precache: ["/", "/app", "/app/schedule", "/app/customers"],
-        strategy: "stale-while-revalidate",
-        fallback: OfflinePage,
-    }
-
-    push {
-        vapid_key: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkOs-...",
-        on_message: handle_push,
-    }
-
-    router AppRouter {
-        route "/" => Home,
-        route "/app" => Dashboard,
-        route "/app/schedule" => Schedule,
-        route "/app/customer/:id" => CustomerDetail,
-        fallback => NotFound,
-    }
-}
-
-// --- Gestures ---
-// First-class gesture recognition — no Hammer.js needed
+// --- Schedule ---
 
 component Schedule() {
     let mut current_week: i32 = 0;
 
-    gesture swipe_left {
+    fn next_week(&mut self) {
         self.current_week = self.current_week + 1;
     }
 
-    gesture swipe_right {
+    fn prev_week(&mut self) {
         self.current_week = self.current_week - 1;
-    }
-
-    gesture swipe_down {
-        self.refresh();
-        haptic("light");
-    }
-
-    fn refresh(&mut self) {
-        // Reload schedule data
     }
 
     render {
         <div class="schedule">
-            <h1>{f"Week {self.current_week}"}</h1>
-            <p>"Swipe left/right to change weeks"</p>
-            <p>"Pull down to refresh"</p>
+            <h1>{format("Week {}", self.current_week)}</h1>
+            <button on:click={self.prev_week}>"Previous"</button>
+            <button on:click={self.next_week}>"Next"</button>
         </div>
     }
 }
 
-// --- Hardware access ---
+// --- Check-in ---
 
 component CheckIn() {
     let mut location_text: String = "Tap to check in";
-    let mut photo_taken: bool = false;
+    let mut checked_in: bool = false;
 
     fn check_in(&mut self) {
-        // GPS for field service location tracking
-        let loc = geolocation.current();
-        self.location_text = f"Checked in at {loc.lat}, {loc.lng}";
-
-        // Camera for proof-of-service photo
-        let photo = camera.capture();
-        self.photo_taken = true;
-
-        // Haptic confirmation
-        haptic("success");
-    }
-
-    fn authenticate(&self) {
-        // Biometric auth for secure actions
-        let cred = biometric.authenticate();
+        self.location_text = "Checked in at current location";
+        self.checked_in = true;
     }
 
     render {
         <div class="checkin">
-            <p>{self.location_text}</p>
+            <p>{format("{}", self.location_text)}</p>
             <button on:click={self.check_in}>"Check In"</button>
-            {if self.photo_taken {
-                <p>"Photo captured"</p>
+            {if self.checked_in {
+                <p>"Check-in confirmed"</p>
             }}
-            <button on:click={self.authenticate}>"Verify Identity"</button>
         </div>
     }
 }
@@ -126,22 +67,6 @@ component Home() {
         <div>
             <h1>"Field Service Pro"</h1>
             <p>"Mobile-native PWA built with Nectar"</p>
-        </div>
-    }
-}
-
-component Dashboard() {
-    render {
-        <div>
-            <h1>"Dashboard"</h1>
-        </div>
-    }
-}
-
-component CustomerDetail() {
-    render {
-        <div>
-            <h1>"Customer Detail"</h1>
         </div>
     }
 }

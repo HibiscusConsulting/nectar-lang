@@ -164,7 +164,18 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
         }
         Expr::Match { subject, arms, .. } => {
             check_expr(subject, ns);
-            for arm in arms { check_expr(&arm.body, ns); }
+            for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    check_expr(guard, ns);
+                }
+                check_expr(&arm.body, ns);
+            }
+        }
+        Expr::ArrayLit(elements) => {
+            for e in elements { check_expr(e, ns); }
+        }
+        Expr::ObjectLit { fields } => {
+            for (_, v) in fields { check_expr(v, ns); }
         }
         Expr::For { iterator, body, .. } => { check_expr(iterator, ns); check_exprs_in_block(body, ns); }
         Expr::While { condition, body, .. } => { check_expr(condition, ns); check_exprs_in_block(body, ns); }
@@ -1127,6 +1138,7 @@ mod tests {
             subject: Box::new(Expr::Ident("x".to_string())),
             arms: vec![MatchArm {
                 pattern: Pattern::Wildcard,
+                guard: None,
                 body: Expr::Spawn {
                     body: Block { stmts: vec![], span: empty_span() },
                     span: empty_span(),
@@ -1422,5 +1434,34 @@ mod tests {
         });
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("gpu"), "gpu.request_adapter should trigger gpu namespace");
+    }
+
+    #[test]
+    fn test_check_expr_array_lit() {
+        let program = program_with_component_method(Expr::ArrayLit(vec![
+            Expr::Spawn {
+                body: Block { stmts: vec![], span: empty_span() },
+                span: empty_span(),
+            },
+        ]));
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("worker"));
+    }
+
+    #[test]
+    fn test_check_expr_match_with_guard() {
+        let program = program_with_component_method(Expr::Match {
+            subject: Box::new(Expr::Ident("x".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: Some(Expr::Spawn {
+                    body: Block { stmts: vec![], span: empty_span() },
+                    span: empty_span(),
+                }),
+                body: Expr::Integer(0),
+            }],
+        });
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("worker"));
     }
 }

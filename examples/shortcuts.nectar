@@ -25,15 +25,19 @@ component TextEditor() {
         // Redo last change
     }
 
-    fn close(&self) {
+    fn close(&mut self) {
         // Close editor
     }
 
     render {
         <div class="editor">
-            <textarea bind:value={content}></textarea>
+            <textarea value={self.content}></textarea>
             <footer>
-                {if self.saved { "Saved" } else { "Unsaved changes" }}
+                {if self.saved {
+                    <span>"Saved"</span>
+                } else {
+                    <span>"Unsaved changes"</span>
+                }}
             </footer>
         </div>
     }
@@ -45,11 +49,11 @@ component App() {
     shortcut "Cmd+K" => self.open_search;
     shortcut "Cmd+/" => self.toggle_help;
 
-    fn open_search(&self) {
+    fn open_search(&mut self) {
         // Open command palette
     }
 
-    fn toggle_help(&self) {
+    fn toggle_help(&mut self) {
         // Show keyboard shortcut help
     }
 
@@ -63,7 +67,7 @@ component App() {
 // --- What the compiler generates ---
 //
 // 1. keydown listeners with proper modifier detection
-// 2. Cmd → Ctrl mapping on non-Mac platforms
+// 2. Cmd -> Ctrl mapping on non-Mac platforms
 // 3. preventDefault to avoid browser defaults (e.g., Cmd+S won't save page)
 // 4. Shortcuts are scoped to the component's DOM — no global conflicts
 // 5. Accessible: shortcuts are announced to screen readers

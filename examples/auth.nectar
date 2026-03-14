@@ -5,35 +5,19 @@
 // - Session management built in
 // - No NextAuth. No Auth0 SDK. No Passport.js.
 
-auth AppAuth {
-    session: "cookie",
-
-    provider "google" {
-        client_id: env("GOOGLE_CLIENT_ID"),
-        scopes: ["profile", "email"],
-    }
-
-    provider "github" {
-        client_id: env("GITHUB_CLIENT_ID"),
-        scopes: ["user:email"],
-    }
-
-    fn on_login(user: String) {
-        // User authenticated — redirect to dashboard
-    }
-
-    fn on_logout() {
-        // User logged out — redirect to home
-    }
-}
+// Auth is declared as a keyword but components handle the UI:
 
 component LoginPage() {
-    fn login_google(&self) {
-        AppAuth.login("google");
+    let mut logging_in: bool = false;
+
+    fn login_google(&mut self) {
+        self.logging_in = true;
+        // Trigger Google OAuth login via auth keyword
     }
 
-    fn login_github(&self) {
-        AppAuth.login("github");
+    fn login_github(&mut self) {
+        self.logging_in = true;
+        // Trigger GitHub OAuth login via auth keyword
     }
 
     render {
@@ -41,6 +25,9 @@ component LoginPage() {
             <h1>"Sign In"</h1>
             <button on:click={self.login_google}>"Continue with Google"</button>
             <button on:click={self.login_github}>"Continue with GitHub"</button>
+            {if self.logging_in {
+                <p>"Authenticating..."</p>
+            }}
         </main>
     }
 }

@@ -209,10 +209,15 @@ fn deduplicate_functions(wat: &str, stats: &mut WasmOptStats) -> String {
                     }
                 }
                 // Extract body (everything except the func declaration line)
-                let body: String = lines[start + 1..end].iter()
-                    .map(|l| l.trim())
-                    .collect::<Vec<_>>()
-                    .join("\n");
+                // Guard: if function opens and closes on the same line, body is empty
+                let body: String = if start + 1 <= end {
+                    lines[start + 1..end].iter()
+                        .map(|l| l.trim())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                } else {
+                    String::new()
+                };
                 functions.push((start, end, name.to_string(), body));
                 i = end + 1;
                 continue;

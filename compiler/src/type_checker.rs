@@ -259,12 +259,23 @@ impl Substitution {
             (Ty::Contract(a_name), Ty::Struct(b_name)) | (Ty::Struct(a_name), Ty::Contract(b_name))
                 if a_name == b_name => Ok(()),
 
-            // Numeric coercion: i32 <-> i64, f32 <-> f64
+            // Numeric coercion: i32 <-> i64, f32 <-> f64, i32 <-> u32, i64 <-> u64, u32 <-> u64
             (Ty::I32, Ty::I64) | (Ty::I64, Ty::I32) => Ok(()),
             (Ty::F32, Ty::F64) | (Ty::F64, Ty::F32) => Ok(()),
+            (Ty::I32, Ty::U32) | (Ty::U32, Ty::I32) => Ok(()),
+            (Ty::I64, Ty::U64) | (Ty::U64, Ty::I64) => Ok(()),
+            (Ty::U32, Ty::U64) | (Ty::U64, Ty::U32) => Ok(()),
 
             // Error absorbs anything (prevents cascading)
             (Ty::Error, _) | (_, Ty::Error) => Ok(()),
+
+            // Secret coercion: a `secret T` value is usable wherever a plain
+            // `T` is accepted (the secret modifier is a compile-time
+            // restriction, not a different runtime type).  Likewise, a plain
+            // `T` value can satisfy a `secret T` parameter.
+            (Ty::Secret(a_inner), Ty::Secret(b_inner)) => self.unify(a_inner, b_inner),
+            (Ty::Secret(inner), other) => self.unify(inner, other),
+            (other, Ty::Secret(inner)) => self.unify(other, inner),
 
             // Structural unification
             (Ty::Array(a_inner), Ty::Array(b_inner)) => self.unify(a_inner, b_inner),
@@ -314,6 +325,94 @@ impl Substitution {
                     ));
                 }
                 self.unify(ai, bi)
+            }
+
+            // Iterator<T> is coercible to Array<T> (implicit collect) and vice versa.
+            // Strip one level of reference from element types to allow [&T] ↔ Iterator<T>.
+            (Ty::Iterator(ai), Ty::Array(bi)) | (Ty::Array(ai), Ty::Iterator(bi)) => {
+                let ai_stripped = match ai.as_ref() {
+                    Ty::Reference { inner, .. } => *inner.clone(),
+                    other => other.clone(),
+                };
+                let bi_stripped = match bi.as_ref() {
+                    Ty::Reference { inner, .. } => *inner.clone(),
+                    other => other.clone(),
+                };
+                self.unify(&ai_stripped, &bi_stripped)
+            }
+
+            // &[T] is coercible to [T] and vice versa (borrowed slice ↔ owned array).
+            // Also handles [&T] ↔ &[T] by stripping the array elem reference.
+            (Ty::Reference { inner: ai, .. }, Ty::Array(bi)) => {
+                let inner_resolved = self.resolve(ai);
+                match inner_resolved {
+                    Ty::Array(ai_elem) => {
+                        // &[T] vs [U]: unify T with U stripping refs
+                        let ai_stripped = match ai_elem.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        let bi_stripped = match bi.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        self.unify(&ai_stripped, &bi_stripped)
+                    }
+                    _ => self.unify(ai, &Ty::Array(bi.clone())),
+                }
+            }
+            (Ty::Array(ai), Ty::Reference { inner: bi, .. }) => {
+                let inner_resolved = self.resolve(bi);
+                match inner_resolved {
+                    Ty::Array(bi_elem) => {
+                        let ai_stripped = match ai.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        let bi_stripped = match bi_elem.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        self.unify(&ai_stripped, &bi_stripped)
+                    }
+                    _ => self.unify(&Ty::Array(ai.clone()), bi),
+                }
+            }
+
+            // Iterator<T> vs &[U]: handle borrowed slice from iterator
+            (Ty::Iterator(ai), Ty::Reference { inner: bi, .. }) => {
+                let inner_resolved = self.resolve(bi);
+                match inner_resolved {
+                    Ty::Array(bi_elem) => {
+                        let ai_stripped = match ai.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        let bi_stripped = match bi_elem.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        self.unify(&ai_stripped, &bi_stripped)
+                    }
+                    _ => Err(format!("type mismatch: expected {}, found {}", a, b)),
+                }
+            }
+            (Ty::Reference { inner: ai, .. }, Ty::Iterator(bi)) => {
+                let inner_resolved = self.resolve(ai);
+                match inner_resolved {
+                    Ty::Array(ai_elem) => {
+                        let ai_stripped = match ai_elem.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        let bi_stripped = match bi.as_ref() {
+                            Ty::Reference { inner, .. } => *inner.clone(),
+                            other => other.clone(),
+                        };
+                        self.unify(&ai_stripped, &bi_stripped)
+                    }
+                    _ => Err(format!("type mismatch: expected {}, found {}", a, b)),
+                }
             }
 
             _ => Err(format!("type mismatch: expected {}, found {}", a, b)),
@@ -471,6 +570,8 @@ struct TypeChecker {
     /// Names of functions marked `must_use` — their return values must not be
     /// silently discarded.
     must_use_fns: std::collections::HashSet<String>,
+    /// The name of the component or store currently being checked, for SelfType resolution.
+    current_component: Option<String>,
 }
 
 #[derive(Debug)]
@@ -494,6 +595,7 @@ impl TypeChecker {
             contracts: std::collections::HashSet::new(),
             warnings: Vec::new(),
             must_use_fns: std::collections::HashSet::new(),
+            current_component: None,
         }
     }
 
@@ -511,6 +613,22 @@ impl TypeChecker {
         if let Err(msg) = self.subst.unify(a, b) {
             self.error(msg, span);
         }
+    }
+
+    /// Unify two types with implicit deref coercion: `&T` is considered
+    /// compatible with `T` (and vice versa) at the call site.  Used in
+    /// iterator method closures where the user writes `fn(p: &Post)` but
+    /// the iterator element type is `Post`.
+    fn unify_coercing_refs(&mut self, a: &Ty, b: &Ty, span: Span) {
+        let a_inner = match self.resolve(a) {
+            Ty::Reference { inner, .. } => *inner,
+            other => other,
+        };
+        let b_inner = match self.resolve(b) {
+            Ty::Reference { inner, .. } => *inner,
+            other => other,
+        };
+        self.unify(&a_inner, &b_inner, span);
     }
 
     fn resolve(&self, ty: &Ty) -> Ty {
@@ -542,17 +660,33 @@ impl TypeChecker {
                 }
             },
             Type::Generic { name, args } => {
-                // Generic type application — resolve args but treat the
-                // overall type as the named type for now (monomorphization
-                // is deferred; the args are checked for validity).
-                let _resolved_args: Vec<Ty> = args.iter()
+                // Generic type application — resolve args and handle well-known types.
+                let resolved_args: Vec<Ty> = args.iter()
                     .map(|t| self.ast_type_to_ty(t))
                     .collect();
-                // For now, treat generic applications as their base type
-                if self.structs.contains_key(name.as_str()) {
-                    Ty::Struct(name.clone())
-                } else {
-                    Ty::Enum(name.clone())
+                match name.as_str() {
+                    "Result" => {
+                        let ok = resolved_args.get(0).cloned().unwrap_or(Ty::Unit);
+                        let err = resolved_args.get(1).cloned().unwrap_or(Ty::String_);
+                        Ty::Result_ { ok: Box::new(ok), err: Box::new(err) }
+                    }
+                    "Option" => {
+                        let inner = resolved_args.into_iter().next().unwrap_or(Ty::Unit);
+                        Ty::Option_(Box::new(inner))
+                    }
+                    // Vec<T> is an alias for [T] in Nectar — array literals and
+                    // Vec-annotated bindings must unify transparently.
+                    "Vec" => {
+                        let inner = resolved_args.into_iter().next().unwrap_or(Ty::Error);
+                        Ty::Array(Box::new(inner))
+                    }
+                    _ => {
+                        if self.structs.contains_key(name.as_str()) {
+                            Ty::Struct(name.clone())
+                        } else {
+                            Ty::Enum(name.clone())
+                        }
+                    }
                 }
             }
             Type::Reference { mutable, lifetime, inner } => Ty::Reference {
@@ -757,6 +891,44 @@ impl TypeChecker {
             self.fn_sigs.insert("crypto::hkdf".to_string(), Ty::Function {
                 params: vec![Ty::String_, Ty::String_, Ty::String_, Ty::I32],
                 ret: Box::new(Ty::String_),
+            });
+
+            // Also register common crypto functions without the namespace prefix
+            // so that `sha256(x)` works in addition to `crypto::sha256(x)`.
+            self.fn_sigs.insert("sha256".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("sha512".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("hmac".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("encrypt".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("decrypt".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::String_],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
+        // Register hardware / sensor API functions.
+        // `haptic`, `vibrate`, `geolocation::watch`, etc. are thin bridges to
+        // browser hardware APIs.  Register them as callable top-level functions
+        // so `haptic("light")` type-checks without a namespace qualifier.
+        {
+            self.fn_sigs.insert("haptic".to_string(), Ty::Function {
+                params: vec![Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("vibrate".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
             });
         }
 
@@ -1690,6 +1862,33 @@ impl TypeChecker {
                     );
                     self.type_params_in_scope = prev;
                 }
+                // Register keyword-definition names as struct types so they can
+                // be referenced by name in the rest of the program without
+                // producing "undefined variable: <Name>" errors.
+                Item::Auth(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Cache(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Db(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Payment(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Pdf(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Upload(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Store(store) => {
+                    // Pre-register store names so forward references in
+                    // collect_declarations work; the real struct entry with
+                    // signal fields is populated during check_store.
+                    self.structs.entry(store.name.clone()).or_insert(StructInfo { fields: HashMap::new() });
+                }
                 _ => {},
             }
         }
@@ -1930,6 +2129,8 @@ impl TypeChecker {
     }
 
     fn check_store(&mut self, store: &StoreDef, env: &mut TypeEnv) {
+        let prev_component = self.current_component.take();
+        self.current_component = Some(store.name.clone());
         let mut store_env = env.child();
         store_env.insert("self".to_string(), Ty::Struct(store.name.clone()));
 
@@ -1972,6 +2173,7 @@ impl TypeChecker {
             let mut effect_env = store_env.child();
             self.infer_block(&effect.body, &mut effect_env);
         }
+        self.current_component = prev_component;
     }
 
     fn check_function(&mut self, func: &Function, env: &mut TypeEnv) {
@@ -2002,7 +2204,12 @@ impl TypeChecker {
                     body_env.insert(param.name.clone(), ty);
                 }
             } else {
-                let ty = self.ast_type_to_ty(&param.ty);
+                let base_ty = self.ast_type_to_ty(&param.ty);
+                let ty = if param.secret {
+                    Ty::Secret(Box::new(base_ty))
+                } else {
+                    base_ty
+                };
                 body_env.insert(param.name.clone(), ty);
             }
         }
@@ -2026,6 +2233,8 @@ impl TypeChecker {
     }
 
     fn check_component(&mut self, comp: &Component, env: &mut TypeEnv) {
+        let prev_component = self.current_component.take();
+        self.current_component = Some(comp.name.clone());
         let mut comp_env = env.child();
 
         // Register `self` so that self.field works inside methods.
@@ -2073,6 +2282,7 @@ impl TypeChecker {
         for method in &comp.methods {
             self.check_function(method, &mut comp_env);
         }
+        self.current_component = prev_component;
     }
 
     /// Recursively check that no secret-typed variable is used in a template expression.
@@ -2121,6 +2331,30 @@ impl TypeChecker {
                 };
                 for child in children {
                     self.check_template_secret_safety(child, env, span);
+                }
+            }
+            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+                self.check_expr_not_secret(condition, env, span);
+                for child in then_children {
+                    self.check_template_secret_safety(child, env, span);
+                }
+                if let Some(else_nodes) = else_children {
+                    for child in else_nodes {
+                        self.check_template_secret_safety(child, env, span);
+                    }
+                }
+            }
+            TemplateNode::TemplateFor { children, .. } => {
+                for child in children {
+                    self.check_template_secret_safety(child, env, span);
+                }
+            }
+            TemplateNode::TemplateMatch { subject, arms } => {
+                self.check_expr_not_secret(subject, env, span);
+                for arm in arms {
+                    for child in &arm.body {
+                        self.check_template_secret_safety(child, env, span);
+                    }
                 }
             }
         }
@@ -2345,7 +2579,16 @@ impl TypeChecker {
                     );
                 }
             }
-            Pattern::Literal(_) | Pattern::Variant { .. } => {}
+            Pattern::Literal(_) => {}
+            // Enum variant destructuring — `Shape::Circle(r)` or `Some(x)`.
+            // Bind each sub-pattern to a fresh type variable so identifiers
+            // inside the arm body resolve correctly.
+            Pattern::Variant { fields, .. } => {
+                for field_pat in fields {
+                    let fresh = self.fresh_var();
+                    self.bind_pattern(field_pat, &fresh, env, span);
+                }
+            }
         }
     }
 
@@ -2366,6 +2609,84 @@ impl TypeChecker {
                 } else if let Some(ty) = self.fn_sigs.get(name) {
                     ty.clone()
                 } else {
+                    // Handle built-in constructors
+                    match name.as_str() {
+                        "None" => return Ty::Option_(Box::new(self.fresh_var())),
+                        "Ok" | "Err" | "Some" | "format" => return self.fresh_var(),
+                        _ => {}
+                    }
+                    // Check known namespace prefixes
+                    let ns_prefix = format!("{}::", name);
+                    let is_namespace = self.fn_sigs.keys().any(|k| k.starts_with(&ns_prefix));
+                    if is_namespace {
+                        if !self.structs.contains_key(name.as_str()) {
+                            self.structs.insert(name.clone(), StructInfo { fields: HashMap::new() });
+                        }
+                        return Ty::Struct(name.clone());
+                    }
+                    // Check structs, components, enums, contracts
+                    if self.structs.contains_key(name.as_str()) {
+                        return Ty::Struct(name.clone());
+                    }
+                    if self.components.contains_key(name.as_str()) {
+                        return Ty::Struct(name.clone());
+                    }
+                    if self.enum_defs.contains_key(name.as_str()) {
+                        return Ty::Enum(name.clone());
+                    }
+                    if self.contracts.contains(name.as_str()) {
+                        return Ty::Contract(name.clone());
+                    }
+                    // Handle qualified names like "AuthStore::login" or
+                    // "Filter::All" (enum variant access).
+                    if name.contains("::") {
+                        // Check if the prefix is a known type/store/enum
+                        let parts: Vec<&str> = name.splitn(2, "::").collect();
+                        if parts.len() == 2 {
+                            let type_name = parts[0];
+                            // Built-in generic types: Result::Ok, Result::Err,
+                            // Option::Some, Option::None.  These are not in
+                            // enum_defs because they're handled as Ty::Result_
+                            // and Ty::Option_ internally, but user code can
+                            // still write `Result::Ok(42)` as an expression.
+                            match (type_name, parts[1]) {
+                                ("Result", "Ok") | ("Result", "Err") => {
+                                    return self.fresh_var();
+                                }
+                                ("Option", "Some") | ("Option", "None") => {
+                                    return self.fresh_var();
+                                }
+                                _ => {}
+                            }
+                            // Enum variant access: Enum::Variant → Ty::Enum(type_name)
+                            if let Some(variants) = self.enum_defs.get(type_name).cloned() {
+                                let variant_name = parts[1];
+                                if variants.iter().any(|v| v == variant_name) {
+                                    return Ty::Enum(type_name.to_string());
+                                }
+                            }
+                            // Check fn_sigs for the qualified name or method
+                            if self.structs.contains_key(type_name)
+                                || self.components.contains_key(type_name)
+                                || self.fn_sigs.keys().any(|k| k.starts_with(&format!("{}::", type_name)))
+                            {
+                                return self.fresh_var(); // Treat as valid callable
+                            }
+                        }
+                    }
+                    // Known stdlib / browser-API namespace names.
+                    // `geolocation`, `camera`, `biometric`, `haptic` are
+                    // hardware-access namespaces bridged via the `hardware`
+                    // syscall namespace in core.js.
+                    let stdlib_ns = ["clipboard", "time", "crypto", "format", "url", "search",
+                        "collections", "toast", "skeleton", "datepicker", "pagination",
+                        "chart", "csv", "compress", "animate", "theme", "mask",
+                        "combobox", "editor", "syntax", "media", "image", "qr",
+                        "share", "wizard", "maps", "responsive",
+                        "geolocation", "camera", "biometric", "haptic"];
+                    if stdlib_ns.contains(&name.as_str()) {
+                        return Ty::Struct(name.clone());
+                    }
                     self.error(
                         format!("undefined variable: {}", name),
                         Self::dummy_span(),
@@ -2452,25 +2773,21 @@ impl TypeChecker {
                     let qualified = format!("{}::{}", name, method);
                     if let Some(sig) = self.fn_sigs.get(&qualified).cloned() {
                         if let Ty::Function { params, ret } = sig {
-                            // Skip `self` param when matching args.
-                            let param_start = if params.first() == Some(&Ty::Struct(name.clone()))
-                                || params.first()
-                                    == Some(&Ty::Reference {
-                mutable: false,
-                lifetime: None,
-                inner: Box::new(Ty::Struct(name.clone())),
-            })
-                                || params.first()
-                                    == Some(&Ty::Reference {
-                mutable: true,
-                lifetime: None,
-                inner: Box::new(Ty::Struct(name.clone())),
-            })
-                            {
-                                1
-                            } else {
-                                0
+                            // Skip `self` param when matching args.  The self
+                            // param may be stored as Struct(name), &Struct,
+                            // &mut Struct, or Enum("Self") / SelfType (when
+                            // the method is declared with `&self` in an impl).
+                            let first_is_self = match params.first() {
+                                Some(Ty::Struct(n)) if n == &name => true,
+                                Some(Ty::Reference { inner, .. }) => {
+                                    matches!(self.resolve(inner), Ty::Struct(n) if n == name)
+                                        || matches!(inner.as_ref(), Ty::Struct(n) if n == &name)
+                                }
+                                Some(Ty::Enum(n)) if n == "Self" => true,
+                                Some(Ty::SelfType) => true,
+                                _ => false,
                             };
+                            let param_start = if first_is_self { 1 } else { 0 };
                             let expected_params = &params[param_start..];
                             if arg_tys.len() != expected_params.len() {
                                 self.error(
@@ -2521,6 +2838,17 @@ impl TypeChecker {
                         *ret
                     }
                     Ty::Error => Ty::Error,
+                    // Unresolved type variable — the callee might hold a
+                    // function value whose type is not yet determined.  Return
+                    // a fresh variable so callers do not get spurious errors.
+                    Ty::Var(_) => self.fresh_var(),
+                    // Enum variant constructor call: `Shape::Circle(5.0)` or
+                    // `Result::Ok(42)`.  The callee resolved to the enum type;
+                    // return the enum type as the result.
+                    Ty::Enum(name) => Ty::Enum(name),
+                    // Struct constructor called as a function: `Foo(x)`.
+                    // Return the struct type.
+                    Ty::Struct(name) => Ty::Struct(name),
                     _ => {
                         self.error(
                             format!("type {} is not callable", resolved),
@@ -2587,11 +2915,15 @@ impl TypeChecker {
             }
 
             Expr::Match { subject, arms } => {
-                let _subject_ty = self.infer_expr(subject, env);
+                let subject_ty = self.infer_expr(subject, env);
 
                 let result = self.fresh_var();
                 for arm in arms {
-                    let arm_ty = self.infer_expr(&arm.body, env);
+                    // Each arm gets its own scope so pattern bindings (e.g.
+                    // `Shape::Circle(r)`) are available only within that arm.
+                    let mut arm_env = env.child();
+                    self.bind_pattern(&arm.pattern, &subject_ty, &mut arm_env, Self::dummy_span());
+                    let arm_ty = self.infer_expr(&arm.body, &mut arm_env);
                     self.unify(&result, &arm_ty, Self::dummy_span());
                 }
                 self.resolve(&result)
@@ -2605,6 +2937,13 @@ impl TypeChecker {
                 let iter_ty = self.infer_expr(iterator, env);
                 let elem_ty = match self.resolve(&iter_ty) {
                     Ty::Array(inner) => *inner,
+                    Ty::Reference { inner, .. } => {
+                        match *inner {
+                            Ty::Array(elem) => *elem,
+                            _ => self.fresh_var(),
+                        }
+                    }
+                    Ty::Iterator(inner) => *inner,
                     _ => self.fresh_var(),
                 };
 
@@ -2763,8 +3102,9 @@ impl TypeChecker {
                 self.infer_expr(body, env)
             }
             Expr::Spawn { body, .. } => {
-                self.infer_block(body, env);
-                Ty::Unit
+                // The spawn block runs off the main thread and produces the
+                // type of its last expression — just like a regular block.
+                self.infer_block(body, env)
             }
             Expr::Channel { .. } => {
                 self.fresh_var()
@@ -2853,8 +3193,9 @@ impl TypeChecker {
             }
             Expr::Trace { label, body, .. } => {
                 self.infer_expr(label, env);
-                self.infer_block(body, env);
-                Ty::Unit
+                // The trace block produces the type of its last expression so
+                // that `let result = trace("x") { ... "value" }` infers String.
+                self.infer_block(body, env)
             }
             Expr::Flag { name, .. } => {
                 self.infer_expr(name, env);
@@ -2865,6 +3206,24 @@ impl TypeChecker {
                 self.infer_expr(item_height, env);
                 self.infer_expr(template, env);
                 Ty::Unit
+            }
+            Expr::ArrayLit(elements) => {
+                if elements.is_empty() {
+                    Ty::Array(Box::new(self.fresh_var()))
+                } else {
+                    let elem_ty = self.infer_expr(&elements[0], env);
+                    for elem in &elements[1..] {
+                        let t = self.infer_expr(elem, env);
+                        self.unify(&elem_ty, &t, Self::dummy_span());
+                    }
+                    Ty::Array(Box::new(elem_ty))
+                }
+            }
+            Expr::ObjectLit { fields } => {
+                for (_key, value) in fields {
+                    self.infer_expr(value, env);
+                }
+                self.fresh_var()
             }
         }
     }
@@ -2946,9 +3305,10 @@ impl TypeChecker {
                     if let Some(closure_ty) = arg_tys.first() {
                         let resolved = self.resolve(closure_ty);
                         if let Ty::Function { ret, params } = &resolved {
-                            // Unify closure param with iterator element type
+                            // Unify closure param with iterator element type, allowing
+                            // implicit deref coercion (fn(p: &Post) over Post iterator).
                             if let Some(param) = params.first() {
-                                self.unify(param, elem, Self::dummy_span());
+                                self.unify_coercing_refs(param, elem, Self::dummy_span());
                             }
                             return Some(Ty::Iterator(ret.clone()));
                         }
@@ -2967,7 +3327,8 @@ impl TypeChecker {
                         let resolved = self.resolve(closure_ty);
                         if let Ty::Function { ret, params } = &resolved {
                             if let Some(param) = params.first() {
-                                self.unify(param, elem, Self::dummy_span());
+                                // Allow fn(p: &T) closures over T iterators.
+                                self.unify_coercing_refs(param, elem, Self::dummy_span());
                             }
                             self.unify(ret, &Ty::Bool, Self::dummy_span());
                         }
@@ -2996,9 +3357,10 @@ impl TypeChecker {
                             if let Some(acc_param) = params.first() {
                                 self.unify(acc_param, &init_ty, Self::dummy_span());
                             }
-                            // Unify element param with iterator element type
+                            // Unify element param with iterator element type,
+                            // allowing implicit deref coercion.
                             if let Some(elem_param) = params.get(1) {
-                                self.unify(elem_param, elem, Self::dummy_span());
+                                self.unify_coercing_refs(elem_param, elem, Self::dummy_span());
                             }
                             // Unify return type with init type
                             self.unify(ret, &init_ty, Self::dummy_span());
@@ -3021,7 +3383,7 @@ impl TypeChecker {
                         let resolved = self.resolve(closure_ty);
                         if let Ty::Function { ret, params } = &resolved {
                             if let Some(param) = params.first() {
-                                self.unify(param, elem, Self::dummy_span());
+                                self.unify_coercing_refs(param, elem, Self::dummy_span());
                             }
                             self.unify(ret, &Ty::Bool, Self::dummy_span());
                         }
@@ -3038,7 +3400,7 @@ impl TypeChecker {
                         let resolved = self.resolve(closure_ty);
                         if let Ty::Function { ret, params } = &resolved {
                             if let Some(param) = params.first() {
-                                self.unify(param, elem, Self::dummy_span());
+                                self.unify_coercing_refs(param, elem, Self::dummy_span());
                             }
                             self.unify(ret, &Ty::Bool, Self::dummy_span());
                         }
@@ -3105,6 +3467,56 @@ impl TypeChecker {
                 None
             }
 
+            // Array<T>.len() -> i32
+            "len" => {
+                if let Ty::Array(_) = obj_ty {
+                    return Some(Ty::I32);
+                }
+                if let Ty::Iterator(_) = obj_ty {
+                    return Some(Ty::I32);
+                }
+                None
+            }
+
+            // Array<T>.is_empty() -> Bool
+            "is_empty" => {
+                if let Ty::Array(_) = obj_ty {
+                    return Some(Ty::Bool);
+                }
+                if let Ty::Iterator(_) = obj_ty {
+                    return Some(Ty::Bool);
+                }
+                None
+            }
+
+            // Array<T>.push(T) -> Array<T>
+            "push" => {
+                if let Ty::Array(elem) = obj_ty {
+                    if let Some(val_ty) = arg_tys.first() {
+                        self.unify(val_ty, elem, Self::dummy_span());
+                    }
+                    return Some(Ty::Array(elem.clone()));
+                }
+                None
+            }
+
+            // Array<T>.contains(T) -> Bool
+            "contains" => {
+                if let Ty::Array(elem) = obj_ty {
+                    if let Some(val_ty) = arg_tys.first() {
+                        self.unify(val_ty, elem, Self::dummy_span());
+                    }
+                    return Some(Ty::Bool);
+                }
+                if let Ty::Iterator(elem) = obj_ty {
+                    if let Some(val_ty) = arg_tys.first() {
+                        self.unify(val_ty, elem, Self::dummy_span());
+                    }
+                    return Some(Ty::Bool);
+                }
+                None
+            }
+
             _ => None,
         }
     }
@@ -3119,7 +3531,28 @@ impl TypeChecker {
             other => other.clone(),
         };
 
+        // Resolve SelfType (and Enum("Self") produced when `Self` appears as
+        // a bare identifier in an expression) to the current component/store.
+        let is_self_ty = matches!(&base, Ty::SelfType)
+            || matches!(&base, Ty::Enum(n) if n == "Self");
+        let base = if is_self_ty {
+            if let Some(ref comp_name) = self.current_component {
+                Ty::Struct(comp_name.clone())
+            } else {
+                base
+            }
+        } else {
+            base
+        };
+
         match &base {
+            // Unresolved type variable — field access is speculative; return a
+            // fresh variable rather than emitting a spurious error.  This
+            // handles patterns like `let r = fetch(...); r.status` where the
+            // concrete type of `r` is not yet known.
+            Ty::Var(_) => {
+                return self.fresh_var();
+            }
             Ty::Struct(name) | Ty::Contract(name) => {
                 let kind = if self.contracts.contains(name) { "contract" } else { "struct" };
                 if let Some(info) = self.structs.get(name).cloned() {
@@ -3360,12 +3793,14 @@ mod tests {
                     name: "a".into(),
                     ty: Type::Named("i32".into()),
                     ownership: Ownership::Owned,
-                },
+                    secret: false,
+},
                 Param {
                     name: "b".into(),
                     ty: Type::Named("i32".into()),
                     ownership: Ownership::Owned,
-                },
+                    secret: false,
+},
             ],
             return_type: None, // should be inferred as i32
             trait_bounds: vec![],
@@ -3724,12 +4159,14 @@ mod tests {
                         name: "a".into(),
                         ty: Type::Named("i32".into()),
                         ownership: Ownership::Owned,
-                    },
+                        secret: false,
+},
                     Param {
                         name: "b".into(),
                         ty: Type::Named("i32".into()),
                         ownership: Ownership::Owned,
-                    },
+                        secret: false,
+},
                 ],
                 return_type: Some(Type::Named("i32".into())),
                 trait_bounds: vec![],
@@ -3778,7 +4215,8 @@ mod tests {
                     name: "name".into(),
                     ty: Type::Named("String".into()),
                     ownership: Ownership::Owned,
-                }],
+                    secret: false,
+}],
                 return_type: Some(Type::Named("String".into())),
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Expr(Expr::Ident("name".into()))]),
@@ -3840,7 +4278,8 @@ mod iterator_tests {
                 name: "arr".into(),
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             return_type: None,
             trait_bounds: vec![],
             body: block(body_stmts),
@@ -4286,16 +4725,66 @@ mod comprehensive_type_checker_tests {
             arms: vec![
                 MatchArm {
                     pattern: Pattern::Literal(Expr::Integer(1)),
+                    guard: None,
                     body: Expr::Integer(10),
                 },
                 MatchArm {
                     pattern: Pattern::Wildcard,
+                    guard: None,
                     body: Expr::Integer(0),
                 },
             ],
         })])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "match should type check: {:?}", result.err());
+    }
+
+    #[test]
+    fn secret_param_produces_secret_type() {
+        // A function with a secret parameter should type the param as Ty::Secret(inner)
+        let program = simple_program(vec![Item::Function(Function {
+            name: "hash".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param {
+                name: "password".into(),
+                ty: Type::Named("String".into()),
+                ownership: Ownership::Owned,
+                secret: true,
+            }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Integer(0))]),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "secret param function should type check: {:?}", result.err());
+    }
+
+    #[test]
+    fn non_secret_param_produces_plain_type() {
+        // A function with a regular parameter should not wrap in Secret
+        let program = simple_program(vec![Item::Function(Function {
+            name: "add".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![Param {
+                name: "x".into(),
+                ty: Type::Named("i32".into()),
+                ownership: Ownership::Owned,
+                secret: false,
+            }],
+            return_type: Some(Type::Named("i32".into())),
+            trait_bounds: vec![],
+            body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
+            is_pub: false,
+            must_use: false,
+            span: span(),
+        })]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "non-secret param should type check: {:?}", result.err());
     }
 
     // -----------------------------------------------------------------------
@@ -4312,7 +4801,8 @@ mod comprehensive_type_checker_tests {
                 name: "arr".into(),
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::For {
@@ -4405,7 +4895,8 @@ mod comprehensive_type_checker_tests {
                 name: "arr".into(),
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Let {
@@ -4514,10 +5005,12 @@ mod comprehensive_type_checker_tests {
                 arms: vec![
                     MatchArm {
                         pattern: Pattern::Literal(Expr::Integer(0)),
+                        guard: None,
                         body: Expr::Integer(1),
                     },
                     MatchArm {
                         pattern: Pattern::Wildcard,
+                        guard: None,
                         body: Expr::Integer(0),
                     },
                 ],
@@ -4539,7 +5032,8 @@ mod comprehensive_type_checker_tests {
                 name: "x".into(),
                 ty: Type::Named("i32".into()),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             Some(Type::Named("bool".into())),
             vec![Stmt::Expr(Expr::Binary {
                 op: BinOp::Gt,
@@ -4572,7 +5066,7 @@ mod comprehensive_type_checker_tests {
         let program = simple_program(vec![
             make_fn_with_body(
                 "square",
-                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
                 Some(Type::Named("i32".into())),
                 vec![Stmt::Expr(Expr::Binary {
                     op: BinOp::Mul,
@@ -4731,7 +5225,7 @@ mod comprehensive_type_checker_tests {
             })]),
             make_fn_with_body(
                 "helper",
-                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned }],
+                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
                 Some(Type::Named("i32".into())),
                 vec![Stmt::Expr(Expr::Ident("x".into()))],
             ),
@@ -4864,7 +5358,8 @@ mod comprehensive_type_checker_tests {
                 name: "arr".into(),
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Index {
@@ -4985,7 +5480,8 @@ mod comprehensive_type_checker_tests {
                         name: "self".into(),
                         ty: Type::Named("Foo".into()),
                         ownership: Ownership::Borrowed,
-                    }],
+                        secret: false,
+}],
                     return_type: Some(Type::Named("i32".into())),
                     trait_bounds: vec![],
                     body: block(vec![Stmt::Expr(Expr::FieldAccess {
@@ -5067,7 +5563,7 @@ mod coverage_type_checker_tests {
     }
 
     fn param(name: &str, ty: Type) -> Param {
-        Param { name: name.into(), ty, ownership: Ownership::Owned }
+        Param { name: name.into(), ty, ownership: Ownership::Owned, secret: false }
     }
 
     // ── Ty Display coverage ─────────────────────────────────────────────
@@ -5405,10 +5901,12 @@ mod coverage_type_checker_tests {
                     arms: vec![
                         MatchArm {
                             pattern: Pattern::Literal(Expr::Integer(1)),
+                            guard: None,
                             body: Expr::StringLit("one".into()),
                         },
                         MatchArm {
                             pattern: Pattern::Wildcard,
+                            guard: None,
                             body: Expr::StringLit("other".into()),
                         },
                     ],
@@ -7045,5 +7543,1130 @@ mod coverage_type_checker_tests {
         let prog = p.parse_program().unwrap();
         let result = infer_program(&prog);
         assert!(result.is_ok(), "mut self field access should type-check: {:?}", result.err());
+    }
+
+    // ── Integer coercion tests ──────────────────────────────────────────
+
+    #[test]
+    fn unify_i32_u32_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::I32, &Ty::U32).is_ok());
+    }
+
+    #[test]
+    fn unify_u32_i32_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::U32, &Ty::I32).is_ok());
+    }
+
+    #[test]
+    fn unify_i64_u64_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::I64, &Ty::U64).is_ok());
+    }
+
+    #[test]
+    fn unify_u64_i64_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::U64, &Ty::I64).is_ok());
+    }
+
+    #[test]
+    fn unify_u32_u64_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::U32, &Ty::U64).is_ok());
+    }
+
+    #[test]
+    fn unify_u64_u32_coercion() {
+        let mut s = Substitution::new();
+        assert!(s.unify(&Ty::U64, &Ty::U32).is_ok());
+    }
+
+    // ── Result/Option generic type annotation tests ─────────────────────
+
+    #[test]
+    fn ast_type_to_ty_result_generic() {
+        let checker = TypeChecker::new();
+        let ty = checker.ast_type_to_ty(&Type::Generic {
+            name: "Result".to_string(),
+            args: vec![Type::Named("i32".to_string()), Type::Named("String".to_string())],
+        });
+        match ty {
+            Ty::Result_ { ok, err } => {
+                assert_eq!(*ok, Ty::I32);
+                assert_eq!(*err, Ty::String_);
+            }
+            other => panic!("Expected Result_, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn ast_type_to_ty_option_generic() {
+        let checker = TypeChecker::new();
+        let ty = checker.ast_type_to_ty(&Type::Generic {
+            name: "Option".to_string(),
+            args: vec![Type::Named("bool".to_string())],
+        });
+        match ty {
+            Ty::Option_(inner) => assert_eq!(*inner, Ty::Bool),
+            other => panic!("Expected Option_, got {:?}", other),
+        }
+    }
+
+    // ── For-loop iterator type tests ────────────────────────────────────
+
+    #[test]
+    fn for_loop_over_reference_array() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "arr".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2)]),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::For {
+                binding: "x".into(),
+                iterator: Box::new(Expr::Borrow(Box::new(Expr::Ident("arr".into())))),
+                body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "For loop over &array should work: {:?}", result.err());
+    }
+
+    #[test]
+    fn for_loop_over_iterator() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        env.insert("items".into(), Ty::Iterator(Box::new(Ty::String_)));
+        let ty = checker.infer_expr(&Expr::For {
+            binding: "item".into(),
+            iterator: Box::new(Expr::Ident("items".into())),
+            body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
+        }, &mut env);
+        assert_eq!(ty, Ty::Unit);
+    }
+
+    // ── Built-in constructor tests ──────────────────────────────────────
+
+    #[test]
+    fn infer_none_as_option() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::Ident("None".into()), &mut env);
+        assert!(matches!(ty, Ty::Option_(_)));
+    }
+
+    #[test]
+    fn infer_ok_err_some_as_builtins() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ok_ty = checker.infer_expr(&Expr::Ident("Ok".into()), &mut env);
+        assert!(matches!(ok_ty, Ty::Var(_)));
+        let err_ty = checker.infer_expr(&Expr::Ident("Err".into()), &mut env);
+        assert!(matches!(err_ty, Ty::Var(_)));
+        let some_ty = checker.infer_expr(&Expr::Ident("Some".into()), &mut env);
+        assert!(matches!(some_ty, Ty::Var(_)));
+        let fmt_ty = checker.infer_expr(&Expr::Ident("format".into()), &mut env);
+        assert!(matches!(fmt_ty, Ty::Var(_)));
+    }
+
+    // ── Namespace prefix tests ──────────────────────────────────────────
+
+    #[test]
+    fn infer_namespace_prefix_as_struct() {
+        let mut checker = TypeChecker::new();
+        checker.fn_sigs.insert("time::now".into(), Ty::Function {
+            params: vec![],
+            ret: Box::new(Ty::I64),
+        });
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::Ident("time".into()), &mut env);
+        assert!(matches!(ty, Ty::Struct(ref n) if n == "time"));
+    }
+
+    // ── SelfType field access tests ──────────────────────────────────────
+
+    #[test]
+    fn self_type_delegates_to_current_component() {
+        let mut checker = TypeChecker::new();
+        let mut fields = HashMap::new();
+        fields.insert("count".to_string(), Ty::I32);
+        checker.structs.insert("Counter".to_string(), StructInfo { fields });
+        checker.current_component = Some("Counter".to_string());
+        let ty = checker.resolve_field_access(&Ty::SelfType, "count");
+        assert_eq!(ty, Ty::I32);
+    }
+
+    // ── Match guard tests ───────────────────────────────────────────────
+
+    #[test]
+    fn match_with_guard_type_checks() {
+        let prog = program(vec![Item::Function(func("main", vec![Stmt::Expr(Expr::Match {
+            subject: Box::new(Expr::Integer(1)),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Ident("n".into()),
+                    guard: Some(Expr::Binary {
+                        op: BinOp::Gt,
+                        left: Box::new(Expr::Ident("n".into())),
+                        right: Box::new(Expr::Integer(0)),
+                    }),
+                    body: Expr::Integer(10),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                },
+            ],
+        })]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Match with guard should type-check: {:?}", result.err());
+    }
+
+    // ── ArrayLit / ObjectLit type inference ──────────────────────────────
+
+    #[test]
+    fn infer_array_lit_type() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::ArrayLit(vec![
+            Expr::Integer(1), Expr::Integer(2), Expr::Integer(3),
+        ]), &mut env);
+        match ty {
+            Ty::Array(inner) => assert_eq!(*inner, Ty::I32),
+            other => panic!("Expected Array(I32), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn infer_empty_array_lit() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::ArrayLit(vec![]), &mut env);
+        assert!(matches!(ty, Ty::Array(_)));
+    }
+
+    #[test]
+    fn infer_object_lit_type() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::ObjectLit {
+            fields: vec![
+                ("x".into(), Expr::Integer(1)),
+                ("y".into(), Expr::Integer(2)),
+            ],
+        }, &mut env);
+        // ObjectLit infers field types and returns a fresh type variable
+        assert!(matches!(ty, Ty::Var(_)));
+    }
+
+    #[test]
+    fn infer_empty_object_lit() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::ObjectLit { fields: vec![] }, &mut env);
+        assert!(matches!(ty, Ty::Var(_)));
+    }
+
+    #[test]
+    fn infer_nested_array_lit() {
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        let ty = checker.infer_expr(&Expr::ArrayLit(vec![
+            Expr::ArrayLit(vec![Expr::Integer(1)]),
+            Expr::ArrayLit(vec![Expr::Integer(2)]),
+        ]), &mut env);
+        match ty {
+            Ty::Array(inner) => assert!(matches!(*inner, Ty::Array(_))),
+            other => panic!("Expected Array(Array(I32)), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unify_i32_u32_succeeds() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::I32, &Ty::U32);
+        assert!(result.is_ok(), "I32 and U32 should unify: {:?}", result);
+    }
+
+    #[test]
+    fn unify_u32_i32_succeeds() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::U32, &Ty::I32);
+        assert!(result.is_ok(), "U32 and I32 should unify: {:?}", result);
+    }
+
+    #[test]
+    fn unify_i64_u64_succeeds() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::I64, &Ty::U64);
+        assert!(result.is_ok(), "I64 and U64 should unify: {:?}", result);
+    }
+
+    #[test]
+    fn unify_u32_u64_succeeds() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::U32, &Ty::U64);
+        assert!(result.is_ok(), "U32 and U64 should unify: {:?}", result);
+    }
+
+    #[test]
+    fn unify_i32_i64_succeeds() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::I32, &Ty::I64);
+        assert!(result.is_ok(), "I32 and I64 should unify via numeric coercion: {:?}", result);
+    }
+
+    #[test]
+    fn unify_string_i32_fails() {
+        let mut table = Substitution::new();
+        let result = table.unify(&Ty::String_, &Ty::I32);
+        assert!(result.is_err(), "String and I32 should not unify");
+    }
+
+    // ── Fix 1: Self field access ─────────────────────────────────────────
+    // Enum("Self") produced by bare `Self` identifier should resolve to the
+    // current component's struct for field access.
+
+    #[test]
+    fn self_enum_field_access_resolves_to_current_component() {
+        let mut checker = TypeChecker::new();
+        let mut fields = HashMap::new();
+        fields.insert("is_logged_in".to_string(), Ty::Bool);
+        checker.structs.insert("AppAuth".to_string(), StructInfo { fields });
+        checker.current_component = Some("AppAuth".to_string());
+        // Ty::Enum("Self") is what the type checker produces when the user
+        // writes `Self` as a bare identifier in an expression.
+        let ty = checker.resolve_field_access(&Ty::Enum("Self".to_string()), "is_logged_in");
+        assert_eq!(ty, Ty::Bool, "Enum(\"Self\") should delegate to current component");
+    }
+
+    #[test]
+    fn self_enum_field_access_without_current_component_is_error() {
+        let mut checker = TypeChecker::new();
+        // No current_component set — should emit an error and return Ty::Error.
+        let ty = checker.resolve_field_access(&Ty::Enum("Self".to_string()), "x");
+        assert!(
+            matches!(ty, Ty::Error),
+            "Self field access with no current component should produce Ty::Error, got {:?}", ty
+        );
+    }
+
+    #[test]
+    fn self_type_field_access_resolves_to_current_component() {
+        // Ty::SelfType (distinct from Enum("Self")) should also work.
+        let mut checker = TypeChecker::new();
+        let mut fields = HashMap::new();
+        fields.insert("count".to_string(), Ty::I32);
+        checker.structs.insert("Counter".to_string(), StructInfo { fields });
+        checker.current_component = Some("Counter".to_string());
+        let ty = checker.resolve_field_access(&Ty::SelfType, "count");
+        assert_eq!(ty, Ty::I32);
+    }
+
+    // ── Fix 2: Keyword definitions register names as types ───────────────
+    // auth / cache / db / payment / pdf / upload definitions must register
+    // their names in the structs map during collect_declarations so that
+    // later references like `AppAuth.login()` don't produce "undefined variable".
+
+    #[test]
+    fn auth_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Auth(AuthDef {
+            name: "AppAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "auth def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn cache_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Cache(CacheDef {
+            name: "AppCache".into(),
+            strategy: None,
+            default_ttl: None,
+            persist: false,
+            max_entries: None,
+            queries: vec![],
+            mutations: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "cache def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn db_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Db(DbDef {
+            name: "AppDatabase".into(),
+            version: None,
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "db def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn payment_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Payment(PaymentDef {
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "payment def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn pdf_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Pdf(PdfDef {
+            name: "InvoicePdf".into(),
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            page_size: None,
+            orientation: None,
+            margins: None,
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "pdf def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn upload_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Upload(UploadDef {
+            name: "AvatarUpload".into(),
+            endpoint: Expr::StringLit("/upload".into()),
+            max_size: None,
+            accept: vec![],
+            chunked: false,
+            on_progress: None,
+            on_complete: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "upload def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn keyword_def_name_usable_as_ident_after_registration() {
+        // After registering, the name should appear in the structs table so a
+        // later ident reference resolves to Ty::Struct rather than an error.
+        let prog = program(vec![
+            Item::Auth(AuthDef {
+                name: "AppAuth".into(),
+                provider: None,
+                providers: vec![],
+                on_login: None,
+                on_logout: None,
+                on_error: None,
+                session_storage: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("use_auth", vec![
+                Stmt::Expr(Expr::Ident("AppAuth".into())),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "AppAuth ident should resolve after auth registration: {:?}", result.err());
+    }
+
+    // ── Fix 3: Vec<T> unifies with array literals ─────────────────────────
+    // `Vec<i32>` in a type annotation should produce the same type as `[1,2,3]`.
+
+    #[test]
+    fn vec_generic_maps_to_array_type() {
+        let mut checker = TypeChecker::new();
+        let ty = checker.ast_type_to_ty(&Type::Generic {
+            name: "Vec".into(),
+            args: vec![Type::Named("i32".into())],
+        });
+        assert!(
+            matches!(ty, Ty::Array(ref inner) if **inner == Ty::I32),
+            "Vec<i32> should map to Array(I32), got {:?}", ty
+        );
+    }
+
+    #[test]
+    fn vec_annotation_unifies_with_array_literal() {
+        // `let xs: Vec<i32> = [1, 2, 3];` should type-check without errors.
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "xs".into(),
+                ty: Some(Type::Generic {
+                    name: "Vec".into(),
+                    args: vec![Type::Named("i32".into())],
+                }),
+                mutable: false,
+                secret: false,
+                value: Expr::ArrayLit(vec![
+                    Expr::Integer(1),
+                    Expr::Integer(2),
+                    Expr::Integer(3),
+                ]),
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Vec<i32> annotation should unify with array literal: {:?}", result.err());
+    }
+
+    #[test]
+    fn vec_without_type_arg_maps_to_array_of_error() {
+        // Vec with no args (unusual but should not panic).
+        let mut checker = TypeChecker::new();
+        let ty = checker.ast_type_to_ty(&Type::Generic {
+            name: "Vec".into(),
+            args: vec![],
+        });
+        assert!(
+            matches!(ty, Ty::Array(ref inner) if **inner == Ty::Error),
+            "Vec with no args should map to Array(Error), got {:?}", ty
+        );
+    }
+
+    // ── Array methods: len, is_empty, push, contains ──────────────────────
+
+    #[test]
+    fn array_len_returns_i32() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "len".into(),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "array len: {:?}", result.err());
+    }
+
+    #[test]
+    fn array_is_empty_returns_bool() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "is_empty".into(),
+                    args: vec![],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "array is_empty: {:?}", result.err());
+    }
+
+    #[test]
+    fn array_push_returns_array() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "push".into(),
+                    args: vec![Expr::Integer(42)],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "array push: {:?}", result.err());
+    }
+
+    #[test]
+    fn array_contains_returns_bool() {
+        let prog = program(vec![
+            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
+                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
+            ])),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "arr".into(), ty: None, mutable: false, secret: false,
+                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "contains".into(),
+                    args: vec![Expr::Integer(7)],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "array contains: {:?}", result.err());
+    }
+
+    // ── Fix: Field access on unresolved type variable is allowed ──────────
+    // When a method/fetch returns an opaque type variable (e.g. `?T3`), field
+    // access on that variable should not produce a spurious error.
+
+    #[test]
+    fn field_access_on_type_variable_returns_fresh_var() {
+        let mut checker = TypeChecker::new();
+        let var = checker.fresh_var();
+        let result = checker.resolve_field_access(&var, "status");
+        assert!(
+            matches!(result, Ty::Var(_)),
+            "field access on unresolved var should return fresh var, got {:?}", result
+        );
+        assert!(checker.errors.is_empty(), "should not emit errors for field access on type var");
+    }
+
+    #[test]
+    fn field_access_on_fetch_result_no_error() {
+        // `let r = fetch("/api"); r.status` — fetch without contract returns a
+        // fresh type variable; field access on it must not produce an error.
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "r".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Fetch {
+                    url: Box::new(Expr::StringLit("/api".into())),
+                    options: None,
+                    contract: None,
+                },
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("r".into())),
+                field: "status".into(),
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "field access on fetch result (no contract): {:?}", result.err());
+    }
+
+    // ── Fix: spawn block returns the type of its last expression ─────────
+
+    #[test]
+    fn spawn_block_returns_body_type() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "result".into(),
+                ty: Some(Type::Named("String".into())),
+                mutable: false,
+                secret: false,
+                value: Expr::Spawn {
+                    body: block(vec![Stmt::Expr(Expr::StringLit("hello".into()))]),
+                    span: span(),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "spawn block should return body type: {:?}", result.err());
+    }
+
+    #[test]
+    fn spawn_block_string_body_assigned_to_string_var() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "x".into(), ty: None, mutable: false, secret: false,
+                value: Expr::StringLit("data".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "out".into(),
+                ty: Some(Type::Named("String".into())),
+                mutable: false,
+                secret: false,
+                value: Expr::Spawn {
+                    body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
+                    span: span(),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "spawn block body type propagates to binding: {:?}", result.err());
+    }
+
+    // ── Fix: trace block returns the type of its last expression ──────────
+
+    #[test]
+    fn trace_block_returns_body_type() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "result".into(),
+                ty: Some(Type::Named("String".into())),
+                mutable: false,
+                secret: false,
+                value: Expr::Trace {
+                    label: Box::new(Expr::StringLit("load".into())),
+                    body: block(vec![Stmt::Expr(Expr::StringLit("loaded".into()))]),
+                    span: span(),
+                },
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "trace block should return body type: {:?}", result.err());
+    }
+
+    // ── Fix: unresolved type variable callee does not error ───────────────
+
+    #[test]
+    fn calling_fn_value_held_in_var_no_error() {
+        // A closure stored in a variable is callable. The type of the closure
+        // is a concrete Ty::Function, so calling it should succeed.
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "f".into(), ty: None, mutable: false, secret: false,
+                value: Expr::Closure {
+                    params: vec![],
+                    body: Box::new(Expr::Integer(42)),
+                },
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::FnCall {
+                callee: Box::new(Expr::Ident("f".into())),
+                args: vec![],
+            }),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "calling a closure value should not error: {:?}", result.err());
+    }
+
+    #[test]
+    fn calling_type_var_callee_does_not_error() {
+        // When the callee resolves to an unresolved type variable, the type
+        // checker should return a fresh var rather than "type ?T is not callable".
+        let mut checker = TypeChecker::new();
+        let mut env = TypeEnv::new();
+        // Insert a variable whose type is a fresh var (unresolved).
+        let var_ty = checker.fresh_var();
+        env.insert("f".into(), var_ty);
+        let call_expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("f".into())),
+            args: vec![],
+        };
+        let result_ty = checker.infer_expr(&call_expr, &mut env);
+        assert!(matches!(result_ty, Ty::Var(_)), "call on type var should return fresh var");
+        assert!(checker.errors.is_empty(), "call on type var should not emit errors");
+    }
+
+    // ── Fix: geolocation and sibling hardware namespaces are recognized ────
+
+    #[test]
+    fn geolocation_namespace_ident_resolves() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Ident("geolocation".into())),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "geolocation namespace should resolve: {:?}", result.err());
+    }
+
+    #[test]
+    fn camera_namespace_ident_resolves() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Ident("camera".into())),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "camera namespace should resolve: {:?}", result.err());
+    }
+
+    #[test]
+    fn biometric_namespace_ident_resolves() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Expr(Expr::Ident("biometric".into())),
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "biometric namespace should resolve: {:?}", result.err());
+    }
+
+    // ── Fix: qualified enum variant access (Enum::Variant) ───────────────
+
+    #[test]
+    fn enum_qualified_variant_access_resolves() {
+        let prog = program(vec![
+            Item::Enum(EnumDef {
+                name: "Filter".into(),
+                type_params: vec![],
+                variants: vec![
+                    Variant { name: "All".into(), fields: vec![] },
+                    Variant { name: "Active".into(), fields: vec![] },
+                    Variant { name: "Completed".into(), fields: vec![] },
+                ],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::Ident("Filter::All".into())),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Filter::All should resolve to enum type: {:?}", result.err());
+    }
+
+    #[test]
+    fn enum_qualified_variant_assigned_to_enum_typed_var() {
+        let prog = program(vec![
+            Item::Enum(EnumDef {
+                name: "Filter".into(),
+                type_params: vec![],
+                variants: vec![Variant { name: "All".into(), fields: vec![] }],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "filter".into(),
+                    ty: Some(Type::Named("Filter".into())),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Ident("Filter::All".into()),
+                    ownership: Ownership::Owned,
+                },
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "let filter: Filter = Filter::All should type-check: {:?}", result.err());
+    }
+
+    #[test]
+    fn enum_qualified_unknown_variant_does_not_panic() {
+        // Filter::NonExistent — must not panic; errors collected gracefully.
+        let prog = program(vec![
+            Item::Enum(EnumDef {
+                name: "Filter".into(),
+                type_params: vec![],
+                variants: vec![Variant { name: "All".into(), fields: vec![] }],
+                is_pub: false,
+                span: span(),
+            }),
+            Item::Function(func("main", vec![
+                Stmt::Expr(Expr::Ident("Filter::NonExistent".into())),
+            ])),
+        ]);
+        let _result = infer_program(&prog);
+    }
+
+    // ── Fix: secret T unifies with plain T ────────────────────────────────
+
+    #[test]
+    fn secret_value_passes_to_non_secret_param() {
+        let prog = program(vec![
+            Item::Function(func_with_params("accept",
+                vec![param("x", Type::Named("String".into()))],
+                None,
+                vec![],
+            )),
+            Item::Function(func("main", vec![
+                Stmt::Let {
+                    name: "v".into(),
+                    ty: Some(Type::Named("String".into())),
+                    mutable: false,
+                    secret: true,
+                    value: Expr::StringLit("secret".into()),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("accept".into())),
+                    args: vec![Expr::Ident("v".into())],
+                }),
+            ])),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "secret String should satisfy String param: {:?}", result.err());
+    }
+
+    #[test]
+    fn two_secret_types_unify() {
+        let prog = program(vec![Item::Function(func("main", vec![
+            Stmt::Let {
+                name: "a".into(),
+                ty: Some(Type::Named("String".into())),
+                mutable: false,
+                secret: true,
+                value: Expr::StringLit("sec".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: Some(Type::Named("String".into())),
+                mutable: false,
+                secret: true,
+                value: Expr::Ident("a".into()),
+                ownership: Ownership::Owned,
+            },
+        ]))]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "two secret Strings should unify: {:?}", result.err());
+    }
+
+    // ── Fix: iterator closure with reference params ───────────────────────
+
+    /// filter(fn(p: &T)) over an Iterator<T> should type-check via
+    /// unify_coercing_refs (implicit deref coercion).
+    #[test]
+    fn filter_closure_ref_param_over_owned_iterator() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            struct Post { id: u32, title: String }
+            fn main() {
+                let posts: [Post] = [];
+                let result = posts.iter()
+                    .filter(fn(p: &Post) -> bool { true })
+                    .collect();
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "filter with &T param over T iterator: {:?}", result.err());
+    }
+
+    /// map(fn(p: &T)) over Iterator<T> should also work.
+    #[test]
+    fn map_closure_ref_param_over_owned_iterator() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            struct Item { val: i32 }
+            fn main() {
+                let items: [Item] = [];
+                let mapped = items.iter().map(fn(x: &Item) -> i32 { x.val }).collect();
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "map with &T param over T iterator: {:?}", result.err());
+    }
+
+    // ── Fix: Iterator<T> and &[T] unification ────────────────────────────
+
+    /// A function returning [&T] should accept an Iterator<T> body.
+    #[test]
+    fn iterator_unifies_with_ref_array_return_type() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            struct Todo { done: bool }
+            fn visible(todos: [Todo]) -> [&Todo] {
+                todos.iter().filter(fn(t: &Todo) -> bool { !t.done })
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Iterator<T> should unify with [&T]: {:?}", result.err());
+    }
+
+    // ── Fix: sha256 and haptic as top-level callable functions ───────────
+
+    #[test]
+    fn sha256_callable_without_namespace() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            fn main() {
+                let hash = sha256("hello");
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "sha256 should be callable without namespace: {:?}", result.err());
+    }
+
+    #[test]
+    fn haptic_callable_as_function() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            fn main() {
+                haptic("light");
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "haptic should be callable as a function: {:?}", result.err());
+    }
+
+    // ── Fix: match arm variant pattern bindings ───────────────────────────
+
+    /// Variables bound in variant patterns (e.g. `Shape::Circle(r)`) must be
+    /// available inside the match arm body.
+    #[test]
+    fn match_variant_pattern_binds_variables() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            enum Shape { Circle, Rectangle, Triangle }
+            fn area(s: Shape) -> i32 {
+                match s {
+                    Shape::Circle(r) => r,
+                    Shape::Rectangle(w, h) => w + h,
+                    Shape::Triangle(a, b, c) => a + b + c,
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "variant pattern bindings should resolve: {:?}", result.err());
+    }
+
+    /// Result::Ok and Result::Err used in match patterns should bind the
+    /// inner variable correctly.
+    #[test]
+    fn match_result_variant_binds_inner() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            fn handle(r: Result<i32, String>) -> i32 {
+                match r {
+                    Result::Ok(v) => v,
+                    Result::Err(_) => 0,
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Result variant pattern should bind inner: {:?}", result.err());
+    }
+
+    // ── Fix: enum/struct constructor calls type-check ────────────────────
+
+    /// `Result::Ok(42)` used as an expression (not a pattern) should
+    /// type-check without "type Result is not callable".
+    #[test]
+    fn result_ok_constructor_call_typechecks() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            fn make_ok() -> Result<i32, String> {
+                Result::Ok(42)
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "Result::Ok constructor should type-check: {:?}", result.err());
+    }
+
+    // ── Fix: impl method self-param detection ─────────────────────────────
+
+    /// Methods declared with `&self` in an impl block should have `self`
+    /// skipped when counting call-site arguments.
+    #[test]
+    fn impl_method_self_param_skipped_in_arg_count() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            struct Point { x: f64, y: f64 }
+            impl Point {
+                fn scale(&self, factor: f64) -> f64 {
+                    self.x * factor
+                }
+            }
+            fn main() {
+                let p = Point { x: 3.0, y: 4.0 };
+                let s = p.scale(2.0);
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "impl method &self param should be skipped in arg count: {:?}", result.err());
+    }
+
+    /// Methods with no params (only &self) should be callable with no args.
+    #[test]
+    fn impl_method_only_self_param_zero_args() {
+        use crate::lexer::Lexer;
+        use crate::parser;
+        let src = r#"
+            struct User { age: u32 }
+            impl User {
+                fn is_adult(&self) -> bool {
+                    self.age >= 18
+                }
+            }
+            fn main() {
+                let u = User { age: 25 };
+                let adult = u.is_adult();
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let (prog, errs) = parser::parse(tokens);
+        assert!(errs.is_empty(), "parse errors: {:?}", errs);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "zero-arg impl method with &self should work: {:?}", result.err());
     }
 }

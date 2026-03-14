@@ -196,6 +196,8 @@ impl Parser {
             TokenKind::Db => Ok(Item::Db(self.parse_db(is_pub)?)),
             TokenKind::Cache => Ok(Item::Cache(self.parse_cache(is_pub)?)),
             TokenKind::Breakpoint => Ok(Item::Breakpoints(self.parse_breakpoints_def()?)),
+            // Also handle `breakpoints` (plural) as an identifier
+            TokenKind::Ident(ref id) if id == "breakpoints" => Ok(Item::Breakpoints(self.parse_breakpoints_def_plural()?)),
             TokenKind::Theme => Ok(Item::Theme(self.parse_theme(is_pub)?)),
             TokenKind::Spring => Ok(Item::Animation(self.parse_spring_block(is_pub)?)),
             TokenKind::Keyframes => Ok(Item::Animation(self.parse_keyframes_block(is_pub)?)),
@@ -406,6 +408,52 @@ impl Parser {
                 TokenKind::Ident(ref id) if id == "error_boundary" => {
                     error_boundary = Some(self.parse_error_boundary()?);
                 }
+                // spring enter { from: {...}, to: {...} } inside a component
+                TokenKind::Spring => {
+                    self.advance(); // consume `spring`
+                    let _anim_name = self.expect_ident()?; // consume name (e.g. "enter", "exit")
+                    self.expect(&TokenKind::LeftBrace)?;
+                    // Parse key: value pairs, discarding them (the info is used at codegen)
+                    let mut depth: u32 = 1;
+                    while depth > 0 && !self.is_at_end() {
+                        match self.peek_kind() {
+                            TokenKind::LeftBrace => { depth += 1; self.advance(); }
+                            TokenKind::RightBrace => {
+                                depth -= 1;
+                                self.advance();
+                            }
+                            _ => { self.advance(); }
+                        }
+                    }
+                }
+                // keyframes inside a component — consume and discard similarly
+                TokenKind::Keyframes => {
+                    self.advance();
+                    let _anim_name = self.expect_ident()?;
+                    self.expect(&TokenKind::LeftBrace)?;
+                    let mut depth: u32 = 1;
+                    while depth > 0 && !self.is_at_end() {
+                        match self.peek_kind() {
+                            TokenKind::LeftBrace => { depth += 1; self.advance(); }
+                            TokenKind::RightBrace => { depth -= 1; self.advance(); }
+                            _ => { self.advance(); }
+                        }
+                    }
+                }
+                // stagger inside a component — consume and discard similarly
+                TokenKind::Stagger => {
+                    self.advance();
+                    let _anim_name = self.expect_ident()?;
+                    self.expect(&TokenKind::LeftBrace)?;
+                    let mut depth: u32 = 1;
+                    while depth > 0 && !self.is_at_end() {
+                        match self.peek_kind() {
+                            TokenKind::LeftBrace => { depth += 1; self.advance(); }
+                            TokenKind::RightBrace => { depth -= 1; self.advance(); }
+                            _ => { self.advance(); }
+                        }
+                    }
+                }
                 TokenKind::Shortcut => {
                     self.advance();
                     let shortcut_span = self.current_span();
@@ -416,7 +464,17 @@ impl Parser {
                     } else {
                         return Err(self.error("expected shortcut key string"));
                     };
-                    let body = self.parse_block()?;
+                    let body = if self.match_token(&TokenKind::FatArrow) {
+                        // shortcut "Cmd+S" => self.save;
+                        let expr = self.parse_expr()?;
+                        self.match_token(&TokenKind::Semicolon);
+                        Block {
+                            stmts: vec![Stmt::Expr(expr)],
+                            span: shortcut_span,
+                        }
+                    } else {
+                        self.parse_block()?
+                    };
                     shortcuts.push(ShortcutDef { keys, body, span: shortcut_span });
                 }
                 _ => return Err(self.error("Expected let, signal, fn, chunk, style, transition, render, permissions, gesture, a11y, shortcut, skeleton, or error_boundary in component")),
@@ -556,8 +614,12 @@ impl Parser {
 
     fn parse_structured_data(&mut self) -> Result<StructuredDataDef, ParseError> {
         let span = self.current_span();
-        // Parse Schema.Article or just Article
+        // Parse Schema.Article, schema.Article, or just Article
         let schema_type = if self.match_token(&TokenKind::Schema) {
+            self.expect(&TokenKind::Dot)?;
+            self.expect_ident()?
+        } else if matches!(self.peek_kind(), TokenKind::Ident(ref s) if s == "Schema") {
+            self.advance(); // consume "Schema"
             self.expect(&TokenKind::Dot)?;
             self.expect_ident()?
         } else {
@@ -902,9 +964,100 @@ impl Parser {
             TokenKind::LeftAngle => self.parse_element(),
             TokenKind::LeftBrace => {
                 self.advance();
-                let expr = self.parse_expr()?;
-                self.expect(&TokenKind::RightBrace)?;
-                Ok(TemplateNode::Expression(Box::new(expr)))
+                if self.check(&TokenKind::If) {
+                    self.advance();
+                    let condition = self.parse_expr()?;
+                    self.expect(&TokenKind::LeftBrace)?;
+                    let mut then_children = Vec::new();
+                    while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                        then_children.push(self.parse_template_node()?);
+                    }
+                    self.expect(&TokenKind::RightBrace)?;
+                    let else_children = if self.check(&TokenKind::Else) {
+                        self.advance();
+                        self.expect(&TokenKind::LeftBrace)?;
+                        let mut children = Vec::new();
+                        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                            children.push(self.parse_template_node()?);
+                        }
+                        self.expect(&TokenKind::RightBrace)?;
+                        Some(children)
+                    } else {
+                        None
+                    };
+                    self.expect(&TokenKind::RightBrace)?;
+                    Ok(TemplateNode::TemplateIf {
+                        condition: Box::new(condition),
+                        then_children,
+                        else_children,
+                    })
+                } else if self.check(&TokenKind::For) {
+                    self.advance();
+                    let binding = self.expect_ident()?;
+                    self.expect(&TokenKind::In)?;
+                    let iterator = self.parse_expr()?;
+                    self.expect(&TokenKind::LeftBrace)?;
+                    let mut children = Vec::new();
+                    while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                        children.push(self.parse_template_node()?);
+                    }
+                    self.expect(&TokenKind::RightBrace)?;
+                    self.expect(&TokenKind::RightBrace)?;
+                    Ok(TemplateNode::TemplateFor {
+                        binding,
+                        iterator: Box::new(iterator),
+                        children,
+                    })
+                } else if self.check(&TokenKind::Match) {
+                    // {match subject { Pattern => <template>, ... }}
+                    self.advance(); // consume `match`
+                    let subject = self.parse_expr()?;
+                    self.expect(&TokenKind::LeftBrace)?;
+                    let mut arms = Vec::new();
+                    while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                        let pattern = self.parse_pattern()?;
+                        let guard = if self.check(&TokenKind::If) {
+                            self.advance();
+                            Some(self.parse_expr()?)
+                        } else {
+                            None
+                        };
+                        self.expect(&TokenKind::FatArrow)?;
+                        // Arm body: zero or more template nodes until `,` or `}`
+                        let mut body = Vec::new();
+                        // A single template node is the common case:
+                        //   Some(err) => <div>{err}</div>,
+                        //   None => <span />,
+                        // We parse one template node unless the arm starts with `{`
+                        // followed by multiple nodes.
+                        if self.check(&TokenKind::LeftBrace)
+                            && !self.is_object_literal_brace()
+                        {
+                            // Block: { <node1> <node2> ... }
+                            self.advance(); // consume `{`
+                            while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                                body.push(self.parse_template_node()?);
+                            }
+                            self.expect(&TokenKind::RightBrace)?;
+                        } else {
+                            body.push(self.parse_template_node()?);
+                        }
+                        arms.push(TemplateMatchArm { pattern, guard, body });
+                        if !self.check(&TokenKind::RightBrace) {
+                            self.expect(&TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(&TokenKind::RightBrace)?; // close match `}`
+                    self.expect(&TokenKind::RightBrace)?; // close outer `}`
+                    Ok(TemplateNode::TemplateMatch {
+                        subject: Box::new(subject),
+                        arms,
+                    })
+                } else {
+                    let expr = self.parse_expr()?;
+                    self.expect(&TokenKind::RightBrace)?;
+                    Ok(TemplateNode::Expression(Box::new(expr)))
+                }
             }
             TokenKind::StringLit(_) => {
                 if let TokenKind::StringLit(s) = self.advance().kind {
@@ -1864,8 +2017,11 @@ impl Parser {
                     name: "self".into(),
                     ty: Type::Named("Self".into()),
                     ownership,
+                    secret: false,
                 });
             } else {
+                // Check for optional `secret` modifier before parameter name
+                let is_secret = self.match_token(&TokenKind::Secret);
                 let name = self.expect_ident()?;
                 self.expect(&TokenKind::Colon)?;
 
@@ -1879,7 +2035,7 @@ impl Parser {
                     (Ownership::Owned, self.parse_type()?)
                 };
 
-                params.push(Param { name, ty, ownership });
+                params.push(Param { name, ty, ownership, secret: is_secret });
             }
 
             if !self.check(&TokenKind::RightParen) {
@@ -2042,6 +2198,13 @@ impl Parser {
                 self.expect(&TokenKind::Semicolon)?;
                 Ok(Stmt::Yield(expr))
             }
+            // `<element>` — a template node used as an expression-statement inside
+            // a closure body (e.g., the virtual list row template).
+            // We parse and discard the element structure; codegen handles the virtual
+            // list template separately via the VirtualList AST node.
+            TokenKind::LeftAngle => {
+                self.parse_template_element_as_stmt()
+            }
             _ => {
                 let expr = self.parse_expr()?;
                 // Optional semicolon for expression statements
@@ -2049,6 +2212,70 @@ impl Parser {
                 Ok(Stmt::Expr(expr))
             }
         }
+    }
+
+    /// Parse a template element `<tag ...>...</tag>` appearing as a statement
+    /// inside a closure body (e.g., virtual list row template). We consume the
+    /// full element including nested children and return a placeholder `Stmt::Expr`.
+    fn parse_template_element_as_stmt(&mut self) -> Result<Stmt, ParseError> {
+        self.expect(&TokenKind::LeftAngle)?;
+        let tag = self.expect_ident()?;
+        // Consume attributes until `>` or `/>`
+        let mut depth = 1u32;
+        let mut self_closing = false;
+        // Consume attributes (simplified: eat tokens until > or />)
+        loop {
+            match self.peek_kind() {
+                TokenKind::Slash => {
+                    self.advance();
+                    self.expect(&TokenKind::RightAngle)?;
+                    self_closing = true;
+                    break;
+                }
+                TokenKind::RightAngle => {
+                    self.advance();
+                    break;
+                }
+                TokenKind::Eof => break,
+                _ => { self.advance(); }
+            }
+        }
+        if !self_closing {
+            // Consume children until matching closing tag
+            while depth > 0 && !self.is_at_end() {
+                match self.peek_kind() {
+                    TokenKind::LeftAngle => {
+                        self.advance();
+                        if self.check(&TokenKind::Slash) {
+                            // Closing tag
+                            self.advance();
+                            let _ = self.expect_ident(); // tag name
+                            let _ = self.expect(&TokenKind::RightAngle);
+                            depth -= 1;
+                        } else {
+                            // Opening tag — consume attrs and check for self-close
+                            let _ = self.expect_ident(); // tag name
+                            loop {
+                                match self.peek_kind() {
+                                    TokenKind::Slash => {
+                                        self.advance();
+                                        let _ = self.expect(&TokenKind::RightAngle);
+                                        break;
+                                    }
+                                    TokenKind::RightAngle => { self.advance(); depth += 1; break; }
+                                    TokenKind::Eof => break,
+                                    _ => { self.advance(); }
+                                }
+                            }
+                        }
+                    }
+                    _ => { self.advance(); }
+                }
+            }
+        }
+        // Return a placeholder expression for this template element
+        let _ = tag;
+        Ok(Stmt::Expr(Expr::Ident("__template__".to_string())))
     }
 
     // === Expression parsing (Pratt parser) ===
@@ -2225,6 +2452,42 @@ impl Parser {
                         method: field,
                         args,
                     };
+                } else if self.check(&TokenKind::LeftBrace)
+                    && field.chars().next().is_some_and(|c| c.is_uppercase())
+                {
+                    // `Schema.Article { field: val }` — struct construction via dot-access.
+                    // Only valid when the field name is PascalCase (a type name).
+                    // This prevents `self.cond { ... }` from being mis-parsed as struct init.
+                    let base_name = match &expr {
+                        Expr::Ident(n) => format!("{}.{}", n, field),
+                        Expr::FieldAccess { object, field: f } => {
+                            // Flatten nested field accesses to a qualified name
+                            fn flatten(e: &Expr) -> String {
+                                match e {
+                                    Expr::Ident(n) => n.clone(),
+                                    Expr::FieldAccess { object, field } => {
+                                        format!("{}.{}", flatten(object), field)
+                                    }
+                                    _ => "__obj__".to_string(),
+                                }
+                            }
+                            format!("{}.{}", flatten(object), f)
+                        }
+                        _ => field.clone(),
+                    };
+                    self.advance(); // consume `{`
+                    let mut fields = Vec::new();
+                    while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                        let fname = self.expect_ident()?;
+                        self.expect(&TokenKind::Colon)?;
+                        let fval = self.parse_expr()?;
+                        fields.push((fname, fval));
+                        if !self.check(&TokenKind::RightBrace) {
+                            self.expect(&TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(&TokenKind::RightBrace)?;
+                    expr = Expr::StructInit { name: base_name, fields };
                 } else {
                     expr = Expr::FieldAccess {
                         object: Box::new(expr),
@@ -2279,6 +2542,18 @@ impl Parser {
             TokenKind::True => { self.advance(); Ok(Expr::Bool(true)) }
             TokenKind::False => { self.advance(); Ok(Expr::Bool(false)) }
             TokenKind::SelfKw => { self.advance(); Ok(Expr::SelfExpr) }
+            TokenKind::LeftBracket => {
+                self.advance();
+                let mut elements = Vec::new();
+                while !self.check(&TokenKind::RightBracket) && !self.is_at_end() {
+                    elements.push(self.parse_expr()?);
+                    if !self.check(&TokenKind::RightBracket) {
+                        self.expect(&TokenKind::Comma)?;
+                    }
+                }
+                self.expect(&TokenKind::RightBracket)?;
+                Ok(Expr::ArrayLit(elements))
+            }
             TokenKind::Await => {
                 self.advance();
                 let expr = self.parse_unary()?;
@@ -2549,8 +2824,12 @@ impl Parser {
                 Ok(expr)
             }
             TokenKind::LeftBrace => {
-                let block = self.parse_block()?;
-                Ok(Expr::Block(block))
+                if self.is_object_literal_brace() {
+                    self.parse_object_literal()
+                } else {
+                    let block = self.parse_block()?;
+                    Ok(Expr::Block(block))
+                }
             }
             // Closure / lambda: |params| body
             TokenKind::Pipe => {
@@ -2566,7 +2845,67 @@ impl Parser {
                 let body = self.parse_closure_body()?;
                 Ok(Expr::Closure { params: Vec::new(), body: Box::new(body) })
             }
+            // fn(params) -> RetType { body } closure syntax
+            TokenKind::Fn => {
+                self.advance();
+                self.expect(&TokenKind::LeftParen)?;
+                let mut params = Vec::new();
+                while !self.check(&TokenKind::RightParen) && !self.is_at_end() {
+                    let pname = self.expect_ident()?;
+                    let pty = if self.match_token(&TokenKind::Colon) {
+                        Some(self.parse_type()?)
+                    } else {
+                        None
+                    };
+                    params.push((pname, pty));
+                    if !self.check(&TokenKind::RightParen) {
+                        self.expect(&TokenKind::Comma)?;
+                    }
+                }
+                self.expect(&TokenKind::RightParen)?;
+                // Optional return type
+                if self.match_token(&TokenKind::Arrow) {
+                    let _ret_ty = self.parse_type()?;
+                }
+                let body = if self.check(&TokenKind::LeftBrace) {
+                    let block = self.parse_block()?;
+                    if let Some(last) = block.stmts.last() {
+                        match last {
+                            Stmt::Expr(e) => e.clone(),
+                            _ => Expr::Block(block),
+                        }
+                    } else {
+                        Expr::Block(block)
+                    }
+                } else {
+                    self.parse_expr()?
+                };
+                Ok(Expr::Closure { params, body: Box::new(body) })
+            }
 
+            TokenKind::Ident(ref id) if id == "vec" => {
+                self.advance();
+                if self.match_token(&TokenKind::Bang) {
+                    // vec![...] or vec!(...)
+                    let (open, close) = if self.check(&TokenKind::LeftBracket) {
+                        (TokenKind::LeftBracket, TokenKind::RightBracket)
+                    } else {
+                        (TokenKind::LeftParen, TokenKind::RightParen)
+                    };
+                    self.expect(&open)?;
+                    let mut elements = Vec::new();
+                    while !self.check(&close) && !self.is_at_end() {
+                        elements.push(self.parse_expr()?);
+                        if !self.check(&close) {
+                            self.expect(&TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(&close)?;
+                    Ok(Expr::ArrayLit(elements))
+                } else {
+                    Ok(Expr::Ident("vec".to_string()))
+                }
+            }
             TokenKind::Ident(_) => {
                 let span = self.current_span();
                 let name = self.expect_ident()?;
@@ -2610,17 +2949,56 @@ impl Parser {
                 }
             }
             // Keyword tokens that double as stdlib namespace prefixes (crypto::sha256, etc.)
-            TokenKind::Crypto | TokenKind::Cache | TokenKind::Db | TokenKind::Auth => {
+            TokenKind::Crypto | TokenKind::Cache | TokenKind::Db | TokenKind::Auth
+            | TokenKind::Clipboard | TokenKind::Upload | TokenKind::Payment => {
                 let _span = self.current_span();
                 let name = match self.peek_kind() {
                     TokenKind::Crypto => "crypto",
                     TokenKind::Cache => "cache",
                     TokenKind::Db => "db",
                     TokenKind::Auth => "auth",
+                    TokenKind::Clipboard => "clipboard",
+                    TokenKind::Upload => "upload",
+                    TokenKind::Payment => "payment",
                     _ => unreachable!(),
                 }.to_string();
                 self.advance();
                 // Require :: namespace access — bare keyword use is handled elsewhere
+                let name = if self.check(&TokenKind::ColonColon) {
+                    let mut qualified = name;
+                    while self.match_token(&TokenKind::ColonColon) {
+                        let segment = self.expect_ident()?;
+                        qualified.push_str("::");
+                        qualified.push_str(&segment);
+                    }
+                    qualified
+                } else {
+                    name
+                };
+                if self.check(&TokenKind::LeftParen) {
+                    self.advance();
+                    let mut args = Vec::new();
+                    while !self.check(&TokenKind::RightParen) && !self.is_at_end() {
+                        args.push(self.parse_expr()?);
+                        if !self.check(&TokenKind::RightParen) {
+                            self.expect(&TokenKind::Comma)?;
+                        }
+                    }
+                    self.expect(&TokenKind::RightParen)?;
+                    Ok(Expr::FnCall {
+                        callee: Box::new(Expr::Ident(name)),
+                        args,
+                    })
+                } else {
+                    Ok(Expr::Ident(name))
+                }
+            }
+            // Ident-like keyword tokens usable as function calls or identifiers in expressions.
+            // These are keywords that also double as stdlib function names (fluid, format, env, etc.)
+            // or as namespace identifiers when the context is an expression.
+            _ if self.is_ident_like() => {
+                let name = self.expect_ident()?;
+                // Handle optional :: namespacing
                 let name = if self.check(&TokenKind::ColonColon) {
                     let mut qualified = name;
                     while self.match_token(&TokenKind::ColonColon) {
@@ -2707,9 +3085,15 @@ impl Parser {
         let mut arms = Vec::new();
         while !self.check(&TokenKind::RightBrace) {
             let pattern = self.parse_pattern()?;
+            let guard = if self.check(&TokenKind::If) {
+                self.advance();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
             self.expect(&TokenKind::FatArrow)?;
             let body = self.parse_expr()?;
-            arms.push(MatchArm { pattern, body });
+            arms.push(MatchArm { pattern, guard, body });
             if !self.check(&TokenKind::RightBrace) {
                 self.expect(&TokenKind::Comma)?;
             }
@@ -2721,6 +3105,38 @@ impl Parser {
 
     fn parse_for_expr(&mut self) -> Result<Expr, ParseError> {
         self.expect(&TokenKind::For)?;
+        // Support tuple destructuring: for (i, col) in expr { ... }
+        if self.check(&TokenKind::LeftParen) {
+            let span = self.current_span();
+            self.advance(); // consume `(`
+            let mut names = Vec::new();
+            while !self.check(&TokenKind::RightParen) && !self.is_at_end() {
+                names.push(self.expect_ident()?);
+                if !self.check(&TokenKind::RightParen) {
+                    self.expect(&TokenKind::Comma)?;
+                }
+            }
+            self.expect(&TokenKind::RightParen)?;
+            self.expect(&TokenKind::In)?;
+            let iterator = self.parse_expr()?;
+            let mut body = self.parse_block()?;
+            // Synthesize: let (a, b, ...) = __for_tuple_binding__;
+            // at the start of the body block.
+            let binding = "__for_tuple__".to_string();
+            let pattern = Pattern::Tuple(names.into_iter().map(Pattern::Ident).collect());
+            let destructure = Stmt::LetDestructure {
+                pattern,
+                ty: None,
+                value: Expr::Ident(binding.clone()),
+            };
+            body.stmts.insert(0, destructure);
+            let _ = span;
+            return Ok(Expr::For {
+                binding,
+                iterator: Box::new(iterator),
+                body,
+            });
+        }
         let binding = self.expect_ident()?;
         self.expect(&TokenKind::In)?;
         let iterator = self.parse_expr()?;
@@ -2754,6 +3170,13 @@ impl Parser {
             }
             TokenKind::Ident(_) => {
                 let name = self.expect_ident()?;
+                // Handle Enum::Variant or Enum::Variant(payload) patterns
+                let is_qualified = self.match_token(&TokenKind::ColonColon);
+                let variant_name = if is_qualified {
+                    self.expect_ident()?
+                } else {
+                    String::new()
+                };
                 if self.match_token(&TokenKind::LeftParen) {
                     let mut fields = Vec::new();
                     while !self.check(&TokenKind::RightParen) {
@@ -2763,7 +3186,12 @@ impl Parser {
                         }
                     }
                     self.expect(&TokenKind::RightParen)?;
-                    Ok(Pattern::Variant { name, fields })
+                    // Variant with fields — use variant name (unqualified) for codegen
+                    let pat_name = if is_qualified { variant_name } else { name };
+                    Ok(Pattern::Variant { name: pat_name, fields })
+                } else if is_qualified {
+                    // Qualified variant without fields (e.g., Status::Active)
+                    Ok(Pattern::Variant { name: variant_name, fields: vec![] })
                 } else {
                     Ok(Pattern::Ident(name))
                 }
@@ -3333,16 +3761,19 @@ impl Parser {
                     methods.push(self.parse_function(false)?);
                 }
                 TokenKind::OnMessage => {
+                    let handler_name = "on_message".to_string();
                     self.advance();
-                    on_message = Some(self.parse_function(false)?);
+                    on_message = Some(self.parse_channel_handler(handler_name)?);
                 }
                 TokenKind::OnConnect => {
+                    let handler_name = "on_connect".to_string();
                     self.advance();
-                    on_connect = Some(self.parse_function(false)?);
+                    on_connect = Some(self.parse_channel_handler(handler_name)?);
                 }
                 TokenKind::OnDisconnect => {
+                    let handler_name = "on_disconnect".to_string();
                     self.advance();
-                    on_disconnect = Some(self.parse_function(false)?);
+                    on_disconnect = Some(self.parse_channel_handler(handler_name)?);
                 }
                 _ => {
                     // Parse key: value pairs for url, reconnect, heartbeat
@@ -3351,9 +3782,11 @@ impl Parser {
                     match key.as_str() {
                         "url" => { url = self.parse_expr()?; }
                         "reconnect" => {
-                            if let TokenKind::Ident(ref v) = self.peek_kind() {
-                                reconnect = v == "true";
-                                self.advance();
+                            match self.peek_kind() {
+                                TokenKind::True => { reconnect = true; self.advance(); }
+                                TokenKind::False => { reconnect = false; self.advance(); }
+                                TokenKind::Ident(v) => { reconnect = v == "true"; self.advance(); }
+                                _ => {}
                             }
                         }
                         "heartbeat" => {
@@ -3378,6 +3811,40 @@ impl Parser {
         self.expect(&TokenKind::RightBrace)?;
 
         Ok(ChannelDef { name, url, contract, on_message, on_connect, on_disconnect, reconnect, heartbeat_interval, methods, is_pub, span })
+    }
+
+    /// Parse a channel handler: either a named `fn name(params) { body }` or
+    /// an anonymous `fn(params) { body }` (prefixed by on_connect/on_message/etc.).
+    fn parse_channel_handler(&mut self, default_name: String) -> Result<Function, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::Fn)?;
+        // The name is optional for anonymous channel handlers: `on_connect fn() { ... }`
+        let name = if self.check(&TokenKind::LeftParen) {
+            default_name
+        } else {
+            self.expect_ident()?
+        };
+        self.expect(&TokenKind::LeftParen)?;
+        let params = self.parse_params()?;
+        self.expect(&TokenKind::RightParen)?;
+        let return_type = if self.match_token(&TokenKind::Arrow) {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        let body = self.parse_block()?;
+        Ok(Function {
+            name,
+            lifetimes: Vec::new(),
+            type_params: Vec::new(),
+            params,
+            return_type,
+            trait_bounds: Vec::new(),
+            body,
+            is_pub: false,
+            must_use: false,
+            span,
+        })
     }
 
     // === Embed parsing ===
@@ -3406,15 +3873,11 @@ impl Parser {
                     }
                 }
                 "sandbox" => {
-                    if let TokenKind::Ident(ref v) = self.peek_kind() {
-                        sandbox = v == "true";
-                        self.advance();
-                    } else if let TokenKind::True = self.peek_kind() {
-                        sandbox = true;
-                        self.advance();
-                    } else if let TokenKind::False = self.peek_kind() {
-                        sandbox = false;
-                        self.advance();
+                    match self.peek_kind() {
+                        TokenKind::True => { sandbox = true; self.advance(); }
+                        TokenKind::False => { sandbox = false; self.advance(); }
+                        TokenKind::Ident(v) => { sandbox = v == "true"; self.advance(); }
+                        _ => {}
                     }
                 }
                 "integrity" => { integrity = Some(self.parse_expr()?); }
@@ -3526,9 +3989,11 @@ impl Parser {
                         "provider" => { provider = Some(self.parse_expr()?); }
                         "public_key" => { public_key = Some(self.parse_expr()?); }
                         "sandbox" => {
-                            if let TokenKind::Ident(v) = self.peek_kind() {
-                                sandbox_mode = v == "true";
-                                self.advance();
+                            match self.peek_kind() {
+                                TokenKind::True => { sandbox_mode = true; self.advance(); }
+                                TokenKind::False => { sandbox_mode = false; self.advance(); }
+                                TokenKind::Ident(v) => { sandbox_mode = v == "true"; self.advance(); }
+                                _ => {}
                             }
                         }
                         _ => { self.parse_expr()?; } // skip unknown
@@ -3672,9 +4137,11 @@ impl Parser {
                             self.expect(&TokenKind::RightBracket)?;
                         }
                         "chunked" => {
-                            if let TokenKind::Ident(v) = self.peek_kind() {
-                                chunked = v == "true";
-                                self.advance();
+                            match self.peek_kind() {
+                                TokenKind::True => { chunked = true; self.advance(); }
+                                TokenKind::False => { chunked = false; self.advance(); }
+                                TokenKind::Ident(v) => { chunked = v == "true"; self.advance(); }
+                                _ => {}
                             }
                         }
                         _ => { self.parse_expr()?; } // skip unknown
@@ -3725,9 +4192,11 @@ impl Parser {
                             }
                         }
                         "persist" => {
-                            if let TokenKind::Ident(v) = self.peek_kind() {
-                                persist = v == "true";
-                                self.advance();
+                            match self.peek_kind() {
+                                TokenKind::True => { persist = true; self.advance(); }
+                                TokenKind::False => { persist = false; self.advance(); }
+                                TokenKind::Ident(v) => { persist = v == "true"; self.advance(); }
+                                _ => {}
                             }
                         }
                         "max_entries" => {
@@ -3846,16 +4315,20 @@ impl Parser {
                 match key.as_str() {
                     "optimistic" => {
                         self.expect(&TokenKind::Colon)?;
-                        if let TokenKind::Ident(v) = self.peek_kind() {
-                            optimistic = v == "true";
-                            self.advance();
+                        match self.peek_kind() {
+                            TokenKind::True => { optimistic = true; self.advance(); }
+                            TokenKind::False => { optimistic = false; self.advance(); }
+                            TokenKind::Ident(v) => { optimistic = v == "true"; self.advance(); }
+                            _ => {}
                         }
                     }
                     "rollback_on_error" => {
                         self.expect(&TokenKind::Colon)?;
-                        if let TokenKind::Ident(v) = self.peek_kind() {
-                            rollback_on_error = v == "true";
-                            self.advance();
+                        match self.peek_kind() {
+                            TokenKind::True => { rollback_on_error = true; self.advance(); }
+                            TokenKind::False => { rollback_on_error = false; self.advance(); }
+                            TokenKind::Ident(v) => { rollback_on_error = v == "true"; self.advance(); }
+                            _ => {}
                         }
                     }
                     "invalidate" => {
@@ -3968,9 +4441,42 @@ impl Parser {
         Ok(DbDef { name, version, stores, is_pub, span })
     }
 
+    /// Parse `breakpoints Name { sm: 640, md: 768 }` where the keyword is the
+    /// plural `breakpoints` ident (not the `breakpoint` keyword token).
+    fn parse_breakpoints_def_plural(&mut self) -> Result<BreakpointsDef, ParseError> {
+        let span = self.current_span();
+        self.advance(); // consume `breakpoints` ident
+        // Optional name
+        if self.is_ident_like() {
+            self.advance();
+        }
+        self.expect(&TokenKind::LeftBrace)?;
+
+        let mut breakpoints = Vec::new();
+
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            let name = self.expect_ident()?;
+            self.expect(&TokenKind::Colon)?;
+            if let TokenKind::Integer(n) = self.peek_kind() {
+                breakpoints.push((name, n as u32));
+                self.advance();
+            } else {
+                return Err(self.error("Expected integer value for breakpoint"));
+            }
+            self.match_token(&TokenKind::Comma);
+        }
+
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(BreakpointsDef { breakpoints, span })
+    }
+
     fn parse_breakpoints_def(&mut self) -> Result<BreakpointsDef, ParseError> {
         let span = self.current_span();
         self.expect(&TokenKind::Breakpoint)?;
+        // Optional name: `breakpoints AppBreakpoints { ... }`
+        if self.is_ident_like() {
+            self.advance();
+        }
         self.expect(&TokenKind::LeftBrace)?;
 
         let mut breakpoints = Vec::new();
@@ -4056,7 +4562,15 @@ impl Parser {
                     primary = Some(self.parse_expr()?);
                     self.match_token(&TokenKind::Comma);
                 }
-                _ => return Err(self.error("Expected light, dark, auto, or primary in theme")),
+                // `default: "auto"` — default theme mode declaration
+                TokenKind::Ident(ref id) if id == "default" => {
+                    self.advance();
+                    self.expect(&TokenKind::Colon)?;
+                    // Consume the value (e.g., "auto", "light", "dark") — stored implicitly
+                    let _val = self.parse_expr()?;
+                    self.match_token(&TokenKind::Comma);
+                }
+                _ => return Err(self.error("Expected light, dark, auto, primary, or default in theme")),
             }
             self.match_token(&TokenKind::Comma);
         }
@@ -4318,6 +4832,21 @@ impl Parser {
                     TokenKind::Trace => Some("trace"),
                     TokenKind::Env => Some("env"),
                     TokenKind::Style => Some("style"),
+                    TokenKind::Fallback => Some("fallback"),
+                    TokenKind::Push => Some("push"),
+                    TokenKind::Query => Some("query"),
+                    TokenKind::Store => Some("store"),
+                    TokenKind::True => Some("true"),
+                    TokenKind::False => Some("false"),
+                    TokenKind::Secret => Some("secret"),
+                    TokenKind::Tool => Some("tool"),
+                    TokenKind::Theme => Some("theme"),
+                    TokenKind::Page => Some("page"),
+                    TokenKind::Chunk => Some("chunk"),
+                    TokenKind::Form => Some("form"),
+                    TokenKind::OnMessage => Some("on_message"),
+                    TokenKind::Upload => Some("upload"),
+                    TokenKind::Payment => Some("payment"),
                     _ => None,
                 };
                 if let Some(name) = name {
@@ -4345,7 +4874,12 @@ impl Parser {
             | TokenKind::Virtual | TokenKind::Breakpoint | TokenKind::Download
             | TokenKind::Haptic | TokenKind::Biometric | TokenKind::Camera
             | TokenKind::Geolocation | TokenKind::Flag | TokenKind::Trace
-            | TokenKind::Env
+            | TokenKind::Env | TokenKind::Fallback | TokenKind::Push
+            | TokenKind::Query | TokenKind::Store | TokenKind::True
+            | TokenKind::False | TokenKind::Secret | TokenKind::Tool
+            | TokenKind::Theme | TokenKind::Page | TokenKind::Chunk
+            | TokenKind::Form | TokenKind::OnMessage | TokenKind::Upload
+            | TokenKind::Payment
         )
     }
 
@@ -4358,6 +4892,74 @@ impl Parser {
             message: msg.to_string(),
             span: self.current_span(),
         }
+    }
+
+    /// Returns true if the `{` at the current position begins an object literal
+    /// rather than a block statement. Heuristic: `{ }` (empty) or `{ ident: ...`
+    /// or `{ "string": ...` where the token after the key is `:`.
+    /// Blocks start with statements: let, signal, return, fn, if, for, while,
+    /// match, yield, or an expression that is not a key:value pair.
+    fn is_object_literal_brace(&self) -> bool {
+        // pos is at `{`
+        let t1 = self.tokens.get(self.pos + 1);
+        let t2 = self.tokens.get(self.pos + 2);
+        match (t1.map(|t| &t.kind), t2.map(|t| &t.kind)) {
+            // Empty braces `{}` — treat as object literal (empty object)
+            (Some(TokenKind::RightBrace), _) => true,
+            // `{ ident : ...` — object literal
+            (Some(TokenKind::Ident(_)), Some(TokenKind::Colon)) => true,
+            // `{ "string" : ...` — object literal with string key
+            (Some(TokenKind::StringLit(_)), Some(TokenKind::Colon)) => true,
+            // Keyword-idents that can be object keys: method, headers, body, url, etc.
+            // These keyword tokens followed by `:` are object literal keys.
+            (Some(k), Some(TokenKind::Colon)) if Self::token_is_keyword_ident(k) => true,
+            // Otherwise it's a block
+            _ => false,
+        }
+    }
+
+    /// Returns true if the token kind is a keyword that can be used as an
+    /// object literal key (i.e., it is recognized by `expect_ident`).
+    fn token_is_keyword_ident(kind: &TokenKind) -> bool {
+        matches!(kind,
+            TokenKind::Canonical | TokenKind::Selector | TokenKind::Sandbox
+            | TokenKind::Loading | TokenKind::Duration | TokenKind::Invalidate
+            | TokenKind::Optimistic | TokenKind::Validate | TokenKind::Schema
+            | TokenKind::Instant | TokenKind::Fluid | TokenKind::Clipboard
+            | TokenKind::Draggable | TokenKind::Droppable | TokenKind::Crypto
+            | TokenKind::Virtual | TokenKind::Breakpoint | TokenKind::Download
+            | TokenKind::Haptic | TokenKind::Biometric | TokenKind::Camera
+            | TokenKind::Geolocation | TokenKind::Flag | TokenKind::Trace
+            | TokenKind::Env | TokenKind::Fallback | TokenKind::Push
+            | TokenKind::Query | TokenKind::Store | TokenKind::True
+            | TokenKind::False | TokenKind::Secret | TokenKind::Tool
+            | TokenKind::Theme | TokenKind::Page | TokenKind::Chunk
+            | TokenKind::Form | TokenKind::OnMessage | TokenKind::Upload
+            | TokenKind::Payment | TokenKind::Style
+        )
+    }
+
+    /// Parse an object literal: `{ key: value, key2: value2 }`.
+    /// Keys can be identifiers or string literals.
+    fn parse_object_literal(&mut self) -> Result<Expr, ParseError> {
+        self.expect(&TokenKind::LeftBrace)?;
+        let mut fields = Vec::new();
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            let key = if let TokenKind::StringLit(s) = self.peek_kind() {
+                self.advance();
+                s
+            } else {
+                self.expect_ident()?
+            };
+            self.expect(&TokenKind::Colon)?;
+            let val = self.parse_expr()?;
+            fields.push((key, val));
+            if !self.check(&TokenKind::RightBrace) {
+                self.expect(&TokenKind::Comma)?;
+            }
+        }
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(Expr::ObjectLit { fields })
     }
 }
 
@@ -7979,6 +8581,1399 @@ mod tests {
             assert_eq!(name, "crypto::sha256");
         } else {
             panic!("Expected Ident, got {:?}", e);
+        }
+    }
+
+    // --- vec![] macro parsing ---
+
+    #[test]
+    fn test_parse_vec_macro_brackets() {
+        let e = parse_expr("vec![1, 2, 3]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 3);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_vec_macro_parens() {
+        let e = parse_expr("vec!(4, 5)");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 2);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_vec_macro_empty() {
+        let e = parse_expr("vec![]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 0);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_vec_ident_no_bang() {
+        let e = parse_expr("vec");
+        assert!(matches!(e, Expr::Ident(ref n) if n == "vec"), "Expected Ident(\"vec\"), got {:?}", e);
+    }
+
+    // --- fn closure parsing ---
+
+    #[test]
+    fn test_parse_fn_closure_no_params() {
+        let e = parse_expr("fn() { 42 }");
+        if let Expr::Closure { params, .. } = &e {
+            assert_eq!(params.len(), 0);
+        } else {
+            panic!("Expected Closure, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_fn_closure_with_params() {
+        let e = parse_expr("fn(x: i32, y: i32) { x }");
+        if let Expr::Closure { params, .. } = &e {
+            assert_eq!(params.len(), 2);
+            assert_eq!(params[0].0, "x");
+            assert_eq!(params[1].0, "y");
+        } else {
+            panic!("Expected Closure, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_fn_closure_with_return_type() {
+        let e = parse_expr("fn(a: String) -> i32 { 0 }");
+        if let Expr::Closure { params, .. } = &e {
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].0, "a");
+        } else {
+            panic!("Expected Closure, got {:?}", e);
+        }
+    }
+
+    // --- :: qualified pattern parsing ---
+
+    #[test]
+    fn test_parse_qualified_pattern_variant() {
+        let prog = parse("fn main() { match x { Color::Red => 1, _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                if let Pattern::Variant { name, fields } = &arms[0].pattern {
+                    assert_eq!(name, "Red");
+                    assert!(fields.is_empty());
+                } else {
+                    panic!("Expected Variant pattern, got {:?}", arms[0].pattern);
+                }
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_qualified_pattern_with_payload() {
+        let prog = parse("fn main() { match x { Option::Some(v) => v, _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                if let Pattern::Variant { name, fields } = &arms[0].pattern {
+                    assert_eq!(name, "Some");
+                    assert_eq!(fields.len(), 1);
+                } else {
+                    panic!("Expected Variant pattern, got {:?}", arms[0].pattern);
+                }
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_variant_no_fields_pattern() {
+        // Enum::Variant without payload should produce Pattern::Variant with empty fields
+        let prog = parse("fn main() { match status { Status::Active => 1, Status::Inactive => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                if let Pattern::Variant { name, fields } = &arms[0].pattern {
+                    assert_eq!(name, "Active");
+                    assert!(fields.is_empty(), "No-payload variant should have empty fields");
+                } else {
+                    panic!("Expected Variant pattern for Status::Active, got {:?}", arms[0].pattern);
+                }
+                if let Pattern::Variant { name, fields } = &arms[1].pattern {
+                    assert_eq!(name, "Inactive");
+                    assert!(fields.is_empty());
+                } else {
+                    panic!("Expected Variant pattern for Status::Inactive, got {:?}", arms[1].pattern);
+                }
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_enum_variant_with_nested_payload() {
+        // Enum::Variant(Enum2::Other) should parse nested qualified patterns
+        let prog = parse("fn main() { match x { Result::Ok(v) => v, Result::Err(e) => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                if let Pattern::Variant { name, fields } = &arms[0].pattern {
+                    assert_eq!(name, "Ok");
+                    assert_eq!(fields.len(), 1);
+                } else {
+                    panic!("Expected Variant pattern for Result::Ok");
+                }
+                if let Pattern::Variant { name, fields } = &arms[1].pattern {
+                    assert_eq!(name, "Err");
+                    assert_eq!(fields.len(), 1);
+                } else {
+                    panic!("Expected Variant pattern for Result::Err");
+                }
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_secret_parameter() {
+        let prog = parse("fn hash(secret password: String) -> String { password }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.params.len(), 1);
+            assert_eq!(f.params[0].name, "password");
+            assert!(f.params[0].secret, "Parameter should be marked secret");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_non_secret_parameter() {
+        let prog = parse("fn add(a: i32, b: i32) -> i32 { a }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert!(!f.params[0].secret, "Regular param should not be secret");
+            assert!(!f.params[1].secret, "Regular param should not be secret");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_mixed_secret_and_regular_params() {
+        let prog = parse("fn verify(secret token: String, user_id: i32) -> bool { true }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.params.len(), 2);
+            assert!(f.params[0].secret, "token should be secret");
+            assert_eq!(f.params[0].name, "token");
+            assert!(!f.params[1].secret, "user_id should not be secret");
+            assert_eq!(f.params[1].name, "user_id");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    // --- match guard parsing ---
+
+    #[test]
+    fn test_parse_match_guard() {
+        let prog = parse("fn main() { match x { n if n > 0 => n, _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                assert!(arms[0].guard.is_some(), "Expected guard on first arm");
+                assert!(arms[1].guard.is_none(), "Expected no guard on wildcard arm");
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_match_no_guard() {
+        let prog = parse("fn main() { match x { 1 => 10, _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                assert!(arms[0].guard.is_none());
+                assert!(arms[1].guard.is_none());
+            } else {
+                panic!("Expected Match expr");
+            }
+        }
+    }
+
+    // --- array literal parsing ---
+
+    #[test]
+    fn test_parse_array_literal() {
+        let e = parse_expr("[1, 2, 3]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 3);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_empty_array_literal() {
+        let e = parse_expr("[]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 0);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_match_guard_with_equality() {
+        let prog = parse("fn main() { match x { n if n == 0 => 1, _ => 2, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                assert!(arms[0].guard.is_some());
+                assert_eq!(arms.len(), 2);
+            } else { panic!("Expected Match"); }
+        }
+    }
+
+    #[test]
+    fn test_parse_match_multiple_guards() {
+        let prog = parse("fn main() { match x { a if a > 0 => 1, b if b < 0 => 2, _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                assert!(arms[0].guard.is_some());
+                assert!(arms[1].guard.is_some());
+                assert!(arms[2].guard.is_none());
+                assert_eq!(arms.len(), 3);
+            } else { panic!("Expected Match"); }
+        }
+    }
+
+    #[test]
+    fn test_parse_vec_macro_with_parens() {
+        let e = parse_expr("vec!(1, 2, 3)");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 3);
+        } else {
+            panic!("Expected ArrayLit from vec!(), got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_vec_macro_single_element() {
+        let e = parse_expr("vec![42]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 1);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_fn_closure_empty_body() {
+        let e = parse_expr("fn() { }");
+        assert!(matches!(e, Expr::Closure { .. }));
+    }
+
+    #[test]
+    fn test_parse_qualified_pattern_simple_ident() {
+        // Without ::, should parse as normal ident pattern
+        let prog = parse("fn main() { match x { y => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                if let Pattern::Ident(name) = &arms[0].pattern {
+                    assert_eq!(name, "y");
+                } else { panic!("Expected Ident pattern"); }
+            } else { panic!("Expected Match"); }
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_array_literal() {
+        let e = parse_expr("[[1, 2], [3, 4]]");
+        if let Expr::ArrayLit(outer) = &e {
+            assert_eq!(outer.len(), 2);
+            assert!(matches!(&outer[0], Expr::ArrayLit(_)));
+            assert!(matches!(&outer[1], Expr::ArrayLit(_)));
+        } else {
+            panic!("Expected nested ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_single_element_array() {
+        let e = parse_expr("[42]");
+        if let Expr::ArrayLit(elements) = &e {
+            assert_eq!(elements.len(), 1);
+        } else {
+            panic!("Expected ArrayLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_match_wildcard_only() {
+        let prog = parse("fn main() { match x { _ => 0, } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
+                assert_eq!(arms.len(), 1);
+                assert!(matches!(&arms[0].pattern, Pattern::Wildcard));
+                assert!(arms[0].guard.is_none());
+            } else { panic!("Expected Match"); }
+        }
+    }
+
+    // --- TemplateIf and TemplateFor in templates ---
+
+    #[test]
+    fn test_parse_template_if() {
+        let prog = parse(r#"
+            component Test() {
+                render {
+                    <div>
+                        {if show {
+                            <span>"visible"</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        assert!(matches!(prog.items[0], Item::Component(_)));
+    }
+
+    #[test]
+    fn test_parse_template_for() {
+        let prog = parse(r#"
+            component List() {
+                render {
+                    <ul>
+                        {for item in items {
+                            <li>{item}</li>
+                        }}
+                    </ul>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        assert!(matches!(prog.items[0], Item::Component(_)));
+    }
+
+    // ========================================================================
+    // TESTS FOR NEW PARSER FIXES
+    // ========================================================================
+
+    // --- Fix 1: Object literal as function argument ---
+
+    #[test]
+    fn test_parse_object_literal_as_arg() {
+        let e = parse_expr(r#"fetch("url", { method: "POST" })"#);
+        if let Expr::Fetch { options: Some(opts), .. } = e {
+            assert!(matches!(*opts, Expr::ObjectLit { .. }));
+        } else {
+            panic!("Expected Fetch with object literal options, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_object_literal_nested() {
+        // { method: "POST", headers: { "Content-Type": "application/json" } }
+        let e = parse_expr(r#"{ method: "POST", headers: { "Content-Type": "application/json" } }"#);
+        if let Expr::ObjectLit { fields } = e {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].0, "method");
+            if let Expr::ObjectLit { fields: nested } = &fields[1].1 {
+                assert_eq!(nested.len(), 1);
+                assert_eq!(nested[0].0, "Content-Type");
+            } else {
+                panic!("Expected nested ObjectLit for headers");
+            }
+        } else {
+            panic!("Expected ObjectLit, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_parse_object_literal_empty() {
+        let e = parse_expr("{}");
+        assert!(matches!(e, Expr::ObjectLit { fields } if fields.is_empty()));
+    }
+
+    #[test]
+    fn test_parse_object_literal_single_field() {
+        let e = parse_expr("{ method: \"DELETE\" }");
+        if let Expr::ObjectLit { fields } = e {
+            assert_eq!(fields.len(), 1);
+            assert_eq!(fields[0].0, "method");
+        } else {
+            panic!("Expected ObjectLit");
+        }
+    }
+
+    #[test]
+    fn test_parse_block_not_confused_with_object_literal() {
+        // A block with a let statement should not be parsed as an object literal
+        let prog = parse("fn f() { let x = 1; }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.body.stmts.len(), 1);
+            assert!(matches!(f.body.stmts[0], Stmt::Let { .. }));
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_fetch_with_object_options() {
+        let prog = parse(r#"
+            fn post() {
+                let resp = await fetch("https://api.example.com/posts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: "data",
+                });
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                // The outer expression is Await(Fetch(...))
+                assert!(matches!(value, Expr::Await(_)));
+            } else {
+                panic!("Expected let statement");
+            }
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    // --- Fix 3: `secret` parameter modifier ---
+
+    #[test]
+    fn test_parse_secret_param_modifier() {
+        let prog = parse("fn secure(secret password: String) { }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.params.len(), 1);
+            assert_eq!(f.params[0].name, "password");
+            assert!(matches!(f.params[0].ty, Type::Named(ref n) if n == "String"));
+        } else {
+            panic!("Expected Function with secret param");
+        }
+    }
+
+    #[test]
+    fn test_parse_secret_param_multiple() {
+        let prog = parse("fn process(secret key: String, secret data: String) { }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.params.len(), 2);
+            assert_eq!(f.params[0].name, "key");
+            assert_eq!(f.params[1].name, "data");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    // --- Fix 4: `shortcut "key" => expr;` syntax ---
+
+    #[test]
+    fn test_parse_shortcut_fat_arrow_syntax() {
+        let prog = parse(r#"
+            component Editor() {
+                shortcut "Cmd+S" => self.save;
+
+                fn save(&self) { }
+
+                render {
+                    <div>"editor"</div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.shortcuts.len(), 1);
+            assert_eq!(c.shortcuts[0].keys, "Cmd+S");
+            // Body should contain one expression statement
+            assert_eq!(c.shortcuts[0].body.stmts.len(), 1);
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_shortcut_multiple_fat_arrows() {
+        let prog = parse(r#"
+            component App() {
+                shortcut "Cmd+S" => self.save;
+                shortcut "Cmd+Z" => self.undo;
+
+                fn save(&self) { }
+                fn undo(&self) { }
+
+                render {
+                    <div>"app"</div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.shortcuts.len(), 2);
+            assert_eq!(c.shortcuts[0].keys, "Cmd+S");
+            assert_eq!(c.shortcuts[1].keys, "Cmd+Z");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    // --- Fix 5: `for (i, col) in expr` tuple destructuring ---
+
+    #[test]
+    fn test_parse_for_tuple_destructure() {
+        let prog = parse(r#"
+            fn f() {
+                for (i, col) in items.iter().enumerate() {
+                    let x = i;
+                }
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::For { binding, body, .. }) = &f.body.stmts[0] {
+                assert_eq!(binding, "__for_tuple__");
+                // First stmt in body should be LetDestructure with Tuple pattern
+                assert!(matches!(&body.stmts[0], Stmt::LetDestructure {
+                    pattern: Pattern::Tuple(_), ..
+                }));
+                if let Stmt::LetDestructure { pattern: Pattern::Tuple(pats), .. } = &body.stmts[0] {
+                    assert_eq!(pats.len(), 2);
+                    assert!(matches!(&pats[0], Pattern::Ident(n) if n == "i"));
+                    assert!(matches!(&pats[1], Pattern::Ident(n) if n == "col"));
+                }
+            } else {
+                panic!("Expected For statement");
+            }
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_for_triple_tuple_destructure() {
+        let prog = parse(r#"
+            fn f() {
+                for (a, b, c) in triples {
+                    let x = a;
+                }
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::For { binding, body, .. }) = &f.body.stmts[0] {
+                assert_eq!(binding, "__for_tuple__");
+                if let Stmt::LetDestructure { pattern: Pattern::Tuple(pats), .. } = &body.stmts[0] {
+                    assert_eq!(pats.len(), 3);
+                }
+            } else {
+                panic!("Expected For");
+            }
+        }
+    }
+
+    // --- Fix 6: `on_connect fn() { ... }` channel syntax ---
+
+    #[test]
+    fn test_parse_channel_on_connect_anonymous_fn() {
+        let prog = parse(r#"
+            channel Chat {
+                url: "wss://example.com/ws",
+
+                on_connect fn() {
+                }
+
+                on_disconnect fn() {
+                }
+            }
+        "#);
+        if let Item::Channel(ch) = &prog.items[0] {
+            assert!(ch.on_connect.is_some());
+            let f = ch.on_connect.as_ref().unwrap();
+            assert_eq!(f.name, "on_connect");
+            assert_eq!(f.params.len(), 0);
+            assert!(ch.on_disconnect.is_some());
+        } else {
+            panic!("Expected Channel");
+        }
+    }
+
+    #[test]
+    fn test_parse_channel_on_message_with_param() {
+        let prog = parse(r#"
+            channel Chat {
+                url: "wss://example.com/ws",
+
+                on_message fn(msg: String) {
+                }
+            }
+        "#);
+        if let Item::Channel(ch) = &prog.items[0] {
+            assert!(ch.on_message.is_some());
+            let f = ch.on_message.as_ref().unwrap();
+            assert_eq!(f.params.len(), 1);
+            assert_eq!(f.params[0].name, "msg");
+        } else {
+            panic!("Expected Channel");
+        }
+    }
+
+    // --- Fix 7: `spring enter { ... }` inside a component ---
+
+    #[test]
+    fn test_parse_spring_in_component() {
+        let prog = parse(r#"
+            component Modal() {
+                let mut visible: bool = false;
+
+                spring enter {
+                    from: { opacity: 0.0 },
+                    to: { opacity: 1.0 },
+                    stiffness: 300,
+                    damping: 25,
+                }
+
+                fn toggle(&mut self) {
+                    self.visible = !self.visible;
+                }
+
+                render {
+                    <div>"modal"</div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "Modal");
+            // The spring block is consumed silently — check we parsed the rest correctly
+            assert_eq!(c.methods.len(), 1);
+            assert_eq!(c.methods[0].name, "toggle");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_keyframes_in_component() {
+        let prog = parse(r#"
+            component Spinner() {
+                keyframes spin {
+                    from: { transform: "rotate(0deg)" },
+                    to: { transform: "rotate(360deg)" },
+                }
+
+                render {
+                    <div>"spinner"</div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "Spinner");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_stagger_in_component() {
+        let prog = parse(r#"
+            component FeedList() {
+                stagger feed_enter {
+                    from: { opacity: 0.0 },
+                    to: { opacity: 1.0 },
+                    delay: 50,
+                }
+
+                render {
+                    <ul>"items"</ul>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "FeedList");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    // --- Fix 8: `breakpoints AppBreakpoints { ... }` with name ---
+
+    #[test]
+    fn test_parse_breakpoints_with_name() {
+        let prog = parse(r#"
+            breakpoints AppBreakpoints {
+                sm: 640,
+                md: 768,
+                lg: 1024,
+            }
+        "#);
+        if let Item::Breakpoints(bp) = &prog.items[0] {
+            assert_eq!(bp.breakpoints.len(), 3);
+            assert_eq!(bp.breakpoints[0], ("sm".to_string(), 640));
+            assert_eq!(bp.breakpoints[1], ("md".to_string(), 768));
+            assert_eq!(bp.breakpoints[2], ("lg".to_string(), 1024));
+        } else {
+            panic!("Expected Breakpoints");
+        }
+    }
+
+    #[test]
+    fn test_parse_breakpoints_without_name() {
+        let prog = parse(r#"
+            breakpoints {
+                sm: 640,
+                md: 768,
+            }
+        "#);
+        if let Item::Breakpoints(bp) = &prog.items[0] {
+            assert_eq!(bp.breakpoints.len(), 2);
+        } else {
+            panic!("Expected Breakpoints without name");
+        }
+    }
+
+    // --- Fix 9: Closure with template body in virtual list ---
+
+    #[test]
+    fn test_parse_closure_with_template_body_in_virtual_list() {
+        let prog = parse(r#"
+            component LogViewer() {
+                let logs: Vec<String> = vec![];
+
+                render {
+                    <div class="log-viewer">
+                        <virtual list={self.logs} item_height={32} buffer={10}>
+                            {|log, index| {
+                                <div class="log-entry">
+                                    <span class="message">{log}</span>
+                                </div>
+                            }}
+                        </virtual>
+                    </div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        assert!(matches!(prog.items[0], Item::Component(_)));
+    }
+
+    // --- Fix 10: `Schema.Article { ... }` struct construction ---
+
+    #[test]
+    fn test_parse_schema_dot_struct_init() {
+        let prog = parse(r#"
+            fn f() {
+                let sd = Schema.Article {
+                    headline: title,
+                    author: name,
+                };
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Article"));
+            } else {
+                panic!("Expected Let statement");
+            }
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_schema_dot_product_init() {
+        let prog = parse(r#"
+            fn f() {
+                let sd = Schema.Product {
+                    name: product_name,
+                    price: price_str,
+                };
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Product"));
+            } else {
+                panic!("Expected Let");
+            }
+        }
+    }
+
+    // --- Fix 11: `default: "auto"` in theme block ---
+
+    #[test]
+    fn test_parse_theme_with_default_field() {
+        let prog = parse(r##"
+            theme AppTheme {
+                light {
+                    bg: "#ffffff",
+                    text: "#000000",
+                }
+                dark {
+                    bg: "#0f172a",
+                    text: "#e2e8f0",
+                }
+                default: "auto",
+            }
+        "##);
+        if let Item::Theme(t) = &prog.items[0] {
+            assert_eq!(t.name, "AppTheme");
+            assert!(t.light.is_some());
+            assert!(t.dark.is_some());
+        } else {
+            panic!("Expected Theme");
+        }
+    }
+
+    #[test]
+    fn test_parse_theme_default_only() {
+        let prog = parse(r##"
+            theme SimpleTheme {
+                primary: "#2563eb",
+                default: "light",
+            }
+        "##);
+        if let Item::Theme(t) = &prog.items[0] {
+            assert_eq!(t.name, "SimpleTheme");
+        } else {
+            panic!("Expected Theme");
+        }
+    }
+
+    // --- Integration: parse full example-style programs ---
+
+    #[test]
+    fn test_parse_fetch_with_nested_object_options() {
+        // Models api.nectar pattern: fetch(url, { method: "POST", headers: {...}, body: ... })
+        let prog = parse(r#"
+            fn create_post(title: String, body: String) {
+                let response = await fetch("https://api.example.com/posts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: body,
+                });
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.name, "create_post");
+            assert_eq!(f.body.stmts.len(), 1);
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_channel_realtime_example() {
+        let prog = parse(r#"
+            channel Chat {
+                url: "wss://api.example.com/ws/chat",
+                reconnect: true,
+                heartbeat: 30000,
+
+                on_connect fn() {
+                }
+
+                on_message fn(msg: String) {
+                }
+
+                on_disconnect fn() {
+                }
+
+                fn send_message(&self, text: String) {
+                }
+            }
+        "#);
+        if let Item::Channel(ch) = &prog.items[0] {
+            assert_eq!(ch.name, "Chat");
+            assert!(ch.on_connect.is_some());
+            assert!(ch.on_message.is_some());
+            assert!(ch.on_disconnect.is_some());
+            assert_eq!(ch.methods.len(), 1);
+        } else {
+            panic!("Expected Channel");
+        }
+    }
+
+    #[test]
+    fn test_parse_shortcuts_example() {
+        let prog = parse(r#"
+            component TextEditor() {
+                let mut content: String = "";
+                let mut saved: bool = true;
+
+                shortcut "Cmd+S" => self.save;
+                shortcut "Cmd+Z" => self.undo;
+                shortcut "Escape" => self.close;
+
+                fn save(&mut self) { }
+                fn undo(&mut self) { }
+                fn close(&self) { }
+
+                render {
+                    <div class="editor">
+                        <p>"editor"</p>
+                    </div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.shortcuts.len(), 3);
+            assert_eq!(c.shortcuts[0].keys, "Cmd+S");
+            assert_eq!(c.shortcuts[1].keys, "Cmd+Z");
+            assert_eq!(c.shortcuts[2].keys, "Escape");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_for_tuple_in_template() {
+        // Tests for (i, col) in template context (dnd.nectar pattern)
+        let prog = parse(r#"
+            fn f() {
+                for (i, item) in self.items.iter().enumerate() {
+                    let idx = i;
+                }
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::For { binding, .. }) = &f.body.stmts[0] {
+                assert_eq!(binding, "__for_tuple__");
+            } else {
+                panic!("Expected For with tuple binding");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_crypto_secret_param() {
+        // Tests crypto.nectar pattern: fn secure_token_flow(secret user_password: String)
+        let prog = parse(r#"
+            fn secure_token_flow(secret user_password: String) {
+                let key = crypto.derive_key(user_password, "salt");
+            }
+        "#);
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.params.len(), 1);
+            assert_eq!(f.params[0].name, "user_password");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_animations_component() {
+        // Tests animations.nectar: spring enter/exit inside component
+        let prog = parse(r#"
+            component Modal() {
+                let mut visible: bool = false;
+
+                spring enter {
+                    from: { opacity: 0.0, transform: "scale(0.95)" },
+                    to: { opacity: 1.0, transform: "scale(1)" },
+                    stiffness: 300,
+                    damping: 25,
+                }
+
+                spring exit {
+                    from: { opacity: 1.0 },
+                    to: { opacity: 0.0 },
+                    stiffness: 400,
+                    damping: 30,
+                }
+
+                fn toggle(&mut self) {
+                    self.visible = !self.visible;
+                }
+
+                render {
+                    <div>"modal"</div>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "Modal");
+            assert_eq!(c.methods.len(), 1);
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    // === Tests for previously missing parser features ===
+
+    /// Qualified paths with `::` work in match patterns and fn bodies
+    /// without triggering the struct-init heuristic.
+    #[test]
+    fn test_parse_qualified_path_in_match_pattern() {
+        // AuthStatus::LoggedIn(_) must parse as Pattern::Variant
+        let prog = parse(r#"
+component Foo() {
+    fn check(&self) -> bool {
+        match self.status {
+            AuthStatus::LoggedIn(_) => true,
+            AuthStatus::Error(msg) => false,
+            _ => false,
+        }
+    }
+    render { <div>"ok"</div> }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.methods.len(), 1);
+            assert_eq!(c.methods[0].name, "check");
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// `TypeName::method()` static call with `::` in expressions
+    #[test]
+    fn test_parse_static_method_call_via_colon_colon() {
+        let prog = parse(r#"
+component Foo() {
+    fn handle(&mut self) {
+        PostService::create_post(self.title, self.body);
+    }
+    render { <div>"ok"</div> }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.methods[0].name, "handle");
+            if let Stmt::Expr(Expr::FnCall { callee, .. }) = &c.methods[0].body.stmts[0] {
+                if let Expr::Ident(name) = callee.as_ref() {
+                    assert_eq!(name, "PostService::create_post");
+                } else {
+                    panic!("Expected Ident callee with qualified name");
+                }
+            } else {
+                panic!("Expected Expr(FnCall) statement");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// `{match subject { Pattern => <element> }}` in template expressions
+    #[test]
+    fn test_parse_template_match_with_element_arms() {
+        let prog = parse(r#"
+component Foo() {
+    render {
+        {match self.get_error() {
+            Some(err) => <div class="error">{err.message}</div>,
+            None => <span />,
+        }}
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::TemplateMatch { arms, .. } = &c.render.body {
+                assert_eq!(arms.len(), 2);
+                // First arm: Some(err) => <div ...>
+                if let Pattern::Variant { name, fields } = &arms[0].pattern {
+                    assert_eq!(name, "Some");
+                    assert_eq!(fields.len(), 1);
+                } else {
+                    panic!("Expected Variant pattern for Some arm");
+                }
+                assert_eq!(arms[0].body.len(), 1);
+                assert!(matches!(&arms[0].body[0], TemplateNode::Element(e) if e.tag == "div"));
+                // Second arm: None => <span />
+                // `None` with no parentheses parses as Pattern::Ident("None")
+                assert!(
+                    matches!(&arms[1].pattern, Pattern::Ident(n) if n == "None")
+                    || matches!(&arms[1].pattern, Pattern::Variant { name: n, .. } if n == "None"),
+                    "Expected Ident or Variant pattern for None arm"
+                );
+                assert_eq!(arms[1].body.len(), 1);
+                assert!(matches!(&arms[1].body[0], TemplateNode::Element(e) if e.tag == "span"));
+            } else {
+                panic!("Expected TemplateMatch node, got {:?}", c.render.body);
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// `{match}` template node with element inside `{if}` — verifies that
+    /// `<element>` inside a conditional template block works
+    #[test]
+    fn test_parse_template_if_with_element_body() {
+        let prog = parse(r#"
+component Foo() {
+    render {
+        {if PostService::get_loading() {
+            <div>"Loading..."</div>
+        }}
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::TemplateIf { then_children, else_children, .. } = &c.render.body {
+                assert_eq!(then_children.len(), 1);
+                assert!(matches!(&then_children[0], TemplateNode::Element(e) if e.tag == "div"));
+                assert!(else_children.is_none());
+            } else {
+                panic!("Expected TemplateIf, got {:?}", c.render.body);
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// Inline `{if ... { "str" } else { "str" }}` with string literal branches
+    #[test]
+    fn test_parse_template_if_else_string_branches() {
+        // This tests the case from shortcuts.nectar:
+        // {if self.saved { "Saved" } else { "Unsaved changes" }}
+        let prog = parse(r#"
+component Foo() {
+    render {
+        <footer>
+            {if self.saved { "Saved" } else { "Unsaved changes" }}
+        </footer>
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(footer) = &c.render.body {
+                assert_eq!(footer.tag, "footer");
+                assert_eq!(footer.children.len(), 1);
+                if let TemplateNode::TemplateIf { then_children, else_children, .. } = &footer.children[0] {
+                    assert_eq!(then_children.len(), 1);
+                    assert!(matches!(&then_children[0], TemplateNode::TextLiteral(s) if s == "Saved"));
+                    let else_nodes = else_children.as_ref().expect("Expected else branch");
+                    assert_eq!(else_nodes.len(), 1);
+                    assert!(matches!(&else_nodes[0], TemplateNode::TextLiteral(s) if s == "Unsaved changes"));
+                } else {
+                    panic!("Expected TemplateIf inside footer");
+                }
+            } else {
+                panic!("Expected footer Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// Format string interpolation with function calls containing commas: `f"size: {fluid(24, 64)};"`
+    #[test]
+    fn test_parse_format_string_with_fn_call_args_in_interpolation() {
+        // fluid is a keyword-like token; it must be handled as an ident-like in parse_primary
+        let prog = parse(r#"
+component Foo() {
+    render {
+        <h1 style={f"font-size: {fluid(24, 64)};"}>"Title"</h1>
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(h1) = &c.render.body {
+                assert_eq!(h1.tag, "h1");
+                // The style attribute should be a dynamic attribute with a format string expr
+                let has_format_style = h1.attributes.iter().any(|a| {
+                    matches!(a, Attribute::Dynamic { name, value: Expr::FormatString { .. } }
+                        if name == "style")
+                });
+                assert!(has_format_style, "Expected format-string style attribute");
+            } else {
+                panic!("Expected h1 Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// `fluid(min, max)` call works as a standalone expression
+    /// (tests the ident-like keyword fallthrough in parse_primary)
+    #[test]
+    fn test_parse_fluid_function_call_expression() {
+        let prog = parse(r#"
+fn f() {
+    let size = fluid(16, 48);
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Let { name, value, .. } = &f.body.stmts[0] {
+                assert_eq!(name, "size");
+                if let Expr::FnCall { callee, args } = value {
+                    assert!(matches!(callee.as_ref(), Expr::Ident(n) if n == "fluid"));
+                    assert_eq!(args.len(), 2);
+                } else {
+                    panic!("Expected FnCall for fluid");
+                }
+            } else {
+                panic!("Expected Let statement");
+            }
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    /// Self-closing tags `<tag />` parse correctly as elements with no children
+    #[test]
+    fn test_parse_self_closing_tag_in_template() {
+        let prog = parse(r#"
+component Foo() {
+    render {
+        <div>
+            <span />
+            <input type="text" />
+            <br />
+        </div>
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(div) = &c.render.body {
+                assert_eq!(div.tag, "div");
+                assert_eq!(div.children.len(), 3);
+                for child in &div.children {
+                    if let TemplateNode::Element(e) = child {
+                        assert!(e.children.is_empty(), "Self-closing tag should have no children");
+                    } else {
+                        panic!("Expected Element child");
+                    }
+                }
+            } else {
+                panic!("Expected div Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// `struct.Field { field: val }` dot-access struct init still works
+    /// (verifies that the uppercase-only guard doesn't break legitimate uses)
+    #[test]
+    fn test_parse_dot_access_struct_init_uppercase_field() {
+        let prog = parse(r#"
+fn build() {
+    let x = Schema.Article { id: 1, title: "hello" };
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Article"),
+                    "Expected StructInit with name Schema.Article, got {:?}", value);
+            } else {
+                panic!("Expected Let");
+            }
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    /// Lowercase field after dot followed by `{` is NOT a struct init —
+    /// the `{` belongs to a subsequent block/template, not a struct literal.
+    #[test]
+    fn test_parse_lowercase_field_then_brace_is_not_struct_init() {
+        // self.saved { ... } should be FieldAccess, not StructInit
+        // This is the key regression that was causing issues.
+        let prog = parse(r#"
+component Foo() {
+    render {
+        {if self.saved { "yes" } else { "no" }}
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::TemplateIf { condition, .. } = &c.render.body {
+                // condition must be self.saved (FieldAccess), not a StructInit
+                assert!(
+                    matches!(condition.as_ref(), Expr::FieldAccess { field, .. } if field == "saved"),
+                    "Expected FieldAccess(saved) as condition, got {:?}", condition
+                );
+            } else {
+                panic!("Expected TemplateIf");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// Template `{match}` with a wildcard arm renders correctly
+    #[test]
+    fn test_parse_template_match_with_wildcard_arm() {
+        let prog = parse(r#"
+component Foo() {
+    render {
+        {match self.state {
+            Active => <span>"active"</span>,
+            _ => <span>"other"</span>,
+        }}
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::TemplateMatch { arms, .. } = &c.render.body {
+                assert_eq!(arms.len(), 2);
+                assert!(matches!(&arms[1].pattern, Pattern::Wildcard));
+            } else {
+                panic!("Expected TemplateMatch");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    /// Full api.nectar-style component with `{match}` and `{if}` template blocks
+    #[test]
+    fn test_parse_api_component_with_template_match_and_if() {
+        let prog = parse(r#"
+component PostList() {
+    let mut new_title: String = "";
+
+    fn handle_create(&mut self) {
+        PostService::create_post(self.new_title, "");
+        self.new_title = "";
+    }
+
+    render {
+        <div>
+            {if PostService::get_loading() {
+                <div>"Loading..."</div>
+            }}
+            {match PostService::get_error() {
+                Some(err) => <div class="error">{err.message}</div>,
+                None => <span />,
+            }}
+            <button on:click={self.handle_create}>"Create"</button>
+        </div>
+    }
+}
+"#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            assert_eq!(c.name, "PostList");
+            assert_eq!(c.methods.len(), 1);
+            // render body is a <div> with 3 children
+            if let TemplateNode::Element(div) = &c.render.body {
+                assert_eq!(div.tag, "div");
+                assert_eq!(div.children.len(), 3);
+                assert!(matches!(&div.children[0], TemplateNode::TemplateIf { .. }));
+                assert!(matches!(&div.children[1], TemplateNode::TemplateMatch { .. }));
+                assert!(matches!(&div.children[2], TemplateNode::Element(e) if e.tag == "button"));
+            } else {
+                panic!("Expected div Element");
+            }
+        } else {
+            panic!("Expected Component");
         }
     }
 }

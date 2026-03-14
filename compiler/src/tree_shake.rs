@@ -387,9 +387,18 @@ fn collect_expr_deps(expr: &Expr, deps: &mut HashSet<String>) {
         Expr::Match { subject, arms, .. } => {
             collect_expr_deps(subject, deps);
             for arm in arms {
+                if let Some(guard) = &arm.guard {
+                    collect_expr_deps(guard, deps);
+                }
                 collect_expr_deps(&arm.body, deps);
                 collect_pattern_deps(&arm.pattern, deps);
             }
+        }
+        Expr::ArrayLit(elements) => {
+            for e in elements { collect_expr_deps(e, deps); }
+        }
+        Expr::ObjectLit { fields } => {
+            for (_, v) in fields { collect_expr_deps(v, deps); }
         }
         Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Await(e)
         | Expr::Stream { source: e } | Expr::Navigate { path: e }
@@ -499,6 +508,31 @@ fn collect_template_deps(node: &TemplateNode, deps: &mut HashSet<String>) {
             };
             for child in children {
                 collect_template_deps(child, deps);
+            }
+        }
+        TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            collect_expr_deps(condition, deps);
+            for child in then_children {
+                collect_template_deps(child, deps);
+            }
+            if let Some(else_nodes) = else_children {
+                for child in else_nodes {
+                    collect_template_deps(child, deps);
+                }
+            }
+        }
+        TemplateNode::TemplateFor { iterator, children, .. } => {
+            collect_expr_deps(iterator, deps);
+            for child in children {
+                collect_template_deps(child, deps);
+            }
+        }
+        TemplateNode::TemplateMatch { subject, arms } => {
+            collect_expr_deps(subject, deps);
+            for arm in arms {
+                for child in &arm.body {
+                    collect_template_deps(child, deps);
+                }
             }
         }
     }
@@ -1582,6 +1616,7 @@ mod tests {
             subject: Box::new(Expr::Ident("subj".to_string())),
             arms: vec![MatchArm {
                 pattern: Pattern::Variant { name: "Var".to_string(), fields: vec![] },
+                guard: None,
                 body: Expr::Ident("body_dep".to_string()),
             }],
         };
@@ -1794,7 +1829,8 @@ mod tests {
             params: vec![Param {
                 name: "x".to_string(), ty: Type::Named("ParamType".to_string()),
                 ownership: Ownership::Owned,
-            }],
+                secret: false,
+}],
             return_type: Some(Type::Named("RetType".to_string())),
             trait_bounds: vec![],
             body: Block { stmts: vec![], span: dummy_span() },
@@ -1804,5 +1840,79 @@ mod tests {
         collect_item_deps(&item, &mut deps);
         assert!(deps.contains("ParamType"));
         assert!(deps.contains("RetType"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_array_lit() {
+        let expr = Expr::ArrayLit(vec![
+            Expr::Ident("a".to_string()),
+            Expr::Ident("b".to_string()),
+        ]);
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("a"));
+        assert!(deps.contains("b"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_object_lit() {
+        let expr = Expr::ObjectLit {
+            fields: vec![
+                ("x".into(), Expr::Ident("val".to_string())),
+            ],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("val"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_match_with_guard() {
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("subj".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: Some(Expr::Ident("guard_dep".to_string())),
+                body: Expr::Ident("body_dep".to_string()),
+            }],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("subj"));
+        assert!(deps.contains("guard_dep"));
+        assert!(deps.contains("body_dep"));
+    }
+
+    #[test]
+    fn test_collect_expr_deps_empty_array() {
+        let expr = Expr::ArrayLit(vec![]);
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.is_empty());
+    }
+
+    #[test]
+    fn test_collect_expr_deps_empty_object() {
+        let expr = Expr::ObjectLit { fields: vec![] };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.is_empty());
+    }
+
+    #[test]
+    fn test_collect_expr_deps_match_no_guard() {
+        let expr = Expr::Match {
+            subject: Box::new(Expr::Ident("s".to_string())),
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: None,
+                body: Expr::Ident("b".to_string()),
+            }],
+        };
+        let mut deps = std::collections::HashSet::new();
+        collect_expr_deps(&expr, &mut deps);
+        assert!(deps.contains("s"));
+        assert!(deps.contains("b"));
+        assert_eq!(deps.len(), 2);
     }
 }

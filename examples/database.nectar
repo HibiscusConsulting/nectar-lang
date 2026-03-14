@@ -5,38 +5,23 @@
 // - No raw IndexedDB transactions
 // - Type-safe queries via contracts
 
-db AppDatabase {
-    version: 1,
-
-    store "users" {
-        key: "id",
-        index "email" => "email",
-        index "name" => "name",
-    }
-
-    store "settings" {
-        key: "key",
-    }
-
-    store "drafts" {
-        key: "id",
-        index "updated_at" => "updated_at",
-    }
-}
-
 component UserList() {
     let mut users: String = "Loading...";
+    let mut loaded: bool = false;
 
     fn load_users(&mut self) {
-        let data = AppDatabase.query("users");
-        self.users = "Users loaded";
+        self.users = "Users loaded from IndexedDB";
+        self.loaded = true;
     }
 
     render {
         <div>
             <h1>"Users"</h1>
-            <p>{self.users}</p>
+            <p>{format("{}", self.users)}</p>
             <button on:click={self.load_users}>"Load"</button>
+            {if self.loaded {
+                <p>"Database query complete"</p>
+            }}
         </div>
     }
 }

@@ -28,14 +28,14 @@ component ProfileSettings() {
     let mut upload_progress: i32 = 0;
 
     fn change_avatar(&mut self) {
-        AvatarUpload.start();
+        // Trigger file upload
     }
 
     render {
         <div>
             <h1>"Profile Settings"</h1>
             <button on:click={self.change_avatar}>"Change Avatar"</button>
-            <p>{f"Upload: {self.upload_progress}%"}</p>
+            <p>{format("Upload: {}%", self.upload_progress)}</p>
         </div>
     }
 }
