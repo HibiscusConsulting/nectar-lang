@@ -89,6 +89,10 @@ pub struct WasmCodegen {
     /// Each entry: (func_name, container_global, last_val_global, signal_globals, condition_expr, then_children, else_children)
     /// The updater re-evaluates the condition and mounts/clears the container.
     cond_updaters: Vec<CondUpdater>,
+    /// Deferred lazy for-loop batch functions.
+    /// Each entry records everything needed to emit a batch-render function that
+    /// renders the next 20 items when the IntersectionObserver fires.
+    lazy_batches: Vec<LazyBatch>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -110,6 +114,27 @@ struct CondUpdater {
     then_children: Vec<TemplateNode>,
     /// Children to render when condition is false (optional)
     else_children: Option<Vec<TemplateNode>>,
+}
+
+/// Describes a deferred lazy for-loop batch function.
+/// When a `{lazy for ...}` template is encountered, the initial 20 items are
+/// rendered inline.  A `LazyBatch` is recorded so that a batch-render function
+/// can be emitted after the mount function.  That function renders the next 20
+/// items and is triggered by an IntersectionObserver on a sentinel element.
+#[derive(Clone)]
+struct LazyBatch {
+    /// Unique label id for naming globals/functions
+    uid: u32,
+    /// Component name (for function naming and callback dispatch)
+    comp: String,
+    /// Template children to render per item
+    children: Vec<TemplateNode>,
+    /// Loop binding variable name (e.g. "item")
+    binding: String,
+    /// Whether the iterator is a range (true) or array (false)
+    is_range: bool,
+    /// The callback index assigned to the batch function
+    callback_idx: u32,
 }
 
 /// The kind of a top-level keyword definition.
@@ -165,6 +190,7 @@ impl WasmCodegen {
             struct_layouts: HashMap::new(),
             handler_param_bindings: Vec::new(),
             cond_updaters: Vec::new(),
+            lazy_batches: Vec::new(),
         }
     }
 
@@ -1126,6 +1152,7 @@ impl WasmCodegen {
         }
         self.signal_updaters.clear();
         self.cond_updaters.clear();
+        self.lazy_batches.clear();
 
         // Generate the init/mount function with prop parameters
         // String props are passed as (ptr, len) pairs in WASM
@@ -1740,6 +1767,166 @@ impl WasmCodegen {
 
             self.indent -= 1;
             self.line(")");
+        }
+
+        // Emit lazy for-loop batch globals and functions
+        for batch in &self.lazy_batches.clone() {
+            self.line(&format!("(global $__lazy_parent_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!("(global $__lazy_cursor_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!("(global $__lazy_total_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!("(global $__lazy_data_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!("(global $__lazy_sentinel_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!("(global $__lazy_observer_{} (mut i32) (i32.const 0))", batch.uid));
+        }
+
+        for batch in self.lazy_batches.clone() {
+            // Save/restore pattern for deferred locals
+            let saved_output = std::mem::take(&mut self.output);
+            self.output = String::new();
+            let saved_defer = self.defer_template_locals;
+            let saved_locals = std::mem::take(&mut self.template_locals);
+            self.defer_template_locals = true;
+            self.template_locals.clear();
+
+            let batch_size = 20;
+            let uid = batch.uid;
+            let binding_var = format!("${}", batch.binding);
+            let idx_var = format!("$__lb_idx_{}", uid);
+            let end_var = format!("$__lb_end_{}", uid);
+            let block_label = format!("$lb_break_{}", uid);
+            let loop_label = format!("$lb_cont_{}", uid);
+
+            self.emit_template_local(&idx_var);
+            self.emit_template_local(&end_var);
+            self.emit_template_local(&binding_var);
+
+            self.line(&format!(";; lazy batch: render next {} items", batch_size));
+
+            // idx = cursor (current position)
+            self.line(&format!("global.get $__lazy_cursor_{}", uid));
+            self.line(&format!("local.set {}", idx_var));
+
+            // end = min(cursor + batch_size, total)
+            self.line(&format!("global.get $__lazy_cursor_{}", uid));
+            self.line(&format!("i32.const {}", batch_size));
+            self.line("i32.add");
+            self.line(&format!("global.get $__lazy_total_{}", uid));
+            // select: if (cursor+batch_size) < total then (cursor+batch_size) else total
+            self.line(&format!("global.get $__lazy_cursor_{}", uid));
+            self.line(&format!("i32.const {}", batch_size));
+            self.line("i32.add");
+            self.line(&format!("global.get $__lazy_total_{}", uid));
+            self.line("i32.lt_u");
+            self.line("select");
+            self.line(&format!("local.set {}", end_var));
+
+            // Loop: render items [idx, end)
+            self.line(&format!("block {} ;; lazy batch break", block_label));
+            self.indent += 1;
+            self.line(&format!("loop {} ;; lazy batch cont", loop_label));
+            self.indent += 1;
+
+            // br_if break (idx >= end)
+            self.line(&format!("local.get {}", idx_var));
+            self.line(&format!("local.get {}", end_var));
+            if batch.is_range {
+                self.line("i32.ge_s");
+            } else {
+                self.line("i32.ge_u");
+            }
+            self.line(&format!("br_if {}", block_label));
+
+            if !batch.is_range {
+                // Load current element: data_ptr + idx * 4
+                self.line(&format!("global.get $__lazy_data_{}", uid));
+                self.line(&format!("local.get {}", idx_var));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                self.line(&format!("local.set {}", binding_var));
+            }
+
+            // Generate children with parent = global lazy parent
+            // We use a local that reads from the global
+            let parent_local = format!("$__lb_parent_{}", uid);
+            self.emit_template_local(&parent_local);
+            self.line(&format!("global.get $__lazy_parent_{}", uid));
+            self.line(&format!("local.set {}", parent_local));
+
+            self.for_loop_bindings.push(batch.binding.clone());
+            for child in &batch.children {
+                self.generate_template(child, &parent_local);
+            }
+            self.for_loop_bindings.pop();
+
+            // Increment index
+            self.line(&format!("local.get {}", idx_var));
+            self.line("i32.const 1");
+            self.line("i32.add");
+            self.line(&format!("local.set {}", idx_var));
+
+            self.line(&format!("br {}", loop_label));
+
+            self.indent -= 1;
+            self.line("end ;; lazy batch cont");
+            self.indent -= 1;
+            self.line("end ;; lazy batch break");
+
+            // Update cursor = end
+            self.line(&format!("local.get {}", end_var));
+            self.line(&format!("global.set $__lazy_cursor_{}", uid));
+
+            // If cursor >= total, disconnect observer
+            self.line(&format!("global.get $__lazy_cursor_{}", uid));
+            self.line(&format!("global.get $__lazy_total_{}", uid));
+            self.line("i32.ge_u");
+            self.line("if ;; all items rendered — disconnect observer");
+            self.indent += 1;
+            self.line(&format!("global.get $__lazy_observer_{}", uid));
+            self.line("call $observe_disconnect");
+            self.indent -= 1;
+            self.line("end");
+
+            // Capture the body, then emit with locals hoisted
+            let body_output = std::mem::take(&mut self.output);
+            self.output = saved_output;
+
+            let func_name = format!("$__lazy_batch_{}_{}", batch.comp, uid);
+            self.line("");
+            self.emit(&format!("(func {} (export \"{}\") ;; lazy batch render", func_name, &func_name[1..]));
+            self.indent += 1;
+
+            // Emit hoisted locals
+            for local_decl in std::mem::take(&mut self.template_locals) {
+                self.line(&local_decl);
+            }
+            self.defer_template_locals = saved_defer;
+            self.template_locals = saved_locals;
+
+            // Emit body
+            self.output.push_str(&body_output);
+
+            self.indent -= 1;
+            self.line(")");
+
+            // Emit a per-batch callback dispatcher that the global __callback
+            // routes to.  It accepts (param $idx i32) to match the component
+            // callback signature, ignores the parameter, and calls the batch fn.
+            let cb_disp_name = format!("__lazy_batch_{}_{}__callback", batch.comp, uid);
+            self.line("");
+            self.emit(&format!("(func ${cb_disp_name} (export \"{cb_disp_name}\") (param $idx i32)"));
+            self.indent += 1;
+            self.line(&format!("call {}", func_name));
+            self.indent -= 1;
+            self.line(")");
+
+            // Register in callback registry so __callback(cb_idx) routes here
+            self.callback_registry.push((
+                format!("__lazy_batch_{}_{}", batch.comp, uid),
+                batch.callback_idx,
+                1,
+            ));
         }
 
         // Reset component context
@@ -4132,46 +4319,119 @@ impl WasmCodegen {
             }
             TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
                 // Check if iterator is a Range expression (start..end)
-                if let Expr::Range { start, end } = iterator.as_ref() {
-                    // Range-based for loop: iterates i32 values [start, end)
-                    let loop_id = self.next_label();
-                    let idx_var = format!("${}", binding);
-                    let end_var = format!("$for_end_{}", loop_id);
-                    let block_label = format!("$for_break_{}", loop_id);
-                    let loop_label = format!("$for_cont_{}", loop_id);
+                let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
+
+                if *lazy {
+                    // ── Lazy for-loop: render first batch, defer rest to IntersectionObserver ──
+                    let uid = self.next_label();
+                    let comp = self.component_name.clone();
+                    let batch_size = 20;
+
+                    // Allocate a callback index for the batch function
+                    let cb_idx = self.global_handler_base;
+                    self.global_handler_base += 1;
+
+                    // Locals for the initial batch loop
+                    let idx_var = format!("$__lazy_idx_{}", uid);
+                    let end_var = format!("$__lazy_end_{}", uid);
+                    let binding_var = format!("${}", binding);
+                    let block_label = format!("$lazy_break_{}", uid);
+                    let loop_label = format!("$lazy_cont_{}", uid);
+                    let sentinel_var = format!("$__lazy_sent_{}", uid);
+                    let observer_var = format!("$__lazy_obs_{}", uid);
 
                     self.emit_template_local(&idx_var);
                     self.emit_template_local(&end_var);
+                    self.emit_template_local(&binding_var);
+                    self.emit_template_local(&sentinel_var);
+                    self.emit_template_local(&observer_var);
 
-                    self.line(&format!(";; template for {} in range", binding));
+                    self.line(&format!(";; lazy for {} — initial batch of {} items", binding, batch_size));
 
-                    // Evaluate start and end expressions
-                    self.generate_expr(start);
-                    self.line(&format!("local.set {}", idx_var));
-                    self.generate_expr(end);
+                    // Store parent element ID in global
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("global.set $__lazy_parent_{}", uid));
+
+                    if is_range {
+                        // Range-based: extract start and end
+                        if let Expr::Range { start, end } = iterator.as_ref() {
+                            // Total = end
+                            self.generate_expr(end);
+                            self.line(&format!("global.set $__lazy_total_{}", uid));
+
+                            // Start value → idx_var
+                            self.generate_expr(start);
+                            self.line(&format!("local.set {}", idx_var));
+
+                            // Store start as initial data (range start offset)
+                            self.generate_expr(start);
+                            self.line(&format!("global.set $__lazy_data_{}", uid));
+                        }
+                    } else {
+                        // Array-based: evaluate iterator, extract length and data_ptr
+                        let arr_var = format!("$__lazy_arr_{}", uid);
+                        self.emit_template_local(&arr_var);
+
+                        self.generate_expr(iterator);
+                        self.line(&format!("local.set {}", arr_var));
+
+                        // Total = array length
+                        self.line(&format!("local.get {}", arr_var));
+                        self.line("i32.load ;; array length");
+                        self.line(&format!("global.set $__lazy_total_{}", uid));
+
+                        // Data ptr
+                        self.line(&format!("local.get {}", arr_var));
+                        self.line("i32.load offset=8 ;; data_ptr");
+                        self.line(&format!("global.set $__lazy_data_{}", uid));
+
+                        // Start at index 0
+                        self.line("i32.const 0");
+                        self.line(&format!("local.set {}", idx_var));
+                    }
+
+                    // end_var = min(batch_size, total)
+                    self.line(&format!("global.get $__lazy_total_{}", uid));
+                    self.line(&format!("i32.const {}", batch_size));
+                    // if total < batch_size, use total; else use batch_size
+                    self.line(&format!("global.get $__lazy_total_{}", uid));
+                    self.line(&format!("i32.const {}", batch_size));
+                    self.line("i32.lt_u");
+                    self.line("select");
                     self.line(&format!("local.set {}", end_var));
 
-                    // block $for_break { loop $for_cont {
-                    self.line(&format!("block {} ;; for break", block_label));
+                    // Initial batch loop: render items [idx_var, end_var)
+                    self.line(&format!("block {} ;; lazy initial break", block_label));
                     self.indent += 1;
-                    self.line(&format!("loop {} ;; for continue", loop_label));
+                    self.line(&format!("loop {} ;; lazy initial cont", loop_label));
                     self.indent += 1;
 
-                    // br_if $for_break (idx >= end)
+                    // br_if break (idx >= end)
                     self.line(&format!("local.get {}", idx_var));
                     self.line(&format!("local.get {}", end_var));
-                    self.line("i32.ge_s");
+                    if is_range {
+                        self.line("i32.ge_s");
+                    } else {
+                        self.line("i32.ge_u");
+                    }
                     self.line(&format!("br_if {}", block_label));
 
-                    // Push binding name so child expression resolution works
-                    self.for_loop_bindings.push(binding.clone());
+                    if !is_range {
+                        // Load current element: data_ptr + idx * 4
+                        self.line(&format!("global.get $__lazy_data_{}", uid));
+                        self.line(&format!("local.get {}", idx_var));
+                        self.line("i32.const 4");
+                        self.line("i32.mul");
+                        self.line("i32.add");
+                        self.line("i32.load");
+                        self.line(&format!("local.set {}", binding_var));
+                    }
 
-                    // Generate child template nodes
+                    // Push binding and generate children
+                    self.for_loop_bindings.push(binding.clone());
                     for child in children {
                         self.generate_template(child, parent);
                     }
-
-                    // Pop binding
                     self.for_loop_bindings.pop();
 
                     // Increment index
@@ -4180,15 +4440,127 @@ impl WasmCodegen {
                     self.line("i32.add");
                     self.line(&format!("local.set {}", idx_var));
 
-                    // Branch back to loop start
                     self.line(&format!("br {}", loop_label));
 
                     self.indent -= 1;
-                    self.line("end ;; for continue");
+                    self.line("end ;; lazy initial cont");
                     self.indent -= 1;
-                    self.line("end ;; for break");
+                    self.line("end ;; lazy initial break");
+
+                    // Store cursor = end_var (how many items rendered so far)
+                    self.line(&format!("local.get {}", end_var));
+                    self.line(&format!("global.set $__lazy_cursor_{}", uid));
+
+                    // Create sentinel div and observer (only if total > batch_size)
+                    self.line(&format!(";; lazy for sentinel + IntersectionObserver"));
+                    self.line(&format!("global.get $__lazy_cursor_{}", uid));
+                    self.line(&format!("global.get $__lazy_total_{}", uid));
+                    self.line("i32.lt_u");
+                    self.line("if ;; more items remain — set up observer");
+                    self.indent += 1;
+
+                    // Create sentinel <div>
+                    let sentinel_tag = self.store_string("div");
+                    self.line(&format!("i32.const {} ;; \"div\" tag ptr", sentinel_tag));
+                    self.line("i32.const 3 ;; \"div\" tag len");
+                    self.line("call $dom_createElement");
+                    self.line(&format!("local.set {}", sentinel_var));
+
+                    // Append sentinel to parent
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("local.get {}", sentinel_var));
+                    self.line("call $dom_appendChild");
+
+                    // Store sentinel element ID in global for disconnect later
+                    self.line(&format!("local.get {}", sentinel_var));
+                    self.line(&format!("global.set $__lazy_sentinel_{}", uid));
+
+                    // Create IntersectionObserver with batch callback index
+                    self.line(&format!("i32.const {} ;; lazy batch callback index", cb_idx));
+                    self.line("i32.const 0 ;; no options");
+                    self.line("call $observe_intersectionObserver");
+                    self.line(&format!("local.set {}", observer_var));
+
+                    // Store observer ID in global for disconnect
+                    self.line(&format!("local.get {}", observer_var));
+                    self.line(&format!("global.set $__lazy_observer_{}", uid));
+
+                    // Observe the sentinel
+                    self.line(&format!("local.get {}", observer_var));
+                    self.line(&format!("local.get {}", sentinel_var));
+                    self.line("call $observe_observe");
+
+                    self.indent -= 1;
+                    self.line("end ;; observer setup");
+
+                    // Record deferred batch function
+                    self.lazy_batches.push(LazyBatch {
+                        uid,
+                        comp: comp.clone(),
+                        children: children.clone(),
+                        binding: binding.clone(),
+                        is_range,
+                        callback_idx: cb_idx,
+                    });
+                } else if is_range {
+                    // ── Non-lazy range-based for loop ──
+                    if let Expr::Range { start, end } = iterator.as_ref() {
+                        let loop_id = self.next_label();
+                        let idx_var = format!("${}", binding);
+                        let end_var = format!("$for_end_{}", loop_id);
+                        let block_label = format!("$for_break_{}", loop_id);
+                        let loop_label = format!("$for_cont_{}", loop_id);
+
+                        self.emit_template_local(&idx_var);
+                        self.emit_template_local(&end_var);
+
+                        self.line(&format!(";; template for {} in range", binding));
+
+                        // Evaluate start and end expressions
+                        self.generate_expr(start);
+                        self.line(&format!("local.set {}", idx_var));
+                        self.generate_expr(end);
+                        self.line(&format!("local.set {}", end_var));
+
+                        // block $for_break { loop $for_cont {
+                        self.line(&format!("block {} ;; for break", block_label));
+                        self.indent += 1;
+                        self.line(&format!("loop {} ;; for continue", loop_label));
+                        self.indent += 1;
+
+                        // br_if $for_break (idx >= end)
+                        self.line(&format!("local.get {}", idx_var));
+                        self.line(&format!("local.get {}", end_var));
+                        self.line("i32.ge_s");
+                        self.line(&format!("br_if {}", block_label));
+
+                        // Push binding name so child expression resolution works
+                        self.for_loop_bindings.push(binding.clone());
+
+                        // Generate child template nodes
+                        for child in children {
+                            self.generate_template(child, parent);
+                        }
+
+                        // Pop binding
+                        self.for_loop_bindings.pop();
+
+                        // Increment index
+                        self.line(&format!("local.get {}", idx_var));
+                        self.line("i32.const 1");
+                        self.line("i32.add");
+                        self.line(&format!("local.set {}", idx_var));
+
+                        // Branch back to loop start
+                        self.line(&format!("br {}", loop_label));
+
+                        self.indent -= 1;
+                        self.line("end ;; for continue");
+                        self.indent -= 1;
+                        self.line("end ;; for break");
+                    }
                 } else {
-                    // Array-based for loop
+                    // ── Non-lazy array-based for loop ──
                     // Vec layout: [length: i32, capacity: i32, data_ptr: i32] = 12 byte header
                     // Data region: contiguous i32 elements at data_ptr
                     let loop_id = self.next_label();
@@ -21181,5 +21553,291 @@ component Feed {
         // The sentinel is a <div> element — verify createElement is called
         // with the "div" string (tag_len = 3)
         assert!(wat.contains("i32.const 3 ;; \"div\" tag len"), "sentinel should be a div element");
+    }
+}
+
+#[cfg(test)]
+mod lazy_for_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    #[test]
+    fn test_lazy_for_emits_globals() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("__lazy_parent_"), "should emit lazy parent global");
+        assert!(wat.contains("__lazy_cursor_"), "should emit lazy cursor global");
+        assert!(wat.contains("__lazy_total_"), "should emit lazy total global");
+        assert!(wat.contains("__lazy_data_"), "should emit lazy data global");
+        assert!(wat.contains("__lazy_sentinel_"), "should emit lazy sentinel global");
+        assert!(wat.contains("__lazy_observer_"), "should emit lazy observer global");
+    }
+
+    #[test]
+    fn test_lazy_for_initial_batch_comment() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("lazy for item"), "should emit lazy for comment");
+        assert!(wat.contains("initial batch of 20 items"), "should mention initial batch size");
+    }
+
+    #[test]
+    fn test_lazy_for_emits_batch_function() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("__lazy_batch_ItemList_"), "should emit lazy batch function");
+        assert!(wat.contains("lazy batch render"), "should comment the batch function");
+        assert!(wat.contains("lazy batch: render next 20 items"), "should comment batch body");
+    }
+
+    #[test]
+    fn test_lazy_for_creates_observer() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("call $observe_intersectionObserver"), "should create IntersectionObserver");
+        assert!(wat.contains("call $observe_observe"), "should observe the sentinel");
+        assert!(wat.contains("lazy batch callback index"), "should comment callback index");
+    }
+
+    #[test]
+    fn test_lazy_for_batch_disconnects_observer() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("call $observe_disconnect"), "batch function should disconnect observer when done");
+        assert!(wat.contains("all items rendered"), "should comment observer disconnect");
+    }
+
+    #[test]
+    fn test_lazy_for_range_based() {
+        let src = r#"
+component RangeList {
+    let mut count: i32 = 100;
+
+    render {
+        <div>
+            {lazy for i in 0..self.count {
+                <p>"item"</p>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("lazy for i"), "should emit lazy for comment for range");
+        assert!(wat.contains("__lazy_batch_RangeList_"), "should emit batch function for range");
+        assert!(wat.contains("i32.ge_s"), "range-based lazy should use signed comparison");
+    }
+
+    #[test]
+    fn test_lazy_for_batch_callback_registered() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        // The batch function's callback dispatcher should be registered
+        assert!(wat.contains("__lazy_batch_ItemList_"), "should register batch callback");
+        // The global __callback dispatcher should reference it
+        assert!(wat.contains("__callback"), "should have global callback dispatcher");
+    }
+
+    #[test]
+    fn test_lazy_for_coexists_with_methods() {
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    fn reset(&mut self) {
+        self.items = [1];
+    }
+
+    render {
+        <div>
+            {lazy for item in self.items {
+                <span>"item"</span>
+            }}
+            <button on:click={self.reset}>"Reset"</button>
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        // Both the component handler and lazy batch should be registered
+        assert!(wat.contains("ItemList__handler_"), "should have component handler");
+        assert!(wat.contains("__lazy_batch_ItemList_"), "should have lazy batch function");
+        assert!(wat.contains("ItemList__callback"), "should have component callback");
+    }
+
+    #[test]
+    fn test_non_lazy_for_unchanged() {
+        // Non-lazy for loops should NOT emit lazy batch machinery
+        let src = r#"
+component ItemList {
+    let mut items: Vec<i32> = [1, 2, 3];
+
+    render {
+        <div>
+            {for item in self.items {
+                <span>"item"</span>
+            }}
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(!wat.contains("__lazy_batch_"), "non-lazy for should NOT emit batch function");
+        assert!(!wat.contains("__lazy_cursor_"), "non-lazy for should NOT emit cursor global");
+        assert!(!wat.contains("lazy for item"), "non-lazy for should NOT emit lazy comment");
+        assert!(wat.contains("template for item in ..."), "non-lazy for should emit normal comment");
+    }
+
+    #[test]
+    fn test_lazy_for_unit_level_codegen_array() {
+        // Direct unit test on generate_template with lazy=true array iterator
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        codegen.component_name = "TestComp".to_string();
+        let node = TemplateNode::TemplateFor {
+            binding: "x".to_string(),
+            iterator: Box::new(Expr::Ident("items".to_string())),
+            children: vec![
+                TemplateNode::TextLiteral("hello".to_string()),
+            ],
+            lazy: true,
+        };
+        codegen.generate_template(&node, "$root");
+        let mut out = String::new();
+        for local in &codegen.template_locals {
+            out.push_str(local);
+            out.push('\n');
+        }
+        out.push_str(&codegen.output);
+
+        assert!(out.contains("lazy for x"), "should emit lazy for comment");
+        assert!(out.contains("global.set $__lazy_parent_"), "should store parent in global");
+        assert!(out.contains("global.set $__lazy_total_"), "should store total in global");
+        assert!(out.contains("global.set $__lazy_data_"), "should store data ptr in global");
+        assert!(out.contains("global.set $__lazy_cursor_"), "should store cursor in global");
+
+        // Should have recorded a lazy batch
+        assert_eq!(codegen.lazy_batches.len(), 1, "should record one lazy batch");
+        assert_eq!(codegen.lazy_batches[0].binding, "x");
+        assert_eq!(codegen.lazy_batches[0].comp, "TestComp");
+        assert!(!codegen.lazy_batches[0].is_range);
+    }
+
+    #[test]
+    fn test_lazy_for_unit_level_codegen_range() {
+        // Direct unit test on generate_template with lazy=true range iterator
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        codegen.component_name = "TestComp".to_string();
+        let node = TemplateNode::TemplateFor {
+            binding: "i".to_string(),
+            iterator: Box::new(Expr::Range {
+                start: Box::new(Expr::Integer(0)),
+                end: Box::new(Expr::Integer(100)),
+            }),
+            children: vec![
+                TemplateNode::TextLiteral("num".to_string()),
+            ],
+            lazy: true,
+        };
+        codegen.generate_template(&node, "$root");
+        let mut out = String::new();
+        for local in &codegen.template_locals {
+            out.push_str(local);
+            out.push('\n');
+        }
+        out.push_str(&codegen.output);
+
+        assert!(out.contains("lazy for i"), "should emit lazy for comment");
+        assert!(out.contains("i32.ge_s"), "range lazy for should use signed comparison");
+
+        // Should have recorded a lazy batch
+        assert_eq!(codegen.lazy_batches.len(), 1, "should record one lazy batch");
+        assert_eq!(codegen.lazy_batches[0].binding, "i");
+        assert!(codegen.lazy_batches[0].is_range);
     }
 }
