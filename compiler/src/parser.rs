@@ -1167,8 +1167,8 @@ impl Parser {
                 } else {
                     return Err(self.error("Expected tabindex value"));
                 }
-            } else {
-                self.expect(&TokenKind::Equals)?;
+            } else if self.check(&TokenKind::Equals) {
+                self.advance(); // consume '='
                 if self.check(&TokenKind::LeftBrace) {
                     self.advance();
                     let value = self.parse_expr()?;
@@ -1181,6 +1181,10 @@ impl Parser {
                 } else {
                     return Err(self.error("Expected attribute value"));
                 }
+            } else {
+                // Boolean attribute (e.g., disabled, checked, readonly)
+                // No `=` follows — treat as a static attribute with empty value
+                attributes.push(Attribute::Static { name: attr_name, value: String::new() });
             }
         }
 
@@ -1289,8 +1293,8 @@ impl Parser {
                 } else {
                     return Err(self.error("Expected string value for role attribute"));
                 }
-            } else {
-                self.expect(&TokenKind::Equals)?;
+            } else if self.check(&TokenKind::Equals) {
+                self.advance(); // consume '='
                 if self.check(&TokenKind::LeftBrace) {
                     self.advance();
                     let value = self.parse_expr()?;
@@ -1303,6 +1307,9 @@ impl Parser {
                 } else {
                     return Err(self.error("Expected attribute value"));
                 }
+            } else {
+                // Boolean attribute (e.g., disabled, checked, readonly)
+                attributes.push(Attribute::Static { name: attr_name, value: String::new() });
             }
         }
 
@@ -4847,6 +4854,7 @@ impl Parser {
                     TokenKind::OnMessage => Some("on_message"),
                     TokenKind::Upload => Some("upload"),
                     TokenKind::Payment => Some("payment"),
+                    TokenKind::Select => Some("select"),
                     _ => None,
                 };
                 if let Some(name) = name {
@@ -4879,7 +4887,7 @@ impl Parser {
             | TokenKind::False | TokenKind::Secret | TokenKind::Tool
             | TokenKind::Theme | TokenKind::Page | TokenKind::Chunk
             | TokenKind::Form | TokenKind::OnMessage | TokenKind::Upload
-            | TokenKind::Payment
+            | TokenKind::Payment | TokenKind::Select
         )
     }
 
@@ -9971,6 +9979,124 @@ component PostList() {
                 assert!(matches!(&div.children[2], TemplateNode::Element(e) if e.tag == "button"));
             } else {
                 panic!("Expected div Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_select_element() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <select class="picker">
+                        <option>"A"</option>
+                    </select>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.tag, "select");
+                assert_eq!(el.attributes.len(), 1);
+                assert_eq!(el.children.len(), 1);
+                if let TemplateNode::Element(opt) = &el.children[0] {
+                    assert_eq!(opt.tag, "option");
+                } else {
+                    panic!("Expected option Element");
+                }
+            } else {
+                panic!("Expected Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_select_self_closing() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <select />
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.tag, "select");
+                assert!(el.children.is_empty());
+            } else {
+                panic!("Expected Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_boolean_attribute_disabled() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <button disabled>"Click"</button>
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.tag, "button");
+                assert_eq!(el.attributes.len(), 1);
+                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty()));
+            } else {
+                panic!("Expected Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_boolean_attribute_checked() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <input checked />
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.tag, "input");
+                assert_eq!(el.attributes.len(), 1);
+                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "checked" && value.is_empty()));
+            } else {
+                panic!("Expected Element");
+            }
+        } else {
+            panic!("Expected Component");
+        }
+    }
+
+    #[test]
+    fn test_parse_mixed_boolean_and_value_attributes() {
+        let prog = parse(r#"
+            component C {
+                render {
+                    <input disabled type="text" readonly />
+                }
+            }
+        "#);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                assert_eq!(el.tag, "input");
+                assert_eq!(el.attributes.len(), 3);
+                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty()));
+                assert!(matches!(&el.attributes[1], Attribute::Static { name, value } if name == "type" && value == "text"));
+                assert!(matches!(&el.attributes[2], Attribute::Static { name, value } if name == "readonly" && value.is_empty()));
+            } else {
+                panic!("Expected Element");
             }
         } else {
             panic!("Expected Component");

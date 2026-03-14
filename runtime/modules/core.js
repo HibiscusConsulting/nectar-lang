@@ -229,6 +229,7 @@ export const wasmImports = {
           if (e.dataTransfer) {
             R.__objects[0] = e; // stash event for getDragData/setDragData
           }
+          dv.setInt32(base + 32, elId, true);
         }
         R.__cb(cbIdx);
       };
@@ -254,6 +255,7 @@ export const wasmImports = {
     setAttribute(elId, nPtr, nLen, vPtr, vLen) { R.__getElement(elId).setAttribute(R.__getString(nPtr, nLen), R.__getString(vPtr, vLen)); },
     setStyle(elId, pPtr, pLen, vPtr, vLen) { R.__getElement(elId).style.setProperty(R.__getString(pPtr, pLen), R.__getString(vPtr, vLen)); },
     setProperty(elId, nPtr, nLen, val) { R.__getElement(elId)[R.__getString(nPtr, nLen)] = val; },
+    getValue(elId) { return R.__allocString(String(R.__getElement(elId).value ?? '')); },
 
     setTitle(ptr, len) { document.title = R.__getString(ptr, len); },
 

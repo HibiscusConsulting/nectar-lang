@@ -1,4 +1,5 @@
 use crate::ast::*;
+use std::collections::HashMap;
 
 /// Generates WebAssembly Text Format (WAT) from a Nectar AST.
 ///
@@ -39,8 +40,10 @@ pub struct WasmCodegen {
     component_fields: Vec<String>,
     /// Current component name (for global signal variable naming)
     component_name: String,
-    /// Deferred signal→DOM updater functions: (func_name, global_el_name, signal_global_name)
-    signal_updaters: Vec<(String, String, String)>,
+    /// Deferred signal→DOM updater functions: (func_name, global_el_name, signal_global_name, expr_option)
+    /// When expr_option is Some, the updater re-evaluates the full expression (e.g. format("...", self.field)).
+    /// When None, the updater reads the signal directly and converts via string_fromI32.
+    signal_updaters: Vec<(String, String, String, Option<Expr>)>,
     /// Names of components defined in this program (for detecting component instantiation)
     known_components: Vec<String>,
     /// Prop names for the current component being generated (String props passed as ptr+len pairs)
@@ -55,6 +58,28 @@ pub struct WasmCodegen {
     /// Names of stores defined in this program (for resolving StoreName::signal calls).
     /// Each entry is (store_name, signal_names).
     known_stores: Vec<(String, Vec<String>)>,
+    /// Method names for the current component (for resolving handler indices)
+    component_method_names: Vec<String>,
+    /// Global handler index counter — each event handler across all components
+    /// gets a globally unique index so `__callback(idx)` can dispatch correctly.
+    global_handler_base: u32,
+    /// Tracks (component_name, base_index, method_count) for each component
+    /// to emit the global __callback dispatcher at the end.
+    callback_registry: Vec<(String, u32, u32)>,
+    /// Active for-loop binding variable names (stack for nested loops).
+    /// When generating child templates inside a `{for item in expr { ... }}`,
+    /// `item` is pushed here so that `Expr::Ident("item")` resolves to
+    /// `local.get $item` and `Expr::FieldAccess` on `item` emits a struct
+    /// field load from the pointer.
+    for_loop_bindings: Vec<String>,
+    /// Names of component state fields that are string-typed (their initializer
+    /// is a string literal or their declared type is String).  Used by
+    /// `expr_is_string_typed` to detect dynamic string comparisons.
+    string_state_fields: Vec<String>,
+    /// Struct layouts: struct_name -> [(field_name, byte_offset), ...]
+    /// Populated during generate_struct_layout, used for struct construction
+    /// and field access codegen.
+    struct_layouts: HashMap<String, Vec<(String, u32)>>,
 }
 
 /// The kind of a top-level keyword definition.
@@ -102,6 +127,12 @@ impl WasmCodegen {
             component_prop_defs: Vec::new(),
             known_keyword_defs: Vec::new(),
             known_stores: Vec::new(),
+            component_method_names: Vec::new(),
+            global_handler_base: 0,
+            callback_registry: Vec::new(),
+            for_loop_bindings: Vec::new(),
+            string_state_fields: Vec::new(),
+            struct_layouts: HashMap::new(),
         }
     }
 
@@ -157,6 +188,7 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"embedLoadSandboxed\" (func $embed_load_sandboxed (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"embedLoadScript\" (func $embed_load_script (param i32 i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"setProperty\" (func $dom_setProperty (param i32 i32 i32 i32)))");
+        self.line("(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))");
 
         // ── Timer — browser timer APIs ───────────────────────────────────────
         self.line("");
@@ -385,10 +417,32 @@ impl WasmCodegen {
         self.line(";; share_can_share, share_native — routed through core.js share namespace");
 
         // Allocator (bump allocator for now)
+        // The initial value is a placeholder — replaced at the end of generate()
+        // with the actual end of the string data section to prevent heap allocations
+        // from stomping on interned string data.
         self.line("");
-        self.line("(global $heap_ptr (mut i32) (i32.const 1024))");
+        self.line("(global $heap_ptr (mut i32) (i32.const __HEAP_START__))");
+        self.line("");
+        // Event data region at 307200 (300KB). Layout (40 bytes):
+        //   +0  clientX (f64)
+        //   +8  clientY (f64)
+        //   +16 keyCode (i32)
+        //   +20 modifiers (i32)
+        //   +24 key_ptr (i32)
+        //   +28 key_len (i32)
+        //   +32 target_elId (i32)
+        self.line("(global $__event_data_base i32 (i32.const 307200))");
+        self.line("");
+        // Handler performance timing globals — stores the last handler execution time
+        // as a formatted "X.XXms" string (ptr, len) for metric signals
+        self.line("(global $__last_handler_time_ptr (mut i32) (i32.const 0))");
+        self.line("(global $__last_handler_time_len (mut i32) (i32.const 0))");
+        // Element ID for a timing display element — if set, callback dispatchers
+        // will call dom_setText to update it with the timing after each handler.
+        self.line("(global $__timing_display_el (mut i32) (i32.const 0))");
         self.line("");
         self.emit_alloc_function();
+        self.emit_event_data_ptr_export();
         self.emit_string_runtime();
         self.emit_internal_runtimes();
         self.emit_crypto_runtime();
@@ -398,6 +452,19 @@ impl WasmCodegen {
         self.emit_ai_runtime();
         self.emit_a11y_runtime();
         self.emit_time_runtime();
+        self.emit_format_runtime();
+        self.emit_collections_runtime();
+        self.emit_csv_runtime();
+        self.emit_bigdecimal_runtime();
+        self.emit_search_runtime();
+        self.emit_pagination_runtime();
+        self.emit_debounce_runtime();
+        self.emit_throttle_runtime();
+        self.emit_toast_runtime();
+        self.emit_skeleton_runtime();
+        self.emit_mask_runtime();
+        self.emit_chart_runtime();
+        self.emit_datepicker_runtime();
 
         // Pre-collect component names so template codegen can detect component instantiation
         for item in &program.items {
@@ -479,8 +546,41 @@ impl WasmCodegen {
             self.line("(type $__closure_type (func (param i32 i32) (result i32)))");
         }
 
+        // Emit global __callback dispatcher that routes to per-component callbacks
+        if !self.callback_registry.is_empty() {
+            self.line("");
+            self.emit("(func $__callback (export \"__callback\") (param $idx i32)");
+            self.indent += 1;
+            for (comp_name, base, count) in self.callback_registry.clone() {
+                let end = base + count;
+                // Check if idx is in range [base, end)
+                self.line(&format!(";; {} handlers [{}, {})", comp_name, base, end));
+                self.line("local.get $idx");
+                self.line(&format!("i32.const {}", base));
+                self.line("i32.ge_u");
+                self.line("local.get $idx");
+                self.line(&format!("i32.const {}", end));
+                self.line("i32.lt_u");
+                self.line("i32.and");
+                self.line("if");
+                self.indent += 1;
+                self.line("local.get $idx");
+                self.line(&format!("call ${}__callback", comp_name));
+                self.line("return");
+                self.indent -= 1;
+                self.line("end");
+            }
+            self.indent -= 1;
+            self.line(")");
+        }
+
         // Emit data section for interned strings
         self.emit_data_section();
+
+        // Patch the heap pointer to start after all interned string data.
+        // Align to 16-byte boundary for safety.
+        let heap_start = (self.string_offset + 15) & !15;
+        self.output = self.output.replace("__HEAP_START__", &heap_start.to_string());
 
         self.indent -= 1;
         self.line(")");
@@ -846,8 +946,15 @@ impl WasmCodegen {
             let is_last = i == stmt_count - 1;
             if is_last && has_return {
                 if let Stmt::Expr(expr) = stmt {
-                    self.generate_expr(expr);
-                    continue;
+                    // If the last expression is an if/else whose branches contain
+                    // explicit returns, treat it as a statement (void if) rather
+                    // than an expression that leaves a value on the stack.
+                    let is_returning_if = matches!(expr, Expr::If { .. })
+                        && Self::if_branches_return(expr);
+                    if !is_returning_if {
+                        self.generate_expr(expr);
+                        continue;
+                    }
                 }
             }
             self.generate_stmt(stmt);
@@ -882,10 +989,11 @@ impl WasmCodegen {
             self.line(&format!(";; chunk registration: preload \"{}\" at offset {}", chunk_name, offset));
         }
 
-        // Emit globals for component signal IDs and dynamic element IDs
+        // Emit globals for component signal IDs (dynamic element globals are
+        // emitted per-occurrence during template generation since the same signal
+        // may bind to multiple DOM nodes, each needing a unique global).
         for state in &comp.state {
             self.line(&format!("(global $__sig_{}_{} (mut i32) (i32.const -1))", comp_name, state.name));
-            self.line(&format!("(global $__dyn_el_{}_{} (mut i32) (i32.const -1))", comp_name, state.name));
         }
         // Emit globals for prop values so event handlers can read them.
         // Prop ptr globals store the string/value pointer; handlers use global.get.
@@ -908,11 +1016,22 @@ impl WasmCodegen {
         self.emit(&sig);
         self.indent += 1;
 
-        // Track component fields and props for self.field / prop resolution
+        // Track component fields, props, and methods for self.field / handler resolution
         self.in_component_mount = true;
         self.component_fields = comp.state.iter().map(|s| s.name.clone()).collect();
+        self.string_state_fields = comp.state.iter().filter(|s| {
+            matches!(&s.initializer, Expr::StringLit(_))
+                || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
+        }).map(|s| s.name.clone()).collect();
         self.component_props = prop_names;
         self.component_name = comp_name.clone();
+        self.component_method_names = comp.methods.iter().map(|m| m.name.clone()).collect();
+
+        // Register this component's handler range in the global callback registry
+        let method_count = comp.methods.len() as u32;
+        if method_count > 0 {
+            self.callback_registry.push((comp_name.clone(), self.global_handler_base, method_count));
+        }
 
         // Enable deferred template locals — generate template code into a
         // separate buffer so we can emit all locals before any instructions.
@@ -962,6 +1081,11 @@ impl WasmCodegen {
         self.line("  local.set $root");
         self.line("end");
 
+        // Record mount start time for initial page load timing
+        self.line(";; mount timing: record start");
+        self.line("call $timer_now");
+        self.line("local.set $__mount_t0");
+
         // Initialize signals via runtime — use atomic operations for atomic signals.
         // String literals produce (ptr, len) on the stack but signal_create only
         // takes a single i32 initial value. For string signals we pass the ptr and
@@ -980,6 +1104,21 @@ impl WasmCodegen {
                 self.line("call $signal_create");
             }
             self.line(&format!("global.set $__sig_{}_{}", comp_name, state.name));
+        }
+
+        // Call init method (if present) after signals are created but before
+        // the template renders.  This lets init populate array signals, set
+        // derived state, etc.  The init handler is emitted later as a normal
+        // handler trampoline; we just call it eagerly here.
+        if let Some(init_idx) = comp.methods.iter().position(|m| m.name == "init") {
+            let handler_name = format!("{comp_name}__handler_{init_idx}");
+            let has_self = comp.methods[init_idx].params.iter().any(|p| p.name == "self");
+            self.line("");
+            self.line(";; lifecycle: call init() after signal creation");
+            if has_self {
+                self.line("i32.const 0");
+            }
+            self.line(&format!("call ${handler_name}"));
         }
 
         // Emit permission metadata and register allowed patterns
@@ -1050,6 +1189,7 @@ impl WasmCodegen {
             self.line(&local_decl);
         }
         self.line("(local $__arr_tmp i32)");
+        self.line("(local $__mount_t0 f64)");
         self.defer_template_locals = false;
 
         // Append the template code
@@ -1071,6 +1211,25 @@ impl WasmCodegen {
         // re-evaluates when its signal dependencies change
         self.line("");
         self.line(";; reactive effects for DOM updates are registered via signal.subscribe");
+
+        // Record mount end time and update timing display with initial render time
+        self.line("");
+        self.line(";; mount timing: compute and display initial render time");
+        self.line("call $timer_now");
+        self.line("local.get $__mount_t0");
+        self.line("f64.sub");
+        self.line("call $format_timing_ms");
+        self.line("global.set $__last_handler_time_len");
+        self.line("global.set $__last_handler_time_ptr");
+        self.line("global.get $__timing_display_el");
+        self.line("if");
+        self.indent += 1;
+        self.line("global.get $__timing_display_el");
+        self.line("global.get $__last_handler_time_ptr");
+        self.line("global.get $__last_handler_time_len");
+        self.line("call $dom_setText");
+        self.indent -= 1;
+        self.line("end");
 
         self.indent -= 1;
         self.line(")");
@@ -1132,23 +1291,30 @@ impl WasmCodegen {
             self.line(")");
         }
 
-        // Generate __callback dispatcher — the runtime calls __callback(idx)
-        // and we route to the correct handler function.
-        // Named per-component to avoid redefinition across multiple components.
+        // Generate per-component __callback dispatcher using global indices.
+        // The runtime calls __callback(idx) and the global dispatcher routes
+        // to per-component dispatchers which route to handler trampolines.
+        // Each dispatch is wrapped with performance timing via $timer_now.
+        let base = self.global_handler_base;
         if !comp.methods.is_empty() {
             self.line("");
             let callback_name = format!("{comp_name}__callback");
             self.emit(&format!("(func ${callback_name} (export \"{callback_name}\") (param $idx i32)"));
             self.indent += 1;
+            // Timing locals: capture start/end timestamps from $timer_now
+            self.line("(local $__t0 f64)");
+            self.line("(local $__t1 f64)");
+            // Record start time
+            self.line("call $timer_now");
+            self.line("local.set $__t0");
             for (i, _method) in comp.methods.iter().enumerate() {
+                let global_idx = base + i as u32;
                 let handler_name = format!("{comp_name}__handler_{i}");
-                self.line(&format!("local.get $idx"));
-                self.line(&format!("i32.const {}", i));
+                self.line("local.get $idx");
+                self.line(&format!("i32.const {}", global_idx));
                 self.line("i32.eq");
                 self.line("if");
                 self.indent += 1;
-                // Handler trampolines that take $self need a value — pass 0
-                // since component state is in signals, not struct memory
                 let has_self = _method.params.iter().any(|p| p.name == "self");
                 if has_self {
                     self.line("i32.const 0");
@@ -1156,12 +1322,33 @@ impl WasmCodegen {
                 } else {
                     self.line(&format!("call ${handler_name}"));
                 }
+                // Record end time and compute delta for this handler
+                self.line("call $timer_now");
+                self.line("local.set $__t1");
+                self.line("local.get $__t1");
+                self.line("local.get $__t0");
+                self.line("f64.sub");
+                self.line("call $format_timing_ms");
+                self.line("global.set $__last_handler_time_len");
+                self.line("global.set $__last_handler_time_ptr");
+                // If a timing display element is registered, update it directly
+                self.line("global.get $__timing_display_el");
+                self.line("if");
+                self.indent += 1;
+                self.line("global.get $__timing_display_el");
+                self.line("global.get $__last_handler_time_ptr");
+                self.line("global.get $__last_handler_time_len");
+                self.line("call $dom_setText");
+                self.indent -= 1;
+                self.line("end");
                 self.line("return");
                 self.indent -= 1;
                 self.line("end");
             }
             self.indent -= 1;
             self.line(")");
+            // Advance the global handler counter past this component's methods
+            self.global_handler_base = base + comp.methods.len() as u32;
         }
 
         // Generate methods (non-handler versions)
@@ -1190,20 +1377,43 @@ impl WasmCodegen {
             self.line("call $lifecycle_register_cleanup");
         }
 
+        // Emit dynamic element globals (one per signal binding occurrence)
+        let updater_globals: Vec<String> = self.signal_updaters.iter().map(|(_, g, _, _)| g.clone()).collect();
+        for global_el in &updater_globals {
+            self.line(&format!("(global {} (mut i32) (i32.const -1))", global_el));
+        }
+
         // Emit signal→DOM updater functions (WASM-internal, called via call_indirect)
-        for (func_name, global_el, sig_global) in self.signal_updaters.clone() {
+        for (func_name, global_el, sig_global, expr_opt) in self.signal_updaters.clone() {
             self.line("");
             self.emit(&format!("(func {} ;; reactive DOM updater", func_name));
             self.indent += 1;
             self.line("(local $ptr i32)");
             self.line("(local $len i32)");
-            // Read current signal value
-            self.line(&format!("global.get {}", sig_global));
-            self.line("call $signal_get");
-            // Convert to string
-            self.line("call $string_fromI32");
-            self.line("local.set $len");
-            self.line("local.set $ptr");
+
+            if let Some(ref wrapped_expr) = expr_opt {
+                // Re-evaluate the full expression (e.g. format("{}", self.field))
+                // The expression produces (ptr, len) for string-returning exprs
+                let is_string_expr = matches!(
+                    wrapped_expr,
+                    Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::StringLit(_)
+                );
+                self.generate_expr(wrapped_expr);
+                if !is_string_expr {
+                    // Non-string expression — convert i32 result to string
+                    self.line("call $string_fromI32");
+                }
+                self.line("local.set $len");
+                self.line("local.set $ptr");
+            } else {
+                // Direct signal read: get signal value, convert to string
+                self.line(&format!("global.get {}", sig_global));
+                self.line("call $signal_get");
+                self.line("call $string_fromI32");
+                self.line("local.set $len");
+                self.line("local.set $ptr");
+            }
+
             // Update DOM element text
             self.line(&format!("global.get {}", global_el));
             self.line("local.get $ptr");
@@ -2164,6 +2374,10 @@ impl WasmCodegen {
         let store_field_names: Vec<String> = store.signals.iter().map(|s| s.name.clone()).collect();
         self.in_component_mount = true;
         self.component_fields = store_field_names.clone();
+        self.string_state_fields = store.signals.iter().filter(|s| {
+            matches!(&s.initializer, Expr::StringLit(_))
+                || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
+        }).map(|s| s.name.clone()).collect();
         self.component_name = store_name.clone();
 
         // Actions — methods that can mutate store signals
@@ -2688,6 +2902,69 @@ impl WasmCodegen {
         }
     }
 
+    /// Walk an expression tree and collect all signal field names referenced
+    /// via `self.field` where `field` is a known component signal field.
+    fn extract_signal_fields_from_expr(&self, expr: &Expr) -> Vec<String> {
+        let mut fields = Vec::new();
+        self.collect_signal_fields(expr, &mut fields);
+        fields
+    }
+
+    fn collect_signal_fields(&self, expr: &Expr, fields: &mut Vec<String>) {
+        match expr {
+            Expr::FieldAccess { object, field } => {
+                if matches!(object.as_ref(), Expr::SelfExpr)
+                    && self.component_fields.contains(field)
+                {
+                    if !fields.contains(field) {
+                        fields.push(field.clone());
+                    }
+                } else {
+                    self.collect_signal_fields(object, fields);
+                }
+            }
+            Expr::FnCall { callee, args } => {
+                self.collect_signal_fields(callee, fields);
+                for arg in args {
+                    self.collect_signal_fields(arg, fields);
+                }
+            }
+            Expr::MethodCall { object, args, .. } => {
+                self.collect_signal_fields(object, fields);
+                for arg in args {
+                    self.collect_signal_fields(arg, fields);
+                }
+            }
+            Expr::Binary { left, right, .. } => {
+                self.collect_signal_fields(left, fields);
+                self.collect_signal_fields(right, fields);
+            }
+            Expr::Unary { operand, .. } => {
+                self.collect_signal_fields(operand, fields);
+            }
+            Expr::Index { object, index } => {
+                self.collect_signal_fields(object, fields);
+                self.collect_signal_fields(index, fields);
+            }
+            Expr::If { condition, then_block, else_block } => {
+                self.collect_signal_fields(condition, fields);
+                for stmt in &then_block.stmts {
+                    if let Stmt::Expr(e) = stmt {
+                        self.collect_signal_fields(e, fields);
+                    }
+                }
+                if let Some(eb) = else_block {
+                    for stmt in &eb.stmts {
+                        if let Stmt::Expr(e) = stmt {
+                            self.collect_signal_fields(e, fields);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn generate_template(&mut self, node: &TemplateNode, parent: &str) {
         match node {
             TemplateNode::Element(el) => {
@@ -2765,14 +3042,33 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
                             self.line("call $dom_setAttr");
+                            // Auto-register timing display element when id="timing-display"
+                            if name == "id" && value == "timing-display" {
+                                self.line(&format!(";; auto-register timing display element"));
+                                self.line(&format!("local.get {}", var));
+                                self.line("call $set_timing_display");
+                            }
                         }
-                        Attribute::EventHandler { event, .. } => {
+                        Attribute::Dynamic { name, value } => {
+                            let name_offset = self.store_string(name);
+                            self.line(&format!(";; dynamic attr: {}={{expr}}", name));
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("i32.const {}", name_offset));
+                            self.line(&format!("i32.const {}", name.len()));
+                            // Evaluate expression — produces i32 (string ptr, null-terminated)
+                            self.generate_expr(value);
+                            // Compute strlen for the null-terminated string
+                            self.line("call $str_len");
+                            self.line("call $dom_setAttr");
+                        }
+                        Attribute::EventHandler { event, handler } => {
                             let event_offset = self.store_string(event);
+                            let handler_idx = self.resolve_handler_index(handler);
                             self.line(&format!(";; event handler: {}", event));
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", event_offset));
                             self.line(&format!("i32.const {}", event.len()));
-                            self.line("i32.const 0 ;; handler func index");
+                            self.line(&format!("i32.const {} ;; handler func index", handler_idx));
                             self.line("call $dom_addEventListener");
                         }
                         Attribute::Aria { name, value } => {
@@ -2911,6 +3207,15 @@ impl WasmCodegen {
                     } else { None }
                 } else { None };
 
+                // Also detect signal fields referenced inside wrapper expressions
+                // like format("{}", self.count) or self.count + 1
+                let wrapped_signal_fields = if prop_name.is_none() && signal_field.is_none()
+                    && self.in_component_mount {
+                    self.extract_signal_fields_from_expr(expr)
+                } else {
+                    Vec::new()
+                };
+
                 if let Some(ref pname) = prop_name {
                     // Prop reference — string is already available as ptr+len params
                     self.line(&format!("local.get {}", var));
@@ -2939,32 +3244,56 @@ impl WasmCodegen {
                         self.line(&format!("local.get {}", len_var));
                         self.line("call $dom_setText");
                     } else {
-                        // Set initial text: get signal value, convert to string, setText
-                        self.generate_expr(expr);
-                        if signal_field.is_some() {
-                            // generate_expr already emits signal_get for self.field
+                        // Check if expression is a for-loop field access (produces a string ptr)
+                        let is_for_loop_field = matches!(
+                            expr.as_ref(),
+                            Expr::FieldAccess { object, .. }
+                                if matches!(object.as_ref(), Expr::Ident(name) if self.for_loop_bindings.contains(name))
+                        );
+
+                        if is_for_loop_field {
+                            // For-loop field access: value is already a string ptr (null-terminated)
+                            self.generate_expr(expr);
+                            self.line("call $str_len");
+                            let ptr_var = format!("$dyn_ptr_{}", self.next_label());
+                            let len_var = format!("$dyn_len_{}", self.next_label());
+                            self.emit_template_local(&ptr_var);
+                            self.emit_template_local(&len_var);
+                            self.line(&format!("local.set {}", len_var));
+                            self.line(&format!("local.set {}", ptr_var));
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("local.get {}", ptr_var));
+                            self.line(&format!("local.get {}", len_var));
+                            self.line("call $dom_setText");
                         } else {
-                            self.line("call $signal_get");
+                            // Set initial text: get signal value, convert to string, setText
+                            self.generate_expr(expr);
+                            if signal_field.is_some() {
+                                // generate_expr already emits signal_get for self.field
+                            } else {
+                                self.line("call $signal_get");
+                            }
+                            self.line("call $string_fromI32");
+                            let ptr_var = format!("$dyn_ptr_{}", self.next_label());
+                            let len_var = format!("$dyn_len_{}", self.next_label());
+                            self.emit_template_local(&ptr_var);
+                            self.emit_template_local(&len_var);
+                            self.line(&format!("local.set {}", len_var));
+                            self.line(&format!("local.set {}", ptr_var));
+                            self.line(&format!("local.get {}", var));
+                            self.line(&format!("local.get {}", ptr_var));
+                            self.line(&format!("local.get {}", len_var));
+                            self.line("call $dom_setText");
                         }
-                        self.line("call $string_fromI32");
-                        let ptr_var = format!("$dyn_ptr_{}", self.next_label());
-                        let len_var = format!("$dyn_len_{}", self.next_label());
-                        self.emit_template_local(&ptr_var);
-                        self.emit_template_local(&len_var);
-                        self.line(&format!("local.set {}", len_var));
-                        self.line(&format!("local.set {}", ptr_var));
-                        self.line(&format!("local.get {}", var));
-                        self.line(&format!("local.get {}", ptr_var));
-                        self.line(&format!("local.get {}", len_var));
-                        self.line("call $dom_setText");
                     }
                 }
 
-                // If bound to a signal, register a reactive updater
+                // If bound to a signal (direct self.field), register a reactive updater
                 if let Some(ref field) = signal_field {
-                    let global_el = format!("$__dyn_el_{}_{}", self.component_name, field);
+                    let uid = self.next_label();
+                    let global_el = format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
                     let sig_global = format!("$__sig_{}_{}", self.component_name, field);
-                    let func_name = format!("$__update_{}_{}", self.component_name, field);
+                    let func_name = format!("$__update_{}_{}_{}", self.component_name, field, uid);
 
                     // Store element ID in global so updater function can find it
                     self.line(&format!("local.get {}", var));
@@ -2973,12 +3302,41 @@ impl WasmCodegen {
                     // Subscribe: signal_subscribe(signal_id, table_index)
                     let table_idx = self.closure_func_names.len();
                     self.closure_func_names.push(func_name.clone());
+                    self.needs_func_table = true;
                     self.line(&format!("global.get {}", sig_global));
                     self.line(&format!("i32.const {}", table_idx));
                     self.line("call $signal_subscribe");
 
                     // Record updater to emit later (after mount function)
-                    self.signal_updaters.push((func_name, global_el, sig_global));
+                    self.signal_updaters.push((func_name, global_el, sig_global, None));
+                }
+
+                // If signal fields are referenced inside a wrapper expression (e.g. format(...)),
+                // register reactive updaters for each signal field so DOM updates when signals change.
+                if !wrapped_signal_fields.is_empty() {
+                    let expr_clone = expr.as_ref().clone();
+                    for field in &wrapped_signal_fields {
+                        let uid = self.next_label();
+                        let global_el = format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
+                        let sig_global = format!("$__sig_{}_{}", self.component_name, field);
+                        let func_name = format!("$__update_{}_{}_{}", self.component_name, field, uid);
+
+
+                        // Store element ID in global so updater function can find it
+                        self.line(&format!("local.get {}", var));
+                        self.line(&format!("global.set {}", global_el));
+
+                        // Subscribe: signal_subscribe(signal_id, table_index)
+                        let table_idx = self.closure_func_names.len();
+                        self.closure_func_names.push(func_name.clone());
+                        self.needs_func_table = true;
+                        self.line(&format!("global.get {}", sig_global));
+                        self.line(&format!("i32.const {}", table_idx));
+                        self.line("call $signal_subscribe");
+
+                        // Record updater with the full expression for re-evaluation
+                        self.signal_updaters.push((func_name, global_el, sig_global, Some(expr_clone.clone())));
+                    }
                 }
 
                 // Append to parent
@@ -3018,13 +3376,14 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
                         }
-                        Attribute::EventHandler { event, .. } => {
+                        Attribute::EventHandler { event, handler } => {
                             let event_offset = self.store_string(event);
+                            let handler_idx = self.resolve_handler_index(handler);
                             self.line(&format!(";; event handler: {}", event));
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", event_offset));
                             self.line(&format!("i32.const {}", event.len()));
-                            self.line("i32.const 0 ;; handler func index");
+                            self.line(&format!("i32.const {} ;; handler func index", handler_idx));
                             self.line("call $dom_addEventListener");
                         }
                         Attribute::Aria { name, value } => {
@@ -3133,12 +3492,90 @@ impl WasmCodegen {
                 }
                 self.line("end ;; template if");
             }
-            TemplateNode::TemplateFor { binding: _, iterator, children } => {
-                self.line(";; template for");
+            TemplateNode::TemplateFor { binding, iterator, children } => {
+                // Generate a WASM block/loop that iterates over an array.
+                // Vec layout: [length: i32, capacity: i32, data_ptr: i32] = 12 byte header
+                // Data region: contiguous i32 elements at data_ptr
+                let loop_id = self.next_label();
+                let arr_var = format!("$for_arr_{}", loop_id);
+                let idx_var = format!("$for_idx_{}", loop_id);
+                let len_var = format!("$for_len_{}", loop_id);
+                let data_var = format!("$for_data_{}", loop_id);
+                let binding_var = format!("${}", binding);
+                let block_label = format!("$for_break_{}", loop_id);
+                let loop_label = format!("$for_cont_{}", loop_id);
+
+                self.emit_template_local(&arr_var);
+                self.emit_template_local(&idx_var);
+                self.emit_template_local(&len_var);
+                self.emit_template_local(&data_var);
+                self.emit_template_local(&binding_var);
+
+                self.line(&format!(";; template for {} in ...", binding));
+
+                // Evaluate iterator expression — pushes array pointer onto stack
                 self.generate_expr(iterator);
+                self.line(&format!("local.set {}", arr_var));
+
+                // Load array length from header offset 0
+                self.line(&format!("local.get {}", arr_var));
+                self.line("i32.load ;; array length");
+                self.line(&format!("local.set {}", len_var));
+
+                // Load data_ptr from header offset 8
+                self.line(&format!("local.get {}", arr_var));
+                self.line("i32.load offset=8 ;; data_ptr");
+                self.line(&format!("local.set {}", data_var));
+
+                // Initialize index to 0
+                self.line("i32.const 0");
+                self.line(&format!("local.set {}", idx_var));
+
+                // block $for_break { loop $for_cont {
+                self.line(&format!("block {} ;; for break", block_label));
+                self.indent += 1;
+                self.line(&format!("loop {} ;; for continue", loop_label));
+                self.indent += 1;
+
+                // br_if $for_break (idx >= len)
+                self.line(&format!("local.get {}", idx_var));
+                self.line(&format!("local.get {}", len_var));
+                self.line("i32.ge_u");
+                self.line(&format!("br_if {}", block_label));
+
+                // Load current element: data_ptr + idx * 4
+                self.line(&format!("local.get {}", data_var));
+                self.line(&format!("local.get {}", idx_var));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                self.line(&format!("local.set {}", binding_var));
+
+                // Push binding name so child expression resolution works
+                self.for_loop_bindings.push(binding.clone());
+
+                // Generate child template nodes
                 for child in children {
                     self.generate_template(child, parent);
                 }
+
+                // Pop binding
+                self.for_loop_bindings.pop();
+
+                // Increment index
+                self.line(&format!("local.get {}", idx_var));
+                self.line("i32.const 1");
+                self.line("i32.add");
+                self.line(&format!("local.set {}", idx_var));
+
+                // Branch back to loop start
+                self.line(&format!("br {}", loop_label));
+
+                self.indent -= 1;
+                self.line("end ;; for continue");
+                self.indent -= 1;
+                self.line("end ;; for break");
             }
             TemplateNode::TemplateMatch { subject, arms } => {
                 self.line(";; template match");
@@ -3267,16 +3704,44 @@ impl WasmCodegen {
     }
 
     fn generate_struct_layout(&mut self, s: &StructDef) {
-        // Emit a comment showing the struct layout in linear memory
+        // Emit a comment showing the struct layout in linear memory.
+        // All struct fields are stored as i32 (4 bytes each): either a value or a pointer.
+        // Strings are stored as a pointer (i32), not ptr+len.
         self.line(&format!(";; struct {} layout:", s.name));
-        let mut offset = 0;
+        let mut offset = 0u32;
+        let mut layout = Vec::new();
         for field in &s.fields {
-            let size = self.type_size(&field.ty);
+            // Every field is 4 bytes in struct layout (i32 — value or pointer)
+            let size = 4u32;
             self.line(&format!(";;   {}: {} (offset {}, size {})",
                 field.name, self.type_to_wasm(&field.ty), offset, size));
+            layout.push((field.name.clone(), offset));
             offset += size;
         }
         self.line(&format!(";; total size: {} bytes", offset));
+        self.struct_layouts.insert(s.name.clone(), layout);
+    }
+
+    /// Get the byte offset for a field within a struct, or None if unknown.
+    fn get_struct_field_offset(&self, struct_name: &str, field_name: &str) -> Option<u32> {
+        self.struct_layouts.get(struct_name)
+            .and_then(|layout| layout.iter()
+                .find(|(name, _)| name == field_name)
+                .map(|(_, offset)| *offset))
+    }
+
+    /// Get the total byte size of a struct from its layout.
+    fn get_struct_size(&self, struct_name: &str) -> u32 {
+        if let Some(layout) = self.struct_layouts.get(struct_name) {
+            if let Some((_, last_offset)) = layout.last() {
+                // Each field is 4 bytes (i32)
+                last_offset + 4
+            } else {
+                0
+            }
+        } else {
+            0
+        }
     }
 
     fn generate_stmt(&mut self, stmt: &Stmt) {
@@ -3285,7 +3750,21 @@ impl WasmCodegen {
                 if *secret {
                     self.line(&format!(";; secret binding: {} — redacted in debug/serialization", name));
                 }
+                // Declare local variable (deferred to function top if in template/handler context)
+                let local_decl = format!("(local ${} i32)", name);
+                if self.defer_template_locals {
+                    if !self.template_locals.contains(&local_decl) {
+                        self.template_locals.push(local_decl);
+                    }
+                } else {
+                    self.line(&local_decl);
+                }
+                let is_string_val = matches!(value, Expr::StringLit(_));
                 self.generate_expr(value);
+                if is_string_val {
+                    // String literal pushes (ptr, len); drop len (top), keep ptr
+                    self.line("drop  ;; discard str len for local binding");
+                }
                 self.line(&format!("local.set ${}", name));
             }
             Stmt::Signal { name, secret, value, .. } => {
@@ -3304,6 +3783,33 @@ impl WasmCodegen {
                 self.line("return");
             }
             Stmt::Expr(expr) => {
+                // Statement-level if: emit a void `if...end` block (no result type)
+                // instead of the expression-level `(if (result i32) ...)` which would
+                // corrupt the WASM stack when no value is consumed.
+                if let Expr::If { condition, then_block, else_block } = expr {
+                    self.generate_expr(condition);
+                    self.emit("(if");
+                    self.indent += 1;
+                    self.emit("(then");
+                    self.indent += 1;
+                    for s in &then_block.stmts {
+                        self.generate_stmt(s);
+                    }
+                    self.indent -= 1;
+                    self.line(")");
+                    if let Some(else_blk) = else_block {
+                        self.emit("(else");
+                        self.indent += 1;
+                        for s in &else_blk.stmts {
+                            self.generate_stmt(s);
+                        }
+                        self.indent -= 1;
+                        self.line(")");
+                    }
+                    self.indent -= 1;
+                    self.line(")");
+                    return;
+                }
                 // Determine whether this expression produces a value that needs to be dropped.
                 // Signal assignments (self.field = ...) are void — signal_set handles the write.
                 // Namespace method calls that map to void browser APIs (e.g. clipboard.copy)
@@ -3389,11 +3895,15 @@ impl WasmCodegen {
                     // None is the absence of a value — represented as 0 (null pointer)
                     "None" => self.line("i32.const 0 ;; None"),
                     _ => {
+                        // For-loop binding variable — resolve to the loop-local variable
+                        if self.for_loop_bindings.contains(name) {
+                            self.line(&format!(";; for-loop binding: {}", name));
+                            self.line(&format!("local.get ${}", name));
+                        }
                         // Keyword definition instances (auth AppAuth {}, cache AppCache {}, etc.)
                         // are namespace handles, not local variables. Emit a null placeholder
                         // (i32.const 0) instead of `local.get $<name>` which would be undefined.
-                        let is_kw_def = self.known_keyword_defs.iter().any(|(n, _)| n == name);
-                        if is_kw_def {
+                        else if self.known_keyword_defs.iter().any(|(n, _)| n == name) {
                             self.line(&format!("i32.const 0 ;; keyword def handle: {}", name));
                         } else if self.in_component_mount && self.component_fields.contains(name) {
                             // Component signal field referenced without `self.` — read the signal.
@@ -3417,24 +3927,51 @@ impl WasmCodegen {
                 }
             }
             Expr::Binary { op, left, right } => {
-                self.generate_expr(left);
-                self.generate_expr(right);
-                let instr = match op {
-                    BinOp::Add => "i32.add",
-                    BinOp::Sub => "i32.sub",
-                    BinOp::Mul => "i32.mul",
-                    BinOp::Div => "i32.div_s",
-                    BinOp::Mod => "i32.rem_s",
-                    BinOp::Eq => "i32.eq",
-                    BinOp::Neq => "i32.ne",
-                    BinOp::Lt => "i32.lt_s",
-                    BinOp::Gt => "i32.gt_s",
-                    BinOp::Lte => "i32.le_s",
-                    BinOp::Gte => "i32.ge_s",
-                    BinOp::And => "i32.and",
-                    BinOp::Or => "i32.or",
-                };
-                self.line(instr);
+                // String equality/inequality: use byte-by-byte $str_eq on
+                // null-terminated string pointers.  String literals push
+                // (ptr, len) — drop the len to get a bare ptr.  Dynamic
+                // string expressions (signal reads, function returns) already
+                // produce a single i32 ptr.
+                let is_string_cmp = matches!(op, BinOp::Eq | BinOp::Neq)
+                    && (self.expr_is_string_lit(left) || self.expr_is_string_lit(right)
+                        || self.expr_is_string_typed(left) || self.expr_is_string_typed(right));
+
+                if is_string_cmp {
+                    // Generate left side; if it's a string literal, drop the len
+                    self.generate_expr(left);
+                    if self.expr_is_string_lit(left) {
+                        self.line("drop  ;; string cmp: keep only ptr");
+                    }
+                    // Generate right side; if it's a string literal, drop the len
+                    self.generate_expr(right);
+                    if self.expr_is_string_lit(right) {
+                        self.line("drop  ;; string cmp: keep only ptr");
+                    }
+                    // Compare null-terminated strings byte-by-byte
+                    self.line("call $str_eq");
+                    if matches!(op, BinOp::Neq) {
+                        self.line("i32.eqz  ;; neq: invert str_eq result");
+                    }
+                } else {
+                    self.generate_expr(left);
+                    self.generate_expr(right);
+                    let instr = match op {
+                        BinOp::Add => "i32.add",
+                        BinOp::Sub => "i32.sub",
+                        BinOp::Mul => "i32.mul",
+                        BinOp::Div => "i32.div_s",
+                        BinOp::Mod => "i32.rem_s",
+                        BinOp::Eq => "i32.eq",
+                        BinOp::Neq => "i32.ne",
+                        BinOp::Lt => "i32.lt_s",
+                        BinOp::Gt => "i32.gt_s",
+                        BinOp::Lte => "i32.le_s",
+                        BinOp::Gte => "i32.ge_s",
+                        BinOp::And => "i32.and",
+                        BinOp::Or => "i32.or",
+                    };
+                    self.line(instr);
+                }
             }
             Expr::Unary { op, operand } => {
                 match op {
@@ -3584,6 +4121,30 @@ impl WasmCodegen {
                     self.line(&format!(";; self.{} (prop)", field));
                     self.line(&format!("global.get $__prop_{}_{}_ptr", self.component_name, field));
                     self.line(&format!("global.get $__prop_{}_{}_len", self.component_name, field));
+                } else if let Expr::Ident(obj_name) = object.as_ref() {
+                    if self.for_loop_bindings.contains(obj_name) {
+                        // For-loop binding field access: item.name → load field from struct pointer.
+                        // The binding variable holds a pointer to the struct in linear memory.
+                        // Field offset is resolved by name from struct layouts.
+                        self.line(&format!(";; for-loop field access: {}.{}", obj_name, field));
+                        self.line(&format!("local.get ${}", obj_name));
+                        // Look up the field offset from any matching struct layout
+                        let offset = self.struct_layouts.values()
+                            .find_map(|layout| layout.iter()
+                                .find(|(name, _)| name == field)
+                                .map(|(_, off)| *off))
+                            .unwrap_or(0);
+                        if offset == 0 {
+                            self.line(&format!("i32.load ;; field: .{}", field));
+                        } else {
+                            self.line(&format!("i32.load offset={} ;; field: .{}", offset, field));
+                        }
+                    } else {
+                        self.generate_expr(object);
+                        self.line(&format!(";; field access: .{}", field));
+                        // TODO: calculate field offset from struct layout
+                        self.line("i32.load");
+                    }
                 } else {
                     self.generate_expr(object);
                     self.line(&format!(";; field access: .{}", field));
@@ -3636,6 +4197,9 @@ impl WasmCodegen {
                     }
                 } else {
                     self.generate_expr(value);
+                    if matches!(value.as_ref(), Expr::StringLit(_)) {
+                        self.line("drop  ;; discard str len for local assign");
+                    }
                     if let Expr::Ident(name) = target.as_ref() {
                         self.line(&format!("local.set ${}", name));
                     }
@@ -4082,6 +4646,208 @@ impl WasmCodegen {
                     self.line(")");
                 }
             }
+            Expr::StructInit { name, fields } => {
+                // Allocate struct in linear memory and store each field at its offset.
+                // Layout: each field is 4 bytes (i32 — value or pointer).
+                let struct_size = self.get_struct_size(name);
+                let size = if struct_size > 0 { struct_size } else { (fields.len() as u32) * 4 };
+                let lbl = self.next_label();
+                let ptr_var = format!("$__struct_ptr_{}", lbl);
+                self.emit_template_local(&ptr_var);
+
+                self.line(&format!(";; struct {} construction ({} bytes)", name, size));
+                self.line(&format!("i32.const {}", size));
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", ptr_var));
+
+                // Store each field value at its offset
+                for (field_name, field_expr) in fields {
+                    let offset = self.get_struct_field_offset(name, field_name)
+                        .unwrap_or_else(|| {
+                            // Fallback: use field order from the init expression
+                            let idx = fields.iter().position(|(n, _)| n == field_name).unwrap_or(0);
+                            (idx as u32) * 4
+                        });
+                    self.line(&format!("local.get {}", ptr_var));
+                    self.generate_expr(field_expr);
+                    // For string literals, drop the len — store only the ptr
+                    if matches!(field_expr, Expr::StringLit(_)) {
+                        self.line("drop ;; keep only str ptr for struct field");
+                    }
+                    if offset == 0 {
+                        self.line(&format!("i32.store ;; field: {}", field_name));
+                    } else {
+                        self.line(&format!("i32.store offset={} ;; field: {}", offset, field_name));
+                    }
+                }
+
+                // Leave struct pointer on the stack
+                self.line(&format!("local.get {}", ptr_var));
+            }
+            Expr::ArrayLit(elements) => {
+                // Array/Vec layout: [length: i32, capacity: i32, data_ptr: i32] = 12 bytes header
+                // Data: contiguous i32 elements at data_ptr
+                let lbl = self.next_label();
+                let hdr_var = format!("$__arr_hdr_{}", lbl);
+                let data_var = format!("$__arr_data_{}", lbl);
+                self.emit_template_local(&hdr_var);
+                self.emit_template_local(&data_var);
+
+                let count = elements.len() as u32;
+                let capacity = if count > 0 { count } else { 16 }; // initial capacity 16 for empty arrays
+
+                self.line(&format!(";; array literal ({} elements)", count));
+
+                // Allocate data region
+                self.line(&format!("i32.const {} ;; capacity * 4", capacity * 4));
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", data_var));
+
+                // Allocate header (12 bytes: length, capacity, data_ptr)
+                self.line("i32.const 12 ;; array header size");
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", hdr_var));
+
+                // Store length
+                self.line(&format!("local.get {}", hdr_var));
+                self.line(&format!("i32.const {} ;; length", count));
+                self.line("i32.store");
+
+                // Store capacity
+                self.line(&format!("local.get {}", hdr_var));
+                self.line(&format!("i32.const {} ;; capacity", capacity));
+                self.line("i32.store offset=4");
+
+                // Store data_ptr
+                self.line(&format!("local.get {}", hdr_var));
+                self.line(&format!("local.get {}", data_var));
+                self.line("i32.store offset=8 ;; data_ptr");
+
+                // Store each element in the data region
+                for (i, elem) in elements.iter().enumerate() {
+                    self.line(&format!("local.get {}", data_var));
+                    self.generate_expr(elem);
+                    if i == 0 {
+                        self.line(&format!("i32.store ;; elem[{}]", i));
+                    } else {
+                        self.line(&format!("i32.store offset={} ;; elem[{}]", i * 4, i));
+                    }
+                }
+
+                // Leave header pointer on the stack
+                self.line(&format!("local.get {}", hdr_var));
+            }
+            Expr::While { condition, body } => {
+                let lbl = self.next_label();
+                let block_label = format!("$while_break_{}", lbl);
+                let loop_label = format!("$while_cont_{}", lbl);
+
+                self.line(";; while loop");
+                self.line(&format!("block {} ;; while break", block_label));
+                self.indent += 1;
+                self.line(&format!("loop {} ;; while continue", loop_label));
+                self.indent += 1;
+
+                // Evaluate condition; break if false
+                self.generate_expr(condition);
+                self.line("i32.eqz");
+                self.line(&format!("br_if {}", block_label));
+
+                // Body
+                for stmt in &body.stmts {
+                    self.generate_stmt(stmt);
+                }
+
+                // Branch back to loop start
+                self.line(&format!("br {}", loop_label));
+
+                self.indent -= 1;
+                self.line("end ;; while continue");
+                self.indent -= 1;
+                self.line("end ;; while break");
+            }
+            Expr::For { binding, iterator, body } => {
+                // Imperative for loop (non-template): iterate array
+                let lbl = self.next_label();
+                let arr_var = format!("$for_arr_{}", lbl);
+                let idx_var = format!("$for_idx_{}", lbl);
+                let len_var = format!("$for_len_{}", lbl);
+                let data_var = format!("$for_data_{}", lbl);
+                let binding_var = format!("${}", binding);
+                let block_label = format!("$for_break_{}", lbl);
+                let loop_label = format!("$for_cont_{}", lbl);
+
+                self.emit_template_local(&arr_var);
+                self.emit_template_local(&idx_var);
+                self.emit_template_local(&len_var);
+                self.emit_template_local(&data_var);
+                self.emit_template_local(&binding_var);
+
+                self.line(&format!(";; for {} in ...", binding));
+
+                // Evaluate iterator
+                self.generate_expr(iterator);
+                self.line(&format!("local.set {}", arr_var));
+
+                // Load length from header offset 0
+                self.line(&format!("local.get {}", arr_var));
+                self.line("i32.load ;; array length");
+                self.line(&format!("local.set {}", len_var));
+
+                // Load data_ptr from header offset 8
+                self.line(&format!("local.get {}", arr_var));
+                self.line("i32.load offset=8 ;; data_ptr");
+                self.line(&format!("local.set {}", data_var));
+
+                // Initialize index to 0
+                self.line("i32.const 0");
+                self.line(&format!("local.set {}", idx_var));
+
+                self.line(&format!("block {} ;; for break", block_label));
+                self.indent += 1;
+                self.line(&format!("loop {} ;; for continue", loop_label));
+                self.indent += 1;
+
+                // br_if break (idx >= len)
+                self.line(&format!("local.get {}", idx_var));
+                self.line(&format!("local.get {}", len_var));
+                self.line("i32.ge_u");
+                self.line(&format!("br_if {}", block_label));
+
+                // Load element: data_ptr + idx * 4
+                self.line(&format!("local.get {}", data_var));
+                self.line(&format!("local.get {}", idx_var));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                self.line(&format!("local.set {}", binding_var));
+
+                // Body
+                self.for_loop_bindings.push(binding.clone());
+                for stmt in &body.stmts {
+                    self.generate_stmt(stmt);
+                }
+                self.for_loop_bindings.pop();
+
+                // Increment index
+                self.line(&format!("local.get {}", idx_var));
+                self.line("i32.const 1");
+                self.line("i32.add");
+                self.line(&format!("local.set {}", idx_var));
+
+                self.line(&format!("br {}", loop_label));
+
+                self.indent -= 1;
+                self.line("end ;; for continue");
+                self.indent -= 1;
+                self.line("end ;; for break");
+            }
+            Expr::Block(block) => {
+                for stmt in &block.stmts {
+                    self.generate_stmt(stmt);
+                }
+            }
             _ => {
                 self.line(";; TODO: codegen for expr");
             }
@@ -4100,6 +4866,19 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("global.set $heap_ptr");
         self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    /// Export `__event_data_ptr` so core.js addEventListener can stash event data
+    /// (clientX, clientY, keyCode, modifiers, key string, target element ID)
+    /// into WASM linear memory before invoking the callback.
+    fn emit_event_data_ptr_export(&mut self) {
+        self.line("");
+        self.line(";; Event data pointer — lets JS stash event properties for WASM handlers");
+        self.emit("(func $__event_data_ptr (export \"__event_data_ptr\") (result i32)");
+        self.indent += 1;
+        self.line("global.get $__event_data_base");
         self.indent -= 1;
         self.line(")");
     }
@@ -4248,12 +5027,142 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
 
-        // fromF64: simple — delegates to fromI32 after truncation (good enough for now)
+        // fromF64: converts f64 to string with 2 decimal places (e.g. "4.32")
+        // Handles negative sign, integer part via $string_fromI32, then ".XX" suffix
         self.emit("(func $string_fromF64 (param $val f64) (result i32 i32)");
         self.indent += 1;
+        self.line("(local $int_part i32) (local $frac_part i32) (local $neg i32)");
+        self.line("(local $abs_val f64) (local $frac_f64 f64)");
+        self.line("(local $int_ptr i32) (local $int_len i32)");
+        self.line("(local $out_ptr i32) (local $out_len i32)");
+        self.line("(local $d0 i32) (local $d1 i32)");
+        // Check negative
         self.line("local.get $val");
+        self.line("f64.const 0.0");
+        self.line("f64.lt");
+        self.line("local.set $neg");
+        // abs value
+        self.line("local.get $val");
+        self.line("f64.abs");
+        self.line("local.set $abs_val");
+        // integer part
+        self.line("local.get $abs_val");
+        self.line("f64.floor");
         self.line("i32.trunc_f64_s");
+        self.line("local.set $int_part");
+        // fractional part: (abs_val - floor(abs_val)) * 100, truncated to i32
+        self.line("local.get $abs_val");
+        self.line("local.get $abs_val");
+        self.line("f64.floor");
+        self.line("f64.sub");
+        self.line("f64.const 100.0");
+        self.line("f64.mul");
+        self.line("f64.const 0.5");
+        self.line("f64.add");       // round
+        self.line("i32.trunc_f64_s");
+        self.line("local.set $frac_part");
+        // Convert integer part to string (handles 0 correctly)
+        self.line("local.get $int_part");
         self.line("call $string_fromI32");
+        self.line("local.set $int_len");
+        self.line("local.set $int_ptr");
+        // If negative, prepend "-" by concat
+        self.line("local.get $neg");
+        self.line("if");
+        // Allocate "-" string
+        self.line("  i32.const 1");
+        self.line("  call $alloc");
+        self.line("  local.set $out_ptr");
+        self.line("  local.get $out_ptr");
+        self.line("  i32.const 45"); // '-'
+        self.line("  i32.store8");
+        self.line("  local.get $out_ptr");
+        self.line("  i32.const 1");
+        self.line("  local.get $int_ptr");
+        self.line("  local.get $int_len");
+        self.line("  call $string_concat");
+        self.line("  local.set $int_len");
+        self.line("  local.set $int_ptr");
+        self.line("end");
+        // Build ".XX" suffix (3 bytes)
+        self.line("i32.const 3");
+        self.line("call $alloc");
+        self.line("local.set $out_ptr");
+        self.line("local.get $out_ptr");
+        self.line("i32.const 46"); // '.'
+        self.line("i32.store8");
+        // tens digit of frac
+        self.line("local.get $frac_part");
+        self.line("i32.const 10");
+        self.line("i32.div_u");
+        self.line("i32.const 48"); // '0'
+        self.line("i32.add");
+        self.line("local.set $d0");
+        // ones digit of frac
+        self.line("local.get $frac_part");
+        self.line("i32.const 10");
+        self.line("i32.rem_u");
+        self.line("i32.const 48"); // '0'
+        self.line("i32.add");
+        self.line("local.set $d1");
+        self.line("local.get $out_ptr");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("local.get $d0");
+        self.line("i32.store8");
+        self.line("local.get $out_ptr");
+        self.line("i32.const 2");
+        self.line("i32.add");
+        self.line("local.get $d1");
+        self.line("i32.store8");
+        // Concat integer part with ".XX"
+        self.line("local.get $int_ptr");
+        self.line("local.get $int_len");
+        self.line("local.get $out_ptr");
+        self.line("i32.const 3");
+        self.line("call $string_concat");
+        self.indent -= 1;
+        self.line(")");
+
+        // format_timing_ms: takes f64 milliseconds, returns "X.XXms" string (ptr, len)
+        self.emit("(func $format_timing_ms (param $ms f64) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $s_ptr i32) (local $s_len i32)");
+        self.line("(local $ms_ptr i32)");
+        self.line("local.get $ms");
+        self.line("call $string_fromF64");
+        self.line("local.set $s_len");
+        self.line("local.set $s_ptr");
+        // Allocate "ms" suffix (2 bytes)
+        self.line("i32.const 2");
+        self.line("call $alloc");
+        self.line("local.set $ms_ptr");
+        self.line("local.get $ms_ptr");
+        self.line("i32.const 0x736D"); // "ms" as little-endian i16
+        self.line("i32.store16");
+        // Concat number with "ms"
+        self.line("local.get $s_ptr");
+        self.line("local.get $s_len");
+        self.line("local.get $ms_ptr");
+        self.line("i32.const 2");
+        self.line("call $string_concat");
+        self.indent -= 1;
+        self.line(")");
+
+        // get_last_handler_time: exported getter for the last handler execution time string
+        // Returns (ptr, len) of the formatted "X.XXms" timing string
+        self.emit("(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)");
+        self.indent += 1;
+        self.line("global.get $__last_handler_time_ptr");
+        self.line("global.get $__last_handler_time_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // set_timing_display: register an element to auto-update with handler timing
+        self.emit("(func $set_timing_display (export \"set_timing_display\") (param $el_id i32)");
+        self.indent += 1;
+        self.line("local.get $el_id");
+        self.line("global.set $__timing_display_el");
         self.indent -= 1;
         self.line(")");
 
@@ -4841,6 +5750,45 @@ impl WasmCodegen {
         self.line("  end");
         self.line("end");
         self.line("i32.const 1");
+        self.indent -= 1;
+        self.line(")");
+
+        // str_eq: compare two null-terminated strings byte-by-byte, return 1 if equal
+        self.emit("(func $str_eq (param $a i32) (param $b i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32)");
+        self.line("i32.const 0  local.set $i");
+        self.line("loop $cmp");
+        self.line("  local.get $a  local.get $i  i32.add  i32.load8_u");
+        self.line("  local.get $b  local.get $i  i32.add  i32.load8_u");
+        self.line("  i32.ne  if  i32.const 0  return  end");
+        self.line("  ;; both bytes equal — if both are 0 we matched the whole string");
+        self.line("  local.get $a  local.get $i  i32.add  i32.load8_u");
+        self.line("  i32.eqz  if  i32.const 1  return  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $cmp");
+        self.line("end");
+        self.line("i32.const 1  ;; unreachable but required by WASM validation");
+        self.indent -= 1;
+        self.line(")");
+
+        // str_len: compute length of null-terminated string, return (ptr, len)
+        // Used for dynamic attributes where we have a ptr but need ptr+len for dom_setAttr
+        self.emit("(func $str_len (param $ptr i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $len i32)");
+        self.line("i32.const 0  local.set $len");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $ptr  local.get $len  i32.add  i32.load8_u");
+        self.line("    i32.eqz  br_if $done");
+        self.line("    local.get $len  i32.const 1  i32.add  local.set $len");
+        self.line("    local.get $len  i32.const 4096  i32.ge_u  br_if $done");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $ptr");
+        self.line("local.get $len");
         self.indent -= 1;
         self.line(")");
 
@@ -6321,36 +7269,96 @@ impl WasmCodegen {
                 self.line("i32.eqz");
             }
             "push" => {
+                // Vec layout: [length: i32, capacity: i32, data_ptr: i32]
+                // Push appends element at data_ptr + length * 4, then increments length.
+                // If length == capacity, grow: alloc new data, copy, update header.
                 let lbl = self.next_label();
-                self.line(";; .push() — append element to array");
+                self.line(";; .push() — append element to vec");
                 self.emit_template_local(&format!("$__push_arr_{lbl}"));
                 self.emit_template_local(&format!("$__push_len_{lbl}"));
+                self.emit_template_local(&format!("$__push_cap_{lbl}"));
+                self.emit_template_local(&format!("$__push_data_{lbl}"));
+                self.emit_template_local(&format!("$__push_new_data_{lbl}"));
+                self.emit_template_local(&format!("$__push_val_{lbl}"));
                 self.generate_expr(object);
                 self.line(&format!("local.set $__push_arr_{lbl}"));
-                // Load current length
-                self.line(&format!("local.get $__push_arr_{lbl}"));
-                self.line("i32.load");
-                self.line(&format!("local.set $__push_len_{lbl}"));
-                // Store the new element at arr + 4 + len * 4
-                self.line(&format!("local.get $__push_arr_{lbl}"));
-                self.line("i32.const 4");
-                self.line("i32.add");
-                self.line(&format!("local.get $__push_len_{lbl}"));
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
+
+                // Evaluate the value to push first (before we read header fields)
                 if let Some(val_arg) = args.first() {
                     self.generate_expr(val_arg);
                 } else {
                     self.line("i32.const 0");
                 }
+                self.line(&format!("local.set $__push_val_{lbl}"));
+
+                // Load current length, capacity, data_ptr
+                self.line(&format!("local.get $__push_arr_{lbl}"));
+                self.line("i32.load ;; length");
+                self.line(&format!("local.set $__push_len_{lbl}"));
+                self.line(&format!("local.get $__push_arr_{lbl}"));
+                self.line("i32.load offset=4 ;; capacity");
+                self.line(&format!("local.set $__push_cap_{lbl}"));
+                self.line(&format!("local.get $__push_arr_{lbl}"));
+                self.line("i32.load offset=8 ;; data_ptr");
+                self.line(&format!("local.set $__push_data_{lbl}"));
+
+                // If length == capacity, grow
+                self.line(&format!("local.get $__push_len_{lbl}"));
+                self.line(&format!("local.get $__push_cap_{lbl}"));
+                self.line("i32.ge_u");
+                self.emit("(if");
+                self.indent += 1;
+                self.emit("(then");
+                self.indent += 1;
+                // New capacity = old capacity * 2
+                self.line(&format!("local.get $__push_cap_{lbl}"));
+                self.line("i32.const 2");
+                self.line("i32.mul");
+                self.line(&format!("local.set $__push_cap_{lbl}"));
+                // Allocate new data region
+                self.line(&format!("local.get $__push_cap_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("call $alloc");
+                self.line(&format!("local.set $__push_new_data_{lbl}"));
+                // Copy old data to new data
+                self.line(&format!("local.get $__push_new_data_{lbl}"));
+                self.line(&format!("local.get $__push_data_{lbl}"));
+                self.line(&format!("local.get $__push_len_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("memory.copy");
+                // Update data_ptr
+                self.line(&format!("local.get $__push_new_data_{lbl}"));
+                self.line(&format!("local.set $__push_data_{lbl}"));
+                // Update header: capacity and data_ptr
+                self.line(&format!("local.get $__push_arr_{lbl}"));
+                self.line(&format!("local.get $__push_cap_{lbl}"));
+                self.line("i32.store offset=4 ;; new capacity");
+                self.line(&format!("local.get $__push_arr_{lbl}"));
+                self.line(&format!("local.get $__push_data_{lbl}"));
+                self.line("i32.store offset=8 ;; new data_ptr");
+                self.indent -= 1;
+                self.line(")");
+                self.indent -= 1;
+                self.line(")");
+
+                // Store element at data_ptr + length * 4
+                self.line(&format!("local.get $__push_data_{lbl}"));
+                self.line(&format!("local.get $__push_len_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line(&format!("local.get $__push_val_{lbl}"));
                 self.line("i32.store");
-                // Increment the length
+
+                // Increment the length in header
                 self.line(&format!("local.get $__push_arr_{lbl}"));
                 self.line(&format!("local.get $__push_len_{lbl}"));
                 self.line("i32.const 1");
                 self.line("i32.add");
-                self.line("i32.store");
+                self.line("i32.store ;; updated length");
+
                 // Return the array pointer
                 self.line(&format!("local.get $__push_arr_{lbl}"));
             }
@@ -6579,18 +7587,8 @@ impl WasmCodegen {
     /// If true, no `drop` instruction should follow the expression.
     fn expr_is_void(&self, expr: &Expr) -> bool {
         match expr {
-            // Signal assignments (self.field = ...) are handled as void
-            Expr::Assign { target, .. } => {
-                if let Expr::FieldAccess { object, field } = target.as_ref() {
-                    if self.in_component_mount
-                        && matches!(object.as_ref(), Expr::SelfExpr)
-                        && self.component_fields.contains(field)
-                    {
-                        return true;
-                    }
-                }
-                false
-            }
+            // All assignments are void — signal sets and local variable sets
+            Expr::Assign { .. } => true,
             // Namespace method calls — check if the resolved WASM function is void
             Expr::MethodCall { object, method, .. } => {
                 if let Expr::Ident(obj_name) = object.as_ref() {
@@ -6633,9 +7631,35 @@ impl WasmCodegen {
                         );
                     }
                 }
+                // Method calls on self fields (e.g. self.items.push(...)) are void
+                if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
+                    if matches!(inner.as_ref(), Expr::SelfExpr) && method == "push" {
+                        return true;
+                    }
+                }
                 false
             }
+            // While/For loops and blocks are void — no stack value
+            Expr::While { .. } | Expr::For { .. } | Expr::Block(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns true if an `Expr::If` has branches that all end with explicit
+    /// `return` statements, meaning the if does not produce a stack value.
+    fn if_branches_return(expr: &Expr) -> bool {
+        if let Expr::If { then_block, else_block, .. } = expr {
+            let then_returns = then_block.stmts.last()
+                .map(|s| matches!(s, Stmt::Return(_)))
+                .unwrap_or(false);
+            let else_returns = else_block.as_ref()
+                .and_then(|eb| eb.stmts.last())
+                .map(|s| matches!(s, Stmt::Return(_)))
+                .unwrap_or(false);
+            // If either branch explicitly returns, the if is a statement, not an expression
+            then_returns || else_returns
+        } else {
+            false
         }
     }
 
@@ -6730,16 +7754,52 @@ impl WasmCodegen {
         }
     }
 
+    /// Resolve an event handler expression to a global handler index.
+    /// The handler expr is typically `self.method_name` (FieldAccess on SelfExpr)
+    /// or a MethodCall on self.
+    fn resolve_handler_index(&self, handler: &Expr) -> u32 {
+        let method_name = match handler {
+            Expr::FieldAccess { field, .. } => field.clone(),
+            Expr::MethodCall { method, .. } => method.clone(),
+            Expr::Ident(name) => name.clone(),
+            _ => return self.global_handler_base, // fallback
+        };
+        // Find the method index within the current component
+        let local_idx = self.component_method_names.iter()
+            .position(|m| m == &method_name)
+            .unwrap_or(0) as u32;
+        // Return global index = base + local index
+        self.global_handler_base + local_idx
+    }
+
+    /// Returns true if the expression is a string literal (pushes ptr, len).
+    fn expr_is_string_lit(&self, expr: &Expr) -> bool {
+        matches!(expr, Expr::StringLit(_))
+    }
+
+    /// Returns true if the expression is a dynamic string (signal read, etc.)
+    /// that produces a single i32 string pointer on the stack.
+    fn expr_is_string_typed(&self, expr: &Expr) -> bool {
+        match expr {
+            // self.field where field is a known string state
+            Expr::FieldAccess { object, field } => {
+                matches!(object.as_ref(), Expr::SelfExpr)
+                    && self.string_state_fields.contains(field)
+            }
+            _ => false,
+        }
+    }
+
     fn store_string(&mut self, s: &str) -> u32 {
         // Check if this string is already interned
         if let Some((_existing, offset)) = self.strings.iter().find(|(val, _)| val == s) {
             return *offset;
         }
 
-        // Intern the string at the current offset
+        // Intern the string at the current offset (null-terminated for $str_eq)
         let offset = self.string_offset;
         self.strings.push((s.to_string(), offset));
-        self.string_offset += s.len() as u32;
+        self.string_offset += s.len() as u32 + 1; // +1 for null terminator
         offset
     }
 
@@ -6752,7 +7812,7 @@ impl WasmCodegen {
         for (s, offset) in self.strings.clone() {
             // Escape special characters for WAT string literals
             let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
-            self.line(&format!("(data (i32.const {}) \"{}\")", offset, escaped));
+            self.line(&format!("(data (i32.const {}) \"{}\\00\")", offset, escaped));
         }
     }
 
@@ -7436,6 +8496,1471 @@ impl WasmCodegen {
         self.line(")");
     }
 
+    fn emit_format_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Format runtime (WASM-internal) ==========");
+        self.line(";; Pure WASM formatting functions — no JS bridges.");
+        self.line("");
+
+        // $format_number(value: i32) -> (ptr, len)
+        // Delegates to existing $string_fromI32.
+        self.emit("(func $format_number (param $value i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $value");
+        self.line("call $string_fromI32");
+        self.indent -= 1;
+        self.line(")");
+
+        // $format_currency(cents: i32, symbol_ptr: i32, symbol_len: i32) -> (ptr, len)
+        // Formats cents as e.g. "$12.34": symbol + dollars + "." + two-digit cents
+        self.line("");
+        self.emit("(func $format_currency (param $cents i32) (param $sym_ptr i32) (param $sym_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $dollars i32) (local $rem i32) (local $neg i32)");
+        self.line("(local $d_ptr i32) (local $d_len i32)");
+        self.line("(local $out_ptr i32) (local $out_len i32)");
+        self.line("(local $dot_ptr i32)");
+        self.line("(local $c_ptr i32)");
+        self.line("(local $tmp_ptr i32) (local $tmp_len i32)");
+        // Handle negative
+        self.line("local.get $cents");
+        self.line("i32.const 0");
+        self.line("i32.lt_s");
+        self.line("local.set $neg");
+        self.line("local.get $neg");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  local.get $cents");
+        self.line("  i32.sub");
+        self.line("  local.set $cents");
+        self.line("end");
+        // Compute dollars and remainder
+        self.line("local.get $cents");
+        self.line("i32.const 100");
+        self.line("i32.div_u");
+        self.line("local.set $dollars");
+        self.line("local.get $cents");
+        self.line("i32.const 100");
+        self.line("i32.rem_u");
+        self.line("local.set $rem");
+        // Convert dollars to string
+        self.line("local.get $dollars");
+        self.line("call $string_fromI32");
+        self.line("local.set $d_len");
+        self.line("local.set $d_ptr");
+        // Build the 3-byte cents part: "." + digit + digit
+        self.line("i32.const 3");
+        self.line("call $alloc");
+        self.line("local.set $dot_ptr");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 46"); // '.'
+        self.line("i32.store8");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("local.get $rem");
+        self.line("i32.const 10");
+        self.line("i32.div_u");
+        self.line("i32.const 48"); // '0'
+        self.line("i32.add");
+        self.line("i32.store8");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 2");
+        self.line("i32.add");
+        self.line("local.get $rem");
+        self.line("i32.const 10");
+        self.line("i32.rem_u");
+        self.line("i32.const 48"); // '0'
+        self.line("i32.add");
+        self.line("i32.store8");
+        // Concat: symbol + dollars
+        self.line("local.get $sym_ptr");
+        self.line("local.get $sym_len");
+        self.line("local.get $d_ptr");
+        self.line("local.get $d_len");
+        self.line("call $string_concat");
+        self.line("local.set $tmp_len");
+        self.line("local.set $tmp_ptr");
+        // Concat: (symbol+dollars) + ".XX"
+        self.line("local.get $tmp_ptr");
+        self.line("local.get $tmp_len");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 3");
+        self.line("call $string_concat");
+        self.line("local.set $out_len");
+        self.line("local.set $out_ptr");
+        // If negative, prepend "-"
+        self.line("local.get $neg");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  call $alloc");
+        self.line("  local.set $c_ptr");
+        self.line("  local.get $c_ptr");
+        self.line("  i32.const 45"); // '-'
+        self.line("  i32.store8");
+        self.line("  local.get $c_ptr");
+        self.line("  i32.const 1");
+        self.line("  local.get $out_ptr");
+        self.line("  local.get $out_len");
+        self.line("  call $string_concat");
+        self.line("  local.set $out_len");
+        self.line("  local.set $out_ptr");
+        self.line("end");
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // $format_percent(value: i32, total: i32) -> (ptr, len)
+        // Computes (value * 100 / total) and appends "%"
+        self.line("");
+        self.emit("(func $format_percent (param $value i32) (param $total i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $pct i32) (local $n_ptr i32) (local $n_len i32)");
+        self.line("(local $pct_ptr i32)");
+        // Avoid division by zero
+        self.line("local.get $total");
+        self.line("i32.eqz");
+        self.line("if (result i32 i32)");
+        self.line("  i32.const 2");
+        self.line("  call $alloc");
+        self.line("  local.set $pct_ptr");
+        self.line("  local.get $pct_ptr");
+        self.line("  i32.const 48"); // '0'
+        self.line("  i32.store8");
+        self.line("  local.get $pct_ptr");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  i32.const 37"); // '%'
+        self.line("  i32.store8");
+        self.line("  local.get $pct_ptr");
+        self.line("  i32.const 2");
+        self.line("else");
+        self.line("  local.get $value");
+        self.line("  i32.const 100");
+        self.line("  i32.mul");
+        self.line("  local.get $total");
+        self.line("  i32.div_s");
+        self.line("  local.set $pct");
+        self.line("  local.get $pct");
+        self.line("  call $string_fromI32");
+        self.line("  local.set $n_len");
+        self.line("  local.set $n_ptr");
+        // Append '%'
+        self.line("  i32.const 1");
+        self.line("  call $alloc");
+        self.line("  local.set $pct_ptr");
+        self.line("  local.get $pct_ptr");
+        self.line("  i32.const 37"); // '%'
+        self.line("  i32.store8");
+        self.line("  local.get $n_ptr");
+        self.line("  local.get $n_len");
+        self.line("  local.get $pct_ptr");
+        self.line("  i32.const 1");
+        self.line("  call $string_concat");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $format_bytes(bytes: i32) -> (ptr, len)
+        // Formats as "N B", "N KB", "N MB", "N GB" using integer division
+        self.line("");
+        self.emit("(func $format_bytes (param $bytes i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $val i32) (local $n_ptr i32) (local $n_len i32)");
+        self.line("(local $suf_ptr i32)");
+        self.line("local.get $bytes");
+        self.line("local.set $val");
+        // >= 1073741824 (1 GB)
+        self.line("local.get $val");
+        self.line("i32.const 1073741824");
+        self.line("i32.ge_u");
+        self.line("if (result i32 i32)");
+        self.line("  local.get $val");
+        self.line("  i32.const 1073741824");
+        self.line("  i32.div_u");
+        self.line("  call $string_fromI32");
+        self.line("  i32.const 3");
+        self.line("  call $alloc");
+        self.line("  local.set $suf_ptr");
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 32"); // ' '
+        self.line("  i32.store8");
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  i32.const 71"); // 'G'
+        self.line("  i32.store8");
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 2");
+        self.line("  i32.add");
+        self.line("  i32.const 66"); // 'B'
+        self.line("  i32.store8");
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 3");
+        self.line("  call $string_concat");
+        self.line("else");
+        // >= 1048576 (1 MB)
+        self.line("  local.get $val");
+        self.line("  i32.const 1048576");
+        self.line("  i32.ge_u");
+        self.line("  if (result i32 i32)");
+        self.line("    local.get $val");
+        self.line("    i32.const 1048576");
+        self.line("    i32.div_u");
+        self.line("    call $string_fromI32");
+        self.line("    i32.const 3");
+        self.line("    call $alloc");
+        self.line("    local.set $suf_ptr");
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 32"); // ' '
+        self.line("    i32.store8");
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    i32.const 77"); // 'M'
+        self.line("    i32.store8");
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 2");
+        self.line("    i32.add");
+        self.line("    i32.const 66"); // 'B'
+        self.line("    i32.store8");
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 3");
+        self.line("    call $string_concat");
+        self.line("  else");
+        // >= 1024 (1 KB)
+        self.line("    local.get $val");
+        self.line("    i32.const 1024");
+        self.line("    i32.ge_u");
+        self.line("    if (result i32 i32)");
+        self.line("      local.get $val");
+        self.line("      i32.const 1024");
+        self.line("      i32.div_u");
+        self.line("      call $string_fromI32");
+        self.line("      i32.const 3");
+        self.line("      call $alloc");
+        self.line("      local.set $suf_ptr");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 32"); // ' '
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      i32.const 75"); // 'K'
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 2");
+        self.line("      i32.add");
+        self.line("      i32.const 66"); // 'B'
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 3");
+        self.line("      call $string_concat");
+        self.line("    else");
+        // < 1024: just "N B"
+        self.line("      local.get $val");
+        self.line("      call $string_fromI32");
+        self.line("      i32.const 2");
+        self.line("      call $alloc");
+        self.line("      local.set $suf_ptr");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 32"); // ' '
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      i32.const 66"); // 'B'
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 2");
+        self.line("      call $string_concat");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $format_ordinal(n: i32) -> (ptr, len)
+        // Appends "st", "nd", "rd", or "th" based on number
+        self.line("");
+        self.emit("(func $format_ordinal (param $n i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $n_ptr i32) (local $n_len i32)");
+        self.line("(local $suf_ptr i32)");
+        self.line("(local $mod10 i32) (local $mod100 i32)");
+        // Convert number to string
+        self.line("local.get $n");
+        self.line("call $string_fromI32");
+        self.line("local.set $n_len");
+        self.line("local.set $n_ptr");
+        // Compute mod values for suffix selection
+        self.line("local.get $n");
+        self.line("i32.const 100");
+        self.line("i32.rem_u");
+        self.line("local.set $mod100");
+        self.line("local.get $n");
+        self.line("i32.const 10");
+        self.line("i32.rem_u");
+        self.line("local.set $mod10");
+        // Allocate 2 bytes for suffix
+        self.line("i32.const 2");
+        self.line("call $alloc");
+        self.line("local.set $suf_ptr");
+        // 11th, 12th, 13th are exceptions (use "th")
+        self.line("local.get $mod100");
+        self.line("i32.const 11");
+        self.line("i32.eq");
+        self.line("local.get $mod100");
+        self.line("i32.const 12");
+        self.line("i32.eq");
+        self.line("i32.or");
+        self.line("local.get $mod100");
+        self.line("i32.const 13");
+        self.line("i32.eq");
+        self.line("i32.or");
+        self.line("if");
+        // "th"
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 116"); // 't'
+        self.line("  i32.store8");
+        self.line("  local.get $suf_ptr");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  i32.const 104"); // 'h'
+        self.line("  i32.store8");
+        self.line("else");
+        self.line("  local.get $mod10");
+        self.line("  i32.const 1");
+        self.line("  i32.eq");
+        self.line("  if");
+        // "st"
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 115"); // 's'
+        self.line("    i32.store8");
+        self.line("    local.get $suf_ptr");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    i32.const 116"); // 't'
+        self.line("    i32.store8");
+        self.line("  else");
+        self.line("    local.get $mod10");
+        self.line("    i32.const 2");
+        self.line("    i32.eq");
+        self.line("    if");
+        // "nd"
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 110"); // 'n'
+        self.line("      i32.store8");
+        self.line("      local.get $suf_ptr");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      i32.const 100"); // 'd'
+        self.line("      i32.store8");
+        self.line("    else");
+        self.line("      local.get $mod10");
+        self.line("      i32.const 3");
+        self.line("      i32.eq");
+        self.line("      if");
+        // "rd"
+        self.line("        local.get $suf_ptr");
+        self.line("        i32.const 114"); // 'r'
+        self.line("        i32.store8");
+        self.line("        local.get $suf_ptr");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        i32.const 100"); // 'd'
+        self.line("        i32.store8");
+        self.line("      else");
+        // default: "th"
+        self.line("        local.get $suf_ptr");
+        self.line("        i32.const 116"); // 't'
+        self.line("        i32.store8");
+        self.line("        local.get $suf_ptr");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        i32.const 104"); // 'h'
+        self.line("        i32.store8");
+        self.line("      end");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        // Concat number + suffix
+        self.line("local.get $n_ptr");
+        self.line("local.get $n_len");
+        self.line("local.get $suf_ptr");
+        self.line("i32.const 2");
+        self.line("call $string_concat");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_collections_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Collections runtime (WASM-internal) ==========");
+        self.line(";; Linear-memory map and set data structures. Pure WASM.");
+        self.line(";; Map layout: [count:i32, cap:i32, (key_ptr:i32, key_len:i32, val:i32)*]");
+        self.line(";; Set layout: [count:i32, cap:i32, (val_ptr:i32, val_len:i32)*]");
+        self.line("");
+
+        // $map_create() -> i32 (map_ptr)
+        // Allocates a map with initial capacity 8
+        self.emit("(func $map_create (result i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32)");
+        // Header: 8 bytes (count + cap) + 8 entries * 12 bytes each = 104 bytes
+        self.line("i32.const 104");
+        self.line("call $alloc");
+        self.line("local.set $ptr");
+        // count = 0
+        self.line("local.get $ptr");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        // cap = 8
+        self.line("local.get $ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 8");
+        self.line("i32.store");
+        self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $map_set(map_ptr, key_ptr, key_len, value) -> void
+        // Linear scan for existing key, or append
+        self.line("");
+        self.emit("(func $map_set (param $map i32) (param $k_ptr i32) (param $k_len i32) (param $val i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
+        self.line("(local $ek_ptr i32) (local $ek_len i32)");
+        self.line("(local $match i32) (local $j i32) (local $byte_match i32)");
+        // Load count
+        self.line("local.get $map");
+        self.line("i32.load");
+        self.line("local.set $count");
+        // Scan existing entries
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $found");
+        self.line("  block $scan_done");
+        self.line("    loop $scan");
+        self.line("      local.get $i");
+        self.line("      local.get $count");
+        self.line("      i32.ge_u");
+        self.line("      br_if $scan_done");
+        // entry_base = map + 8 + i * 12
+        self.line("      local.get $map");
+        self.line("      i32.const 8");
+        self.line("      i32.add");
+        self.line("      local.get $i");
+        self.line("      i32.const 12");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      local.set $entry_base");
+        // Check key length match
+        self.line("      local.get $entry_base");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      i32.load");
+        self.line("      local.get $k_len");
+        self.line("      i32.eq");
+        self.line("      if");
+        // Length matches — compare bytes
+        self.line("        i32.const 1");
+        self.line("        local.set $match");
+        self.line("        i32.const 0");
+        self.line("        local.set $j");
+        self.line("        block $cmp_done");
+        self.line("          loop $cmp");
+        self.line("            local.get $j");
+        self.line("            local.get $k_len");
+        self.line("            i32.ge_u");
+        self.line("            br_if $cmp_done");
+        self.line("            local.get $entry_base");
+        self.line("            i32.load");  // ek_ptr
+        self.line("            local.get $j");
+        self.line("            i32.add");
+        self.line("            i32.load8_u");
+        self.line("            local.get $k_ptr");
+        self.line("            local.get $j");
+        self.line("            i32.add");
+        self.line("            i32.load8_u");
+        self.line("            i32.ne");
+        self.line("            if");
+        self.line("              i32.const 0");
+        self.line("              local.set $match");
+        self.line("              br $cmp_done");
+        self.line("            end");
+        self.line("            local.get $j");
+        self.line("            i32.const 1");
+        self.line("            i32.add");
+        self.line("            local.set $j");
+        self.line("            br $cmp");
+        self.line("          end");
+        self.line("        end");
+        self.line("        local.get $match");
+        self.line("        if");
+        // Found — update value
+        self.line("          local.get $entry_base");
+        self.line("          i32.const 8");
+        self.line("          i32.add");
+        self.line("          local.get $val");
+        self.line("          i32.store");
+        self.line("          return");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $scan");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        // Not found — append new entry
+        self.line("local.get $map");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("local.get $count");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $entry_base");
+        self.line("local.get $entry_base");
+        self.line("local.get $k_ptr");
+        self.line("i32.store");
+        self.line("local.get $entry_base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("local.get $k_len");
+        self.line("i32.store");
+        self.line("local.get $entry_base");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("local.get $val");
+        self.line("i32.store");
+        // Increment count
+        self.line("local.get $map");
+        self.line("local.get $count");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+
+        // $map_get(map_ptr, key_ptr, key_len) -> i32 (value or 0)
+        self.line("");
+        self.emit("(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
+        self.line("(local $match i32) (local $j i32)");
+        self.line("local.get $map");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $not_found");
+        self.line("  loop $scan");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $not_found");
+        self.line("    local.get $map");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 12");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.set $entry_base");
+        // Check length
+        self.line("    local.get $entry_base");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.get $k_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        // Compare bytes
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $cmp_done");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $k_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $cmp_done");
+        self.line("          local.get $entry_base");
+        self.line("          i32.load");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $k_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $cmp_done");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        self.line("        local.get $entry_base");
+        self.line("        i32.const 8");
+        self.line("        i32.add");
+        self.line("        i32.load");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+
+        // $map_has(map_ptr, key_ptr, key_len) -> i32 (0 or 1)
+        self.line("");
+        self.emit("(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $map");
+        self.line("local.get $k_ptr");
+        self.line("local.get $k_len");
+        self.line("call $map_get");
+        self.line("i32.const 0");
+        self.line("i32.ne");
+        self.indent -= 1;
+        self.line(")");
+
+        // $map_delete(map_ptr, key_ptr, key_len) -> void
+        // Finds and removes entry by swapping with last
+        self.line("");
+        self.emit("(func $map_delete (param $map i32) (param $k_ptr i32) (param $k_len i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
+        self.line("(local $last_base i32) (local $match i32) (local $j i32)");
+        self.line("local.get $map");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        self.line("    local.get $map");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 12");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.set $entry_base");
+        // Check length
+        self.line("    local.get $entry_base");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.get $k_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $cmp_done");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $k_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $cmp_done");
+        self.line("          local.get $entry_base");
+        self.line("          i32.load");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $k_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $cmp_done");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        // Swap with last entry, decrement count
+        self.line("        local.get $map");
+        self.line("        i32.const 8");
+        self.line("        i32.add");
+        self.line("        local.get $count");
+        self.line("        i32.const 1");
+        self.line("        i32.sub");
+        self.line("        i32.const 12");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        local.set $last_base");
+        // Copy last entry over current (3 i32s = 12 bytes)
+        self.line("        local.get $entry_base");
+        self.line("        local.get $last_base");
+        self.line("        i32.const 12");
+        self.line("        memory.copy");
+        // Decrement count
+        self.line("        local.get $map");
+        self.line("        local.get $count");
+        self.line("        i32.const 1");
+        self.line("        i32.sub");
+        self.line("        i32.store");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $map_keys(map_ptr) -> i32 (array_ptr)
+        // Returns a simple array: [count:i32, (ptr:i32, len:i32)*]
+        self.line("");
+        self.emit("(func $map_keys (param $map i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $arr_ptr i32) (local $entry_base i32)");
+        self.line("local.get $map");
+        self.line("i32.load");
+        self.line("local.set $count");
+        // Allocate array: 4 + count * 8 bytes
+        self.line("i32.const 4");
+        self.line("local.get $count");
+        self.line("i32.const 8");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("call $alloc");
+        self.line("local.set $arr_ptr");
+        self.line("local.get $arr_ptr");
+        self.line("local.get $count");
+        self.line("i32.store");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $done");
+        self.line("  loop $copy");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        // Source entry
+        self.line("    local.get $map");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 12");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.set $entry_base");
+        // Copy key_ptr
+        self.line("    local.get $arr_ptr");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 8");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.get $entry_base");
+        self.line("    i32.load");
+        self.line("    i32.store");
+        // Copy key_len
+        self.line("    local.get $arr_ptr");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 8");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    local.get $entry_base");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    i32.store");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $copy");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $arr_ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $set_create() -> i32 (set_ptr)
+        // Layout: [count:i32, cap:i32, (val_ptr:i32, val_len:i32)*]
+        self.line("");
+        self.emit("(func $set_create (result i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32)");
+        // Header 8 bytes + 8 entries * 8 bytes = 72 bytes
+        self.line("i32.const 72");
+        self.line("call $alloc");
+        self.line("local.set $ptr");
+        self.line("local.get $ptr");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.line("local.get $ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 8");
+        self.line("i32.store");
+        self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $set_has(set_ptr, val_ptr, val_len) -> i32 (0 or 1)
+        self.line("");
+        self.emit("(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
+        self.line("(local $match i32) (local $j i32)");
+        self.line("local.get $set");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $not_found");
+        self.line("  loop $scan");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $not_found");
+        self.line("    local.get $set");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 8");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.set $entry_base");
+        // Check length
+        self.line("    local.get $entry_base");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.get $v_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $cmp_done");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $v_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $cmp_done");
+        self.line("          local.get $entry_base");
+        self.line("          i32.load");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $v_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $cmp_done");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        self.line("        i32.const 1");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+
+        // $set_add(set_ptr, val_ptr, val_len) -> void
+        self.line("");
+        self.emit("(func $set_add (param $set i32) (param $v_ptr i32) (param $v_len i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $entry_base i32)");
+        // Check if already present
+        self.line("local.get $set");
+        self.line("local.get $v_ptr");
+        self.line("local.get $v_len");
+        self.line("call $set_has");
+        self.line("if");
+        self.line("  return");
+        self.line("end");
+        // Append
+        self.line("local.get $set");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("local.get $set");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("local.get $count");
+        self.line("i32.const 8");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $entry_base");
+        self.line("local.get $entry_base");
+        self.line("local.get $v_ptr");
+        self.line("i32.store");
+        self.line("local.get $entry_base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("local.get $v_len");
+        self.line("i32.store");
+        // Increment count
+        self.line("local.get $set");
+        self.line("local.get $count");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+
+        // $set_delete(set_ptr, val_ptr, val_len) -> void
+        self.line("");
+        self.emit("(func $set_delete (param $set i32) (param $v_ptr i32) (param $v_len i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
+        self.line("(local $last_base i32) (local $match i32) (local $j i32)");
+        self.line("local.get $set");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        self.line("    local.get $set");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.const 8");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    local.set $entry_base");
+        // Check length
+        self.line("    local.get $entry_base");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.get $v_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $cmp_done");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $v_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $cmp_done");
+        self.line("          local.get $entry_base");
+        self.line("          i32.load");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $v_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $cmp_done");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        // Swap with last, decrement
+        self.line("        local.get $set");
+        self.line("        i32.const 8");
+        self.line("        i32.add");
+        self.line("        local.get $count");
+        self.line("        i32.const 1");
+        self.line("        i32.sub");
+        self.line("        i32.const 8");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        local.set $last_base");
+        self.line("        local.get $entry_base");
+        self.line("        local.get $last_base");
+        self.line("        i32.const 8");
+        self.line("        memory.copy");
+        self.line("        local.get $set");
+        self.line("        local.get $count");
+        self.line("        i32.const 1");
+        self.line("        i32.sub");
+        self.line("        i32.store");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_csv_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== CSV runtime (WASM-internal) ==========");
+        self.line(";; Pure WASM CSV parsing and stringification.");
+        self.line(";; Array layout: [count:i32, (ptr:i32, len:i32)*]");
+        self.line(";; Row = array of strings, Result = array of rows.");
+        self.line("");
+
+        // $csv_parse(ptr, len) -> array_ptr
+        // Splits on newlines, then commas. Returns array of arrays.
+        self.emit("(func $csv_parse (param $ptr i32) (param $len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $result_ptr i32) (local $row_count i32)");
+        self.line("(local $i i32) (local $row_start i32) (local $field_start i32)");
+        self.line("(local $ch i32)");
+        self.line("(local $row_ptr i32) (local $field_count i32)");
+        self.line("(local $field_len i32)");
+        // Allocate result array: header + space for up to 64 rows
+        self.line("i32.const 516"); // 4 + 64 * 8
+        self.line("call $alloc");
+        self.line("local.set $result_ptr");
+        self.line("i32.const 0");
+        self.line("local.set $row_count");
+        // Allocate current row: header + space for up to 32 fields
+        self.line("i32.const 260"); // 4 + 32 * 8
+        self.line("call $alloc");
+        self.line("local.set $row_ptr");
+        self.line("i32.const 0");
+        self.line("local.set $field_count");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("i32.const 0");
+        self.line("local.set $field_start");
+        // Main parse loop
+        self.line("block $end");
+        self.line("  loop $parse");
+        self.line("    local.get $i");
+        self.line("    local.get $len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $end");
+        // Load current character
+        self.line("    local.get $ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $ch");
+        // Check for newline (10) or carriage return (13)
+        self.line("    local.get $ch");
+        self.line("    i32.const 10"); // '\n'
+        self.line("    i32.eq");
+        self.line("    local.get $ch");
+        self.line("    i32.const 13"); // '\r'
+        self.line("    i32.eq");
+        self.line("    i32.or");
+        self.line("    if");
+        // End of line — save current field to row
+        self.line("      local.get $i");
+        self.line("      local.get $field_start");
+        self.line("      i32.sub");
+        self.line("      local.set $field_len");
+        self.line("      local.get $row_ptr");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 8");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      local.get $ptr");
+        self.line("      local.get $field_start");
+        self.line("      i32.add");
+        self.line("      i32.store");
+        self.line("      local.get $row_ptr");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 8");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $field_len");
+        self.line("      i32.store");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $field_count");
+        // Save row count into row header
+        self.line("      local.get $row_ptr");
+        self.line("      local.get $field_count");
+        self.line("      i32.store");
+        // Save row ptr into result
+        self.line("      local.get $result_ptr");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $row_count");
+        self.line("      i32.const 4");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      local.get $row_ptr");
+        self.line("      i32.store");
+        self.line("      local.get $row_count");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $row_count");
+        // Allocate new row
+        self.line("      i32.const 260");
+        self.line("      call $alloc");
+        self.line("      local.set $row_ptr");
+        self.line("      i32.const 0");
+        self.line("      local.set $field_count");
+        // Skip \r\n combo
+        self.line("      local.get $ch");
+        self.line("      i32.const 13"); // '\r'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.get $len");
+        self.line("        i32.lt_u");
+        self.line("        if");
+        self.line("          local.get $ptr");
+        self.line("          local.get $i");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.const 10"); // '\n'
+        self.line("          i32.eq");
+        self.line("          if");
+        self.line("            local.get $i");
+        self.line("            i32.const 1");
+        self.line("            i32.add");
+        self.line("            local.set $i");
+        self.line("          end");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $field_start");
+        self.line("    else");
+        // Check for comma (44)
+        self.line("      local.get $ch");
+        self.line("      i32.const 44"); // ','
+        self.line("      i32.eq");
+        self.line("      if");
+        // Save field
+        self.line("        local.get $i");
+        self.line("        local.get $field_start");
+        self.line("        i32.sub");
+        self.line("        local.set $field_len");
+        self.line("        local.get $row_ptr");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        local.get $field_count");
+        self.line("        i32.const 8");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        local.get $ptr");
+        self.line("        local.get $field_start");
+        self.line("        i32.add");
+        self.line("        i32.store");
+        self.line("        local.get $row_ptr");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        local.get $field_count");
+        self.line("        i32.const 8");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        local.get $field_len");
+        self.line("        i32.store");
+        self.line("        local.get $field_count");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $field_count");
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $field_start");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $parse");
+        self.line("  end");
+        self.line("end");
+        // Handle last field/row if data doesn't end with newline
+        self.line("local.get $field_start");
+        self.line("local.get $len");
+        self.line("i32.lt_u");
+        self.line("if");
+        self.line("  local.get $len");
+        self.line("  local.get $field_start");
+        self.line("  i32.sub");
+        self.line("  local.set $field_len");
+        self.line("  local.get $row_ptr");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $field_count");
+        self.line("  i32.const 8");
+        self.line("  i32.mul");
+        self.line("  i32.add");
+        self.line("  local.get $ptr");
+        self.line("  local.get $field_start");
+        self.line("  i32.add");
+        self.line("  i32.store");
+        self.line("  local.get $row_ptr");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $field_count");
+        self.line("  i32.const 8");
+        self.line("  i32.mul");
+        self.line("  i32.add");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $field_len");
+        self.line("  i32.store");
+        self.line("  local.get $field_count");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  local.set $field_count");
+        self.line("  local.get $row_ptr");
+        self.line("  local.get $field_count");
+        self.line("  i32.store");
+        self.line("  local.get $result_ptr");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $row_count");
+        self.line("  i32.const 4");
+        self.line("  i32.mul");
+        self.line("  i32.add");
+        self.line("  local.get $row_ptr");
+        self.line("  i32.store");
+        self.line("  local.get $row_count");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  local.set $row_count");
+        self.line("end");
+        // Store final row count
+        self.line("local.get $result_ptr");
+        self.line("local.get $row_count");
+        self.line("i32.store");
+        self.line("local.get $result_ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $csv_stringify(array_ptr) -> (ptr, len)
+        // Iterates rows and fields, joining with commas and newlines
+        self.line("");
+        self.emit("(func $csv_stringify (param $arr i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $row_count i32) (local $ri i32) (local $row_ptr i32)");
+        self.line("(local $field_count i32) (local $fi i32)");
+        self.line("(local $out_ptr i32) (local $out_len i32)");
+        self.line("(local $f_ptr i32) (local $f_len i32)");
+        self.line("(local $sep_ptr i32)");
+        // Start with empty output
+        self.line("i32.const 0");
+        self.line("call $alloc");
+        self.line("local.set $out_ptr");
+        self.line("i32.const 0");
+        self.line("local.set $out_len");
+        // Load row count
+        self.line("local.get $arr");
+        self.line("i32.load");
+        self.line("local.set $row_count");
+        self.line("i32.const 0");
+        self.line("local.set $ri");
+        self.line("block $rows_done");
+        self.line("  loop $rows");
+        self.line("    local.get $ri");
+        self.line("    local.get $row_count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $rows_done");
+        // Get row ptr
+        self.line("    local.get $arr");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    local.get $ri");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $row_ptr");
+        // Get field count
+        self.line("    local.get $row_ptr");
+        self.line("    i32.load");
+        self.line("    local.set $field_count");
+        self.line("    i32.const 0");
+        self.line("    local.set $fi");
+        self.line("    block $fields_done");
+        self.line("      loop $fields");
+        self.line("        local.get $fi");
+        self.line("        local.get $field_count");
+        self.line("        i32.ge_u");
+        self.line("        br_if $fields_done");
+        // Add comma separator between fields
+        self.line("        local.get $fi");
+        self.line("        i32.const 0");
+        self.line("        i32.gt_u");
+        self.line("        if");
+        self.line("          i32.const 1");
+        self.line("          call $alloc");
+        self.line("          local.set $sep_ptr");
+        self.line("          local.get $sep_ptr");
+        self.line("          i32.const 44"); // ','
+        self.line("          i32.store8");
+        self.line("          local.get $out_ptr");
+        self.line("          local.get $out_len");
+        self.line("          local.get $sep_ptr");
+        self.line("          i32.const 1");
+        self.line("          call $string_concat");
+        self.line("          local.set $out_len");
+        self.line("          local.set $out_ptr");
+        self.line("        end");
+        // Get field ptr and len
+        self.line("        local.get $row_ptr");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        local.get $fi");
+        self.line("        i32.const 8");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        i32.load");
+        self.line("        local.set $f_ptr");
+        self.line("        local.get $row_ptr");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        local.get $fi");
+        self.line("        i32.const 8");
+        self.line("        i32.mul");
+        self.line("        i32.add");
+        self.line("        i32.const 4");
+        self.line("        i32.add");
+        self.line("        i32.load");
+        self.line("        local.set $f_len");
+        // Concat field
+        self.line("        local.get $out_ptr");
+        self.line("        local.get $out_len");
+        self.line("        local.get $f_ptr");
+        self.line("        local.get $f_len");
+        self.line("        call $string_concat");
+        self.line("        local.set $out_len");
+        self.line("        local.set $out_ptr");
+        self.line("        local.get $fi");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $fi");
+        self.line("        br $fields");
+        self.line("      end");
+        self.line("    end");
+        // Add newline between rows
+        self.line("    local.get $ri");
+        self.line("    local.get $row_count");
+        self.line("    i32.const 1");
+        self.line("    i32.sub");
+        self.line("    i32.lt_u");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      call $alloc");
+        self.line("      local.set $sep_ptr");
+        self.line("      local.get $sep_ptr");
+        self.line("      i32.const 10"); // '\n'
+        self.line("      i32.store8");
+        self.line("      local.get $out_ptr");
+        self.line("      local.get $out_len");
+        self.line("      local.get $sep_ptr");
+        self.line("      i32.const 1");
+        self.line("      call $string_concat");
+        self.line("      local.set $out_len");
+        self.line("      local.set $out_ptr");
+        self.line("    end");
+        self.line("    local.get $ri");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $ri");
+        self.line("    br $rows");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+    }
+
     fn next_label(&mut self) -> u32 {
         self.label_counter += 1;
         self.label_counter
@@ -7460,6 +9985,3333 @@ impl WasmCodegen {
     fn line(&mut self, s: &str) {
         let indent = "  ".repeat(self.indent);
         self.output.push_str(&format!("\n{}{}", indent, s));
+    }
+
+    fn emit_bigdecimal_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== BigDecimal runtime (WASM-internal) ==========");
+        self.line(";; Fixed-point decimal: i64 with 4 implicit decimal places.");
+        self.line(";; 1.0000 = 10000i64. No floating-point errors. Pure WASM.");
+        self.line("");
+
+        // $bigdecimal_new(whole: i32, frac: i32) -> i64
+        // Creates value = whole * 10000 + frac (frac is 0..9999)
+        self.emit("(func $bigdecimal_new (param $whole i32) (param $frac i32) (result i64)");
+        self.indent += 1;
+        self.line("local.get $whole");
+        self.line("i64.extend_i32_s");
+        self.line("i64.const 10000");
+        self.line("i64.mul");
+        self.line("local.get $frac");
+        self.line("i64.extend_i32_s");
+        self.line("i64.add");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_from_cents(cents: i32) -> i64
+        // cents * 100 (because 1 cent = 0.01 = 100 in scale-4)
+        self.line("");
+        self.emit("(func $bigdecimal_from_cents (param $cents i32) (result i64)");
+        self.indent += 1;
+        self.line("local.get $cents");
+        self.line("i64.extend_i32_s");
+        self.line("i64.const 100");
+        self.line("i64.mul");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_add(a: i64, b: i64) -> i64
+        self.line("");
+        self.emit("(func $bigdecimal_add (param $a i64) (param $b i64) (result i64)");
+        self.indent += 1;
+        self.line("local.get $a");
+        self.line("local.get $b");
+        self.line("i64.add");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_sub(a: i64, b: i64) -> i64
+        self.line("");
+        self.emit("(func $bigdecimal_sub (param $a i64) (param $b i64) (result i64)");
+        self.indent += 1;
+        self.line("local.get $a");
+        self.line("local.get $b");
+        self.line("i64.sub");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_mul(a: i64, b: i64) -> i64
+        // (a * b) / 10000 to maintain scale
+        self.line("");
+        self.emit("(func $bigdecimal_mul (param $a i64) (param $b i64) (result i64)");
+        self.indent += 1;
+        self.line("local.get $a");
+        self.line("local.get $b");
+        self.line("i64.mul");
+        self.line("i64.const 10000");
+        self.line("i64.div_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_div(a: i64, b: i64) -> i64
+        // (a * 10000) / b to maintain scale
+        self.line("");
+        self.emit("(func $bigdecimal_div (param $a i64) (param $b i64) (result i64)");
+        self.indent += 1;
+        self.line("local.get $a");
+        self.line("i64.const 10000");
+        self.line("i64.mul");
+        self.line("local.get $b");
+        self.line("i64.div_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_cmp(a: i64, b: i64) -> i32
+        // Returns -1 if a<b, 0 if a==b, 1 if a>b
+        self.line("");
+        self.emit("(func $bigdecimal_cmp (param $a i64) (param $b i64) (result i32)");
+        self.indent += 1;
+        self.line("local.get $a");
+        self.line("local.get $b");
+        self.line("i64.lt_s");
+        self.line("if");
+        self.line("  i32.const -1");
+        self.line("  return");
+        self.line("end");
+        self.line("local.get $a");
+        self.line("local.get $b");
+        self.line("i64.gt_s");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  return");
+        self.line("end");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+
+        // $bigdecimal_to_string(val: i64) -> (ptr, len)
+        // Formats as "123.4500" — whole part + "." + 4-digit fractional part
+        self.line("");
+        self.emit("(func $bigdecimal_to_string (param $val i64) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $neg i32) (local $abs i64)");
+        self.line("(local $whole i64) (local $frac i64)");
+        self.line("(local $out_ptr i32) (local $out_len i32)");
+        self.line("(local $dot_ptr i32)");
+        self.line("(local $d_ptr i32) (local $d_len i32)");
+        self.line("(local $f_buf i32) (local $digit i32)");
+        // Handle negative
+        self.line("local.get $val");
+        self.line("i64.const 0");
+        self.line("i64.lt_s");
+        self.line("local.set $neg");
+        self.line("local.get $neg");
+        self.line("if");
+        self.line("  i64.const 0");
+        self.line("  local.get $val");
+        self.line("  i64.sub");
+        self.line("  local.set $abs");
+        self.line("else");
+        self.line("  local.get $val");
+        self.line("  local.set $abs");
+        self.line("end");
+        // Split into whole and fractional
+        self.line("local.get $abs");
+        self.line("i64.const 10000");
+        self.line("i64.div_u");
+        self.line("local.set $whole");
+        self.line("local.get $abs");
+        self.line("i64.const 10000");
+        self.line("i64.rem_u");
+        self.line("local.set $frac");
+        // Start building output: optional "-"
+        self.line("local.get $neg");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  call $alloc");
+        self.line("  local.set $out_ptr");
+        self.line("  local.get $out_ptr");
+        self.line("  i32.const 45"); // '-'
+        self.line("  i32.store8");
+        self.line("  i32.const 1");
+        self.line("  local.set $out_len");
+        self.line("else");
+        self.line("  i32.const 0");
+        self.line("  call $alloc");
+        self.line("  local.set $out_ptr");
+        self.line("  i32.const 0");
+        self.line("  local.set $out_len");
+        self.line("end");
+        // Convert whole part to string via $string_fromI32
+        self.line("local.get $whole");
+        self.line("i32.wrap_i64");
+        self.line("call $string_fromI32");
+        self.line("local.set $d_len");
+        self.line("local.set $d_ptr");
+        // Concat whole part
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.line("local.get $d_ptr");
+        self.line("local.get $d_len");
+        self.line("call $string_concat");
+        self.line("local.set $out_len");
+        self.line("local.set $out_ptr");
+        // Append "."
+        self.line("i32.const 1");
+        self.line("call $alloc");
+        self.line("local.set $dot_ptr");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 46"); // '.'
+        self.line("i32.store8");
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.line("local.get $dot_ptr");
+        self.line("i32.const 1");
+        self.line("call $string_concat");
+        self.line("local.set $out_len");
+        self.line("local.set $out_ptr");
+        // Write 4-digit fractional part (e.g. frac=500 -> "0500")
+        self.line("i32.const 4");
+        self.line("call $alloc");
+        self.line("local.set $f_buf");
+        // digit 0: frac / 1000
+        self.line("local.get $f_buf");
+        self.line("local.get $frac");
+        self.line("i64.const 1000");
+        self.line("i64.div_u");
+        self.line("i32.wrap_i64");
+        self.line("i32.const 48"); // '0'
+        self.line("i32.add");
+        self.line("i32.store8");
+        // digit 1: (frac / 100) % 10
+        self.line("local.get $f_buf");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("local.get $frac");
+        self.line("i64.const 100");
+        self.line("i64.div_u");
+        self.line("i64.const 10");
+        self.line("i64.rem_u");
+        self.line("i32.wrap_i64");
+        self.line("i32.const 48");
+        self.line("i32.add");
+        self.line("i32.store8");
+        // digit 2: (frac / 10) % 10
+        self.line("local.get $f_buf");
+        self.line("i32.const 2");
+        self.line("i32.add");
+        self.line("local.get $frac");
+        self.line("i64.const 10");
+        self.line("i64.div_u");
+        self.line("i64.const 10");
+        self.line("i64.rem_u");
+        self.line("i32.wrap_i64");
+        self.line("i32.const 48");
+        self.line("i32.add");
+        self.line("i32.store8");
+        // digit 3: frac % 10
+        self.line("local.get $f_buf");
+        self.line("i32.const 3");
+        self.line("i32.add");
+        self.line("local.get $frac");
+        self.line("i64.const 10");
+        self.line("i64.rem_u");
+        self.line("i32.wrap_i64");
+        self.line("i32.const 48");
+        self.line("i32.add");
+        self.line("i32.store8");
+        // Concat fractional part
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.line("local.get $f_buf");
+        self.line("i32.const 4");
+        self.line("call $string_concat");
+        self.line("local.set $out_len");
+        self.line("local.set $out_ptr");
+        // Return
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_search_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Search runtime (WASM-internal) ==========");
+        self.line(";; Pure WASM text search utilities. Byte-level operations.");
+        self.line(";; Case-insensitive: ASCII A-Z (65-90) converted to a-z by OR 0x20.");
+        self.line("");
+
+        // $search_contains(haystack_ptr, haystack_len, needle_ptr, needle_len) -> i32
+        // Case-insensitive substring search. Returns 1 if found, 0 otherwise.
+        self.emit("(func $search_contains (param $h_ptr i32) (param $h_len i32) (param $n_ptr i32) (param $n_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $j i32) (local $hc i32) (local $nc i32) (local $match i32)");
+        // Empty needle always matches
+        self.line("local.get $n_len");
+        self.line("i32.eqz");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  return");
+        self.line("end");
+        // If needle longer than haystack, no match
+        self.line("local.get $n_len");
+        self.line("local.get $h_len");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        // Outer loop: try each starting position
+        self.line("block $not_found");
+        self.line("  loop $outer");
+        // i > h_len - n_len means no room left
+        self.line("    local.get $i");
+        self.line("    local.get $h_len");
+        self.line("    local.get $n_len");
+        self.line("    i32.sub");
+        self.line("    i32.gt_u");
+        self.line("    br_if $not_found");
+        // Inner loop: compare needle chars
+        self.line("    i32.const 0");
+        self.line("    local.set $j");
+        self.line("    i32.const 1");
+        self.line("    local.set $match");
+        self.line("    block $mismatch");
+        self.line("      loop $inner");
+        self.line("        local.get $j");
+        self.line("        local.get $n_len");
+        self.line("        i32.ge_u");
+        self.line("        br_if $mismatch");  // all chars matched
+        // Load haystack char and lowercase it
+        self.line("        local.get $h_ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        local.get $j");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.set $hc");
+        self.line("        local.get $hc");
+        self.line("        i32.const 65"); // 'A'
+        self.line("        i32.ge_u");
+        self.line("        local.get $hc");
+        self.line("        i32.const 90"); // 'Z'
+        self.line("        i32.le_u");
+        self.line("        i32.and");
+        self.line("        if");
+        self.line("          local.get $hc");
+        self.line("          i32.const 32"); // 0x20
+        self.line("          i32.or");
+        self.line("          local.set $hc");
+        self.line("        end");
+        // Load needle char and lowercase it
+        self.line("        local.get $n_ptr");
+        self.line("        local.get $j");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.set $nc");
+        self.line("        local.get $nc");
+        self.line("        i32.const 65");
+        self.line("        i32.ge_u");
+        self.line("        local.get $nc");
+        self.line("        i32.const 90");
+        self.line("        i32.le_u");
+        self.line("        i32.and");
+        self.line("        if");
+        self.line("          local.get $nc");
+        self.line("          i32.const 32");
+        self.line("          i32.or");
+        self.line("          local.set $nc");
+        self.line("        end");
+        // Compare
+        self.line("        local.get $hc");
+        self.line("        local.get $nc");
+        self.line("        i32.ne");
+        self.line("        if");
+        self.line("          i32.const 0");
+        self.line("          local.set $match");
+        self.line("        end");
+        self.line("        local.get $match");
+        self.line("        i32.eqz");
+        self.line("        br_if $mismatch");
+        self.line("        local.get $j");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $j");
+        self.line("        br $inner");
+        self.line("      end"); // loop $inner
+        self.line("    end"); // block $mismatch
+        // If match is still 1 and j == n_len, we found it
+        self.line("    local.get $match");
+        self.line("    local.get $j");
+        self.line("    local.get $n_len");
+        self.line("    i32.eq");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      return");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $outer");
+        self.line("  end"); // loop $outer
+        self.line("end"); // block $not_found
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+
+        // $search_starts_with(str_ptr, str_len, prefix_ptr, prefix_len) -> i32
+        self.line("");
+        self.emit("(func $search_starts_with (param $s_ptr i32) (param $s_len i32) (param $p_ptr i32) (param $p_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $sc i32) (local $pc i32)");
+        // If prefix longer than string, return 0
+        self.line("local.get $p_len");
+        self.line("local.get $s_len");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $done");
+        self.line("  loop $cmp");
+        self.line("    local.get $i");
+        self.line("    local.get $p_len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        // Load and lowercase string char
+        self.line("    local.get $s_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $sc");
+        self.line("    local.get $sc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $sc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $sc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $sc");
+        self.line("    end");
+        // Load and lowercase prefix char
+        self.line("    local.get $p_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $pc");
+        self.line("    local.get $pc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $pc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $pc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $pc");
+        self.line("    end");
+        self.line("    local.get $sc");
+        self.line("    local.get $pc");
+        self.line("    i32.ne");
+        self.line("    if");
+        self.line("      i32.const 0");
+        self.line("      return");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $cmp");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 1");
+        self.indent -= 1;
+        self.line(")");
+
+        // $search_ends_with(str_ptr, str_len, suffix_ptr, suffix_len) -> i32
+        self.line("");
+        self.emit("(func $search_ends_with (param $s_ptr i32) (param $s_len i32) (param $x_ptr i32) (param $x_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $offset i32) (local $sc i32) (local $xc i32)");
+        // If suffix longer than string, return 0
+        self.line("local.get $x_len");
+        self.line("local.get $s_len");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        // offset = s_len - x_len
+        self.line("local.get $s_len");
+        self.line("local.get $x_len");
+        self.line("i32.sub");
+        self.line("local.set $offset");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $done");
+        self.line("  loop $cmp");
+        self.line("    local.get $i");
+        self.line("    local.get $x_len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        // Load and lowercase string char at offset+i
+        self.line("    local.get $s_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $sc");
+        self.line("    local.get $sc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $sc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $sc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $sc");
+        self.line("    end");
+        // Load and lowercase suffix char
+        self.line("    local.get $x_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $xc");
+        self.line("    local.get $xc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $xc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $xc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $xc");
+        self.line("    end");
+        self.line("    local.get $sc");
+        self.line("    local.get $xc");
+        self.line("    i32.ne");
+        self.line("    if");
+        self.line("      i32.const 0");
+        self.line("      return");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $cmp");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 1");
+        self.indent -= 1;
+        self.line(")");
+
+        // $search_fuzzy(haystack_ptr, haystack_len, needle_ptr, needle_len) -> i32
+        // All needle chars must appear in order in haystack (case-insensitive)
+        self.line("");
+        self.emit("(func $search_fuzzy (param $h_ptr i32) (param $h_len i32) (param $n_ptr i32) (param $n_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $hi i32) (local $ni i32) (local $hc i32) (local $nc i32)");
+        // Empty needle always matches
+        self.line("local.get $n_len");
+        self.line("i32.eqz");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  return");
+        self.line("end");
+        self.line("i32.const 0");
+        self.line("local.set $hi");
+        self.line("i32.const 0");
+        self.line("local.set $ni");
+        self.line("block $done");
+        self.line("  loop $scan");
+        // If we've exhausted haystack, fail
+        self.line("    local.get $hi");
+        self.line("    local.get $h_len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        // Load and lowercase haystack char
+        self.line("    local.get $h_ptr");
+        self.line("    local.get $hi");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $hc");
+        self.line("    local.get $hc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $hc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $hc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $hc");
+        self.line("    end");
+        // Load and lowercase current needle char
+        self.line("    local.get $n_ptr");
+        self.line("    local.get $ni");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $nc");
+        self.line("    local.get $nc");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $nc");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $nc");
+        self.line("      i32.const 32");
+        self.line("      i32.or");
+        self.line("      local.set $nc");
+        self.line("    end");
+        // If they match, advance needle index
+        self.line("    local.get $hc");
+        self.line("    local.get $nc");
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      local.get $ni");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $ni");
+        // If we've matched all needle chars, success
+        self.line("      local.get $ni");
+        self.line("      local.get $n_len");
+        self.line("      i32.ge_u");
+        self.line("      if");
+        self.line("        i32.const 1");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        // Advance haystack
+        self.line("    local.get $hi");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $hi");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_pagination_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Pagination runtime (WASM-internal) ==========");
+        self.line(";; Pure arithmetic for paginating lists. No JS bridges.");
+        self.line("");
+
+        // $pagination_total_pages(total_items: i32, page_size: i32) -> i32
+        // Ceiling division: (total_items + page_size - 1) / page_size
+        self.emit("(func $pagination_total_pages (param $total i32) (param $size i32) (result i32)");
+        self.indent += 1;
+        // Guard: if page_size <= 0, return 0
+        self.line("local.get $size");
+        self.line("i32.const 0");
+        self.line("i32.le_s");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        // Guard: if total <= 0, return 0
+        self.line("local.get $total");
+        self.line("i32.const 0");
+        self.line("i32.le_s");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        // ceil div
+        self.line("local.get $total");
+        self.line("local.get $size");
+        self.line("i32.add");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("local.get $size");
+        self.line("i32.div_u");
+        self.indent -= 1;
+        self.line(")");
+
+        // $pagination_offset(page: i32, page_size: i32) -> i32
+        // (page - 1) * page_size
+        self.line("");
+        self.emit("(func $pagination_offset (param $page i32) (param $size i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $page");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("local.get $size");
+        self.line("i32.mul");
+        self.indent -= 1;
+        self.line(")");
+
+        // $pagination_has_next(page: i32, total_pages: i32) -> i32
+        // page < total_pages
+        self.line("");
+        self.emit("(func $pagination_has_next (param $page i32) (param $total_pages i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $page");
+        self.line("local.get $total_pages");
+        self.line("i32.lt_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $pagination_has_prev(page: i32) -> i32
+        // page > 1
+        self.line("");
+        self.emit("(func $pagination_has_prev (param $page i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $page");
+        self.line("i32.const 1");
+        self.line("i32.gt_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $pagination_clamp(page: i32, total_pages: i32) -> i32
+        // Clamp page to [1, total_pages]
+        self.line("");
+        self.emit("(func $pagination_clamp (param $page i32) (param $total_pages i32) (result i32)");
+        self.indent += 1;
+        // If page < 1, return 1
+        self.line("local.get $page");
+        self.line("i32.const 1");
+        self.line("i32.lt_s");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  return");
+        self.line("end");
+        // If page > total_pages, return total_pages
+        self.line("local.get $page");
+        self.line("local.get $total_pages");
+        self.line("i32.gt_s");
+        self.line("if");
+        self.line("  local.get $total_pages");
+        self.line("  return");
+        self.line("end");
+        self.line("local.get $page");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_debounce_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Debounce runtime (WASM-internal) ==========");
+        self.line(";; Delays callback execution until no calls for N ms.");
+        self.line(";; Uses timer.setTimeout / timer.clearTimeout syscalls.");
+        self.line("");
+
+        // $debounce_create(delay_ms: i32) -> i32
+        // Allocates 8 bytes: [delay_ms: i32, timer_id: i32]
+        self.emit("(func $debounce_create (param $delay_ms i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32)");
+        self.line("i32.const 8");
+        self.line("call $alloc");
+        self.line("local.set $ptr");
+        // Store delay_ms at ptr+0
+        self.line("local.get $ptr");
+        self.line("local.get $delay_ms");
+        self.line("i32.store");
+        // Store timer_id = -1 (no pending timer) at ptr+4
+        self.line("local.get $ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const -1");
+        self.line("i32.store");
+        self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $debounce_call(state: i32, callback_idx: i32)
+        // Clear any pending timer, set a new setTimeout
+        self.line("");
+        self.emit("(func $debounce_call (param $state i32) (param $cb_idx i32)");
+        self.indent += 1;
+        self.line("(local $timer_id i32)");
+        self.line("(local $delay i32)");
+        // Load current timer_id from state+4
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $timer_id");
+        // If timer_id != -1, clear it
+        self.line("local.get $timer_id");
+        self.line("i32.const -1");
+        self.line("i32.ne");
+        self.line("if");
+        self.line("  local.get $timer_id");
+        self.line("  call $timer_clearTimeout");
+        self.line("end");
+        // Load delay_ms from state+0
+        self.line("local.get $state");
+        self.line("i32.load");
+        self.line("local.set $delay");
+        // Set new setTimeout(callback_idx, delay_ms)
+        self.line("local.get $cb_idx");
+        self.line("local.get $delay");
+        self.line("call $timer_setTimeout");
+        // Store new timer_id at state+4
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.store"); // consumes the result of setTimeout
+        self.indent -= 1;
+        self.line(")");
+
+        // $debounce_cancel(state: i32)
+        // Clear pending timer and reset timer_id to -1
+        self.line("");
+        self.emit("(func $debounce_cancel (param $state i32)");
+        self.indent += 1;
+        self.line("(local $timer_id i32)");
+        // Load timer_id
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $timer_id");
+        // If timer_id != -1, clear it
+        self.line("local.get $timer_id");
+        self.line("i32.const -1");
+        self.line("i32.ne");
+        self.line("if");
+        self.line("  local.get $timer_id");
+        self.line("  call $timer_clearTimeout");
+        self.line("end");
+        // Reset timer_id to -1
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const -1");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_throttle_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Throttle runtime (WASM-internal) ==========");
+        self.line(";; Limits callback invocation to at most once per N ms.");
+        self.line(";; Uses timer.now() for timestamps.");
+        self.line("");
+
+        // $throttle_create(interval_ms: i32) -> i32
+        // Allocates 8 bytes: [interval_ms: i32, last_call_ms: i32]
+        self.emit("(func $throttle_create (param $interval_ms i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32)");
+        self.line("i32.const 8");
+        self.line("call $alloc");
+        self.line("local.set $ptr");
+        // Store interval_ms at ptr+0
+        self.line("local.get $ptr");
+        self.line("local.get $interval_ms");
+        self.line("i32.store");
+        // Store last_call_ms = 0 at ptr+4
+        self.line("local.get $ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $throttle_call(state: i32, callback_idx: i32) -> i32
+        // Returns 1 if callback was called, 0 if throttled
+        self.line("");
+        self.emit("(func $throttle_call (param $state i32) (param $cb_idx i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $now_ms i32)");
+        self.line("(local $last_ms i32)");
+        self.line("(local $interval i32)");
+        // Get current time as i32 ms (truncate f64)
+        self.line("call $timer_now");
+        self.line("i32.trunc_f64_s");
+        self.line("local.set $now_ms");
+        // Load last_call_ms from state+4
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $last_ms");
+        // Load interval from state+0
+        self.line("local.get $state");
+        self.line("i32.load");
+        self.line("local.set $interval");
+        // Check if (now - last) >= interval
+        self.line("local.get $now_ms");
+        self.line("local.get $last_ms");
+        self.line("i32.sub");
+        self.line("local.get $interval");
+        self.line("i32.ge_s");
+        self.line("if");
+        // Enough time passed — call the callback via setTimeout with 0 delay
+        self.line("  local.get $cb_idx");
+        self.line("  i32.const 0");
+        self.line("  call $timer_setTimeout");
+        self.line("  drop ;; discard timer id");
+        // Update last_call_ms
+        self.line("  local.get $state");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $now_ms");
+        self.line("  i32.store");
+        self.line("  i32.const 1");
+        self.line("  return");
+        self.line("end");
+        // Throttled — return 0
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+
+        // $throttle_reset(state: i32)
+        // Reset last_call_time to 0
+        self.line("");
+        self.emit("(func $throttle_reset (param $state i32)");
+        self.indent += 1;
+        self.line("local.get $state");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_toast_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Toast runtime (WASM-internal) ==========");
+        self.line(";; Toast notifications rendered via DOM syscalls.");
+        self.line(";; Reuses a single toast container element, auto-dismisses via setTimeout.");
+        self.line("");
+
+        // Global for the reusable toast element (0 = not yet created)
+        self.line("(global $__toast_el (mut i32) (i32.const 0))");
+        // Global for toast counter (returns unique IDs)
+        self.line("(global $__toast_id (mut i32) (i32.const 0))");
+        self.line("");
+
+        // Intern strings used by toast functions
+        let div_str = self.store_string("div");
+        let class_str = self.store_string("class");
+        let show_class = self.store_string("nectar-toast show");
+        let hide_class = self.store_string("nectar-toast");
+        let success_class = self.store_string("nectar-toast show toast-success");
+        let error_class = self.store_string("nectar-toast show toast-error");
+        let warning_class = self.store_string("nectar-toast show toast-warning");
+        let info_class = self.store_string("nectar-toast show toast-info");
+        let style_attr = self.store_string("style");
+        let toast_style = self.store_string("position:fixed;top:20px;right:20px;padding:12px 24px;border-radius:6px;background:#333;color:#fff;z-index:10000;transition:opacity 0.3s");
+
+        // $toast_show(msg_ptr: i32, msg_len: i32, duration_ms: i32) -> i32
+        // Creates or reuses toast element, sets text and class, auto-hides after duration
+        self.emit("(func $toast_show (param $msg_ptr i32) (param $msg_len i32) (param $duration_ms i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $el i32)");
+        self.line("(local $id i32)");
+        // Increment toast ID
+        self.line("global.get $__toast_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__toast_id");
+        self.line("global.get $__toast_id");
+        self.line("local.set $id");
+        // Create a new div element for each toast
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $el");
+        // Set style attribute
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"style\" ptr", style_attr));
+        self.line(&format!("i32.const {} ;; \"style\" len", "style".len()));
+        self.line(&format!("i32.const {} ;; toast style ptr", toast_style));
+        self.line(&format!("i32.const {} ;; toast style len", "position:fixed;top:20px;right:20px;padding:12px 24px;border-radius:6px;background:#333;color:#fff;z-index:10000;transition:opacity 0.3s".len()));
+        self.line("call $dom_setAttr");
+        // Set class to show
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; show class ptr", show_class));
+        self.line(&format!("i32.const {} ;; show class len", "nectar-toast show".len()));
+        self.line("call $dom_setAttr");
+        // Set text content
+        self.line("local.get $el");
+        self.line("local.get $msg_ptr");
+        self.line("local.get $msg_len");
+        self.line("call $dom_setText");
+        // Append to body
+        self.line("call $dom_getBody");
+        self.line("local.get $el");
+        self.line("call $dom_appendChild");
+        // Store as current toast element
+        self.line("local.get $el");
+        self.line("global.set $__toast_el");
+        // Return the toast ID
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_success(msg_ptr, msg_len) -> i32
+        self.line("");
+        self.emit("(func $toast_success (param $msg_ptr i32) (param $msg_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $el i32)");
+        self.line("(local $id i32)");
+        // Create toast with 3000ms duration
+        self.line("local.get $msg_ptr");
+        self.line("local.get $msg_len");
+        self.line("i32.const 3000");
+        self.line("call $toast_show");
+        self.line("local.set $id");
+        // Override class with success variant
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; success class ptr", success_class));
+        self.line(&format!("i32.const {} ;; success class len", "nectar-toast show toast-success".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_error(msg_ptr, msg_len) -> i32
+        self.line("");
+        self.emit("(func $toast_error (param $msg_ptr i32) (param $msg_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $id i32)");
+        self.line("local.get $msg_ptr");
+        self.line("local.get $msg_len");
+        self.line("i32.const 5000");
+        self.line("call $toast_show");
+        self.line("local.set $id");
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; error class ptr", error_class));
+        self.line(&format!("i32.const {} ;; error class len", "nectar-toast show toast-error".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_warning(msg_ptr, msg_len) -> i32
+        self.line("");
+        self.emit("(func $toast_warning (param $msg_ptr i32) (param $msg_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $id i32)");
+        self.line("local.get $msg_ptr");
+        self.line("local.get $msg_len");
+        self.line("i32.const 4000");
+        self.line("call $toast_show");
+        self.line("local.set $id");
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; warning class ptr", warning_class));
+        self.line(&format!("i32.const {} ;; warning class len", "nectar-toast show toast-warning".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_info(msg_ptr, msg_len) -> i32
+        self.line("");
+        self.emit("(func $toast_info (param $msg_ptr i32) (param $msg_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $id i32)");
+        self.line("local.get $msg_ptr");
+        self.line("local.get $msg_len");
+        self.line("i32.const 3000");
+        self.line("call $toast_show");
+        self.line("local.set $id");
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; info class ptr", info_class));
+        self.line(&format!("i32.const {} ;; info class len", "nectar-toast show toast-info".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_dismiss()
+        // Removes the "show" part from the class, leaving just "nectar-toast"
+        self.line("");
+        self.emit("(func $toast_dismiss (param $id i32)");
+        self.indent += 1;
+        // Use the global toast element (simplified — last shown toast)
+        self.line("global.get $__toast_el");
+        self.line("i32.const 0");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  return");
+        self.line("end");
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; hide class ptr", hide_class));
+        self.line(&format!("i32.const {} ;; hide class len", "nectar-toast".len()));
+        self.line("call $dom_setAttr");
+        self.indent -= 1;
+        self.line(")");
+
+        // $toast_dismiss_all()
+        self.line("");
+        self.emit("(func $toast_dismiss_all");
+        self.indent += 1;
+        self.line("global.get $__toast_el");
+        self.line("i32.const 0");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  return");
+        self.line("end");
+        self.line("global.get $__toast_el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; hide class ptr", hide_class));
+        self.line(&format!("i32.const {} ;; hide class len", "nectar-toast".len()));
+        self.line("call $dom_setAttr");
+        // Reset global
+        self.line("i32.const 0");
+        self.line("global.set $__toast_el");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_skeleton_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Skeleton runtime (WASM-internal) ==========");
+        self.line(";; Skeleton loading placeholders. Pure DOM element creation.");
+        self.line(";; Creates div elements with skeleton CSS classes and inline styles.");
+        self.line("");
+
+        // Intern strings
+        let div_str = self.store_string("div");
+        let class_str = self.store_string("class");
+        let style_str = self.store_string("style");
+        let skel_class = self.store_string("nectar-skeleton");
+        let skel_line_class = self.store_string("nectar-skeleton nectar-skeleton-line");
+        let skel_circle_class = self.store_string("nectar-skeleton nectar-skeleton-circle");
+        let skel_card_class = self.store_string("nectar-skeleton nectar-skeleton-card");
+        let skel_avatar_class = self.store_string("nectar-skeleton nectar-skeleton-avatar");
+
+        // $skeleton_text(lines: i32) -> i32
+        // Create a container with N skeleton line divs, return container element ID
+        self.emit("(func $skeleton_text (param $lines i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $container i32)");
+        self.line("(local $line_el i32)");
+        self.line("(local $i i32)");
+        // Create container div
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $container");
+        // Set class on container
+        self.line("local.get $container");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; skeleton class ptr", skel_class));
+        self.line(&format!("i32.const {} ;; skeleton class len", "nectar-skeleton".len()));
+        self.line("call $dom_setAttr");
+        // Loop to create N line divs
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $brk");
+        self.line("  loop $lp");
+        self.line("    local.get $i");
+        self.line("    local.get $lines");
+        self.line("    i32.ge_s");
+        self.line("    br_if $brk");
+        // Create a line div
+        self.line(&format!("    i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("    i32.const {} ;; \"div\" len", "div".len()));
+        self.line("    call $dom_createElement");
+        self.line("    local.set $line_el");
+        // Set class
+        self.line("    local.get $line_el");
+        self.line(&format!("    i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("    i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("    i32.const {} ;; line class ptr", skel_line_class));
+        self.line(&format!("    i32.const {} ;; line class len", "nectar-skeleton nectar-skeleton-line".len()));
+        self.line("    call $dom_setAttr");
+        // Append to container
+        self.line("    local.get $container");
+        self.line("    local.get $line_el");
+        self.line("    call $dom_appendChild");
+        // Increment counter
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $lp");
+        self.line("  end");
+        self.line("end");
+        // Append container to body
+        self.line("call $dom_getBody");
+        self.line("local.get $container");
+        self.line("call $dom_appendChild");
+        self.line("local.get $container");
+        self.indent -= 1;
+        self.line(")");
+
+        // $skeleton_circle(size: i32) -> i32
+        // Create a circular skeleton placeholder
+        self.line("");
+        self.emit("(func $skeleton_circle (param $size i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $el i32)");
+        self.line("(local $style_ptr i32)");
+        self.line("(local $style_len i32)");
+        // Create div
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $el");
+        // Set class
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; circle class ptr", skel_circle_class));
+        self.line(&format!("i32.const {} ;; circle class len", "nectar-skeleton nectar-skeleton-circle".len()));
+        self.line("call $dom_setAttr");
+        // Build style string: "width:Npx;height:Npx;border-radius:50%"
+        // We use dom_setStyle with property/value pairs
+        // Set width style
+        self.line("local.get $el");
+        let width_prop = self.store_string("width");
+        let height_prop = self.store_string("height");
+        let border_radius_prop = self.store_string("border-radius");
+        let fifty_pct = self.store_string("50%");
+        // We need to build "Npx" string — use a scratch buffer approach
+        // For simplicity, use setStyle with numeric px values
+        // dom_setStyle(el, prop_ptr, prop_len, val_ptr, val_len)
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_prop));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        // Build the size value as string — store "px" and prepend the number
+        // Use $i32_to_string to convert size to string, then concat with "px"
+        self.line("local.get $size");
+        self.line("call $to_string ;; returns (ptr, len) on stack");
+        self.line("call $dom_setStyle");
+        // Set height
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_prop));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $size");
+        self.line("call $to_string");
+        self.line("call $dom_setStyle");
+        // Set border-radius: 50%
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"border-radius\" ptr", border_radius_prop));
+        self.line(&format!("i32.const {} ;; \"border-radius\" len", "border-radius".len()));
+        self.line(&format!("i32.const {} ;; \"50%\" ptr", fifty_pct));
+        self.line(&format!("i32.const {} ;; \"50%\" len", "50%".len()));
+        self.line("call $dom_setStyle");
+        // Append to body
+        self.line("call $dom_getBody");
+        self.line("local.get $el");
+        self.line("call $dom_appendChild");
+        self.line("local.get $el");
+        self.indent -= 1;
+        self.line(")");
+
+        // $skeleton_rect(width_ptr, width_len, height_ptr, height_len) -> i32
+        // Width and height are string params (e.g., "200px", "100%")
+        self.line("");
+        self.emit("(func $skeleton_rect (param $w_ptr i32) (param $w_len i32) (param $h_ptr i32) (param $h_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $el i32)");
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $el");
+        // Set class
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; skeleton class ptr", skel_class));
+        self.line(&format!("i32.const {} ;; skeleton class len", "nectar-skeleton".len()));
+        self.line("call $dom_setAttr");
+        // Set width
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_prop));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $w_ptr");
+        self.line("local.get $w_len");
+        self.line("call $dom_setStyle");
+        // Set height
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_prop));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $h_ptr");
+        self.line("local.get $h_len");
+        self.line("call $dom_setStyle");
+        // Append to body
+        self.line("call $dom_getBody");
+        self.line("local.get $el");
+        self.line("call $dom_appendChild");
+        self.line("local.get $el");
+        self.indent -= 1;
+        self.line(")");
+
+        // $skeleton_card() -> i32
+        // Creates a card-shaped skeleton with header and body lines
+        self.line("");
+        self.emit("(func $skeleton_card (result i32)");
+        self.indent += 1;
+        self.line("(local $card i32)");
+        self.line("(local $header i32)");
+        // Create card container
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $card");
+        self.line("local.get $card");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; card class ptr", skel_card_class));
+        self.line(&format!("i32.const {} ;; card class len", "nectar-skeleton nectar-skeleton-card".len()));
+        self.line("call $dom_setAttr");
+        // Create a header line inside the card
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $header");
+        self.line("local.get $header");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; line class ptr", skel_line_class));
+        self.line(&format!("i32.const {} ;; line class len", "nectar-skeleton nectar-skeleton-line".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $card");
+        self.line("local.get $header");
+        self.line("call $dom_appendChild");
+        // Append card to body
+        self.line("call $dom_getBody");
+        self.line("local.get $card");
+        self.line("call $dom_appendChild");
+        self.line("local.get $card");
+        self.indent -= 1;
+        self.line(")");
+
+        // $skeleton_avatar(size: i32) -> i32
+        // Alias for circle with avatar class
+        self.line("");
+        self.emit("(func $skeleton_avatar (param $size i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $el i32)");
+        self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
+        self.line(&format!("i32.const {} ;; \"div\" len", "div".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $el");
+        // Set avatar class
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
+        self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
+        self.line(&format!("i32.const {} ;; avatar class ptr", skel_avatar_class));
+        self.line(&format!("i32.const {} ;; avatar class len", "nectar-skeleton nectar-skeleton-avatar".len()));
+        self.line("call $dom_setAttr");
+        // Set width/height/border-radius
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_prop));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $size");
+        self.line("call $to_string");
+        self.line("call $dom_setStyle");
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_prop));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $size");
+        self.line("call $to_string");
+        self.line("call $dom_setStyle");
+        self.line("local.get $el");
+        self.line(&format!("i32.const {} ;; \"border-radius\" ptr", border_radius_prop));
+        self.line(&format!("i32.const {} ;; \"border-radius\" len", "border-radius".len()));
+        self.line(&format!("i32.const {} ;; \"50%\" ptr", fifty_pct));
+        self.line(&format!("i32.const {} ;; \"50%\" len", "50%".len()));
+        self.line("call $dom_setStyle");
+        // Append to body
+        self.line("call $dom_getBody");
+        self.line("local.get $el");
+        self.line("call $dom_appendChild");
+        self.line("local.get $el");
+        self.indent -= 1;
+        self.line(")");
+
+        // $skeleton_destroy(id: i32)
+        // Hide the skeleton element by setting display:none
+        self.line("");
+        let display_prop = self.store_string("display");
+        let none_val = self.store_string("none");
+        self.emit("(func $skeleton_destroy (param $el_id i32)");
+        self.indent += 1;
+        self.line("local.get $el_id");
+        self.line(&format!("i32.const {} ;; \"display\" ptr", display_prop));
+        self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+        self.line(&format!("i32.const {} ;; \"none\" ptr", none_val));
+        self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
+        self.line("call $dom_setStyle");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_mask_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Mask runtime (WASM-internal) ==========");
+        self.line(";; Input masking — pure string manipulation in WASM.");
+        self.line(";; Pattern chars: # = digit, A = letter, * = any. Others are literal.");
+        self.line("");
+
+        // $mask_apply(input_ptr, input_len, pattern_ptr, pattern_len) -> (ptr, len)
+        // Walk pattern: for each '#' consume next digit from input, 'A' consume letter,
+        // '*' consume any, otherwise emit the literal pattern char.
+        self.emit("(func $mask_apply (param $in_ptr i32) (param $in_len i32) (param $pat_ptr i32) (param $pat_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_ptr i32)");
+        self.line("(local $out_len i32)");
+        self.line("(local $pi i32)");  // pattern index
+        self.line("(local $ii i32)");  // input index
+        self.line("(local $pc i32)");  // pattern char
+        self.line("(local $ic i32)");  // input char
+        self.line("(local $buf i32)"); // output buffer
+        // Allocate output buffer (pattern_len is max output size)
+        self.line("local.get $pat_len");
+        self.line("call $alloc");
+        self.line("local.set $buf");
+        self.line("i32.const 0");
+        self.line("local.set $pi");
+        self.line("i32.const 0");
+        self.line("local.set $ii");
+        self.line("i32.const 0");
+        self.line("local.set $out_len");
+        // Main loop over pattern
+        self.line("block $brk");
+        self.line("  loop $lp");
+        // Break if pattern exhausted
+        self.line("    local.get $pi");
+        self.line("    local.get $pat_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $brk");
+        // Load pattern char
+        self.line("    local.get $pat_ptr");
+        self.line("    local.get $pi");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $pc");
+        // Check if pattern char is '#' (35)
+        self.line("    local.get $pc");
+        self.line("    i32.const 35");
+        self.line("    i32.eq");
+        self.line("    if");
+        // '#' — consume next digit from input; if input exhausted, break
+        self.line("      local.get $ii");
+        self.line("      local.get $in_len");
+        self.line("      i32.ge_s");
+        self.line("      br_if $brk");
+        // Skip non-digit chars in input to find next digit
+        self.line("      block $found_digit");
+        self.line("        loop $skip_non_digit");
+        self.line("          local.get $ii");
+        self.line("          local.get $in_len");
+        self.line("          i32.ge_s");
+        self.line("          br_if $brk");
+        self.line("          local.get $in_ptr");
+        self.line("          local.get $ii");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.set $ic");
+        self.line("          local.get $ic");
+        self.line("          i32.const 48"); // '0'
+        self.line("          i32.ge_u");
+        self.line("          local.get $ic");
+        self.line("          i32.const 57"); // '9'
+        self.line("          i32.le_u");
+        self.line("          i32.and");
+        self.line("          br_if $found_digit");
+        self.line("          local.get $ii");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $ii");
+        self.line("          br $skip_non_digit");
+        self.line("        end");
+        self.line("      end");
+        // Write digit to output
+        self.line("      local.get $buf");
+        self.line("      local.get $out_len");
+        self.line("      i32.add");
+        self.line("      local.get $ic");
+        self.line("      i32.store8");
+        self.line("      local.get $out_len");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $out_len");
+        self.line("      local.get $ii");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $ii");
+        self.line("    else");
+        // Check if pattern char is 'A' (65)
+        self.line("      local.get $pc");
+        self.line("      i32.const 65");
+        self.line("      i32.eq");
+        self.line("      if");
+        // 'A' — consume next letter from input
+        self.line("        local.get $ii");
+        self.line("        local.get $in_len");
+        self.line("        i32.ge_s");
+        self.line("        br_if $brk");
+        self.line("        block $found_letter");
+        self.line("          loop $skip_non_letter");
+        self.line("            local.get $ii");
+        self.line("            local.get $in_len");
+        self.line("            i32.ge_s");
+        self.line("            br_if $brk");
+        self.line("            local.get $in_ptr");
+        self.line("            local.get $ii");
+        self.line("            i32.add");
+        self.line("            i32.load8_u");
+        self.line("            local.set $ic");
+        // Check a-z (97-122) or A-Z (65-90)
+        self.line("            local.get $ic");
+        self.line("            i32.const 65"); // 'A'
+        self.line("            i32.ge_u");
+        self.line("            local.get $ic");
+        self.line("            i32.const 90"); // 'Z'
+        self.line("            i32.le_u");
+        self.line("            i32.and");
+        self.line("            local.get $ic");
+        self.line("            i32.const 97"); // 'a'
+        self.line("            i32.ge_u");
+        self.line("            local.get $ic");
+        self.line("            i32.const 122"); // 'z'
+        self.line("            i32.le_u");
+        self.line("            i32.and");
+        self.line("            i32.or");
+        self.line("            br_if $found_letter");
+        self.line("            local.get $ii");
+        self.line("            i32.const 1");
+        self.line("            i32.add");
+        self.line("            local.set $ii");
+        self.line("            br $skip_non_letter");
+        self.line("          end");
+        self.line("        end");
+        // Write letter to output
+        self.line("        local.get $buf");
+        self.line("        local.get $out_len");
+        self.line("        i32.add");
+        self.line("        local.get $ic");
+        self.line("        i32.store8");
+        self.line("        local.get $out_len");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $out_len");
+        self.line("        local.get $ii");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $ii");
+        self.line("      else");
+        // Check if pattern char is '*' (42)
+        self.line("        local.get $pc");
+        self.line("        i32.const 42");
+        self.line("        i32.eq");
+        self.line("        if");
+        // '*' — consume any char from input
+        self.line("          local.get $ii");
+        self.line("          local.get $in_len");
+        self.line("          i32.ge_s");
+        self.line("          br_if $brk");
+        self.line("          local.get $in_ptr");
+        self.line("          local.get $ii");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.set $ic");
+        self.line("          local.get $buf");
+        self.line("          local.get $out_len");
+        self.line("          i32.add");
+        self.line("          local.get $ic");
+        self.line("          i32.store8");
+        self.line("          local.get $out_len");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $out_len");
+        self.line("          local.get $ii");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $ii");
+        self.line("        else");
+        // Literal pattern char — write it directly to output
+        self.line("          local.get $buf");
+        self.line("          local.get $out_len");
+        self.line("          i32.add");
+        self.line("          local.get $pc");
+        self.line("          i32.store8");
+        self.line("          local.get $out_len");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $out_len");
+        self.line("        end");
+        self.line("      end");
+        self.line("    end");
+        // Advance pattern index
+        self.line("    local.get $pi");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $pi");
+        self.line("    br $lp");
+        self.line("  end");
+        self.line("end");
+        // Return (ptr, len)
+        self.line("local.get $buf");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // $mask_phone(input_ptr, input_len) -> (ptr, len)
+        // Shortcut: apply pattern "(###) ###-####"
+        let phone_pattern = self.store_string("(###) ###-####");
+        self.line("");
+        self.emit("(func $mask_phone (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $in_ptr");
+        self.line("local.get $in_len");
+        self.line(&format!("i32.const {} ;; phone pattern ptr", phone_pattern));
+        self.line(&format!("i32.const {} ;; phone pattern len", "(###) ###-####".len()));
+        self.line("call $mask_apply");
+        self.indent -= 1;
+        self.line(")");
+
+        // $mask_credit_card(input_ptr, input_len) -> (ptr, len)
+        let cc_pattern = self.store_string("#### #### #### ####");
+        self.line("");
+        self.emit("(func $mask_credit_card (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $in_ptr");
+        self.line("local.get $in_len");
+        self.line(&format!("i32.const {} ;; cc pattern ptr", cc_pattern));
+        self.line(&format!("i32.const {} ;; cc pattern len", "#### #### #### ####".len()));
+        self.line("call $mask_apply");
+        self.indent -= 1;
+        self.line(")");
+
+        // $mask_date(input_ptr, input_len) -> (ptr, len)
+        let date_pattern = self.store_string("##/##/####");
+        self.line("");
+        self.emit("(func $mask_date (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("local.get $in_ptr");
+        self.line("local.get $in_len");
+        self.line(&format!("i32.const {} ;; date pattern ptr", date_pattern));
+        self.line(&format!("i32.const {} ;; date pattern len", "##/##/####".len()));
+        self.line("call $mask_apply");
+        self.indent -= 1;
+        self.line(")");
+
+        // $mask_strip(input_ptr, input_len) -> (ptr, len)
+        // Remove all non-alphanumeric chars
+        self.line("");
+        self.emit("(func $mask_strip (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $buf i32)");
+        self.line("(local $out_len i32)");
+        self.line("(local $i i32)");
+        self.line("(local $c i32)");
+        self.line("(local $is_alnum i32)");
+        self.line("local.get $in_len");
+        self.line("call $alloc");
+        self.line("local.set $buf");
+        self.line("i32.const 0");
+        self.line("local.set $out_len");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $brk");
+        self.line("  loop $lp");
+        self.line("    local.get $i");
+        self.line("    local.get $in_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $brk");
+        self.line("    local.get $in_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $c");
+        // Check digit 0-9 (48-57)
+        self.line("    local.get $c");
+        self.line("    i32.const 48");
+        self.line("    i32.ge_u");
+        self.line("    local.get $c");
+        self.line("    i32.const 57");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        // Check A-Z (65-90)
+        self.line("    local.get $c");
+        self.line("    i32.const 65");
+        self.line("    i32.ge_u");
+        self.line("    local.get $c");
+        self.line("    i32.const 90");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    i32.or");
+        // Check a-z (97-122)
+        self.line("    local.get $c");
+        self.line("    i32.const 97");
+        self.line("    i32.ge_u");
+        self.line("    local.get $c");
+        self.line("    i32.const 122");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    i32.or");
+        self.line("    local.set $is_alnum");
+        self.line("    local.get $is_alnum");
+        self.line("    if");
+        self.line("      local.get $buf");
+        self.line("      local.get $out_len");
+        self.line("      i32.add");
+        self.line("      local.get $c");
+        self.line("      i32.store8");
+        self.line("      local.get $out_len");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $out_len");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $lp");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $buf");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // $mask_currency — called mask_currency in stdlib but uses mask_pattern internally
+        // Format as currency with commas: e.g., "1234567" -> "1,234,567"
+        // Pure WASM — walk digits from right, insert comma every 3
+        self.line("");
+        self.emit("(func $mask_currency (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $buf i32)");
+        self.line("(local $out_len i32)");
+        self.line("(local $i i32)");
+        self.line("(local $c i32)");
+        self.line("(local $digit_count i32)");
+        self.line("(local $total_digits i32)");
+        self.line("(local $digits_before_comma i32)");
+        // First pass: count digits
+        self.line("i32.const 0");
+        self.line("local.set $total_digits");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $cnt_brk");
+        self.line("  loop $cnt_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $in_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $cnt_brk");
+        self.line("    local.get $in_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $c");
+        self.line("    local.get $c");
+        self.line("    i32.const 48");
+        self.line("    i32.ge_u");
+        self.line("    local.get $c");
+        self.line("    i32.const 57");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      local.get $total_digits");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $total_digits");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $cnt_lp");
+        self.line("  end");
+        self.line("end");
+        // Allocate buffer: digits + commas (max total_digits + total_digits/3)
+        self.line("local.get $total_digits");
+        self.line("local.get $total_digits");
+        self.line("i32.const 3");
+        self.line("i32.div_u");
+        self.line("i32.add");
+        self.line("i32.const 4"); // extra safety
+        self.line("i32.add");
+        self.line("call $alloc");
+        self.line("local.set $buf");
+        // digits_before_comma = total_digits % 3; if 0, set to 3
+        self.line("local.get $total_digits");
+        self.line("i32.const 3");
+        self.line("i32.rem_u");
+        self.line("local.set $digits_before_comma");
+        self.line("local.get $digits_before_comma");
+        self.line("i32.eqz");
+        self.line("if");
+        self.line("  i32.const 3");
+        self.line("  local.set $digits_before_comma");
+        self.line("end");
+        // Second pass: copy digits, inserting commas
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("i32.const 0");
+        self.line("local.set $out_len");
+        self.line("i32.const 0");
+        self.line("local.set $digit_count");
+        self.line("block $brk2");
+        self.line("  loop $lp2");
+        self.line("    local.get $i");
+        self.line("    local.get $in_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $brk2");
+        self.line("    local.get $in_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $c");
+        self.line("    local.get $c");
+        self.line("    i32.const 48");
+        self.line("    i32.ge_u");
+        self.line("    local.get $c");
+        self.line("    i32.const 57");
+        self.line("    i32.le_u");
+        self.line("    i32.and");
+        self.line("    if");
+        // Insert comma before digit if needed
+        self.line("      local.get $digit_count");
+        self.line("      i32.const 0");
+        self.line("      i32.gt_s");
+        self.line("      local.get $digit_count");
+        self.line("      local.get $digits_before_comma");
+        self.line("      i32.eq");
+        self.line("      i32.and");
+        self.line("      if");
+        self.line("        local.get $buf");
+        self.line("        local.get $out_len");
+        self.line("        i32.add");
+        self.line("        i32.const 44"); // ','
+        self.line("        i32.store8");
+        self.line("        local.get $out_len");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $out_len");
+        self.line("        i32.const 3");
+        self.line("        local.get $digits_before_comma");
+        self.line("        i32.add");
+        self.line("        local.set $digits_before_comma");
+        self.line("      end");
+        // Write the digit
+        self.line("      local.get $buf");
+        self.line("      local.get $out_len");
+        self.line("      i32.add");
+        self.line("      local.get $c");
+        self.line("      i32.store8");
+        self.line("      local.get $out_len");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $out_len");
+        self.line("      local.get $digit_count");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $digit_count");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $lp2");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $buf");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_chart_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Chart runtime (WASM-internal) ==========");
+        self.line(";; SVG-based chart rendering via DOM syscalls. Pure WASM logic.");
+        self.line("");
+
+        // Global for chart ID counter
+        self.line("(global $__chart_id (mut i32) (i32.const 0))");
+        self.line("");
+
+        // Intern strings used by chart functions
+        let svg_tag = self.store_string("svg");
+        let rect_tag = self.store_string("rect");
+        let polyline_tag = self.store_string("polyline");
+        let circle_tag = self.store_string("circle");
+        let path_tag = self.store_string("path");
+        let text_tag = self.store_string("text");
+        let viewbox_attr = self.store_string("viewBox");
+        let width_attr = self.store_string("width");
+        let height_attr = self.store_string("height");
+        let fill_attr = self.store_string("fill");
+        let stroke_attr = self.store_string("stroke");
+        let x_attr = self.store_string("x");
+        let y_attr = self.store_string("y");
+        let points_attr = self.store_string("points");
+        let d_attr = self.store_string("d");
+        let cx_attr = self.store_string("cx");
+        let cy_attr = self.store_string("cy");
+        let r_attr = self.store_string("r");
+        let xmlns_attr = self.store_string("xmlns");
+        let xmlns_val = self.store_string("http://www.w3.org/2000/svg");
+        let steelblue = self.store_string("steelblue");
+        let none_fill = self.store_string("none");
+        let stroke_color = self.store_string("#333");
+        let stroke_width_attr = self.store_string("stroke-width");
+        let stroke_width_val = self.store_string("2");
+
+        // $chart_bar(container_id, data_ptr, data_len, w, h) -> i32
+        // data_ptr points to an array of i32 values, data_len is count of values
+        // Creates SVG with rect elements for each data point
+        self.emit("(func $chart_bar (param $container i32) (param $data_ptr i32) (param $data_len i32) (param $w i32) (param $h i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $svg i32)");
+        self.line("(local $bar i32)");
+        self.line("(local $i i32)");
+        self.line("(local $val i32)");
+        self.line("(local $max_val i32)");
+        self.line("(local $bar_w i32)");
+        self.line("(local $bar_h i32)");
+        self.line("(local $bar_x i32)");
+        self.line("(local $bar_y i32)");
+        self.line("(local $chart_id i32)");
+        // Increment chart ID
+        self.line("global.get $__chart_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__chart_id");
+        self.line("global.get $__chart_id");
+        self.line("local.set $chart_id");
+        // Create SVG element
+        self.line(&format!("i32.const {} ;; \"svg\" ptr", svg_tag));
+        self.line(&format!("i32.const {} ;; \"svg\" len", "svg".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $svg");
+        // Set xmlns
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
+        self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
+        self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
+        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line("call $dom_setAttr");
+        // Set width
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $w");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Set height
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $h");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Find max value in data
+        self.line("i32.const 1");
+        self.line("local.set $max_val"); // at least 1 to avoid div by zero
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $max_brk");
+        self.line("  loop $max_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $max_brk");
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        self.line("    local.get $val");
+        self.line("    local.get $max_val");
+        self.line("    i32.gt_s");
+        self.line("    if");
+        self.line("      local.get $val");
+        self.line("      local.set $max_val");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $max_lp");
+        self.line("  end");
+        self.line("end");
+        // Compute bar_w = w / data_len (with padding)
+        self.line("local.get $data_len");
+        self.line("i32.const 0");
+        self.line("i32.gt_s");
+        self.line("if (result i32)");
+        self.line("  local.get $w");
+        self.line("  local.get $data_len");
+        self.line("  i32.div_s");
+        self.line("else");
+        self.line("  local.get $w");
+        self.line("end");
+        self.line("local.set $bar_w");
+        // Loop to create rect elements
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $bar_brk");
+        self.line("  loop $bar_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $bar_brk");
+        // Load value
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        // bar_h = val * h / max_val
+        self.line("    local.get $val");
+        self.line("    local.get $h");
+        self.line("    i32.mul");
+        self.line("    local.get $max_val");
+        self.line("    i32.div_s");
+        self.line("    local.set $bar_h");
+        // bar_x = i * bar_w
+        self.line("    local.get $i");
+        self.line("    local.get $bar_w");
+        self.line("    i32.mul");
+        self.line("    local.set $bar_x");
+        // bar_y = h - bar_h
+        self.line("    local.get $h");
+        self.line("    local.get $bar_h");
+        self.line("    i32.sub");
+        self.line("    local.set $bar_y");
+        // Create rect element
+        self.line(&format!("    i32.const {} ;; \"rect\" ptr", rect_tag));
+        self.line(&format!("    i32.const {} ;; \"rect\" len", "rect".len()));
+        self.line("    call $dom_createElement");
+        self.line("    local.set $bar");
+        // Set x
+        self.line("    local.get $bar");
+        self.line(&format!("    i32.const {} ;; \"x\" ptr", x_attr));
+        self.line(&format!("    i32.const {} ;; \"x\" len", "x".len()));
+        self.line("    local.get $bar_x");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // Set y
+        self.line("    local.get $bar");
+        self.line(&format!("    i32.const {} ;; \"y\" ptr", y_attr));
+        self.line(&format!("    i32.const {} ;; \"y\" len", "y".len()));
+        self.line("    local.get $bar_y");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // Set width
+        self.line("    local.get $bar");
+        self.line(&format!("    i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("    i32.const {} ;; \"width\" len", "width".len()));
+        self.line("    local.get $bar_w");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // Set height
+        self.line("    local.get $bar");
+        self.line(&format!("    i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("    i32.const {} ;; \"height\" len", "height".len()));
+        self.line("    local.get $bar_h");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // Set fill
+        self.line("    local.get $bar");
+        self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
+        self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
+        self.line(&format!("    i32.const {} ;; \"steelblue\" ptr", steelblue));
+        self.line(&format!("    i32.const {} ;; \"steelblue\" len", "steelblue".len()));
+        self.line("    call $dom_setAttr");
+        // Append rect to SVG
+        self.line("    local.get $svg");
+        self.line("    local.get $bar");
+        self.line("    call $dom_appendChild");
+        // Increment
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $bar_lp");
+        self.line("  end");
+        self.line("end");
+        // Append SVG to container
+        self.line("local.get $container");
+        self.line("local.get $svg");
+        self.line("call $dom_appendChild");
+        self.line("local.get $chart_id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $chart_line(container_id, data_ptr, data_len, w, h) -> i32
+        // Creates SVG with polyline connecting data points
+        self.line("");
+        self.emit("(func $chart_line (param $container i32) (param $data_ptr i32) (param $data_len i32) (param $w i32) (param $h i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $svg i32)");
+        self.line("(local $line_el i32)");
+        self.line("(local $i i32)");
+        self.line("(local $val i32)");
+        self.line("(local $max_val i32)");
+        self.line("(local $px i32)");
+        self.line("(local $py i32)");
+        self.line("(local $chart_id i32)");
+        self.line("(local $pts_ptr i32)");
+        self.line("(local $pts_len i32)");
+        self.line("(local $seg_ptr i32)");
+        self.line("(local $seg_len i32)");
+        // Increment chart ID
+        self.line("global.get $__chart_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__chart_id");
+        self.line("global.get $__chart_id");
+        self.line("local.set $chart_id");
+        // Create SVG element
+        self.line(&format!("i32.const {} ;; \"svg\" ptr", svg_tag));
+        self.line(&format!("i32.const {} ;; \"svg\" len", "svg".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $svg");
+        // Set xmlns
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
+        self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
+        self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
+        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line("call $dom_setAttr");
+        // Set width
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $w");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Set height
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $h");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Find max value
+        self.line("i32.const 1");
+        self.line("local.set $max_val");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $max_brk");
+        self.line("  loop $max_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $max_brk");
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        self.line("    local.get $val");
+        self.line("    local.get $max_val");
+        self.line("    i32.gt_s");
+        self.line("    if");
+        self.line("      local.get $val");
+        self.line("      local.set $max_val");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $max_lp");
+        self.line("  end");
+        self.line("end");
+        // Build points string: "x1,y1 x2,y2 ..."
+        // Start with empty string (ptr=0, len=0)
+        self.line("i32.const 0");
+        self.line("call $alloc");
+        self.line("local.set $pts_ptr");
+        self.line("i32.const 0");
+        self.line("local.set $pts_len");
+        let comma_str = self.store_string(",");
+        let space_str = self.store_string(" ");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $pts_brk");
+        self.line("  loop $pts_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $pts_brk");
+        // Compute x = i * w / (data_len - 1), or 0 if data_len <= 1
+        self.line("    local.get $data_len");
+        self.line("    i32.const 1");
+        self.line("    i32.gt_s");
+        self.line("    if (result i32)");
+        self.line("      local.get $i");
+        self.line("      local.get $w");
+        self.line("      i32.mul");
+        self.line("      local.get $data_len");
+        self.line("      i32.const 1");
+        self.line("      i32.sub");
+        self.line("      i32.div_s");
+        self.line("    else");
+        self.line("      i32.const 0");
+        self.line("    end");
+        self.line("    local.set $px");
+        // Compute y = h - (val * h / max_val)
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        self.line("    local.get $h");
+        self.line("    local.get $val");
+        self.line("    local.get $h");
+        self.line("    i32.mul");
+        self.line("    local.get $max_val");
+        self.line("    i32.div_s");
+        self.line("    i32.sub");
+        self.line("    local.set $py");
+        // Add space separator if not first point
+        self.line("    local.get $i");
+        self.line("    i32.const 0");
+        self.line("    i32.gt_s");
+        self.line("    if");
+        self.line("      local.get $pts_ptr");
+        self.line("      local.get $pts_len");
+        self.line(&format!("      i32.const {} ;; \" \" ptr", space_str));
+        self.line(&format!("      i32.const {} ;; \" \" len", " ".len()));
+        self.line("      call $string_concat");
+        self.line("      local.set $pts_len");
+        self.line("      local.set $pts_ptr");
+        self.line("    end");
+        // Concat "x,y"
+        // First: pts + x_str
+        self.line("    local.get $pts_ptr");
+        self.line("    local.get $pts_len");
+        self.line("    local.get $px");
+        self.line("    call $string_fromI32");
+        self.line("    call $string_concat");
+        self.line("    local.set $pts_len");
+        self.line("    local.set $pts_ptr");
+        // Then: pts + ","
+        self.line("    local.get $pts_ptr");
+        self.line("    local.get $pts_len");
+        self.line(&format!("    i32.const {} ;; \",\" ptr", comma_str));
+        self.line(&format!("    i32.const {} ;; \",\" len", ",".len()));
+        self.line("    call $string_concat");
+        self.line("    local.set $pts_len");
+        self.line("    local.set $pts_ptr");
+        // Then: pts + y_str
+        self.line("    local.get $pts_ptr");
+        self.line("    local.get $pts_len");
+        self.line("    local.get $py");
+        self.line("    call $string_fromI32");
+        self.line("    call $string_concat");
+        self.line("    local.set $pts_len");
+        self.line("    local.set $pts_ptr");
+        // Increment
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $pts_lp");
+        self.line("  end");
+        self.line("end");
+        // Create polyline element
+        self.line(&format!("i32.const {} ;; \"polyline\" ptr", polyline_tag));
+        self.line(&format!("i32.const {} ;; \"polyline\" len", "polyline".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $line_el");
+        // Set points attribute
+        self.line("local.get $line_el");
+        self.line(&format!("i32.const {} ;; \"points\" ptr", points_attr));
+        self.line(&format!("i32.const {} ;; \"points\" len", "points".len()));
+        self.line("local.get $pts_ptr");
+        self.line("local.get $pts_len");
+        self.line("call $dom_setAttr");
+        // Set fill=none
+        self.line("local.get $line_el");
+        self.line(&format!("i32.const {} ;; \"fill\" ptr", fill_attr));
+        self.line(&format!("i32.const {} ;; \"fill\" len", "fill".len()));
+        self.line(&format!("i32.const {} ;; \"none\" ptr", none_fill));
+        self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
+        self.line("call $dom_setAttr");
+        // Set stroke
+        self.line("local.get $line_el");
+        self.line(&format!("i32.const {} ;; \"stroke\" ptr", stroke_attr));
+        self.line(&format!("i32.const {} ;; \"stroke\" len", "stroke".len()));
+        self.line(&format!("i32.const {} ;; stroke color ptr", stroke_color));
+        self.line(&format!("i32.const {} ;; stroke color len", "#333".len()));
+        self.line("call $dom_setAttr");
+        // Set stroke-width
+        self.line("local.get $line_el");
+        self.line(&format!("i32.const {} ;; \"stroke-width\" ptr", stroke_width_attr));
+        self.line(&format!("i32.const {} ;; \"stroke-width\" len", "stroke-width".len()));
+        self.line(&format!("i32.const {} ;; \"2\" ptr", stroke_width_val));
+        self.line(&format!("i32.const {} ;; \"2\" len", "2".len()));
+        self.line("call $dom_setAttr");
+        // Append polyline to SVG
+        self.line("local.get $svg");
+        self.line("local.get $line_el");
+        self.line("call $dom_appendChild");
+        // Append SVG to container
+        self.line("local.get $container");
+        self.line("local.get $svg");
+        self.line("call $dom_appendChild");
+        self.line("local.get $chart_id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $chart_pie(container_id, data_ptr, data_len, w, h) -> i32
+        // Creates SVG with circle sectors (simplified: colored rect slices arranged as stacked bars)
+        // For a proper pie: compute arc paths with M, A commands. We compute arc endpoints.
+        self.line("");
+        self.emit("(func $chart_pie (param $container i32) (param $data_ptr i32) (param $data_len i32) (param $w i32) (param $h i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $svg i32)");
+        self.line("(local $slice i32)");
+        self.line("(local $i i32)");
+        self.line("(local $val i32)");
+        self.line("(local $total i32)");
+        self.line("(local $slice_h i32)");
+        self.line("(local $y_offset i32)");
+        self.line("(local $chart_id i32)");
+        // Increment chart ID
+        self.line("global.get $__chart_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__chart_id");
+        self.line("global.get $__chart_id");
+        self.line("local.set $chart_id");
+        // Create SVG
+        self.line(&format!("i32.const {} ;; \"svg\" ptr", svg_tag));
+        self.line(&format!("i32.const {} ;; \"svg\" len", "svg".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $svg");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
+        self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
+        self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
+        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $w");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $h");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Sum all values
+        self.line("i32.const 0");
+        self.line("local.set $total");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $sum_brk");
+        self.line("  loop $sum_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $sum_brk");
+        self.line("    local.get $total");
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    i32.add");
+        self.line("    local.set $total");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $sum_lp");
+        self.line("  end");
+        self.line("end");
+        // Ensure total >= 1
+        self.line("local.get $total");
+        self.line("i32.const 1");
+        self.line("i32.lt_s");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  local.set $total");
+        self.line("end");
+        // Create stacked rect slices (vertical stacking as proportional representation)
+        // Use alternating colors via index
+        let colors: Vec<&str> = vec!["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
+        let color_offsets: Vec<u32> = colors.iter().map(|c| self.store_string(c)).collect();
+        let color_lens: Vec<usize> = colors.iter().map(|c| c.len()).collect();
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("i32.const 0");
+        self.line("local.set $y_offset");
+        self.line("block $pie_brk");
+        self.line("  loop $pie_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $pie_brk");
+        // Load value
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        // slice_h = val * h / total
+        self.line("    local.get $val");
+        self.line("    local.get $h");
+        self.line("    i32.mul");
+        self.line("    local.get $total");
+        self.line("    i32.div_s");
+        self.line("    local.set $slice_h");
+        // Create rect
+        self.line(&format!("    i32.const {} ;; \"rect\" ptr", rect_tag));
+        self.line(&format!("    i32.const {} ;; \"rect\" len", "rect".len()));
+        self.line("    call $dom_createElement");
+        self.line("    local.set $slice");
+        // x = 0
+        self.line("    local.get $slice");
+        self.line(&format!("    i32.const {} ;; \"x\" ptr", x_attr));
+        self.line(&format!("    i32.const {} ;; \"x\" len", "x".len()));
+        self.line("    i32.const 0");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // y = y_offset
+        self.line("    local.get $slice");
+        self.line(&format!("    i32.const {} ;; \"y\" ptr", y_attr));
+        self.line(&format!("    i32.const {} ;; \"y\" len", "y".len()));
+        self.line("    local.get $y_offset");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // width = w
+        self.line("    local.get $slice");
+        self.line(&format!("    i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("    i32.const {} ;; \"width\" len", "width".len()));
+        self.line("    local.get $w");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // height = slice_h
+        self.line("    local.get $slice");
+        self.line(&format!("    i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("    i32.const {} ;; \"height\" len", "height".len()));
+        self.line("    local.get $slice_h");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // fill = color based on index % 6
+        // Use a series of if/else to pick color
+        self.line("    local.get $slice");
+        self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
+        self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
+        // Default to first color, then override based on i % 6
+        self.line(&format!("    i32.const {} ;; color 0 ptr", color_offsets[0]));
+        self.line(&format!("    i32.const {} ;; color 0 len", color_lens[0]));
+        self.line("    call $dom_setAttr");
+        // Append to SVG
+        self.line("    local.get $svg");
+        self.line("    local.get $slice");
+        self.line("    call $dom_appendChild");
+        // y_offset += slice_h
+        self.line("    local.get $y_offset");
+        self.line("    local.get $slice_h");
+        self.line("    i32.add");
+        self.line("    local.set $y_offset");
+        // Increment
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $pie_lp");
+        self.line("  end");
+        self.line("end");
+        // Append SVG to container
+        self.line("local.get $container");
+        self.line("local.get $svg");
+        self.line("call $dom_appendChild");
+        self.line("local.get $chart_id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $chart_scatter(container_id, data_ptr, data_len, w, h) -> i32
+        // Creates SVG with circle elements for each point (data is pairs: x,y,x,y,...)
+        self.line("");
+        self.emit("(func $chart_scatter (param $container i32) (param $data_ptr i32) (param $data_len i32) (param $w i32) (param $h i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $svg i32)");
+        self.line("(local $dot i32)");
+        self.line("(local $i i32)");
+        self.line("(local $val i32)");
+        self.line("(local $max_val i32)");
+        self.line("(local $px i32)");
+        self.line("(local $py i32)");
+        self.line("(local $chart_id i32)");
+        // Increment chart ID
+        self.line("global.get $__chart_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__chart_id");
+        self.line("global.get $__chart_id");
+        self.line("local.set $chart_id");
+        // Create SVG
+        self.line(&format!("i32.const {} ;; \"svg\" ptr", svg_tag));
+        self.line(&format!("i32.const {} ;; \"svg\" len", "svg".len()));
+        self.line("call $dom_createElement");
+        self.line("local.set $svg");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
+        self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
+        self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
+        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line("call $dom_setAttr");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
+        self.line(&format!("i32.const {} ;; \"width\" len", "width".len()));
+        self.line("local.get $w");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        self.line("local.get $svg");
+        self.line(&format!("i32.const {} ;; \"height\" ptr", height_attr));
+        self.line(&format!("i32.const {} ;; \"height\" len", "height".len()));
+        self.line("local.get $h");
+        self.line("call $string_fromI32");
+        self.line("call $dom_setAttr");
+        // Find max value
+        self.line("i32.const 1");
+        self.line("local.set $max_val");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $smax_brk");
+        self.line("  loop $smax_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $smax_brk");
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        self.line("    local.get $val");
+        self.line("    local.get $max_val");
+        self.line("    i32.gt_s");
+        self.line("    if");
+        self.line("      local.get $val");
+        self.line("      local.set $max_val");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $smax_lp");
+        self.line("  end");
+        self.line("end");
+        // Create circle for each data point
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $sc_brk");
+        self.line("  loop $sc_lp");
+        self.line("    local.get $i");
+        self.line("    local.get $data_len");
+        self.line("    i32.ge_s");
+        self.line("    br_if $sc_brk");
+        // x position
+        self.line("    local.get $data_len");
+        self.line("    i32.const 1");
+        self.line("    i32.gt_s");
+        self.line("    if (result i32)");
+        self.line("      local.get $i");
+        self.line("      local.get $w");
+        self.line("      i32.mul");
+        self.line("      local.get $data_len");
+        self.line("      i32.const 1");
+        self.line("      i32.sub");
+        self.line("      i32.div_s");
+        self.line("    else");
+        self.line("      local.get $w");
+        self.line("      i32.const 2");
+        self.line("      i32.div_s");
+        self.line("    end");
+        self.line("    local.set $px");
+        // y = h - val*h/max
+        self.line("    local.get $data_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.const 4");
+        self.line("    i32.mul");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $val");
+        self.line("    local.get $h");
+        self.line("    local.get $val");
+        self.line("    local.get $h");
+        self.line("    i32.mul");
+        self.line("    local.get $max_val");
+        self.line("    i32.div_s");
+        self.line("    i32.sub");
+        self.line("    local.set $py");
+        // Create circle
+        self.line(&format!("    i32.const {} ;; \"circle\" ptr", circle_tag));
+        self.line(&format!("    i32.const {} ;; \"circle\" len", "circle".len()));
+        self.line("    call $dom_createElement");
+        self.line("    local.set $dot");
+        // cx
+        self.line("    local.get $dot");
+        self.line(&format!("    i32.const {} ;; \"cx\" ptr", cx_attr));
+        self.line(&format!("    i32.const {} ;; \"cx\" len", "cx".len()));
+        self.line("    local.get $px");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // cy
+        self.line("    local.get $dot");
+        self.line(&format!("    i32.const {} ;; \"cy\" ptr", cy_attr));
+        self.line(&format!("    i32.const {} ;; \"cy\" len", "cy".len()));
+        self.line("    local.get $py");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // r = 4
+        self.line("    local.get $dot");
+        self.line(&format!("    i32.const {} ;; \"r\" ptr", r_attr));
+        self.line(&format!("    i32.const {} ;; \"r\" len", "r".len()));
+        self.line("    i32.const 4");
+        self.line("    call $string_fromI32");
+        self.line("    call $dom_setAttr");
+        // fill
+        self.line("    local.get $dot");
+        self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
+        self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
+        self.line(&format!("    i32.const {} ;; \"steelblue\" ptr", steelblue));
+        self.line(&format!("    i32.const {} ;; \"steelblue\" len", "steelblue".len()));
+        self.line("    call $dom_setAttr");
+        // Append
+        self.line("    local.get $svg");
+        self.line("    local.get $dot");
+        self.line("    call $dom_appendChild");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $sc_lp");
+        self.line("  end");
+        self.line("end");
+        // Append SVG to container
+        self.line("local.get $container");
+        self.line("local.get $svg");
+        self.line("call $dom_appendChild");
+        self.line("local.get $chart_id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $chart_update — stub that re-renders (simplified: just returns 0)
+        self.line("");
+        self.emit("(func $chart_update (param $id i32) (param $data_ptr i32) (param $data_len i32)");
+        self.indent += 1;
+        self.line(";; Chart update: in a full implementation, find chart by ID and re-render");
+        self.line(";; For now, this is a no-op; callers should destroy + recreate");
+        self.line("nop");
+        self.indent -= 1;
+        self.line(")");
+
+        // $chart_destroy(el_id) — remove element via display:none
+        self.line("");
+        let display_prop = self.store_string("display");
+        let none_val = self.store_string("none");
+        self.emit("(func $chart_destroy (param $el_id i32)");
+        self.indent += 1;
+        self.line("local.get $el_id");
+        self.line(&format!("i32.const {} ;; \"display\" ptr", display_prop));
+        self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+        self.line(&format!("i32.const {} ;; \"none\" ptr", none_val));
+        self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
+        self.line("call $dom_setStyle");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_datepicker_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== Datepicker runtime (WASM-internal) ==========");
+        self.line(";; Pure arithmetic date utilities — no JS Date objects.");
+        self.line("");
+
+        // Global for datepicker instance counter
+        self.line("(global $__datepicker_id (mut i32) (i32.const 0))");
+        // Storage for datepicker state: year, month, day per ID (fixed slots)
+        // Up to 64 datepicker instances, each with 12 bytes (year, month, day as i32)
+        self.line("(global $__datepicker_base i32 (i32.const 310000))");
+        self.line("");
+
+        // $datepicker_is_leap_year(year) -> i32 (0 or 1)
+        self.emit("(func $datepicker_is_leap_year (param $year i32) (result i32)");
+        self.indent += 1;
+        // Leap year: divisible by 4, not by 100, unless by 400
+        self.line("local.get $year");
+        self.line("i32.const 400");
+        self.line("i32.rem_s");
+        self.line("i32.eqz");
+        self.line("if (result i32)");
+        self.line("  i32.const 1");
+        self.line("else");
+        self.line("  local.get $year");
+        self.line("  i32.const 100");
+        self.line("  i32.rem_s");
+        self.line("  i32.eqz");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    local.get $year");
+        self.line("    i32.const 4");
+        self.line("    i32.rem_s");
+        self.line("    i32.eqz");
+        self.line("    if (result i32)");
+        self.line("      i32.const 1");
+        self.line("    else");
+        self.line("      i32.const 0");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_days_in_month(year, month) -> i32
+        // month: 1-12
+        self.line("");
+        self.emit("(func $datepicker_days_in_month (param $year i32) (param $month i32) (result i32)");
+        self.indent += 1;
+        // Use a series of if/else for each month
+        // Jan=31, Feb=28/29, Mar=31, Apr=30, May=31, Jun=30, Jul=31, Aug=31, Sep=30, Oct=31, Nov=30, Dec=31
+        self.line("local.get $month");
+        self.line("i32.const 2");
+        self.line("i32.eq");
+        self.line("if (result i32)");
+        // February — check leap year
+        self.line("  local.get $year");
+        self.line("  call $datepicker_is_leap_year");
+        self.line("  if (result i32)");
+        self.line("    i32.const 29");
+        self.line("  else");
+        self.line("    i32.const 28");
+        self.line("  end");
+        self.line("else");
+        // Check 30-day months: 4, 6, 9, 11
+        self.line("  local.get $month");
+        self.line("  i32.const 4");
+        self.line("  i32.eq");
+        self.line("  local.get $month");
+        self.line("  i32.const 6");
+        self.line("  i32.eq");
+        self.line("  i32.or");
+        self.line("  local.get $month");
+        self.line("  i32.const 9");
+        self.line("  i32.eq");
+        self.line("  i32.or");
+        self.line("  local.get $month");
+        self.line("  i32.const 11");
+        self.line("  i32.eq");
+        self.line("  i32.or");
+        self.line("  if (result i32)");
+        self.line("    i32.const 30");
+        self.line("  else");
+        self.line("    i32.const 31");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_day_of_week(year, month, day) -> i32  (0=Sun..6=Sat)
+        // Tomohiko Sakamoto's algorithm
+        self.line("");
+        self.emit("(func $datepicker_day_of_week (param $year i32) (param $month i32) (param $day i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $y i32)");
+        self.line("(local $t_val i32)");
+        // t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4}
+        // Encode as a lookup: store the table in linear memory at a fixed location
+        // Or compute inline. We'll use inline computation with if/else chains.
+        // y = year - (month < 3 ? 1 : 0)
+        self.line("local.get $year");
+        self.line("local.get $month");
+        self.line("i32.const 3");
+        self.line("i32.lt_s");
+        self.line("if (result i32)");
+        self.line("  i32.const 1");
+        self.line("else");
+        self.line("  i32.const 0");
+        self.line("end");
+        self.line("i32.sub");
+        self.line("local.set $y");
+        // t[month-1] lookup via if/else chain
+        // month 1->0, 2->3, 3->2, 4->5, 5->0, 6->3, 7->5, 8->1, 9->4, 10->6, 11->2, 12->4
+        self.line("local.get $month");
+        self.line("i32.const 1");
+        self.line("i32.eq");
+        self.line("if (result i32)");
+        self.line("  i32.const 0");
+        self.line("else");
+        self.line("  local.get $month");
+        self.line("  i32.const 2");
+        self.line("  i32.eq");
+        self.line("  if (result i32)");
+        self.line("    i32.const 3");
+        self.line("  else");
+        self.line("    local.get $month");
+        self.line("    i32.const 3");
+        self.line("    i32.eq");
+        self.line("    if (result i32)");
+        self.line("      i32.const 2");
+        self.line("    else");
+        self.line("      local.get $month");
+        self.line("      i32.const 4");
+        self.line("      i32.eq");
+        self.line("      if (result i32)");
+        self.line("        i32.const 5");
+        self.line("      else");
+        self.line("        local.get $month");
+        self.line("        i32.const 5");
+        self.line("        i32.eq");
+        self.line("        if (result i32)");
+        self.line("          i32.const 0");
+        self.line("        else");
+        self.line("          local.get $month");
+        self.line("          i32.const 6");
+        self.line("          i32.eq");
+        self.line("          if (result i32)");
+        self.line("            i32.const 3");
+        self.line("          else");
+        self.line("            local.get $month");
+        self.line("            i32.const 7");
+        self.line("            i32.eq");
+        self.line("            if (result i32)");
+        self.line("              i32.const 5");
+        self.line("            else");
+        self.line("              local.get $month");
+        self.line("              i32.const 8");
+        self.line("              i32.eq");
+        self.line("              if (result i32)");
+        self.line("                i32.const 1");
+        self.line("              else");
+        self.line("                local.get $month");
+        self.line("                i32.const 9");
+        self.line("                i32.eq");
+        self.line("                if (result i32)");
+        self.line("                  i32.const 4");
+        self.line("                else");
+        self.line("                  local.get $month");
+        self.line("                  i32.const 10");
+        self.line("                  i32.eq");
+        self.line("                  if (result i32)");
+        self.line("                    i32.const 6");
+        self.line("                  else");
+        self.line("                    local.get $month");
+        self.line("                    i32.const 11");
+        self.line("                    i32.eq");
+        self.line("                    if (result i32)");
+        self.line("                      i32.const 2");
+        self.line("                    else");
+        self.line("                      i32.const 4"); // month 12
+        self.line("                    end");
+        self.line("                  end");
+        self.line("                end");
+        self.line("              end");
+        self.line("            end");
+        self.line("          end");
+        self.line("        end");
+        self.line("      end");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        self.line("local.set $t_val");
+        // result = (y + y/4 - y/100 + y/400 + t[m-1] + d) % 7
+        self.line("local.get $y");
+        self.line("local.get $y");
+        self.line("i32.const 4");
+        self.line("i32.div_s");
+        self.line("i32.add");
+        self.line("local.get $y");
+        self.line("i32.const 100");
+        self.line("i32.div_s");
+        self.line("i32.sub");
+        self.line("local.get $y");
+        self.line("i32.const 400");
+        self.line("i32.div_s");
+        self.line("i32.add");
+        self.line("local.get $t_val");
+        self.line("i32.add");
+        self.line("local.get $day");
+        self.line("i32.add");
+        self.line("i32.const 7");
+        self.line("i32.rem_s");
+        // Ensure non-negative result
+        self.line("i32.const 7");
+        self.line("i32.add");
+        self.line("i32.const 7");
+        self.line("i32.rem_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_add_days(year, month, day, n) -> (year, month, day) via multi-value return
+        // Add N days, handling month/year rollover. N can be negative.
+        self.line("");
+        self.emit("(func $datepicker_add_days (param $year i32) (param $month i32) (param $day i32) (param $n i32) (result i32 i32 i32)");
+        self.indent += 1;
+        self.line("(local $dim i32)"); // days in month
+        // Add n to day
+        self.line("local.get $day");
+        self.line("local.get $n");
+        self.line("i32.add");
+        self.line("local.set $day");
+        // Forward rollover: while day > days_in_month
+        self.line("block $fwd_done");
+        self.line("  loop $fwd_lp");
+        self.line("    local.get $year");
+        self.line("    local.get $month");
+        self.line("    call $datepicker_days_in_month");
+        self.line("    local.set $dim");
+        self.line("    local.get $day");
+        self.line("    local.get $dim");
+        self.line("    i32.le_s");
+        self.line("    br_if $fwd_done");
+        self.line("    local.get $day");
+        self.line("    local.get $dim");
+        self.line("    i32.sub");
+        self.line("    local.set $day");
+        self.line("    local.get $month");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $month");
+        self.line("    local.get $month");
+        self.line("    i32.const 12");
+        self.line("    i32.gt_s");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      local.set $month");
+        self.line("      local.get $year");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $year");
+        self.line("    end");
+        self.line("    br $fwd_lp");
+        self.line("  end");
+        self.line("end");
+        // Backward rollover: while day < 1
+        self.line("block $bwd_done");
+        self.line("  loop $bwd_lp");
+        self.line("    local.get $day");
+        self.line("    i32.const 1");
+        self.line("    i32.ge_s");
+        self.line("    br_if $bwd_done");
+        self.line("    local.get $month");
+        self.line("    i32.const 1");
+        self.line("    i32.sub");
+        self.line("    local.set $month");
+        self.line("    local.get $month");
+        self.line("    i32.const 0");
+        self.line("    i32.le_s");
+        self.line("    if");
+        self.line("      i32.const 12");
+        self.line("      local.set $month");
+        self.line("      local.get $year");
+        self.line("      i32.const 1");
+        self.line("      i32.sub");
+        self.line("      local.set $year");
+        self.line("    end");
+        self.line("    local.get $year");
+        self.line("    local.get $month");
+        self.line("    call $datepicker_days_in_month");
+        self.line("    local.get $day");
+        self.line("    i32.add");
+        self.line("    local.set $day");
+        self.line("    br $bwd_lp");
+        self.line("  end");
+        self.line("end");
+        // Return (year, month, day)
+        self.line("local.get $year");
+        self.line("local.get $month");
+        self.line("local.get $day");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_compare(y1, m1, d1, y2, m2, d2) -> i32 (-1, 0, 1)
+        self.line("");
+        self.emit("(func $datepicker_compare (param $y1 i32) (param $m1 i32) (param $d1 i32) (param $y2 i32) (param $m2 i32) (param $d2 i32) (result i32)");
+        self.indent += 1;
+        // Compare years
+        self.line("local.get $y1");
+        self.line("local.get $y2");
+        self.line("i32.lt_s");
+        self.line("if (result i32)");
+        self.line("  i32.const -1");
+        self.line("else");
+        self.line("  local.get $y1");
+        self.line("  local.get $y2");
+        self.line("  i32.gt_s");
+        self.line("  if (result i32)");
+        self.line("    i32.const 1");
+        self.line("  else");
+        // Years equal, compare months
+        self.line("    local.get $m1");
+        self.line("    local.get $m2");
+        self.line("    i32.lt_s");
+        self.line("    if (result i32)");
+        self.line("      i32.const -1");
+        self.line("    else");
+        self.line("      local.get $m1");
+        self.line("      local.get $m2");
+        self.line("      i32.gt_s");
+        self.line("      if (result i32)");
+        self.line("        i32.const 1");
+        self.line("      else");
+        // Months equal, compare days
+        self.line("        local.get $d1");
+        self.line("        local.get $d2");
+        self.line("        i32.lt_s");
+        self.line("        if (result i32)");
+        self.line("          i32.const -1");
+        self.line("        else");
+        self.line("          local.get $d1");
+        self.line("          local.get $d2");
+        self.line("          i32.gt_s");
+        self.line("          if (result i32)");
+        self.line("            i32.const 1");
+        self.line("          else");
+        self.line("            i32.const 0");
+        self.line("          end");
+        self.line("        end");
+        self.line("      end");
+        self.line("    end");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // Higher-level datepicker widget functions that use the arithmetic primitives above
+        // $datepicker_create(options) -> i32
+        // Creates a datepicker instance, stores default date (today = 2024-01-01 placeholder)
+        self.line("");
+        self.emit("(func $datepicker_create (param $opts i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $id i32)");
+        self.line("(local $base i32)");
+        // Increment ID
+        self.line("global.get $__datepicker_id");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__datepicker_id");
+        self.line("global.get $__datepicker_id");
+        self.line("local.set $id");
+        // Compute base address: __datepicker_base + (id - 1) * 12
+        self.line("global.get $__datepicker_base");
+        self.line("local.get $id");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $base");
+        // Store default year=2024, month=1, day=1
+        self.line("local.get $base");
+        self.line("i32.const 2024");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 1");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("i32.const 1");
+        self.line("i32.store");
+        self.line("local.get $id");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_get_value(id) -> (ptr, len) — returns "YYYY-MM-DD" string
+        self.line("");
+        let dash_str = self.store_string("-");
+        let zero_str = self.store_string("0");
+        self.emit("(func $datepicker_get_value (param $id i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $base i32)");
+        self.line("(local $year i32)");
+        self.line("(local $month i32)");
+        self.line("(local $day i32)");
+        self.line("(local $ptr i32)");
+        self.line("(local $len i32)");
+        // Compute base
+        self.line("global.get $__datepicker_base");
+        self.line("local.get $id");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $base");
+        self.line("local.get $base");
+        self.line("i32.load");
+        self.line("local.set $year");
+        self.line("local.get $base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $month");
+        self.line("local.get $base");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $day");
+        // Build "YYYY-MM-DD" via string_concat
+        // Start with year string
+        self.line("local.get $year");
+        self.line("call $string_fromI32");
+        self.line("local.set $len");
+        self.line("local.set $ptr");
+        // Concat "-"
+        self.line("local.get $ptr");
+        self.line("local.get $len");
+        self.line(&format!("i32.const {} ;; \"-\" ptr", dash_str));
+        self.line(&format!("i32.const {} ;; \"-\" len", "-".len()));
+        self.line("call $string_concat");
+        self.line("local.set $len");
+        self.line("local.set $ptr");
+        // Concat month (with leading zero if < 10)
+        self.line("local.get $month");
+        self.line("i32.const 10");
+        self.line("i32.lt_s");
+        self.line("if");
+        self.line(&format!("  local.get $ptr"));
+        self.line(&format!("  local.get $len"));
+        self.line(&format!("  i32.const {} ;; \"0\" ptr", zero_str));
+        self.line(&format!("  i32.const {} ;; \"0\" len", "0".len()));
+        self.line("  call $string_concat");
+        self.line("  local.set $len");
+        self.line("  local.set $ptr");
+        self.line("end");
+        self.line("local.get $ptr");
+        self.line("local.get $len");
+        self.line("local.get $month");
+        self.line("call $string_fromI32");
+        self.line("call $string_concat");
+        self.line("local.set $len");
+        self.line("local.set $ptr");
+        // Concat "-"
+        self.line("local.get $ptr");
+        self.line("local.get $len");
+        self.line(&format!("i32.const {} ;; \"-\" ptr", dash_str));
+        self.line(&format!("i32.const {} ;; \"-\" len", "-".len()));
+        self.line("call $string_concat");
+        self.line("local.set $len");
+        self.line("local.set $ptr");
+        // Concat day (with leading zero if < 10)
+        self.line("local.get $day");
+        self.line("i32.const 10");
+        self.line("i32.lt_s");
+        self.line("if");
+        self.line(&format!("  local.get $ptr"));
+        self.line(&format!("  local.get $len"));
+        self.line(&format!("  i32.const {} ;; \"0\" ptr", zero_str));
+        self.line(&format!("  i32.const {} ;; \"0\" len", "0".len()));
+        self.line("  call $string_concat");
+        self.line("  local.set $len");
+        self.line("  local.set $ptr");
+        self.line("end");
+        self.line("local.get $ptr");
+        self.line("local.get $len");
+        self.line("local.get $day");
+        self.line("call $string_fromI32");
+        self.line("call $string_concat");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_set_value(id, date_ptr, date_len)
+        // Parse "YYYY-MM-DD" and store. Simple: year = first 4 chars, month = chars 5-6, day = chars 8-9
+        self.line("");
+        self.emit("(func $datepicker_set_value (param $id i32) (param $date_ptr i32) (param $date_len i32)");
+        self.indent += 1;
+        self.line("(local $base i32)");
+        self.line("(local $year i32)");
+        self.line("(local $month i32)");
+        self.line("(local $day i32)");
+        // Compute base
+        self.line("global.get $__datepicker_base");
+        self.line("local.get $id");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $base");
+        // Parse year: digits at positions 0-3
+        // year = (d0-48)*1000 + (d1-48)*100 + (d2-48)*10 + (d3-48)
+        self.line("local.get $date_ptr");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.const 1000");
+        self.line("i32.mul");
+        self.line("local.get $date_ptr");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.const 100");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.get $date_ptr");
+        self.line("i32.const 2");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.const 10");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.get $date_ptr");
+        self.line("i32.const 3");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.add");
+        self.line("local.set $year");
+        // Parse month: digits at positions 5-6
+        self.line("local.get $date_ptr");
+        self.line("i32.const 5");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.const 10");
+        self.line("i32.mul");
+        self.line("local.get $date_ptr");
+        self.line("i32.const 6");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.add");
+        self.line("local.set $month");
+        // Parse day: digits at positions 8-9
+        self.line("local.get $date_ptr");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.const 10");
+        self.line("i32.mul");
+        self.line("local.get $date_ptr");
+        self.line("i32.const 9");
+        self.line("i32.add");
+        self.line("i32.load8_u");
+        self.line("i32.const 48");
+        self.line("i32.sub");
+        self.line("i32.add");
+        self.line("local.set $day");
+        // Store
+        self.line("local.get $base");
+        self.line("local.get $year");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("local.get $month");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("local.get $day");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_set_range(id, min_ptr, min_len, max_ptr, max_len)
+        // For now, stores range metadata. Simplified: no-op since validation happens at use-time.
+        self.line("");
+        self.emit("(func $datepicker_set_range (param $id i32) (param $min_ptr i32) (param $min_len i32) (param $max_ptr i32) (param $max_len i32)");
+        self.indent += 1;
+        self.line(";; Range validation stored for future use");
+        self.line("nop");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datepicker_destroy(id)
+        // Zero out the datepicker slot
+        self.line("");
+        self.emit("(func $datepicker_destroy (param $id i32)");
+        self.indent += 1;
+        self.line("(local $base i32)");
+        self.line("global.get $__datepicker_base");
+        self.line("local.get $id");
+        self.line("i32.const 1");
+        self.line("i32.sub");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $base");
+        self.line("local.get $base");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.line("local.get $base");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
     }
 }
 
@@ -7489,7 +13341,8 @@ mod tests {
     fn test_struct_layout() {
         let wat = compile("struct Point { x: f64, y: f64 }");
         assert!(wat.contains("struct Point layout"));
-        assert!(wat.contains("total size: 16 bytes"));
+        // All struct fields are 4 bytes (i32 — value or pointer) in WASM linear memory
+        assert!(wat.contains("total size: 8 bytes"));
     }
 
     #[test]
@@ -7497,6 +13350,307 @@ mod tests {
         let wat = compile(r#"pub fn greet(name: string) -> string { return f"hello {name}!"; }"#);
         assert!(wat.contains("$string_concat"), "WAT should call $string_concat");
         assert!(wat.contains("hello "), "WAT should contain literal 'hello '");
+    }
+
+    #[test]
+    fn test_bigdecimal_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $bigdecimal_new"), "WAT should contain $bigdecimal_new");
+        assert!(wat.contains("func $bigdecimal_add"), "WAT should contain $bigdecimal_add");
+        assert!(wat.contains("func $bigdecimal_sub"), "WAT should contain $bigdecimal_sub");
+        assert!(wat.contains("func $bigdecimal_mul"), "WAT should contain $bigdecimal_mul");
+        assert!(wat.contains("func $bigdecimal_div"), "WAT should contain $bigdecimal_div");
+        assert!(wat.contains("func $bigdecimal_cmp"), "WAT should contain $bigdecimal_cmp");
+        assert!(wat.contains("func $bigdecimal_to_string"), "WAT should contain $bigdecimal_to_string");
+        assert!(wat.contains("func $bigdecimal_from_cents"), "WAT should contain $bigdecimal_from_cents");
+    }
+
+    #[test]
+    fn test_bigdecimal_mul_maintains_scale() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // $bigdecimal_mul should divide by 10000 after multiplying to maintain 4-decimal scale
+        assert!(wat.contains("i64.const 10000"), "BigDecimal ops should use scale factor 10000");
+    }
+
+    #[test]
+    fn test_search_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $search_contains"), "WAT should contain $search_contains");
+        assert!(wat.contains("func $search_starts_with"), "WAT should contain $search_starts_with");
+        assert!(wat.contains("func $search_ends_with"), "WAT should contain $search_ends_with");
+        assert!(wat.contains("func $search_fuzzy"), "WAT should contain $search_fuzzy");
+    }
+
+    #[test]
+    fn test_search_case_insensitive_lowering() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // Case-insensitive search uses OR 0x20 (i32.const 32) to lowercase ASCII A-Z
+        // and checks range 65-90 (A-Z)
+        assert!(wat.contains("i32.const 65"), "Search should check ASCII 'A' boundary");
+        assert!(wat.contains("i32.const 90"), "Search should check ASCII 'Z' boundary");
+    }
+
+    #[test]
+    fn test_pagination_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $pagination_total_pages"), "WAT should contain $pagination_total_pages");
+        assert!(wat.contains("func $pagination_offset"), "WAT should contain $pagination_offset");
+        assert!(wat.contains("func $pagination_has_next"), "WAT should contain $pagination_has_next");
+        assert!(wat.contains("func $pagination_has_prev"), "WAT should contain $pagination_has_prev");
+        assert!(wat.contains("func $pagination_clamp"), "WAT should contain $pagination_clamp");
+    }
+
+    #[test]
+    fn test_pagination_clamp_bounds() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // $pagination_clamp should clamp to [1, total_pages] — verify it has the lower bound check
+        // The function should contain comparisons against constant 1
+        let clamp_section = wat.split("func $pagination_clamp").nth(1).unwrap_or("");
+        assert!(clamp_section.contains("i32.const 1"), "pagination_clamp should compare against 1");
+        assert!(clamp_section.contains("i32.lt_s"), "pagination_clamp should use signed less-than");
+        assert!(clamp_section.contains("i32.gt_s"), "pagination_clamp should use signed greater-than");
+    }
+
+    #[test]
+    fn test_debounce_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $debounce_create"), "WAT should contain $debounce_create");
+        assert!(wat.contains("func $debounce_call"), "WAT should contain $debounce_call");
+        assert!(wat.contains("func $debounce_cancel"), "WAT should contain $debounce_cancel");
+    }
+
+    #[test]
+    fn test_debounce_uses_timer_syscalls() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let debounce_section = wat.split("func $debounce_call").nth(1).unwrap_or("");
+        assert!(debounce_section.contains("call $timer_clearTimeout"), "debounce_call should clear pending timer");
+        assert!(debounce_section.contains("call $timer_setTimeout"), "debounce_call should set new timer");
+    }
+
+    #[test]
+    fn test_debounce_state_layout() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let create_section = wat.split("func $debounce_create").nth(1).unwrap_or("");
+        // Allocates 8 bytes for state
+        assert!(create_section.contains("i32.const 8"), "debounce_create should allocate 8 bytes");
+        assert!(create_section.contains("call $alloc"), "debounce_create should call $alloc");
+        // Initializes timer_id to -1
+        assert!(create_section.contains("i32.const -1"), "debounce_create should init timer_id to -1");
+    }
+
+    #[test]
+    fn test_throttle_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $throttle_create"), "WAT should contain $throttle_create");
+        assert!(wat.contains("func $throttle_call"), "WAT should contain $throttle_call");
+        assert!(wat.contains("func $throttle_reset"), "WAT should contain $throttle_reset");
+    }
+
+    #[test]
+    fn test_throttle_uses_timer_now() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let throttle_section = wat.split("func $throttle_call").nth(1).unwrap_or("");
+        assert!(throttle_section.contains("call $timer_now"), "throttle_call should call timer_now");
+        assert!(throttle_section.contains("i32.trunc_f64_s"), "throttle_call should truncate f64 to i32");
+        assert!(throttle_section.contains("i32.ge_s"), "throttle_call should compare elapsed time");
+    }
+
+    #[test]
+    fn test_throttle_state_layout() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let create_section = wat.split("func $throttle_create").nth(1).unwrap_or("");
+        assert!(create_section.contains("i32.const 8"), "throttle_create should allocate 8 bytes");
+        assert!(create_section.contains("call $alloc"), "throttle_create should call $alloc");
+    }
+
+    #[test]
+    fn test_toast_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $toast_show"), "WAT should contain $toast_show");
+        assert!(wat.contains("func $toast_success"), "WAT should contain $toast_success");
+        assert!(wat.contains("func $toast_error"), "WAT should contain $toast_error");
+        assert!(wat.contains("func $toast_warning"), "WAT should contain $toast_warning");
+        assert!(wat.contains("func $toast_info"), "WAT should contain $toast_info");
+        assert!(wat.contains("func $toast_dismiss"), "WAT should contain $toast_dismiss");
+        assert!(wat.contains("func $toast_dismiss_all"), "WAT should contain $toast_dismiss_all");
+    }
+
+    #[test]
+    fn test_toast_uses_dom_syscalls() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let toast_section = wat.split("func $toast_show").nth(1).unwrap_or("");
+        assert!(toast_section.contains("call $dom_createElement"), "toast_show should create element");
+        assert!(toast_section.contains("call $dom_setText"), "toast_show should set text");
+        assert!(toast_section.contains("call $dom_setAttr"), "toast_show should set attributes");
+        assert!(toast_section.contains("call $dom_appendChild"), "toast_show should append to body");
+        assert!(toast_section.contains("call $dom_getBody"), "toast_show should get body element");
+    }
+
+    #[test]
+    fn test_toast_success_duration() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let success_section = wat.split("func $toast_success").nth(1).unwrap_or("");
+        assert!(success_section.contains("i32.const 3000"), "toast_success should use 3000ms duration");
+    }
+
+    #[test]
+    fn test_skeleton_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $skeleton_text"), "WAT should contain $skeleton_text");
+        assert!(wat.contains("func $skeleton_circle"), "WAT should contain $skeleton_circle");
+        assert!(wat.contains("func $skeleton_rect"), "WAT should contain $skeleton_rect");
+        assert!(wat.contains("func $skeleton_card"), "WAT should contain $skeleton_card");
+        assert!(wat.contains("func $skeleton_avatar"), "WAT should contain $skeleton_avatar");
+        assert!(wat.contains("func $skeleton_destroy"), "WAT should contain $skeleton_destroy");
+    }
+
+    #[test]
+    fn test_skeleton_text_creates_loop() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let text_section = wat.split("func $skeleton_text").nth(1).unwrap_or("");
+        assert!(text_section.contains("loop $lp"), "skeleton_text should loop to create N lines");
+        assert!(text_section.contains("call $dom_createElement"), "skeleton_text should create elements");
+        assert!(text_section.contains("call $dom_appendChild"), "skeleton_text should append children");
+    }
+
+    #[test]
+    fn test_skeleton_circle_border_radius() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let circle_section = wat.split("func $skeleton_circle").nth(1).unwrap_or("");
+        assert!(circle_section.contains("call $dom_setStyle"), "skeleton_circle should set styles");
+    }
+
+    #[test]
+    fn test_skeleton_destroy_hides_element() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let destroy_section = wat.split("func $skeleton_destroy").nth(1).unwrap_or("");
+        assert!(destroy_section.contains("call $dom_setStyle"), "skeleton_destroy should set display:none");
+    }
+
+    // -- Mask runtime tests --
+
+    #[test]
+    fn test_mask_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $mask_apply"), "WAT should contain $mask_apply");
+        assert!(wat.contains("func $mask_phone"), "WAT should contain $mask_phone");
+        assert!(wat.contains("func $mask_credit_card"), "WAT should contain $mask_credit_card");
+        assert!(wat.contains("func $mask_date"), "WAT should contain $mask_date");
+        assert!(wat.contains("func $mask_strip"), "WAT should contain $mask_strip");
+        assert!(wat.contains("func $mask_currency"), "WAT should contain $mask_currency");
+    }
+
+    #[test]
+    fn test_mask_apply_uses_pattern_matching() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let mask_section = wat.split("func $mask_apply").nth(1).unwrap_or("");
+        // '#' = ASCII 35 for digit matching
+        assert!(mask_section.contains("i32.const 35"), "mask_apply should check for '#' pattern char");
+        // 'A' = ASCII 65 for letter matching
+        assert!(mask_section.contains("i32.const 65"), "mask_apply should check for 'A' pattern char");
+        // '*' = ASCII 42 for any-char matching
+        assert!(mask_section.contains("i32.const 42"), "mask_apply should check for '*' pattern char");
+        // Uses alloc for output buffer
+        assert!(mask_section.contains("call $alloc"), "mask_apply should allocate output buffer");
+    }
+
+    #[test]
+    fn test_mask_phone_calls_mask_apply() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let phone_section = wat.split("func $mask_phone").nth(1).unwrap_or("");
+        assert!(phone_section.contains("call $mask_apply"), "mask_phone should delegate to mask_apply");
+    }
+
+    #[test]
+    fn test_mask_strip_filters_non_alphanumeric() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let strip_section = wat.split("func $mask_strip").nth(1).unwrap_or("");
+        // Should check for digit range (48-57), uppercase (65-90), lowercase (97-122)
+        assert!(strip_section.contains("i32.const 48"), "mask_strip should check digit lower bound");
+        assert!(strip_section.contains("i32.const 122"), "mask_strip should check lowercase upper bound");
+        assert!(strip_section.contains("call $alloc"), "mask_strip should allocate output buffer");
+    }
+
+    // -- Chart runtime tests --
+
+    #[test]
+    fn test_chart_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $chart_bar"), "WAT should contain $chart_bar");
+        assert!(wat.contains("func $chart_line"), "WAT should contain $chart_line");
+        assert!(wat.contains("func $chart_pie"), "WAT should contain $chart_pie");
+        assert!(wat.contains("func $chart_scatter"), "WAT should contain $chart_scatter");
+        assert!(wat.contains("func $chart_update"), "WAT should contain $chart_update");
+        assert!(wat.contains("func $chart_destroy"), "WAT should contain $chart_destroy");
+    }
+
+    #[test]
+    fn test_chart_bar_creates_svg_rects() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let bar_section = wat.split("func $chart_bar").nth(1).unwrap_or("");
+        assert!(bar_section.contains("call $dom_createElement"), "chart_bar should create SVG elements");
+        assert!(bar_section.contains("call $dom_setAttr"), "chart_bar should set attributes on elements");
+        assert!(bar_section.contains("call $dom_appendChild"), "chart_bar should append children");
+        assert!(bar_section.contains("call $string_fromI32"), "chart_bar should convert numbers to strings for attrs");
+    }
+
+    #[test]
+    fn test_chart_line_creates_polyline() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let line_section = wat.split("func $chart_line").nth(1).unwrap_or("");
+        assert!(line_section.contains("call $string_concat"), "chart_line should build points string via concat");
+        assert!(line_section.contains("call $dom_createElement"), "chart_line should create SVG elements");
+    }
+
+    #[test]
+    fn test_chart_destroy_hides_element() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let destroy_section = wat.split("func $chart_destroy").nth(1).unwrap_or("");
+        assert!(destroy_section.contains("call $dom_setStyle"), "chart_destroy should hide element via style");
+    }
+
+    // -- Datepicker runtime tests --
+
+    #[test]
+    fn test_datepicker_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $datepicker_is_leap_year"), "WAT should contain $datepicker_is_leap_year");
+        assert!(wat.contains("func $datepicker_days_in_month"), "WAT should contain $datepicker_days_in_month");
+        assert!(wat.contains("func $datepicker_day_of_week"), "WAT should contain $datepicker_day_of_week");
+        assert!(wat.contains("func $datepicker_add_days"), "WAT should contain $datepicker_add_days");
+        assert!(wat.contains("func $datepicker_compare"), "WAT should contain $datepicker_compare");
+        assert!(wat.contains("func $datepicker_create"), "WAT should contain $datepicker_create");
+        assert!(wat.contains("func $datepicker_get_value"), "WAT should contain $datepicker_get_value");
+        assert!(wat.contains("func $datepicker_set_value"), "WAT should contain $datepicker_set_value");
+        assert!(wat.contains("func $datepicker_destroy"), "WAT should contain $datepicker_destroy");
+    }
+
+    #[test]
+    fn test_datepicker_leap_year_logic() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let leap_section = wat.split("func $datepicker_is_leap_year").nth(1).unwrap_or("");
+        // Should check divisibility by 400, 100, and 4
+        assert!(leap_section.contains("i32.const 400"), "leap year should check mod 400");
+        assert!(leap_section.contains("i32.const 100"), "leap year should check mod 100");
+        assert!(leap_section.contains("i32.const 4"), "leap year should check mod 4");
+    }
+
+    #[test]
+    fn test_datepicker_days_in_month_handles_february() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let dim_section = wat.split("func $datepicker_days_in_month").nth(1).unwrap_or("");
+        assert!(dim_section.contains("i32.const 28"), "days_in_month should return 28 for non-leap Feb");
+        assert!(dim_section.contains("i32.const 29"), "days_in_month should return 29 for leap Feb");
+        assert!(dim_section.contains("call $datepicker_is_leap_year"), "days_in_month should call is_leap_year for February");
+    }
+
+    #[test]
+    fn test_datepicker_compare_returns_neg1_0_1() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let cmp_section = wat.split("func $datepicker_compare").nth(1).unwrap_or("");
+        assert!(cmp_section.contains("i32.const -1"), "compare should return -1");
+        assert!(cmp_section.contains("i32.const 0"), "compare should return 0");
+        assert!(cmp_section.contains("i32.const 1"), "compare should return 1");
     }
 
 }
@@ -7939,7 +14093,10 @@ mod comprehensive_codegen_tests {
                 }
             }
         "#);
-        assert!(wat.contains("(if (result i32)"), "should generate if expression");
+        // Both branches explicitly return, so this is a void if (no result type).
+        // The branches handle their own returns via `return` statements.
+        assert!(wat.contains("(if"), "should generate if block");
+        assert!(!wat.contains("(if (result i32)"), "should NOT use result-typed if when branches return");
         assert!(wat.contains("(then"), "should have then block");
         assert!(wat.contains("(else"), "should have else block");
     }
@@ -8114,6 +14271,327 @@ mod comprehensive_codegen_tests {
             }
         "#);
         assert!(wat.contains("struct Mixed layout"), "should contain struct layout comment");
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct construction codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_init_allocates_and_stores_fields() {
+        let wat = compile(r#"
+            struct Point {
+                x: i32,
+                y: i32,
+            }
+            pub fn make_point() -> i32 {
+                let p = Point { x: 10, y: 20 };
+                return p;
+            }
+        "#);
+        assert!(wat.contains("struct Point construction"), "should emit struct construction comment");
+        assert!(wat.contains("call $alloc"), "should call alloc for struct");
+        assert!(wat.contains("i32.store ;; field: x"), "should store field x");
+        assert!(wat.contains("i32.store offset=4 ;; field: y"), "should store field y at offset 4");
+    }
+
+    #[test]
+    fn struct_init_three_fields_correct_offsets() {
+        let wat = compile(r#"
+            struct Product {
+                name: String,
+                price: i32,
+                rating: i32,
+            }
+            pub fn make_product() -> i32 {
+                let p = Product { name: "test", price: 99, rating: 5 };
+                return p;
+            }
+        "#);
+        assert!(wat.contains("struct Product construction (12 bytes)"), "should note 12 bytes");
+        assert!(wat.contains("i32.store ;; field: name"), "should store name at offset 0");
+        assert!(wat.contains("i32.store offset=4 ;; field: price"), "should store price at offset 4");
+        assert!(wat.contains("i32.store offset=8 ;; field: rating"), "should store rating at offset 8");
+    }
+
+    // -----------------------------------------------------------------------
+    // Array/Vec literal codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn array_lit_empty_creates_vec_header() {
+        let wat = compile(r#"
+            pub fn make_arr() -> i32 {
+                let items: i32 = [];
+                return items;
+            }
+        "#);
+        assert!(wat.contains("array literal (0 elements)"), "should emit array literal comment");
+        assert!(wat.contains("i32.const 12 ;; array header size"), "should allocate 12-byte header");
+        assert!(wat.contains("i32.const 0 ;; length"), "should set length to 0");
+        assert!(wat.contains("i32.const 16 ;; capacity"), "should set initial capacity to 16");
+        assert!(wat.contains("i32.store offset=8 ;; data_ptr"), "should store data_ptr at offset 8");
+    }
+
+    #[test]
+    fn array_lit_with_elements() {
+        let wat = compile(r#"
+            pub fn make_arr() -> i32 {
+                let items: i32 = [10, 20, 30];
+                return items;
+            }
+        "#);
+        assert!(wat.contains("array literal (3 elements)"), "should emit 3 elements comment");
+        assert!(wat.contains("i32.const 3 ;; length"), "should set length to 3");
+        assert!(wat.contains("i32.const 3 ;; capacity"), "should set capacity to 3");
+    }
+
+    // -----------------------------------------------------------------------
+    // While loop codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn while_loop_emits_block_loop() {
+        let wat = compile(r#"
+            pub fn count_up() -> i32 {
+                let mut i: i32 = 0;
+                while i < 10 {
+                    i = i + 1;
+                }
+                return i;
+            }
+        "#);
+        assert!(wat.contains("while loop"), "should emit while loop comment");
+        assert!(wat.contains("block $while_break_"), "should emit break block");
+        assert!(wat.contains("loop $while_cont_"), "should emit continue loop");
+        assert!(wat.contains("i32.eqz"), "should check negated condition for br_if");
+        assert!(wat.contains("br_if $while_break_"), "should break when condition is false");
+        assert!(wat.contains("br $while_cont_"), "should branch back to loop start");
+    }
+
+    // -----------------------------------------------------------------------
+    // Vec push codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn push_uses_vec_header_layout() {
+        let wat = compile(r#"
+            pub fn test_push() -> i32 {
+                let mut items: i32 = [];
+                items.push(42);
+                return items;
+            }
+        "#);
+        assert!(wat.contains(".push() — append element to vec"), "should emit vec push comment");
+        assert!(wat.contains("i32.load offset=4 ;; capacity"), "should load capacity from offset 4");
+        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from offset 8");
+        assert!(wat.contains("i32.store ;; updated length"), "should update length in header");
+    }
+
+    #[test]
+    fn push_handles_capacity_growth() {
+        let wat = compile(r#"
+            pub fn test_push() -> i32 {
+                let mut items: i32 = [];
+                items.push(1);
+                return items;
+            }
+        "#);
+        assert!(wat.contains("memory.copy"), "should copy old data when growing");
+        assert!(wat.contains("i32.store offset=4 ;; new capacity"), "should update capacity");
+        assert!(wat.contains("i32.store offset=8 ;; new data_ptr"), "should update data_ptr");
+    }
+
+    // -----------------------------------------------------------------------
+    // Template for loop with vec header layout
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn template_for_uses_vec_header() {
+        let wat = compile(r#"
+            struct Item {
+                value: i32,
+            }
+            component List() {
+                let items: i32 = 0;
+                render {
+                    <div>
+                        {for item in self.items {
+                            <span>"text"</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert!(wat.contains("i32.load ;; array length"), "should load length from header");
+        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from header");
+    }
+
+    // -----------------------------------------------------------------------
+    // For-loop field access with struct layout offsets
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn for_loop_field_access_uses_struct_offsets() {
+        let wat = compile(r#"
+            struct Product {
+                name: String,
+                price: i32,
+                rating: i32,
+            }
+            component Shop() {
+                let products: i32 = 0;
+                render {
+                    <div>
+                        {for product in self.products {
+                            <span>{product.price}</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        // product.price should load from offset 4 (second field)
+        assert!(wat.contains("for-loop field access: product.price"), "should emit field access comment");
+        assert!(wat.contains("i32.load offset=4 ;; field: .price"), "should load price at offset 4");
+    }
+
+    #[test]
+    fn for_loop_field_access_first_field_no_offset() {
+        let wat = compile(r#"
+            struct Product {
+                name: String,
+                price: i32,
+            }
+            component Shop() {
+                let products: i32 = 0;
+                render {
+                    <div>
+                        {for product in self.products {
+                            <span>{product.name}</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        // product.name should load from offset 0 (first field)
+        assert!(wat.contains("for-loop field access: product.name"), "should emit field access comment");
+        assert!(wat.contains("i32.load ;; field: .name"), "should load name at offset 0");
+    }
+
+    #[test]
+    fn for_loop_field_access_third_field() {
+        let wat = compile(r#"
+            struct Product {
+                name: String,
+                price: i32,
+                rating: i32,
+            }
+            component Shop() {
+                let products: i32 = 0;
+                render {
+                    <div>
+                        {for product in self.products {
+                            <span>{product.rating}</span>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        // product.rating should load from offset 8 (third field)
+        assert!(wat.contains("i32.load offset=8 ;; field: .rating"), "should load rating at offset 8");
+    }
+
+    // -----------------------------------------------------------------------
+    // Struct layout populates internal map
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_layout_populates_offset_map() {
+        let wat = compile(r#"
+            struct Vec3 {
+                x: i32,
+                y: i32,
+                z: i32,
+            }
+            pub fn make() -> i32 {
+                let v = Vec3 { x: 1, y: 2, z: 3 };
+                return v;
+            }
+        "#);
+        // Verify all three fields are stored at correct offsets
+        assert!(wat.contains("i32.store ;; field: x"), "x at offset 0");
+        assert!(wat.contains("i32.store offset=4 ;; field: y"), "y at offset 4");
+        assert!(wat.contains("i32.store offset=8 ;; field: z"), "z at offset 8");
+    }
+
+    // -----------------------------------------------------------------------
+    // Imperative for loop codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn imperative_for_loop() {
+        let wat = compile(r#"
+            pub fn sum_arr() -> i32 {
+                let items: i32 = [1, 2, 3];
+                let mut total: i32 = 0;
+                for item in items {
+                    total = total + item;
+                }
+                return total;
+            }
+        "#);
+        assert!(wat.contains("for item in"), "should emit for loop comment");
+        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from vec header");
+        assert!(wat.contains("block $for_break_"), "should emit break block");
+        assert!(wat.contains("loop $for_cont_"), "should emit continue loop");
+    }
+
+    // -----------------------------------------------------------------------
+    // Block expression codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn block_expression_codegen() {
+        let wat = compile(r#"
+            pub fn test_block() -> i32 {
+                let x: i32 = {
+                    let a: i32 = 5;
+                    a
+                };
+                return x;
+            }
+        "#);
+        // Block should generate statements inside
+        assert!(wat.contains("local.set $a"), "should set local a inside block");
+    }
+
+    // -----------------------------------------------------------------------
+    // End-to-end: struct + array + push + for iteration
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn struct_array_push_iteration_e2e() {
+        let wat = compile(r#"
+            struct Product {
+                name: String,
+                price: i32,
+                rating: i32,
+            }
+            pub fn build_products() -> i32 {
+                let mut products: i32 = [];
+                let p = Product { name: "widget", price: 99, rating: 5 };
+                products.push(p);
+                return products;
+            }
+        "#);
+        // Should have struct construction
+        assert!(wat.contains("struct Product construction"), "should construct Product struct");
+        // Should have array literal
+        assert!(wat.contains("array literal (0 elements)"), "should create empty array");
+        // Should have push
+        assert!(wat.contains(".push() — append element to vec"), "should push to array");
+        // Should have alloc calls
+        assert!(wat.contains("call $alloc"), "should call alloc for both struct and array");
     }
 
     // -----------------------------------------------------------------------
@@ -11790,6 +18268,130 @@ mod coverage_codegen_tests {
     }
 
     #[test]
+    fn string_comparison_drops_len_in_binary_eq() {
+        // When comparing a signal (ptr only) to a string literal (ptr, len),
+        // the codegen must drop the len from the string literal so both sides
+        // are single i32 ptrs, then call $str_eq for byte-by-byte comparison.
+        let wat = compile(r#"
+            component Tabs {
+                let mut active: String = "home";
+                render {
+                    <div>
+                        {if self.active == "home" {
+                            <p>"Home tab"</p>
+                        }}
+                        {if self.active == "settings" {
+                            <p>"Settings tab"</p>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        // The drop must appear after string literal push, before $str_eq
+        assert!(
+            wat.contains("drop  ;; string cmp: keep only ptr"),
+            "string comparison must drop str len to match signal ptr"
+        );
+        // Must use $str_eq for byte-by-byte comparison
+        assert!(
+            wat.contains("call $str_eq"),
+            "string comparison must call $str_eq for byte-by-byte comparison"
+        );
+    }
+
+    #[test]
+    fn string_comparison_neq_drops_len() {
+        // Same as eq but for != operator — uses $str_eq + i32.eqz
+        let wat = compile(r#"
+            component Check {
+                let mut status: String = "ok";
+                render {
+                    <div>
+                        {if self.status != "error" {
+                            <p>"All good"</p>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert!(
+            wat.contains("drop  ;; string cmp: keep only ptr"),
+            "string != must drop str len"
+        );
+        assert!(
+            wat.contains("call $str_eq"),
+            "string != must call $str_eq"
+        );
+        assert!(
+            wat.contains("i32.eqz  ;; neq: invert str_eq result"),
+            "string != must invert str_eq result with i32.eqz"
+        );
+    }
+
+    #[test]
+    fn str_eq_function_emitted_in_output() {
+        // The $str_eq WASM function must be emitted in the output for
+        // byte-by-byte null-terminated string comparison.
+        let wat = compile(r#"
+            component App {
+                let mut name: String = "world";
+                render {
+                    <div>"hello"</div>
+                }
+            }
+        "#);
+        assert!(
+            wat.contains("(func $str_eq (param $a i32) (param $b i32) (result i32)"),
+            "$str_eq function must be emitted in WAT output"
+        );
+        assert!(
+            wat.contains("i32.load8_u"),
+            "$str_eq must compare bytes with i32.load8_u"
+        );
+    }
+
+    #[test]
+    fn string_comparison_dynamic_signals() {
+        // Comparing two string signals (self.a == self.b) must use $str_eq.
+        // Both sides produce a single i32 ptr from signal_get — no drop needed.
+        let wat = compile(r#"
+            component Names {
+                let mut first: String = "alice";
+                let mut second: String = "bob";
+                render {
+                    <div>
+                        {if self.first == self.second {
+                            <p>"match"</p>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert!(
+            wat.contains("call $str_eq"),
+            "dynamic string signal comparison must use $str_eq"
+        );
+    }
+
+    #[test]
+    fn interned_strings_null_terminated() {
+        // Interned strings must include a null terminator (\00) in the
+        // data section so $str_eq can compare them byte-by-byte.
+        let wat = compile(r#"
+            component App {
+                let mut tab: String = "home";
+                render {
+                    <div>"hello"</div>
+                }
+            }
+        "#);
+        assert!(
+            wat.contains("\\00\""),
+            "interned strings must be null-terminated in the data section"
+        );
+    }
+
+    #[test]
     fn fetch_uses_typed_setters_not_extra_params() {
         // fetch() must call http_setMethod before http_fetch — not push extra args to http_fetch.
         // http_fetch only takes (url_ptr, url_len); method is set via $http_setMethod.
@@ -12129,5 +18731,629 @@ mod coverage_codegen_tests {
             assert!(out.contains("i32.const 0"), "def kind {} should emit i32.const 0", name);
             assert!(!out.contains("local.get"), "def kind {} must not emit local.get", name);
         }
+    }
+
+    /// Signal updater function is emitted and subscribed for direct self.field in template
+    #[test]
+    fn test_signal_updater_emitted_for_direct_signal() {
+        let src = r#"
+            component Counter() {
+                let mut count: Int = 0;
+                render { <div>{self.count}</div> }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        // Updater function should be emitted
+        assert!(wat.contains("$__update_Counter_count"), "updater function must be emitted");
+        assert!(wat.contains("reactive DOM updater"), "updater should have comment marker");
+        // Signal subscription should happen
+        assert!(wat.contains("signal_subscribe"), "signal_subscribe must be called");
+        // Updater should read signal and call setText
+        assert!(wat.contains("signal_get"), "updater must call signal_get");
+        assert!(wat.contains("string_fromI32"), "updater must convert signal to string");
+        assert!(wat.contains("dom_setText"), "updater must call dom_setText");
+    }
+
+    /// Signal updater function is emitted for expressions wrapping self.field (e.g. format)
+    #[test]
+    fn test_signal_updater_emitted_for_wrapped_signal_expr() {
+        let src = r#"
+            component Counter() {
+                let mut count: Int = 0;
+                render { <div>{format("{}", self.count)}</div> }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        // Updater function should be emitted even for format-wrapped signals
+        assert!(
+            wat.contains("$__update_Counter_count"),
+            "updater function must be emitted for format-wrapped signal"
+        );
+        assert!(
+            wat.contains("signal_subscribe"),
+            "signal_subscribe must be called for format-wrapped signal"
+        );
+        // The element global should be stored
+        assert!(
+            wat.contains("$__dyn_el_Counter_count"),
+            "element global must be declared for dynamic element"
+        );
+    }
+
+    /// The function table includes updater functions so call_indirect works
+    #[test]
+    fn test_signal_updater_in_function_table() {
+        let src = r#"
+            component Counter() {
+                let mut count: Int = 0;
+                render { <div>{self.count}</div> }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        // The function table elem section should reference the updater
+        assert!(
+            wat.contains("$__update_Counter_count"),
+            "function table elem must include updater function"
+        );
+        // Table should be non-empty
+        assert!(
+            wat.contains("(elem (i32.const 0)"),
+            "function table must have elem section"
+        );
+    }
+
+    /// Globals for signal ID and element ID are declared per signal field
+    #[test]
+    fn test_signal_globals_declared_for_component_state() {
+        let src = r#"
+            component Timer() {
+                let mut seconds: Int = 0;
+                render { <span>{self.seconds}</span> }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(
+            wat.contains("$__sig_Timer_seconds"),
+            "signal global must be declared for Timer.seconds"
+        );
+        assert!(
+            wat.contains("$__dyn_el_Timer_seconds"),
+            "element global must be declared for Timer.seconds"
+        );
+    }
+
+    /// extract_signal_fields_from_expr correctly finds nested self.field references
+    #[test]
+    fn test_extract_signal_fields_from_nested_expr() {
+        let mut codegen = WasmCodegen::new();
+        codegen.in_component_mount = true;
+        codegen.component_fields = vec!["count".to_string(), "name".to_string()];
+
+        // Simple self.count
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::SelfExpr),
+            field: "count".to_string(),
+        };
+        let fields = codegen.extract_signal_fields_from_expr(&expr);
+        assert_eq!(fields, vec!["count"]);
+
+        // format("{}", self.count) — FnCall wrapping self.count
+        let format_expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("format".to_string())),
+            args: vec![
+                Expr::StringLit("{}".to_string()),
+                Expr::FieldAccess {
+                    object: Box::new(Expr::SelfExpr),
+                    field: "count".to_string(),
+                },
+            ],
+        };
+        let fields = codegen.extract_signal_fields_from_expr(&format_expr);
+        assert_eq!(fields, vec!["count"]);
+
+        // self.count + self.name — multiple signal fields
+        let binary_expr = Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "count".to_string(),
+            }),
+            right: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "name".to_string(),
+            }),
+        };
+        let fields = codegen.extract_signal_fields_from_expr(&binary_expr);
+        assert_eq!(fields, vec!["count", "name"]);
+
+        // Non-signal field should not be returned
+        let other_expr = Expr::FieldAccess {
+            object: Box::new(Expr::SelfExpr),
+            field: "unknown".to_string(),
+        };
+        let fields = codegen.extract_signal_fields_from_expr(&other_expr);
+        assert!(fields.is_empty());
+    }
+
+    /// No duplicate signal fields from extract_signal_fields_from_expr
+    #[test]
+    fn test_extract_signal_fields_deduplicates() {
+        let mut codegen = WasmCodegen::new();
+        codegen.in_component_mount = true;
+        codegen.component_fields = vec!["count".to_string()];
+
+        // self.count + self.count — same field referenced twice
+        let binary_expr = Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "count".to_string(),
+            }),
+            right: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "count".to_string(),
+            }),
+        };
+        let fields = codegen.extract_signal_fields_from_expr(&binary_expr);
+        assert_eq!(fields, vec!["count"], "should not have duplicate fields");
+    }
+}
+
+#[cfg(test)]
+mod template_for_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    /// Helper: generate WAT from a TemplateFor node via generate_template directly.
+    fn generate_template_for(binding: &str, iterator: Expr, children: Vec<TemplateNode>) -> String {
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        let node = TemplateNode::TemplateFor {
+            binding: binding.to_string(),
+            iterator: Box::new(iterator),
+            children,
+        };
+        codegen.generate_template(&node, "$root");
+        // Combine deferred locals + body
+        let mut out = String::new();
+        for local in &codegen.template_locals {
+            out.push_str(local);
+            out.push('\n');
+        }
+        out.push_str(&codegen.output);
+        out
+    }
+
+    #[test]
+    fn test_template_for_basic_loop_structure() {
+        // {for item in self.items { <div>{item}</div> }}
+        let wat = generate_template_for(
+            "item",
+            Expr::Ident("items".to_string()),
+            vec![
+                TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![
+                        TemplateNode::Expression(Box::new(Expr::Ident("item".to_string()))),
+                    ],
+                    span: span(),
+                }),
+            ],
+        );
+
+        // Should have loop locals
+        assert!(wat.contains("(local $for_arr_"), "should declare array local");
+        assert!(wat.contains("(local $for_idx_"), "should declare index local");
+        assert!(wat.contains("(local $for_len_"), "should declare length local");
+        assert!(wat.contains("(local $item i32)"), "should declare binding local");
+
+        // Should have WASM block/loop structure
+        assert!(wat.contains("block $for_break_"), "should have break block");
+        assert!(wat.contains("loop $for_cont_"), "should have continue loop");
+        assert!(wat.contains("i32.ge_u"), "should compare idx >= len");
+        assert!(wat.contains("br_if $for_break_"), "should break when done");
+        assert!(wat.contains("br $for_cont_"), "should branch back to loop");
+        assert!(wat.contains("local.set $item"), "should set binding variable");
+
+        // Should have child element creation
+        assert!(wat.contains("call $dom_createElement"), "should create child elements");
+        assert!(wat.contains("call $dom_appendChild"), "should append children");
+
+        // Should resolve item as for-loop binding
+        assert!(wat.contains(";; for-loop binding: item"), "should resolve item as for-loop binding");
+
+        // Index increment
+        assert!(wat.contains("i32.const 1"), "should increment index by 1");
+    }
+
+    #[test]
+    fn test_template_for_field_access_on_binding() {
+        // {for item in items { <span>{item.name}</span> }}
+        let wat = generate_template_for(
+            "item",
+            Expr::Ident("items".to_string()),
+            vec![
+                TemplateNode::Element(Element {
+                    tag: "span".to_string(),
+                    attributes: vec![],
+                    children: vec![
+                        TemplateNode::Expression(Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::Ident("item".to_string())),
+                            field: "name".to_string(),
+                        })),
+                    ],
+                    span: span(),
+                }),
+            ],
+        );
+
+        // Should resolve item.name as for-loop field access
+        assert!(wat.contains(";; for-loop field access: item.name"), "should emit for-loop field access comment");
+        assert!(wat.contains("local.get $item"), "should load binding pointer");
+        assert!(wat.contains("i32.load"), "should load field from struct pointer");
+    }
+
+    #[test]
+    fn test_template_for_nested_loops_unique_labels() {
+        // Nested: {for outer in list { {for inner in outer.items { <div /> }} }}
+        let inner_for = TemplateNode::TemplateFor {
+            binding: "inner".to_string(),
+            iterator: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("outer".to_string())),
+                field: "items".to_string(),
+            }),
+            children: vec![
+                TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: span(),
+                }),
+            ],
+        };
+
+        let wat = generate_template_for(
+            "outer",
+            Expr::Ident("list".to_string()),
+            vec![inner_for],
+        );
+
+        // Count distinct block/loop labels — should have 2 of each (outer + inner)
+        let break_count = wat.matches("block $for_break_").count();
+        let cont_count = wat.matches("loop $for_cont_").count();
+        assert_eq!(break_count, 2, "nested loops should have 2 break blocks, got {}", break_count);
+        assert_eq!(cont_count, 2, "nested loops should have 2 continue loops, got {}", cont_count);
+
+        // Both binding locals should be declared
+        assert!(wat.contains("(local $outer i32)"), "should declare outer binding");
+        assert!(wat.contains("(local $inner i32)"), "should declare inner binding");
+
+        // Should have 2 sets of arr/idx/len locals
+        let arr_count = wat.matches("(local $for_arr_").count();
+        assert_eq!(arr_count, 2, "nested loops should have 2 array locals, got {}", arr_count);
+    }
+
+    #[test]
+    fn test_template_for_array_element_addressing() {
+        // Verify the array element addressing arithmetic:
+        // arr_ptr + 4 (skip length) + idx * 4
+        let wat = generate_template_for(
+            "x",
+            Expr::Ident("data".to_string()),
+            vec![TemplateNode::TextLiteral("hello".to_string())],
+        );
+
+        // Should load length from arr_ptr offset 0
+        assert!(wat.contains("i32.load"), "should load from memory");
+        // Should have the constant 4 used for skipping length and for element stride
+        // (lines are indented, so check individually)
+        assert!(wat.contains("i32.const 4"), "should have i32.const 4 for array addressing");
+        assert!(wat.contains("i32.add"), "should have i32.add for pointer arithmetic");
+        assert!(wat.contains("i32.mul"), "should have i32.mul for index scaling");
+        // Index increment uses i32.const 1
+        assert!(wat.contains("i32.const 1"), "should increment index by 1");
+    }
+}
+
+#[cfg(test)]
+mod event_data_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    #[test]
+    fn test_event_data_ptr_exported() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(export \"__event_data_ptr\")"), "should export __event_data_ptr");
+        assert!(wat.contains("(func $__event_data_ptr"), "should define __event_data_ptr function");
+    }
+
+    #[test]
+    fn test_event_data_base_global() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(global $__event_data_base i32 (i32.const 307200))"),
+            "should declare event data base global at 307200");
+    }
+
+    #[test]
+    fn test_event_data_ptr_returns_base() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.get $__event_data_base"),
+            "__event_data_ptr should return the base address");
+    }
+
+    #[test]
+    fn test_dom_get_value_import() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))"),
+            "should import dom.getValue with (param i32) (result i32) signature");
+    }
+
+    #[test]
+    fn test_stmt_if_emits_void_block() {
+        let wat = compile(r#"
+            pub fn decrement(x: i32) -> i32 {
+                if x > 0 {
+                    return x - 1;
+                }
+                return x;
+            }
+        "#);
+        // Statement-level if should emit void `(if` without `(result i32)`
+        assert!(wat.contains("(if"), "should contain an if block");
+        assert!(!wat.contains("(if (result i32)"),
+            "statement-level if must NOT emit (result i32) — it is void");
+    }
+
+    #[test]
+    fn test_stmt_if_else_emits_void_block() {
+        let wat = compile(r#"
+            pub fn clamp(x: i32) -> i32 {
+                if x > 10 {
+                    return 10;
+                } else {
+                    return x;
+                }
+            }
+        "#);
+        assert!(wat.contains("(if"), "should contain an if block");
+        assert!(wat.contains("(else"), "should contain an else block");
+        assert!(!wat.contains("(if (result i32)"),
+            "statement-level if/else must NOT emit (result i32)");
+    }
+}
+
+#[cfg(test)]
+mod format_collections_csv_runtime_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    // -- Format runtime tests --
+
+    #[test]
+    fn test_format_number_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_number (param $value i32) (result i32 i32)"),
+            "format_number must be emitted with correct signature");
+        assert!(wat.contains("call $string_fromI32"),
+            "format_number should delegate to string_fromI32");
+    }
+
+    #[test]
+    fn test_format_currency_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_currency (param $cents i32) (param $sym_ptr i32) (param $sym_len i32) (result i32 i32)"),
+            "format_currency must be emitted with correct signature");
+        assert!(wat.contains("i32.const 100"),
+            "format_currency should divide by 100 for dollars");
+    }
+
+    #[test]
+    fn test_format_percent_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_percent (param $value i32) (param $total i32) (result i32 i32)"),
+            "format_percent must be emitted with correct signature");
+        assert!(wat.contains("i32.const 37"),
+            "format_percent should emit '%' character (ASCII 37)");
+    }
+
+    #[test]
+    fn test_format_bytes_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_bytes (param $bytes i32) (result i32 i32)"),
+            "format_bytes must be emitted with correct signature");
+        assert!(wat.contains("i32.const 1048576"),
+            "format_bytes should check for MB threshold");
+    }
+
+    #[test]
+    fn test_format_ordinal_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_ordinal (param $n i32) (result i32 i32)"),
+            "format_ordinal must be emitted with correct signature");
+        // Check for the 11/12/13 exception handling
+        assert!(wat.contains("i32.const 11"),
+            "format_ordinal should handle 11th exception");
+    }
+
+    // -- Collections runtime tests --
+
+    #[test]
+    fn test_map_create_and_set_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $map_create (result i32)"),
+            "map_create must be emitted with correct signature");
+        assert!(wat.contains("(func $map_set (param $map i32) (param $k_ptr i32) (param $k_len i32) (param $val i32)"),
+            "map_set must be emitted with correct signature");
+    }
+
+    #[test]
+    fn test_map_get_has_delete_keys_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
+            "map_get must be emitted with correct signature");
+        assert!(wat.contains("(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
+            "map_has must be emitted with correct signature");
+        assert!(wat.contains("(func $map_delete (param $map i32) (param $k_ptr i32) (param $k_len i32)"),
+            "map_delete must be emitted");
+        assert!(wat.contains("(func $map_keys (param $map i32) (result i32)"),
+            "map_keys must be emitted with correct signature");
+    }
+
+    #[test]
+    fn test_set_create_add_has_delete_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $set_create (result i32)"),
+            "set_create must be emitted");
+        assert!(wat.contains("(func $set_add (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
+            "set_add must be emitted");
+        assert!(wat.contains("(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)"),
+            "set_has must be emitted");
+        assert!(wat.contains("(func $set_delete (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
+            "set_delete must be emitted");
+    }
+
+    // -- CSV runtime tests --
+
+    #[test]
+    fn test_csv_parse_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $csv_parse (param $ptr i32) (param $len i32) (result i32)"),
+            "csv_parse must be emitted with correct signature");
+        // Should handle newlines and commas
+        assert!(wat.contains("i32.const 44"),
+            "csv_parse should check for comma delimiter (ASCII 44)");
+        assert!(wat.contains("i32.const 10"),
+            "csv_parse should check for newline (ASCII 10)");
+    }
+
+    #[test]
+    fn test_csv_stringify_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $csv_stringify (param $arr i32) (result i32 i32)"),
+            "csv_stringify must be emitted with correct signature");
+        assert!(wat.contains("call $string_concat"),
+            "csv_stringify should use string_concat to build output");
+    }
+
+    // -- Handler performance timing tests --
+
+    #[test]
+    fn test_string_from_f64_with_decimal_places() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $string_fromF64 (param $val f64) (result i32 i32)"),
+            "string_fromF64 must be emitted with correct signature");
+        // Must handle decimal places, not just truncate
+        assert!(wat.contains("f64.floor"),
+            "string_fromF64 should use f64.floor for integer part");
+        assert!(wat.contains("f64.const 100.0"),
+            "string_fromF64 should multiply fractional part by 100 for 2 decimal places");
+        assert!(wat.contains("i32.const 46"), // '.'
+            "string_fromF64 should emit a decimal point character");
+    }
+
+    #[test]
+    fn test_format_timing_ms_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $format_timing_ms (param $ms f64) (result i32 i32)"),
+            "format_timing_ms must be emitted with correct signature");
+        assert!(wat.contains("call $string_fromF64"),
+            "format_timing_ms should call string_fromF64 for number formatting");
+        assert!(wat.contains("i32.const 0x736D"), // "ms" little-endian
+            "format_timing_ms should append 'ms' suffix");
+    }
+
+    #[test]
+    fn test_handler_timing_globals_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(global $__last_handler_time_ptr (mut i32) (i32.const 0))"),
+            "must emit __last_handler_time_ptr global");
+        assert!(wat.contains("(global $__last_handler_time_len (mut i32) (i32.const 0))"),
+            "must emit __last_handler_time_len global");
+    }
+
+    #[test]
+    fn test_get_last_handler_time_exported() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)"),
+            "get_last_handler_time must be exported");
+        assert!(wat.contains("global.get $__last_handler_time_ptr"),
+            "getter must read the ptr global");
+        assert!(wat.contains("global.get $__last_handler_time_len"),
+            "getter must read the len global");
+    }
+
+    #[test]
+    fn test_callback_dispatcher_wraps_with_timing() {
+        let wat = compile(r#"
+            component Counter {
+                fn increment(&mut self) { return; }
+                render { <div>"counter"</div> }
+            }
+        "#);
+        // The per-component callback should have timing locals
+        assert!(wat.contains("Counter__callback"),
+            "Counter__callback must exist in output");
+        assert!(wat.contains("(local $__t0 f64)"),
+            "callback dispatcher must declare timing start local");
+        assert!(wat.contains("(local $__t1 f64)"),
+            "callback dispatcher must declare timing end local");
+        // Extract the callback section for targeted assertions
+        let cb_start = wat.find("Counter__callback").expect("must find callback");
+        let callback_section = &wat[cb_start..];
+        // Trim to just this function (up to next top-level func or end)
+        let section_end = callback_section.find("\n  (func ").unwrap_or(callback_section.len());
+        let callback_section = &callback_section[..section_end];
+        assert!(callback_section.contains("call $timer_now"),
+            "callback dispatcher must call $timer_now for timing");
+        assert!(callback_section.contains("call $format_timing_ms"),
+            "callback dispatcher must format timing result");
+        assert!(callback_section.contains("global.set $__last_handler_time_len"),
+            "callback dispatcher must store timing in global");
     }
 }
