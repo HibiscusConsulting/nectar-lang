@@ -1290,9 +1290,13 @@ impl Formatter {
                 }
                 self.push_line("}}");
             }
-            TemplateNode::TemplateFor { binding, iterator, children } => {
+            TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
                 self.push_indent();
-                self.push(&format!("{{for {} in ", binding));
+                if *lazy {
+                    self.push(&format!("{{lazy for {} in ", binding));
+                } else {
+                    self.push(&format!("{{for {} in ", binding));
+                }
                 self.push(&self.format_expr_to_string(iterator));
                 self.push(" {");
                 self.newline();
@@ -4122,6 +4126,7 @@ mod tests {
             binding: "item".into(),
             iterator: Box::new(Expr::Ident("items".into())),
             children: vec![TemplateNode::TextLiteral("row".into())],
+            lazy: false,
         };
         let result = format_program(&make_component_with_template(node));
         assert!(result.contains("for"), "got: {}", result);
@@ -4200,6 +4205,7 @@ mod tests {
                 TemplateNode::TextLiteral("row".into()),
                 TemplateNode::TextLiteral("end".into()),
             ],
+            lazy: false,
         };
         let result = format_program(&make_component_with_template(node));
         assert!(result.contains("for"), "got: {}", result);
