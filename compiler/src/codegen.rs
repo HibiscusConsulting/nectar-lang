@@ -441,7 +441,15 @@ impl WasmCodegen {
         // will call dom_setText to update it with the timing after each handler.
         self.line("(global $__timing_display_el (mut i32) (i32.const 0))");
         self.line("");
+        // Callback data table for parameterized event handlers in for-loops.
+        // Base address at 308000. Each entry is 8 bytes: [handler_idx: i32, data_ptr: i32].
+        // Dynamic callback indices start at 10000 to avoid collision with static indices.
+        // $__cb_data_count tracks how many entries have been registered.
+        self.line("(global $__cb_data_table_base i32 (i32.const 308000))");
+        self.line("(global $__cb_data_count (mut i32) (i32.const 0))");
+        self.line("");
         self.emit_alloc_function();
+        self.emit_cb_data_register();
         self.emit_event_data_ptr_export();
         self.emit_string_runtime();
         self.emit_internal_runtimes();
@@ -584,6 +592,42 @@ impl WasmCodegen {
             self.line("");
             self.emit("(func $__callback (export \"__callback\") (param $idx i32)");
             self.indent += 1;
+            self.line("(local $__slot_addr i32)");
+            // Dynamic callback resolution: if idx >= 10000, it's a for-loop
+            // parameterized callback. Look up (handler_idx, data_ptr) from the
+            // callback data table and re-dispatch with data set in $__callback_data.
+            self.line(";; dynamic callback resolution for for-loop handlers");
+            self.line("local.get $idx");
+            self.line("i32.const 10000");
+            self.line("i32.ge_u");
+            self.line("if");
+            self.indent += 1;
+            // slot_addr = __cb_data_table_base + (idx - 10000) * 8
+            self.line("global.get $__cb_data_table_base");
+            self.line("local.get $idx");
+            self.line("i32.const 10000");
+            self.line("i32.sub");
+            self.line("i32.const 8");
+            self.line("i32.mul");
+            self.line("i32.add");
+            self.line("local.set $__slot_addr");
+            // Set __callback_data = data_ptr (slot+4)
+            self.line("local.get $__slot_addr");
+            self.line("i32.load offset=4");
+            self.line("global.set $__callback_data");
+            // Re-dispatch with the real handler_idx (slot+0)
+            self.line("local.get $__slot_addr");
+            self.line("i32.load");
+            self.line("local.set $idx");
+            self.indent -= 1;
+            self.line("else");
+            self.indent += 1;
+            // Static callback — reset __callback_data to 0 so handler
+            // sees $self=0 (component state via signals, no captured item)
+            self.line("i32.const 0");
+            self.line("global.set $__callback_data");
+            self.indent -= 1;
+            self.line("end");
             for (comp_name, base, count) in self.callback_registry.clone() {
                 let end = base + count;
                 // Check if idx is in range [base, end)
@@ -603,6 +647,19 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line("end");
             }
+            self.indent -= 1;
+            self.line(")");
+
+            // __callback_with_data: same as __callback but stores data in a global first.
+            // Used by async operations (db.open, db.get, etc.) that return results.
+            self.line("");
+            self.line("(global $__callback_data (mut i32) (i32.const 0))");
+            self.emit("(func $__callback_with_data (export \"__callback_with_data\") (param $idx i32) (param $data i32)");
+            self.indent += 1;
+            self.line("local.get $data");
+            self.line("global.set $__callback_data");
+            self.line("local.get $idx");
+            self.line("call $__callback");
             self.indent -= 1;
             self.line(")");
         }
@@ -1351,7 +1408,10 @@ impl WasmCodegen {
                 self.indent += 1;
                 let has_self = _method.params.iter().any(|p| p.name == "self");
                 if has_self {
-                    self.line("i32.const 0");
+                    // Pass $__callback_data as $self — for static callbacks this
+                    // is 0 (the default), for for-loop parameterized callbacks it
+                    // contains the captured item pointer (e.g., product ptr).
+                    self.line("global.get $__callback_data");
                     self.line(&format!("call ${handler_name}"));
                 } else {
                     self.line(&format!("call ${handler_name}"));
@@ -3286,7 +3346,17 @@ impl WasmCodegen {
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", event_offset));
                             self.line(&format!("i32.const {}", event.len()));
-                            self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                            if !self.for_loop_bindings.is_empty() {
+                                // Inside a for-loop: register a parameterized callback
+                                // that captures the current loop binding value (item ptr).
+                                let binding = self.for_loop_bindings.last().unwrap().clone();
+                                self.line(&format!(";; parameterized callback: captures ${}", binding));
+                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!("local.get ${} ;; captured item ptr", binding));
+                                self.line("call $__cb_register_with_data ;; -> dynamic callback idx");
+                            } else {
+                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                            }
                             self.line("call $dom_addEventListener");
                         }
                         Attribute::Aria { name, value } => {
@@ -3601,7 +3671,15 @@ impl WasmCodegen {
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", event_offset));
                             self.line(&format!("i32.const {}", event.len()));
-                            self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                            if !self.for_loop_bindings.is_empty() {
+                                let binding = self.for_loop_bindings.last().unwrap().clone();
+                                self.line(&format!(";; parameterized callback: captures ${}", binding));
+                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!("local.get ${} ;; captured item ptr", binding));
+                                self.line("call $__cb_register_with_data ;; -> dynamic callback idx");
+                            } else {
+                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                            }
                             self.line("call $dom_addEventListener");
                         }
                         Attribute::Aria { name, value } => {
@@ -5084,6 +5162,48 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("global.set $heap_ptr");
         self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    /// Emit the callback data registration function for parameterized for-loop handlers.
+    /// Each call allocates a table entry mapping a dynamic callback index to
+    /// the real handler index + captured data pointer (e.g., the loop item ptr).
+    fn emit_cb_data_register(&mut self) {
+        self.line("");
+        self.line(";; Register a for-loop callback: returns a unique dynamic callback index");
+        self.line(";; that maps to (handler_idx, data_ptr) in the callback data table.");
+        self.emit("(func $__cb_register_with_data (param $handler_idx i32) (param $data_ptr i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $slot i32)");
+        self.line("(local $dyn_idx i32)");
+        // slot = __cb_data_table_base + __cb_data_count * 8
+        self.line("global.get $__cb_data_table_base");
+        self.line("global.get $__cb_data_count");
+        self.line("i32.const 8");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $slot");
+        // Store handler_idx at slot+0
+        self.line("local.get $slot");
+        self.line("local.get $handler_idx");
+        self.line("i32.store");
+        // Store data_ptr at slot+4
+        self.line("local.get $slot");
+        self.line("local.get $data_ptr");
+        self.line("i32.store offset=4");
+        // dyn_idx = 10000 + __cb_data_count
+        self.line("i32.const 10000");
+        self.line("global.get $__cb_data_count");
+        self.line("i32.add");
+        self.line("local.set $dyn_idx");
+        // Increment count
+        self.line("global.get $__cb_data_count");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__cb_data_count");
+        // Return dynamic index
+        self.line("local.get $dyn_idx");
         self.indent -= 1;
         self.line(")");
     }
@@ -19389,6 +19509,221 @@ mod template_for_tests {
         assert!(wat.contains("i32.mul"), "should have i32.mul for index scaling");
         // Index increment uses i32.const 1
         assert!(wat.contains("i32.const 1"), "should increment index by 1");
+    }
+
+    #[test]
+    fn test_template_for_event_handler_uses_parameterized_callback() {
+        // {for product in self.products { <button on:click={self.add_to_cart}>"Add"</button> }}
+        // The event handler inside a for-loop should use __cb_register_with_data
+        // to capture the current loop binding (product ptr).
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        // Set up component context so resolve_handler_index works
+        codegen.component_method_names = vec!["add_to_cart".to_string()];
+        codegen.global_handler_base = 5;
+
+        let node = TemplateNode::TemplateFor {
+            binding: "product".to_string(),
+            iterator: Box::new(Expr::Ident("products".to_string())),
+            children: vec![
+                TemplateNode::Element(Element {
+                    tag: "button".to_string(),
+                    attributes: vec![
+                        Attribute::EventHandler {
+                            event: "click".to_string(),
+                            handler: Expr::FieldAccess {
+                                object: Box::new(Expr::SelfExpr),
+                                field: "add_to_cart".to_string(),
+                            },
+                        },
+                    ],
+                    children: vec![
+                        TemplateNode::TextLiteral("Add".to_string()),
+                    ],
+                    span: span(),
+                }),
+            ],
+        };
+        codegen.generate_template(&node, "$root");
+        let mut out = String::new();
+        for local in &codegen.template_locals {
+            out.push_str(local);
+            out.push('\n');
+        }
+        out.push_str(&codegen.output);
+
+        // Should use parameterized callback registration
+        assert!(out.contains("call $__cb_register_with_data"),
+            "for-loop event handler should call __cb_register_with_data");
+        assert!(out.contains("local.get $product"),
+            "should capture the for-loop binding variable");
+        assert!(out.contains("parameterized callback: captures $product"),
+            "should have comment about captured binding");
+        // Should still call dom_addEventListener
+        assert!(out.contains("call $dom_addEventListener"),
+            "should still register the event listener");
+    }
+
+    #[test]
+    fn test_template_for_static_handler_outside_loop_uses_static_idx() {
+        // Outside a for-loop, event handlers should NOT use __cb_register_with_data
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        codegen.component_method_names = vec!["handle_click".to_string()];
+        codegen.global_handler_base = 0;
+
+        let node = TemplateNode::Element(Element {
+            tag: "button".to_string(),
+            attributes: vec![
+                Attribute::EventHandler {
+                    event: "click".to_string(),
+                    handler: Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "handle_click".to_string(),
+                    },
+                },
+            ],
+            children: vec![],
+            span: span(),
+        });
+        codegen.generate_template(&node, "$root");
+        let out = codegen.output;
+
+        // Should NOT use parameterized callback registration
+        assert!(!out.contains("__cb_register_with_data"),
+            "static event handler should not call __cb_register_with_data");
+        // Should use a static handler index
+        assert!(out.contains("i32.const 0 ;; handler func index"),
+            "should use static handler index");
+    }
+
+    #[test]
+    fn test_template_for_nested_loop_captures_innermost_binding() {
+        // Nested for-loops: the event handler should capture the innermost binding
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.template_locals.clear();
+        codegen.component_method_names = vec!["select".to_string()];
+        codegen.global_handler_base = 0;
+
+        let inner_for = TemplateNode::TemplateFor {
+            binding: "item".to_string(),
+            iterator: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("category".to_string())),
+                field: "items".to_string(),
+            }),
+            children: vec![
+                TemplateNode::Element(Element {
+                    tag: "button".to_string(),
+                    attributes: vec![
+                        Attribute::EventHandler {
+                            event: "click".to_string(),
+                            handler: Expr::FieldAccess {
+                                object: Box::new(Expr::SelfExpr),
+                                field: "select".to_string(),
+                            },
+                        },
+                    ],
+                    children: vec![],
+                    span: span(),
+                }),
+            ],
+        };
+
+        let node = TemplateNode::TemplateFor {
+            binding: "category".to_string(),
+            iterator: Box::new(Expr::Ident("categories".to_string())),
+            children: vec![inner_for],
+        };
+        codegen.generate_template(&node, "$root");
+        let out = codegen.output;
+
+        // Should capture the innermost binding (item), not the outer (category)
+        assert!(out.contains("parameterized callback: captures $item"),
+            "nested for-loop should capture innermost binding 'item'");
+        assert!(out.contains("local.get $item ;; captured item ptr"),
+            "should use local.get $item to capture the item pointer");
+    }
+}
+
+#[cfg(test)]
+mod parameterized_callback_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    #[test]
+    fn test_cb_data_table_globals_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(global $__cb_data_table_base i32 (i32.const 308000))"),
+            "should emit callback data table base global");
+        assert!(wat.contains("(global $__cb_data_count (mut i32) (i32.const 0))"),
+            "should emit callback data count global");
+    }
+
+    #[test]
+    fn test_cb_register_with_data_function_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(func $__cb_register_with_data"),
+            "should emit __cb_register_with_data function");
+        assert!(wat.contains("i32.const 10000"),
+            "dynamic callback indices should start at 10000");
+    }
+
+    #[test]
+    fn test_callback_dispatcher_handles_dynamic_indices() {
+        // A component with methods triggers the __callback dispatcher
+        let src = r#"
+            component Counter {
+                fn increment(&mut self) { return; }
+                render { <button on:click={self.increment}>"+"</button> }
+            }
+        "#;
+        let wat = compile(src);
+
+        // The __callback dispatcher should check for dynamic indices >= 10000
+        assert!(wat.contains("i32.const 10000"),
+            "callback dispatcher should check for dynamic indices");
+        assert!(wat.contains("global.set $__callback_data"),
+            "callback dispatcher should set __callback_data for dynamic callbacks");
+    }
+
+    #[test]
+    fn test_handler_trampoline_passes_callback_data_as_self() {
+        // Handler trampolines should pass $__callback_data as $self
+        let src = r#"
+            component Cart {
+                fn add_item(&mut self) { return; }
+                render { <button on:click={self.add_item}>"Add"</button> }
+            }
+        "#;
+        let wat = compile(src);
+
+        // The per-component callback dispatcher should pass global.get $__callback_data
+        // as $self instead of i32.const 0
+        assert!(wat.contains("global.get $__callback_data"),
+            "handler trampoline should pass $__callback_data as $self");
+        // The callback dispatcher function should reference $__callback_data
+        // to pass the captured item pointer as $self
+        let cb_fn_marker = "(func $Cart__callback";
+        let cb_start = wat.find(cb_fn_marker)
+            .expect("Cart__callback function must exist");
+        let cb_section = &wat[cb_start..];
+        let cb_end = cb_section[1..].find("\n  (func ").unwrap_or(cb_section.len() - 1);
+        let cb_section = &cb_section[..cb_end + 1];
+        assert!(cb_section.contains("global.get $__callback_data"),
+            "Cart__callback should use $__callback_data for $self parameter");
     }
 }
 
