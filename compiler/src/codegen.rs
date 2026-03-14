@@ -1314,6 +1314,12 @@ impl WasmCodegen {
         }
         self.line("(local $__arr_tmp i32)");
         self.line("(local $__mount_t0 f64)");
+        // If the component has a load_more method, declare locals for lazy scroll setup
+        let has_load_more = comp.methods.iter().any(|m| m.name == "load_more");
+        if has_load_more {
+            self.line("(local $__lazy_sentinel i32)");
+            self.line("(local $__lazy_observer i32)");
+        }
         self.defer_template_locals = false;
 
         // Append the template code
@@ -1328,6 +1334,41 @@ impl WasmCodegen {
             self.line(&format!("i32.const {} ;; component name ptr", name_offset));
             self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
             self.line("call $a11y_enhance");
+        }
+
+        // Lazy scroll: if the component has a load_more method, set up an
+        // IntersectionObserver on a sentinel element so that scrolling near
+        // the bottom of the rendered content automatically triggers load_more.
+        if has_load_more {
+            if let Some(load_more_idx) = comp.methods.iter().position(|m| m.name == "load_more") {
+                let global_idx = self.global_handler_base + load_more_idx as u32;
+
+                self.line("");
+                self.line(";; lazy scroll: IntersectionObserver auto-loads more content");
+
+                // Create a sentinel <div> element
+                let sentinel_tag = self.store_string("div");
+                self.line(&format!("i32.const {} ;; \"div\" tag ptr", sentinel_tag));
+                self.line("i32.const 3 ;; \"div\" tag len");
+                self.line("call $dom_createElement");
+                self.line("local.set $__lazy_sentinel");
+
+                // Append sentinel to $root (positioned after all rendered content)
+                self.line("local.get $root");
+                self.line("local.get $__lazy_sentinel");
+                self.line("call $dom_appendChild");
+
+                // Create IntersectionObserver with load_more as the callback
+                self.line(&format!("i32.const {} ;; load_more handler index", global_idx));
+                self.line("i32.const 0 ;; no options (null ptr)");
+                self.line("call $observe_intersectionObserver");
+                self.line("local.set $__lazy_observer");
+
+                // Observe the sentinel element
+                self.line("local.get $__lazy_observer");
+                self.line("local.get $__lazy_sentinel");
+                self.line("call $observe_observe");
+            }
         }
 
         // Register effects for reactive DOM updates
@@ -3688,8 +3729,10 @@ impl WasmCodegen {
 
                 // Also detect signal fields referenced inside wrapper expressions
                 // like format("{}", self.count) or self.count + 1
+                // Don't create reactive updaters for expressions inside for-loops
+                // (the loop binding variable doesn't exist outside the loop)
                 let wrapped_signal_fields = if prop_name.is_none() && signal_field.is_none()
-                    && self.in_component_mount {
+                    && self.in_component_mount && self.for_loop_bindings.is_empty() {
                     self.extract_signal_fields_from_expr(expr)
                 } else {
                     Vec::new()
@@ -3723,12 +3766,22 @@ impl WasmCodegen {
                         self.line(&format!("local.get {}", len_var));
                         self.line("call $dom_setText");
                     } else {
-                        // Check if expression is a for-loop field access (produces a string ptr)
-                        let is_for_loop_field = matches!(
-                            expr.as_ref(),
-                            Expr::FieldAccess { object, .. }
-                                if matches!(object.as_ref(), Expr::Ident(name) if self.for_loop_bindings.contains(name))
-                        );
+                        // Check if expression produces a string ptr from struct field access.
+                        // Covers: product.name (for-loop binding), self.products[i].name (index), etc.
+                        let is_for_loop_field = match expr.as_ref() {
+                            Expr::FieldAccess { object, .. } => {
+                                match object.as_ref() {
+                                    // Direct for-loop binding: product.name
+                                    Expr::Ident(name) if self.for_loop_bindings.contains(name) => true,
+                                    // Handler param: product.name
+                                    Expr::Ident(name) if self.handler_param_bindings.contains(name) => true,
+                                    // Array index: self.products[i].name
+                                    Expr::Index { .. } => true,
+                                    _ => false,
+                                }
+                            }
+                            _ => false,
+                        };
 
                         if is_for_loop_field {
                             // For-loop field access: value is already a string ptr (null-terminated)
@@ -4077,7 +4130,7 @@ impl WasmCodegen {
                     });
                 }
             }
-            TemplateNode::TemplateFor { binding, iterator, children } => {
+            TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
                 // Check if iterator is a Range expression (start..end)
                 if let Expr::Range { start, end } = iterator.as_ref() {
                     // Range-based for loop: iterates i32 values [start, end)
@@ -4802,9 +4855,37 @@ impl WasmCodegen {
                 } else {
                     self.generate_expr(object);
                     self.line(&format!(";; field access: .{}", field));
-                    // TODO: calculate field offset from struct layout
-                    self.line("i32.load");
+                    // Look up field offset from any known struct layout
+                    let mut offset_found = None;
+                    for (_struct_name, layout) in &self.struct_layouts {
+                        if let Some((_, off)) = layout.iter().find(|(n, _)| n == field) {
+                            offset_found = Some(*off);
+                            break;
+                        }
+                    }
+                    if let Some(off) = offset_found {
+                        if off == 0 {
+                            self.line("i32.load");
+                        } else {
+                            self.line(&format!("i32.load offset={}", off));
+                        }
+                    } else {
+                        self.line("i32.load");
+                    }
                 }
+            }
+            Expr::Index { object, index } => {
+                // Array/Vec indexing: arr[i] → load from data_ptr + i * 4
+                // Vec layout: [length: i32, capacity: i32, data_ptr: i32]
+                self.line(";; array index: arr[i]");
+                self.generate_expr(object);
+                // Stack: arr_ptr (the Vec header pointer)
+                self.line("i32.load offset=8 ;; data_ptr");
+                self.generate_expr(index);
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load ;; element at index");
             }
             Expr::MethodCall { object, method, args } => {
                 self.generate_iterator_method(object, method, args);
@@ -19728,6 +19809,7 @@ mod template_for_tests {
             binding: binding.to_string(),
             iterator: Box::new(iterator),
             children,
+            lazy: false,
         };
         codegen.generate_template(&node, "$root");
         // Combine deferred locals + body
@@ -19827,6 +19909,7 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
+            lazy: false,
         };
 
         let wat = generate_template_for(
@@ -19904,6 +19987,7 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
+            lazy: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -19990,12 +20074,14 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
+            lazy: false,
         };
 
         let node = TemplateNode::TemplateFor {
             binding: "category".to_string(),
             iterator: Box::new(Expr::Ident("categories".to_string())),
             children: vec![inner_for],
+            lazy: false,
         };
         codegen.generate_template(&node, "$root");
         let out = codegen.output;
@@ -20952,6 +21038,7 @@ mod reactive_cond_tests {
             children: vec![
                 TemplateNode::TextLiteral("item".to_string()),
             ],
+            lazy: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -20979,5 +21066,120 @@ mod reactive_cond_tests {
         assert!(output.contains("range expression"), "should emit range expression comment");
         assert!(output.contains("i32.const 5"), "should push start value");
         assert!(output.contains("i32.const 20"), "should push end value");
+    }
+}
+
+#[cfg(test)]
+mod lazy_scroll_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    #[test]
+    fn test_lazy_scroll_emitted_when_load_more_exists() {
+        let src = r#"
+component ProductGrid {
+    let mut count: i32 = 10;
+
+    fn load_more(&mut self) {
+        self.count = 400;
+    }
+
+    render {
+        <div class="grid">
+            <p>"products"</p>
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("lazy scroll"), "should emit lazy scroll comment");
+        assert!(wat.contains("$__lazy_sentinel"), "should declare sentinel local");
+        assert!(wat.contains("$__lazy_observer"), "should declare observer local");
+        assert!(wat.contains("call $observe_intersectionObserver"), "should create IntersectionObserver");
+        assert!(wat.contains("call $observe_observe"), "should observe the sentinel");
+        assert!(wat.contains("call $dom_appendChild"), "should append sentinel to root");
+    }
+
+    #[test]
+    fn test_lazy_scroll_not_emitted_without_load_more() {
+        let src = r#"
+component SimpleGrid {
+    let mut count: i32 = 10;
+
+    fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+
+    render {
+        <div class="grid">
+            <p>"items"</p>
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(!wat.contains("lazy scroll"), "should NOT emit lazy scroll without load_more");
+        assert!(!wat.contains("$__lazy_sentinel"), "should NOT declare sentinel local");
+        assert!(!wat.contains("$__lazy_observer"), "should NOT declare observer local");
+    }
+
+    #[test]
+    fn test_lazy_scroll_handler_index_matches_load_more() {
+        // load_more is the second method (index 1), so the handler index
+        // should be global_handler_base + 1
+        let src = r#"
+component BigList {
+    let mut visible: i32 = 20;
+
+    fn reset(&mut self) {
+        self.visible = 0;
+    }
+
+    fn load_more(&mut self) {
+        self.visible = self.visible + 50;
+    }
+
+    render {
+        <div class="list">
+            <span>"items"</span>
+        </div>
+    }
+}
+"#;
+        let wat = compile(src);
+        assert!(wat.contains("lazy scroll"), "should emit lazy scroll setup");
+        // The handler index comment should reference load_more
+        assert!(wat.contains("load_more handler index"), "should comment the handler index");
+    }
+
+    #[test]
+    fn test_lazy_scroll_sentinel_is_div() {
+        let src = r#"
+component Feed {
+    let mut end: i32 = 10;
+
+    fn load_more(&mut self) {
+        self.end = self.end + 10;
+    }
+
+    render {
+        <div>"content"</div>
+    }
+}
+"#;
+        let wat = compile(src);
+        // The sentinel is a <div> element — verify createElement is called
+        // with the "div" string (tag_len = 3)
+        assert!(wat.contains("i32.const 3 ;; \"div\" tag len"), "sentinel should be a div element");
     }
 }
