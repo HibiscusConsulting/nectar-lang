@@ -24,10 +24,8 @@ COPY runtime/modules/core.js /srv/nectar/core.js
 # Cloud Run sets PORT env var (default 8080)
 ENV PORT=8080
 
-# The entrypoint expects a .wasm file mounted/copied at /srv/nectar/app.wasm
-# For the base image, we include a placeholder that returns a welcome page.
-# Real deployments overlay their compiled .wasm via Cloud Run volume mounts
-# or a custom layer.
+# The entrypoint starts in standby mode if no .wasm exists.
+# Users deploy their app.wasm via Cloud Run volume mounts or a derived image.
 EXPOSE 8080
 
 ENTRYPOINT ["nectar", "serve"]
