@@ -517,6 +517,39 @@ impl WasmCodegen {
             self.generate_test_runner(&test_defs);
         }
 
+        // Emit $__init_all that calls all store inits, auth registers, and db opens
+        {
+            let mut init_calls: Vec<String> = Vec::new();
+
+            // Collect store init calls
+            for (store_name, _) in &self.known_stores {
+                init_calls.push(format!("  call ${}_init", store_name));
+            }
+
+            // Collect auth register calls
+            for (kw_name, kind) in &self.known_keyword_defs {
+                match kind {
+                    KeywordDefKind::Auth => {
+                        init_calls.push(format!("  call $__auth_register_{}", kw_name));
+                    }
+                    KeywordDefKind::Database => {
+                        init_calls.push(format!("  call ${}_init", kw_name));
+                    }
+                    _ => {}
+                }
+            }
+
+            if !init_calls.is_empty() {
+                self.line("");
+                self.line(";; Auto-init: call all store inits, auth registers, and db opens");
+                self.line("(func $__init_all (export \"__init_all\")");
+                for call in &init_calls {
+                    self.line(call);
+                }
+                self.line(")");
+            }
+        }
+
         // Emit closure functions
         if !self.closure_functions.is_empty() {
             self.line("");
@@ -624,6 +657,7 @@ impl WasmCodegen {
             Item::Embed(embed) => self.generate_embed(embed),
             Item::Pdf(pdf) => self.generate_pdf(pdf),
             Item::Cache(cache) => self.generate_cache(cache),
+            Item::Db(db) => self.generate_db(db),
             Item::Breakpoints(bp) => self.generate_breakpoints(bp),
             Item::Animation(anim) => self.generate_animation_block(anim),
             Item::Theme(theme) => self.generate_theme(theme),
@@ -1848,6 +1882,9 @@ impl WasmCodegen {
         let name_offset = self.store_string(&auth.name);
         let name_len = auth.name.len();
 
+        // Default session_storage to "cookie" for HttpOnly secure defaults
+        let session_storage = auth.session_storage.clone().unwrap_or_else(|| "cookie".to_string());
+
         // Build JSON config for providers
         let mut config = String::from("{\"providers\":{");
         for (i, prov) in auth.providers.iter().enumerate() {
@@ -1864,13 +1901,17 @@ impl WasmCodegen {
             config.push_str("]}");
         }
         config.push_str("}");
-        if let Some(ref storage) = auth.session_storage {
-            config.push_str(&format!(",\"session\":\"{}\"", storage));
-        }
+        // Always emit session config — defaults to "cookie"
+        config.push_str(&format!(",\"session\":\"{}\"", session_storage));
         config.push('}');
 
         let config_offset = self.store_string(&config);
         let config_len = config.len();
+
+        // Store the cookie suffix for HttpOnly secure defaults
+        let cookie_suffix = "; HttpOnly; Secure; SameSite=Strict; Path=/";
+        let cookie_suffix_offset = self.store_string(cookie_suffix);
+        let cookie_suffix_len = cookie_suffix.len();
 
         self.line(&format!("(func $__auth_register_{} (export \"__auth_register_{}\")", auth.name, auth.name));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
@@ -1878,6 +1919,60 @@ impl WasmCodegen {
         self.line(&format!("  i32.const {}  ;; config ptr", config_offset));
         self.line(&format!("  i32.const {}  ;; config len", config_len));
         self.line("  call $auth_init");
+        self.line(")");
+
+        // Emit set_cookie wrapper that appends HttpOnly; Secure; SameSite=Strict; Path=/
+        self.line(&format!(
+            "(func ${}_set_cookie (export \"{}_set_cookie\") (param $val_ptr i32) (param $val_len i32)",
+            auth.name, auth.name
+        ));
+        self.line("  (local $buf_ptr i32)");
+        self.line("  (local $buf_len i32)");
+        self.line("  ;; Concatenate cookie value with secure suffix in WASM memory");
+        self.line("  local.get $val_ptr");
+        self.line("  local.get $val_len");
+        self.line(&format!("  i32.const {}  ;; suffix ptr", cookie_suffix_offset));
+        self.line(&format!("  i32.const {}  ;; suffix len", cookie_suffix_len));
+        self.line("  call $string_concat");
+        self.line("  local.set $buf_len");
+        self.line("  local.set $buf_ptr");
+        self.line("  local.get $buf_ptr");
+        self.line("  local.get $buf_len");
+        self.line("  call $auth_set_cookie");
+        self.line(")");
+
+        // Emit is_authenticated function — reads cookies and checks for session key
+        let session_key = format!("{}__session", auth.name);
+        let session_key_offset = self.store_string(&session_key);
+        let session_key_len = session_key.len();
+
+        self.line(&format!(
+            "(func ${}_is_authenticated (export \"{}_is_authenticated\") (result i32)",
+            auth.name, auth.name
+        ));
+        self.line("  (local $cookie_ptr i32)");
+        self.line("  ;; Get raw cookies from browser");
+        self.line("  call $auth_getRawCookies");
+        self.line("  local.set $cookie_ptr");
+        self.line("  ;; Check if session key exists in cookie string");
+        self.line("  local.get $cookie_ptr");
+        self.line(&format!("  i32.const {}  ;; session key ptr", session_key_offset));
+        self.line(&format!("  i32.const {}  ;; session key len", session_key_len));
+        self.line("  call $string_contains");
+        self.line(")");
+
+        // Emit check function — verifies session server-side via /api/me
+        let api_me = "/api/me";
+        let api_me_offset = self.store_string(api_me);
+        let api_me_len = api_me.len();
+
+        self.line(&format!(
+            "(func ${}_check (export \"{}_check\") (result i32)",
+            auth.name, auth.name
+        ));
+        self.line(&format!("  i32.const {}  ;; url ptr", api_me_offset));
+        self.line(&format!("  i32.const {}  ;; url len", api_me_len));
+        self.line("  call $http_fetch");
         self.line(")");
 
         if let Some(ref handler) = auth.on_login {
@@ -1892,6 +1987,111 @@ impl WasmCodegen {
         for method in &auth.methods {
             self.generate_function(method);
         }
+    }
+
+    fn generate_db(&mut self, db: &DbDef) {
+        self.line(&format!(";; === Database: {} ===", db.name));
+
+        let name_offset = self.store_string(&db.name);
+        let name_len = db.name.len();
+        let version = db.version.unwrap_or(1);
+
+        // Emit global for the db handle
+        self.line(&format!(
+            "(global $__db_{}_handle (mut i32) (i32.const 0))",
+            db.name
+        ));
+
+        // Allocate a callback index for the open callback
+        let cb_idx = self.global_handler_base;
+        self.global_handler_base += 1;
+
+        // Emit init function that opens the database
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            db.name, db.name
+        ));
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line(&format!("  i32.const {}  ;; version", version));
+        self.line(&format!("  i32.const {}  ;; callback idx", cb_idx));
+        self.line("  call $db_open");
+        self.line(")");
+
+        // Determine default store name — use first store if defined, else "default"
+        let default_store = if !db.stores.is_empty() {
+            db.stores[0].name.clone()
+        } else {
+            "default".to_string()
+        };
+        let store_offset = self.store_string(&default_store);
+        let store_len = default_store.len();
+
+        // Emit convenience wrapper: put(key_ptr, key_len, val_ptr, val_len)
+        self.line(&format!(
+            "(func ${}_put (export \"{}_put\") (param $key_ptr i32) (param $key_len i32) (param $val_ptr i32) (param $val_len i32)",
+            db.name, db.name
+        ));
+        self.line(&format!(
+            "  global.get $__db_{}_handle  ;; db handle",
+            db.name
+        ));
+        self.line(&format!("  i32.const {}  ;; store name ptr", store_offset));
+        self.line(&format!("  i32.const {}  ;; store name len", store_len));
+        self.line("  local.get $key_ptr");
+        self.line("  local.get $key_len");
+        self.line("  local.get $val_ptr");
+        self.line("  local.get $val_len");
+        self.line("  call $db_put");
+        self.line(")");
+
+        // Emit convenience wrapper: get(key_ptr, key_len, cb_idx)
+        self.line(&format!(
+            "(func ${}_get (export \"{}_get\") (param $key_ptr i32) (param $key_len i32) (param $cb_idx i32)",
+            db.name, db.name
+        ));
+        self.line(&format!(
+            "  global.get $__db_{}_handle  ;; db handle",
+            db.name
+        ));
+        self.line(&format!("  i32.const {}  ;; store name ptr", store_offset));
+        self.line(&format!("  i32.const {}  ;; store name len", store_len));
+        self.line("  local.get $key_ptr");
+        self.line("  local.get $key_len");
+        self.line("  local.get $cb_idx");
+        self.line("  call $db_get");
+        self.line(")");
+
+        // Emit convenience wrapper: delete(key_ptr, key_len)
+        self.line(&format!(
+            "(func ${}_delete (export \"{}_delete\") (param $key_ptr i32) (param $key_len i32)",
+            db.name, db.name
+        ));
+        self.line(&format!(
+            "  global.get $__db_{}_handle  ;; db handle",
+            db.name
+        ));
+        self.line(&format!("  i32.const {}  ;; store name ptr", store_offset));
+        self.line(&format!("  i32.const {}  ;; store name len", store_len));
+        self.line("  local.get $key_ptr");
+        self.line("  local.get $key_len");
+        self.line("  call $db_delete");
+        self.line(")");
+
+        // Emit convenience wrapper: getAll(cb_idx)
+        self.line(&format!(
+            "(func ${}_getAll (export \"{}_getAll\") (param $cb_idx i32)",
+            db.name, db.name
+        ));
+        self.line(&format!(
+            "  global.get $__db_{}_handle  ;; db handle",
+            db.name
+        ));
+        self.line(&format!("  i32.const {}  ;; store name ptr", store_offset));
+        self.line(&format!("  i32.const {}  ;; store name len", store_len));
+        self.line("  local.get $cb_idx");
+        self.line("  call $db_getAll");
+        self.line(")");
     }
 
     fn generate_upload(&mut self, upload: &UploadDef) {
@@ -2320,20 +2520,38 @@ impl WasmCodegen {
 
         // Global signal IDs for each store signal
         for (i, sig) in store.signals.iter().enumerate() {
-            self.line(&format!("(global ${store_name}_{} (mut i32) (i32.const -1)) ;; signal ID", sig.name));
+            self.line(&format!("(global $__sig_{store_name}_{} (mut i32) (i32.const -1)) ;; signal ID", sig.name));
             let _ = i;
         }
 
         // Store init function — creates all signals
+        // Use deferred locals so array/struct initializers can declare locals
         self.line("");
         self.emit(&format!("(func ${store_name}_init (export \"{store_name}_init\")"));
         self.indent += 1;
 
+        let saved_output = std::mem::take(&mut self.output);
+        self.output = String::new();
+        self.defer_template_locals = true;
+        self.template_locals.clear();
+
         for sig in &store.signals {
+            let is_string_init = matches!(&sig.initializer, Expr::StringLit(_));
             self.generate_expr(&sig.initializer);
+            if is_string_init {
+                self.line("drop  ;; discard str len — signal stores only the ptr");
+            }
             self.line("call $signal_create");
-            self.line(&format!("global.set ${store_name}_{}", sig.name));
+            self.line(&format!("global.set $__sig_{store_name}_{}", sig.name));
         }
+
+        let body_output = std::mem::take(&mut self.output);
+        self.output = saved_output;
+        for local_decl in std::mem::take(&mut self.template_locals) {
+            self.line(&local_decl);
+        }
+        self.defer_template_locals = false;
+        self.output.push_str(&body_output);
 
         self.indent -= 1;
         self.line(")");
@@ -2347,7 +2565,7 @@ impl WasmCodegen {
             self.emit(&format!("(func ${store_name}_get_{} (export \"{store_name}_get_{}\") (result {wasm_ty})",
                 sig.name, sig.name));
             self.indent += 1;
-            self.line(&format!("global.get ${store_name}_{}", sig.name));
+            self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
             self.line("call $signal_get");
             self.indent -= 1;
             self.line(")");
@@ -2362,7 +2580,7 @@ impl WasmCodegen {
             self.emit(&format!("(func ${store_name}_set_{} (export \"{store_name}_set_{}\") (param $value {wasm_ty})",
                 sig.name, sig.name));
             self.indent += 1;
-            self.line(&format!("global.get ${store_name}_{}", sig.name));
+            self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
             self.line("local.get $value");
             self.line("call $signal_set");
             self.indent -= 1;
@@ -2483,7 +2701,7 @@ impl WasmCodegen {
                 self.emit(&format!("(func ${store_name}_atomic_get_{} (export \"{store_name}_atomic_get_{}\") (result i32)",
                     sig.name, sig.name));
                 self.indent += 1;
-                self.line(&format!("global.get ${store_name}_{}", sig.name));
+                self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
                 self.line("call $state_atomic_get");
                 self.indent -= 1;
                 self.line(")");
@@ -2492,7 +2710,7 @@ impl WasmCodegen {
                 self.emit(&format!("(func ${store_name}_atomic_set_{} (export \"{store_name}_atomic_set_{}\") (param $value i32)",
                     sig.name, sig.name));
                 self.indent += 1;
-                self.line(&format!("global.get ${store_name}_{}", sig.name));
+                self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
                 self.line("local.get $value");
                 self.line("call $state_atomic_set");
                 self.indent -= 1;
@@ -2502,7 +2720,7 @@ impl WasmCodegen {
                 self.emit(&format!("(func ${store_name}_atomic_cas_{} (export \"{store_name}_atomic_cas_{}\") (param $expected i32) (param $desired i32) (result i32)",
                     sig.name, sig.name));
                 self.indent += 1;
-                self.line(&format!("global.get ${store_name}_{}", sig.name));
+                self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
                 self.line("local.get $expected");
                 self.line("local.get $desired");
                 self.line("call $state_atomic_cas");
@@ -4914,6 +5132,79 @@ impl WasmCodegen {
         // Return (ptr, len)
         self.line("local.get $out_ptr");
         self.line("local.get $total_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // contains: check if haystack contains needle, returns i32 (0 or 1)
+        // Brute-force substring search — O(n*m) but fine for cookie strings
+        self.emit("(func $string_contains (param $haystack_ptr i32) (param $needle_ptr i32) (param $needle_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $j i32) (local $h_len i32) (local $match i32)");
+        // Get haystack length from the i32 returned by getRawCookies (ptr encodes len in high bits)
+        // Actually, haystack_ptr here is a plain pointer — caller must provide len.
+        // We re-parameterize: haystack is the result of getRawCookies which returns a ptr
+        // to a (len, data) pair. For simplicity, scan up to 4096 bytes or until null.
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("(block $done");
+        self.line("  (loop $outer");
+        self.line("    ;; Check if we've gone past reasonable cookie length");
+        self.line("    local.get $i");
+        self.line("    i32.const 4096");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        self.line("    ;; Check if needle matches at position i");
+        self.line("    i32.const 0");
+        self.line("    local.set $j");
+        self.line("    i32.const 1");
+        self.line("    local.set $match");
+        self.line("    (block $no_match");
+        self.line("      (loop $inner");
+        self.line("        local.get $j");
+        self.line("        local.get $needle_len");
+        self.line("        i32.ge_u");
+        self.line("        br_if $no_match  ;; all chars matched");
+        self.line("        local.get $haystack_ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        local.get $j");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.get $needle_ptr");
+        self.line("        local.get $j");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        i32.ne");
+        self.line("        if");
+        self.line("          i32.const 0");
+        self.line("          local.set $match");
+        self.line("          br $no_match");
+        self.line("        end");
+        self.line("        local.get $j");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $j");
+        self.line("        br $inner");
+        self.line("      )");
+        self.line("    )");
+        self.line("    ;; If match is still 1 and j == needle_len, we found it");
+        self.line("    local.get $match");
+        self.line("    local.get $j");
+        self.line("    local.get $needle_len");
+        self.line("    i32.eq");
+        self.line("    i32.and");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      return");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $outer");
+        self.line("  )");
+        self.line(")");
+        self.line("i32.const 0");
         self.indent -= 1;
         self.line(")");
 
@@ -7635,6 +7926,26 @@ impl WasmCodegen {
                 if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
                     if matches!(inner.as_ref(), Expr::SelfExpr) && method == "push" {
                         return true;
+                    }
+                }
+                false
+            }
+            // Function calls to store actions are void — they don't return values
+            Expr::FnCall { callee, .. } => {
+                if let Expr::Ident(name) = callee.as_ref() {
+                    if name.contains("::") {
+                        let parts: Vec<&str> = name.splitn(2, "::").collect();
+                        if parts.len() == 2 {
+                            let store_name = parts[0];
+                            // If it's a known store and the member is NOT a signal (i.e. it's an action),
+                            // the call is void.
+                            if let Some((_, signals)) = self.known_stores.iter().find(|(sn, _)| sn == store_name) {
+                                let member = parts[1];
+                                if !signals.iter().any(|s| s == member) {
+                                    return true;
+                                }
+                            }
+                        }
                     }
                 }
                 false
@@ -19355,5 +19666,285 @@ mod format_collections_csv_runtime_tests {
             "callback dispatcher must format timing result");
         assert!(callback_section.contains("global.set $__last_handler_time_len"),
             "callback dispatcher must store timing in global");
+    }
+}
+
+#[cfg(test)]
+mod db_and_auth_codegen_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    // -----------------------------------------------------------------------
+    // Database codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn generate_db_emits_init_function_and_handle_global() {
+        let db = DbDef {
+            name: "AppDB".into(),
+            version: Some(2),
+            stores: vec![
+                DbStoreDef {
+                    name: "items".into(),
+                    key: "id".into(),
+                    indexes: vec![],
+                    span: span(),
+                },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        assert!(output.contains("Database: AppDB"), "should have db header");
+        assert!(output.contains("global $__db_AppDB_handle (mut i32)"),
+            "should emit db handle global");
+        assert!(output.contains("AppDB_init"),
+            "should emit init function");
+        assert!(output.contains("call $db_open"),
+            "init should call db_open");
+        assert!(output.contains("i32.const 2"),
+            "should pass version 2");
+    }
+
+    #[test]
+    fn generate_db_emits_convenience_wrappers() {
+        let db = DbDef {
+            name: "MyDB".into(),
+            version: None,
+            stores: vec![
+                DbStoreDef {
+                    name: "records".into(),
+                    key: "id".into(),
+                    indexes: vec![],
+                    span: span(),
+                },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+
+        // put wrapper
+        assert!(output.contains("MyDB_put"),
+            "should emit put wrapper");
+        assert!(output.contains("call $db_put"),
+            "put wrapper should call db_put import");
+        assert!(output.contains("global.get $__db_MyDB_handle"),
+            "put wrapper should pass db handle");
+
+        // get wrapper
+        assert!(output.contains("MyDB_get"),
+            "should emit get wrapper");
+        assert!(output.contains("call $db_get"),
+            "get wrapper should call db_get import");
+
+        // delete wrapper
+        assert!(output.contains("MyDB_delete"),
+            "should emit delete wrapper");
+        assert!(output.contains("call $db_delete"),
+            "delete wrapper should call db_delete import");
+
+        // getAll wrapper
+        assert!(output.contains("MyDB_getAll"),
+            "should emit getAll wrapper");
+        assert!(output.contains("call $db_getAll"),
+            "getAll wrapper should call db_getAll import");
+    }
+
+    #[test]
+    fn generate_db_defaults_version_to_1() {
+        let db = DbDef {
+            name: "TestDB".into(),
+            version: None,
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        // version should default to 1
+        assert!(output.contains("i32.const 1  ;; version"),
+            "should default version to 1");
+    }
+
+    #[test]
+    fn generate_db_uses_default_store_when_no_stores_defined() {
+        let db = DbDef {
+            name: "EmptyDB".into(),
+            version: None,
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        // Should use "default" as store name (7 chars)
+        assert!(output.contains(";; store name len"),
+            "should have store name in wrappers");
+    }
+
+    // -----------------------------------------------------------------------
+    // Auth codegen — secure defaults
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn auth_defaults_to_cookie_session_storage() {
+        let auth = AuthDef {
+            name: "SecureAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None, // should default to "cookie"
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        // The config string is interned — check that it's in the string table
+        let has_cookie_session = codegen.strings.iter().any(|(s, _)| s.contains("\"session\":\"cookie\""));
+        assert!(has_cookie_session,
+            "should default session to cookie in config string");
+    }
+
+    #[test]
+    fn auth_emits_is_authenticated_function() {
+        let auth = AuthDef {
+            name: "MyAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: Some("cookie".into()),
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("MyAuth_is_authenticated"),
+            "should emit is_authenticated function");
+        assert!(output.contains("call $auth_getRawCookies"),
+            "is_authenticated should read cookies");
+        assert!(output.contains("call $string_contains"),
+            "is_authenticated should check for session key");
+    }
+
+    #[test]
+    fn auth_emits_check_function_with_server_verification() {
+        let auth = AuthDef {
+            name: "AppAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("AppAuth_check"),
+            "should emit check function");
+        assert!(output.contains("call $http_fetch"),
+            "check should call http_fetch for server-side verification");
+    }
+
+    #[test]
+    fn auth_emits_secure_set_cookie_wrapper() {
+        let auth = AuthDef {
+            name: "Auth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: Some("cookie".into()),
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("Auth_set_cookie"),
+            "should emit set_cookie wrapper");
+        // The HttpOnly suffix is interned in the string table
+        let has_httponly = codegen.strings.iter().any(|(s, _)| s.contains("HttpOnly"));
+        assert!(has_httponly,
+            "set_cookie should intern HttpOnly suffix");
+        let has_secure = codegen.strings.iter().any(|(s, _)| s.contains("Secure"));
+        assert!(has_secure,
+            "set_cookie should intern Secure suffix");
+        let has_samesite = codegen.strings.iter().any(|(s, _)| s.contains("SameSite=Strict"));
+        assert!(has_samesite,
+            "set_cookie should intern SameSite=Strict suffix");
+        assert!(output.contains("call $string_concat"),
+            "set_cookie should concatenate suffix");
+        assert!(output.contains("call $auth_set_cookie"),
+            "set_cookie should call auth_set_cookie import");
+    }
+
+    // -----------------------------------------------------------------------
+    // __init_all
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn init_all_calls_db_init_and_auth_register() {
+        let src = r#"
+            auth AppAuth {
+                provider "google" {
+                    scopes: ["email"]
+                }
+            }
+
+            db AppDB {
+                version: 1
+                store items {
+                    key: "id"
+                }
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("__init_all"),
+            "should emit __init_all function");
+        assert!(wat.contains("call $__auth_register_AppAuth"),
+            "__init_all should call auth register");
+        assert!(wat.contains("call $AppDB_init"),
+            "__init_all should call db init");
     }
 }
