@@ -4327,9 +4327,10 @@ impl WasmCodegen {
                     let comp = self.component_name.clone();
                     let batch_size = 20;
 
-                    // Allocate a callback index for the batch function
-                    let cb_idx = self.global_handler_base;
-                    self.global_handler_base += 1;
+                    // Allocate a callback index for the batch function.
+                    // Use 9000 + uid to avoid collision with component handler ranges
+                    // (component handlers are assigned sequentially from global_handler_base).
+                    let cb_idx = 9000 + uid;
 
                     // Locals for the initial batch loop
                     let idx_var = format!("$__lazy_idx_{}", uid);
