@@ -75,7 +75,7 @@ pub fn shake(program: &mut Program, entry_points: &[String], stats: &mut ShakeSt
 
     // Also keep Use items (imports) and Test items always.
     for (i, item) in program.items.iter().enumerate() {
-        if matches!(item, Item::Use(_) | Item::Test(_) | Item::Contract(_) | Item::App(_) | Item::Page(_) | Item::Form(_) | Item::Channel(_) | Item::Embed(_) | Item::Pdf(_) | Item::Payment(_) | Item::Auth(_) | Item::Upload(_) | Item::Db(_) | Item::Cache(_) | Item::Breakpoints(_) | Item::Theme(_) | Item::Animation(_)) {
+        if matches!(item, Item::Use(_) | Item::Test(_) | Item::Contract(_) | Item::App(_) | Item::Page(_) | Item::Form(_) | Item::Channel(_) | Item::Embed(_) | Item::Pdf(_) | Item::Payment(_) | Item::Banking(_) | Item::Map(_) | Item::Auth(_) | Item::Upload(_) | Item::Db(_) | Item::Cache(_) | Item::Breakpoints(_) | Item::Theme(_) | Item::Animation(_)) {
             // Always keep these
             reachable.insert(i);
         }
@@ -130,6 +130,8 @@ fn item_name(item: &Item) -> Option<String> {
         Item::Embed(e) => Some(e.name.clone()),
         Item::Pdf(p) => Some(p.name.clone()),
         Item::Payment(p) => Some(p.name.clone()),
+        Item::Banking(b) => Some(b.name.clone()),
+        Item::Map(m) => Some(m.name.clone()),
         Item::Auth(a) => Some(a.name.clone()),
         Item::Upload(u) => Some(u.name.clone()),
         Item::Db(d) => Some(d.name.clone()),
@@ -252,6 +254,8 @@ fn collect_item_deps(item: &Item, deps: &mut HashSet<String>) {
                 // Pdf render blocks can reference components
             }
             Item::Payment(_) => {}
+            Item::Banking(_) => {}
+            Item::Map(_) => {}
             Item::Auth(_) => {}
             Item::Upload(u) => {
                 collect_expr_deps(&u.endpoint, deps);
@@ -1096,6 +1100,21 @@ mod tests {
             sandbox_mode: false, on_success: None, on_error: None,
             methods: vec![], is_pub: false, span: dummy_span(),
         })), Some("Py".to_string()));
+
+        // Banking
+        assert_eq!(item_name(&Item::Banking(BankingDef {
+            name: "Bk".to_string(), provider: None,
+            on_success: None, on_exit: None, on_error: None,
+            methods: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Bk".to_string()));
+
+        // Map
+        assert_eq!(item_name(&Item::Map(MapDef {
+            name: "Mp".to_string(), provider: None,
+            center: None, zoom: None, style: None,
+            on_ready: None, on_click: None,
+            methods: vec![], is_pub: false, span: dummy_span(),
+        })), Some("Mp".to_string()));
 
         // Auth
         assert_eq!(item_name(&Item::Auth(AuthDef {

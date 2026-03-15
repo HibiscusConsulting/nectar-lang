@@ -152,8 +152,10 @@ struct LazyBatch {
 #[derive(Debug, Clone, PartialEq)]
 enum KeywordDefKind {
     Auth,
+    Banking,
     Cache,
     Database,
+    MapWidget,
     Payment,
     Upload,
     Pdf,
@@ -656,10 +658,24 @@ impl WasmCodegen {
         self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
         self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
 
-        // ── Payment — only processPayment (contentWindow.postMessage) ────────
+        // ── Payment — provider SDK bridges ────────────────────────────────────
         self.line("");
-        self.line(";; Payment — browser contentWindow.postMessage API");
+        self.line(";; Payment — provider SDK syscalls (load SDK, mount widget, confirm)");
         self.line("(import \"payment\" \"processPayment\" (func $payment_processPayment (param i32 i32 i32 i32)))");
+        self.line("(import \"payment\" \"mountStripe\" (func $payment_mountStripe (param i32 i32 i32 i32)))");
+        self.line("(import \"payment\" \"createCardElement\" (func $payment_createCardElement (param i32 i32 i32)))");
+        self.line("(import \"payment\" \"confirmPayment\" (func $payment_confirmPayment (param i32 i32 i32 i32 i32)))");
+
+        // ── Banking — provider SDK bridges ────────────────────────────────────
+        self.line("");
+        self.line(";; Banking — provider SDK syscalls (load SDK, open link flow)");
+        self.line("(import \"banking\" \"mountPlaid\" (func $banking_mountPlaid (param i32 i32 i32)))");
+
+        // ── Map — provider SDK bridges ────────────────────────────────────────
+        self.line("");
+        self.line(";; Map — provider SDK syscalls (load SDK, mount map, add markers)");
+        self.line("(import \"map\" \"mountMapbox\" (func $map_mountMapbox (param i32 i32 i32 f64 f64 f64 i32)))");
+        self.line("(import \"map\" \"addMarker\" (func $map_addMarker (param i32 f64 f64)))");
 
         // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
         self.line("");
@@ -883,6 +899,8 @@ impl WasmCodegen {
                 Item::Cache(c) => self.known_keyword_defs.push((c.name.clone(), KeywordDefKind::Cache)),
                 Item::Db(d) => self.known_keyword_defs.push((d.name.clone(), KeywordDefKind::Database)),
                 Item::Payment(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Payment)),
+                Item::Banking(b) => self.known_keyword_defs.push((b.name.clone(), KeywordDefKind::Banking)),
+                Item::Map(m) => self.known_keyword_defs.push((m.name.clone(), KeywordDefKind::MapWidget)),
                 Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
                 Item::Pdf(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Pdf)),
                 Item::Theme(t) => self.known_keyword_defs.push((t.name.clone(), KeywordDefKind::Theme)),
@@ -940,6 +958,12 @@ impl WasmCodegen {
                     }
                     KeywordDefKind::Database => {
                         init_calls.push(format!("  call ${}_init", kw_name));
+                    }
+                    KeywordDefKind::Banking => {
+                        init_calls.push(format!("  call $__banking_register_{}", kw_name));
+                    }
+                    KeywordDefKind::MapWidget => {
+                        init_calls.push(format!("  call $__map_register_{}", kw_name));
                     }
                     _ => {}
                 }
@@ -1107,6 +1131,8 @@ impl WasmCodegen {
             Item::Form(form) => self.generate_form(form),
             Item::Channel(ch) => self.generate_channel(ch),
             Item::Payment(payment) => self.generate_payment(payment),
+            Item::Banking(banking) => self.generate_banking(banking),
+            Item::Map(map_def) => self.generate_map(map_def),
             Item::Auth(auth) => self.generate_auth(auth),
             Item::Upload(upload) => self.generate_upload(upload),
             Item::Embed(embed) => self.generate_embed(embed),
@@ -2888,6 +2914,88 @@ impl WasmCodegen {
         self.line("  call $payment_init");
         self.line(")");
 
+        // Provider-specific mount function — calls the appropriate syscall
+        let _cb_idx = self.global_handler_base;
+        self.global_handler_base += 1;
+
+        // Globals for storing provider object handles
+        self.line(&format!(
+            "(global $__payment_{}_provider_handle (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_element_handle (mut i32) (i32.const 0))",
+            payment.name
+        ));
+
+        // Mount function: loads provider SDK, mounts widget into container
+        self.line(&format!(
+            "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $cb_idx i32)",
+            payment.name, payment.name
+        ));
+        match provider_str.as_str() {
+            "stripe" => {
+                // Pass: container element ID, public_key ptr/len, callback
+                if let Some(ref key_expr) = payment.public_key {
+                    if let Expr::StringLit(key) = key_expr {
+                        let key_offset = self.store_string(key);
+                        let key_len = key.len();
+                        self.line(&format!("  local.get $container_id"));
+                        self.line(&format!("  i32.const {}  ;; key ptr", key_offset));
+                        self.line(&format!("  i32.const {}  ;; key len", key_len));
+                        self.line("  local.get $cb_idx");
+                        self.line("  call $payment_mountStripe");
+                    }
+                } else {
+                    // No key — still emit the call with empty string
+                    let empty = self.store_string("");
+                    self.line("  local.get $container_id");
+                    self.line(&format!("  i32.const {}  ;; key ptr (empty)", empty));
+                    self.line("  i32.const 0  ;; key len");
+                    self.line("  local.get $cb_idx");
+                    self.line("  call $payment_mountStripe");
+                }
+            }
+            _ => {
+                // Generic provider: use processPayment syscall
+                self.line("  ;; generic payment provider — no-op mount");
+            }
+        }
+        self.line(")");
+
+        // Create card element function (Stripe-specific)
+        if provider_str == "stripe" {
+            self.line(&format!(
+                "(func ${}_create_element (export \"{}_create_element\") (param $stripe_id i32) (param $container_id i32) (param $cb_idx i32)",
+                payment.name, payment.name
+            ));
+            self.line("  local.get $stripe_id");
+            self.line("  local.get $container_id");
+            self.line("  local.get $cb_idx");
+            self.line("  call $payment_createCardElement");
+            self.line(")");
+        }
+
+        // Confirm/submit function — triggers payment processing
+        self.line(&format!(
+            "(func ${}_confirm (export \"{}_confirm\") (param $stripe_id i32) (param $card_id i32) (param $secret_ptr i32) (param $secret_len i32) (param $cb_idx i32)",
+            payment.name, payment.name
+        ));
+        match provider_str.as_str() {
+            "stripe" => {
+                self.line("  local.get $stripe_id");
+                self.line("  local.get $card_id");
+                self.line("  local.get $secret_ptr");
+                self.line("  local.get $secret_len");
+                self.line("  local.get $cb_idx");
+                self.line("  call $payment_confirmPayment");
+            }
+            _ => {
+                self.line("  ;; generic confirm — use processPayment");
+            }
+        }
+        self.line(")");
+
         if let Some(ref handler) = payment.on_success {
             self.generate_function(handler);
         }
@@ -2895,6 +3003,149 @@ impl WasmCodegen {
             self.generate_function(handler);
         }
         for method in &payment.methods {
+            self.generate_function(method);
+        }
+    }
+
+    fn generate_banking(&mut self, banking: &BankingDef) {
+        self.line(&format!(";; === Banking: {} ===", banking.name));
+
+        let name_offset = self.store_string(&banking.name);
+        let name_len = banking.name.len();
+
+        let provider_str = match &banking.provider {
+            Some(Expr::StringLit(s)) => s.clone(),
+            _ => "plaid".to_string(),
+        };
+        let provider_offset = self.store_string(&provider_str);
+        let provider_len = provider_str.len();
+
+        // Register function
+        self.line(&format!(
+            "(func $__banking_register_{} (export \"__banking_register_{}\")",
+            banking.name, banking.name
+        ));
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line(&format!("  i32.const {}  ;; provider ptr", provider_offset));
+        self.line(&format!("  i32.const {}  ;; provider len", provider_len));
+        self.line("  call $banking_init");
+        self.line(")");
+
+        // Open/mount function — opens the banking link flow
+        self.line(&format!(
+            "(func ${}_open (export \"{}_open\") (param $token_ptr i32) (param $token_len i32) (param $cb_idx i32)",
+            banking.name, banking.name
+        ));
+        match provider_str.as_str() {
+            "plaid" => {
+                self.line("  local.get $token_ptr");
+                self.line("  local.get $token_len");
+                self.line("  local.get $cb_idx");
+                self.line("  call $banking_mountPlaid");
+            }
+            _ => {
+                self.line("  ;; generic banking provider — no-op");
+            }
+        }
+        self.line(")");
+
+        if let Some(ref handler) = banking.on_success {
+            self.generate_function(handler);
+        }
+        if let Some(ref handler) = banking.on_exit {
+            self.generate_function(handler);
+        }
+        if let Some(ref handler) = banking.on_error {
+            self.generate_function(handler);
+        }
+        for method in &banking.methods {
+            self.generate_function(method);
+        }
+    }
+
+    fn generate_map(&mut self, map_def: &MapDef) {
+        self.line(&format!(";; === Map: {} ===", map_def.name));
+
+        let name_offset = self.store_string(&map_def.name);
+        let name_len = map_def.name.len();
+
+        let provider_str = match &map_def.provider {
+            Some(Expr::StringLit(s)) => s.clone(),
+            _ => "mapbox".to_string(),
+        };
+        let provider_offset = self.store_string(&provider_str);
+        let provider_len = provider_str.len();
+
+        // Global for map object handle
+        self.line(&format!(
+            "(global $__map_{}_handle (mut i32) (i32.const 0))",
+            map_def.name
+        ));
+
+        // Register function
+        self.line(&format!(
+            "(func $__map_register_{} (export \"__map_register_{}\")",
+            map_def.name, map_def.name
+        ));
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line(&format!("  i32.const {}  ;; provider ptr", provider_offset));
+        self.line(&format!("  i32.const {}  ;; provider len", provider_len));
+        self.line("  call $map_init");
+        self.line(")");
+
+        // Mount function — loads map SDK and creates the map in a container element
+        let lat = map_def.center.map(|(lat, _)| lat).unwrap_or(0.0);
+        let lng = map_def.center.map(|(_, lng)| lng).unwrap_or(0.0);
+        let zoom = map_def.zoom.unwrap_or(10.0);
+
+        self.line(&format!(
+            "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $key_ptr i32) (param $key_len i32) (param $cb_idx i32)",
+            map_def.name, map_def.name
+        ));
+        match provider_str.as_str() {
+            "mapbox" => {
+                self.line("  local.get $container_id");
+                self.line("  local.get $key_ptr");
+                self.line("  local.get $key_len");
+                self.line(&format!("  f64.const {:.6}  ;; lat", lat));
+                self.line(&format!("  f64.const {:.6}  ;; lng", lng));
+                self.line(&format!("  f64.const {:.1}  ;; zoom", zoom));
+                self.line("  local.get $cb_idx");
+                self.line("  call $map_mountMapbox");
+            }
+            _ => {
+                self.line("  ;; generic map provider — no-op mount");
+            }
+        }
+        self.line(")");
+
+        // Add marker function
+        self.line(&format!(
+            "(func ${}_add_marker (export \"{}_add_marker\") (param $map_id i32) (param $lat f64) (param $lng f64)",
+            map_def.name, map_def.name
+        ));
+        match provider_str.as_str() {
+            "mapbox" => {
+                self.line("  local.get $map_id");
+                self.line("  local.get $lat");
+                self.line("  local.get $lng");
+                self.line("  call $map_addMarker");
+            }
+            _ => {
+                self.line("  ;; generic add_marker — no-op");
+            }
+        }
+        self.line(")");
+
+        if let Some(ref handler) = map_def.on_ready {
+            self.generate_function(handler);
+        }
+        if let Some(ref handler) = map_def.on_click {
+            self.generate_function(handler);
+        }
+        for method in &map_def.methods {
             self.generate_function(method);
         }
     }
@@ -8097,6 +8348,16 @@ impl WasmCodegen {
         self.line("  ;; stub — payment initialization");
         self.line(")");
 
+        // banking_init: called by banking block codegen
+        self.emit("(func $banking_init (param $name_ptr i32) (param $name_len i32) (param $provider_ptr i32) (param $provider_len i32)");
+        self.line("  ;; stub — banking initialization");
+        self.line(")");
+
+        // map_init: called by map block codegen
+        self.emit("(func $map_init (param $name_ptr i32) (param $name_len i32) (param $provider_ptr i32) (param $provider_len i32)");
+        self.line("  ;; stub — map initialization");
+        self.line(")");
+
         // pdf_create: called by pdf block codegen
         self.emit("(func $pdf_create (param $name_ptr i32) (param $name_len i32) (param $config_ptr i32) (param $config_len i32) (result i32)");
         self.indent += 1;
@@ -9980,7 +10241,7 @@ impl WasmCodegen {
                     // Known stdlib/built-in namespaces used as static call targets
                     matches!(obj_name.as_str(),
                         "time" | "Duration" | "clipboard" | "crypto" | "auth" |
-                        "db" | "upload" | "payment" | "channel" | "ws" |
+                        "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
                         "pwa" | "console" | "hardware" | "webapi" | "rtc" |
                         "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
                         "http"
@@ -10015,13 +10276,15 @@ impl WasmCodegen {
                     // The receiver is a namespace handle (not a local), so we skip it and
                     // only evaluate the arguments before calling the appropriate import.
                     let ns = match kind {
-                        KeywordDefKind::Auth     => "auth",
-                        KeywordDefKind::Cache    => "cache",
-                        KeywordDefKind::Database => "db",
-                        KeywordDefKind::Payment  => "payment",
-                        KeywordDefKind::Upload   => "upload",
-                        KeywordDefKind::Pdf      => "pdf",
-                        KeywordDefKind::Theme    => "theme",
+                        KeywordDefKind::Auth       => "auth",
+                        KeywordDefKind::Banking    => "banking",
+                        KeywordDefKind::Cache      => "cache",
+                        KeywordDefKind::Database   => "db",
+                        KeywordDefKind::MapWidget  => "map",
+                        KeywordDefKind::Payment    => "payment",
+                        KeywordDefKind::Upload     => "upload",
+                        KeywordDefKind::Pdf        => "pdf",
+                        KeywordDefKind::Theme      => "theme",
                     };
                     let qualified = format!("{}::{}", ns, method);
                     let wasm_fn = self.resolve_stdlib_fn(&qualified);
@@ -10147,7 +10410,7 @@ impl WasmCodegen {
                 if let Expr::Ident(obj_name) = object.as_ref() {
                     if matches!(obj_name.as_str(),
                         "time" | "Duration" | "clipboard" | "crypto" | "auth" |
-                        "db" | "upload" | "payment" | "channel" | "ws" |
+                        "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
                         "pwa" | "console" | "hardware" | "webapi" | "rtc" |
                         "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
                         "http"
@@ -10304,6 +10567,12 @@ impl WasmCodegen {
             "upload::start" => "$upload_start".into(),
             "upload::cancel" => "$upload_cancel".into(),
             "payment::process" => "$payment_processPayment".into(),
+            "payment::mountStripe" => "$payment_mountStripe".into(),
+            "payment::createCardElement" => "$payment_createCardElement".into(),
+            "payment::confirmPayment" => "$payment_confirmPayment".into(),
+            "banking::mountPlaid" => "$banking_mountPlaid".into(),
+            "map::mountMapbox" => "$map_mountMapbox".into(),
+            "map::addMarker" => "$map_addMarker".into(),
             "channel::connect" | "ws::connect" => "$ws_connect".into(),
             "channel::send" | "ws::send" => "$ws_send".into(),
             "channel::close" | "ws::close" => "$ws_close".into(),
@@ -20020,6 +20289,438 @@ mod coverage_codegen_tests {
         let output = codegen.output.clone();
         // defaults to "stripe"
         assert!(output.contains("Payment: Pay"), "should have payment header");
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment provider-specific codegen (Stripe)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn payment_stripe_mount_function() {
+        let payment = PaymentDef {
+            name: "Checkout".into(),
+            provider: Some(Expr::StringLit("stripe".into())),
+            public_key: Some(Expr::StringLit("pk_test_123".into())),
+            sandbox_mode: true,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("Checkout_mount"), "should emit mount function");
+        assert!(output.contains("call $payment_mountStripe"), "should call mountStripe syscall");
+    }
+
+    #[test]
+    fn payment_stripe_confirm_function() {
+        let payment = PaymentDef {
+            name: "Pay".into(),
+            provider: Some(Expr::StringLit("stripe".into())),
+            public_key: Some(Expr::StringLit("pk_test_abc".into())),
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("Pay_confirm"), "should emit confirm function");
+        assert!(output.contains("call $payment_confirmPayment"), "should call confirmPayment syscall");
+    }
+
+    #[test]
+    fn payment_stripe_create_element() {
+        let payment = PaymentDef {
+            name: "Card".into(),
+            provider: Some(Expr::StringLit("stripe".into())),
+            public_key: None,
+            sandbox_mode: true,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("Card_create_element"), "should emit create_element function for stripe");
+        assert!(output.contains("call $payment_createCardElement"), "should call createCardElement syscall");
+    }
+
+    #[test]
+    fn payment_provider_handle_globals() {
+        let payment = PaymentDef {
+            name: "Stripe".into(),
+            provider: Some(Expr::StringLit("stripe".into())),
+            public_key: None,
+            sandbox_mode: true,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("__payment_Stripe_provider_handle"), "should emit provider handle global");
+        assert!(output.contains("__payment_Stripe_element_handle"), "should emit element handle global");
+    }
+
+    #[test]
+    fn payment_generic_provider_no_stripe_calls() {
+        let payment = PaymentDef {
+            name: "PP".into(),
+            provider: Some(Expr::StringLit("paypal".into())),
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("PP_mount"), "should emit mount function");
+        assert!(!output.contains("call $payment_mountStripe"), "generic provider should not call mountStripe");
+        assert!(!output.contains("PP_create_element"), "generic provider should not emit create_element");
+    }
+
+    // -----------------------------------------------------------------------
+    // Banking codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn banking_plaid_codegen() {
+        let banking = BankingDef {
+            name: "AccountLink".into(),
+            provider: Some(Expr::StringLit("plaid".into())),
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("Banking: AccountLink"), "should have banking header");
+        assert!(output.contains("__banking_register_AccountLink"), "should emit register function");
+        assert!(output.contains("banking_init"), "should call banking_init");
+    }
+
+    #[test]
+    fn banking_plaid_open_function() {
+        let banking = BankingDef {
+            name: "Link".into(),
+            provider: Some(Expr::StringLit("plaid".into())),
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("Link_open"), "should emit open function");
+        assert!(output.contains("call $banking_mountPlaid"), "should call mountPlaid syscall");
+    }
+
+    #[test]
+    fn banking_default_provider() {
+        let banking = BankingDef {
+            name: "Bank".into(),
+            provider: None,
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        // Defaults to "plaid"
+        assert!(output.contains("Banking: Bank"), "should have banking header");
+        assert!(output.contains("call $banking_mountPlaid"), "default provider should be plaid");
+    }
+
+    #[test]
+    fn banking_with_handlers() {
+        let banking = BankingDef {
+            name: "BankLink".into(),
+            provider: Some(Expr::StringLit("plaid".into())),
+            on_success: Some(Function {
+                name: "on_success".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_exit: Some(Function {
+                name: "on_exit".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("$on_success"), "should emit on_success handler");
+        assert!(output.contains("$on_exit"), "should emit on_exit handler");
+    }
+
+    #[test]
+    fn banking_generic_provider() {
+        let banking = BankingDef {
+            name: "MX".into(),
+            provider: Some(Expr::StringLit("mx".into())),
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("MX_open"), "should emit open function");
+        assert!(!output.contains("call $banking_mountPlaid"), "generic provider should not call mountPlaid");
+    }
+
+    // -----------------------------------------------------------------------
+    // Map codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn map_mapbox_codegen() {
+        let map_def = MapDef {
+            name: "StoreLocator".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: Some((40.7128, -74.0060)),
+            zoom: Some(12.0),
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("Map: StoreLocator"), "should have map header");
+        assert!(output.contains("__map_register_StoreLocator"), "should emit register function");
+        assert!(output.contains("map_init"), "should call map_init");
+    }
+
+    #[test]
+    fn map_mapbox_mount_function() {
+        let map_def = MapDef {
+            name: "CityMap".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: Some((51.5074, -0.1278)),
+            zoom: Some(10.0),
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("CityMap_mount"), "should emit mount function");
+        assert!(output.contains("call $map_mountMapbox"), "should call mountMapbox syscall");
+        assert!(output.contains("f64.const 51.507"), "should include latitude");
+        assert!(output.contains("f64.const -0.127"), "should include longitude");
+        assert!(output.contains("f64.const 10.0"), "should include zoom");
+    }
+
+    #[test]
+    fn map_mapbox_add_marker() {
+        let map_def = MapDef {
+            name: "Markers".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("Markers_add_marker"), "should emit add_marker function");
+        assert!(output.contains("call $map_addMarker"), "should call addMarker syscall");
+    }
+
+    #[test]
+    fn map_default_provider() {
+        let map_def = MapDef {
+            name: "DefaultMap".into(),
+            provider: None,
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        // Defaults to "mapbox"
+        assert!(output.contains("call $map_mountMapbox"), "default provider should be mapbox");
+    }
+
+    #[test]
+    fn map_default_center_and_zoom() {
+        let map_def = MapDef {
+            name: "NoCenter".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("f64.const 0.000000  ;; lat"), "default lat should be 0");
+        assert!(output.contains("f64.const 0.000000  ;; lng"), "default lng should be 0");
+        assert!(output.contains("f64.const 10.0  ;; zoom"), "default zoom should be 10");
+    }
+
+    #[test]
+    fn map_with_handlers() {
+        let map_def = MapDef {
+            name: "InteractiveMap".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: Some((34.0522, -118.2437)),
+            zoom: Some(8.0),
+            style: None,
+            on_ready: Some(Function {
+                name: "on_ready".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![Stmt::Return(None)]),
+                is_pub: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("$on_ready"), "should emit on_ready handler");
+    }
+
+    #[test]
+    fn map_handle_global() {
+        let map_def = MapDef {
+            name: "MyMap".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(output.contains("__map_MyMap_handle"), "should emit map handle global");
+    }
+
+    #[test]
+    fn map_generic_provider_no_mapbox_calls() {
+        let map_def = MapDef {
+            name: "GMap".into(),
+            provider: Some(Expr::StringLit("google".into())),
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map_def);
+        let output = codegen.output.clone();
+        assert!(!output.contains("call $map_mountMapbox"), "google provider should not call mountMapbox");
+        assert!(!output.contains("call $map_addMarker"), "google provider should not call addMarker");
     }
 
     // -----------------------------------------------------------------------
