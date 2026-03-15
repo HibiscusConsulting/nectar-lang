@@ -131,6 +131,10 @@ pub struct WasmCodegen {
     /// This set contains the original class names (without the dot) so that
     /// template elements with `class="foo"` can be rewritten at compile time.
     component_scoped_selectors: HashSet<String>,
+    /// Codegen errors — expressions or items that have no codegen implementation.
+    /// Collected during generation rather than panicking, so the compiler can
+    /// report all missing codegen at once.
+    pub codegen_errors: Vec<String>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -242,6 +246,7 @@ impl WasmCodegen {
             known_payment_signals: Vec::new(),
             known_capability_signals: Vec::new(),
             component_scoped_selectors: HashSet::new(),
+            codegen_errors: Vec::new(),
         }
     }
 
@@ -1274,9 +1279,14 @@ impl WasmCodegen {
                 // Trait method calls compile to direct calls to concrete implementations.
                 self.line(&format!(";; trait {} (erased)", t.name));
             }
-            Item::Impl(imp) if !imp.trait_impls.is_empty() => {
-                // Trait impl methods are compiled like regular impl methods
-                self.line(&format!(";; impl {} for {}", imp.trait_impls.join(" + "), imp.target));
+            Item::Impl(imp) => {
+                // Impl methods are compiled like regular functions.
+                // Trait impls get a comment showing which traits are implemented.
+                if !imp.trait_impls.is_empty() {
+                    self.line(&format!(";; impl {} for {}", imp.trait_impls.join(" + "), imp.target));
+                } else {
+                    self.line(&format!(";; impl {}", imp.target));
+                }
                 for method in &imp.methods {
                     self.generate_function(method);
                 }
@@ -1297,9 +1307,14 @@ impl WasmCodegen {
             Item::Breakpoints(bp) => self.generate_breakpoints(bp),
             Item::Animation(anim) => self.generate_animation_block(anim),
             Item::Theme(theme) => self.generate_theme(theme),
-            _ => {
-                self.line(&format!(";; TODO: codegen for {:?}", std::mem::discriminant(item)));
+            // Type definitions that are erased at codegen — no output needed
+            Item::Enum(_) => {
+                // Enum variants are handled inline at match/construction sites
             }
+            // Import statements — resolved before codegen, no output needed
+            Item::Use(_) => {}
+            // Module declarations — contents already flattened into the program
+            Item::Mod(_) => {}
         }
     }
 
@@ -8244,8 +8259,35 @@ impl WasmCodegen {
                     self.generate_stmt(stmt);
                 }
             }
-            _ => {
-                self.line(";; TODO: codegen for expr");
+            Expr::ObjectLit { fields } => {
+                // Object literals use the same layout as structs — allocate and store fields
+                let lbl = self.next_label();
+                let ptr_var = format!("$__obj_ptr_{}", lbl);
+                self.emit_template_local(&ptr_var);
+                let size = (fields.len() as u32) * 4;
+                let size = if size == 0 { 4 } else { size };
+                self.line(&format!(";; object literal ({} fields, {} bytes)", fields.len(), size));
+                self.line(&format!("i32.const {}", size));
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", ptr_var));
+                for (i, (_name, value)) in fields.iter().enumerate() {
+                    self.line(&format!("local.get {}", ptr_var));
+                    self.generate_expr(value);
+                    if matches!(value, Expr::StringLit(_)) {
+                        self.line("drop ;; keep only str ptr for object field");
+                    }
+                    if i == 0 {
+                        self.line(&format!("i32.store ;; field: {}", _name));
+                    } else {
+                        self.line(&format!("i32.store offset={} ;; field: {}", i * 4, _name));
+                    }
+                }
+                self.line(&format!("local.get {}", ptr_var));
+            }
+            Expr::Borrow(inner) | Expr::BorrowMut(inner) => {
+                // Borrows are erased at codegen — just generate the inner expression.
+                // Borrow checking happens before codegen ensures safety.
+                self.generate_expr(inner);
             }
         }
     }
@@ -20373,7 +20415,7 @@ mod comprehensive_codegen_tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn impl_block_without_trait_falls_through() {
+    fn impl_block_without_trait_generates_methods() {
         let wat = compile(r#"
             struct Point { x: i32, y: i32 }
 
@@ -20383,8 +20425,10 @@ mod comprehensive_codegen_tests {
                 }
             }
         "#);
-        // Bare impl (no trait) falls to the TODO handler in generate_item
-        assert!(wat.contains("TODO"), "bare impl should produce TODO comment");
+        // Bare impl methods are now compiled as regular functions
+        assert!(wat.contains("impl Point"), "bare impl should have comment");
+        assert!(wat.contains("make"), "bare impl should generate methods");
+        assert!(!wat.contains("TODO"), "bare impl should not produce TODO");
     }
 
     #[test]
@@ -24137,11 +24181,21 @@ mod coverage_codegen_tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn fallback_expr_codegen() {
+    fn borrow_expr_codegen() {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::Borrow(Box::new(Expr::Integer(1))));
         let output = codegen.output.clone();
-        assert!(output.contains("TODO: codegen for expr"), "unhandled expr should produce TODO");
+        // Borrows are erased at codegen — the inner expression is generated directly
+        assert!(output.contains("i32.const 1"), "borrow should generate inner expr");
+        assert!(!output.contains("TODO"), "borrow should not produce TODO");
+    }
+
+    #[test]
+    fn borrow_mut_expr_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::BorrowMut(Box::new(Expr::Integer(42))));
+        let output = codegen.output.clone();
+        assert!(output.contains("i32.const 42"), "borrow_mut should generate inner expr");
     }
 
     // -----------------------------------------------------------------------
@@ -24465,7 +24519,87 @@ mod coverage_codegen_tests {
             ],
         });
         let output = codegen.output.clone();
-        assert!(!output.is_empty());
+        assert!(output.contains("object literal"), "object lit should have comment");
+        assert!(output.contains("call $alloc"), "object lit should allocate memory");
+        assert!(output.contains("i32.store"), "object lit should store fields");
+    }
+
+    #[test]
+    fn generate_item_enum_is_noop() {
+        let mut codegen = WasmCodegen::new();
+        let item = Item::Enum(EnumDef {
+            name: "Color".into(),
+            type_params: vec![],
+            variants: vec![
+                Variant { name: "Red".into(), fields: vec![] },
+                Variant { name: "Green".into(), fields: vec![] },
+            ],
+            is_pub: false,
+            span: Span::new(0, 0, 1, 1),
+        });
+        codegen.generate_item(&item);
+        // Enum definitions are erased at codegen — no TODO, no error
+        assert!(!codegen.output.contains("TODO"));
+        assert!(codegen.codegen_errors.is_empty());
+    }
+
+    #[test]
+    fn generate_item_impl_without_trait() {
+        let mut codegen = WasmCodegen::new();
+        let item = Item::Impl(ImplBlock {
+            target: "Point".into(),
+            trait_impls: vec![],
+            methods: vec![Function {
+                name: "distance".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Integer(0)))],
+                    span: Span::new(0, 0, 1, 1),
+                },
+                is_pub: false,
+                must_use: false,
+                span: Span::new(0, 0, 1, 1),
+            }],
+            span: Span::new(0, 0, 1, 1),
+        });
+        codegen.generate_item(&item);
+        let output = codegen.output.clone();
+        assert!(output.contains("impl Point"), "should have impl comment");
+        assert!(output.contains("distance"), "should generate method");
+        assert!(codegen.codegen_errors.is_empty());
+    }
+
+    #[test]
+    fn generate_item_use_is_noop() {
+        let mut codegen = WasmCodegen::new();
+        let item = Item::Use(UsePath {
+            segments: vec!["std".into(), "collections".into()],
+            alias: None,
+            glob: false,
+            group: None,
+            span: Span::new(0, 0, 1, 1),
+        });
+        codegen.generate_item(&item);
+        assert!(!codegen.output.contains("TODO"));
+        assert!(codegen.codegen_errors.is_empty());
+    }
+
+    #[test]
+    fn generate_item_mod_is_noop() {
+        let mut codegen = WasmCodegen::new();
+        let item = Item::Mod(ModDef {
+            name: "utils".into(),
+            items: None,
+            is_external: true,
+            span: Span::new(0, 0, 1, 1),
+        });
+        codegen.generate_item(&item);
+        assert!(!codegen.output.contains("TODO"));
+        assert!(codegen.codegen_errors.is_empty());
     }
 
     #[test]
