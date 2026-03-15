@@ -104,6 +104,10 @@ pub struct WasmCodegen {
     /// Used to resolve `ContractName::call()`, `ContractName::parse()`,
     /// `ContractName::serialize()` to their generated WASM functions.
     known_contracts: Vec<(String, Vec<ContractField>)>,
+    /// Provider names that the program requires (e.g. "stripe", "plaid", "mapbox", "moov").
+    /// Populated during codegen when payment/banking/map definitions declare a provider.
+    /// The build step uses this to know which provider JS files to bundle alongside core.js.
+    pub required_providers: HashSet<String>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -206,6 +210,7 @@ impl WasmCodegen {
             lazy_batches: Vec::new(),
             used_runtime_categories: HashSet::new(),
             known_contracts: Vec::new(),
+            required_providers: HashSet::new(),
         }
     }
 
@@ -658,24 +663,23 @@ impl WasmCodegen {
         self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
         self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
 
-        // ── Payment — provider SDK bridges ────────────────────────────────────
+        // ── Payment — generic provider interface ──────────────────────────────
         self.line("");
-        self.line(";; Payment — provider SDK syscalls (load SDK, mount widget, confirm)");
-        self.line("(import \"payment\" \"processPayment\" (func $payment_processPayment (param i32 i32 i32 i32)))");
-        self.line("(import \"payment\" \"mountStripe\" (func $payment_mountStripe (param i32 i32 i32 i32)))");
-        self.line("(import \"payment\" \"createCardElement\" (func $payment_createCardElement (param i32 i32 i32)))");
-        self.line("(import \"payment\" \"confirmPayment\" (func $payment_confirmPayment (param i32 i32 i32 i32 i32)))");
+        self.line(";; Payment — generic provider syscalls (mount widget, create element, confirm)");
+        self.line("(import \"payment\" \"mount\" (func $payment_mount (param i32 i32 i32 i32)))");
+        self.line("(import \"payment\" \"create_element\" (func $payment_create_element (param i32 i32 i32)))");
+        self.line("(import \"payment\" \"confirm\" (func $payment_confirm (param i32 i32 i32 i32 i32)))");
 
-        // ── Banking — provider SDK bridges ────────────────────────────────────
+        // ── Banking — generic provider interface ─────────────────────────────
         self.line("");
-        self.line(";; Banking — provider SDK syscalls (load SDK, open link flow)");
-        self.line("(import \"banking\" \"mountPlaid\" (func $banking_mountPlaid (param i32 i32 i32)))");
+        self.line(";; Banking — generic provider syscalls (open link flow)");
+        self.line("(import \"banking\" \"open\" (func $banking_open (param i32 i32 i32)))");
 
-        // ── Map — provider SDK bridges ────────────────────────────────────────
+        // ── Map — generic provider interface ─────────────────────────────────
         self.line("");
-        self.line(";; Map — provider SDK syscalls (load SDK, mount map, add markers)");
-        self.line("(import \"map\" \"mountMapbox\" (func $map_mountMapbox (param i32 i32 i32 f64 f64 f64 i32)))");
-        self.line("(import \"map\" \"addMarker\" (func $map_addMarker (param i32 f64 f64)))");
+        self.line(";; Map — generic provider syscalls (mount map, add markers)");
+        self.line("(import \"map\" \"mount\" (func $map_mount (param i32 i32 i32 f64 f64 f64 i32)))");
+        self.line("(import \"map\" \"add_marker\" (func $map_add_marker (param i32 f64 f64)))");
 
         // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
         self.line("");
@@ -2903,6 +2907,9 @@ impl WasmCodegen {
         let provider_offset = self.store_string(&provider_str);
         let provider_len = provider_str.len();
 
+        // Track required provider for build system bundling
+        self.required_providers.insert(provider_str.clone());
+
         let sandboxed = if payment.sandbox_mode { 1 } else { 0 };
 
         self.line(&format!("(func $__payment_register_{} (export \"__payment_register_{}\")", payment.name, payment.name));
@@ -2914,7 +2921,9 @@ impl WasmCodegen {
         self.line("  call $payment_init");
         self.line(")");
 
-        // Provider-specific mount function — calls the appropriate syscall
+        // Provider-agnostic mount/create_element/confirm — all providers go through
+        // the same generic syscall interface. The provider JS file (e.g. providers/stripe.js)
+        // overrides the stubs in core.js with the actual SDK calls.
         let _cb_idx = self.global_handler_base;
         self.global_handler_base += 1;
 
@@ -2928,72 +2937,54 @@ impl WasmCodegen {
             payment.name
         ));
 
-        // Mount function: loads provider SDK, mounts widget into container
+        // Mount function: calls generic $payment_mount — provider JS implements the SDK loading
         self.line(&format!(
             "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $cb_idx i32)",
             payment.name, payment.name
         ));
-        match provider_str.as_str() {
-            "stripe" => {
-                // Pass: container element ID, public_key ptr/len, callback
-                if let Some(ref key_expr) = payment.public_key {
-                    if let Expr::StringLit(key) = key_expr {
-                        let key_offset = self.store_string(key);
-                        let key_len = key.len();
-                        self.line(&format!("  local.get $container_id"));
-                        self.line(&format!("  i32.const {}  ;; key ptr", key_offset));
-                        self.line(&format!("  i32.const {}  ;; key len", key_len));
-                        self.line("  local.get $cb_idx");
-                        self.line("  call $payment_mountStripe");
-                    }
-                } else {
-                    // No key — still emit the call with empty string
-                    let empty = self.store_string("");
-                    self.line("  local.get $container_id");
-                    self.line(&format!("  i32.const {}  ;; key ptr (empty)", empty));
-                    self.line("  i32.const 0  ;; key len");
-                    self.line("  local.get $cb_idx");
-                    self.line("  call $payment_mountStripe");
-                }
+        if let Some(ref key_expr) = payment.public_key {
+            if let Expr::StringLit(key) = key_expr {
+                let key_offset = self.store_string(key);
+                let key_len = key.len();
+                self.line("  local.get $container_id");
+                self.line(&format!("  i32.const {}  ;; key ptr", key_offset));
+                self.line(&format!("  i32.const {}  ;; key len", key_len));
+                self.line("  local.get $cb_idx");
+                self.line("  call $payment_mount");
             }
-            _ => {
-                // Generic provider: use processPayment syscall
-                self.line("  ;; generic payment provider — no-op mount");
-            }
+        } else {
+            // No key — still emit the call with empty string
+            let empty = self.store_string("");
+            self.line("  local.get $container_id");
+            self.line(&format!("  i32.const {}  ;; key ptr (empty)", empty));
+            self.line("  i32.const 0  ;; key len");
+            self.line("  local.get $cb_idx");
+            self.line("  call $payment_mount");
         }
         self.line(")");
 
-        // Create card element function (Stripe-specific)
-        if provider_str == "stripe" {
-            self.line(&format!(
-                "(func ${}_create_element (export \"{}_create_element\") (param $stripe_id i32) (param $container_id i32) (param $cb_idx i32)",
-                payment.name, payment.name
-            ));
-            self.line("  local.get $stripe_id");
-            self.line("  local.get $container_id");
-            self.line("  local.get $cb_idx");
-            self.line("  call $payment_createCardElement");
-            self.line(")");
-        }
-
-        // Confirm/submit function — triggers payment processing
+        // Create element function — generic across all providers
         self.line(&format!(
-            "(func ${}_confirm (export \"{}_confirm\") (param $stripe_id i32) (param $card_id i32) (param $secret_ptr i32) (param $secret_len i32) (param $cb_idx i32)",
+            "(func ${}_create_element (export \"{}_create_element\") (param $provider_id i32) (param $container_id i32) (param $cb_idx i32)",
             payment.name, payment.name
         ));
-        match provider_str.as_str() {
-            "stripe" => {
-                self.line("  local.get $stripe_id");
-                self.line("  local.get $card_id");
-                self.line("  local.get $secret_ptr");
-                self.line("  local.get $secret_len");
-                self.line("  local.get $cb_idx");
-                self.line("  call $payment_confirmPayment");
-            }
-            _ => {
-                self.line("  ;; generic confirm — use processPayment");
-            }
-        }
+        self.line("  local.get $provider_id");
+        self.line("  local.get $container_id");
+        self.line("  local.get $cb_idx");
+        self.line("  call $payment_create_element");
+        self.line(")");
+
+        // Confirm/submit function — generic across all providers
+        self.line(&format!(
+            "(func ${}_confirm (export \"{}_confirm\") (param $provider_id i32) (param $element_id i32) (param $secret_ptr i32) (param $secret_len i32) (param $cb_idx i32)",
+            payment.name, payment.name
+        ));
+        self.line("  local.get $provider_id");
+        self.line("  local.get $element_id");
+        self.line("  local.get $secret_ptr");
+        self.line("  local.get $secret_len");
+        self.line("  local.get $cb_idx");
+        self.line("  call $payment_confirm");
         self.line(")");
 
         if let Some(ref handler) = payment.on_success {
@@ -3020,6 +3011,9 @@ impl WasmCodegen {
         let provider_offset = self.store_string(&provider_str);
         let provider_len = provider_str.len();
 
+        // Track required provider for build system bundling
+        self.required_providers.insert(provider_str.clone());
+
         // Register function
         self.line(&format!(
             "(func $__banking_register_{} (export \"__banking_register_{}\")",
@@ -3032,22 +3026,16 @@ impl WasmCodegen {
         self.line("  call $banking_init");
         self.line(")");
 
-        // Open/mount function — opens the banking link flow
+        // Open function — generic across all providers. The provider JS file
+        // (e.g. providers/plaid.js) overrides banking.open with the actual SDK call.
         self.line(&format!(
             "(func ${}_open (export \"{}_open\") (param $token_ptr i32) (param $token_len i32) (param $cb_idx i32)",
             banking.name, banking.name
         ));
-        match provider_str.as_str() {
-            "plaid" => {
-                self.line("  local.get $token_ptr");
-                self.line("  local.get $token_len");
-                self.line("  local.get $cb_idx");
-                self.line("  call $banking_mountPlaid");
-            }
-            _ => {
-                self.line("  ;; generic banking provider — no-op");
-            }
-        }
+        self.line("  local.get $token_ptr");
+        self.line("  local.get $token_len");
+        self.line("  local.get $cb_idx");
+        self.line("  call $banking_open");
         self.line(")");
 
         if let Some(ref handler) = banking.on_success {
@@ -3077,6 +3065,9 @@ impl WasmCodegen {
         let provider_offset = self.store_string(&provider_str);
         let provider_len = provider_str.len();
 
+        // Track required provider for build system bundling
+        self.required_providers.insert(provider_str.clone());
+
         // Global for map object handle
         self.line(&format!(
             "(global $__map_{}_handle (mut i32) (i32.const 0))",
@@ -3095,7 +3086,8 @@ impl WasmCodegen {
         self.line("  call $map_init");
         self.line(")");
 
-        // Mount function — loads map SDK and creates the map in a container element
+        // Mount function — generic across all providers. The provider JS file
+        // (e.g. providers/mapbox.js) overrides map.mount with the actual SDK call.
         let lat = map_def.center.map(|(lat, _)| lat).unwrap_or(0.0);
         let lng = map_def.center.map(|(_, lng)| lng).unwrap_or(0.0);
         let zoom = map_def.zoom.unwrap_or(10.0);
@@ -3104,39 +3096,25 @@ impl WasmCodegen {
             "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $key_ptr i32) (param $key_len i32) (param $cb_idx i32)",
             map_def.name, map_def.name
         ));
-        match provider_str.as_str() {
-            "mapbox" => {
-                self.line("  local.get $container_id");
-                self.line("  local.get $key_ptr");
-                self.line("  local.get $key_len");
-                self.line(&format!("  f64.const {:.6}  ;; lat", lat));
-                self.line(&format!("  f64.const {:.6}  ;; lng", lng));
-                self.line(&format!("  f64.const {:.1}  ;; zoom", zoom));
-                self.line("  local.get $cb_idx");
-                self.line("  call $map_mountMapbox");
-            }
-            _ => {
-                self.line("  ;; generic map provider — no-op mount");
-            }
-        }
+        self.line("  local.get $container_id");
+        self.line("  local.get $key_ptr");
+        self.line("  local.get $key_len");
+        self.line(&format!("  f64.const {:.6}  ;; lat", lat));
+        self.line(&format!("  f64.const {:.6}  ;; lng", lng));
+        self.line(&format!("  f64.const {:.1}  ;; zoom", zoom));
+        self.line("  local.get $cb_idx");
+        self.line("  call $map_mount");
         self.line(")");
 
-        // Add marker function
+        // Add marker function — generic across all providers
         self.line(&format!(
             "(func ${}_add_marker (export \"{}_add_marker\") (param $map_id i32) (param $lat f64) (param $lng f64)",
             map_def.name, map_def.name
         ));
-        match provider_str.as_str() {
-            "mapbox" => {
-                self.line("  local.get $map_id");
-                self.line("  local.get $lat");
-                self.line("  local.get $lng");
-                self.line("  call $map_addMarker");
-            }
-            _ => {
-                self.line("  ;; generic add_marker — no-op");
-            }
-        }
+        self.line("  local.get $map_id");
+        self.line("  local.get $lat");
+        self.line("  local.get $lng");
+        self.line("  call $map_add_marker");
         self.line(")");
 
         if let Some(ref handler) = map_def.on_ready {
@@ -8344,7 +8322,7 @@ impl WasmCodegen {
         self.line(")");
 
         // payment_init: called by payment block codegen
-        self.emit("(func $payment_init (param $name_ptr i32) (param $name_len i32)");
+        self.emit("(func $payment_init (param $name_ptr i32) (param $name_len i32) (param $provider_ptr i32) (param $provider_len i32) (param $sandboxed i32)");
         self.line("  ;; stub — payment initialization");
         self.line(")");
 
@@ -10566,13 +10544,12 @@ impl WasmCodegen {
             "upload::init" => "$upload_init".into(),
             "upload::start" => "$upload_start".into(),
             "upload::cancel" => "$upload_cancel".into(),
-            "payment::process" => "$payment_processPayment".into(),
-            "payment::mountStripe" => "$payment_mountStripe".into(),
-            "payment::createCardElement" => "$payment_createCardElement".into(),
-            "payment::confirmPayment" => "$payment_confirmPayment".into(),
-            "banking::mountPlaid" => "$banking_mountPlaid".into(),
-            "map::mountMapbox" => "$map_mountMapbox".into(),
-            "map::addMarker" => "$map_addMarker".into(),
+            "payment::mount" => "$payment_mount".into(),
+            "payment::create_element" => "$payment_create_element".into(),
+            "payment::confirm" => "$payment_confirm".into(),
+            "banking::open" => "$banking_open".into(),
+            "map::mount" => "$map_mount".into(),
+            "map::add_marker" => "$map_add_marker".into(),
             "channel::connect" | "ws::connect" => "$ws_connect".into(),
             "channel::send" | "ws::send" => "$ws_send".into(),
             "channel::close" | "ws::close" => "$ws_close".into(),
@@ -20287,16 +20264,17 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        // defaults to "stripe"
+        // defaults to "stripe" provider, tracked in required_providers
         assert!(output.contains("Payment: Pay"), "should have payment header");
+        assert!(codegen.required_providers.contains("stripe"), "default provider should be tracked");
     }
 
     // -----------------------------------------------------------------------
-    // Payment provider-specific codegen (Stripe)
+    // Payment generic provider interface codegen
     // -----------------------------------------------------------------------
 
     #[test]
-    fn payment_stripe_mount_function() {
+    fn payment_mount_function_generic() {
         let payment = PaymentDef {
             name: "Checkout".into(),
             provider: Some(Expr::StringLit("stripe".into())),
@@ -20313,11 +20291,13 @@ mod coverage_codegen_tests {
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
         assert!(output.contains("Checkout_mount"), "should emit mount function");
-        assert!(output.contains("call $payment_mountStripe"), "should call mountStripe syscall");
+        assert!(output.contains("call $payment_mount"), "should call generic payment_mount syscall");
+        assert!(!output.contains("call $payment_mountStripe"), "should not use vendor-specific import name");
+        assert!(codegen.required_providers.contains("stripe"), "stripe should be tracked as required provider");
     }
 
     #[test]
-    fn payment_stripe_confirm_function() {
+    fn payment_confirm_function_generic() {
         let payment = PaymentDef {
             name: "Pay".into(),
             provider: Some(Expr::StringLit("stripe".into())),
@@ -20334,11 +20314,12 @@ mod coverage_codegen_tests {
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
         assert!(output.contains("Pay_confirm"), "should emit confirm function");
-        assert!(output.contains("call $payment_confirmPayment"), "should call confirmPayment syscall");
+        assert!(output.contains("call $payment_confirm"), "should call generic payment_confirm syscall");
+        assert!(!output.contains("call $payment_confirmPayment"), "should not use vendor-specific import name");
     }
 
     #[test]
-    fn payment_stripe_create_element() {
+    fn payment_create_element_generic() {
         let payment = PaymentDef {
             name: "Card".into(),
             provider: Some(Expr::StringLit("stripe".into())),
@@ -20354,8 +20335,9 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("Card_create_element"), "should emit create_element function for stripe");
-        assert!(output.contains("call $payment_createCardElement"), "should call createCardElement syscall");
+        assert!(output.contains("Card_create_element"), "should emit create_element function for all providers");
+        assert!(output.contains("call $payment_create_element"), "should call generic create_element syscall");
+        assert!(!output.contains("call $payment_createCardElement"), "should not use vendor-specific import name");
     }
 
     #[test]
@@ -20380,25 +20362,32 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn payment_generic_provider_no_stripe_calls() {
-        let payment = PaymentDef {
-            name: "PP".into(),
-            provider: Some(Expr::StringLit("paypal".into())),
-            public_key: None,
-            sandbox_mode: false,
-            on_success: None,
-            on_error: None,
-            methods: vec![],
-            is_pub: false,
-            span: span(),
-        };
-        let mut codegen = WasmCodegen::new();
-        codegen.indent = 1;
-        codegen.generate_payment(&payment);
-        let output = codegen.output.clone();
-        assert!(output.contains("PP_mount"), "should emit mount function");
-        assert!(!output.contains("call $payment_mountStripe"), "generic provider should not call mountStripe");
-        assert!(!output.contains("PP_create_element"), "generic provider should not emit create_element");
+    fn payment_all_providers_use_generic_interface() {
+        // All providers (paypal, stripe, moov, etc.) should emit the same generic syscalls
+        for provider in &["paypal", "stripe", "moov", "square"] {
+            let payment = PaymentDef {
+                name: "PP".into(),
+                provider: Some(Expr::StringLit(provider.to_string())),
+                public_key: None,
+                sandbox_mode: false,
+                on_success: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
+            };
+            let mut codegen = WasmCodegen::new();
+            codegen.indent = 1;
+            codegen.generate_payment(&payment);
+            let output = codegen.output.clone();
+            assert!(output.contains("PP_mount"), "should emit mount function for {}", provider);
+            assert!(output.contains("PP_create_element"), "should emit create_element for {}", provider);
+            assert!(output.contains("PP_confirm"), "should emit confirm for {}", provider);
+            assert!(output.contains("call $payment_mount"), "{} should call generic payment_mount", provider);
+            assert!(output.contains("call $payment_create_element"), "{} should call generic payment_create_element", provider);
+            assert!(output.contains("call $payment_confirm"), "{} should call generic payment_confirm", provider);
+            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -20427,7 +20416,7 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn banking_plaid_open_function() {
+    fn banking_open_function_generic() {
         let banking = BankingDef {
             name: "Link".into(),
             provider: Some(Expr::StringLit("plaid".into())),
@@ -20443,7 +20432,9 @@ mod coverage_codegen_tests {
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
         assert!(output.contains("Link_open"), "should emit open function");
-        assert!(output.contains("call $banking_mountPlaid"), "should call mountPlaid syscall");
+        assert!(output.contains("call $banking_open"), "should call generic banking_open syscall");
+        assert!(!output.contains("call $banking_mountPlaid"), "should not use vendor-specific import name");
+        assert!(codegen.required_providers.contains("plaid"), "plaid should be tracked as required provider");
     }
 
     #[test]
@@ -20462,9 +20453,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
-        // Defaults to "plaid"
+        // Defaults to "plaid" provider, uses generic interface
         assert!(output.contains("Banking: Bank"), "should have banking header");
-        assert!(output.contains("call $banking_mountPlaid"), "default provider should be plaid");
+        assert!(output.contains("call $banking_open"), "default provider should use generic banking_open");
+        assert!(codegen.required_providers.contains("plaid"), "default provider plaid should be tracked");
     }
 
     #[test]
@@ -20510,23 +20502,28 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn banking_generic_provider() {
-        let banking = BankingDef {
-            name: "MX".into(),
-            provider: Some(Expr::StringLit("mx".into())),
-            on_success: None,
-            on_exit: None,
-            on_error: None,
-            methods: vec![],
-            is_pub: false,
-            span: span(),
-        };
-        let mut codegen = WasmCodegen::new();
-        codegen.indent = 1;
-        codegen.generate_banking(&banking);
-        let output = codegen.output.clone();
-        assert!(output.contains("MX_open"), "should emit open function");
-        assert!(!output.contains("call $banking_mountPlaid"), "generic provider should not call mountPlaid");
+    fn banking_all_providers_use_generic_interface() {
+        // All providers (plaid, mx, etc.) should emit the same generic syscalls
+        for provider in &["plaid", "mx", "yodlee"] {
+            let banking = BankingDef {
+                name: "MX".into(),
+                provider: Some(Expr::StringLit(provider.to_string())),
+                on_success: None,
+                on_exit: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
+            };
+            let mut codegen = WasmCodegen::new();
+            codegen.indent = 1;
+            codegen.generate_banking(&banking);
+            let output = codegen.output.clone();
+            assert!(output.contains("MX_open"), "should emit open function for {}", provider);
+            assert!(output.contains("call $banking_open"), "{} should call generic banking_open", provider);
+            assert!(!output.contains("call $banking_mountPlaid"), "{} should not use vendor-specific import", provider);
+            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -20557,7 +20554,7 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn map_mapbox_mount_function() {
+    fn map_mount_function_generic() {
         let map_def = MapDef {
             name: "CityMap".into(),
             provider: Some(Expr::StringLit("mapbox".into())),
@@ -20575,14 +20572,16 @@ mod coverage_codegen_tests {
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
         assert!(output.contains("CityMap_mount"), "should emit mount function");
-        assert!(output.contains("call $map_mountMapbox"), "should call mountMapbox syscall");
+        assert!(output.contains("call $map_mount"), "should call generic map_mount syscall");
+        assert!(!output.contains("call $map_mountMapbox"), "should not use vendor-specific import name");
         assert!(output.contains("f64.const 51.507"), "should include latitude");
         assert!(output.contains("f64.const -0.127"), "should include longitude");
         assert!(output.contains("f64.const 10.0"), "should include zoom");
+        assert!(codegen.required_providers.contains("mapbox"), "mapbox should be tracked as required provider");
     }
 
     #[test]
-    fn map_mapbox_add_marker() {
+    fn map_add_marker_generic() {
         let map_def = MapDef {
             name: "Markers".into(),
             provider: Some(Expr::StringLit("mapbox".into())),
@@ -20600,7 +20599,8 @@ mod coverage_codegen_tests {
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
         assert!(output.contains("Markers_add_marker"), "should emit add_marker function");
-        assert!(output.contains("call $map_addMarker"), "should call addMarker syscall");
+        assert!(output.contains("call $map_add_marker"), "should call generic map_add_marker syscall");
+        assert!(!output.contains("call $map_addMarker"), "should not use vendor-specific import name");
     }
 
     #[test]
@@ -20621,8 +20621,9 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        // Defaults to "mapbox"
-        assert!(output.contains("call $map_mountMapbox"), "default provider should be mapbox");
+        // Defaults to "mapbox" provider, uses generic interface
+        assert!(output.contains("call $map_mount"), "default provider should use generic map_mount");
+        assert!(codegen.required_providers.contains("mapbox"), "default provider mapbox should be tracked");
     }
 
     #[test]
@@ -20702,25 +20703,32 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn map_generic_provider_no_mapbox_calls() {
-        let map_def = MapDef {
-            name: "GMap".into(),
-            provider: Some(Expr::StringLit("google".into())),
-            center: None,
-            zoom: None,
-            style: None,
-            on_ready: None,
-            on_click: None,
-            methods: vec![],
-            is_pub: false,
-            span: span(),
-        };
-        let mut codegen = WasmCodegen::new();
-        codegen.indent = 1;
-        codegen.generate_map(&map_def);
-        let output = codegen.output.clone();
-        assert!(!output.contains("call $map_mountMapbox"), "google provider should not call mountMapbox");
-        assert!(!output.contains("call $map_addMarker"), "google provider should not call addMarker");
+    fn map_all_providers_use_generic_interface() {
+        // All providers (mapbox, google, etc.) should emit the same generic syscalls
+        for provider in &["mapbox", "google", "leaflet"] {
+            let map_def = MapDef {
+                name: "GMap".into(),
+                provider: Some(Expr::StringLit(provider.to_string())),
+                center: None,
+                zoom: None,
+                style: None,
+                on_ready: None,
+                on_click: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
+            };
+            let mut codegen = WasmCodegen::new();
+            codegen.indent = 1;
+            codegen.generate_map(&map_def);
+            let output = codegen.output.clone();
+            assert!(output.contains("GMap_mount"), "should emit mount function for {}", provider);
+            assert!(output.contains("GMap_add_marker"), "should emit add_marker function for {}", provider);
+            assert!(output.contains("call $map_mount"), "{} should call generic map_mount", provider);
+            assert!(output.contains("call $map_add_marker"), "{} should call generic map_add_marker", provider);
+            assert!(!output.contains("call $map_mountMapbox"), "{} should not use vendor-specific import", provider);
+            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+        }
     }
 
     // -----------------------------------------------------------------------

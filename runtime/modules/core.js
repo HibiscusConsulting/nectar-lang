@@ -570,68 +570,22 @@ export const wasmImports = {
     },
   },
 
-  // ── Payment — provider SDK bridges (load SDK, mount widget, confirm) ────
+  // ── Payment — generic provider interface (stubs overridden by provider JS) ──
   payment: {
-    processPayment(elId, msgPtr, msgLen, cbIdx) {
-      window.addEventListener('message', (e) => {
-        R.__cbData(cbIdx, R.__allocString(typeof e.data === 'string' ? e.data : ''));
-      }, { once: true });
-      R.__getElement(elId).contentWindow.postMessage(R.__getString(msgPtr, msgLen), '*');
-    },
-    mountStripe(elId, keyPtr, keyLen, cbIdx) {
-      const s = document.createElement('script');
-      s.src = 'https://js.stripe.com/v3/';
-      s.onload = () => R.__cbData(cbIdx, R.__registerObject(Stripe(R.__getString(keyPtr, keyLen))));
-      document.head.appendChild(s);
-    },
-    createCardElement(stripeId, elId, cbIdx) {
-      const card = R.__getObject(stripeId).elements().create('card');
-      card.mount(R.__getElement(elId));
-      R.__cbData(cbIdx, R.__registerObject(card));
-    },
-    confirmPayment(stripeId, cardId, secretPtr, secretLen, cbIdx) {
-      R.__getObject(stripeId).confirmCardPayment(R.__getString(secretPtr, secretLen),
-        { payment_method: { card: R.__getObject(cardId) } })
-        .then(r => R.__cbData(cbIdx, R.__allocString(r.paymentIntent ? r.paymentIntent.id : '')))
-        .catch(() => R.__cbData(cbIdx, 0));
-    },
+    mount(elId, keyPtr, keyLen, cbIdx) { console.error('[nectar] No payment provider configured. Include a provider file (e.g. providers/stripe.js).'); },
+    create_element(providerId, elId, cbIdx) { console.error('[nectar] No payment provider configured.'); },
+    confirm(providerId, elementId, secretPtr, secretLen, cbIdx) { console.error('[nectar] No payment provider configured.'); },
   },
 
-  // ── Banking — provider SDK bridges (load SDK, open link flow) ──────────
+  // ── Banking — generic provider interface (stubs overridden by provider JS) ──
   banking: {
-    mountPlaid(tokenPtr, tokenLen, cbIdx) {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
-      s.onload = () => {
-        Plaid.create({
-          token: R.__getString(tokenPtr, tokenLen),
-          onSuccess: (token) => R.__cbData(cbIdx, R.__allocString(token)),
-          onExit: () => R.__cbData(cbIdx, 0),
-        }).open();
-      };
-      document.head.appendChild(s);
-    },
+    open(tokenPtr, tokenLen, cbIdx) { console.error('[nectar] No banking provider configured. Include a provider file (e.g. providers/plaid.js).'); },
   },
 
-  // ── Map — provider SDK bridges (load SDK, mount map, add markers) ──────
+  // ── Map — generic provider interface (stubs overridden by provider JS) ─────
   map: {
-    mountMapbox(elId, keyPtr, keyLen, lat, lng, zoom, cbIdx) {
-      const s = document.createElement('script');
-      s.src = 'https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js';
-      s.onload = () => {
-        mapboxgl.accessToken = R.__getString(keyPtr, keyLen);
-        R.__cbData(cbIdx, R.__registerObject(new mapboxgl.Map({
-          container: R.__getElement(elId),
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: [lng, lat],
-          zoom: zoom,
-        })));
-      };
-      document.head.appendChild(s);
-    },
-    addMarker(mapId, lat, lng) {
-      new mapboxgl.Marker().setLngLat([lng, lat]).addTo(R.__getObject(mapId));
-    },
+    mount(elId, keyPtr, keyLen, lat, lng, zoom, cbIdx) { console.error('[nectar] No map provider configured. Include a provider file (e.g. providers/mapbox.js).'); },
+    add_marker(mapId, lat, lng) { console.error('[nectar] No map provider configured.'); },
   },
 
   // ── Auth — pure syscalls, no logic. WASM parses cookies. ────────────────
