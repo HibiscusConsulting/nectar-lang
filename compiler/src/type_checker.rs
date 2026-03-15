@@ -2753,6 +2753,13 @@ impl TypeChecker {
                 self.resolve_field_access(&obj_ty, field)
             }
 
+            Expr::OptionalChain { object, field } => {
+                let obj_ty = self.infer_expr(object, env);
+                // Optional chaining returns Option<FieldType> but for simplicity
+                // we resolve the field type directly (nullable in practice)
+                self.resolve_field_access(&obj_ty, field)
+            }
+
             // --- Method call ---
             Expr::MethodCall {
                 object,
@@ -3703,6 +3710,7 @@ mod tests {
                 ownership: Ownership::Owned,
             }]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3729,6 +3737,7 @@ mod tests {
                 ownership: Ownership::Owned,
             }]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3754,6 +3763,7 @@ mod tests {
                 right: Box::new(Expr::Integer(1)),
             })]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3785,6 +3795,7 @@ mod tests {
                 right: Box::new(Expr::Integer(2)),
             })]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3823,6 +3834,7 @@ mod tests {
                 right: Box::new(Expr::Ident("b".into())),
             })]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3851,6 +3863,7 @@ mod tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Integer(42))]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3912,6 +3925,7 @@ mod tests {
                     }),
                 ]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -3972,6 +3986,7 @@ mod tests {
                     }),
                 ]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -4019,6 +4034,7 @@ mod tests {
                 },
             ]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4059,6 +4075,7 @@ mod tests {
                 },
             ]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4100,6 +4117,7 @@ mod tests {
                 },
             ]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4189,6 +4207,7 @@ mod tests {
                     right: Box::new(Expr::Ident("b".into())),
                 })]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -4204,6 +4223,7 @@ mod tests {
                     args: vec![Expr::Integer(1)], // missing second arg
                 })]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -4234,6 +4254,7 @@ mod tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Expr(Expr::Ident("name".into()))]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -4249,6 +4270,7 @@ mod tests {
                     args: vec![Expr::Integer(42)], // wrong type
                 })]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -4297,6 +4319,7 @@ mod iterator_tests {
             trait_bounds: vec![],
             body: block(body_stmts),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })
@@ -4491,6 +4514,7 @@ mod closure_tests {
                 trait_bounds: vec![],
                 body: Block { stmts, span: span() },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -4568,6 +4592,7 @@ mod comprehensive_type_checker_tests {
             trait_bounds: vec![],
             body: block(stmts),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })
@@ -4769,6 +4794,7 @@ mod comprehensive_type_checker_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Integer(0))]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4793,6 +4819,7 @@ mod comprehensive_type_checker_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4824,6 +4851,7 @@ mod comprehensive_type_checker_tests {
                 body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
             })]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4925,6 +4953,7 @@ mod comprehensive_type_checker_tests {
                 ownership: Ownership::Owned,
             }]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -4987,6 +5016,7 @@ mod comprehensive_type_checker_tests {
                     }),
                 ]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -5325,6 +5355,7 @@ mod comprehensive_type_checker_tests {
                     trait_bounds: vec![],
                     body: block(vec![Stmt::Expr(Expr::Integer(0))]),
                     is_pub: true,
+                    is_async: false,
                     must_use: false,
                     span: span(),
                 }],
@@ -5380,6 +5411,7 @@ mod comprehensive_type_checker_tests {
                 index: Box::new(Expr::Integer(0)),
             })]),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -5502,6 +5534,7 @@ mod comprehensive_type_checker_tests {
                         field: "x".into(),
                     })]),
                     is_pub: true,
+                    is_async: false,
                     must_use: false,
                     span: span(),
                 }],
@@ -5540,6 +5573,7 @@ mod coverage_type_checker_tests {
             trait_bounds: vec![],
             body: block(body),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         }
@@ -5555,6 +5589,7 @@ mod coverage_type_checker_tests {
             trait_bounds: vec![],
             body: block(body),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         }
@@ -5570,6 +5605,7 @@ mod coverage_type_checker_tests {
             trait_bounds: vec![],
             body: block(body),
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: span(),
         }
@@ -7190,6 +7226,7 @@ mod coverage_type_checker_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(Some(Expr::Integer(42)))]),
                 is_pub: false,
+                is_async: false,
                 must_use: true,
                 span: span(),
             }),
@@ -7223,6 +7260,7 @@ mod coverage_type_checker_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(Some(Expr::Integer(0)))]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -7251,6 +7289,7 @@ mod coverage_type_checker_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(Some(Expr::Integer(0)))]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -7276,7 +7315,7 @@ mod coverage_type_checker_tests {
             Item::Use(UsePath { segments: vec!["std".into(), "io".into()], alias: None, glob: false, group: None, span: span() }),
             Item::Channel(ChannelDef {
                 name: "Events".into(), url: Expr::StringLit("ws://localhost".into()),
-                contract: None, on_message: None, on_connect: None, on_disconnect: None,
+                provider: None, contract: None, on_message: None, on_connect: None, on_disconnect: None,
                 reconnect: false, heartbeat_interval: None, methods: vec![],
                 is_pub: false, span: span(),
             }),
@@ -7438,6 +7477,7 @@ mod coverage_type_checker_tests {
                     }),
                 })]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }],

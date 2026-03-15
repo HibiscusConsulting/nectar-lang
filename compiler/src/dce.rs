@@ -406,6 +406,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         })
@@ -838,6 +839,7 @@ mod tests {
                     span: dummy_span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: dummy_span(),
             }],
@@ -884,6 +886,7 @@ mod tests {
                     span: dummy_span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: dummy_span(),
             }],
@@ -907,6 +910,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         }
@@ -1315,7 +1319,7 @@ mod tests {
                 name: "m".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             render: None, span: dummy_span(),
         });

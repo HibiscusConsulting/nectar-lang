@@ -169,8 +169,7 @@ impl Parser {
         match self.peek_kind() {
             TokenKind::Fn => Ok(Item::Function(self.parse_function(is_pub)?)),
             TokenKind::Async => {
-                // async fn ...
-                self.advance();
+                // async fn ... — parse_function handles consuming the `async` token
                 Ok(Item::Function(self.parse_function(is_pub)?))
             }
             TokenKind::Component => Ok(Item::Component(self.parse_component()?)),
@@ -240,6 +239,7 @@ impl Parser {
     }
 
     fn parse_function(&mut self, is_pub: bool) -> Result<Function, ParseError> {
+        let is_async = self.match_token(&TokenKind::Async);
         let must_use = self.match_token(&TokenKind::MustUse);
         let span = self.current_span();
         self.expect(&TokenKind::Fn)?;
@@ -259,7 +259,7 @@ impl Parser {
 
         let body = self.parse_block()?;
 
-        Ok(Function { name, lifetimes, type_params, params, return_type, trait_bounds, body, is_pub, must_use, span })
+        Ok(Function { name, lifetimes, type_params, params, return_type, trait_bounds, body, is_pub, is_async, must_use, span })
     }
 
     /// Parse optional where clause: `where T: Display, U: Clone`
@@ -362,7 +362,7 @@ impl Parser {
                     }
                     self.match_token(&TokenKind::Semicolon);
                 }
-                TokenKind::Fn => {
+                TokenKind::Fn | TokenKind::Async => {
                     let func = self.parse_function(false)?;
                     if func.name == "on_destroy" {
                         on_destroy = Some(func);
@@ -2535,6 +2535,13 @@ impl Parser {
                     object: Box::new(expr),
                     index: Box::new(index),
                 };
+            } else if self.match_token(&TokenKind::QuestionDot) {
+                // `?.` optional chaining operator — short-circuit to 0 if null
+                let field = self.expect_ident()?;
+                expr = Expr::OptionalChain {
+                    object: Box::new(expr),
+                    field,
+                };
             } else if self.match_token(&TokenKind::QuestionMark) {
                 // `?` error propagation operator — postfix
                 expr = Expr::Try(Box::new(expr));
@@ -3776,6 +3783,7 @@ impl Parser {
         self.expect(&TokenKind::LeftBrace)?;
 
         let mut url = Expr::StringLit("".to_string());
+        let mut provider = None;
         let mut on_message = None;
         let mut on_connect = None;
         let mut on_disconnect = None;
@@ -3809,6 +3817,12 @@ impl Parser {
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
                         "url" => { url = self.parse_expr()?; }
+                        "provider" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                provider = Some(s.clone());
+                                self.advance();
+                            }
+                        }
                         "reconnect" => {
                             match self.peek_kind() {
                                 TokenKind::True => { reconnect = true; self.advance(); }
@@ -3838,7 +3852,7 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(ChannelDef { name, url, contract, on_message, on_connect, on_disconnect, reconnect, heartbeat_interval, methods, is_pub, span })
+        Ok(ChannelDef { name, url, provider, contract, on_message, on_connect, on_disconnect, reconnect, heartbeat_interval, methods, is_pub, span })
     }
 
     /// Parse a channel handler: either a named `fn name(params) { body }` or
@@ -3870,6 +3884,7 @@ impl Parser {
             trait_bounds: Vec::new(),
             body,
             is_pub: false,
+            is_async: false,
             must_use: false,
             span,
         })

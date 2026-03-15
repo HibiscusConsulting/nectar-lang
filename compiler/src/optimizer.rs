@@ -122,6 +122,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         })

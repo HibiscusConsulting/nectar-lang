@@ -266,6 +266,7 @@ pub struct FormStep {
 pub struct ChannelDef {
     pub name: String,
     pub url: Expr,
+    pub provider: Option<String>,  // "ws" (default) or "sse"
     pub contract: Option<String>,
     pub on_message: Option<Function>,
     pub on_connect: Option<Function>,
@@ -619,6 +620,7 @@ pub struct Function {
     pub trait_bounds: Vec<TraitBound>,
     pub body: Block,
     pub is_pub: bool,
+    pub is_async: bool,
     pub must_use: bool,
     pub span: Span,
 }
@@ -1192,6 +1194,12 @@ pub enum Expr {
 
     // Access
     FieldAccess {
+        object: Box<Expr>,
+        field: String,
+    },
+    /// Optional chaining — `obj?.field`
+    /// Short-circuits to 0 (None) if obj is null/zero.
+    OptionalChain {
         object: Box<Expr>,
         field: String,
     },

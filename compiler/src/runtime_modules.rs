@@ -305,6 +305,7 @@ mod tests {
             items: vec![Item::Channel(ChannelDef {
                 name: "Chat".to_string(),
                 url: Expr::StringLit("/ws".to_string()),
+                provider: None,
                 contract: None,
                 on_message: None,
                 on_connect: None,
@@ -645,6 +646,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts: vec![], span: empty_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         });
@@ -770,6 +772,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts: vec![], span: empty_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         });
@@ -795,6 +798,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts: vec![Stmt::Expr(expr)], span: empty_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         }
@@ -1238,7 +1242,7 @@ mod tests {
                 ],
                 span: empty_span(),
             },
-            is_pub: false, must_use: false, span: empty_span(),
+            is_pub: false, is_async: false, must_use: false, span: empty_span(),
         }];
         let program = Program { items: vec![Item::Component(c)] };
         let ns = detect_required_namespaces(&program);
@@ -1318,7 +1322,7 @@ mod tests {
                 })],
                 span: empty_span(),
             },
-            is_pub: false, must_use: false, span: empty_span(),
+            is_pub: false, is_async: false, must_use: false, span: empty_span(),
         }];
         let program = Program { items: vec![Item::Component(c)] };
         let ns = detect_required_namespaces(&program);
@@ -1338,7 +1342,7 @@ mod tests {
                 stmts: vec![Stmt::Return(None)],
                 span: empty_span(),
             },
-            is_pub: false, must_use: false, span: empty_span(),
+            is_pub: false, is_async: false, must_use: false, span: empty_span(),
         }];
         let program = Program { items: vec![Item::Component(c)] };
         let ns = detect_required_namespaces(&program);
@@ -1365,7 +1369,7 @@ mod tests {
                 }],
                 span: empty_span(),
             },
-            is_pub: false, must_use: false, span: empty_span(),
+            is_pub: false, is_async: false, must_use: false, span: empty_span(),
         }];
         let program = Program { items: vec![Item::Component(c)] };
         let ns = detect_required_namespaces(&program);

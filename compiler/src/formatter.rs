@@ -861,6 +861,10 @@ impl Formatter {
                 format!("{}.{}", self.format_expr_inner(object, depth), field)
             }
 
+            Expr::OptionalChain { object, field } => {
+                format!("{}?.{}", self.format_expr_inner(object, depth), field)
+            }
+
             Expr::MethodCall { object, method, args } => {
                 let obj = self.format_expr_inner(object, depth);
                 let args_str: Vec<String> =
@@ -1605,6 +1609,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         }
@@ -1644,6 +1649,7 @@ mod tests {
                     span: dummy_span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: dummy_span(),
                 lifetimes: vec![],
@@ -3824,6 +3830,7 @@ mod tests {
         let ch = ChannelDef {
             name: "Chat".to_string(),
             url: Expr::StringLit("/ws".to_string()),
+            provider: None,
             contract: Some("ChatMsg".to_string()),
             on_message: None,
             on_connect: None,
@@ -4235,6 +4242,7 @@ mod tests {
                     span: dummy_span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: dummy_span(),
                 lifetimes: vec![],

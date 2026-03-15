@@ -187,6 +187,7 @@ pub enum TokenKind {
     StarEquals,
     SlashEquals,
     QuestionMark, // ?
+    QuestionDot,  // ?.
     Hash,         // #
     SingleQuote,  // '
 
