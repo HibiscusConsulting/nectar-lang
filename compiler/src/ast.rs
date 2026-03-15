@@ -88,7 +88,7 @@ pub struct ContractDef {
 
 /// A field within a contract definition.
 /// Unlike struct fields, contract fields can have inline enum types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractField {
     pub name: String,
     pub ty: Type,

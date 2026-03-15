@@ -100,6 +100,10 @@ pub struct WasmCodegen {
     /// "toast", "debounce", "throttle", "bigdecimal", "search",
     /// "pagination", "csv", "collections"
     used_runtime_categories: HashSet<String>,
+    /// Contract definitions in this program. Each entry is (contract_name, fields).
+    /// Used to resolve `ContractName::call()`, `ContractName::parse()`,
+    /// `ContractName::serialize()` to their generated WASM functions.
+    known_contracts: Vec<(String, Vec<ContractField>)>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -199,6 +203,7 @@ impl WasmCodegen {
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
             used_runtime_categories: HashSet::new(),
+            known_contracts: Vec::new(),
         }
     }
 
@@ -513,6 +518,7 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"getDocumentElement\" (func $dom_getDocumentElement (result i32)))");
         self.line("(import \"dom\" \"addEventListener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"removeEventListener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
+        self.line("(import \"dom\" \"clearChildren\" (func $dom_clearChildren (param i32)))");
         self.line("(import \"dom\" \"lazyMount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"setTitle\" (func $dom_setTitle (param i32 i32)))");
         self.line("(import \"dom\" \"getScrollTop\" (func $dom_getScrollTop (param i32) (result f64)))");
@@ -591,6 +597,7 @@ impl WasmCodegen {
         self.line("(import \"http\" \"setBody\" (func $http_setBody (param i32 i32)))");
         self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
         self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))");
+        self.line("(import \"http\" \"fetchWithCallback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
 
         // ── Observe — IntersectionObserver + matchMedia ──────────────────────
         self.line("");
@@ -811,6 +818,7 @@ impl WasmCodegen {
         self.emit_a11y_runtime();
         self.emit_time_runtime();
         self.emit_format_runtime();
+        self.emit_json_runtime();
 
         // Conditionally emit runtime helpers based on AST pre-scan.
         // Only emit categories that the program actually references.
@@ -878,6 +886,16 @@ impl WasmCodegen {
                 Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
                 Item::Pdf(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Pdf)),
                 Item::Theme(t) => self.known_keyword_defs.push((t.name.clone(), KeywordDefKind::Theme)),
+                // Collect contract definitions so `ContractName::call()`, `ContractName::parse()`,
+                // `ContractName::serialize()` can be resolved to their generated WASM functions.
+                Item::Contract(c) => {
+                    self.known_contracts.push((c.name.clone(), c.fields.iter().map(|f| ContractField {
+                        name: f.name.clone(),
+                        ty: f.ty.clone(),
+                        nullable: f.nullable,
+                        span: f.span.clone(),
+                    }).collect()));
+                }
                 // Collect store names and their signal names so `StoreName::signal()` can
                 // be resolved to the getter `$StoreName_get_signal`.
                 Item::Store(s) => {
@@ -1169,6 +1187,210 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; schema ptr", schema_offset));
         self.line(&format!("i32.const {} ;; schema len", schema.len()));
         self.line("call $contract_registerSchema");
+        self.indent -= 1;
+        self.line(")");
+
+        // ── _parse: JSON bytes → struct pointer ──
+        // Compile-time generated from the contract's field list.
+        // Calls $json_parse, then $json_get_field for each field,
+        // allocates a struct with fields at 4-byte offsets, returns the pointer.
+        let field_count = contract.fields.len();
+        let struct_size = field_count * 4;
+
+        // Store each field name string for use in $json_get_field calls
+        let field_name_offsets: Vec<(u32, usize)> = contract.fields.iter().map(|f| {
+            let offset = self.store_string(&f.name);
+            (offset, f.name.len())
+        }).collect();
+
+        self.line("");
+        self.emit(&format!(
+            "(func ${}_parse (param $json_ptr i32) (param $json_len i32) (result i32)",
+            contract.name
+        ));
+        self.indent += 1;
+        self.line("(local $obj i32) (local $struct_ptr i32) (local $type i32) (local $data i32)");
+
+        // Parse JSON string into structured representation
+        self.line(";; Parse JSON");
+        self.line("local.get $json_ptr");
+        self.line("local.get $json_len");
+        self.line("call $json_parse");
+        self.line("local.set $obj");
+
+        // $json_parse returns a 12-byte entry [type, data_lo, data_hi].
+        // For an object, data_lo (offset 4) is the object pointer we pass to $json_get_field.
+        // Read data_lo from the parsed result.
+        self.line(";; Get object pointer from parsed result (data_lo at offset 4)");
+        self.line("local.get $obj");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $obj");
+
+        // Allocate struct
+        self.line(&format!(";; Allocate struct ({} fields x 4 bytes = {} bytes)", field_count, struct_size));
+        self.line(&format!("i32.const {}", struct_size));
+        self.line("call $alloc");
+        self.line("local.set $struct_ptr");
+
+        // Extract each field
+        for (i, field) in contract.fields.iter().enumerate() {
+            let (name_offset, name_len) = field_name_offsets[i];
+            let byte_offset = i * 4;
+
+            self.line(&format!(";; Field: {} (offset {})", field.name, byte_offset));
+            self.line("local.get $obj");
+            self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+            self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
+            self.line("call $json_get_field");
+            self.line("local.set $data  ;; data_lo");
+            self.line("local.set $type  ;; type tag");
+            self.line("local.get $struct_ptr");
+            self.line("local.get $data");
+            if byte_offset == 0 {
+                self.line("i32.store");
+            } else {
+                self.line(&format!("i32.store offset={}", byte_offset));
+            }
+        }
+
+        self.line("local.get $struct_ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // ── _serialize: struct pointer → (json_ptr, json_len) ──
+        // Reads each field from the struct at its byte offset, builds a
+        // 20-byte-per-field array [key_ptr, key_len, type, data_lo, data_hi],
+        // and calls $json_serialize_object.
+        self.line("");
+        self.emit(&format!(
+            "(func ${}_serialize (param $struct_ptr i32) (result i32 i32)",
+            contract.name
+        ));
+        self.indent += 1;
+        self.line("(local $fields_ptr i32)");
+
+        // Allocate field array: 20 bytes per field
+        let fields_array_size = field_count * 20;
+        self.line(&format!(";; Allocate field array ({} fields x 20 bytes = {} bytes)", field_count, fields_array_size));
+        self.line(&format!("i32.const {}", fields_array_size));
+        self.line("call $alloc");
+        self.line("local.set $fields_ptr");
+
+        // Populate each field entry
+        for (i, field) in contract.fields.iter().enumerate() {
+            let (name_offset, name_len) = field_name_offsets[i];
+            let field_array_offset = i * 20;
+            let struct_byte_offset = i * 4;
+
+            // Determine the JSON type tag for this field's type
+            let json_type_tag = match &field.ty {
+                Type::Named(name) => match name.as_str() {
+                    "i32" | "i64" | "u32" | "u64" => 2,  // integer
+                    "f32" | "f64" => 2,                    // number (same tag)
+                    "bool" => 3,                           // boolean
+                    "String" | "DateTime" => 1,            // string
+                    _ => 4,                                // object
+                },
+                Type::Array(_) => 5,                       // array
+                _ => 4,                                    // object
+            };
+
+            self.line(&format!(";; Field entry: {} (array offset {})", field.name, field_array_offset));
+
+            // key_ptr (offset 0)
+            self.line("local.get $fields_ptr");
+            self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+            if field_array_offset == 0 {
+                self.line("i32.store");
+            } else {
+                self.line(&format!("i32.store offset={}", field_array_offset));
+            }
+
+            // key_len (offset 4)
+            self.line("local.get $fields_ptr");
+            self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
+            self.line(&format!("i32.store offset={}", field_array_offset + 4));
+
+            // type (offset 8)
+            self.line("local.get $fields_ptr");
+            self.line(&format!("i32.const {} ;; type tag", json_type_tag));
+            self.line(&format!("i32.store offset={}", field_array_offset + 8));
+
+            // data_lo (offset 12) — read from struct
+            self.line("local.get $fields_ptr");
+            self.line("local.get $struct_ptr");
+            if struct_byte_offset == 0 {
+                self.line("i32.load");
+            } else {
+                self.line(&format!("i32.load offset={}", struct_byte_offset));
+            }
+            self.line(&format!("i32.store offset={}", field_array_offset + 12));
+
+            // data_hi (offset 16) — 0 for simple types
+            self.line("local.get $fields_ptr");
+            self.line("i32.const 0");
+            self.line(&format!("i32.store offset={}", field_array_offset + 16));
+        }
+
+        // Call $json_serialize_object
+        self.line("local.get $fields_ptr");
+        self.line(&format!("i32.const {} ;; field count", field_count));
+        self.line("call $json_serialize_object");
+        self.indent -= 1;
+        self.line(")");
+
+        // ── _call: HTTP request with typed setters and async callback ──
+        // Params: url_ptr, url_len, method_ptr, method_len, body_ptr, body_len, callback_idx
+        // Sets HTTP method, optionally sets body, calls $http_fetchWithCallback.
+        // The callback fires with (response_body_ptr, response_body_len) written
+        // into WASM memory. The caller's callback should parse via _parse.
+        self.line("");
+        self.emit(&format!(
+            "(func ${}_call (param $url_ptr i32) (param $url_len i32) (param $method_ptr i32) (param $method_len i32) (param $body_ptr i32) (param $body_len i32) (param $callback_idx i32)",
+            contract.name
+        ));
+        self.indent += 1;
+
+        // Set HTTP method
+        self.line(";; Set HTTP method");
+        self.line("local.get $method_ptr");
+        self.line("local.get $method_len");
+        self.line("call $http_setMethod");
+
+        // Conditionally set body (if body_ptr != 0)
+        self.line(";; Set body if provided");
+        self.line("local.get $body_ptr");
+        self.line("i32.const 0");
+        self.line("i32.ne");
+        self.line("if");
+        self.indent += 1;
+        self.line("local.get $body_ptr");
+        self.line("local.get $body_len");
+        self.line("call $http_setBody");
+        self.indent -= 1;
+        self.line("end");
+
+        // Add Content-Type header for JSON
+        let ct_key = self.store_string("Content-Type");
+        let ct_val = self.store_string("application/json");
+        self.line(";; Add Content-Type: application/json header");
+        self.line(&format!("i32.const {} ;; \"Content-Type\" ptr", ct_key));
+        self.line(&format!("i32.const {} ;; \"Content-Type\" len", "Content-Type".len()));
+        self.line(&format!("i32.const {} ;; \"application/json\" ptr", ct_val));
+        self.line(&format!("i32.const {} ;; \"application/json\" len", "application/json".len()));
+        self.line("call $http_addHeader");
+
+        // Fetch with callback — response body is written into WASM memory
+        // and __callback_with_data(cb_idx, body_ptr) is called when done.
+        // body_len is stored at (body_ptr - 4) by the JS bridge.
+        self.line(";; Fetch with async callback");
+        self.line("local.get $url_ptr");
+        self.line("local.get $url_len");
+        self.line("local.get $callback_idx");
+        self.line("call $http_fetchWithCallback");
+
         self.indent -= 1;
         self.line(")");
     }
@@ -4973,11 +5195,81 @@ impl WasmCodegen {
                 }
             }
             TemplateNode::TemplateMatch { subject, arms } => {
-                self.line(";; template match");
+                self.line(";; template match on tagged value");
+                let label = self.next_label();
+                let subject_var = format!("$__match_subj_{}", label);
+                let tag_var = format!("$__match_tag_{}", label);
+                self.emit_template_local(&subject_var);
+                self.emit_template_local(&tag_var);
                 self.generate_expr(subject);
-                for arm in arms {
-                    for child in &arm.body {
-                        self.generate_template(child, parent);
+                self.line(&format!("local.set {}", subject_var));
+                // Load the discriminant tag from offset 0
+                self.line(&format!("local.get {}", subject_var));
+                self.line("i32.load ;; tag");
+                self.line(&format!("local.set {}", tag_var));
+
+                for (arm_idx, arm) in arms.iter().enumerate() {
+                    let arm_label = format!("{}_arm{}", label, arm_idx);
+                    match &arm.pattern {
+                        Pattern::Variant { name, fields } => {
+                            // Map Ok/Some to tag 0, Err/None to tag 1
+                            let expected_tag = match name.as_str() {
+                                "Ok" | "Some" => 0,
+                                "Err" | "None" => 1,
+                                _ => arm_idx as i32,
+                            };
+                            self.line(&format!(";; match arm: {}(..)", name));
+                            self.line(&format!("local.get {}", tag_var));
+                            self.line(&format!("i32.const {}", expected_tag));
+                            self.line("i32.eq");
+                            self.line(&format!("if ;; arm {}", arm_label));
+                            self.indent += 1;
+
+                            // Bind the payload field if the pattern destructures
+                            if let Some(Pattern::Ident(binding)) = fields.first() {
+                                let binding_var = format!("$__{}", binding);
+                                self.emit_template_local(&binding_var);
+                                self.line(&format!("local.get {}", subject_var));
+                                self.line("i32.load offset=4 ;; payload");
+                                self.line(&format!("local.set {}", binding_var));
+                                self.for_loop_bindings.push(binding.clone());
+                            }
+
+                            for child in &arm.body {
+                                self.generate_template(child, parent);
+                            }
+
+                            // Clean up binding
+                            if let Some(Pattern::Ident(_binding)) = fields.first() {
+                                self.for_loop_bindings.pop();
+                            }
+                            self.indent -= 1;
+                            self.line(&format!("end ;; end arm {}", arm_label));
+                        }
+                        Pattern::Wildcard | Pattern::Ident(_) => {
+                            // Wildcard arm — always matches (fallback)
+                            self.line(&format!(";; match arm: _ (wildcard) {}", arm_label));
+                            if let Pattern::Ident(binding) = &arm.pattern {
+                                let binding_var = format!("$__{}", binding);
+                                self.emit_template_local(&binding_var);
+                                self.line(&format!("local.get {}", subject_var));
+                                self.line(&format!("local.set {}", binding_var));
+                                self.for_loop_bindings.push(binding.clone());
+                            }
+                            for child in &arm.body {
+                                self.generate_template(child, parent);
+                            }
+                            if let Pattern::Ident(_binding) = &arm.pattern {
+                                self.for_loop_bindings.pop();
+                            }
+                        }
+                        _ => {
+                            // Other patterns — emit body unconditionally as fallback
+                            self.line(&format!(";; match arm: pattern {}", arm_label));
+                            for child in &arm.body {
+                                self.generate_template(child, parent);
+                            }
+                        }
                     }
                 }
             }
@@ -5385,15 +5677,16 @@ impl WasmCodegen {
                 }
             }
             Expr::FnCall { callee, args } => {
-                // Result/Option constructors — types are erased to i32, so these
-                // are identity functions. The wrapped value is already on the stack.
+                // Result/Option constructors — allocate tagged values via $Ok/$Err/$Some.
+                // These functions store [tag, value] in linear memory so the ? operator
+                // can inspect the discriminant at offset 0.
                 if let Expr::Ident(name) = callee.as_ref() {
                     match name.as_str() {
                         "Ok" | "Some" | "Err" => {
                             for arg in args {
                                 self.generate_expr(arg);
                             }
-                            self.line(&format!(";; {} — identity wrapper", name));
+                            self.line(&format!("call ${} ;; tagged allocation", name));
                             return;
                         }
                         _ => {}
@@ -5490,10 +5783,33 @@ impl WasmCodegen {
                                 self.line(&format!(";; store: {}", name));
                                 self.line(&format!("call {}", wasm_fn));
                             } else {
-                                // Route through stdlib resolver
-                                let wasm_fn = self.resolve_stdlib_fn(name);
-                                self.line(&format!(";; stdlib: {}", name));
-                                self.line(&format!("call {}", wasm_fn));
+                                // Check if it's a contract method call
+                                // e.g. `UserResponse::parse(ptr, len)` → `call $UserResponse_parse`
+                                let contract_fn = if parts.len() == 2 {
+                                    let contract_name = parts[0];
+                                    let method = parts[1];
+                                    if self.known_contracts.iter().any(|(cn, _)| cn == contract_name) {
+                                        match method {
+                                            "call" | "parse" | "serialize" => {
+                                                Some(format!("${}_{}", contract_name, method))
+                                            }
+                                            _ => None,
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                };
+                                if let Some(wasm_fn) = contract_fn {
+                                    self.line(&format!(";; contract: {}", name));
+                                    self.line(&format!("call {}", wasm_fn));
+                                } else {
+                                    // Route through stdlib resolver
+                                    let wasm_fn = self.resolve_stdlib_fn(name);
+                                    self.line(&format!(";; stdlib: {}", name));
+                                    self.line(&format!("call {}", wasm_fn));
+                                }
                             }
                         } else {
                             self.line(&format!("call ${}", name));
@@ -5878,13 +6194,27 @@ impl WasmCodegen {
                 }
             }
             Expr::Closure { params, body } => {
-                // Generate closure as a WASM function with captured variables
-                // passed as extra parameters. Store [func_index, captures...] in
-                // linear memory.
+                // Generate closure as a WASM function with captured variables.
+                // Captured vars are stored in a heap-allocated env struct and
+                // loaded from the $__env pointer inside the closure body.
                 let closure_id = self.closure_counter;
                 self.closure_counter += 1;
                 let func_name = format!("$__closure_{}", closure_id);
                 self.needs_func_table = true;
+
+                // Detect captured variables: identifiers used in the body that
+                // are not closure parameters and exist as locals in the enclosing scope.
+                let param_names: Vec<&str> = params.iter().map(|(n, _)| n.as_str()).collect();
+                let mut free_vars: Vec<String> = Vec::new();
+                Self::collect_free_vars(body, &param_names, &mut free_vars);
+                // Deduplicate
+                free_vars.sort();
+                free_vars.dedup();
+                // Only keep names that are actually locals in the current scope
+                let local_names: Vec<String> = self.locals.iter().map(|(n, _)| n.clone()).collect();
+                let captures: Vec<String> = free_vars.into_iter()
+                    .filter(|v| local_names.contains(v) || self.for_loop_bindings.contains(v))
+                    .collect();
 
                 // Build the closure function signature
                 let mut param_list = String::new();
@@ -5900,6 +6230,22 @@ impl WasmCodegen {
                 // Generate the closure function body into a separate buffer
                 let mut closure_body = String::new();
                 closure_body.push_str(&format!("  (func {} {} (result i32)\n", func_name, param_list));
+
+                // If there are captures, emit locals and loads from the env pointer
+                if !captures.is_empty() {
+                    for cap in &captures {
+                        closure_body.push_str(&format!("    (local ${} i32)\n", cap));
+                    }
+                    for (i, cap) in captures.iter().enumerate() {
+                        closure_body.push_str(&format!("    local.get $__env\n"));
+                        if i > 0 {
+                            closure_body.push_str(&format!("    i32.const {}\n", i * 4));
+                            closure_body.push_str("    i32.add\n");
+                        }
+                        closure_body.push_str("    i32.load\n");
+                        closure_body.push_str(&format!("    local.set ${}\n", cap));
+                    }
+                }
 
                 // Save and swap codegen state
                 let saved_output = std::mem::take(&mut self.output);
@@ -5919,32 +6265,68 @@ impl WasmCodegen {
                 self.closure_functions.push(closure_body);
                 self.closure_func_names.push(func_name);
 
-                // At the call site, allocate a closure struct in linear memory:
-                // [func_table_index (i32)]
-                // For now, push the table index as the closure value.
                 let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!(";; closure — table index {}", table_idx));
-                self.line(&format!("i32.const {} ;; closure func table index", table_idx));
+
+                if captures.is_empty() {
+                    // No captures — just push the table index
+                    self.line(&format!(";; closure — table index {} (no captures)", table_idx));
+                    self.line(&format!("i32.const {} ;; closure func table index", table_idx));
+                } else {
+                    // Allocate env struct: [captured_val_0, captured_val_1, ...]
+                    // Then allocate closure struct: [func_table_index, env_ptr]
+                    let env_size = captures.len() * 4;
+                    let lbl = self.next_label();
+                    self.emit_template_local(&format!("$__clos_env_{}", lbl));
+                    self.emit_template_local(&format!("$__clos_ptr_{}", lbl));
+                    self.line(&format!(";; closure — table index {} with {} captures", table_idx, captures.len()));
+
+                    // Allocate and populate env
+                    self.line(&format!("i32.const {} ;; env size", env_size));
+                    self.line("call $alloc");
+                    self.line(&format!("local.set $__clos_env_{}", lbl));
+                    for (i, cap) in captures.iter().enumerate() {
+                        self.line(&format!("local.get $__clos_env_{}", lbl));
+                        if i > 0 {
+                            self.line(&format!("i32.const {}", i * 4));
+                            self.line("i32.add");
+                        }
+                        self.line(&format!("local.get ${}", cap));
+                        self.line(&format!("i32.store ;; capture {}", cap));
+                        // Fix: use a comment format
+                    }
+
+                    // Allocate closure struct: [func_index (i32), env_ptr (i32)]
+                    self.line("i32.const 8 ;; closure struct size");
+                    self.line("call $alloc");
+                    self.line(&format!("local.set $__clos_ptr_{}", lbl));
+                    self.line(&format!("local.get $__clos_ptr_{}", lbl));
+                    self.line(&format!("i32.const {} ;; func table index", table_idx));
+                    self.line("i32.store");
+                    self.line(&format!("local.get $__clos_ptr_{}", lbl));
+                    self.line(&format!("local.get $__clos_env_{}", lbl));
+                    self.line("i32.store offset=4 ;; env ptr");
+                    self.line(&format!("local.get $__clos_ptr_{}", lbl));
+                }
             }
             Expr::Try(inner) => {
                 self.line(";; ? error propagation operator");
+                let label = self.next_label();
+                self.emit_template_local(&format!("$__try_tmp_{}", label));
                 self.generate_expr(inner);
                 // Check discriminant (0 = Ok/Some, non-zero = Err/None)
-                let label = self.next_label();
-                self.line("local.tee $__try_tmp");
+                self.line(&format!("local.set $__try_tmp_{}", label));
+                self.line(&format!("local.get $__try_tmp_{}", label));
                 self.line("i32.load ;; discriminant");
-                self.line(&format!("(if (then"));
+                self.line("if ;; error check");
                 self.indent += 1;
-                // Error path: return early
-                self.line("local.get $__try_tmp");
+                // Error path: return early with the tagged value
+                self.line(&format!("local.get $__try_tmp_{}", label));
                 self.line("return");
                 self.indent -= 1;
-                self.line(&format!(") ;; end try_err_{}", label));
+                self.line(&format!("end ;; end try_err_{}", label));
                 // Ok path: extract value at offset 4
-                self.line("local.get $__try_tmp");
-                self.line("i32.const 4");
-                self.line("i32.add");
-                self.line("i32.load");
+                self.line(&format!("local.get $__try_tmp_{}", label));
+                self.line("i32.load offset=4 ;; unwrapped Ok/Some value");
             }
             Expr::DynamicImport { path, .. } => {
                 self.line(";; dynamic import — triggers code split and async chunk loading");
@@ -6761,6 +7143,247 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
 
+        // ── String operations (pure WASM) ───────────────────────────────────
+
+        // string_trim: remove leading/trailing ASCII whitespace, returns (ptr, len)
+        self.emit("(func $string_trim (param $ptr i32) (param $len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $start i32) (local $end i32) (local $ch i32)");
+        self.line("i32.const 0  local.set $start");
+        self.line("local.get $len  local.set $end");
+        // Skip leading whitespace
+        self.line("block $ldone  loop $lscan");
+        self.line("  local.get $start  local.get $end  i32.ge_u  br_if $ldone");
+        self.line("  local.get $ptr  local.get $start  i32.add  i32.load8_u  local.set $ch");
+        self.line("  local.get $ch  i32.const 32  i32.eq");  // space
+        self.line("  local.get $ch  i32.const 9  i32.eq  i32.or");  // tab
+        self.line("  local.get $ch  i32.const 10  i32.eq  i32.or");  // newline
+        self.line("  local.get $ch  i32.const 13  i32.eq  i32.or");  // CR
+        self.line("  i32.eqz  br_if $ldone");
+        self.line("  local.get $start  i32.const 1  i32.add  local.set $start");
+        self.line("  br $lscan");
+        self.line("end  end");
+        // Skip trailing whitespace
+        self.line("block $rdone  loop $rscan");
+        self.line("  local.get $end  local.get $start  i32.le_u  br_if $rdone");
+        self.line("  local.get $ptr  local.get $end  i32.add  i32.const 1  i32.sub  i32.load8_u  local.set $ch");
+        self.line("  local.get $ch  i32.const 32  i32.eq");
+        self.line("  local.get $ch  i32.const 9  i32.eq  i32.or");
+        self.line("  local.get $ch  i32.const 10  i32.eq  i32.or");
+        self.line("  local.get $ch  i32.const 13  i32.eq  i32.or");
+        self.line("  i32.eqz  br_if $rdone");
+        self.line("  local.get $end  i32.const 1  i32.sub  local.set $end");
+        self.line("  br $rscan");
+        self.line("end  end");
+        // Return trimmed (ptr, len)
+        self.line("local.get $ptr  local.get $start  i32.add");
+        self.line("local.get $end  local.get $start  i32.sub");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_slice: substring from start to end indices, returns (ptr, len)
+        self.emit("(func $string_slice (param $ptr i32) (param $len i32) (param $start i32) (param $end i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_ptr i32) (local $out_len i32)");
+        // Clamp start and end
+        self.line("local.get $start  i32.const 0  i32.lt_s  if  i32.const 0  local.set $start  end");
+        self.line("local.get $end  local.get $len  i32.gt_s  if  local.get $len  local.set $end  end");
+        self.line("local.get $start  local.get $end  i32.ge_s  if  i32.const 0  i32.const 0  return  end");
+        self.line("local.get $end  local.get $start  i32.sub  local.set $out_len");
+        self.line("local.get $out_len  call $alloc  local.set $out_ptr");
+        self.line("local.get $out_ptr  local.get $ptr  local.get $start  i32.add  local.get $out_len  memory.copy");
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_to_upper: ASCII uppercase, returns (ptr, len)
+        self.emit("(func $string_to_upper (param $ptr i32) (param $len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_ptr i32) (local $i i32) (local $ch i32)");
+        self.line("local.get $len  call $alloc  local.set $out_ptr");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $lp");
+        self.line("  local.get $i  local.get $len  i32.ge_u  br_if $done");
+        self.line("  local.get $ptr  local.get $i  i32.add  i32.load8_u  local.set $ch");
+        // If 'a' <= ch <= 'z', subtract 32
+        self.line("  local.get $ch  i32.const 97  i32.ge_u");
+        self.line("  local.get $ch  i32.const 122  i32.le_u  i32.and");
+        self.line("  if  local.get $ch  i32.const 32  i32.sub  local.set $ch  end");
+        self.line("  local.get $out_ptr  local.get $i  i32.add  local.get $ch  i32.store8");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $lp");
+        self.line("end  end");
+        self.line("local.get $out_ptr");
+        self.line("local.get $len");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_to_lower: ASCII lowercase, returns (ptr, len)
+        self.emit("(func $string_to_lower (param $ptr i32) (param $len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_ptr i32) (local $i i32) (local $ch i32)");
+        self.line("local.get $len  call $alloc  local.set $out_ptr");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $lp");
+        self.line("  local.get $i  local.get $len  i32.ge_u  br_if $done");
+        self.line("  local.get $ptr  local.get $i  i32.add  i32.load8_u  local.set $ch");
+        // If 'A' <= ch <= 'Z', add 32
+        self.line("  local.get $ch  i32.const 65  i32.ge_u");
+        self.line("  local.get $ch  i32.const 90  i32.le_u  i32.and");
+        self.line("  if  local.get $ch  i32.const 32  i32.add  local.set $ch  end");
+        self.line("  local.get $out_ptr  local.get $i  i32.add  local.get $ch  i32.store8");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $lp");
+        self.line("end  end");
+        self.line("local.get $out_ptr");
+        self.line("local.get $len");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_index_of: find needle in haystack, returns position or -1
+        self.emit("(func $string_index_of (param $str_ptr i32) (param $str_len i32) (param $needle_ptr i32) (param $needle_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $j i32) (local $match i32)");
+        // Empty needle -> 0
+        self.line("local.get $needle_len  i32.eqz  if  i32.const 0  return  end");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $outer");
+        self.line("  local.get $i  local.get $str_len  local.get $needle_len  i32.sub  i32.const 1  i32.add  i32.ge_u  br_if $done");
+        self.line("  i32.const 0  local.set $j");
+        self.line("  i32.const 1  local.set $match");
+        self.line("  block $no_match  loop $inner");
+        self.line("    local.get $j  local.get $needle_len  i32.ge_u  br_if $no_match");
+        self.line("    local.get $str_ptr  local.get $i  i32.add  local.get $j  i32.add  i32.load8_u");
+        self.line("    local.get $needle_ptr  local.get $j  i32.add  i32.load8_u");
+        self.line("    i32.ne  if  i32.const 0  local.set $match  br $no_match  end");
+        self.line("    local.get $j  i32.const 1  i32.add  local.set $j");
+        self.line("    br $inner");
+        self.line("  end  end");
+        self.line("  local.get $match  local.get $j  local.get $needle_len  i32.eq  i32.and");
+        self.line("  if  local.get $i  return  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $outer");
+        self.line("end  end");
+        self.line("i32.const -1");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_starts_with: check if string starts with prefix, returns 0/1
+        self.emit("(func $string_starts_with (param $str_ptr i32) (param $str_len i32) (param $prefix_ptr i32) (param $prefix_len i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $prefix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end");
+        self.line("local.get $str_ptr  local.get $prefix_ptr  local.get $prefix_len  call $mem_compare");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_ends_with: check if string ends with suffix, returns 0/1
+        self.emit("(func $string_ends_with (param $str_ptr i32) (param $str_len i32) (param $suffix_ptr i32) (param $suffix_len i32) (result i32)");
+        self.indent += 1;
+        self.line("local.get $suffix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end");
+        self.line("local.get $str_ptr  local.get $str_len  i32.add  local.get $suffix_len  i32.sub");
+        self.line("local.get $suffix_ptr  local.get $suffix_len  call $mem_compare");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_replace: replace first occurrence of find with replacement, returns (ptr, len)
+        self.emit("(func $string_replace (param $str_ptr i32) (param $str_len i32) (param $find_ptr i32) (param $find_len i32) (param $rep_ptr i32) (param $rep_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $pos i32) (local $out_ptr i32) (local $out_len i32)");
+        self.line("local.get $str_ptr  local.get $str_len  local.get $find_ptr  local.get $find_len  call $string_index_of");
+        self.line("local.set $pos");
+        // If not found, return original
+        self.line("local.get $pos  i32.const -1  i32.eq  if  local.get $str_ptr  local.get $str_len  return  end");
+        // out_len = str_len - find_len + rep_len
+        self.line("local.get $str_len  local.get $find_len  i32.sub  local.get $rep_len  i32.add  local.set $out_len");
+        self.line("local.get $out_len  call $alloc  local.set $out_ptr");
+        // Copy prefix (before match)
+        self.line("local.get $out_ptr  local.get $str_ptr  local.get $pos  memory.copy");
+        // Copy replacement
+        self.line("local.get $out_ptr  local.get $pos  i32.add  local.get $rep_ptr  local.get $rep_len  memory.copy");
+        // Copy suffix (after match)
+        self.line("local.get $out_ptr  local.get $pos  i32.add  local.get $rep_len  i32.add");
+        self.line("local.get $str_ptr  local.get $pos  i32.add  local.get $find_len  i32.add");
+        self.line("local.get $str_len  local.get $pos  i32.sub  local.get $find_len  i32.sub");
+        self.line("memory.copy");
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_parse_int: parse decimal string to i32
+        self.emit("(func $string_parse_int (param $ptr i32) (param $len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $result i32) (local $neg i32) (local $ch i32)");
+        self.line("i32.const 0  local.set $result");
+        self.line("i32.const 0  local.set $i");
+        self.line("i32.const 0  local.set $neg");
+        // Check for leading '-'
+        self.line("local.get $len  i32.const 0  i32.gt_s");
+        self.line("local.get $ptr  i32.load8_u  i32.const 45  i32.eq");
+        self.line("i32.and");
+        self.line("if  i32.const 1  local.set $neg  i32.const 1  local.set $i  end");
+        // Parse digits
+        self.line("block $done  loop $parse");
+        self.line("  local.get $i  local.get $len  i32.ge_u  br_if $done");
+        self.line("  local.get $ptr  local.get $i  i32.add  i32.load8_u  local.set $ch");
+        self.line("  local.get $ch  i32.const 48  i32.lt_u  br_if $done");
+        self.line("  local.get $ch  i32.const 57  i32.gt_u  br_if $done");
+        self.line("  local.get $result  i32.const 10  i32.mul  local.get $ch  i32.const 48  i32.sub  i32.add  local.set $result");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $parse");
+        self.line("end  end");
+        // Apply negation
+        self.line("local.get $neg  if  i32.const 0  local.get $result  i32.sub  local.set $result  end");
+        self.line("local.get $result");
+        self.indent -= 1;
+        self.line(")");
+
+        // string_split: split string by delimiter, returns ptr to array of (ptr, len) pairs
+        // Array format: [count: i32, (ptr: i32, len: i32), ...]
+        self.emit("(func $string_split (param $str_ptr i32) (param $str_len i32) (param $delim_ptr i32) (param $delim_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $arr_ptr i32) (local $count i32) (local $i i32) (local $seg_start i32) (local $match i32) (local $j i32)");
+        // Allocate space for up to 64 segments (count + 64 * (ptr, len))
+        self.line("i32.const 516  call $alloc  local.set $arr_ptr");  // 4 + 64*8
+        self.line("i32.const 0  local.set $count");
+        self.line("i32.const 0  local.set $seg_start");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done  loop $scan");
+        // Check if we can fit the delimiter at position i
+        self.line("  local.get $i  local.get $str_len  local.get $delim_len  i32.sub  i32.const 1  i32.add  i32.gt_u");
+        self.line("  if");
+        // Remaining text is a segment
+        self.line("    local.get $arr_ptr  i32.const 4  i32.add  local.get $count  i32.const 8  i32.mul  i32.add");
+        self.line("    local.get $str_ptr  local.get $seg_start  i32.add  i32.store");
+        self.line("    local.get $arr_ptr  i32.const 4  i32.add  local.get $count  i32.const 8  i32.mul  i32.add  i32.const 4  i32.add");
+        self.line("    local.get $str_len  local.get $seg_start  i32.sub  i32.store");
+        self.line("    local.get $count  i32.const 1  i32.add  local.set $count");
+        self.line("    br $done");
+        self.line("  end");
+        // Check if delimiter matches at position i
+        self.line("  local.get $str_ptr  local.get $i  i32.add  local.get $delim_ptr  local.get $delim_len  call $mem_compare");
+        self.line("  i32.const 1  i32.eq");
+        self.line("  if");
+        // Store segment [seg_start, i)
+        self.line("    local.get $arr_ptr  i32.const 4  i32.add  local.get $count  i32.const 8  i32.mul  i32.add");
+        self.line("    local.get $str_ptr  local.get $seg_start  i32.add  i32.store");
+        self.line("    local.get $arr_ptr  i32.const 4  i32.add  local.get $count  i32.const 8  i32.mul  i32.add  i32.const 4  i32.add");
+        self.line("    local.get $i  local.get $seg_start  i32.sub  i32.store");
+        self.line("    local.get $count  i32.const 1  i32.add  local.set $count");
+        self.line("    local.get $i  local.get $delim_len  i32.add  local.set $i");
+        self.line("    local.get $i  local.set $seg_start");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("  br $scan");
+        self.line("end  end");
+        // Store count at arr_ptr[0]
+        self.line("local.get $arr_ptr  local.get $count  i32.store");
+        self.line("local.get $arr_ptr");
+        self.indent -= 1;
+        self.line(")");
+
         // $format: format(template_ptr, template_len, arg) -> (ptr, len)
         // Scans template for "{}" and replaces first occurrence with arg converted to string.
         // If no "{}" found, returns template unchanged.
@@ -7246,6 +7869,70 @@ impl WasmCodegen {
         self.line("local.get $path_ptr");
         self.line("local.get $path_len");
         self.line("call $router_navigate");
+        self.line(";; Register popstate listener for browser back/forward navigation");
+        self.line("i32.const 0 ;; popstate callback index — __router_on_popstate");
+        self.line("call $webapi_onPopState");
+        self.indent -= 1;
+        self.line(")");
+
+        // __router_on_popstate: called by JS when browser back/forward triggers popstate
+        // Reads the new pathname and navigates without pushing another history entry
+        self.emit("(func $__router_on_popstate (export \"__router_on_popstate\")");
+        self.indent += 1;
+        self.line("(local $path_ptr i32) (local $path_len i32)");
+        self.line(";; Re-read current pathname after popstate");
+        self.line("call $webapi_getLocationPathname");
+        self.line("local.set $path_ptr");
+        self.line("i32.const 0  local.set $path_len");
+        self.line("block $end  loop $measure");
+        self.line("  local.get $path_ptr  local.get $path_len  i32.add  i32.load8_u");
+        self.line("  i32.eqz  br_if $end");
+        self.line("  local.get $path_len  i32.const 1  i32.add  local.set $path_len");
+        self.line("  local.get $path_len  i32.const 4096  i32.ge_u  br_if $end");
+        self.line("  br $measure");
+        self.line("end  end");
+        self.line(";; Navigate to the popstate path (navigate handles clearing + mounting)");
+        self.line("local.get $path_ptr");
+        self.line("local.get $path_len");
+        self.line("call $router_navigate_no_push");
+        self.indent -= 1;
+        self.line(")");
+
+        // router_navigate_no_push: same as router_navigate but skips pushState
+        // Used by popstate handler to avoid pushing duplicate history entries
+        self.emit("(func $router_navigate_no_push (param $path_ptr i32) (param $path_len i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $addr i32) (local $rpath_ptr i32) (local $rpath_len i32) (local $cb_idx i32)");
+        self.line(";; Clear router container before mounting new route");
+        self.line("global.get $__router_container");
+        self.line("call $dom_clearChildren");
+        self.line(";; Scan route table for matching path");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $i  global.get $__route_count  i32.ge_u  br_if $done");
+        self.line("    global.get $__route_base  local.get $i  i32.const 32  i32.mul  i32.add  local.set $addr");
+        self.line("    local.get $addr  i32.load  local.set $rpath_ptr");
+        self.line("    local.get $addr  i32.const 4  i32.add  i32.load  local.set $rpath_len");
+        self.line("    local.get $addr  i32.const 16  i32.add  i32.load  local.set $cb_idx");
+        self.line("    ;; Compare path lengths first");
+        self.line("    local.get $path_len  local.get $rpath_len  i32.eq");
+        self.line("    if");
+        self.line("      ;; Compare path bytes");
+        self.line("      local.get $path_ptr  local.get $rpath_ptr  local.get $path_len  call $mem_compare");
+        self.line("      i32.const 1  i32.eq");
+        self.line("      if");
+        self.line("        ;; Match found — call the mount function via table");
+        self.line("        global.get $__router_container");
+        self.line("        local.get $cb_idx");
+        self.line("        call_indirect (type $__effect_type_i32)");
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
         self.indent -= 1;
         self.line(")");
 
@@ -7258,6 +7945,9 @@ impl WasmCodegen {
         self.line("local.get $path_ptr");
         self.line("local.get $path_len");
         self.line("call $webapi_pushState");
+        self.line(";; Clear router container before mounting new route");
+        self.line("global.get $__router_container");
+        self.line("call $dom_clearChildren");
         self.line(";; Scan route table for matching path");
         self.line("i32.const 0  local.set $i");
         self.line("block $done");
@@ -8811,6 +9501,122 @@ impl WasmCodegen {
                 self.generate_expr(object);
                 self.line("i32.load");
             }
+            "reduce" => {
+                // reduce(closure, initial) is an alias for fold(initial, closure)
+                // but with args in the order: closure first, initial second.
+                let lbl = self.next_label();
+                let brk = lbl + 1000;
+                self.line(";; .reduce() — reduce array with accumulator");
+                self.emit_template_local(&format!("$__red_src_{lbl}"));
+                self.emit_template_local(&format!("$__red_acc_{lbl}"));
+                self.emit_template_local(&format!("$__red_idx_{lbl}"));
+                self.emit_template_local(&format!("$__red_len_{lbl}"));
+                self.generate_expr(object);
+                self.line(&format!("local.set $__red_src_{lbl}"));
+                self.line(&format!("local.get $__red_src_{lbl}"));
+                self.line("i32.load");
+                self.line(&format!("local.set $__red_len_{lbl}"));
+                // Initial value is the second argument
+                if let Some(init_arg) = args.get(1) {
+                    self.generate_expr(init_arg);
+                } else {
+                    self.line("i32.const 0");
+                }
+                self.line(&format!("local.set $__red_acc_{lbl}"));
+                self.line("i32.const 0");
+                self.line(&format!("local.set $__red_idx_{lbl}"));
+                self.line(&format!("(block $__red_brk_{brk} (loop $__red_lp_{lbl}"));
+                self.indent += 1;
+                self.line(&format!("local.get $__red_idx_{lbl}"));
+                self.line(&format!("local.get $__red_len_{lbl}"));
+                self.line("i32.ge_u");
+                self.line(&format!("br_if $__red_brk_{brk}"));
+                // Push acc and current element
+                self.line(&format!("local.get $__red_acc_{lbl}"));
+                self.line(&format!("local.get $__red_src_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.add");
+                self.line(&format!("local.get $__red_idx_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                if let Some(closure_arg) = args.first() {
+                    self.line(";; apply reduce closure");
+                    self.generate_expr(closure_arg);
+                    self.line("call_indirect (type 0)");
+                }
+                self.line(&format!("local.set $__red_acc_{lbl}"));
+                self.line(&format!("local.get $__red_idx_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.add");
+                self.line(&format!("local.set $__red_idx_{lbl}"));
+                self.line(&format!("br $__red_lp_{lbl}"));
+                self.indent -= 1;
+                self.line("))");
+                self.line(&format!("local.get $__red_acc_{lbl}"));
+            }
+            "find" => {
+                let lbl = self.next_label();
+                let brk = lbl + 1000;
+                self.line(";; .find() — return first matching element or 0 (None)");
+                self.emit_template_local(&format!("$__find_src_{lbl}"));
+                self.emit_template_local(&format!("$__find_idx_{lbl}"));
+                self.emit_template_local(&format!("$__find_len_{lbl}"));
+                self.emit_template_local(&format!("$__find_res_{lbl}"));
+                self.emit_template_local(&format!("$__find_elem_{lbl}"));
+                self.generate_expr(object);
+                self.line(&format!("local.set $__find_src_{lbl}"));
+                self.line(&format!("local.get $__find_src_{lbl}"));
+                self.line("i32.load");
+                self.line(&format!("local.set $__find_len_{lbl}"));
+                self.line("i32.const 0");
+                self.line(&format!("local.set $__find_res_{lbl}"));
+                self.line("i32.const 0");
+                self.line(&format!("local.set $__find_idx_{lbl}"));
+                self.line(&format!("(block $__find_brk_{brk} (loop $__find_lp_{lbl}"));
+                self.indent += 1;
+                self.line(&format!("local.get $__find_idx_{lbl}"));
+                self.line(&format!("local.get $__find_len_{lbl}"));
+                self.line("i32.ge_u");
+                self.line(&format!("br_if $__find_brk_{brk}"));
+                // Load element
+                self.line(&format!("local.get $__find_src_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.add");
+                self.line(&format!("local.get $__find_idx_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                self.line(&format!("local.set $__find_elem_{lbl}"));
+                // Apply predicate
+                self.line(&format!("local.get $__find_elem_{lbl}"));
+                if let Some(closure_arg) = args.first() {
+                    self.generate_expr(closure_arg);
+                    self.line("call_indirect (type 0)");
+                }
+                // If truthy, store result and break
+                self.emit("(if");
+                self.indent += 1;
+                self.emit("(then");
+                self.indent += 1;
+                self.line(&format!("local.get $__find_elem_{lbl}"));
+                self.line(&format!("local.set $__find_res_{lbl}"));
+                self.line(&format!("br $__find_brk_{brk}"));
+                self.indent -= 1;
+                self.line(")");
+                self.indent -= 1;
+                self.line(")");
+                self.line(&format!("local.get $__find_idx_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.add");
+                self.line(&format!("local.set $__find_idx_{lbl}"));
+                self.line(&format!("br $__find_lp_{lbl}"));
+                self.indent -= 1;
+                self.line("))");
+                self.line(&format!("local.get $__find_res_{lbl}"));
+            }
             "len" => {
                 self.line(";; .len() — array length");
                 self.generate_expr(object);
@@ -9045,6 +9851,98 @@ impl WasmCodegen {
                 self.line("memory.copy");
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
             }
+            // ── String instance methods ──────────────────────────────────────
+            "trim" => {
+                self.line(";; .trim() — remove leading/trailing whitespace");
+                self.generate_expr(object);
+                self.line("call $string_trim");
+            }
+            "to_upper" => {
+                self.line(";; .to_upper() — ASCII uppercase");
+                self.generate_expr(object);
+                self.line("call $string_to_upper");
+            }
+            "to_lower" => {
+                self.line(";; .to_lower() — ASCII lowercase");
+                self.generate_expr(object);
+                self.line("call $string_to_lower");
+            }
+            "split" => {
+                self.line(";; .split() — split string by delimiter");
+                self.generate_expr(object);
+                if let Some(delim) = args.first() {
+                    self.generate_expr(delim);
+                } else {
+                    // Default: split by space
+                    let sp_offset = self.store_string(" ");
+                    self.line(&format!("i32.const {} ;; space ptr", sp_offset));
+                    self.line("i32.const 1 ;; space len");
+                }
+                self.line("call $string_split");
+            }
+            "slice" => {
+                self.line(";; .slice() — substring");
+                self.generate_expr(object);
+                if args.len() >= 2 {
+                    self.generate_expr(&args[0]);
+                    self.generate_expr(&args[1]);
+                } else if args.len() == 1 {
+                    self.generate_expr(&args[0]);
+                    // If only start provided, slice to end — use a large number
+                    self.line("i32.const 2147483647");
+                } else {
+                    self.line("i32.const 0");
+                    self.line("i32.const 2147483647");
+                }
+                self.line("call $string_slice");
+            }
+            "replace" => {
+                self.line(";; .replace() — replace first occurrence");
+                self.generate_expr(object);
+                if args.len() >= 2 {
+                    self.generate_expr(&args[0]);
+                    self.generate_expr(&args[1]);
+                } else {
+                    self.line("i32.const 0  i32.const 0");
+                    self.line("i32.const 0  i32.const 0");
+                }
+                self.line("call $string_replace");
+            }
+            "index_of" => {
+                self.line(";; .index_of() — find substring position");
+                self.generate_expr(object);
+                if let Some(needle) = args.first() {
+                    self.generate_expr(needle);
+                } else {
+                    self.line("i32.const 0  i32.const 0");
+                }
+                self.line("call $string_index_of");
+            }
+            "starts_with" => {
+                self.line(";; .starts_with() — check prefix");
+                self.generate_expr(object);
+                if let Some(prefix) = args.first() {
+                    self.generate_expr(prefix);
+                } else {
+                    self.line("i32.const 0  i32.const 0");
+                }
+                self.line("call $string_starts_with");
+            }
+            "ends_with" => {
+                self.line(";; .ends_with() — check suffix");
+                self.generate_expr(object);
+                if let Some(suffix) = args.first() {
+                    self.generate_expr(suffix);
+                } else {
+                    self.line("i32.const 0  i32.const 0");
+                }
+                self.line("call $string_ends_with");
+            }
+            "parse_int" => {
+                self.line(";; .parse_int() — parse string to integer");
+                self.generate_expr(object);
+                self.line("call $string_parse_int");
+            }
             _ => {
                 // Check if this is a namespace/type static method call — e.g. `time.now()`,
                 // `Duration.hours(2)`, `clipboard.copy(x)`. In these cases the object is a
@@ -9057,7 +9955,8 @@ impl WasmCodegen {
                         "time" | "Duration" | "clipboard" | "crypto" | "auth" |
                         "db" | "upload" | "payment" | "channel" | "ws" |
                         "pwa" | "console" | "hardware" | "webapi" | "rtc" |
-                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme"
+                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
+                        "http"
                     )
                 } else {
                     false
@@ -9134,6 +10033,82 @@ impl WasmCodegen {
         }
     }
 
+    /// Collect free variable names referenced in an expression that are not
+    /// in the provided `bound` set (closure parameters). Used to detect captures.
+    fn collect_free_vars(expr: &Expr, bound: &[&str], out: &mut Vec<String>) {
+        match expr {
+            Expr::Ident(name) => {
+                if !bound.contains(&name.as_str()) {
+                    out.push(name.clone());
+                }
+            }
+            Expr::Binary { left, right, .. } => {
+                Self::collect_free_vars(left, bound, out);
+                Self::collect_free_vars(right, bound, out);
+            }
+            Expr::Unary { operand, .. } => {
+                Self::collect_free_vars(operand, bound, out);
+            }
+            Expr::FieldAccess { object, .. } => {
+                Self::collect_free_vars(object, bound, out);
+            }
+            Expr::MethodCall { object, args, .. } => {
+                Self::collect_free_vars(object, bound, out);
+                for a in args { Self::collect_free_vars(a, bound, out); }
+            }
+            Expr::FnCall { callee, args } => {
+                Self::collect_free_vars(callee, bound, out);
+                for a in args { Self::collect_free_vars(a, bound, out); }
+            }
+            Expr::Index { object, index } => {
+                Self::collect_free_vars(object, bound, out);
+                Self::collect_free_vars(index, bound, out);
+            }
+            Expr::If { condition, then_block, else_block } => {
+                Self::collect_free_vars(condition, bound, out);
+                for s in &then_block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+                if let Some(eb) = else_block {
+                    for s in &eb.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+                }
+            }
+            Expr::Block(block) => {
+                for s in &block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+            }
+            Expr::ArrayLit(elems) => {
+                for e in elems { Self::collect_free_vars(e, bound, out); }
+            }
+            Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
+                for (_, e) in fields { Self::collect_free_vars(e, bound, out); }
+            }
+            Expr::Closure { params: inner_params, body: inner_body } => {
+                let mut new_bound: Vec<&str> = bound.to_vec();
+                for (n, _) in inner_params { new_bound.push(n.as_str()); }
+                Self::collect_free_vars(inner_body, &new_bound, out);
+            }
+            Expr::Assign { target, value } => {
+                Self::collect_free_vars(target, bound, out);
+                Self::collect_free_vars(value, bound, out);
+            }
+            Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Await(e) | Expr::Try(e) => {
+                Self::collect_free_vars(e, bound, out);
+            }
+            _ => {}
+        }
+    }
+
+    /// Collect free variables from a statement.
+    fn collect_free_vars_stmt(stmt: &Stmt, bound: &[&str], out: &mut Vec<String>) {
+        match stmt {
+            Stmt::Let { value, .. } => Self::collect_free_vars(value, bound, out),
+            Stmt::Signal { value, .. } => Self::collect_free_vars(value, bound, out),
+            Stmt::Expr(e) => Self::collect_free_vars(e, bound, out),
+            Stmt::Return(Some(e)) => Self::collect_free_vars(e, bound, out),
+            Stmt::Return(None) => {}
+            Stmt::LetDestructure { value, .. } => Self::collect_free_vars(value, bound, out),
+            Stmt::Yield(e) => Self::collect_free_vars(e, bound, out),
+        }
+    }
+
     /// Determine whether an expression in statement position produces no value (is void).
     /// If true, no `drop` instruction should follow the expression.
     fn expr_is_void(&self, expr: &Expr) -> bool {
@@ -9147,7 +10122,8 @@ impl WasmCodegen {
                         "time" | "Duration" | "clipboard" | "crypto" | "auth" |
                         "db" | "upload" | "payment" | "channel" | "ws" |
                         "pwa" | "console" | "hardware" | "webapi" | "rtc" |
-                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme"
+                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
+                        "http"
                     ) {
                         let qualified = format!("{}::{}", obj_name, method);
                         let wasm_fn = self.resolve_stdlib_fn(&qualified);
@@ -9178,7 +10154,10 @@ impl WasmCodegen {
                             "$worker_terminate" |
                             "$observe_observe" |
                             "$observe_unobserve" |
-                            "$observe_disconnect"
+                            "$observe_disconnect" |
+                            "$http_setMethod" |
+                            "$http_setBody" |
+                            "$http_addHeader"
                         );
                     }
                 }
@@ -9301,6 +10280,12 @@ impl WasmCodegen {
             "channel::connect" | "ws::connect" => "$ws_connect".into(),
             "channel::send" | "ws::send" => "$ws_send".into(),
             "channel::close" | "ws::close" => "$ws_close".into(),
+            // HTTP — typed setters + fetch
+            "http::fetch" => "$http_fetch".into(),
+            "http::fetchWithCallback" | "http::fetch_with_callback" => "$http_fetchWithCallback".into(),
+            "http::setMethod" | "http::set_method" => "$http_setMethod".into(),
+            "http::setBody" | "http::set_body" => "$http_setBody".into(),
+            "http::addHeader" | "http::add_header" => "$http_addHeader".into(),
             "pwa::register" => "$pwa_registerServiceWorker".into(),
             "pwa::cachePrecache" => "$pwa_cachePrecache".into(),
             "pwa::registerPush" => "$pwa_registerPush".into(),
@@ -14884,6 +15869,1243 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
     }
+
+    fn emit_json_runtime(&mut self) {
+        self.line("");
+        self.line(";; ── JSON runtime (WASM-internal) ──────────────────────────────");
+        self.line(";; Pure byte-level JSON parser and serializer. No JS. No JSON.parse.");
+        self.line(";; Memory layout:");
+        self.line(";;   Value: 12 bytes [type:i32, data_lo:i32, data_hi:i32]");
+        self.line(";;     type 0=null, 1=bool, 2=int, 3=string, 4=object, 5=array");
+        self.line(";;   Object field: 20 bytes [key_ptr:i32, key_len:i32, val_type:i32, val_lo:i32, val_hi:i32]");
+        self.line("");
+
+        // Global parse position — used by recursive descent parser
+        self.line("(global $__json_pos (mut i32) (i32.const 0))");
+        self.line("(global $__json_end (mut i32) (i32.const 0))");
+        self.line("");
+
+        // ── $json_skip_whitespace ──
+        // Advances $__json_pos past whitespace chars (space, tab, \n, \r)
+        self.emit("(func $json_skip_whitespace");
+        self.indent += 1;
+        self.line("(local $ch i32)");
+        self.line("block $done");
+        self.line("  loop $ws");
+        self.line("    global.get $__json_pos");
+        self.line("    global.get $__json_end");
+        self.line("    i32.ge_u");
+        self.line("    br_if $done");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.load8_u");
+        self.line("    local.set $ch");
+        // space=32, tab=9, \n=10, \r=13
+        self.line("    local.get $ch");
+        self.line("    i32.const 32");
+        self.line("    i32.eq");
+        self.line("    local.get $ch");
+        self.line("    i32.const 9");
+        self.line("    i32.eq");
+        self.line("    i32.or");
+        self.line("    local.get $ch");
+        self.line("    i32.const 10");
+        self.line("    i32.eq");
+        self.line("    i32.or");
+        self.line("    local.get $ch");
+        self.line("    i32.const 13");
+        self.line("    i32.eq");
+        self.line("    i32.or");
+        self.line("    i32.eqz");
+        self.line("    br_if $done");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    global.set $__json_pos");
+        self.line("    br $ws");
+        self.line("  end");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_parse_string ──
+        // Assumes $__json_pos points at opening '"'. Returns (str_ptr, str_len).
+        // Handles escapes: \", \\, \/, \n, \t, \r
+        self.emit("(func $json_parse_string (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $start i32) (local $out_ptr i32) (local $out_len i32) (local $ch i32)");
+        // Skip opening quote
+        self.line("global.get $__json_pos");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__json_pos");
+        // Allocate output buffer (max size = remaining input)
+        self.line("global.get $__json_end");
+        self.line("global.get $__json_pos");
+        self.line("i32.sub");
+        self.line("call $alloc");
+        self.line("local.set $out_ptr");
+        self.line("i32.const 0");
+        self.line("local.set $out_len");
+        // Scan until closing unescaped quote
+        self.line("block $str_done");
+        self.line("  loop $str_loop");
+        self.line("    global.get $__json_pos");
+        self.line("    global.get $__json_end");
+        self.line("    i32.ge_u");
+        self.line("    br_if $str_done");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.load8_u");
+        self.line("    local.set $ch");
+        // Check for closing quote
+        self.line("    local.get $ch");
+        self.line("    i32.const 34"); // '"'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      global.get $__json_pos");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      global.set $__json_pos");
+        self.line("      local.get $out_ptr");
+        self.line("      local.get $out_len");
+        self.line("      return");
+        self.line("    end");
+        // Check for backslash escape
+        self.line("    local.get $ch");
+        self.line("    i32.const 92"); // '\\'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      global.get $__json_pos");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      global.set $__json_pos");
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      local.set $ch");
+        // Map escape characters
+        self.line("      local.get $ch");
+        self.line("      i32.const 110"); // 'n'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        i32.const 10"); // newline
+        self.line("        local.set $ch");
+        self.line("      end");
+        self.line("      local.get $ch");
+        self.line("      i32.const 116"); // 't'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        i32.const 9"); // tab
+        self.line("        local.set $ch");
+        self.line("      end");
+        self.line("      local.get $ch");
+        self.line("      i32.const 114"); // 'r'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        i32.const 13"); // carriage return
+        self.line("        local.set $ch");
+        self.line("      end");
+        // For \" \\ \/ the char itself is correct after skipping backslash
+        self.line("    end");
+        // Write char to output
+        self.line("    local.get $out_ptr");
+        self.line("    local.get $out_len");
+        self.line("    i32.add");
+        self.line("    local.get $ch");
+        self.line("    i32.store8");
+        self.line("    local.get $out_len");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $out_len");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    global.set $__json_pos");
+        self.line("    br $str_loop");
+        self.line("  end");
+        self.line("end");
+        // Unterminated string — return what we have
+        self.line("local.get $out_ptr");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_parse_number ──
+        // Parses integer from current position. Returns i32 value.
+        self.emit("(func $json_parse_number (result i32)");
+        self.indent += 1;
+        self.line("(local $val i32) (local $neg i32) (local $ch i32)");
+        self.line("i32.const 0");
+        self.line("local.set $val");
+        self.line("i32.const 0");
+        self.line("local.set $neg");
+        // Check for minus sign
+        self.line("global.get $__json_pos");
+        self.line("i32.load8_u");
+        self.line("i32.const 45"); // '-'
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  i32.const 1");
+        self.line("  local.set $neg");
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        self.line("end");
+        // Parse digits
+        self.line("block $num_done");
+        self.line("  loop $num_loop");
+        self.line("    global.get $__json_pos");
+        self.line("    global.get $__json_end");
+        self.line("    i32.ge_u");
+        self.line("    br_if $num_done");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.load8_u");
+        self.line("    local.set $ch");
+        // Check if digit (48-57 = '0'-'9')
+        self.line("    local.get $ch");
+        self.line("    i32.const 48");
+        self.line("    i32.lt_u");
+        self.line("    if");
+        self.line("      br $num_done");
+        self.line("    end");
+        self.line("    local.get $ch");
+        self.line("    i32.const 57");
+        self.line("    i32.gt_u");
+        self.line("    if");
+        // Skip decimal point and fractional digits (treat as int, truncate)
+        self.line("      local.get $ch");
+        self.line("      i32.const 46"); // '.'
+        self.line("      i32.eq");
+        self.line("      if");
+        // Skip past decimal and remaining digits
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        block $frac_done");
+        self.line("          loop $frac_loop");
+        self.line("            global.get $__json_pos");
+        self.line("            global.get $__json_end");
+        self.line("            i32.ge_u");
+        self.line("            br_if $frac_done");
+        self.line("            global.get $__json_pos");
+        self.line("            i32.load8_u");
+        self.line("            i32.const 48");
+        self.line("            i32.lt_u");
+        self.line("            br_if $frac_done");
+        self.line("            global.get $__json_pos");
+        self.line("            i32.load8_u");
+        self.line("            i32.const 57");
+        self.line("            i32.gt_u");
+        self.line("            br_if $frac_done");
+        self.line("            global.get $__json_pos");
+        self.line("            i32.const 1");
+        self.line("            i32.add");
+        self.line("            global.set $__json_pos");
+        self.line("            br $frac_loop");
+        self.line("          end");
+        self.line("        end");
+        self.line("      end");
+        self.line("      br $num_done");
+        self.line("    end");
+        // val = val * 10 + (ch - '0')
+        self.line("    local.get $val");
+        self.line("    i32.const 10");
+        self.line("    i32.mul");
+        self.line("    local.get $ch");
+        self.line("    i32.const 48");
+        self.line("    i32.sub");
+        self.line("    i32.add");
+        self.line("    local.set $val");
+        self.line("    global.get $__json_pos");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    global.set $__json_pos");
+        self.line("    br $num_loop");
+        self.line("  end");
+        self.line("end");
+        // Apply negation
+        self.line("local.get $neg");
+        self.line("if");
+        self.line("  i32.const 0");
+        self.line("  local.get $val");
+        self.line("  i32.sub");
+        self.line("  local.set $val");
+        self.line("end");
+        self.line("local.get $val");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_parse_value ──
+        // Parses any JSON value from current position.
+        // Returns (type, data_lo, data_hi) as 3 i32 values.
+        self.emit("(func $json_parse_value (result i32 i32 i32)");
+        self.indent += 1;
+        self.line("(local $ch i32) (local $str_ptr i32) (local $str_len i32)");
+        self.line("(local $obj_ptr i32) (local $field_count i32) (local $field_base i32)");
+        self.line("(local $arr_ptr i32) (local $arr_len i32) (local $arr_base i32)");
+        self.line("(local $vtype i32) (local $vlo i32) (local $vhi i32)");
+        self.line("(local $key_ptr i32) (local $key_len i32)");
+        self.line("(local $num_val i32)");
+        // Skip whitespace
+        self.line("call $json_skip_whitespace");
+        // Check if we've reached the end
+        self.line("global.get $__json_pos");
+        self.line("global.get $__json_end");
+        self.line("i32.ge_u");
+        self.line("if");
+        self.line("  i32.const 0"); // null type
+        self.line("  i32.const 0");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+        // Read first character to determine type
+        self.line("global.get $__json_pos");
+        self.line("i32.load8_u");
+        self.line("local.set $ch");
+
+        // ── String: starts with '"' (34) ──
+        self.line("local.get $ch");
+        self.line("i32.const 34");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  call $json_parse_string");
+        self.line("  local.set $str_len");
+        self.line("  local.set $str_ptr");
+        self.line("  i32.const 3"); // type=string
+        self.line("  local.get $str_ptr");
+        self.line("  local.get $str_len");
+        self.line("  return");
+        self.line("end");
+
+        // ── Object: starts with '{' (123) ──
+        self.line("local.get $ch");
+        self.line("i32.const 123");
+        self.line("i32.eq");
+        self.line("if");
+        // Skip '{'
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        // Allocate space for up to 64 fields (64 * 20 bytes = 1280)
+        self.line("  i32.const 1280");
+        self.line("  call $alloc");
+        self.line("  local.set $field_base");
+        self.line("  i32.const 0");
+        self.line("  local.set $field_count");
+        // Parse fields
+        self.line("  block $obj_done");
+        self.line("    loop $obj_loop");
+        self.line("      call $json_skip_whitespace");
+        self.line("      global.get $__json_pos");
+        self.line("      global.get $__json_end");
+        self.line("      i32.ge_u");
+        self.line("      br_if $obj_done");
+        // Check for closing '}'
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 125"); // '}'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        br $obj_done");
+        self.line("      end");
+        // Skip comma if present
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 44"); // ','
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        call $json_skip_whitespace");
+        self.line("      end");
+        // Check for closing '}' again (after comma or trailing comma)
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 125");
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        br $obj_done");
+        self.line("      end");
+        // Parse key (must be a string)
+        self.line("      call $json_parse_string");
+        self.line("      local.set $key_len");
+        self.line("      local.set $key_ptr");
+        // Skip ':' after whitespace
+        self.line("      call $json_skip_whitespace");
+        self.line("      global.get $__json_pos");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      global.set $__json_pos");
+        // Parse value (recursive)
+        self.line("      call $json_parse_value");
+        self.line("      local.set $vhi");
+        self.line("      local.set $vlo");
+        self.line("      local.set $vtype");
+        // Store field: 20 bytes at field_base + field_count * 20
+        self.line("      local.get $field_base");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 20");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      local.get $key_ptr");
+        self.line("      i32.store");        // key_ptr
+        self.line("      local.get $field_base");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 20");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $key_len");
+        self.line("      i32.store");        // key_len
+        self.line("      local.get $field_base");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 20");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 8");
+        self.line("      i32.add");
+        self.line("      local.get $vtype");
+        self.line("      i32.store");        // value_type
+        self.line("      local.get $field_base");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 20");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 12");
+        self.line("      i32.add");
+        self.line("      local.get $vlo");
+        self.line("      i32.store");        // value_lo
+        self.line("      local.get $field_base");
+        self.line("      local.get $field_count");
+        self.line("      i32.const 20");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 16");
+        self.line("      i32.add");
+        self.line("      local.get $vhi");
+        self.line("      i32.store");        // value_hi
+        self.line("      local.get $field_count");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $field_count");
+        self.line("      br $obj_loop");
+        self.line("    end");
+        self.line("  end");
+        // Allocate final object header: [field_count, field_base]
+        self.line("  i32.const 8");
+        self.line("  call $alloc");
+        self.line("  local.set $obj_ptr");
+        self.line("  local.get $obj_ptr");
+        self.line("  local.get $field_count");
+        self.line("  i32.store");
+        self.line("  local.get $obj_ptr");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  local.get $field_base");
+        self.line("  i32.store");
+        self.line("  i32.const 4"); // type=object
+        self.line("  local.get $obj_ptr");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+
+        // ── Array: starts with '[' (91) ──
+        self.line("local.get $ch");
+        self.line("i32.const 91");
+        self.line("i32.eq");
+        self.line("if");
+        // Skip '['
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        // Allocate space for up to 256 elements (256 * 12 bytes = 3072)
+        self.line("  i32.const 3072");
+        self.line("  call $alloc");
+        self.line("  local.set $arr_base");
+        self.line("  i32.const 0");
+        self.line("  local.set $arr_len");
+        // Parse elements
+        self.line("  block $arr_done");
+        self.line("    loop $arr_loop");
+        self.line("      call $json_skip_whitespace");
+        self.line("      global.get $__json_pos");
+        self.line("      global.get $__json_end");
+        self.line("      i32.ge_u");
+        self.line("      br_if $arr_done");
+        // Check for closing ']'
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 93"); // ']'
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        br $arr_done");
+        self.line("      end");
+        // Skip comma
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 44"); // ','
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        call $json_skip_whitespace");
+        self.line("      end");
+        // Check for closing ']' after comma
+        self.line("      global.get $__json_pos");
+        self.line("      i32.load8_u");
+        self.line("      i32.const 93");
+        self.line("      i32.eq");
+        self.line("      if");
+        self.line("        global.get $__json_pos");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        global.set $__json_pos");
+        self.line("        br $arr_done");
+        self.line("      end");
+        // Parse value
+        self.line("      call $json_parse_value");
+        self.line("      local.set $vhi");
+        self.line("      local.set $vlo");
+        self.line("      local.set $vtype");
+        // Store element: 12 bytes at arr_base + arr_len * 12
+        self.line("      local.get $arr_base");
+        self.line("      local.get $arr_len");
+        self.line("      i32.const 12");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      local.get $vtype");
+        self.line("      i32.store");        // type
+        self.line("      local.get $arr_base");
+        self.line("      local.get $arr_len");
+        self.line("      i32.const 12");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 4");
+        self.line("      i32.add");
+        self.line("      local.get $vlo");
+        self.line("      i32.store");        // data_lo
+        self.line("      local.get $arr_base");
+        self.line("      local.get $arr_len");
+        self.line("      i32.const 12");
+        self.line("      i32.mul");
+        self.line("      i32.add");
+        self.line("      i32.const 8");
+        self.line("      i32.add");
+        self.line("      local.get $vhi");
+        self.line("      i32.store");        // data_hi
+        self.line("      local.get $arr_len");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $arr_len");
+        self.line("      br $arr_loop");
+        self.line("    end");
+        self.line("  end");
+        // Return type=array, data_lo=arr_base, data_hi=arr_len
+        self.line("  i32.const 5"); // type=array
+        self.line("  local.get $arr_base");
+        self.line("  local.get $arr_len");
+        self.line("  return");
+        self.line("end");
+
+        // ── Boolean true: 't' (116) ──
+        self.line("local.get $ch");
+        self.line("i32.const 116"); // 't'
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 4"); // skip "true"
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        self.line("  i32.const 1"); // type=bool
+        self.line("  i32.const 1"); // data_lo=1 (true)
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+
+        // ── Boolean false: 'f' (102) ──
+        self.line("local.get $ch");
+        self.line("i32.const 102"); // 'f'
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 5"); // skip "false"
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        self.line("  i32.const 1"); // type=bool
+        self.line("  i32.const 0"); // data_lo=0 (false)
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+
+        // ── Null: 'n' (110) ──
+        self.line("local.get $ch");
+        self.line("i32.const 110"); // 'n'
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  global.get $__json_pos");
+        self.line("  i32.const 4"); // skip "null"
+        self.line("  i32.add");
+        self.line("  global.set $__json_pos");
+        self.line("  i32.const 0"); // type=null
+        self.line("  i32.const 0");
+        self.line("  i32.const 0");
+        self.line("  return");
+        self.line("end");
+
+        // ── Number: '-' (45) or digit '0'-'9' (48-57) ──
+        // Default case — must be a number
+        self.line("call $json_parse_number");
+        self.line("local.set $num_val");
+        self.line("i32.const 2"); // type=int
+        self.line("local.get $num_val");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_parse ──
+        // Entry point: parses JSON string at (ptr, len) into structured representation.
+        // Returns pointer to a 12-byte value entry [type, data_lo, data_hi].
+        self.emit("(func $json_parse (param $ptr i32) (param $len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $result_ptr i32) (local $vtype i32) (local $vlo i32) (local $vhi i32)");
+        // Set global parse state
+        self.line("local.get $ptr");
+        self.line("global.set $__json_pos");
+        self.line("local.get $ptr");
+        self.line("local.get $len");
+        self.line("i32.add");
+        self.line("global.set $__json_end");
+        // Parse root value
+        self.line("call $json_parse_value");
+        self.line("local.set $vhi");
+        self.line("local.set $vlo");
+        self.line("local.set $vtype");
+        // Allocate 12-byte result entry
+        self.line("i32.const 12");
+        self.line("call $alloc");
+        self.line("local.set $result_ptr");
+        self.line("local.get $result_ptr");
+        self.line("local.get $vtype");
+        self.line("i32.store");
+        self.line("local.get $result_ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("local.get $vlo");
+        self.line("i32.store");
+        self.line("local.get $result_ptr");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("local.get $vhi");
+        self.line("i32.store");
+        self.line("local.get $result_ptr");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_get_field ──
+        // Look up a field by key name in a parsed object.
+        // obj_ptr points to [field_count:i32, fields_ptr:i32]
+        // Returns (type, data_lo) — 0,0 if not found.
+        self.emit("(func $json_get_field (param $obj_ptr i32) (param $key_ptr i32) (param $key_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $fields i32) (local $i i32)");
+        self.line("(local $fkey_ptr i32) (local $fkey_len i32) (local $match i32) (local $j i32)");
+        self.line("(local $offset i32)");
+        self.line("local.get $obj_ptr");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("local.get $obj_ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $fields");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $not_found");
+        self.line("  loop $search");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $not_found");
+        // Calculate field offset
+        self.line("    local.get $i");
+        self.line("    i32.const 20");
+        self.line("    i32.mul");
+        self.line("    local.set $offset");
+        // Get key ptr and len for this field
+        self.line("    local.get $fields");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fkey_ptr");
+        self.line("    local.get $fields");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fkey_len");
+        // Compare key lengths first
+        self.line("    local.get $fkey_len");
+        self.line("    local.get $key_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        // Compare key bytes
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $mismatch");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $key_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $mismatch");
+        self.line("          local.get $fkey_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $key_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $mismatch");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        // Found — return (value_type, value_lo)
+        self.line("        local.get $fields");
+        self.line("        local.get $offset");
+        self.line("        i32.add");
+        self.line("        i32.const 8");
+        self.line("        i32.add");
+        self.line("        i32.load"); // value_type
+        self.line("        local.get $fields");
+        self.line("        local.get $offset");
+        self.line("        i32.add");
+        self.line("        i32.const 12");
+        self.line("        i32.add");
+        self.line("        i32.load"); // value_lo
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $search");
+        self.line("  end");
+        self.line("end");
+        // Not found
+        self.line("i32.const 0");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_get_array_element ──
+        // Gets element at index from a parsed array.
+        // arr_ptr points to the element array base, arr_len from data_hi.
+        // Returns (type, data_lo).
+        self.emit("(func $json_get_array_element (param $arr_ptr i32) (param $index i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $offset i32)");
+        self.line("local.get $index");
+        self.line("i32.const 12");
+        self.line("i32.mul");
+        self.line("local.set $offset");
+        // type
+        self.line("local.get $arr_ptr");
+        self.line("local.get $offset");
+        self.line("i32.add");
+        self.line("i32.load");
+        // data_lo
+        self.line("local.get $arr_ptr");
+        self.line("local.get $offset");
+        self.line("i32.add");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_array_length ──
+        // Returns the length of a parsed array (stored in data_hi of the value entry).
+        self.emit("(func $json_array_length (param $arr_ptr i32) (result i32)");
+        self.indent += 1;
+        // arr_ptr is a 12-byte value entry; data_hi at offset 8 is the length
+        self.line("local.get $arr_ptr");
+        self.line("i32.const 8");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_write_byte ──
+        // Helper: write a single byte to output buffer at current position.
+        // Uses a global for serializer output position.
+        self.line("(global $__json_out_pos (mut i32) (i32.const 0))");
+        self.line("");
+
+        self.emit("(func $json_write_byte (param $byte i32)");
+        self.indent += 1;
+        self.line("global.get $__json_out_pos");
+        self.line("local.get $byte");
+        self.line("i32.store8");
+        self.line("global.get $__json_out_pos");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__json_out_pos");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_write_bytes ──
+        // Helper: write a sequence of bytes from memory.
+        self.emit("(func $json_write_bytes (param $src i32) (param $len i32)");
+        self.indent += 1;
+        self.line("global.get $__json_out_pos");
+        self.line("local.get $src");
+        self.line("local.get $len");
+        self.line("memory.copy");
+        self.line("global.get $__json_out_pos");
+        self.line("local.get $len");
+        self.line("i32.add");
+        self.line("global.set $__json_out_pos");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_write_escaped_string ──
+        // Write a JSON-escaped string (with surrounding quotes).
+        self.emit("(func $json_write_escaped_string (param $str_ptr i32) (param $str_len i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $ch i32)");
+        self.line("i32.const 34"); // '"'
+        self.line("call $json_write_byte");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $esc_done");
+        self.line("  loop $esc_loop");
+        self.line("    local.get $i");
+        self.line("    local.get $str_len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $esc_done");
+        self.line("    local.get $str_ptr");
+        self.line("    local.get $i");
+        self.line("    i32.add");
+        self.line("    i32.load8_u");
+        self.line("    local.set $ch");
+        // Escape backslash
+        self.line("    local.get $ch");
+        self.line("    i32.const 92"); // '\\'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $esc_loop");
+        self.line("    end");
+        // Escape double quote
+        self.line("    local.get $ch");
+        self.line("    i32.const 34"); // '"'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      i32.const 34");
+        self.line("      call $json_write_byte");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $esc_loop");
+        self.line("    end");
+        // Escape newline
+        self.line("    local.get $ch");
+        self.line("    i32.const 10"); // '\n'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      i32.const 110"); // 'n'
+        self.line("      call $json_write_byte");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $esc_loop");
+        self.line("    end");
+        // Escape tab
+        self.line("    local.get $ch");
+        self.line("    i32.const 9"); // '\t'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      i32.const 116"); // 't'
+        self.line("      call $json_write_byte");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $esc_loop");
+        self.line("    end");
+        // Escape carriage return
+        self.line("    local.get $ch");
+        self.line("    i32.const 13"); // '\r'
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 92");
+        self.line("      call $json_write_byte");
+        self.line("      i32.const 114"); // 'r'
+        self.line("      call $json_write_byte");
+        self.line("      local.get $i");
+        self.line("      i32.const 1");
+        self.line("      i32.add");
+        self.line("      local.set $i");
+        self.line("      br $esc_loop");
+        self.line("    end");
+        // Normal character
+        self.line("    local.get $ch");
+        self.line("    call $json_write_byte");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $esc_loop");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 34"); // closing '"'
+        self.line("call $json_write_byte");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_serialize_value ──
+        // Serialize a single value entry by type.
+        self.emit("(func $json_serialize_value (param $vtype i32) (param $vlo i32) (param $vhi i32)");
+        self.indent += 1;
+        self.line("(local $int_ptr i32) (local $int_len i32)");
+        // null (type=0)
+        self.line("local.get $vtype");
+        self.line("i32.eqz");
+        self.line("if");
+        self.line("  i32.const 110"); // 'n'
+        self.line("  call $json_write_byte");
+        self.line("  i32.const 117"); // 'u'
+        self.line("  call $json_write_byte");
+        self.line("  i32.const 108"); // 'l'
+        self.line("  call $json_write_byte");
+        self.line("  i32.const 108"); // 'l'
+        self.line("  call $json_write_byte");
+        self.line("  return");
+        self.line("end");
+        // bool (type=1)
+        self.line("local.get $vtype");
+        self.line("i32.const 1");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo");
+        self.line("  if");
+        // true
+        self.line("    i32.const 116"); // 't'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 114"); // 'r'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 117"); // 'u'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 101"); // 'e'
+        self.line("    call $json_write_byte");
+        self.line("  else");
+        // false
+        self.line("    i32.const 102"); // 'f'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 97");  // 'a'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 108"); // 'l'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 115"); // 's'
+        self.line("    call $json_write_byte");
+        self.line("    i32.const 101"); // 'e'
+        self.line("    call $json_write_byte");
+        self.line("  end");
+        self.line("  return");
+        self.line("end");
+        // int (type=2)
+        self.line("local.get $vtype");
+        self.line("i32.const 2");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo");
+        self.line("  call $string_fromI32");
+        self.line("  local.set $int_len");
+        self.line("  local.set $int_ptr");
+        self.line("  local.get $int_ptr");
+        self.line("  local.get $int_len");
+        self.line("  call $json_write_bytes");
+        self.line("  return");
+        self.line("end");
+        // string (type=3)
+        self.line("local.get $vtype");
+        self.line("i32.const 3");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo");  // str_ptr
+        self.line("  local.get $vhi");  // str_len
+        self.line("  call $json_write_escaped_string");
+        self.line("  return");
+        self.line("end");
+        // object (type=4) — serialize nested object
+        self.line("local.get $vtype");
+        self.line("i32.const 4");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo"); // obj_ptr -> [field_count, fields_ptr]
+        self.line("  i32.load");       // field_count
+        self.line("  local.get $vlo");
+        self.line("  i32.const 4");
+        self.line("  i32.add");
+        self.line("  i32.load");       // fields_ptr
+        self.line("  call $json_serialize_object_inner");
+        self.line("  return");
+        self.line("end");
+        // array (type=5) — serialize array
+        self.line("local.get $vtype");
+        self.line("i32.const 5");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo"); // arr_base
+        self.line("  local.get $vhi"); // arr_len
+        self.line("  call $json_serialize_array_inner");
+        self.line("  return");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_serialize_array_inner ──
+        // Writes [...] for an array given base ptr and length.
+        self.emit("(func $json_serialize_array_inner (param $arr_base i32) (param $arr_len i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $offset i32)");
+        self.line("(local $et i32) (local $elo i32) (local $ehi i32)");
+        self.line("i32.const 91"); // '['
+        self.line("call $json_write_byte");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $adone");
+        self.line("  loop $aloop");
+        self.line("    local.get $i");
+        self.line("    local.get $arr_len");
+        self.line("    i32.ge_u");
+        self.line("    br_if $adone");
+        // Comma separator (not before first element)
+        self.line("    local.get $i");
+        self.line("    i32.const 0");
+        self.line("    i32.gt_u");
+        self.line("    if");
+        self.line("      i32.const 44"); // ','
+        self.line("      call $json_write_byte");
+        self.line("    end");
+        // Get element
+        self.line("    local.get $i");
+        self.line("    i32.const 12");
+        self.line("    i32.mul");
+        self.line("    local.set $offset");
+        self.line("    local.get $arr_base");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $et");
+        self.line("    local.get $arr_base");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $elo");
+        self.line("    local.get $arr_base");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $ehi");
+        self.line("    local.get $et");
+        self.line("    local.get $elo");
+        self.line("    local.get $ehi");
+        self.line("    call $json_serialize_value");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $aloop");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 93"); // ']'
+        self.line("call $json_write_byte");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_serialize_object_inner ──
+        // Writes {...} given field_count and fields_ptr. Used internally.
+        self.emit("(func $json_serialize_object_inner (param $field_count i32) (param $fields_ptr i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $offset i32)");
+        self.line("(local $fk_ptr i32) (local $fk_len i32)");
+        self.line("(local $fvtype i32) (local $fvlo i32) (local $fvhi i32)");
+        self.line("i32.const 123"); // '{'
+        self.line("call $json_write_byte");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $sdone");
+        self.line("  loop $sloop");
+        self.line("    local.get $i");
+        self.line("    local.get $field_count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $sdone");
+        // Comma (not before first)
+        self.line("    local.get $i");
+        self.line("    i32.const 0");
+        self.line("    i32.gt_u");
+        self.line("    if");
+        self.line("      i32.const 44"); // ','
+        self.line("      call $json_write_byte");
+        self.line("    end");
+        // Calculate offset
+        self.line("    local.get $i");
+        self.line("    i32.const 20");
+        self.line("    i32.mul");
+        self.line("    local.set $offset");
+        // Read field entry
+        self.line("    local.get $fields_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fk_ptr");
+        self.line("    local.get $fields_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fk_len");
+        self.line("    local.get $fields_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 8");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fvtype");
+        self.line("    local.get $fields_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 12");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fvlo");
+        self.line("    local.get $fields_ptr");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 16");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fvhi");
+        // Write "key":
+        self.line("    local.get $fk_ptr");
+        self.line("    local.get $fk_len");
+        self.line("    call $json_write_escaped_string");
+        self.line("    i32.const 58"); // ':'
+        self.line("    call $json_write_byte");
+        // Write value
+        self.line("    local.get $fvtype");
+        self.line("    local.get $fvlo");
+        self.line("    local.get $fvhi");
+        self.line("    call $json_serialize_value");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $sloop");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const 125"); // '}'
+        self.line("call $json_write_byte");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
+        // ── $json_serialize_object ──
+        // Public entry point for serializing an object.
+        // fields_ptr: array of 20-byte field entries
+        // field_count: number of fields
+        // Returns (ptr, len) of the JSON string.
+        self.emit("(func $json_serialize_object (param $fields_ptr i32) (param $field_count i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $out_start i32) (local $out_len i32)");
+        // Allocate a large output buffer (8 KB)
+        self.line("i32.const 8192");
+        self.line("call $alloc");
+        self.line("local.set $out_start");
+        self.line("local.get $out_start");
+        self.line("global.set $__json_out_pos");
+        // Serialize
+        self.line("local.get $field_count");
+        self.line("local.get $fields_ptr");
+        self.line("call $json_serialize_object_inner");
+        // Calculate length
+        self.line("global.get $__json_out_pos");
+        self.line("local.get $out_start");
+        self.line("i32.sub");
+        self.line("local.set $out_len");
+        self.line("local.get $out_start");
+        self.line("local.get $out_len");
+        self.indent -= 1;
+        self.line(")");
+    }
 }
 
 #[cfg(test)]
@@ -15658,12 +17880,15 @@ mod comprehensive_codegen_tests {
                 return None;
             }
         "#);
-        // Ok(42) should pass through the value without calling a function
-        assert!(wat.contains(";; Ok"), "Ok should have identity wrapper comment");
-        assert!(!wat.contains("call $Ok"), "should not emit call $Ok");
-        // None should be i32.const 0
+        // Ok(42) should allocate a tagged struct via call $Ok
+        assert!(wat.contains("call $Ok"), "Ok should emit call $Ok for tagged allocation");
+        // None as an identifier should emit i32.const 0
         assert!(wat.contains("i32.const 0 ;; None"), "None should be i32.const 0");
         assert!(!wat.contains("local.get $None"), "should not emit local.get $None");
+        // Verify the Ok helper function is emitted with tag=0
+        assert!(wat.contains("i32.store ;; tag=Ok"), "Ok helper should store tag=0");
+        // Verify the Err helper function is emitted with tag=1
+        assert!(wat.contains("i32.store ;; tag=Err"), "Err helper should store tag=1");
     }
 
     // -----------------------------------------------------------------------
@@ -22269,5 +24494,633 @@ component ItemList {
         assert_eq!(codegen.lazy_batches.len(), 1, "should record one lazy batch");
         assert_eq!(codegen.lazy_batches[0].binding, "i");
         assert!(codegen.lazy_batches[0].is_range);
+    }
+
+    // ── Feature 1: HTTP namespace callable from user code ─────────────────
+
+    #[test]
+    fn test_http_namespace_fetch_resolves() {
+        let codegen = WasmCodegen::new();
+        assert_eq!(codegen.resolve_stdlib_fn("http::fetch"), "$http_fetch");
+        assert_eq!(codegen.resolve_stdlib_fn("http::setMethod"), "$http_setMethod");
+        assert_eq!(codegen.resolve_stdlib_fn("http::set_method"), "$http_setMethod");
+        assert_eq!(codegen.resolve_stdlib_fn("http::setBody"), "$http_setBody");
+        assert_eq!(codegen.resolve_stdlib_fn("http::set_body"), "$http_setBody");
+        assert_eq!(codegen.resolve_stdlib_fn("http::addHeader"), "$http_addHeader");
+        assert_eq!(codegen.resolve_stdlib_fn("http::add_header"), "$http_addHeader");
+    }
+
+    #[test]
+    fn test_http_namespace_method_call_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("http".into())),
+            method: "fetch".into(),
+            args: vec![Expr::StringLit("/api/data".into())],
+        };
+        codegen.generate_iterator_method(&Expr::Ident("http".into()), "fetch", &[Expr::StringLit("/api/data".into())]);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $http_fetch"), "http.fetch() should call $http_fetch");
+    }
+
+    #[test]
+    fn test_http_setmethod_is_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("http".into())),
+            method: "setMethod".into(),
+            args: vec![Expr::StringLit("POST".into())],
+        };
+        assert!(codegen.expr_is_void(&expr), "http.setMethod() should be void");
+    }
+
+    #[test]
+    fn test_http_fetch_is_not_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("http".into())),
+            method: "fetch".into(),
+            args: vec![Expr::StringLit("/api".into())],
+        };
+        assert!(!codegen.expr_is_void(&expr), "http.fetch() should NOT be void (returns i32)");
+    }
+
+    // ── Feature 2: Router popstate + container clearing ───────────────────
+
+    #[test]
+    fn test_router_init_registers_popstate() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("call $webapi_onPopState"), "router_init should register popstate listener");
+    }
+
+    #[test]
+    fn test_router_navigate_clears_container() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("call $dom_clearChildren"), "router_navigate should clear container before mounting");
+    }
+
+    #[test]
+    fn test_router_popstate_handler_exists() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("__router_on_popstate"), "popstate handler should be exported");
+    }
+
+    #[test]
+    fn test_router_navigate_no_push_exists() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("router_navigate_no_push"), "navigate_no_push should exist for popstate");
+    }
+
+    #[test]
+    fn test_dom_clear_children_import() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("\"clearChildren\""), "should import dom.clearChildren");
+    }
+
+    // ── Feature 3: String operations (pure WASM) ──────────────────────────
+
+    #[test]
+    fn test_string_trim_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "trim",
+            &[],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_trim"), ".trim() should call $string_trim");
+    }
+
+    #[test]
+    fn test_string_to_upper_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "to_upper",
+            &[],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_to_upper"), ".to_upper() should call $string_to_upper");
+    }
+
+    #[test]
+    fn test_string_to_lower_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "to_lower",
+            &[],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_to_lower"), ".to_lower() should call $string_to_lower");
+    }
+
+    #[test]
+    fn test_string_split_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "split",
+            &[Expr::StringLit(",".into())],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_split"), ".split() should call $string_split");
+    }
+
+    #[test]
+    fn test_string_slice_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "slice",
+            &[Expr::Integer(2), Expr::Integer(5)],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_slice"), ".slice() should call $string_slice");
+    }
+
+    #[test]
+    fn test_string_replace_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "replace",
+            &[Expr::StringLit("old".into()), Expr::StringLit("new".into())],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_replace"), ".replace() should call $string_replace");
+    }
+
+    #[test]
+    fn test_string_index_of_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "index_of",
+            &[Expr::StringLit("needle".into())],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_index_of"), ".index_of() should call $string_index_of");
+    }
+
+    #[test]
+    fn test_string_starts_with_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "starts_with",
+            &[Expr::StringLit("pre".into())],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_starts_with"), ".starts_with() should call $string_starts_with");
+    }
+
+    #[test]
+    fn test_string_ends_with_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "ends_with",
+            &[Expr::StringLit(".txt".into())],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_ends_with"), ".ends_with() should call $string_ends_with");
+    }
+
+    #[test]
+    fn test_string_parse_int_method_generates_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_iterator_method(
+            &Expr::Ident("s".into()),
+            "parse_int",
+            &[],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $string_parse_int"), ".parse_int() should call $string_parse_int");
+    }
+
+    #[test]
+    fn test_string_runtime_functions_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $string_trim"), "should emit $string_trim");
+        assert!(wat.contains("func $string_slice"), "should emit $string_slice");
+        assert!(wat.contains("func $string_to_upper"), "should emit $string_to_upper");
+        assert!(wat.contains("func $string_to_lower"), "should emit $string_to_lower");
+        assert!(wat.contains("func $string_index_of"), "should emit $string_index_of");
+        assert!(wat.contains("func $string_starts_with"), "should emit $string_starts_with");
+        assert!(wat.contains("func $string_ends_with"), "should emit $string_ends_with");
+        assert!(wat.contains("func $string_replace"), "should emit $string_replace");
+        assert!(wat.contains("func $string_parse_int"), "should emit $string_parse_int");
+        assert!(wat.contains("func $string_split"), "should emit $string_split");
+    }
+
+    #[test]
+    fn test_json_parse_function_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $json_parse (param $ptr i32) (param $len i32) (result i32)"),
+            "should emit $json_parse with correct signature");
+    }
+
+    #[test]
+    fn test_json_serialize_object_function_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $json_serialize_object (param $fields_ptr i32) (param $field_count i32) (result i32 i32)"),
+            "should emit $json_serialize_object with correct signature");
+    }
+
+    #[test]
+    fn test_json_parse_value_function_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $json_parse_value (result i32 i32 i32)"),
+            "should emit $json_parse_value returning type, data_lo, data_hi");
+    }
+
+    #[test]
+    fn test_json_helper_functions_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $json_skip_whitespace"), "should emit $json_skip_whitespace");
+        assert!(wat.contains("func $json_parse_string"), "should emit $json_parse_string");
+        assert!(wat.contains("func $json_parse_number"), "should emit $json_parse_number");
+        assert!(wat.contains("func $json_get_field"), "should emit $json_get_field");
+        assert!(wat.contains("func $json_get_array_element"), "should emit $json_get_array_element");
+        assert!(wat.contains("func $json_array_length"), "should emit $json_array_length");
+    }
+
+    #[test]
+    fn test_json_serializer_helpers_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("func $json_write_byte"), "should emit $json_write_byte");
+        assert!(wat.contains("func $json_write_bytes"), "should emit $json_write_bytes");
+        assert!(wat.contains("func $json_write_escaped_string"), "should emit $json_write_escaped_string");
+        assert!(wat.contains("func $json_serialize_value"), "should emit $json_serialize_value");
+        assert!(wat.contains("func $json_serialize_object_inner"), "should emit $json_serialize_object_inner");
+        assert!(wat.contains("func $json_serialize_array_inner"), "should emit $json_serialize_array_inner");
+    }
+
+    #[test]
+    fn test_json_runtime_globals_emitted() {
+        let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
+        assert!(wat.contains("global $__json_pos (mut i32)"), "should emit parse position global");
+        assert!(wat.contains("global $__json_end (mut i32)"), "should emit parse end global");
+        assert!(wat.contains("global $__json_out_pos (mut i32)"), "should emit serializer output position global");
+    }
+
+}
+
+#[cfg(test)]
+mod contract_api_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    // -----------------------------------------------------------------------
+    // Contract API call system — _parse, _serialize, _call
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn contract_parse_function_emitted() {
+        let contract = ContractDef {
+            name: "UserResponse".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
+                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField { name: "email".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _parse function exists with correct signature
+        assert!(output.contains("func $UserResponse_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
+            "should emit $UserResponse_parse with correct signature");
+        // Calls $json_parse to parse the JSON
+        assert!(output.contains("call $json_parse"),
+            "_parse should call $json_parse");
+        // Calls $json_get_field for each of the 3 fields
+        let get_field_count = output.matches("call $json_get_field").count();
+        assert_eq!(get_field_count, 3, "_parse should call $json_get_field once per field (expected 3, got {})", get_field_count);
+        // Allocates the struct (3 fields x 4 bytes = 12 bytes)
+        assert!(output.contains("i32.const 12") && output.contains("call $alloc"),
+            "_parse should allocate 12 bytes for the struct");
+        // Returns the struct pointer
+        assert!(output.contains("local.get $struct_ptr"),
+            "_parse should return the struct pointer");
+        // Field names are referenced for json_get_field lookups
+        assert!(output.contains("\"id\""), "_parse should reference field name 'id'");
+        assert!(output.contains("\"name\""), "_parse should reference field name 'name'");
+        assert!(output.contains("\"email\""), "_parse should reference field name 'email'");
+    }
+
+    #[test]
+    fn contract_serialize_function_emitted() {
+        let contract = ContractDef {
+            name: "Product".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "title".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField { name: "price".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
+                ContractField { name: "active".into(), ty: Type::Named("bool".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _serialize function exists with correct signature
+        assert!(output.contains("func $Product_serialize (param $struct_ptr i32) (result i32 i32)"),
+            "should emit $Product_serialize returning (ptr, len)");
+        // Allocates field array (4 fields x 20 bytes = 80 bytes)
+        assert!(output.contains("i32.const 80") && output.contains("call $alloc"),
+            "_serialize should allocate 80 bytes for field entries");
+        // Calls $json_serialize_object
+        assert!(output.contains("call $json_serialize_object"),
+            "_serialize should call $json_serialize_object");
+        // Passes correct field count
+        assert!(output.contains("i32.const 4 ;; field count"),
+            "_serialize should pass field_count = 4");
+        // Type tags: id=integer(2), title=string(1), price=number(2), active=boolean(3)
+        assert!(output.contains("i32.const 2 ;; type tag"),
+            "_serialize should have integer type tag");
+        assert!(output.contains("i32.const 1 ;; type tag"),
+            "_serialize should have string type tag");
+        assert!(output.contains("i32.const 3 ;; type tag"),
+            "_serialize should have boolean type tag");
+    }
+
+    #[test]
+    fn contract_call_function_emitted() {
+        let contract = ContractDef {
+            name: "GetProducts".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _call function exists with full HTTP signature
+        assert!(output.contains("func $GetProducts_call"),
+            "should emit $GetProducts_call function");
+        assert!(output.contains("param $url_ptr i32"),
+            "_call should accept url_ptr param");
+        assert!(output.contains("param $method_ptr i32"),
+            "_call should accept method_ptr param");
+        assert!(output.contains("param $body_ptr i32"),
+            "_call should accept body_ptr param");
+        assert!(output.contains("param $callback_idx i32"),
+            "_call should accept callback_idx param");
+        assert!(output.contains("result i32"),
+            "_call should return i32 (fetch promise ID)");
+        // Uses typed setters — no serialization
+        assert!(output.contains("call $http_setMethod"),
+            "_call should set HTTP method via typed setter");
+        assert!(output.contains("call $http_fetch"),
+            "_call should call $http_fetch");
+        // Conditionally sets body
+        assert!(output.contains("call $http_setBody"),
+            "_call should conditionally set HTTP body");
+        // Adds Content-Type header
+        assert!(output.contains("call $http_addHeader"),
+            "_call should add Content-Type header");
+        assert!(output.contains("application/json"),
+            "_call should set Content-Type to application/json");
+    }
+
+    #[test]
+    fn contract_known_contracts_populated() {
+        let contract = ContractDef {
+            name: "OrderResponse".into(),
+            fields: vec![
+                ContractField { name: "order_id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
+                ContractField { name: "total".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.known_contracts.push((contract.name.clone(), contract.fields.clone()));
+        assert_eq!(codegen.known_contracts.len(), 1, "should track one contract");
+        assert_eq!(codegen.known_contracts[0].0, "OrderResponse", "should store contract name");
+        assert_eq!(codegen.known_contracts[0].1.len(), 2, "should store 2 fields");
+    }
+
+    #[test]
+    fn result_tagged_allocation_ok() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("Ok".into())),
+            args: vec![Expr::Integer(42)],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("call $Ok"), "Ok(42) should emit call $Ok");
+        assert!(output.contains("i32.const 42"), "Ok(42) should push 42");
+    }
+
+    #[test]
+    fn result_tagged_allocation_err() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("Err".into())),
+            args: vec![Expr::Integer(1)],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("call $Err"), "Err(1) should emit call $Err");
+    }
+
+    #[test]
+    fn result_tagged_allocation_some() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("Some".into())),
+            args: vec![Expr::Integer(99)],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("call $Some"), "Some(99) should emit call $Some");
+    }
+
+    #[test]
+    fn none_ident_emits_const_zero() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Ident("None".into()));
+        let output = codegen.output.clone();
+        assert!(output.contains("i32.const 0 ;; None"), "None should be i32.const 0");
+    }
+
+    #[test]
+    fn try_operator_unwraps_ok_and_propagates_err() {
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.generate_expr(&Expr::Try(Box::new(Expr::FnCall {
+            callee: Box::new(Expr::Ident("Ok".into())),
+            args: vec![Expr::Integer(5)],
+        })));
+        let output = codegen.output.clone();
+        assert!(output.contains("? error propagation"), "should have try comment");
+        assert!(output.contains("i32.load ;; discriminant"), "should load discriminant");
+        assert!(output.contains("if ;; error check"), "should branch on discriminant");
+        assert!(output.contains("return"), "should return on Err path");
+        assert!(output.contains("i32.load offset=4 ;; unwrapped Ok/Some value"), "should unwrap Ok value at offset 4");
+    }
+
+    #[test]
+    fn contract_call_uses_fetch_with_callback() {
+        let contract = ContractDef {
+            name: "UserApi".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+        // _call function should exist
+        assert!(output.contains("func $UserApi_call"), "should emit $UserApi_call");
+        // Should use fetchWithCallback, not plain fetch
+        assert!(output.contains("call $http_fetchWithCallback"),
+            "_call should use fetchWithCallback for async response");
+        assert!(!output.contains("call $http_fetch\n"),
+            "_call should not use plain http_fetch");
+        // Should accept callback_idx parameter
+        assert!(output.contains("param $callback_idx i32"),
+            "_call should accept callback_idx parameter");
+        // Should not return a value (async callback delivers it)
+        assert!(!output.contains("func $UserApi_call") || !output.contains("(result i32)") ||
+            output.contains("func $UserApi_call (param $url_ptr i32) (param $url_len i32) (param $method_ptr i32) (param $method_len i32) (param $body_ptr i32) (param $body_len i32) (param $callback_idx i32)\n"),
+            "_call should be void (no result)");
+    }
+
+    #[test]
+    fn http_fetch_with_callback_import_exists() {
+        let codegen = WasmCodegen::new();
+        let resolved = codegen.resolve_stdlib_fn("http::fetchWithCallback");
+        assert_eq!(resolved, "$http_fetchWithCallback",
+            "should resolve http::fetchWithCallback");
+        let resolved2 = codegen.resolve_stdlib_fn("http::fetch_with_callback");
+        assert_eq!(resolved2, "$http_fetchWithCallback",
+            "should resolve snake_case variant");
+    }
+
+    #[test]
+    fn template_match_emits_tag_branch() {
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.label_counter = 0;
+        let parent = "root";
+        let subject = Box::new(Expr::Ident("status".into()));
+        let arms = vec![
+            TemplateMatchArm {
+                pattern: Pattern::Variant { name: "Ok".into(), fields: vec![Pattern::Ident("data".into())] },
+                guard: None,
+                body: vec![],
+            },
+            TemplateMatchArm {
+                pattern: Pattern::Variant { name: "Err".into(), fields: vec![Pattern::Ident("e".into())] },
+                guard: None,
+                body: vec![],
+            },
+        ];
+        codegen.for_loop_bindings.push("status".into());
+        codegen.generate_template(&TemplateNode::TemplateMatch { subject, arms }, parent);
+        let output = codegen.output.clone();
+        assert!(output.contains("template match on tagged value"), "should have match comment");
+        assert!(output.contains("i32.load ;; tag"), "should load tag from tagged value");
+        assert!(output.contains("match arm: Ok(..)"), "should have Ok arm");
+        assert!(output.contains("match arm: Err(..)"), "should have Err arm");
+        assert!(output.contains("i32.const 0") && output.contains("i32.eq"),
+            "Ok should check tag == 0");
+        assert!(output.contains("i32.const 1") && output.contains("i32.eq"),
+            "Err should check tag == 1");
+        assert!(output.contains("i32.load offset=4 ;; payload"),
+            "should extract payload at offset 4");
+    }
+
+    #[test]
+    fn template_match_wildcard_arm() {
+        let mut codegen = WasmCodegen::new();
+        codegen.defer_template_locals = true;
+        codegen.label_counter = 0;
+        let parent = "root";
+        let arms = vec![
+            TemplateMatchArm {
+                pattern: Pattern::Wildcard,
+                guard: None,
+                body: vec![],
+            },
+        ];
+        codegen.generate_template(&TemplateNode::TemplateMatch {
+            subject: Box::new(Expr::Integer(0)),
+            arms,
+        }, parent);
+        let output = codegen.output.clone();
+        assert!(output.contains("wildcard"), "should have wildcard comment");
+    }
+
+    #[test]
+    fn ok_err_helpers_emit_tagged_structs() {
+        let wat = compile(r#"
+            pub fn make_ok() -> i32 {
+                return Ok(100);
+            }
+            pub fn make_err() -> i32 {
+                return Err(42);
+            }
+            pub fn make_some() -> i32 {
+                return Some(77);
+            }
+        "#);
+        // Verify helper functions are emitted
+        assert!(wat.contains("func $Ok (param $val i32) (result i32)"),
+            "should emit $Ok helper");
+        assert!(wat.contains("func $Err (param $val i32) (result i32)"),
+            "should emit $Err helper");
+        assert!(wat.contains("func $Some (param $val i32) (result i32)"),
+            "should emit $Some helper");
+        assert!(wat.contains("func $None (result i32)"),
+            "should emit $None helper");
+        // Ok tag is 0, Err tag is 1
+        assert!(wat.contains("i32.const 0  i32.store ;; tag=Ok"),
+            "Ok should store tag 0");
+        assert!(wat.contains("i32.const 1  i32.store ;; tag=Err"),
+            "Err should store tag 1");
     }
 }
