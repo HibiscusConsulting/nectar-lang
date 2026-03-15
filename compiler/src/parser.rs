@@ -3493,6 +3493,16 @@ impl Parser {
         self.expect(&TokenKind::Style)?;
         self.expect(&TokenKind::LeftBrace)?;
 
+        let blocks = self.parse_style_blocks_inner()?;
+
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(blocks)
+    }
+
+    /// Parse style rule blocks inside braces. Each block is either a normal
+    /// `selector { prop: value; ... }` or an `@name { nested blocks... }`
+    /// at-rule that contains nested selector blocks (used for breakpoints).
+    fn parse_style_blocks_inner(&mut self) -> Result<Vec<StyleBlock>, ParseError> {
         let mut blocks = Vec::new();
 
         while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
@@ -3505,7 +3515,7 @@ impl Parser {
                 match &tok.kind {
                     TokenKind::Dot => selector.push('.'),
                     TokenKind::Ident(s) => {
-                        if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') {
+                        if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') {
                             selector.push(' ');
                         }
                         selector.push_str(s);
@@ -3524,6 +3534,7 @@ impl Parser {
                         selector.push('"');
                     }
                     TokenKind::Hash => selector.push('#'),
+                    TokenKind::At => selector.push('@'),
                     _ => {
                         if !selector.is_empty() && !selector.ends_with(' ') {
                             selector.push(' ');
@@ -3533,6 +3544,28 @@ impl Parser {
             }
 
             self.expect(&TokenKind::LeftBrace)?;
+
+            let trimmed_sel = selector.trim().to_string();
+
+            // If the selector starts with `@`, this is an at-rule block that
+            // may contain nested selector blocks (e.g. `@md { .card { ... } }`).
+            // Parse the inner blocks recursively and tag each with the at-rule
+            // prefix so codegen can expand breakpoints.
+            if trimmed_sel.starts_with('@') {
+                let inner_blocks = self.parse_style_blocks_inner()?;
+                self.expect(&TokenKind::RightBrace)?;
+
+                // Flatten nested blocks: prefix each inner selector with the at-rule.
+                // The codegen layer uses the `@name` prefix to detect breakpoint expansion.
+                for inner in inner_blocks {
+                    blocks.push(StyleBlock {
+                        selector: format!("{} {}", trimmed_sel, inner.selector),
+                        properties: inner.properties,
+                        span: inner.span,
+                    });
+                }
+                continue;
+            }
 
             let mut properties = Vec::new();
             while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
@@ -3617,10 +3650,9 @@ impl Parser {
             }
 
             self.expect(&TokenKind::RightBrace)?;
-            blocks.push(StyleBlock { selector: selector.trim().to_string(), properties, span });
+            blocks.push(StyleBlock { selector: trimmed_sel, properties, span });
         }
 
-        self.expect(&TokenKind::RightBrace)?;
         Ok(blocks)
     }
 
@@ -6069,6 +6101,72 @@ mod tests {
         let prog = parse("pub contract PC { id: u32 }");
         if let Item::Contract(c) = &prog.items[0] {
             assert!(c.is_pub);
+        } else {
+            panic!("Expected Contract");
+        }
+    }
+
+    #[test]
+    fn test_parse_contract_array_field() {
+        let prog = parse(r#"
+            contract AdminUser {
+                id: i32,
+                roles: [String],
+                scores: [i32],
+            }
+        "#);
+        if let Item::Contract(c) = &prog.items[0] {
+            assert_eq!(c.name, "AdminUser");
+            assert_eq!(c.fields.len(), 3);
+            assert_eq!(c.fields[1].name, "roles");
+            assert!(matches!(&c.fields[1].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "String")),
+                "roles field should be [String]");
+            assert_eq!(c.fields[2].name, "scores");
+            assert!(matches!(&c.fields[2].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "i32")),
+                "scores field should be [i32]");
+        } else {
+            panic!("Expected Contract");
+        }
+    }
+
+    #[test]
+    fn test_parse_contract_nested_type() {
+        let prog = parse(r#"
+            contract OrderResponse {
+                id: u32,
+                user: UserRow,
+                address: ShippingAddress,
+            }
+        "#);
+        if let Item::Contract(c) = &prog.items[0] {
+            assert_eq!(c.name, "OrderResponse");
+            assert_eq!(c.fields.len(), 3);
+            assert_eq!(c.fields[1].name, "user");
+            assert!(matches!(&c.fields[1].ty, Type::Named(n) if n == "UserRow"),
+                "user field should be UserRow");
+            assert_eq!(c.fields[2].name, "address");
+            assert!(matches!(&c.fields[2].ty, Type::Named(n) if n == "ShippingAddress"),
+                "address field should be ShippingAddress");
+        } else {
+            panic!("Expected Contract");
+        }
+    }
+
+    #[test]
+    fn test_parse_contract_array_and_nested() {
+        let prog = parse(r#"
+            contract FullResponse {
+                id: i32,
+                roles: [String],
+                user: UserRow,
+                tags: [i32],
+            }
+        "#);
+        if let Item::Contract(c) = &prog.items[0] {
+            assert_eq!(c.fields.len(), 4);
+            assert!(matches!(&c.fields[1].ty, Type::Array(_)));
+            assert!(matches!(&c.fields[2].ty, Type::Named(n) if n == "UserRow"));
+            assert!(matches!(&c.fields[3].ty, Type::Array(_)));
         } else {
             panic!("Expected Contract");
         }

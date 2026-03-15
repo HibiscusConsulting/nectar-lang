@@ -178,6 +178,7 @@ impl Lexer {
                     self.read_identifier(c)
                 }
             }
+            '@' => TokenKind::At,
             c => {
                 return Err(LexError {
                     message: format!("Unexpected character: '{c}'"),
@@ -852,11 +853,20 @@ mod tests {
 
     #[test]
     fn test_unexpected_character() {
-        let mut lexer = Lexer::new("@");
+        let mut lexer = Lexer::new("~");
         let result = lexer.tokenize();
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.message.contains("Unexpected character"));
+    }
+
+    #[test]
+    fn test_at_token() {
+        let mut lexer = Lexer::new("@md");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 3); // At + Ident("md") + EOF
+        assert!(matches!(tokens[0].kind, TokenKind::At));
+        assert!(matches!(&tokens[1].kind, TokenKind::Ident(s) if s == "md"));
     }
 
     #[test]

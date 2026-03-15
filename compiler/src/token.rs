@@ -190,6 +190,7 @@ pub enum TokenKind {
     QuestionDot,  // ?.
     Hash,         // #
     SingleQuote,  // '
+    At,           // @
 
     // JSX-like
     #[allow(dead_code)]

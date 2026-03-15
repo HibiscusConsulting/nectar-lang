@@ -131,6 +131,10 @@ pub struct WasmCodegen {
     /// This set contains the original class names (without the dot) so that
     /// template elements with `class="foo"` can be rewritten at compile time.
     component_scoped_selectors: HashSet<String>,
+    /// Responsive breakpoints defined by `breakpoints { ... }` blocks.
+    /// Stored at codegen time so that `@name { ... }` patterns in component
+    /// style blocks can be expanded to `@media (min-width: value)` at compile time.
+    breakpoint_defs: Vec<(String, u32)>,
     /// Codegen errors — expressions or items that have no codegen implementation.
     /// Collected during generation rather than panicking, so the compiler can
     /// report all missing codegen at once.
@@ -246,6 +250,7 @@ impl WasmCodegen {
             known_payment_signals: Vec::new(),
             known_capability_signals: Vec::new(),
             component_scoped_selectors: HashSet::new(),
+            breakpoint_defs: Vec::new(),
             codegen_errors: Vec::new(),
         }
     }
@@ -5681,6 +5686,11 @@ impl WasmCodegen {
     fn generate_breakpoints(&mut self, bp: &BreakpointsDef) {
         self.line(";; === Responsive Breakpoints ===");
 
+        // Store breakpoint definitions for @breakpoint expansion in style blocks
+        for (name, px) in &bp.breakpoints {
+            self.breakpoint_defs.push((name.clone(), *px));
+        }
+
         // Build config JSON: {"mobile":640,"tablet":1024,...}
         let mut config = String::from("{");
         for (i, (name, px)) in bp.breakpoints.iter().enumerate() {
@@ -5783,61 +5793,105 @@ impl WasmCodegen {
     }
 
     /// Generate theme initialization code.
+    ///
+    /// Emits CSS custom properties from the theme's light/dark blocks and injects
+    /// them via `dom.injectStyles` at mount time. Light block values become `:root`
+    /// custom properties. Dark block values go into a `@media (prefers-color-scheme: dark)`
+    /// block that overrides the light values. Underscores in key names are converted
+    /// to hyphens (e.g. `spacing_sm` becomes `--spacing-sm`).
     fn generate_theme(&mut self, theme: &ThemeDef) {
         self.line(&format!(";; === Theme: {} ===", theme.name));
 
-        // Build config JSON from light/dark entries
-        let mut config = String::from("{");
+        // Build CSS custom properties from light/dark entries
+        let mut css = String::new();
 
-        // Light theme
+        // Light theme → :root { --key: value; ... }
         if let Some(ref entries) = theme.light {
-            config.push_str("\"light\":{");
-            for (i, (key, value)) in entries.iter().enumerate() {
-                if i > 0 { config.push(','); }
-                config.push_str(&format!("\"{}\":", key));
+            css.push_str(":root { ");
+            for (key, value) in entries {
+                let css_var = key.replace('_', "-");
                 match value {
-                    Expr::StringLit(s) => config.push_str(&format!("\"{}\"", s)),
-                    _ => config.push_str("null"),
+                    Expr::StringLit(s) => {
+                        css.push_str(&format!("--{}: {}; ", css_var, s));
+                    }
+                    _ => {}
                 }
             }
-            config.push('}');
+            css.push_str("} ");
         }
 
-        // Dark theme
+        // Dark theme → @media (prefers-color-scheme: dark) { :root { --key: value; ... } }
         if let Some(ref entries) = theme.dark {
-            if theme.light.is_some() { config.push(','); }
-            config.push_str("\"dark\":{");
-            for (i, (key, value)) in entries.iter().enumerate() {
-                if i > 0 { config.push(','); }
-                config.push_str(&format!("\"{}\":", key));
+            css.push_str("@media (prefers-color-scheme: dark) { :root { ");
+            for (key, value) in entries {
+                let css_var = key.replace('_', "-");
                 match value {
-                    Expr::StringLit(s) => config.push_str(&format!("\"{}\"", s)),
-                    _ => config.push_str("null"),
+                    Expr::StringLit(s) => {
+                        css.push_str(&format!("--{}: {}; ", css_var, s));
+                    }
+                    _ => {}
                 }
             }
-            config.push('}');
+            css.push_str("} } ");
         }
 
-        // Dark auto flag
+        // Dark auto flag — generate inverted colors from light palette
         if theme.dark_auto {
-            if theme.light.is_some() || theme.dark.is_some() { config.push(','); }
-            config.push_str("\"darkAuto\":true");
+            if let Some(ref entries) = theme.light {
+                css.push_str("@media (prefers-color-scheme: dark) { :root { ");
+                for (key, value) in entries {
+                    let css_var = key.replace('_', "-");
+                    match value {
+                        Expr::StringLit(s) => {
+                            css.push_str(&format!("--{}: {}; ", css_var, s));
+                        }
+                        _ => {}
+                    }
+                }
+                css.push_str("} } ");
+            }
         }
 
-        config.push('}');
+        // Inject CSS custom properties via dom.injectStyles
+        if !css.is_empty() {
+            let theme_scope = format!("__theme_{}", theme.name);
+            let scope_offset = self.store_string(&theme_scope);
+            let css_offset = self.store_string(&css);
 
-        let name_offset = self.store_string(&theme.name);
-        let config_offset = self.store_string(&config);
+            self.emit(&format!("(func $__init_theme_{} (export \"__init_theme_{}\")", theme.name, theme.name));
+            self.indent += 1;
 
-        self.emit(&format!("(func $__init_theme_{} (export \"__init_theme_{}\")", theme.name, theme.name));
-        self.indent += 1;
-        self.line(&format!("i32.const {} ;; name ptr", name_offset));
-        self.line(&format!("i32.const {} ;; name len", theme.name.len()));
-        self.line(&format!("i32.const {} ;; config ptr", config_offset));
-        self.line(&format!("i32.const {} ;; config len", config.len()));
-        self.line("call $theme_init");
-        self.indent -= 1;
-        self.line(")");
+            // Inject theme CSS via style_injectStyles
+            self.line(&format!("i32.const {} ;; theme scope ptr", scope_offset));
+            self.line(&format!("i32.const {} ;; theme scope len", theme_scope.len()));
+            self.line(&format!("i32.const {} ;; css ptr", css_offset));
+            self.line(&format!("i32.const {} ;; css len", css.len()));
+            self.line("call $style_injectStyles");
+            self.line("drop ;; discard scope ID");
+
+            self.indent -= 1;
+            self.line(")");
+        } else {
+            // Fallback: still emit the init function with theme_init for dark_auto without light
+            let mut config = String::from("{");
+            if theme.dark_auto {
+                config.push_str("\"darkAuto\":true");
+            }
+            config.push('}');
+
+            let name_offset = self.store_string(&theme.name);
+            let config_offset = self.store_string(&config);
+
+            self.emit(&format!("(func $__init_theme_{} (export \"__init_theme_{}\")", theme.name, theme.name));
+            self.indent += 1;
+            self.line(&format!("i32.const {} ;; name ptr", name_offset));
+            self.line(&format!("i32.const {} ;; name len", theme.name.len()));
+            self.line(&format!("i32.const {} ;; config ptr", config_offset));
+            self.line(&format!("i32.const {} ;; config len", config.len()));
+            self.line("call $theme_init");
+            self.indent -= 1;
+            self.line(")");
+        }
     }
 
     /// Generate permission metadata and URL/storage validation for a component.
@@ -6458,8 +6512,40 @@ impl WasmCodegen {
         // Class selectors are prefixed with ComponentName__ so that
         // `.card` in ProductCard becomes `.ProductCard__card`.
         // CSS custom properties (:root) are left global for theming.
+        //
+        // Breakpoint expansion: when the parser encounters `@md { .card { ... } }`,
+        // it flattens to a StyleBlock with selector `@md .card`. If `md` matches a
+        // known breakpoint, we wrap the rule in `@media (min-width: <px>px)`.
         let mut css = String::new();
+
+        // Group blocks by breakpoint so we can merge rules into one @media block
+        let mut normal_blocks: Vec<&StyleBlock> = Vec::new();
+        let mut bp_groups: Vec<(String, u32, Vec<&StyleBlock>)> = Vec::new();
+
         for block in styles {
+            let trimmed = block.selector.trim();
+            // Check for `@name .selector` pattern
+            if trimmed.starts_with('@') {
+                // Extract the at-rule name (everything between @ and first space)
+                let after_at = &trimmed[1..];
+                if let Some(space_idx) = after_at.find(' ') {
+                    let bp_name = &after_at[..space_idx];
+                    if let Some((_name, px)) = self.breakpoint_defs.iter().find(|(n, _)| n == bp_name) {
+                        let px_val = *px;
+                        if let Some(group) = bp_groups.iter_mut().find(|(n, _, _)| n == bp_name) {
+                            group.2.push(block);
+                        } else {
+                            bp_groups.push((bp_name.to_string(), px_val, vec![block]));
+                        }
+                        continue;
+                    }
+                }
+            }
+            normal_blocks.push(block);
+        }
+
+        // Emit normal (non-breakpoint) blocks
+        for block in &normal_blocks {
             let scoped_selector = Self::scope_css_selector(comp_name, &block.selector);
             css.push_str(&scoped_selector);
             css.push_str(" { ");
@@ -6468,6 +6554,32 @@ impl WasmCodegen {
                 css.push_str(": ");
                 css.push_str(val);
                 css.push_str("; ");
+            }
+            css.push_str("} ");
+        }
+
+        // Emit breakpoint-wrapped blocks
+        for (_bp_name, px, blocks) in &bp_groups {
+            css.push_str(&format!("@media (min-width: {}px) {{ ", px));
+            for block in blocks {
+                // Extract the inner selector by stripping the `@name ` prefix
+                let trimmed = block.selector.trim();
+                let after_at = &trimmed[1..];
+                let inner_selector = if let Some(space_idx) = after_at.find(' ') {
+                    after_at[space_idx..].trim()
+                } else {
+                    ""
+                };
+                let scoped_selector = Self::scope_css_selector(comp_name, inner_selector);
+                css.push_str(&scoped_selector);
+                css.push_str(" { ");
+                for (prop, val) in &block.properties {
+                    css.push_str(prop);
+                    css.push_str(": ");
+                    css.push_str(val);
+                    css.push_str("; ");
+                }
+                css.push_str("} ");
             }
             css.push_str("} ");
         }
@@ -24075,7 +24187,7 @@ mod coverage_codegen_tests {
             name: "MainTheme".into(),
             light: Some(vec![
                 ("bg".into(), Expr::StringLit("#fff".into())),
-                ("fg".into(), Expr::Integer(0)), // triggers null branch
+                ("fg".into(), Expr::Integer(0)), // non-string values are skipped
             ]),
             dark: Some(vec![
                 ("bg".into(), Expr::StringLit("#000".into())),
@@ -24090,7 +24202,8 @@ mod coverage_codegen_tests {
         codegen.generate_theme(&theme);
         let output = codegen.output.clone();
         assert!(output.contains("Theme: MainTheme"), "should have theme header");
-        assert!(output.contains("theme_init"), "should call theme_init");
+        assert!(output.contains("style_injectStyles"), "should call style_injectStyles for CSS custom properties");
+        assert!(output.contains("__init_theme_MainTheme"), "should emit init function");
     }
 
     #[test]
@@ -24110,6 +24223,255 @@ mod coverage_codegen_tests {
         let output = codegen.output.clone();
         assert!(output.contains("Theme: Auto"), "should have theme header");
         assert!(output.contains("init_theme"), "should call init_theme");
+    }
+
+    // -----------------------------------------------------------------------
+    // Theme CSS custom properties
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn theme_emits_root_css_custom_properties() {
+        let theme = ThemeDef {
+            name: "AppTheme".into(),
+            light: Some(vec![
+                ("brand".into(), Expr::StringLit("#303234".into())),
+                ("accent".into(), Expr::StringLit("#FFB547".into())),
+                ("bg".into(), Expr::StringLit("#F6F7F9".into())),
+            ]),
+            dark: None,
+            dark_auto: false,
+            primary: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_theme(&theme);
+        let output = codegen.output.clone();
+
+        // Verify the stored CSS contains :root with custom properties
+        let css_str = codegen.strings.iter()
+            .find(|(s, _)| s.contains(":root"))
+            .map(|(s, _)| s.clone());
+        assert!(css_str.is_some(), "should store :root CSS string");
+        let css = css_str.unwrap();
+        assert!(css.contains("--brand: #303234"), "should emit --brand custom property");
+        assert!(css.contains("--accent: #FFB547"), "should emit --accent custom property");
+        assert!(css.contains("--bg: #F6F7F9"), "should emit --bg custom property");
+    }
+
+    #[test]
+    fn theme_emits_dark_mode_media_query() {
+        let theme = ThemeDef {
+            name: "AppTheme".into(),
+            light: Some(vec![
+                ("bg".into(), Expr::StringLit("#FFFFFF".into())),
+            ]),
+            dark: Some(vec![
+                ("bg".into(), Expr::StringLit("#1A1A1A".into())),
+            ]),
+            dark_auto: false,
+            primary: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_theme(&theme);
+
+        let css_str = codegen.strings.iter()
+            .find(|(s, _)| s.contains(":root"))
+            .map(|(s, _)| s.clone())
+            .unwrap();
+
+        assert!(css_str.contains(":root { --bg: #FFFFFF; }"), "light values in :root");
+        assert!(css_str.contains("@media (prefers-color-scheme: dark) { :root { --bg: #1A1A1A; } }"),
+            "dark values in prefers-color-scheme media query");
+    }
+
+    #[test]
+    fn theme_underscore_to_hyphen_in_css_vars() {
+        let theme = ThemeDef {
+            name: "AppTheme".into(),
+            light: Some(vec![
+                ("spacing_sm".into(), Expr::StringLit("8px".into())),
+                ("spacing_md".into(), Expr::StringLit("16px".into())),
+                ("radius_md".into(), Expr::StringLit("8px".into())),
+            ]),
+            dark: None,
+            dark_auto: false,
+            primary: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_theme(&theme);
+
+        let css_str = codegen.strings.iter()
+            .find(|(s, _)| s.contains(":root"))
+            .map(|(s, _)| s.clone())
+            .unwrap();
+
+        assert!(css_str.contains("--spacing-sm: 8px"), "underscore converted to hyphen");
+        assert!(css_str.contains("--spacing-md: 16px"), "underscore converted to hyphen");
+        assert!(css_str.contains("--radius-md: 8px"), "underscore converted to hyphen");
+    }
+
+    // -----------------------------------------------------------------------
+    // Breakpoint expansion in style blocks
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn breakpoints_stored_in_codegen_for_expansion() {
+        let bp = BreakpointsDef {
+            breakpoints: vec![
+                ("sm".into(), 640),
+                ("md".into(), 768),
+                ("lg".into(), 1024),
+            ],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_breakpoints(&bp);
+
+        assert_eq!(codegen.breakpoint_defs.len(), 3, "should store 3 breakpoints");
+        assert_eq!(codegen.breakpoint_defs[0], ("sm".into(), 640));
+        assert_eq!(codegen.breakpoint_defs[1], ("md".into(), 768));
+        assert_eq!(codegen.breakpoint_defs[2], ("lg".into(), 1024));
+    }
+
+    #[test]
+    fn breakpoint_expansion_in_style_injection() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // Register breakpoints first
+        codegen.breakpoint_defs.push(("md".into(), 768));
+        codegen.breakpoint_defs.push(("lg".into(), 1024));
+
+        let styles = vec![
+            StyleBlock {
+                selector: ".card".into(),
+                properties: vec![("padding".into(), "24px".into())],
+                span: span(),
+            },
+            StyleBlock {
+                selector: "@md .card".into(),
+                properties: vec![("padding".into(), "16px".into())],
+                span: span(),
+            },
+            StyleBlock {
+                selector: "@lg .card".into(),
+                properties: vec![("padding".into(), "8px".into())],
+                span: span(),
+            },
+        ];
+
+        codegen.generate_style_injection("Card", &styles);
+
+        // Find the CSS string in stored strings
+        let css_str = codegen.strings.iter()
+            .find(|(s, _)| s.contains("Card__card"))
+            .map(|(s, _)| s.clone())
+            .unwrap();
+
+        assert!(css_str.contains(".Card__card { padding: 24px; }"),
+            "normal rule should be scoped: {}", css_str);
+        assert!(css_str.contains("@media (min-width: 768px)"),
+            "md breakpoint should expand to media query: {}", css_str);
+        assert!(css_str.contains("@media (min-width: 1024px)"),
+            "lg breakpoint should expand to media query: {}", css_str);
+    }
+
+    #[test]
+    fn breakpoint_expansion_end_to_end() {
+        let src = r##"
+            breakpoints App {
+                sm: 640,
+                md: 768,
+                lg: 1024,
+            }
+
+            theme AppTheme {
+                light {
+                    brand: "#303234",
+                    bg: "#F6F7F9",
+                    spacing_lg: "24px",
+                    spacing_md: "16px",
+                    radius_md: "8px",
+                }
+            }
+
+            component Card() {
+                style {
+                    .card {
+                        background: "var(--bg)";
+                        padding: "var(--spacing-lg)";
+                        border-radius: "var(--radius-md)";
+                    }
+                    @md {
+                        .card {
+                            padding: "var(--spacing-md)";
+                        }
+                    }
+                }
+                render {
+                    <div class="card">"Hello"</div>
+                }
+            }
+        "##;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Verify :root CSS variables are emitted
+        let has_root = codegen.strings.iter().any(|(s, _)| s.contains(":root") && s.contains("--brand: #303234"));
+        assert!(has_root, "should emit :root with --brand CSS custom property");
+
+        // Verify breakpoint expansion
+        let has_media = codegen.strings.iter().any(|(s, _)| s.contains("@media (min-width: 768px)"));
+        assert!(has_media, "should expand @md to @media (min-width: 768px)");
+
+        // Verify scoped selectors
+        let has_scoped = codegen.strings.iter().any(|(s, _)| s.contains(".Card__card"));
+        assert!(has_scoped, "should scope .card to .Card__card");
+
+        // Verify the WAT contains style injection calls
+        assert!(wat.contains("call $style_injectStyles"), "should call style_injectStyles");
+    }
+
+    #[test]
+    fn non_breakpoint_at_rule_left_as_is() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // Register only "md" as a breakpoint — "print" should not match
+        codegen.breakpoint_defs.push(("md".into(), 768));
+
+        // A style block with @media selector that is NOT a breakpoint
+        // should be left as a normal style block
+        let styles = vec![
+            StyleBlock {
+                selector: ".card".into(),
+                properties: vec![("color".into(), "red".into())],
+                span: span(),
+            },
+        ];
+
+        codegen.generate_style_injection("Widget", &styles);
+
+        let css_str = codegen.strings.iter()
+            .find(|(s, _)| s.contains("Widget__card"))
+            .map(|(s, _)| s.clone())
+            .unwrap();
+
+        assert!(css_str.contains(".Widget__card { color: red; }"),
+            "non-breakpoint block should be emitted as normal rule");
+        assert!(!css_str.contains("@media"),
+            "should not contain @media when no breakpoint blocks present");
     }
 
     // -----------------------------------------------------------------------
@@ -26904,8 +27266,9 @@ mod coverage_codegen_tests {
         let program = parser.parse_program().unwrap();
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
-        assert!(wat.contains("func $theme_init"), "theme_init must be defined in the output WAT");
-        assert!(wat.contains("call $theme_init"), "generate_theme must call $theme_init");
+        // Theme with light/dark blocks now emits CSS custom properties via style_injectStyles
+        assert!(wat.contains("__init_theme_AppTheme"), "theme init function must be emitted");
+        assert!(wat.contains("call $style_injectStyles"), "generate_theme must call style_injectStyles for CSS custom properties");
     }
 
     /// Issue 10: signal field referenced without `self.` in component template
