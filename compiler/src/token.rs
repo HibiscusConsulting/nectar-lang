@@ -223,6 +223,57 @@ pub enum FormatStringPart {
     Expr(String),
 }
 
+impl TokenKind {
+    /// Text representation for CSS selector context.
+    /// All keywords return their lowercase text so class names
+    /// like .app-layout, .form-row, .page-header parse correctly.
+    pub fn as_css_text(&self) -> String {
+        match self {
+            TokenKind::Ident(s) => s.clone(),
+            TokenKind::Integer(n) => n.to_string(),
+            TokenKind::Let => "let".into(), TokenKind::Mut => "mut".into(),
+            TokenKind::Fn => "fn".into(), TokenKind::Return => "return".into(),
+            TokenKind::If => "if".into(), TokenKind::Else => "else".into(),
+            TokenKind::While => "while".into(), TokenKind::For => "for".into(),
+            TokenKind::In => "in".into(), TokenKind::Struct => "struct".into(),
+            TokenKind::Enum => "enum".into(), TokenKind::Impl => "impl".into(),
+            TokenKind::Trait => "trait".into(), TokenKind::Pub => "pub".into(),
+            TokenKind::Use => "use".into(), TokenKind::Mod => "mod".into(),
+            TokenKind::True => "true".into(), TokenKind::False => "false".into(),
+            TokenKind::Component => "component".into(), TokenKind::Render => "render".into(),
+            TokenKind::Store => "store".into(), TokenKind::Signal => "signal".into(),
+            TokenKind::Action => "action".into(), TokenKind::Computed => "computed".into(),
+            TokenKind::Effect => "effect".into(), TokenKind::Selector => "selector".into(),
+            TokenKind::Router => "router".into(), TokenKind::Route => "route".into(),
+            TokenKind::Page => "page".into(), TokenKind::Form => "form".into(),
+            TokenKind::Channel => "channel".into(), TokenKind::Agent => "agent".into(),
+            TokenKind::App => "app".into(), TokenKind::Theme => "theme".into(),
+            TokenKind::Auth => "auth".into(), TokenKind::Payment => "payment".into(),
+            TokenKind::Upload => "upload".into(), TokenKind::Embed => "embed".into(),
+            TokenKind::Pdf => "pdf".into(), TokenKind::Db => "db".into(),
+            TokenKind::Cache => "cache".into(), TokenKind::Contract => "contract".into(),
+            TokenKind::Async => "async".into(), TokenKind::Await => "await".into(),
+            TokenKind::Lazy => "lazy".into(), TokenKind::Spring => "spring".into(),
+            TokenKind::Keyframes => "keyframes".into(), TokenKind::Stagger => "stagger".into(),
+            TokenKind::Shortcut => "shortcut".into(), TokenKind::Secret => "secret".into(),
+            TokenKind::Atomic => "atomic".into(), TokenKind::Select => "select".into(),
+            TokenKind::Test => "test".into(), TokenKind::Match => "match".into(),
+            TokenKind::Fallback => "fallback".into(), TokenKind::Navigate => "navigate".into(),
+            TokenKind::Guard => "guard".into(), TokenKind::Layout => "layout".into(),
+            TokenKind::Breakpoint => "breakpoint".into(), TokenKind::Where => "where".into(),
+            TokenKind::As => "as".into(), TokenKind::SelfKw => "self".into(),
+            TokenKind::Spawn => "spawn".into(), TokenKind::Suspend => "suspend".into(),
+            TokenKind::MustUse => "must_use".into(), TokenKind::Yield => "yield".into(),
+            TokenKind::Try => "try".into(), TokenKind::Catch => "catch".into(),
+            TokenKind::Banking => "banking".into(), TokenKind::MapKeyword => "map".into(),
+            TokenKind::A11y => "a11y".into(), TokenKind::Manual => "manual".into(),
+            TokenKind::Hybrid => "hybrid".into(), TokenKind::Outlet => "outlet".into(),
+            TokenKind::Crypto => "crypto".into(), TokenKind::Virtual => "virtual".into(),
+            _ => String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,

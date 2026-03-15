@@ -3537,48 +3537,14 @@ impl Parser {
                     TokenKind::Hash => selector.push('#'),
                     TokenKind::At => selector.push('@'),
                     _ => {
-                        // Keywords (app, store, page, form, etc.) should be treated
-                        // as identifiers in CSS selector context
-                        let keyword_text = match &tok.kind {
-                            TokenKind::App => Some("app"),
-                            TokenKind::Store => Some("store"),
-                            TokenKind::Page => Some("page"),
-                            TokenKind::Form => Some("form"),
-                            TokenKind::Component => Some("component"),
-                            TokenKind::Router => Some("router"),
-                            TokenKind::Theme => Some("theme"),
-                            TokenKind::Auth => Some("auth"),
-                            TokenKind::Channel => Some("channel"),
-                            TokenKind::Upload => Some("upload"),
-                            TokenKind::Payment => Some("payment"),
-                            TokenKind::Agent => Some("agent"),
-                            TokenKind::Cache => Some("cache"),
-                            TokenKind::Db => Some("db"),
-                            TokenKind::Embed => Some("embed"),
-                            TokenKind::Pdf => Some("pdf"),
-                            TokenKind::Signal => Some("signal"),
-                            TokenKind::Action => Some("action"),
-                            TokenKind::Computed => Some("computed"),
-                            TokenKind::Effect => Some("effect"),
-                            TokenKind::Selector => Some("selector"),
-                            TokenKind::Render => Some("render"),
-                            TokenKind::Select => Some("select"),
-                            TokenKind::Lazy => Some("lazy"),
-                            TokenKind::Spring => Some("spring"),
-                            TokenKind::Stagger => Some("stagger"),
-                            TokenKind::Banking => Some("banking"),
-                            TokenKind::MapKeyword => Some("map"),
-                            TokenKind::Secret => Some("secret"),
-                            TokenKind::Atomic => Some("atomic"),
-                            TokenKind::Async => Some("async"),
-                            TokenKind::Test => Some("test"),
-                            _ => None,
-                        };
-                        if let Some(text) = keyword_text {
+                        // In CSS selector context, ALL tokens are identifier parts.
+                        // Use as_css_text() to handle every keyword generically.
+                        let text = tok.kind.as_css_text();
+                        if !text.is_empty() {
                             if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') && !selector.ends_with('-') && !selector.ends_with('#') {
                                 selector.push(' ');
                             }
-                            selector.push_str(text);
+                            selector.push_str(&text);
                         } else if !selector.is_empty() && !selector.ends_with(' ') {
                             selector.push(' ');
                         }
