@@ -1153,9 +1153,20 @@ impl WasmCodegen {
                 }
             }
 
+            // Collect theme init calls
+            for item in &program.items {
+                if let Item::Theme(t) = item {
+                    init_calls.push(format!("  call $__init_theme_{}", t.name));
+                }
+                if let Item::Breakpoints(b) = item {
+                    init_calls.push("  call $__init_breakpoints".to_string());
+                    let _ = b;
+                }
+            }
+
             if !init_calls.is_empty() {
                 self.line("");
-                self.line(";; Auto-init: call all store inits, auth registers, and db opens");
+                self.line(";; Auto-init: call all store/auth/db/theme/breakpoint inits");
                 self.line("(func $__init_all (export \"__init_all\")");
                 for call in &init_calls {
                     self.line(call);
