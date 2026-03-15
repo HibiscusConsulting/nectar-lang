@@ -109,6 +109,8 @@ pub enum TokenKind {
     Pdf,
     Download,
     Payment,
+    Banking,
+    MapKeyword,
     Auth,
     Upload,
     Env,

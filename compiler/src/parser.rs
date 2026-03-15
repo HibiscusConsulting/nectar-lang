@@ -191,6 +191,8 @@ impl Parser {
             TokenKind::Embed => Ok(Item::Embed(self.parse_embed(is_pub)?)),
             TokenKind::Pdf => Ok(Item::Pdf(self.parse_pdf(is_pub)?)),
             TokenKind::Payment => Ok(Item::Payment(self.parse_payment(is_pub)?)),
+            TokenKind::Banking => Ok(Item::Banking(self.parse_banking(is_pub)?)),
+            TokenKind::MapKeyword => Ok(Item::Map(self.parse_map(is_pub)?)),
             TokenKind::Auth => Ok(Item::Auth(self.parse_auth(is_pub)?)),
             TokenKind::Upload => Ok(Item::Upload(self.parse_upload(is_pub)?)),
             TokenKind::Db => Ok(Item::Db(self.parse_db(is_pub)?)),
@@ -2975,7 +2977,8 @@ impl Parser {
             }
             // Keyword tokens that double as stdlib namespace prefixes (crypto::sha256, etc.)
             TokenKind::Crypto | TokenKind::Cache | TokenKind::Db | TokenKind::Auth
-            | TokenKind::Clipboard | TokenKind::Upload | TokenKind::Payment => {
+            | TokenKind::Clipboard | TokenKind::Upload | TokenKind::Payment
+            | TokenKind::Banking | TokenKind::MapKeyword => {
                 let _span = self.current_span();
                 let name = match self.peek_kind() {
                     TokenKind::Crypto => "crypto",
@@ -2985,6 +2988,8 @@ impl Parser {
                     TokenKind::Clipboard => "clipboard",
                     TokenKind::Upload => "upload",
                     TokenKind::Payment => "payment",
+                    TokenKind::Banking => "banking",
+                    TokenKind::MapKeyword => "map",
                     _ => unreachable!(),
                 }.to_string();
                 self.advance();
@@ -4029,6 +4034,121 @@ impl Parser {
         Ok(PaymentDef { name, provider, public_key, sandbox_mode, on_success, on_error, methods, is_pub, span })
     }
 
+    fn parse_banking(&mut self, is_pub: bool) -> Result<BankingDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::Banking)?;
+        let name = self.expect_ident()?;
+        self.expect(&TokenKind::LeftBrace)?;
+
+        let mut provider = None;
+        let mut on_success = None;
+        let mut on_exit = None;
+        let mut on_error = None;
+        let mut methods = vec![];
+
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            match self.peek_kind() {
+                TokenKind::Fn | TokenKind::Async => {
+                    let f = self.parse_function(false)?;
+                    match f.name.as_str() {
+                        "on_success" => on_success = Some(f),
+                        "on_exit" => on_exit = Some(f),
+                        "on_error" => on_error = Some(f),
+                        _ => methods.push(f),
+                    }
+                }
+                _ => {
+                    let key = self.expect_ident()?;
+                    self.expect(&TokenKind::Colon)?;
+                    match key.as_str() {
+                        "provider" => { provider = Some(self.parse_expr()?); }
+                        _ => { self.parse_expr()?; } // skip unknown
+                    }
+                    self.match_token(&TokenKind::Comma);
+                }
+            }
+        }
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(BankingDef { name, provider, on_success, on_exit, on_error, methods, is_pub, span })
+    }
+
+    fn parse_map(&mut self, is_pub: bool) -> Result<MapDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::MapKeyword)?;
+        let name = self.expect_ident()?;
+        self.expect(&TokenKind::LeftBrace)?;
+
+        let mut provider = None;
+        let mut center: Option<(f64, f64)> = None;
+        let mut zoom: Option<f64> = None;
+        let mut style = None;
+        let mut on_ready = None;
+        let mut on_click = None;
+        let mut methods = vec![];
+
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            match self.peek_kind() {
+                TokenKind::Fn | TokenKind::Async => {
+                    let f = self.parse_function(false)?;
+                    match f.name.as_str() {
+                        "on_ready" => on_ready = Some(f),
+                        "on_click" => on_click = Some(f),
+                        _ => methods.push(f),
+                    }
+                }
+                _ => {
+                    let key = self.expect_ident()?;
+                    self.expect(&TokenKind::Colon)?;
+                    match key.as_str() {
+                        "provider" => { provider = Some(self.parse_expr()?); }
+                        "style" => { style = Some(self.parse_expr()?); }
+                        "center" => {
+                            // Parse (lat, lng) tuple
+                            self.expect(&TokenKind::LeftParen)?;
+                            let lat_expr = self.parse_expr()?;
+                            self.expect(&TokenKind::Comma)?;
+                            let lng_expr = self.parse_expr()?;
+                            self.expect(&TokenKind::RightParen)?;
+                            let lat = match &lat_expr {
+                                Expr::Float(f) => *f,
+                                Expr::Integer(i) => *i as f64,
+                                Expr::Unary { op: UnaryOp::Neg, operand } => match operand.as_ref() {
+                                    Expr::Float(f) => -f,
+                                    Expr::Integer(i) => -(*i as f64),
+                                    _ => 0.0,
+                                },
+                                _ => 0.0,
+                            };
+                            let lng = match &lng_expr {
+                                Expr::Float(f) => *f,
+                                Expr::Integer(i) => *i as f64,
+                                Expr::Unary { op: UnaryOp::Neg, operand } => match operand.as_ref() {
+                                    Expr::Float(f) => -f,
+                                    Expr::Integer(i) => -(*i as f64),
+                                    _ => 0.0,
+                                },
+                                _ => 0.0,
+                            };
+                            center = Some((lat, lng));
+                        }
+                        "zoom" => {
+                            let z = self.parse_expr()?;
+                            zoom = match &z {
+                                Expr::Float(f) => Some(*f),
+                                Expr::Integer(i) => Some(*i as f64),
+                                _ => None,
+                            };
+                        }
+                        _ => { self.parse_expr()?; } // skip unknown
+                    }
+                    self.match_token(&TokenKind::Comma);
+                }
+            }
+        }
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(MapDef { name, provider, center, zoom, style, on_ready, on_click, methods, is_pub, span })
+    }
+
     fn parse_auth(&mut self, is_pub: bool) -> Result<AuthDef, ParseError> {
         let span = self.current_span();
         self.expect(&TokenKind::Auth)?;
@@ -4870,6 +4990,8 @@ impl Parser {
                     TokenKind::OnMessage => Some("on_message"),
                     TokenKind::Upload => Some("upload"),
                     TokenKind::Payment => Some("payment"),
+                    TokenKind::Banking => Some("banking"),
+                    TokenKind::MapKeyword => Some("map"),
                     TokenKind::Select => Some("select"),
                     _ => None,
                 };
@@ -6262,6 +6384,149 @@ mod tests {
             assert!(p.on_error.is_some());
         } else {
             panic!("Expected Payment");
+        }
+    }
+
+    // --- Banking ---
+
+    #[test]
+    fn test_parse_banking() {
+        let prog = parse(r#"
+            banking AccountLink {
+                provider: "plaid",
+                fn on_success() { return; }
+                fn on_exit() { return; }
+                fn on_error() { return; }
+            }
+        "#);
+        if let Item::Banking(b) = &prog.items[0] {
+            assert_eq!(b.name, "AccountLink");
+            assert!(b.provider.is_some());
+            assert!(b.on_success.is_some());
+            assert!(b.on_exit.is_some());
+            assert!(b.on_error.is_some());
+        } else {
+            panic!("Expected Banking");
+        }
+    }
+
+    #[test]
+    fn test_parse_banking_minimal() {
+        let prog = parse(r#"
+            banking BankLink {
+                provider: "plaid",
+            }
+        "#);
+        if let Item::Banking(b) = &prog.items[0] {
+            assert_eq!(b.name, "BankLink");
+            assert!(b.provider.is_some());
+            assert!(b.on_success.is_none());
+            assert!(b.on_exit.is_none());
+            assert!(b.on_error.is_none());
+        } else {
+            panic!("Expected Banking");
+        }
+    }
+
+    #[test]
+    fn test_parse_banking_with_methods() {
+        let prog = parse(r#"
+            banking Fin {
+                provider: "mx",
+                fn get_accounts() { return; }
+            }
+        "#);
+        if let Item::Banking(b) = &prog.items[0] {
+            assert_eq!(b.name, "Fin");
+            assert_eq!(b.methods.len(), 1);
+            assert_eq!(b.methods[0].name, "get_accounts");
+        } else {
+            panic!("Expected Banking");
+        }
+    }
+
+    // --- Map ---
+
+    #[test]
+    fn test_parse_map() {
+        let prog = parse(r#"
+            map StoreLocator {
+                provider: "mapbox",
+                center: (40.7128, -74.0060),
+                zoom: 12,
+                fn on_ready() { return; }
+                fn on_click() { return; }
+            }
+        "#);
+        if let Item::Map(m) = &prog.items[0] {
+            assert_eq!(m.name, "StoreLocator");
+            assert!(m.provider.is_some());
+            assert!(m.center.is_some());
+            let (lat, lng) = m.center.unwrap();
+            assert!((lat - 40.7128).abs() < 0.001);
+            assert!((lng - (-74.006)).abs() < 0.001);
+            assert_eq!(m.zoom, Some(12.0));
+            assert!(m.on_ready.is_some());
+            assert!(m.on_click.is_some());
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_parse_map_minimal() {
+        let prog = parse(r#"
+            map SimpleMap {
+                provider: "mapbox",
+            }
+        "#);
+        if let Item::Map(m) = &prog.items[0] {
+            assert_eq!(m.name, "SimpleMap");
+            assert!(m.center.is_none());
+            assert!(m.zoom.is_none());
+            assert!(m.on_ready.is_none());
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_parse_map_with_methods() {
+        let prog = parse(r#"
+            map GeoMap {
+                provider: "mapbox",
+                center: (0, 0),
+                zoom: 5,
+                fn add_markers() { return; }
+                fn fly_to() { return; }
+            }
+        "#);
+        if let Item::Map(m) = &prog.items[0] {
+            assert_eq!(m.name, "GeoMap");
+            assert_eq!(m.methods.len(), 2);
+            assert_eq!(m.methods[0].name, "add_markers");
+            assert_eq!(m.methods[1].name, "fly_to");
+            let (lat, lng) = m.center.unwrap();
+            assert_eq!(lat, 0.0);
+            assert_eq!(lng, 0.0);
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_parse_map_no_provider_defaults() {
+        let prog = parse(r#"
+            map DefaultMap {
+                zoom: 8,
+            }
+        "#);
+        if let Item::Map(m) = &prog.items[0] {
+            assert_eq!(m.name, "DefaultMap");
+            assert!(m.provider.is_none());
+            assert_eq!(m.zoom, Some(8.0));
+        } else {
+            panic!("Expected Map");
         }
     }
 

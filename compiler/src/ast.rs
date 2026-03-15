@@ -53,6 +53,10 @@ pub enum Item {
     Pdf(PdfDef),
     /// Payment gateway definition — PCI-compliant payment processing
     Payment(PaymentDef),
+    /// Banking/financial data connection — account linking, balance, transactions
+    Banking(BankingDef),
+    /// Map widget definition — interactive maps with markers, layers, geocoding
+    Map(MapDef),
     /// Authentication definition — OAuth, JWT, session-based auth
     Auth(AuthDef),
     /// File upload definition — resumable chunked file uploads
@@ -332,6 +336,53 @@ pub struct PaymentDef {
     pub sandbox_mode: bool,            // PCI-compliant isolation
     pub on_success: Option<Function>,
     pub on_error: Option<Function>,
+    pub methods: Vec<Function>,
+    pub is_pub: bool,
+    #[allow(dead_code)]
+    pub span: Span,
+}
+
+/// Banking definition — financial data connection (Plaid, MX, etc.)
+///
+/// ```nectar
+/// banking AccountLink {
+///     provider: "plaid",
+///     on_success fn(public_token: String) { ... }
+///     on_exit fn() { ... }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct BankingDef {
+    pub name: String,
+    pub provider: Option<Expr>,        // "plaid", "mx", etc.
+    pub on_success: Option<Function>,
+    pub on_exit: Option<Function>,
+    pub on_error: Option<Function>,
+    pub methods: Vec<Function>,
+    pub is_pub: bool,
+    #[allow(dead_code)]
+    pub span: Span,
+}
+
+/// Map widget definition — interactive maps (Mapbox, Google Maps, etc.)
+///
+/// ```nectar
+/// map StoreLocator {
+///     provider: "mapbox",
+///     center: (40.7128, -74.0060),
+///     zoom: 12,
+///     on_ready fn(map_id: i32) { ... }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct MapDef {
+    pub name: String,
+    pub provider: Option<Expr>,        // "mapbox", "google", etc.
+    pub center: Option<(f64, f64)>,    // (lat, lng)
+    pub zoom: Option<f64>,
+    pub style: Option<Expr>,           // map style URL
+    pub on_ready: Option<Function>,
+    pub on_click: Option<Function>,
     pub methods: Vec<Function>,
     pub is_pub: bool,
     #[allow(dead_code)]

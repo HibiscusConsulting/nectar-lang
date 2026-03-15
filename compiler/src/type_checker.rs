@@ -1877,6 +1877,12 @@ impl TypeChecker {
                 Item::Payment(def) => {
                     self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
                 }
+                Item::Banking(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
+                Item::Map(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
                 Item::Pdf(def) => {
                     self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
                 }
@@ -1987,6 +1993,8 @@ impl TypeChecker {
                 Item::Embed(_) => { /* embed type checking TODO */ }
                 Item::Pdf(_) => { /* pdf type checking TODO */ }
                 Item::Payment(_) => { /* payment type checking TODO */ }
+                Item::Banking(_) => { /* banking type checking TODO */ }
+                Item::Map(_) => { /* map type checking TODO */ }
                 Item::Auth(_) => { /* auth type checking TODO */ }
                 Item::Upload(_) => { /* upload type checking TODO */ }
                 Item::Db(_) => { /* db type checking TODO */ }
@@ -7942,6 +7950,40 @@ mod coverage_type_checker_tests {
         })]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "payment def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn banking_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Banking(BankingDef {
+            name: "AccountLink".into(),
+            provider: None,
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "banking def should not produce errors: {:?}", result.err());
+    }
+
+    #[test]
+    fn map_def_registers_name_in_structs() {
+        let prog = program(vec![Item::Map(MapDef {
+            name: "StoreLocator".into(),
+            provider: None,
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "map def should not produce errors: {:?}", result.err());
     }
 
     #[test]

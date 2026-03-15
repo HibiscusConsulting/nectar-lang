@@ -27,6 +27,8 @@ pub fn detect_required_namespaces(program: &Program) -> HashSet<String> {
             Item::Embed(_) => { ns.insert("embed".to_string()); }
             Item::Pdf(_) => { ns.insert("pdf".to_string()); }
             Item::Payment(_) => { ns.insert("payment".to_string()); }
+            Item::Banking(_) => { ns.insert("banking".to_string()); }
+            Item::Map(_) => { ns.insert("map".to_string()); }
             Item::Auth(_) => { ns.insert("auth".to_string()); }
             Item::Upload(_) => { ns.insert("upload".to_string()); }
             Item::Db(_) => { ns.insert("db".to_string()); }
@@ -373,6 +375,44 @@ mod tests {
         };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("payment"));
+    }
+
+    #[test]
+    fn test_banking_includes_banking() {
+        let program = Program {
+            items: vec![Item::Banking(BankingDef {
+                name: "Link".to_string(),
+                provider: None,
+                on_success: None,
+                on_exit: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: empty_span(),
+            })],
+        };
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("banking"));
+    }
+
+    #[test]
+    fn test_map_includes_map() {
+        let program = Program {
+            items: vec![Item::Map(MapDef {
+                name: "MapWidget".to_string(),
+                provider: None,
+                center: None,
+                zoom: None,
+                style: None,
+                on_ready: None,
+                on_click: None,
+                methods: vec![],
+                is_pub: false,
+                span: empty_span(),
+            })],
+        };
+        let ns = detect_required_namespaces(&program);
+        assert!(ns.contains("map"));
     }
 
     #[test]
