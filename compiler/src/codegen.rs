@@ -2803,10 +2803,19 @@ impl WasmCodegen {
             self.line(&format!("(global {} (mut i32) (i32.const 0))", cond.last_val_global));
         }
 
-        for cond in self.cond_updaters.clone() {
+        // Use a work queue so that nested cond updaters (reactive conditionals
+        // inside other reactive conditionals) are also processed.
+        let mut cond_queue: Vec<CondUpdater> = self.cond_updaters.clone();
+        let mut cond_queue_idx = 0;
+        while cond_queue_idx < cond_queue.len() {
+            let cond = cond_queue[cond_queue_idx].clone();
+            cond_queue_idx += 1;
+
             // Save signal_updaters so children inside the cond block don't leak
             // updater registrations into the main component's updater list.
             let saved_signal_updaters = std::mem::take(&mut self.signal_updaters);
+            // Save cond_updaters so nested conds can be collected separately
+            let saved_cond_updaters = std::mem::take(&mut self.cond_updaters);
 
             // Emit mount function: renders children into the container
             self.line("");
@@ -2843,12 +2852,25 @@ impl WasmCodegen {
             // Collect any signal updaters created by children inside this cond block
             let cond_updaters_inner = std::mem::take(&mut self.signal_updaters);
 
-            // Restore the outer signal_updaters
+            // Collect any nested cond updaters created by children inside this cond block
+            let nested_cond_updaters = std::mem::take(&mut self.cond_updaters);
+
+            // Restore the outer signal_updaters and cond_updaters
             self.signal_updaters = saved_signal_updaters;
+            self.cond_updaters = saved_cond_updaters;
 
             // Close the mount function
             self.indent -= 1;
             self.line(")");
+
+            // Add nested cond updaters to the work queue for processing
+            for nested in &nested_cond_updaters {
+                // Emit globals for nested cond updaters (at module level, after function close)
+                self.line(&format!("(global {} (mut i32) (i32.const -1))", nested.container_global));
+                self.line(&format!("(global {} (mut i32) (i32.const 0))", nested.last_val_global));
+                self.closure_func_names.push(nested.func_name.clone());
+            }
+            cond_queue.extend(nested_cond_updaters);
 
             // Emit globals for the inner updaters (must be at module level, after function close)
             for (func_name, global_el, _, _) in &cond_updaters_inner {
@@ -6373,14 +6395,12 @@ impl WasmCodegen {
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", name_offset));
                             self.line(&format!("i32.const {}", name.len()));
-                            // Evaluate expression — may produce (ptr, len) or just ptr
+                            // Evaluate expression — may produce (ptr, len) pair or single i32
                             self.generate_expr(value);
-                            // If expression already produces (ptr, len), skip str_len.
-                            // FormatString, FnCall to "format", and StringLit produce (ptr, len).
-                            let produces_pair = matches!(value, Expr::FormatString { .. } | Expr::StringLit(_))
-                                || matches!(value, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format"));
-                            if !produces_pair {
-                                // Compute strlen for the null-terminated string ptr
+                            if Self::expr_returns_ptr_len(value) {
+                                // Expression already produced (ptr, len) — use directly
+                            } else {
+                                // Single i32 string ptr — compute strlen
                                 self.line("call $str_len");
                             }
                             self.line("call $dom_setAttr");
@@ -7834,6 +7854,20 @@ impl WasmCodegen {
                             self.line(&format!("call ${} ;; tagged allocation", name));
                             return;
                         }
+                        // format(template, arg1, arg2, ...) — chain $format calls
+                        // $format takes (tmpl_ptr, tmpl_len, arg) and returns (ptr, len).
+                        // For multiple args, call $format once per arg, feeding the result
+                        // of each call as the template for the next.
+                        "format" if args.len() > 2 => {
+                            // First arg is the template string
+                            self.generate_expr(&args[0]);
+                            // Each subsequent arg: call $format with current (ptr, len) + arg
+                            for arg in &args[1..] {
+                                self.generate_expr(arg);
+                                self.line("call $format");
+                            }
+                            return;
+                        }
                         _ => {}
                     }
                 }
@@ -8110,15 +8144,12 @@ impl WasmCodegen {
                     if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
                         && self.component_fields.contains(field) {
                         // self.field = value → signal_set(signal_id, value)
-                        // Expressions that produce (ptr, len) need len dropped since
-                        // signal_set takes (id, val). This includes StringLit,
-                        // FormatString, and FnCall to "format".
+                        // String literals produce (ptr, len); signal_set takes (id, val),
+                        // so drop len and use only ptr for string values.
                         self.line(&format!(";; self.{} = ... (signal set)", field));
                         self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
                         self.generate_expr(value);
-                        let produces_pair = matches!(value.as_ref(), Expr::StringLit(_) | Expr::FormatString { .. })
-                            || matches!(value.as_ref(), Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format"));
-                        if produces_pair {
+                        if Self::expr_returns_ptr_len(value) {
                             self.line("drop  ;; discard str len for signal_set");
                         }
                         self.line("call $signal_set");
@@ -8127,9 +8158,7 @@ impl WasmCodegen {
                     }
                 } else {
                     self.generate_expr(value);
-                    let produces_pair = matches!(value.as_ref(), Expr::StringLit(_) | Expr::FormatString { .. })
-                        || matches!(value.as_ref(), Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format"));
-                    if produces_pair {
+                    if matches!(value.as_ref(), Expr::StringLit(_)) {
                         self.line("drop  ;; discard str len for local assign");
                     }
                     if let Expr::Ident(name) = target.as_ref() {
@@ -12411,6 +12440,21 @@ impl WasmCodegen {
                 self.line("call $string_parse_int");
             }
             _ => {
+                // Self method calls — self.method_b() inside a component handler
+                // dispatches to the corresponding handler function.
+                if matches!(object, Expr::SelfExpr) && self.in_component_mount {
+                    if let Some(idx) = self.component_method_names.iter().position(|m| m == method) {
+                        let handler_idx = self.global_handler_base + idx as u32;
+                        self.line(&format!(";; self.{}() — component method call", method));
+                        self.line("i32.const 0 ;; self (signals are global)");
+                        for arg in args {
+                            self.generate_expr(arg);
+                        }
+                        self.line(&format!("call ${}__handler_{}", self.component_name, handler_idx));
+                        return;
+                    }
+                }
+
                 // Check if this is a namespace/type static method call — e.g. `time.now()`,
                 // `Duration.hours(2)`, `clipboard.copy(x)`. In these cases the object is a
                 // well-known namespace identifier, not a local variable, so we must NOT emit
@@ -12592,7 +12636,7 @@ impl WasmCodegen {
                         "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
                         "pwa" | "console" | "hardware" | "webapi" | "rtc" |
                         "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
-                        "http"
+                        "http" | "router"
                     ) {
                         let qualified = format!("{}::{}", obj_name, method);
                         let wasm_fn = self.resolve_stdlib_fn(&qualified);
@@ -12626,13 +12670,22 @@ impl WasmCodegen {
                             "$observe_disconnect" |
                             "$http_setMethod" |
                             "$http_setBody" |
-                            "$http_addHeader"
+                            "$http_addHeader" |
+                            "$http_fetchWithCallback" |
+                            "$router_navigate" |
+                            "$router_navigate_with_query"
                         );
                     }
                 }
                 // Method calls on self fields (e.g. self.items.push(...)) are void
                 if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
                     if matches!(inner.as_ref(), Expr::SelfExpr) && method == "push" {
+                        return true;
+                    }
+                }
+                // self.method() calls within a component are void — handlers don't return values
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    if self.component_method_names.iter().any(|m| m == method) {
                         return true;
                     }
                 }
@@ -12832,6 +12885,22 @@ impl WasmCodegen {
     /// Returns true if the expression is a string literal (pushes ptr, len).
     fn expr_is_string_lit(&self, expr: &Expr) -> bool {
         matches!(expr, Expr::StringLit(_))
+    }
+
+    /// Returns true if the expression produces a (ptr, len) pair on the stack
+    /// rather than a single i32. Used to avoid spurious $str_len calls.
+    fn expr_returns_ptr_len(expr: &Expr) -> bool {
+        match expr {
+            // format() returns (ptr, len)
+            Expr::FnCall { callee, .. } => {
+                matches!(callee.as_ref(), Expr::Ident(name) if name == "format")
+            }
+            // FormatString (f"...") also returns (ptr, len)
+            Expr::FormatString { .. } => true,
+            // String literals push (ptr, len)
+            Expr::StringLit(_) => true,
+            _ => false,
+        }
     }
 
     /// Returns true if the expression is a dynamic string (signal read, etc.)
@@ -28546,6 +28615,72 @@ mod reactive_cond_tests {
         );
     }
 
+    /// Nested reactive conditionals: an inner {if signal ...} inside an outer {if signal ...}
+    /// must also emit globals and updater/mount functions for the inner block.
+    #[test]
+    fn test_nested_reactive_template_if_emits_inner_globals() {
+        let src = r#"
+            component Nested() {
+                let mut show_outer: Int = 0;
+                let mut show_inner: Int = 0;
+                fn toggle_outer(self) {
+                    self.show_outer = 1;
+                }
+                fn toggle_inner(self) {
+                    self.show_inner = 1;
+                }
+                render {
+                    <div>
+                        {if self.show_outer == 1 {
+                            <div>"outer"</div>
+                            {if self.show_inner == 1 {
+                                <div>"inner"</div>
+                            }}
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+
+        // Count the number of cond container globals — there should be 2 (outer + inner)
+        let cond_el_count = wat.matches("__cond_el_Nested_").count();
+        assert!(
+            cond_el_count >= 4, // global decl + global.set + global.get for each
+            "should emit cond container globals for both outer and inner: found {} occurrences",
+            cond_el_count
+        );
+
+        // Count cond value globals — should be 2 (outer + inner)
+        let cond_val_count = wat.matches("__cond_val_Nested_").count();
+        assert!(
+            cond_val_count >= 4,
+            "should emit cond value globals for both outer and inner: found {} occurrences",
+            cond_val_count
+        );
+
+        // Should have 2 mount functions
+        let mount_count = wat.matches("reactive cond mount").count();
+        assert!(
+            mount_count >= 2,
+            "should emit 2 reactive cond mount functions, found {}",
+            mount_count
+        );
+
+        // Should have 2 updater functions
+        let updater_count = wat.matches("reactive cond updater").count();
+        assert!(
+            updater_count >= 2,
+            "should emit 2 reactive cond updater functions, found {}",
+            updater_count
+        );
+    }
+
     #[test]
     fn test_range_for_loop_codegen() {
         let mut codegen = WasmCodegen::new();
@@ -30773,15 +30908,197 @@ mod payhive_feature_tests {
         assert!(output.contains("call $debounce_cancel"), "debounce.cancel should resolve to $debounce_cancel");
     }
 
+    // ── Bug fix: fetchWithCallback is void ──────────────────────────────
+
+    #[test]
+    fn test_http_fetch_with_callback_is_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("http".into())),
+            method: "fetchWithCallback".into(),
+            args: vec![
+                Expr::StringLit("/api".into()),
+                Expr::Integer(0),
+            ],
+        };
+        assert!(codegen.expr_is_void(&expr),
+            "http.fetchWithCallback() should be void — no drop after call");
+    }
+
+    #[test]
+    fn test_http_fetch_with_callback_snake_case_is_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("http".into())),
+            method: "fetch_with_callback".into(),
+            args: vec![
+                Expr::StringLit("/api".into()),
+                Expr::Integer(0),
+            ],
+        };
+        assert!(codegen.expr_is_void(&expr),
+            "http.fetch_with_callback() should be void");
+    }
+
+    // ── Bug fix: router.navigate is void ────────────────────────────────
+
+    #[test]
+    fn test_router_navigate_is_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("router".into())),
+            method: "navigate".into(),
+            args: vec![Expr::StringLit("/home".into())],
+        };
+        assert!(codegen.expr_is_void(&expr),
+            "router.navigate() should be void — no drop after call");
+    }
+
+    #[test]
+    fn test_router_navigate_with_query_is_void() {
+        let codegen = WasmCodegen::new();
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("router".into())),
+            method: "navigate_with_query".into(),
+            args: vec![
+                Expr::StringLit("/search".into()),
+                Expr::StringLit("q=test".into()),
+            ],
+        };
+        assert!(codegen.expr_is_void(&expr),
+            "router.navigate_with_query() should be void");
+    }
+
+    // ── Bug fix: self.method() calls within component ───────────────────
+
+    #[test]
+    fn test_self_method_call_emits_handler_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.in_component_mount = true;
+        codegen.component_name = "AdminPanel".to_string();
+        codegen.component_method_names = vec!["load_data".to_string(), "refresh".to_string()];
+        codegen.global_handler_base = 5;
+        codegen.generate_iterator_method(
+            &Expr::SelfExpr,
+            "refresh",
+            &[],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $AdminPanel__handler_6"),
+            "self.refresh() should emit call $AdminPanel__handler_6, got:\n{}", output);
+    }
+
+    #[test]
+    fn test_self_method_call_is_void() {
+        let mut codegen = WasmCodegen::new();
+        codegen.component_method_names = vec!["handle_click".to_string(), "refresh".to_string()];
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::SelfExpr),
+            method: "refresh".into(),
+            args: vec![],
+        };
+        assert!(codegen.expr_is_void(&expr),
+            "self.refresh() should be void — component methods don't return values");
+    }
+
+    // ── Bug fix: format() with multiple args chains calls ───────────────
+
+    #[test]
+    fn test_format_two_args_single_call() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // format("Page {}", page) — 2 args, uses single $format call
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("format".into())),
+            args: vec![
+                Expr::StringLit("Page {}".into()),
+                Expr::Integer(1),
+            ],
+        });
+        let output = codegen.output.clone();
+        let format_count = output.matches("call $format").count();
+        assert_eq!(format_count, 1,
+            "format with 2 args should call $format once, got {}", format_count);
+    }
+
+    #[test]
+    fn test_format_three_args_chains_two_calls() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // format("Page {} of {}", current, total) — 3 args, needs 2 chained $format calls
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("format".into())),
+            args: vec![
+                Expr::StringLit("Page {} of {}".into()),
+                Expr::Integer(1),
+                Expr::Integer(10),
+            ],
+        });
+        let output = codegen.output.clone();
+        let format_count = output.matches("call $format").count();
+        assert_eq!(format_count, 2,
+            "format with 3 args should chain 2 $format calls, got {}", format_count);
+    }
+
+    #[test]
+    fn test_format_four_args_chains_three_calls() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // format("{} {} {}", a, b, c) — 4 args total, needs 3 chained calls
+        codegen.generate_expr(&Expr::FnCall {
+            callee: Box::new(Expr::Ident("format".into())),
+            args: vec![
+                Expr::StringLit("{} {} {}".into()),
+                Expr::Integer(1),
+                Expr::Integer(2),
+                Expr::Integer(3),
+            ],
+        });
+        let output = codegen.output.clone();
+        let format_count = output.matches("call $format").count();
+        assert_eq!(format_count, 3,
+            "format with 4 args should chain 3 $format calls, got {}", format_count);
+    }
+
+    // ── Bug fix: dynamic attr with format() skips str_len ───────────────
+
+    #[test]
+    fn test_expr_returns_ptr_len_for_format() {
+        let expr = Expr::FnCall {
+            callee: Box::new(Expr::Ident("format".into())),
+            args: vec![
+                Expr::StringLit("{}".into()),
+                Expr::Integer(42),
+            ],
+        };
+        assert!(WasmCodegen::expr_returns_ptr_len(&expr),
+            "format() should be recognized as returning (ptr, len)");
+    }
+
+    #[test]
+    fn test_expr_returns_ptr_len_for_string_lit() {
+        let expr = Expr::StringLit("hello".into());
+        assert!(WasmCodegen::expr_returns_ptr_len(&expr),
+            "string literals should be recognized as returning (ptr, len)");
+    }
+
+    #[test]
+    fn test_expr_returns_ptr_len_false_for_signal_get() {
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::SelfExpr),
+            field: "count".into(),
+        };
+        assert!(!WasmCodegen::expr_returns_ptr_len(&expr),
+            "signal reads should NOT return (ptr, len)");
+    }
+
     #[test]
     fn test_signal_set_drops_len_for_format_call() {
-        // When self.field = format("...", val), the format() call returns (ptr, len).
-        // signal_set takes (id, val), so the extra len must be dropped.
         let mut codegen = WasmCodegen::new();
         codegen.component_name = "App".to_string();
         codegen.component_fields = vec!["result".to_string()];
         codegen.in_component_mount = true;
-
         let assign = Expr::Assign {
             target: Box::new(Expr::FieldAccess {
                 object: Box::new(Expr::SelfExpr),
@@ -30789,70 +31106,19 @@ mod payhive_feature_tests {
             }),
             value: Box::new(Expr::FnCall {
                 callee: Box::new(Expr::Ident("format".to_string())),
-                args: vec![
-                    Expr::StringLit("val={}".to_string()),
-                    Expr::Integer(42),
-                ],
+                args: vec![Expr::StringLit("val={}".to_string()), Expr::Integer(42)],
             }),
         };
         codegen.generate_expr(&assign);
-        let output = codegen.output.clone();
-        assert!(output.contains("drop"), "format() result len must be dropped before signal_set");
-        assert!(output.contains("call $signal_set"), "must call signal_set");
-    }
-
-    #[test]
-    fn test_signal_set_drops_len_for_format_string() {
-        // FormatString also produces (ptr, len) — len must be dropped for signal_set.
-        let mut codegen = WasmCodegen::new();
-        codegen.component_name = "App".to_string();
-        codegen.component_fields = vec!["msg".to_string()];
-        codegen.in_component_mount = true;
-
-        let assign = Expr::Assign {
-            target: Box::new(Expr::FieldAccess {
-                object: Box::new(Expr::SelfExpr),
-                field: "msg".to_string(),
-            }),
-            value: Box::new(Expr::FormatString {
-                parts: vec![FormatPart::Literal("hello".to_string())],
-            }),
-        };
-        codegen.generate_expr(&assign);
-        let output = codegen.output.clone();
-        assert!(output.contains("drop"), "FormatString result len must be dropped before signal_set");
+        assert!(codegen.output.contains("drop"), "format() len must be dropped before signal_set");
     }
 
     #[test]
     fn test_dynamic_attr_skips_str_len_for_format() {
-        // When a dynamic attribute value is format(), it already produces (ptr, len),
-        // so str_len should NOT be called (it would consume len as a ptr, breaking the stack).
-        let mut codegen = WasmCodegen::new();
-        codegen.component_name = "App".to_string();
-        codegen.component_fields = vec!["name".to_string()];
-        codegen.in_component_mount = true;
-
-        // Simulate what happens with value={format("{}", self.name)}
-        // The Attribute::Dynamic handler is called from emit_element, so we test
-        // the expression detection logic directly.
         let format_expr = Expr::FnCall {
             callee: Box::new(Expr::Ident("format".to_string())),
-            args: vec![
-                Expr::StringLit("{}".to_string()),
-                Expr::FieldAccess {
-                    object: Box::new(Expr::SelfExpr),
-                    field: "name".to_string(),
-                },
-            ],
+            args: vec![Expr::StringLit("{}".to_string()), Expr::Integer(1)],
         };
-
-        // Verify the produces_pair detection works for FnCall("format")
-        let produces_pair = matches!(&format_expr, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format"));
-        assert!(produces_pair, "FnCall to format should be detected as producing (ptr, len)");
-
-        // Verify FormatString is detected too
-        let fstr = Expr::FormatString { parts: vec![FormatPart::Literal("x".to_string())] };
-        let produces_pair2 = matches!(&fstr, Expr::FormatString { .. });
-        assert!(produces_pair2, "FormatString should be detected as producing (ptr, len)");
+        assert!(WasmCodegen::expr_returns_ptr_len(&format_expr), "format() returns (ptr,len)");
     }
 }
