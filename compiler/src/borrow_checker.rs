@@ -494,7 +494,7 @@ impl Checker {
                 self.check_expr(operand, span);
             }
 
-            Expr::FieldAccess { object, .. } => {
+            Expr::FieldAccess { object, .. } | Expr::OptionalChain { object, .. } => {
                 self.check_expr(object, span);
             }
             Expr::MethodCall { object, args, .. } => {
@@ -1000,7 +1000,7 @@ fn collect_captures_inner(expr: &Expr, locals: &[String], out: &mut Vec<String>)
                 collect_captures_inner(arg, locals, out);
             }
         }
-        Expr::FieldAccess { object, .. } => {
+        Expr::FieldAccess { object, .. } | Expr::OptionalChain { object, .. } => {
             collect_captures_inner(object, locals, out);
         }
         Expr::MethodCall { object, args, .. } => {
@@ -1125,6 +1125,7 @@ mod tests {
                     span: span(),
                 },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -1477,6 +1478,7 @@ mod tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -1518,6 +1520,7 @@ mod tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -1569,6 +1572,7 @@ mod tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -1607,6 +1611,7 @@ mod comprehensive_borrow_tests {
                 trait_bounds: vec![],
                 body: Block { stmts, span: span() },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -2121,6 +2126,7 @@ mod comprehensive_borrow_tests {
                         span: span(),
                     },
                     is_pub: false,
+                    is_async: false,
                     must_use: false,
                     span: span(),
                 }],
@@ -2160,6 +2166,7 @@ mod comprehensive_borrow_tests {
                         span: span(),
                     },
                     is_pub: false,
+                    is_async: false,
                     must_use: false,
                     span: span(),
                 }],
@@ -2456,6 +2463,7 @@ mod comprehensive_borrow_tests {
                 trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Return(Some(int_lit(0)))], span: span() },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -2493,6 +2501,7 @@ mod comprehensive_borrow_tests {
                 trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Return(Some(int_lit(0)))], span: span() },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -2530,6 +2539,7 @@ mod coverage_tests {
                 trait_bounds: vec![],
                 body: Block { stmts, span: span() },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -2701,6 +2711,7 @@ mod coverage_tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -2755,6 +2766,7 @@ mod coverage_tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -3974,6 +3986,7 @@ mod coverage_tests {
                     span: span(),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],

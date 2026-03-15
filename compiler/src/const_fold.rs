@@ -408,6 +408,7 @@ mod tests {
                 trait_bounds: vec![],
                 body: Block { stmts, span: dummy_span() },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: dummy_span(),
             })],
@@ -850,6 +851,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         }
@@ -1056,6 +1058,7 @@ mod tests {
             items: vec![Item::Channel(ChannelDef {
                 name: "Ch".to_string(),
                 url: Expr::StringLit("/ws".to_string()),
+                provider: None,
                 contract: None,
                 on_message: None,
                 on_connect: None,
