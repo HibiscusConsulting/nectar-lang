@@ -8296,10 +8296,12 @@ impl WasmCodegen {
                 } else {
                     self.line(&local_decl);
                 }
-                let is_string_val = matches!(value, Expr::StringLit(_));
+                let is_string_val = matches!(value, Expr::StringLit(_))
+                    || matches!(value, Expr::FormatString { .. })
+                    || self.expr_is_string_typed(value);
                 self.generate_expr(value);
                 if is_string_val {
-                    // String literal pushes (ptr, len); drop len (top), keep ptr
+                    // String expressions push (ptr, len); drop len (top), keep ptr
                     self.line("drop  ;; discard str len for local binding");
                 }
                 self.line(&format!("local.set ${}", name));
