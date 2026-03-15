@@ -3515,12 +3515,13 @@ impl Parser {
                 match &tok.kind {
                     TokenKind::Dot => selector.push('.'),
                     TokenKind::Ident(s) => {
-                        if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') {
+                        if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') && !selector.ends_with('-') && !selector.ends_with('#') {
                             selector.push(' ');
                         }
                         selector.push_str(s);
                     }
                     TokenKind::Colon => selector.push(':'),
+                    TokenKind::Minus => selector.push('-'),
                     TokenKind::Comma => selector.push_str(", "),
                     TokenKind::Star => selector.push('*'),
                     TokenKind::RightAngle => selector.push_str(" > "),
