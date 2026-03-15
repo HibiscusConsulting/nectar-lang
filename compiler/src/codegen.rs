@@ -270,6 +270,15 @@ impl WasmCodegen {
         // doesn't need.  We provide no-op test runtime imports so the test
         // harness still links (tests compile but host may not run them).
         self.line("");
+        self.line(";; ── WASI Key-Value Store ──────────────────────────────────────");
+        self.line("(import \"wasi:keyvalue/store\" \"open\" (func $kv_open (param i32 i32) (result i32)))");
+        self.line("(import \"wasi:keyvalue/store\" \"get\" (func $kv_get (param i32 i32 i32) (result i32)))");
+        self.line("(import \"wasi:keyvalue/store\" \"set\" (func $kv_set (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"wasi:keyvalue/store\" \"delete\" (func $kv_delete (param i32 i32 i32)))");
+        self.line("(import \"wasi:keyvalue/store\" \"exists\" (func $kv_exists (param i32 i32 i32) (result i32)))");
+        self.line("(import \"wasi:keyvalue/store\" \"keys\" (func $kv_keys (param i32) (result i32)))");
+
+        self.line("");
         self.line(";; Test runtime stubs (same signature as browser, host may no-op)");
         self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
         self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
@@ -4665,16 +4674,28 @@ impl WasmCodegen {
         let config_offset = self.store_string(&config);
         let config_len = config.len();
 
-        // Emit cache init function
-        self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
-        self.indent += 1;
-        self.line(&format!("i32.const {}  ;; name ptr", name_offset));
-        self.line(&format!("i32.const {}  ;; name len", name_len));
-        self.line(&format!("i32.const {}  ;; config ptr", config_offset));
-        self.line(&format!("i32.const {}  ;; config len", config_len));
-        self.line("call $cache_init");
-        self.indent -= 1;
-        self.line(")");
+        if self.target == CompilationTarget::Wasi {
+            // WASI target: open a kv store handle, used by queries/mutations below
+            self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
+            self.indent += 1;
+            self.line(&format!("i32.const {}  ;; store name ptr", name_offset));
+            self.line(&format!("i32.const {}  ;; store name len", name_len));
+            self.line("call $kv_open");
+            self.line("drop  ;; store handle (future: persist in global)");
+            self.indent -= 1;
+            self.line(")");
+        } else {
+            // Browser target: WASM-internal LRU cache
+            self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
+            self.indent += 1;
+            self.line(&format!("i32.const {}  ;; name ptr", name_offset));
+            self.line(&format!("i32.const {}  ;; name len", name_len));
+            self.line(&format!("i32.const {}  ;; config ptr", config_offset));
+            self.line(&format!("i32.const {}  ;; config len", config_len));
+            self.line("call $cache_init");
+            self.indent -= 1;
+            self.line(")");
+        }
 
         // Register queries
         for query in &cache.queries {
@@ -4709,15 +4730,28 @@ impl WasmCodegen {
             let q_config_offset = self.store_string(&q_config);
             let q_config_len = q_config.len();
 
-            self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
-            self.indent += 1;
-            self.line(&format!("i32.const {}  ;; query name ptr", q_name_offset));
-            self.line(&format!("i32.const {}  ;; query name len", q_name_len));
-            self.line(&format!("i32.const {}  ;; query config ptr", q_config_offset));
-            self.line(&format!("i32.const {}  ;; query config len", q_config_len));
-            self.line("call $cache_register_query");
-            self.indent -= 1;
-            self.line(")");
+            if self.target == CompilationTarget::Wasi {
+                // WASI target: query dispatches to kv_get
+                self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
+                self.indent += 1;
+                self.line("(result i32)");
+                self.line(&format!("i32.const 0  ;; store handle (opened in init)"));
+                self.line(&format!("i32.const {}  ;; key ptr", q_name_offset));
+                self.line(&format!("i32.const {}  ;; key len", q_name_len));
+                self.line("call $kv_get");
+                self.indent -= 1;
+                self.line(")");
+            } else {
+                self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
+                self.indent += 1;
+                self.line(&format!("i32.const {}  ;; query name ptr", q_name_offset));
+                self.line(&format!("i32.const {}  ;; query name len", q_name_len));
+                self.line(&format!("i32.const {}  ;; query config ptr", q_config_offset));
+                self.line(&format!("i32.const {}  ;; query config len", q_config_len));
+                self.line("call $cache_register_query");
+                self.indent -= 1;
+                self.line(")");
+            }
         }
 
         // Register mutations
@@ -4749,15 +4783,29 @@ impl WasmCodegen {
             let m_config_offset = self.store_string(&m_config);
             let m_config_len = m_config.len();
 
-            self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
-            self.indent += 1;
-            self.line(&format!("i32.const {}  ;; mutation name ptr", m_name_offset));
-            self.line(&format!("i32.const {}  ;; mutation name len", m_name_len));
-            self.line(&format!("i32.const {}  ;; mutation config ptr", m_config_offset));
-            self.line(&format!("i32.const {}  ;; mutation config len", m_config_len));
-            self.line("call $cache_register_mutation");
-            self.indent -= 1;
-            self.line(")");
+            if self.target == CompilationTarget::Wasi {
+                // WASI target: mutation dispatches to kv_set
+                self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
+                self.indent += 1;
+                self.line(&format!("i32.const 0  ;; store handle"));
+                self.line(&format!("i32.const {}  ;; key ptr", m_name_offset));
+                self.line(&format!("i32.const {}  ;; key len", m_name_len));
+                self.line(&format!("i32.const {}  ;; value ptr", m_config_offset));
+                self.line(&format!("i32.const {}  ;; value len", m_config_len));
+                self.line("call $kv_set");
+                self.indent -= 1;
+                self.line(")");
+            } else {
+                self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
+                self.indent += 1;
+                self.line(&format!("i32.const {}  ;; mutation name ptr", m_name_offset));
+                self.line(&format!("i32.const {}  ;; mutation name len", m_name_len));
+                self.line(&format!("i32.const {}  ;; mutation config ptr", m_config_offset));
+                self.line(&format!("i32.const {}  ;; mutation config len", m_config_len));
+                self.line("call $cache_register_mutation");
+                self.indent -= 1;
+                self.line(")");
+            }
         }
     }
 
@@ -28430,5 +28478,29 @@ mod contract_api_tests {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
         assert!(wat.contains("(module"), "WASI WAT should contain (module");
         assert!(wat.contains("func $add"), "WASI target should still generate user functions");
+    }
+
+    #[test]
+    fn test_wasi_target_has_keyvalue_imports() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("wasi:keyvalue/store"), "WASI target should emit wasi:keyvalue/store imports");
+        assert!(wat.contains("$kv_open"), "WASI target should import kv_open");
+        assert!(wat.contains("$kv_get"), "WASI target should import kv_get");
+        assert!(wat.contains("$kv_set"), "WASI target should import kv_set");
+        assert!(wat.contains("$kv_delete"), "WASI target should import kv_delete");
+        assert!(wat.contains("$kv_exists"), "WASI target should import kv_exists");
+        assert!(wat.contains("$kv_keys"), "WASI target should import kv_keys");
+    }
+
+    #[test]
+    fn test_browser_target_no_keyvalue_imports() {
+        let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(!wat.contains("wasi:keyvalue/store"), "Browser target should NOT emit wasi:keyvalue/store imports");
+        assert!(!wat.contains("$kv_open"), "Browser target should NOT have kv_open");
+        assert!(!wat.contains("$kv_get"), "Browser target should NOT have kv_get");
+        assert!(!wat.contains("$kv_set"), "Browser target should NOT have kv_set");
+        assert!(!wat.contains("$kv_delete"), "Browser target should NOT have kv_delete");
+        assert!(!wat.contains("$kv_exists"), "Browser target should NOT have kv_exists");
+        assert!(!wat.contains("$kv_keys"), "Browser target should NOT have kv_keys");
     }
 }
