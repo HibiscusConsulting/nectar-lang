@@ -1282,6 +1282,7 @@ mod tests {
                 span: empty_span(),
             },
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         }
@@ -1460,6 +1461,7 @@ mod tests {
                         span: empty_span(),
                     },
                     is_pub: false,
+                    is_async: false,
                     must_use: false,
                     span: empty_span(),
                 }],
@@ -1560,6 +1562,7 @@ mod tests {
                     span: empty_span(),
                 },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: empty_span(),
             }),
@@ -1663,6 +1666,7 @@ mod tests {
                 span: empty_span(),
             },
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         };
@@ -1691,6 +1695,7 @@ mod tests {
                 span: empty_span(),
             },
             is_pub: false,
+            is_async: false,
             must_use: false,
             span: empty_span(),
         };
@@ -2097,6 +2102,7 @@ mod coverage_wasm_binary_tests {
                     right: Box::new(Expr::Ident("b".into())),
                 }))]),
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })]);
@@ -2122,6 +2128,7 @@ mod coverage_wasm_binary_tests {
                 operand: Box::new(Expr::Ident("x".into())),
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2144,6 +2151,7 @@ mod coverage_wasm_binary_tests {
                 operand: Box::new(Expr::Ident("x".into())),
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2165,6 +2173,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Float(3.14)))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2185,6 +2194,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Bool(true)))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2204,6 +2214,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::StringLit("test string".into()))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2227,6 +2238,7 @@ mod coverage_wasm_binary_tests {
                 else_block: Some(block(vec![Stmt::Expr(Expr::Integer(0))])),
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2251,6 +2263,7 @@ mod coverage_wasm_binary_tests {
                 else_block: None,
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2276,6 +2289,7 @@ mod coverage_wasm_binary_tests {
                 }),
             ]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2297,6 +2311,7 @@ mod coverage_wasm_binary_tests {
                 Stmt::Expr(Expr::Integer(1)),
             ])))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2319,6 +2334,7 @@ mod coverage_wasm_binary_tests {
                 index: Box::new(Expr::Integer(0)),
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2342,6 +2358,7 @@ mod coverage_wasm_binary_tests {
                 Stmt::Return(Some(Expr::BorrowMut(Box::new(Expr::Ident("x".into()))))),
             ]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2364,6 +2381,7 @@ mod coverage_wasm_binary_tests {
                 field: "x".into(),
             }))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2384,6 +2402,7 @@ mod coverage_wasm_binary_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(Some(Expr::Integer(1)))]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -2399,6 +2418,7 @@ mod coverage_wasm_binary_tests {
                     args: vec![],
                 }))]),
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -2423,6 +2443,7 @@ mod coverage_wasm_binary_tests {
                 args: vec![Expr::Integer(1)],
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2447,6 +2468,7 @@ mod coverage_wasm_binary_tests {
                 message: Some("custom msg".into()),
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2470,6 +2492,7 @@ mod coverage_wasm_binary_tests {
                 message: None,
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2493,6 +2516,7 @@ mod coverage_wasm_binary_tests {
                 message: Some("should be equal".into()),
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2517,6 +2541,7 @@ mod coverage_wasm_binary_tests {
                 message: None,
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2542,6 +2567,7 @@ mod coverage_wasm_binary_tests {
                 catch_body: Box::new(Expr::Integer(0)),
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2569,6 +2595,7 @@ mod coverage_wasm_binary_tests {
                 ],
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2594,6 +2621,7 @@ mod coverage_wasm_binary_tests {
                 ],
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2615,6 +2643,7 @@ mod coverage_wasm_binary_tests {
                 parts: vec![],
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2636,6 +2665,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("x".into())))))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2658,6 +2688,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Await(Box::new(Expr::Integer(1))))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2681,6 +2712,7 @@ mod coverage_wasm_binary_tests {
                 Stmt::Signal { name: "count".into(), ty: Some(Type::Named("i32".into())), value: Expr::Integer(0), secret: false, atomic: false },
             ]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2700,6 +2732,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(None)]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2719,6 +2752,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Yield(Expr::Integer(42))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2747,6 +2781,7 @@ mod coverage_wasm_binary_tests {
                 ty: None,
             }]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2774,6 +2809,7 @@ mod coverage_wasm_binary_tests {
                 ty: None,
             }]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2804,6 +2840,7 @@ mod coverage_wasm_binary_tests {
                 ty: None,
             }]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2830,6 +2867,7 @@ mod coverage_wasm_binary_tests {
                 ty: None,
             }]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2856,6 +2894,7 @@ mod coverage_wasm_binary_tests {
                 ty: None,
             }]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -2995,6 +3034,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Integer(42)))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3032,6 +3072,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::SelfExpr)]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3056,6 +3097,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Ident("a".into())))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3078,6 +3120,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Return(Some(Expr::Ident("x".into())))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3119,6 +3162,7 @@ mod coverage_wasm_binary_tests {
                 Stmt::Let { name: "d".into(), ty: Some(Type::Named("f32".into())), value: Expr::Float(0.0), mutable: false, secret: false, ownership: Ownership::Owned },
             ]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3170,6 +3214,7 @@ mod coverage_wasm_binary_tests {
                 args: vec![],
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3197,6 +3242,7 @@ mod coverage_wasm_binary_tests {
                 value: Box::new(Expr::Integer(1)),
             })]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);
@@ -3218,6 +3264,7 @@ mod coverage_wasm_binary_tests {
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Ident("nonexistent".into()))]),
             is_pub: true,
+            is_async: false,
             must_use: false,
             span: span(),
         })]);

@@ -472,6 +472,7 @@ impl WasmCodegen {
             }
             Expr::Unary { operand, .. } => self.scan_expr_for_runtime_deps(operand),
             Expr::FieldAccess { object, .. } => self.scan_expr_for_runtime_deps(object),
+            Expr::OptionalChain { object, .. } => self.scan_expr_for_runtime_deps(object),
             Expr::Index { object, index } => {
                 self.scan_expr_for_runtime_deps(object);
                 self.scan_expr_for_runtime_deps(index);
@@ -985,6 +986,10 @@ impl WasmCodegen {
         self.line("(global $__cb_data_table_base i32 (i32.const 308000))");
         self.line("(global $__cb_data_count (mut i32) (i32.const 0))");
         self.line("");
+        // Async frame pointer — stores the current async continuation's frame
+        // so that CPS state machine continuations can restore saved locals.
+        self.line("(global $__async_frame_current (mut i32) (i32.const 0))");
+        self.line("");
         // Always-emit: core infrastructure needed by every program
         self.emit_alloc_function();
         self.emit_cb_data_register();
@@ -1003,6 +1008,7 @@ impl WasmCodegen {
             self.emit_ai_runtime();
             self.emit_a11y_runtime();
             self.emit_time_runtime();
+            self.emit_datetime_runtime();
 
             // Conditionally emit runtime helpers based on AST pre-scan.
             // Only emit categories that the program actually references.
@@ -1802,6 +1808,12 @@ impl WasmCodegen {
     }
 
     fn generate_function(&mut self, func: &Function) {
+        // If async, use the CPS state machine transform instead.
+        if func.is_async {
+            self.generate_async_function(func);
+            return;
+        }
+
         self.locals.clear();
 
         let has_self = func.params.iter().any(|p| p.name == "self");
@@ -1874,6 +1886,389 @@ impl WasmCodegen {
 
         self.indent -= 1;
         self.line(")");
+    }
+
+    // ── Async/Await: br_table State Machine ─────────────────────────────────
+    //
+    // An async function compiles to ONE poll function that uses br_table to
+    // dispatch on the current state — exactly how Rust compiles async/await.
+    //
+    // The "future struct" lives in linear memory:
+    //   Offset 0: state (i32) — which state we're in (0..N)
+    //   Offset 4: result (i32) — async operation result pointer
+    //   Offset 8: self_ptr (i32) — saved self pointer (if method)
+    //
+    // The poll function:
+    //   - Takes (param $future_ptr i32), returns (result i32): 0=Pending, 1=Ready
+    //   - Loads state from future_ptr, dispatches via br_table
+    //   - Each state runs code up to the next await, initiates the async op,
+    //     advances the state, and returns 0 (Pending)
+    //   - The final state runs remaining code and returns 1 (Ready)
+    //
+    // Re-poll: a small repoll function is registered as the callback. When the
+    // async operation completes, JS calls __callback_with_data(repoll_idx, data).
+    // The repoll function writes the result into the future struct and re-calls poll.
+    //
+    // Entry: a trampoline allocates the future struct, stores initial state=0,
+    // and calls poll() to kick off the first state.
+
+    /// Returns the indices of top-level statements that contain an Expr::Await.
+    /// Only detects `let x = await expr;` and bare `await expr;` at statement level.
+    fn find_await_points(stmts: &[Stmt]) -> Vec<usize> {
+        let mut points = Vec::new();
+        for (i, stmt) in stmts.iter().enumerate() {
+            if Self::stmt_contains_await(stmt) {
+                points.push(i);
+            }
+        }
+        points
+    }
+
+    /// Returns true if a statement directly contains an Expr::Await at the top level.
+    fn stmt_contains_await(stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Let { value, .. } => Self::expr_is_await(value),
+            Stmt::Expr(expr) => Self::expr_is_await(expr),
+            _ => false,
+        }
+    }
+
+    /// Returns true if the expression is an Expr::Await (possibly nested in assignment).
+    fn expr_is_await(expr: &Expr) -> bool {
+        match expr {
+            Expr::Await(_) => true,
+            Expr::Assign { value, .. } => Self::expr_is_await(value),
+            Expr::MethodCall { object, .. } => Self::expr_is_await(object),
+            _ => false,
+        }
+    }
+
+    /// Extract the inner expression from an Await wrapper.
+    fn extract_await_inner(expr: &Expr) -> Option<&Expr> {
+        match expr {
+            Expr::Await(inner) => Some(inner),
+            _ => None,
+        }
+    }
+
+    /// Generate an async function using Rust's state machine pattern.
+    /// ONE poll function with br_table dispatch + a future struct in linear memory.
+    fn generate_async_function(&mut self, func: &Function) {
+        let await_points = Self::find_await_points(&func.body.stmts);
+
+        // If no await points found, generate as a normal function
+        if await_points.is_empty() {
+            let mut sync_func = func.clone();
+            sync_func.is_async = false;
+            self.generate_function(&sync_func);
+            return;
+        }
+
+        let has_self = func.params.iter().any(|p| p.name == "self");
+        let func_name = func.name.clone();
+        let num_states = await_points.len() + 1; // N await points = N+1 states
+
+        self.line("");
+        self.line(";; ── async state machine (br_table) ── ");
+        self.line(&format!(";; async fn {} — {} states ({} await points)",
+            func_name, num_states, await_points.len()));
+
+        // Future struct layout:
+        //   offset 0: state (i32)
+        //   offset 4: result_ptr (i32) — async operation result
+        //   offset 8: self_ptr (i32) — saved self (if method)
+        let future_size = if has_self { 12 } else { 8 };
+
+        // Split statements into state groups
+        let mut state_groups: Vec<&[Stmt]> = Vec::new();
+        let mut prev = 0;
+        for &ap in &await_points {
+            state_groups.push(&func.body.stmts[prev..ap]);
+            prev = ap + 1;
+        }
+        state_groups.push(&func.body.stmts[prev..]);
+
+        // Collect the await expressions (one per await point)
+        let await_exprs: Vec<&Expr> = await_points.iter().map(|&i| {
+            let stmt = &func.body.stmts[i];
+            match stmt {
+                Stmt::Let { value, .. } => {
+                    Self::extract_await_inner(value).unwrap_or(value)
+                }
+                Stmt::Expr(expr) => {
+                    Self::extract_await_inner(expr).unwrap_or(expr)
+                }
+                _ => &Expr::Integer(0),
+            }
+        }).collect();
+
+        // Collect the let-binding names for each await point (if any)
+        let await_binding_names: Vec<Option<String>> = await_points.iter().map(|&i| {
+            let stmt = &func.body.stmts[i];
+            match stmt {
+                Stmt::Let { name, .. } => Some(name.clone()),
+                _ => None,
+            }
+        }).collect();
+
+        // Allocate a single callback index for the repoll function
+        let repoll_cb_idx = self.global_handler_base;
+        self.global_handler_base += 1;
+
+        // Emit the future pointer global for this async function
+        self.line(&format!("(global $__async_future_{} (mut i32) (i32.const 0))", func_name));
+
+        // ── Poll function: ONE function, br_table dispatch ──
+        {
+            self.locals.clear();
+
+            // Poll signature: (param $future_ptr i32) (result i32)
+            // Returns 0 = Pending, 1 = Ready
+            self.emit(&format!("(func ${} (param $future_ptr i32) (result i32)",
+                func_name));
+            self.indent += 1;
+
+            // Save/restore pattern for local hoisting
+            let saved_output = std::mem::take(&mut self.output);
+            self.output = String::new();
+            self.defer_template_locals = true;
+            self.template_locals.clear();
+
+            // Collect locals from the entire function body
+            self.collect_locals(&func.body);
+            for (name, ty) in self.locals.clone() {
+                let wasm_ty = self.wasm_type_str(&ty).to_string();
+                self.emit_template_local_typed(&format!("${}", name), &wasm_ty);
+            }
+            self.emit_template_local("$__arr_tmp");
+            self.emit_template_local("$__state");
+            self.emit_template_local("$__result");
+            if has_self {
+                self.emit_template_local("$self");
+            }
+            // Add locals for all await binding names
+            for binding in &await_binding_names {
+                if let Some(name) = binding {
+                    self.emit_template_local(&format!("${}", name));
+                }
+            }
+
+            // Load state from future struct
+            self.line(";; load state from future struct");
+            self.line("local.get $future_ptr");
+            self.line("i32.load ;; state");
+            self.line("local.set $__state");
+
+            // Restore self from future struct (if method)
+            if has_self {
+                self.line("local.get $future_ptr");
+                self.line("i32.load offset=8 ;; self_ptr");
+                self.line("local.set $self");
+            }
+
+            // br_table dispatch: nested blocks with br_table jumping to correct state
+            // Block structure: we need N+1 blocks, outermost = state 0
+            // br_table 0 jumps to innermost block end (= state 0 code)
+            // br_table 1 jumps to next block end (= state 1 code), etc.
+            //
+            // Structure:
+            //   block $state_end  ;; outermost — unreachable default
+            //     block $state_N
+            //       block $state_N-1
+            //         ...
+            //         block $state_0
+            //           local.get $__state
+            //           br_table $state_0 $state_1 ... $state_N $state_end
+            //         end ;; $state_0 — state 0 code follows
+            //         <state 0 code>
+            //         br $state_end
+            //       end ;; $state_1 — state 1 code follows
+            //       <state 1 code>
+            //       br $state_end
+            //     end ;; $state_N
+            //     <state N code>
+            //     br $state_end
+            //   end ;; $state_end
+
+            // Open the outermost exit block
+            self.line("block $__state_end");
+            self.indent += 1;
+
+            // Open one block per state (innermost = state 0)
+            for i in (0..num_states).rev() {
+                self.line(&format!("block $__state_{}", i));
+                self.indent += 1;
+            }
+
+            // Emit br_table
+            self.line("local.get $__state");
+            let labels: Vec<String> = (0..num_states)
+                .map(|i| format!("$__state_{}", i))
+                .collect();
+            self.line(&format!("br_table {} $__state_end", labels.join(" ")));
+
+            // Generate code for each state
+            for state_idx in 0..num_states {
+                // Close the block for this state (br_table jumps past this end)
+                self.indent -= 1;
+                self.line(&format!("end ;; $__state_{}", state_idx));
+
+                if state_idx > 0 {
+                    // Load async result from future struct for continuation states
+                    self.line(";; load async result from previous operation");
+                    self.line("local.get $future_ptr");
+                    self.line("i32.load offset=4 ;; result_ptr");
+                    self.line("local.set $__result");
+
+                    // Bind result to the let-binding from the previous await
+                    if let Some(ref binding_name) = await_binding_names[state_idx - 1] {
+                        self.line("local.get $__result");
+                        self.line(&format!("local.set ${} ;; bind await result", binding_name));
+                    }
+                }
+
+                // Generate statements for this state
+                self.line(&format!(";; state {} code", state_idx));
+                for stmt in state_groups[state_idx] {
+                    self.generate_stmt(stmt);
+                }
+
+                if state_idx < await_points.len() {
+                    // This state ends with an await — initiate async operation
+
+                    // Advance state in future struct
+                    self.line("local.get $future_ptr");
+                    self.line(&format!("i32.const {} ;; advance to state {}", state_idx + 1, state_idx + 1));
+                    self.line("i32.store ;; future.state = next");
+
+                    // Store future_ptr in the global so repoll can find it
+                    self.line("local.get $future_ptr");
+                    self.line(&format!("global.set $__async_future_{}", func_name));
+
+                    // Initiate the async call with the repoll callback
+                    self.line(&format!(";; initiate async operation (await point {})", state_idx + 1));
+                    self.generate_expr(await_exprs[state_idx]);
+                    self.line(&format!("i32.const {} ;; repoll callback index", repoll_cb_idx));
+                    self.line("call $http_fetchWithCallback");
+
+                    // Return Pending
+                    self.line("i32.const 0 ;; Poll::Pending");
+                    self.line("br $__state_end");
+                } else {
+                    // Final state — return Ready
+                    self.line("i32.const 1 ;; Poll::Ready");
+                    self.line("br $__state_end");
+                }
+            }
+
+            // Close the outermost exit block
+            self.indent -= 1;
+            self.line("end ;; $__state_end");
+
+            // Unreachable default (br_table with out-of-range state)
+            self.line("i32.const 0 ;; unreachable default");
+
+            // Hoist deferred locals before the body
+            let body_output = std::mem::take(&mut self.output);
+            self.output = saved_output;
+            for local_decl in std::mem::take(&mut self.template_locals) {
+                self.line(&local_decl);
+            }
+            self.defer_template_locals = false;
+            self.output.push_str(&body_output);
+
+            self.indent -= 1;
+            self.line(")");
+        }
+
+        // ── Repoll function: callback that writes result and re-polls ──
+        {
+            let repoll_name = format!("{}__repoll", func_name);
+            self.line("");
+            self.emit(&format!("(func ${} (export \"{}\")", repoll_name, repoll_name));
+            self.indent += 1;
+
+            self.line(";; Repoll callback — async operation completed");
+            self.line(";; Write result to future struct, then re-poll");
+
+            // Load the future pointer from the global
+            self.line(&format!("global.get $__async_future_{}", func_name));
+
+            // Write callback_data into future.result (offset 4)
+            self.line("global.get $__callback_data");
+            self.line("i32.store offset=4 ;; future.result_ptr = callback_data");
+
+            // Re-poll the future
+            self.line(&format!("global.get $__async_future_{}", func_name));
+            self.line(&format!("call ${} ;; re-poll", func_name));
+            self.line("drop ;; discard poll result (signals handle updates)");
+
+            self.indent -= 1;
+            self.line(")");
+
+            // Register repoll callback in the callback registry
+            self.callback_registry.push((repoll_name, repoll_cb_idx, 1));
+        }
+
+        // ── Entry trampoline: allocates future struct and kicks off poll ──
+        {
+            let entry_name = format!("{}_entry", func_name);
+            let mut params: Vec<String> = Vec::new();
+            if has_self {
+                params.push("(param $self i32)".into());
+            }
+            params.extend(func.params.iter()
+                .filter(|p| p.name != "self")
+                .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))));
+
+            let export = if func.is_pub {
+                format!(" (export \"{}\")", entry_name)
+            } else {
+                String::new()
+            };
+
+            self.line("");
+            self.emit(&format!("(func ${}{} {}",
+                entry_name, export, params.join(" ")));
+            self.indent += 1;
+
+            self.line("(local $__future_ptr i32)");
+
+            // Allocate future struct
+            self.line(&format!(";; Allocate future struct ({} bytes: state + result{})",
+                future_size, if has_self { " + self" } else { "" }));
+            self.line(&format!("i32.const {}", future_size));
+            self.line("call $alloc");
+            self.line("local.set $__future_ptr");
+
+            // Initialize state to 0
+            self.line("local.get $__future_ptr");
+            self.line("i32.const 0");
+            self.line("i32.store ;; future.state = 0");
+
+            // Save self into future struct if method
+            if has_self {
+                self.line("local.get $__future_ptr");
+                self.line("local.get $self");
+                self.line("i32.store offset=8 ;; future.self_ptr = self");
+            }
+
+            // Store future_ptr in the async global
+            self.line("local.get $__future_ptr");
+            self.line(&format!("global.set $__async_future_{}", func_name));
+
+            // Also store in __async_frame_current for backward compat
+            self.line("local.get $__future_ptr");
+            self.line("global.set $__async_frame_current");
+
+            // Call poll (state 0 runs, initiates first async op, returns Pending)
+            self.line("local.get $__future_ptr");
+            self.line(&format!("call ${}", func_name));
+            self.line("drop ;; initial poll returns Pending");
+
+            self.indent -= 1;
+            self.line(")");
+        }
     }
 
     fn generate_component(&mut self, comp: &Component) {
@@ -3187,6 +3582,12 @@ impl WasmCodegen {
             self.line("  local.get $url_len");
             self.line("  call $stream_write  ;; open stream connection");
             self.line("  drop");
+        } else if ch.provider.as_deref() == Some("sse") {
+            // SSE provider — use EventSource via streaming.sseConnect
+            self.line("  local.get $url_ptr");
+            self.line("  local.get $url_len");
+            self.line("  i32.const 0  ;; callback index for SSE messages");
+            self.line("  call $streaming_sseConnect");
         } else {
             self.line("  local.get $url_ptr");
             self.line("  local.get $url_len");
@@ -3206,6 +3607,12 @@ impl WasmCodegen {
             self.line(&format!("  i32.const {}  ;; url len", url_len));
             self.line("  call $stream_write  ;; open stream via wasi:io");
             self.line("  drop");
+        } else if ch.provider.as_deref() == Some("sse") {
+            // SSE provider — connect via EventSource
+            self.line(&format!("  i32.const {}  ;; url ptr", url_offset));
+            self.line(&format!("  i32.const {}  ;; url len", url_len));
+            self.line("  i32.const 0  ;; callback index for SSE messages");
+            self.line("  call $streaming_sseConnect");
         } else {
             self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
             self.line(&format!("  i32.const {}  ;; name len", name_len));
@@ -5799,7 +6206,7 @@ impl WasmCodegen {
 
     fn collect_signal_fields(&self, expr: &Expr, fields: &mut Vec<String>) {
         match expr {
-            Expr::FieldAccess { object, field } => {
+            Expr::FieldAccess { object, field } | Expr::OptionalChain { object, field } => {
                 if matches!(object.as_ref(), Expr::SelfExpr)
                     && self.component_fields.contains(field)
                 {
@@ -6861,79 +7268,134 @@ impl WasmCodegen {
                 }
             }
             TemplateNode::TemplateMatch { subject, arms } => {
-                self.line(";; template match on tagged value");
-                let label = self.next_label();
-                let subject_var = format!("$__match_subj_{}", label);
-                let tag_var = format!("$__match_tag_{}", label);
-                self.emit_template_local(&subject_var);
-                self.emit_template_local(&tag_var);
-                self.generate_expr(subject);
-                self.line(&format!("local.set {}", subject_var));
-                // Load the discriminant tag from offset 0
-                self.line(&format!("local.get {}", subject_var));
-                self.line("i32.load ;; tag");
-                self.line(&format!("local.set {}", tag_var));
+                // Detect if this is a string match (all non-wildcard arms have string literal patterns)
+                let is_string_match = arms.iter().any(|arm| matches!(&arm.pattern, Pattern::Literal(Expr::StringLit(_))));
 
-                for (arm_idx, arm) in arms.iter().enumerate() {
-                    let arm_label = format!("{}_arm{}", label, arm_idx);
-                    match &arm.pattern {
-                        Pattern::Variant { name, fields } => {
-                            // Map Ok/Some to tag 0, Err/None to tag 1
-                            let expected_tag = match name.as_str() {
-                                "Ok" | "Some" => 0,
-                                "Err" | "None" => 1,
-                                _ => arm_idx as i32,
-                            };
-                            self.line(&format!(";; match arm: {}(..)", name));
-                            self.line(&format!("local.get {}", tag_var));
-                            self.line(&format!("i32.const {}", expected_tag));
-                            self.line("i32.eq");
-                            self.line(&format!("if ;; arm {}", arm_label));
-                            self.indent += 1;
+                if is_string_match {
+                    self.line(";; template match on string value");
+                    let label = self.next_label();
+                    let subject_var = format!("$__match_subj_{}", label);
+                    self.emit_template_local(&subject_var);
+                    self.generate_expr(subject);
+                    // If subject is a string literal it pushes (ptr, len); drop len, keep ptr
+                    if self.expr_is_string_lit(subject) {
+                        self.line("drop ;; string match: keep only ptr");
+                    }
+                    self.line(&format!("local.set {}", subject_var));
 
-                            // Bind the payload field if the pattern destructures
-                            if let Some(Pattern::Ident(binding)) = fields.first() {
-                                let binding_var = format!("$__{}", binding);
-                                self.emit_template_local(&binding_var);
+                    let mut open_ifs: usize = 0;
+                    for (arm_idx, arm) in arms.iter().enumerate() {
+                        let arm_label = format!("{}_arm{}", label, arm_idx);
+                        match &arm.pattern {
+                            Pattern::Literal(Expr::StringLit(s)) => {
+                                let str_offset = self.store_string(s);
+                                self.line(&format!(";; match arm: \"{}\"", s));
                                 self.line(&format!("local.get {}", subject_var));
-                                self.line("i32.load offset=4 ;; payload");
-                                self.line(&format!("local.set {}", binding_var));
-                                self.for_loop_bindings.push(binding.clone());
+                                self.line(&format!("i32.const {} ;; ptr to \"{}\"", str_offset, s));
+                                self.line("call $str_eq");
+                                self.line(&format!("if ;; arm {}", arm_label));
+                                self.indent += 1;
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
+                                self.indent -= 1;
+                                self.line("else");
+                                self.indent += 1;
+                                open_ifs += 1;
                             }
-
-                            for child in &arm.body {
-                                self.generate_template(child, parent);
+                            Pattern::Wildcard | Pattern::Ident(_) => {
+                                self.line(&format!(";; match arm: _ (wildcard) {}", arm_label));
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
                             }
-
-                            // Clean up binding
-                            if let Some(Pattern::Ident(_binding)) = fields.first() {
-                                self.for_loop_bindings.pop();
-                            }
-                            self.indent -= 1;
-                            self.line(&format!("end ;; end arm {}", arm_label));
-                        }
-                        Pattern::Wildcard | Pattern::Ident(_) => {
-                            // Wildcard arm — always matches (fallback)
-                            self.line(&format!(";; match arm: _ (wildcard) {}", arm_label));
-                            if let Pattern::Ident(binding) = &arm.pattern {
-                                let binding_var = format!("$__{}", binding);
-                                self.emit_template_local(&binding_var);
-                                self.line(&format!("local.get {}", subject_var));
-                                self.line(&format!("local.set {}", binding_var));
-                                self.for_loop_bindings.push(binding.clone());
-                            }
-                            for child in &arm.body {
-                                self.generate_template(child, parent);
-                            }
-                            if let Pattern::Ident(_binding) = &arm.pattern {
-                                self.for_loop_bindings.pop();
+                            _ => {
+                                self.line(&format!(";; match arm: pattern {}", arm_label));
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
                             }
                         }
-                        _ => {
-                            // Other patterns — emit body unconditionally as fallback
-                            self.line(&format!(";; match arm: pattern {}", arm_label));
-                            for child in &arm.body {
-                                self.generate_template(child, parent);
+                    }
+                    for _ in 0..open_ifs {
+                        self.indent -= 1;
+                        self.line("end");
+                    }
+                } else {
+                    self.line(";; template match on tagged value");
+                    let label = self.next_label();
+                    let subject_var = format!("$__match_subj_{}", label);
+                    let tag_var = format!("$__match_tag_{}", label);
+                    self.emit_template_local(&subject_var);
+                    self.emit_template_local(&tag_var);
+                    self.generate_expr(subject);
+                    self.line(&format!("local.set {}", subject_var));
+                    // Load the discriminant tag from offset 0
+                    self.line(&format!("local.get {}", subject_var));
+                    self.line("i32.load ;; tag");
+                    self.line(&format!("local.set {}", tag_var));
+
+                    for (arm_idx, arm) in arms.iter().enumerate() {
+                        let arm_label = format!("{}_arm{}", label, arm_idx);
+                        match &arm.pattern {
+                            Pattern::Variant { name, fields } => {
+                                // Map Ok/Some to tag 0, Err/None to tag 1
+                                let expected_tag = match name.as_str() {
+                                    "Ok" | "Some" => 0,
+                                    "Err" | "None" => 1,
+                                    _ => arm_idx as i32,
+                                };
+                                self.line(&format!(";; match arm: {}(..)", name));
+                                self.line(&format!("local.get {}", tag_var));
+                                self.line(&format!("i32.const {}", expected_tag));
+                                self.line("i32.eq");
+                                self.line(&format!("if ;; arm {}", arm_label));
+                                self.indent += 1;
+
+                                // Bind the payload field if the pattern destructures
+                                if let Some(Pattern::Ident(binding)) = fields.first() {
+                                    let binding_var = format!("$__{}", binding);
+                                    self.emit_template_local(&binding_var);
+                                    self.line(&format!("local.get {}", subject_var));
+                                    self.line("i32.load offset=4 ;; payload");
+                                    self.line(&format!("local.set {}", binding_var));
+                                    self.for_loop_bindings.push(binding.clone());
+                                }
+
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
+
+                                // Clean up binding
+                                if let Some(Pattern::Ident(_binding)) = fields.first() {
+                                    self.for_loop_bindings.pop();
+                                }
+                                self.indent -= 1;
+                                self.line(&format!("end ;; end arm {}", arm_label));
+                            }
+                            Pattern::Wildcard | Pattern::Ident(_) => {
+                                // Wildcard arm — always matches (fallback)
+                                self.line(&format!(";; match arm: _ (wildcard) {}", arm_label));
+                                if let Pattern::Ident(binding) = &arm.pattern {
+                                    let binding_var = format!("$__{}", binding);
+                                    self.emit_template_local(&binding_var);
+                                    self.line(&format!("local.get {}", subject_var));
+                                    self.line(&format!("local.set {}", binding_var));
+                                    self.for_loop_bindings.push(binding.clone());
+                                }
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
+                                if let Pattern::Ident(_binding) = &arm.pattern {
+                                    self.for_loop_bindings.pop();
+                                }
+                            }
+                            _ => {
+                                // Other patterns — emit body unconditionally as fallback
+                                self.line(&format!(";; match arm: pattern {}", arm_label));
+                                for child in &arm.body {
+                                    self.generate_template(child, parent);
+                                }
                             }
                         }
                     }
@@ -7081,6 +7543,17 @@ impl WasmCodegen {
             .and_then(|layout| layout.iter()
                 .find(|(name, _)| name == field_name)
                 .map(|(_, offset)| *offset))
+    }
+
+    /// Resolve a field offset by scanning all known struct layouts.
+    /// Returns the offset if found, 0 otherwise.
+    fn resolve_field_offset(&self, field_name: &str) -> u32 {
+        for (_struct_name, layout) in &self.struct_layouts {
+            if let Some((_, off)) = layout.iter().find(|(n, _)| n == field_name) {
+                return *off;
+            }
+        }
+        0
     }
 
     /// Get the total byte size of a struct from its layout.
@@ -7555,6 +8028,38 @@ impl WasmCodegen {
                     }
                 }
             }
+            Expr::OptionalChain { object, field } => {
+                // Optional chaining: obj?.field → null check, short-circuit to 0
+                self.line(&format!(";; optional chain: ?.{}", field));
+                let lbl = self.next_label();
+                let obj_var = format!("$__optchain_{}", lbl);
+                self.locals.push((format!("__optchain_{}", lbl), WasmType::I32));
+                self.generate_expr(object);
+                self.line(&format!("local.set {}", obj_var));
+                self.line(&format!("local.get {}", obj_var));
+                self.line("i32.eqz");
+                self.emit("(if (result i32)");
+                self.indent += 1;
+                self.emit("(then");
+                self.indent += 1;
+                self.line("i32.const 0  ;; None — short circuit");
+                self.indent -= 1;
+                self.line(")");
+                self.emit("(else");
+                self.indent += 1;
+                // Access the field from the non-null object
+                self.line(&format!("local.get {}", obj_var));
+                let offset = self.resolve_field_offset(field);
+                if offset == 0 {
+                    self.line("i32.load");
+                } else {
+                    self.line(&format!("i32.load offset={}", offset));
+                }
+                self.indent -= 1;
+                self.line(")");
+                self.indent -= 1;
+                self.line(")");
+            }
             Expr::Index { object, index } => {
                 // Array/Vec indexing: arr[i] → load from data_ptr + i * 4
                 // Vec layout: [length: i32, capacity: i32, data_ptr: i32]
@@ -7622,12 +8127,15 @@ impl WasmCodegen {
                 }
             }
             Expr::Await(inner) => {
-                self.line(";; await — suspend until promise resolves");
+                self.line(";; await — generate inner expression for state machine poll");
                 self.generate_expr(inner);
-                // In WASM, async is handled by the JS runtime.
-                // The WASM function returns a promise handle,
-                // and the runtime resumes execution when resolved.
-                self.line("call $signal_get ;; resolve promise handle");
+                // In the br_table state machine, the actual suspension is handled
+                // by the poll function structure: each state generates the inner
+                // expression of the await, initiates the async op with a repoll
+                // callback, advances the state, and returns Pending.
+                // When generate_expr encounters an Await *outside* of the state
+                // machine (e.g. in a non-async context), we just emit the inner
+                // expression — the value is already on the stack.
             }
             Expr::Fetch { url, options, contract } => {
                 if let Some(contract_name) = contract {
@@ -8077,9 +8585,17 @@ impl WasmCodegen {
                             }
                         }
                         Pattern::Literal(lit_expr) => {
-                            self.line(&format!("local.get {}", subject_local));
-                            self.generate_expr(lit_expr);
-                            self.line("i32.eq");
+                            if let Expr::StringLit(s) = lit_expr {
+                                // String literal pattern — use $str_eq
+                                let str_offset = self.store_string(s);
+                                self.line(&format!("local.get {}", subject_local));
+                                self.line(&format!("i32.const {} ;; ptr to \"{}\"", str_offset, s));
+                                self.line("call $str_eq");
+                            } else {
+                                self.line(&format!("local.get {}", subject_local));
+                                self.generate_expr(lit_expr);
+                                self.line("i32.eq");
+                            }
                             if let Some(guard) = &arm.guard {
                                 self.generate_expr(guard);
                                 self.line("i32.and");
@@ -9726,6 +10242,145 @@ impl WasmCodegen {
         self.line("end");
         self.line("local.get $ptr");
         self.line("local.get $len");
+        self.indent -= 1;
+        self.line(")");
+
+        // ── Router query param functions (WASM-internal) ──────────
+        self.line("");
+        self.line(";; Router query string parsing — pure WASM, no JS logic");
+
+        // $router_parse_query(url_ptr, url_len) -> i32
+        // Finds '?' in URL, parses key=value&key2=value2 pairs into a linear memory table.
+        // Table layout: [count: i32, (key_ptr, key_len, val_ptr, val_len) * count]
+        self.emit("(func $router_parse_query (param $url_ptr i32) (param $url_len i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $qstart i32) (local $tbl i32) (local $count i32)");
+        self.line("(local $kstart i32) (local $klen i32) (local $vstart i32) (local $vlen i32) (local $ch i32)");
+        // Find '?' position
+        self.line("i32.const -1  local.set $qstart");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $found  loop $scan");
+        self.line("  local.get $i  local.get $url_len  i32.ge_u  br_if $found");
+        self.line("  local.get $url_ptr  local.get $i  i32.add  i32.load8_u");
+        self.line("  i32.const 63  i32.eq  ;; '?'");
+        self.line("  if  local.get $i  i32.const 1  i32.add  local.set $qstart  br $found  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $scan");
+        self.line("end  end");
+        // If no '?', return empty table
+        self.line("local.get $qstart  i32.const -1  i32.eq");
+        self.line("if (result i32)");
+        self.line("  i32.const 4  call $alloc");
+        self.line("  local.tee $tbl  i32.const 0  i32.store");
+        self.line("  local.get $tbl");
+        self.line("else");
+        // Parse pairs after '?'
+        self.line("  i32.const 260  call $alloc  ;; room for 16 pairs (4 + 16*16)");
+        self.line("  local.set $tbl");
+        self.line("  i32.const 0  local.set $count");
+        self.line("  local.get $qstart  local.set $kstart");
+        self.line("  block $done  loop $parse");
+        self.line("    local.get $kstart  local.get $url_len  i32.ge_u  br_if $done");
+        // Find '=' for key end
+        self.line("    local.get $kstart  local.set $i");
+        self.line("    block $eq  loop $fk");
+        self.line("      local.get $i  local.get $url_len  i32.ge_u  br_if $eq");
+        self.line("      local.get $url_ptr  local.get $i  i32.add  i32.load8_u");
+        self.line("      i32.const 61  i32.eq  br_if $eq  ;; '='");
+        self.line("      local.get $i  i32.const 1  i32.add  local.set $i  br $fk");
+        self.line("    end  end");
+        self.line("    local.get $i  local.get $kstart  i32.sub  local.set $klen");
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $vstart");
+        // Find '&' or end for value end
+        self.line("    local.get $vstart  local.set $i");
+        self.line("    block $amp  loop $fv");
+        self.line("      local.get $i  local.get $url_len  i32.ge_u  br_if $amp");
+        self.line("      local.get $url_ptr  local.get $i  i32.add  i32.load8_u");
+        self.line("      i32.const 38  i32.eq  br_if $amp  ;; '&'");
+        self.line("      local.get $i  i32.const 1  i32.add  local.set $i  br $fv");
+        self.line("    end  end");
+        self.line("    local.get $i  local.get $vstart  i32.sub  local.set $vlen");
+        // Store entry: key_ptr, key_len, val_ptr, val_len
+        self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add");
+        self.line("    local.get $url_ptr  local.get $kstart  i32.add  i32.store         ;; key_ptr");
+        self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 4  i32.add");
+        self.line("    local.get $klen  i32.store                                         ;; key_len");
+        self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 8  i32.add");
+        self.line("    local.get $url_ptr  local.get $vstart  i32.add  i32.store          ;; val_ptr");
+        self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 12  i32.add");
+        self.line("    local.get $vlen  i32.store                                         ;; val_len");
+        self.line("    local.get $count  i32.const 1  i32.add  local.set $count");
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $kstart  ;; skip '&'");
+        self.line("    br $parse");
+        self.line("  end  end");
+        self.line("  local.get $tbl  local.get $count  i32.store  ;; write count header");
+        self.line("  local.get $tbl");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $router_get_query(tbl: i32, key_ptr: i32, key_len: i32) -> (ptr, len)
+        // Look up a query param by key name from a parsed table
+        self.line("");
+        self.emit("(func $router_get_query (param $tbl i32) (param $key_ptr i32) (param $key_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $count i32) (local $entry i32) (local $ek_ptr i32) (local $ek_len i32)");
+        self.line("local.get $tbl  i32.load  local.set $count");
+        self.line("i32.const 0  local.set $i");
+        self.line("block $notfound  loop $scan");
+        self.line("  local.get $i  local.get $count  i32.ge_u  br_if $notfound");
+        self.line("  local.get $tbl  i32.const 4  i32.add  local.get $i  i32.const 16  i32.mul  i32.add  local.set $entry");
+        self.line("  local.get $entry  i32.load  local.set $ek_ptr");
+        self.line("  local.get $entry  i32.const 4  i32.add  i32.load  local.set $ek_len");
+        self.line("  local.get $ek_len  local.get $key_len  i32.eq");
+        self.line("  if");
+        self.line("    local.get $ek_ptr  local.get $key_ptr  local.get $key_len  call $mem_compare");
+        self.line("    i32.const 1  i32.eq");
+        self.line("    if");
+        self.line("      local.get $entry  i32.const 8  i32.add  i32.load  ;; val_ptr");
+        self.line("      local.get $entry  i32.const 12  i32.add  i32.load ;; val_len");
+        self.line("      return");
+        self.line("    end");
+        self.line("  end");
+        self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $scan");
+        self.line("end  end");
+        self.line("i32.const 0  i32.const 0  ;; not found");
+        self.indent -= 1;
+        self.line(")");
+
+        // $router_get_current_query(key_ptr, key_len) -> (ptr, len)
+        // Read from current location.search via existing webapi import
+        self.line("");
+        self.emit("(func $router_get_current_query (param $key_ptr i32) (param $key_len i32) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $search_ptr i32) (local $search_len i32) (local $tbl i32)");
+        self.line("call $webapi_getLocationSearch");
+        self.line("local.set $search_ptr");
+        // Measure search string length
+        self.line("local.get $search_ptr  call $str_len");
+        self.line("local.set $search_len  drop  ;; drop ptr from str_len, keep len");
+        self.line("local.get $search_ptr  local.get $search_len  call $router_parse_query");
+        self.line("local.set $tbl");
+        self.line("local.get $tbl  local.get $key_ptr  local.get $key_len  call $router_get_query");
+        self.indent -= 1;
+        self.line(")");
+
+        // $router_navigate_with_query(path_ptr, path_len, query_ptr, query_len)
+        // Concatenates path + "?" + query and navigates
+        self.line("");
+        self.emit("(func $router_navigate_with_query (param $path_ptr i32) (param $path_len i32) (param $query_ptr i32) (param $query_len i32)");
+        self.indent += 1;
+        self.line("(local $full_ptr i32) (local $full_len i32)");
+        // total length = path_len + 1 ('?') + query_len
+        self.line("local.get $path_len  i32.const 1  i32.add  local.get $query_len  i32.add  local.set $full_len");
+        self.line("local.get $full_len  call $alloc  local.set $full_ptr");
+        // Copy path
+        self.line("local.get $full_ptr  local.get $path_ptr  local.get $path_len  memory.copy");
+        // Write '?'
+        self.line("local.get $full_ptr  local.get $path_len  i32.add  i32.const 63  i32.store8");
+        // Copy query
+        self.line("local.get $full_ptr  local.get $path_len  i32.add  i32.const 1  i32.add  local.get $query_ptr  local.get $query_len  memory.copy");
+        // Navigate
+        self.line("local.get $full_ptr  local.get $full_len  call $router_navigate");
         self.indent -= 1;
         self.line(")");
 
@@ -11753,11 +12408,11 @@ impl WasmCodegen {
                 let is_namespace = if let Expr::Ident(obj_name) = object {
                     // Known stdlib/built-in namespaces used as static call targets
                     matches!(obj_name.as_str(),
-                        "time" | "Duration" | "clipboard" | "crypto" | "auth" |
+                        "time" | "Duration" | "DateTime" | "clipboard" | "crypto" | "auth" |
                         "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
-                        "pwa" | "console" | "hardware" | "webapi" | "rtc" |
+                        "pwa" | "console" | "hardware" | "webapi" | "rtc" | "router" |
                         "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
-                        "http"
+                        "http" | "debounce"
                     )
                 } else {
                     false
@@ -12025,6 +12680,20 @@ impl WasmCodegen {
             "clipboard::paste" | "clipboard::read" => "$clipboard_paste_async".into(),
             "clipboard::copy_image" => "$webapi_clipboardWrite".into(),
             "time::now" => "$time_now_i32".into(),
+            // DateTime — pure WASM i64-based date/time functions
+            "DateTime::now" => "$datetime_now".into(),
+            "DateTime::from_ymd" => "$datetime_from_ymd".into(),
+            "DateTime::year" => "$datetime_year".into(),
+            "DateTime::month" => "$datetime_month".into(),
+            "DateTime::day" => "$datetime_day".into(),
+            "DateTime::hour" => "$datetime_hour".into(),
+            "DateTime::minute" => "$datetime_minute".into(),
+            "DateTime::add_days" => "$datetime_add_days".into(),
+            "DateTime::diff_days" => "$datetime_diff_days".into(),
+            "DateTime::day_of_week" => "$datetime_day_of_week".into(),
+            "DateTime::format_iso" => "$datetime_format_iso".into(),
+            "DateTime::format_time" => "$datetime_format_time".into(),
+            "DateTime::to_local" => "$datetime_to_local".into(),
             "time::format" => "$time_format_str".into(),
             "time::zoned" => "$time_zoned".into(),
             "time::date" => "$time_zoned".into(),
@@ -12085,9 +12754,22 @@ impl WasmCodegen {
             "banking::open" => "$banking_open".into(),
             "map::mount" => "$map_mount".into(),
             "map::add_marker" => "$map_add_marker".into(),
+            // Router query params — pure WASM
+            "router::parse_query" => "$router_parse_query".into(),
+            "router::get_query" => "$router_get_query".into(),
+            "router::get_current_query" => "$router_get_current_query".into(),
+            "router::navigate_with_query" => "$router_navigate_with_query".into(),
             "channel::connect" | "ws::connect" => "$ws_connect".into(),
             "channel::send" | "ws::send" => "$ws_send".into(),
             "channel::close" | "ws::close" => "$ws_close".into(),
+            // SSE — Server-Sent Events via streaming import
+            // SSE — Server-Sent Events via streaming import
+            "streaming::connect" | "streaming::sse_connect" => "$streaming_sseConnect".into(),
+            "streaming::stream_fetch" => "$streaming_streamFetch".into(),
+            // Debounce — WASM-internal timer-based debouncing
+            "debounce::create" => "$debounce_create".into(),
+            "debounce::call" => "$debounce_call".into(),
+            "debounce::cancel" => "$debounce_cancel".into(),
             // HTTP — typed setters + fetch
             "http::fetch" => "$http_fetch".into(),
             "http::fetchWithCallback" | "http::fetch_with_callback" => "$http_fetchWithCallback".into(),
@@ -12856,6 +13538,226 @@ impl WasmCodegen {
         self.line("i32.const 0  ;; callback index (default handler)");
         self.line("call $webapi_clipboardRead");
         self.line("i32.const 0  ;; return 0 synchronously — real value arrives via async callback");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    fn emit_datetime_runtime(&mut self) {
+        self.line("");
+        self.line(";; ========== DateTime runtime (WASM-internal, i64-based) ==========");
+        self.line(";; All arithmetic is pure WASM. Only time.now() bridges to JS.");
+        self.line("");
+
+        // $datetime_now() -> i64 — current time as milliseconds since Unix epoch
+        self.emit("(func $datetime_now (result i64)");
+        self.indent += 1;
+        self.line("call $time_now  ;; f64 ms");
+        self.line("i64.trunc_f64_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_from_ymd(year: i32, month: i32, day: i32) -> i64
+        // Pure arithmetic: compute days from epoch, multiply by 86400000
+        self.line("");
+        self.emit("(func $datetime_from_ymd (param $year i32) (param $month i32) (param $day i32) (result i64)");
+        self.indent += 1;
+        self.line("(local $y i32) (local $m i32) (local $days i32)");
+        // Adjust year/month for March-based month numbering
+        self.line("local.get $month  i32.const 2  i32.le_s");
+        self.line("if");
+        self.line("  local.get $year  i32.const 1  i32.sub  local.set $y");
+        self.line("  local.get $month  i32.const 12  i32.add  local.set $m");
+        self.line("else");
+        self.line("  local.get $year  local.set $y");
+        self.line("  local.get $month  local.set $m");
+        self.line("end");
+        // days = 365*y + y/4 - y/100 + y/400 + (153*(m-3)+2)/5 + day - 719469
+        self.line("i32.const 365  local.get $y  i32.mul");
+        self.line("local.get $y  i32.const 4  i32.div_s  i32.add");
+        self.line("local.get $y  i32.const 100  i32.div_s  i32.sub");
+        self.line("local.get $y  i32.const 400  i32.div_s  i32.add");
+        self.line("i32.const 153  local.get $m  i32.const 3  i32.sub  i32.mul  i32.const 2  i32.add  i32.const 5  i32.div_s  i32.add");
+        self.line("local.get $day  i32.add");
+        self.line("i32.const 719469  i32.sub");
+        self.line("local.set $days");
+        // Convert to milliseconds as i64
+        self.line("local.get $days  i64.extend_i32_s");
+        self.line("i64.const 86400000  i64.mul");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_year(ts: i64) -> i32  — extract year from epoch ms
+        // Uses a simplified civil-from-days algorithm with locals for intermediate values.
+        self.line("");
+        self.emit("(func $datetime_year (param $ts i64) (result i32)");
+        self.indent += 1;
+        self.line("(local $z i32) (local $era i32) (local $doe i32) (local $yoe i32) (local $doy i32) (local $mp i32) (local $y i32)");
+        self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
+        self.line("i32.const 719468  i32.add  local.set $z");
+        // era = z / 146097
+        self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
+        // doe = z - era * 146097
+        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        // yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365
+        self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
+        // y = yoe + era * 400
+        self.line("local.get $yoe  local.get $era  i32.const 400  i32.mul  i32.add  local.set $y");
+        // doy = doe - (365*yoe + yoe/4 - yoe/100)
+        self.line("local.get $doe  local.get $yoe  i32.const 365  i32.mul  i32.sub  local.get $yoe  i32.const 4  i32.div_s  i32.sub  local.set $doy");
+        // mp = (5*doy + 2) / 153
+        self.line("i32.const 5  local.get $doy  i32.mul  i32.const 2  i32.add  i32.const 153  i32.div_s  local.set $mp");
+        // if mp < 10, return y; else return y + 1
+        self.line("local.get $mp  i32.const 10  i32.lt_u");
+        self.line("if (result i32)");
+        self.line("  local.get $y");
+        self.line("else");
+        self.line("  local.get $y  i32.const 1  i32.add");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_month(ts: i64) -> i32
+        self.line("");
+        self.emit("(func $datetime_month (param $ts i64) (result i32)");
+        self.indent += 1;
+        self.line("(local $z i32) (local $era i32) (local $doe i32) (local $yoe i32) (local $doy i32) (local $mp i32)");
+        self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
+        self.line("i32.const 719468  i32.add  local.set $z");
+        self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
+        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
+        self.line("local.get $doe  local.get $yoe  i32.const 365  i32.mul  i32.sub  local.get $yoe  i32.const 4  i32.div_s  i32.sub  local.set $doy");
+        self.line("i32.const 5  local.get $doy  i32.mul  i32.const 2  i32.add  i32.const 153  i32.div_s  local.set $mp");
+        self.line("local.get $mp  i32.const 10  i32.lt_u");
+        self.line("if (result i32)");
+        self.line("  local.get $mp  i32.const 3  i32.add");
+        self.line("else");
+        self.line("  local.get $mp  i32.const 9  i32.sub");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_day(ts: i64) -> i32
+        self.line("");
+        self.emit("(func $datetime_day (param $ts i64) (result i32)");
+        self.indent += 1;
+        self.line("(local $z i32) (local $era i32) (local $doe i32) (local $yoe i32) (local $doy i32) (local $mp i32)");
+        self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
+        self.line("i32.const 719468  i32.add  local.set $z");
+        self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
+        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
+        self.line("local.get $doe  local.get $yoe  i32.const 365  i32.mul  i32.sub  local.get $yoe  i32.const 4  i32.div_s  i32.sub  local.set $doy");
+        self.line("i32.const 5  local.get $doy  i32.mul  i32.const 2  i32.add  i32.const 153  i32.div_s  local.set $mp");
+        self.line("local.get $doy  i32.const 153  local.get $mp  i32.mul  i32.const 2  i32.add  i32.const 5  i32.div_s  i32.sub  i32.const 1  i32.add");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_hour(ts: i64) -> i32
+        self.line("");
+        self.emit("(func $datetime_hour (param $ts i64) (result i32)");
+        self.indent += 1;
+        // hour = (ts / 3600000) % 24
+        self.line("local.get $ts  i64.const 3600000  i64.div_s  i64.const 24  i64.rem_s  i32.wrap_i64");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_minute(ts: i64) -> i32
+        self.line("");
+        self.emit("(func $datetime_minute (param $ts i64) (result i32)");
+        self.indent += 1;
+        self.line("local.get $ts  i64.const 60000  i64.div_s  i64.const 60  i64.rem_s  i32.wrap_i64");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_add_days(ts: i64, days: i32) -> i64
+        self.line("");
+        self.emit("(func $datetime_add_days (param $ts i64) (param $days i32) (result i64)");
+        self.indent += 1;
+        self.line("local.get $ts");
+        self.line("local.get $days  i64.extend_i32_s  i64.const 86400000  i64.mul");
+        self.line("i64.add");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_diff_days(a: i64, b: i64) -> i32
+        self.line("");
+        self.emit("(func $datetime_diff_days (param $a i64) (param $b i64) (result i32)");
+        self.indent += 1;
+        self.line("local.get $a  local.get $b  i64.sub");
+        self.line("i64.const 86400000  i64.div_s  i32.wrap_i64");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_day_of_week(ts: i64) -> i32 (0=Thu epoch, adjusted to 0=Sun)
+        self.line("");
+        self.emit("(func $datetime_day_of_week (param $ts i64) (result i32)");
+        self.indent += 1;
+        // Unix epoch (1970-01-01) was a Thursday (day 4).
+        // day_of_week = ((ts / 86400000) + 4) % 7
+        self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
+        self.line("i32.const 4  i32.add  i32.const 7  i32.rem_s");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_format_iso(ts: i64) -> (ptr, len)
+        // Format as "YYYY-MM-DD" — pure WASM string construction
+        self.line("");
+        self.emit("(func $datetime_format_iso (param $ts i64) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32) (local $y i32) (local $m i32) (local $d i32)");
+        self.line("local.get $ts  call $datetime_year  local.set $y");
+        self.line("local.get $ts  call $datetime_month  local.set $m");
+        self.line("local.get $ts  call $datetime_day  local.set $d");
+        // Allocate 10 bytes for "YYYY-MM-DD"
+        self.line("i32.const 10  call $alloc  local.set $ptr");
+        // Write year digits (4 digits)
+        self.line("local.get $ptr  local.get $y  i32.const 1000  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 1  i32.add  local.get $y  i32.const 100  i32.rem_s  i32.const 10  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 2  i32.add  local.get $y  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8  ;; simplified");
+        self.line("local.get $ptr  i32.const 2  i32.add  local.get $y  i32.const 100  i32.rem_s  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 3  i32.add  local.get $y  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        // Dash
+        self.line("local.get $ptr  i32.const 4  i32.add  i32.const 45  i32.store8  ;; '-'");
+        // Month (2 digits)
+        self.line("local.get $ptr  i32.const 5  i32.add  local.get $m  i32.const 10  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 6  i32.add  local.get $m  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        // Dash
+        self.line("local.get $ptr  i32.const 7  i32.add  i32.const 45  i32.store8  ;; '-'");
+        // Day (2 digits)
+        self.line("local.get $ptr  i32.const 8  i32.add  local.get $d  i32.const 10  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 9  i32.add  local.get $d  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 10");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_format_time(ts: i64) -> (ptr, len)
+        // Format as "HH:MM" — pure WASM
+        self.line("");
+        self.emit("(func $datetime_format_time (param $ts i64) (result i32 i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32) (local $h i32) (local $min i32)");
+        self.line("local.get $ts  call $datetime_hour  local.set $h");
+        self.line("local.get $ts  call $datetime_minute  local.set $min");
+        self.line("i32.const 5  call $alloc  local.set $ptr");
+        self.line("local.get $ptr  local.get $h  i32.const 10  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 1  i32.add  local.get $h  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 2  i32.add  i32.const 58  i32.store8  ;; ':'");
+        self.line("local.get $ptr  i32.const 3  i32.add  local.get $min  i32.const 10  i32.div_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 4  i32.add  local.get $min  i32.const 10  i32.rem_s  i32.const 48  i32.add  i32.store8");
+        self.line("local.get $ptr  i32.const 5");
+        self.indent -= 1;
+        self.line(")");
+
+        // $datetime_to_local(ts: i64) -> i64
+        // Adjusts UTC timestamp by the browser's timezone offset
+        self.line("");
+        self.emit("(func $datetime_to_local (param $ts i64) (result i64)");
+        self.indent += 1;
+        self.line("local.get $ts");
+        self.line("call $time_getTimezoneOffset  ;; returns minutes offset (negative = ahead of UTC)");
+        self.line("i64.extend_i32_s  i64.const 60000  i64.mul");
+        self.line("i64.sub  ;; subtract offset to get local time");
         self.indent -= 1;
         self.line(")");
     }
@@ -19524,6 +20426,7 @@ mod closure_codegen_tests {
                     span: span(),
                 },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -19598,6 +20501,7 @@ mod closure_codegen_tests {
                     span: span(),
                 },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -19662,6 +20566,7 @@ mod closure_codegen_tests {
                     span: span(),
                 },
                 is_pub: true,
+                is_async: false,
                 must_use: false,
                 span: span(),
             })],
@@ -20597,6 +21502,7 @@ mod comprehensive_codegen_tests {
                     trait_bounds: vec![],
                     body: Block { stmts: vec![Stmt::Return(Some(Expr::Integer(0)))], span },
                     is_pub: true,
+                    is_async: false,
                     must_use: false,
                     span,
                 }],
@@ -21433,6 +22339,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }],
@@ -21555,6 +22462,7 @@ mod coverage_codegen_tests {
         let ch = ChannelDef {
             name: "Chat".into(),
             url: Expr::StringLit("/ws/chat".into()),
+            provider: None,
             contract: None,
             on_message: Some(Function {
                 name: "on_msg".into(),
@@ -21565,6 +22473,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -21577,6 +22486,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -21589,6 +22499,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -21612,6 +22523,7 @@ mod coverage_codegen_tests {
         let ch = ChannelDef {
             name: "Events".into(),
             url: Expr::Ident("url_var".into()),
+            provider: None,
             contract: None,
             on_message: None,
             on_connect: None,
@@ -21756,6 +22668,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -21768,6 +22681,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22010,6 +22924,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22022,6 +22937,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22203,6 +23119,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22294,6 +23211,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22306,6 +23224,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22318,6 +23237,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22355,6 +23275,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22367,6 +23288,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -22379,6 +23301,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -23082,6 +24005,7 @@ mod coverage_codegen_tests {
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Return(None)]),
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: span(),
             }),
@@ -23433,7 +24357,9 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&Expr::Await(Box::new(Expr::Integer(1))));
         let output = codegen.output.clone();
         assert!(output.contains("await"), "should have await comment");
-        assert!(output.contains("signal_get"), "should resolve promise handle");
+        assert!(output.contains("state machine poll"), "should reference state machine poll");
+        // The inner expression (Integer(1)) generates i32.const 1
+        assert!(output.contains("i32.const 1"), "should generate inner expression");
     }
 
     #[test]
@@ -24709,6 +25635,7 @@ mod coverage_codegen_tests {
                     span: Span::new(0, 0, 1, 1),
                 },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 span: Span::new(0, 0, 1, 1),
             }],
@@ -24975,6 +25902,7 @@ mod coverage_codegen_tests {
         let ch = ChannelDef {
             name: "ChatRoom".into(),
             url: Expr::StringLit("/ws/chat".into()),
+            provider: None,
             contract: None,
             on_message: Some(Function {
                 name: "on_message".into(),
@@ -24984,6 +25912,7 @@ mod coverage_codegen_tests {
                 return_type: None,
                 body: Block { stmts: vec![], span: span() },
                 is_pub: false,
+                is_async: false,
                 must_use: false,
                 trait_bounds: vec![],
                 span: span(),
@@ -27152,6 +28081,7 @@ mod capability_primitive_tests {
         let ch = ChannelDef {
             name: "Chat".into(),
             url: Expr::StringLit("/ws/chat".into()),
+            provider: None,
             contract: None,
             on_message: None,
             on_connect: None,
@@ -27179,6 +28109,7 @@ mod capability_primitive_tests {
         let ch = ChannelDef {
             name: "WS".into(),
             url: Expr::StringLit("/ws".into()),
+            provider: None,
             contract: None,
             on_message: None,
             on_connect: None,
@@ -27205,6 +28136,7 @@ mod capability_primitive_tests {
         let ch = ChannelDef {
             name: "Live".into(),
             url: Expr::StringLit("/ws".into()),
+            provider: None,
             contract: None,
             on_message: None,
             on_connect: None,
@@ -28910,5 +29842,923 @@ mod contract_api_tests {
         "#);
         assert!(wat.contains("upload_init"), "Browser upload should use upload_init");
         assert!(!wat.contains("blob_create"), "Browser upload should NOT use wasi:blob/store");
+    }
+}
+
+#[cfg(test)]
+mod async_state_machine_tests {
+    use super::*;
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+    use crate::token::Span;
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    fn span() -> Span {
+        Span { start: 0, end: 0, line: 1, col: 1 }
+    }
+
+    #[test]
+    fn test_is_async_parsed_from_async_fn() {
+        let mut lexer = Lexer::new("async fn load_data() {}");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Function(f) = &program.items[0] {
+            assert!(f.is_async, "async fn should set is_async = true");
+        } else {
+            panic!("expected Function item");
+        }
+    }
+
+    #[test]
+    fn test_non_async_fn_has_is_async_false() {
+        let mut lexer = Lexer::new("fn regular() {}");
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Function(f) = &program.items[0] {
+            assert!(!f.is_async, "regular fn should have is_async = false");
+        } else {
+            panic!("expected Function item");
+        }
+    }
+
+    #[test]
+    fn test_async_fn_generates_br_table() {
+        // An async function with one await should produce br_table dispatch
+        let func = Function {
+            name: "load_data".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "response".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(42))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("br_table"), "async fn should use br_table dispatch");
+        assert!(output.contains("$__state_0"), "should have state 0 block label");
+        assert!(output.contains("$__state_1"), "should have state 1 block label");
+        assert!(output.contains("$__state_end"), "should have state end block");
+    }
+
+    #[test]
+    fn test_async_fn_correct_state_count() {
+        // Two await points should produce 3 states
+        let func = Function {
+            name: "fetch_two".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(1))),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "b".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(2))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("3 states (2 await points)"),
+            "should report 3 states for 2 await points");
+        assert!(output.contains("$__state_0"), "should have state 0");
+        assert!(output.contains("$__state_1"), "should have state 1");
+        assert!(output.contains("$__state_2"), "should have state 2");
+    }
+
+    #[test]
+    fn test_async_fn_state0_returns_pending() {
+        let func = Function {
+            name: "load".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "data".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("i32.const 0 ;; Poll::Pending"),
+            "state 0 should return Pending after initiating async op");
+    }
+
+    #[test]
+    fn test_async_fn_final_state_returns_ready() {
+        let func = Function {
+            name: "load".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "data".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("i32.const 1 ;; Poll::Ready"),
+            "final state should return Ready");
+    }
+
+    #[test]
+    fn test_async_fn_repoll_callback_emitted() {
+        let func = Function {
+            name: "fetch_stuff".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "r".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("func $fetch_stuff__repoll"),
+            "should emit repoll callback function");
+        assert!(output.contains("call $fetch_stuff ;; re-poll"),
+            "repoll should call the poll function");
+        assert!(output.contains("__callback_data"),
+            "repoll should read callback data");
+    }
+
+    #[test]
+    fn test_async_fn_future_struct_allocated() {
+        let func = Function {
+            name: "my_fetch".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "data".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        // Entry trampoline should allocate 8 bytes (state + result, no self)
+        assert!(output.contains("i32.const 8"), "should allocate 8-byte future struct (no self)");
+        assert!(output.contains("call $alloc"), "should call alloc for future struct");
+        assert!(output.contains("func $my_fetch_entry"),
+            "should emit entry trampoline function");
+    }
+
+    #[test]
+    fn test_async_fn_no_await_generates_sync() {
+        // An async function with no awaits should generate as a normal function
+        let func = Function {
+            name: "no_await".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Expr(Expr::Integer(42)),
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        // Should NOT have br_table (treated as sync)
+        assert!(!output.contains("br_table"),
+            "async fn without awaits should not use br_table");
+        assert!(output.contains("func $no_await"),
+            "should generate the function normally");
+    }
+
+    #[test]
+    fn test_async_fn_multiple_sequential_awaits() {
+        // Three sequential awaits should produce 4 states
+        let func = Function {
+            name: "multi".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(1))),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "b".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(2))),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "c".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(3))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("4 states (3 await points)"),
+            "should have 4 states for 3 awaits");
+        assert!(output.contains("$__state_0"), "should have state 0");
+        assert!(output.contains("$__state_1"), "should have state 1");
+        assert!(output.contains("$__state_2"), "should have state 2");
+        assert!(output.contains("$__state_3"), "should have state 3");
+
+        // Should have exactly one poll function (not N+1 separate state functions)
+        // The br_table instruction appears once per poll function
+        let poll_func_count = output.matches("(param $future_ptr i32) (result i32)").count();
+        assert_eq!(poll_func_count, 1, "should have exactly one poll function");
+        // Should NOT have separate CPS state functions
+        assert!(!output.contains("func $multi__state_"),
+            "should NOT have separate CPS state functions");
+    }
+
+    #[test]
+    fn test_async_fn_with_self_stores_self_in_future() {
+        let func = Function {
+            name: "method".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![
+                Param {
+                    name: "self".into(),
+                    ty: Type::Named("Self".into()),
+                    ownership: Ownership::MutBorrowed,
+                    secret: false,
+                },
+            ],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "r".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        // Should allocate 12 bytes (state + result + self)
+        assert!(output.contains("i32.const 12"),
+            "method should allocate 12-byte future struct (with self)");
+        // Poll function should restore self from future
+        assert!(output.contains("i32.load offset=8 ;; self_ptr"),
+            "poll should restore self from future struct offset 8");
+        // Entry trampoline should save self into future
+        assert!(output.contains("i32.store offset=8 ;; future.self_ptr = self"),
+            "entry should save self into future struct");
+    }
+
+    #[test]
+    fn test_async_fn_state_advances_on_await() {
+        let func = Function {
+            name: "step".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "x".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("i32.const 1 ;; advance to state 1"),
+            "state 0 should advance state to 1 before returning Pending");
+        assert!(output.contains("i32.store ;; future.state = next"),
+            "should store next state into future struct");
+    }
+
+    #[test]
+    fn test_async_fn_loads_result_in_continuation() {
+        let func = Function {
+            name: "cont".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "data".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("i32.load offset=4 ;; result_ptr"),
+            "continuation state should load result from future struct offset 4");
+        assert!(output.contains("local.set $data ;; bind await result"),
+            "should bind result to the let-binding variable");
+    }
+
+    #[test]
+    fn test_async_fn_single_poll_function() {
+        // Verify that we generate ONE poll function, not N+1 separate ones
+        let func = Function {
+            name: "one_poll".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(1))),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "b".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(2))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        // Should have the poll function
+        assert!(output.contains("func $one_poll (param $future_ptr i32) (result i32)"),
+            "should emit poll function with future_ptr param and i32 result");
+
+        // Should NOT have separate state functions (old CPS pattern)
+        assert!(!output.contains("func $one_poll__state_1"),
+            "should NOT have separate CPS state functions");
+        assert!(!output.contains("func $one_poll__state_2"),
+            "should NOT have separate CPS state functions");
+
+        // Should have the repoll and entry functions
+        assert!(output.contains("func $one_poll__repoll"),
+            "should have repoll callback function");
+        assert!(output.contains("func $one_poll_entry"),
+            "should have entry trampoline function");
+    }
+
+    #[test]
+    fn test_async_fn_future_global_emitted() {
+        let func = Function {
+            name: "my_async".into(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![
+                    Stmt::Let {
+                        name: "x".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Await(Box::new(Expr::Integer(0))),
+                        ownership: Ownership::Owned,
+                    },
+                ],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: true,
+            must_use: false,
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_async_function(&func);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("global $__async_future_my_async (mut i32) (i32.const 0)"),
+            "should emit per-function future pointer global");
+    }
+}
+
+#[cfg(test)]
+mod payhive_feature_tests {
+    use super::*;
+    use crate::token::{Span, TokenKind};
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn span() -> Span { Span::new(0, 0, 1, 1) }
+
+    fn compile(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program)
+    }
+
+    // ── Feature 1: Optional chaining (?.) ──────────────────────────
+
+    #[test]
+    fn test_optional_chain_codegen() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_expr(&Expr::OptionalChain {
+            object: Box::new(Expr::Ident("customer".into())),
+            field: "address".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("optional chain: ?.address"), "should emit optional chain comment");
+        assert!(output.contains("i32.eqz"), "should check for null");
+        assert!(output.contains("i32.const 0"), "should short-circuit to 0 on null");
+        assert!(output.contains("i32.load"), "should load field on non-null");
+    }
+
+    #[test]
+    fn test_optional_chain_nested() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // customer?.address?.street
+        codegen.generate_expr(&Expr::OptionalChain {
+            object: Box::new(Expr::OptionalChain {
+                object: Box::new(Expr::Ident("customer".into())),
+                field: "address".into(),
+            }),
+            field: "street".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("?.address"), "should have inner optional chain");
+        assert!(output.contains("?.street"), "should have outer optional chain");
+        // Should have two null checks (two i32.eqz)
+        let eqz_count = output.matches("i32.eqz").count();
+        assert!(eqz_count >= 2, "nested optional chain should have at least 2 null checks");
+    }
+
+    #[test]
+    fn test_optional_chain_lexer() {
+        let mut lexer = Lexer::new("x?.y");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("x".into()));
+        assert_eq!(tokens[1].kind, TokenKind::QuestionDot);
+        assert_eq!(tokens[2].kind, TokenKind::Ident("y".into()));
+    }
+
+    #[test]
+    fn test_optional_chain_parser() {
+        // Parse a function containing x?.y to verify the parser handles ?.
+        let src = "pub fn test_fn() -> i32 { let r = x?.y; return 0; }";
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        // The program should parse without errors — the ?. operator is accepted
+        assert!(!program.items.is_empty(), "should parse program with ?. operator");
+    }
+
+    // ── Feature 2: String match ────────────────────────────────────
+
+    #[test]
+    fn test_expr_match_string_literals() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("status".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Literal(Expr::StringLit("paid".into())),
+                    guard: None,
+                    body: Expr::Integer(1),
+                },
+                MatchArm {
+                    pattern: Pattern::Literal(Expr::StringLit("pending".into())),
+                    guard: None,
+                    body: Expr::Integer(2),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                },
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("call $str_eq"), "string match should use $str_eq");
+        assert!(output.contains("i32.const 1"), "should have paid arm body");
+        assert!(output.contains("i32.const 2"), "should have pending arm body");
+    }
+
+    #[test]
+    fn test_template_match_string_pattern() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.defer_template_locals = true;
+        codegen.generate_template(
+            &TemplateNode::TemplateMatch {
+                subject: Box::new(Expr::Ident("status".into())),
+                arms: vec![
+                    TemplateMatchArm {
+                        pattern: Pattern::Literal(Expr::StringLit("active".into())),
+                        guard: None,
+                        body: vec![TemplateNode::TextLiteral("Active".into())],
+                    },
+                    TemplateMatchArm {
+                        pattern: Pattern::Wildcard,
+                        guard: None,
+                        body: vec![TemplateNode::TextLiteral("Unknown".into())],
+                    },
+                ],
+            },
+            "$parent",
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("template match on string"), "should detect string match");
+        assert!(output.contains("call $str_eq"), "template string match should use $str_eq");
+    }
+
+    // ── Feature 3: DateTime runtime ────────────────────────────────
+
+    #[test]
+    fn test_datetime_runtime_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $datetime_now"), "should emit $datetime_now");
+        assert!(wat.contains("func $datetime_from_ymd"), "should emit $datetime_from_ymd");
+        assert!(wat.contains("func $datetime_year"), "should emit $datetime_year");
+        assert!(wat.contains("func $datetime_month"), "should emit $datetime_month");
+        assert!(wat.contains("func $datetime_day"), "should emit $datetime_day");
+        assert!(wat.contains("func $datetime_hour"), "should emit $datetime_hour");
+        assert!(wat.contains("func $datetime_minute"), "should emit $datetime_minute");
+        assert!(wat.contains("func $datetime_add_days"), "should emit $datetime_add_days");
+        assert!(wat.contains("func $datetime_diff_days"), "should emit $datetime_diff_days");
+        assert!(wat.contains("func $datetime_day_of_week"), "should emit $datetime_day_of_week");
+        assert!(wat.contains("func $datetime_format_iso"), "should emit $datetime_format_iso");
+        assert!(wat.contains("func $datetime_format_time"), "should emit $datetime_format_time");
+        assert!(wat.contains("func $datetime_to_local"), "should emit $datetime_to_local");
+    }
+
+    #[test]
+    fn test_datetime_pure_wasm() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // datetime_add_days should use i64 arithmetic (pure WASM)
+        let section = wat.split("func $datetime_add_days").nth(1).unwrap_or("");
+        assert!(section.contains("i64.add"), "datetime_add_days should use i64.add");
+        assert!(section.contains("i64.const 86400000"), "datetime_add_days should use 86400000 ms/day");
+
+        // datetime_to_local should call time_getTimezoneOffset (only JS bridge)
+        let local_section = wat.split("func $datetime_to_local").nth(1).unwrap_or("");
+        assert!(local_section.contains("call $time_getTimezoneOffset"), "datetime_to_local should call timezone offset import");
+    }
+
+    // ── Feature 4: Router query params ─────────────────────────────
+
+    #[test]
+    fn test_router_query_functions_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $router_parse_query"), "should emit $router_parse_query");
+        assert!(wat.contains("func $router_get_query"), "should emit $router_get_query");
+        assert!(wat.contains("func $router_get_current_query"), "should emit $router_get_current_query");
+        assert!(wat.contains("func $router_navigate_with_query"), "should emit $router_navigate_with_query");
+    }
+
+    #[test]
+    fn test_router_query_pure_wasm_parsing() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // router_parse_query should scan for '?' (ASCII 63) in pure WASM
+        let section = wat.split("func $router_parse_query").nth(1).unwrap_or("");
+        assert!(section.contains("i32.const 63"), "should look for '?' character (ASCII 63)");
+        assert!(section.contains("i32.const 61"), "should look for '=' character (ASCII 61)");
+        assert!(section.contains("i32.const 38"), "should look for '&' character (ASCII 38)");
+    }
+
+    // ── Feature 5: SSE (Server-Sent Events) ────────────────────────
+
+    #[test]
+    fn test_sse_channel_codegen() {
+        let ch = ChannelDef {
+            name: "Events".into(),
+            url: Expr::StringLit("/api/events".into()),
+            provider: Some("sse".into()),
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: false,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $streaming_sseConnect"), "SSE channel should call streaming_sseConnect");
+        assert!(!output.contains("call $channel_connect_named"), "SSE channel should NOT call channel_connect_named");
+    }
+
+    #[test]
+    fn test_ws_channel_codegen_unchanged() {
+        let ch = ChannelDef {
+            name: "Chat".into(),
+            url: Expr::StringLit("/ws/chat".into()),
+            provider: None,
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: true,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $channel_connect"), "WS channel should still call channel_connect");
+        assert!(!output.contains("sseConnect"), "WS channel should NOT call sseConnect");
+    }
+
+    #[test]
+    fn test_sse_channel_parsing() {
+        let src = r#"channel AppEvents {
+            provider: "sse",
+            url: "/api/events",
+        }"#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Channel(ch) = &program.items[0] {
+            assert_eq!(ch.provider.as_deref(), Some("sse"), "should parse provider as sse");
+        } else {
+            panic!("Expected Channel item");
+        }
+    }
+
+    // ── Feature 6: Debounce namespace resolution ───────────────────
+
+    #[test]
+    fn test_debounce_namespace_resolution() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // debounce.create(500) → $debounce_create
+        codegen.generate_iterator_method(
+            &Expr::Ident("debounce".into()),
+            "create",
+            &[Expr::Integer(500)],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $debounce_create"), "debounce.create should resolve to $debounce_create");
+    }
+
+    #[test]
+    fn test_debounce_call_namespace_resolution() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // debounce.call(state, cb_idx) → $debounce_call
+        codegen.generate_iterator_method(
+            &Expr::Ident("debounce".into()),
+            "call",
+            &[Expr::Integer(0), Expr::Integer(1)],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $debounce_call"), "debounce.call should resolve to $debounce_call");
+    }
+
+    #[test]
+    fn test_debounce_cancel_namespace_resolution() {
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        // debounce.cancel(state) → $debounce_cancel
+        codegen.generate_iterator_method(
+            &Expr::Ident("debounce".into()),
+            "cancel",
+            &[Expr::Integer(0)],
+        );
+        let output = codegen.output.clone();
+        assert!(output.contains("call $debounce_cancel"), "debounce.cancel should resolve to $debounce_cancel");
     }
 }

@@ -561,6 +561,7 @@ mod tests {
             trait_bounds: vec![],
             body: Block { stmts, span: dummy_span() },
             is_pub,
+            is_async: false,
             must_use: false,
             span: dummy_span(),
         })
@@ -1069,7 +1070,7 @@ mod tests {
         // Channel
         assert_eq!(item_name(&Item::Channel(ChannelDef {
             name: "Ch".to_string(), url: Expr::StringLit("/ws".to_string()),
-            contract: None, on_message: None, on_connect: None, on_disconnect: None,
+            provider: None, contract: None, on_message: None, on_connect: None, on_disconnect: None,
             reconnect: false, heartbeat_interval: None, methods: vec![],
             is_pub: false, span: dummy_span(),
         })), Some("Ch".to_string()));
@@ -1278,7 +1279,7 @@ mod tests {
                 name: "m".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             render: None, span: dummy_span(),
         });
@@ -1315,7 +1316,7 @@ mod tests {
             name: "m".to_string(), lifetimes: vec![], type_params: vec![],
             params: vec![], return_type: None, trait_bounds: vec![],
             body: Block { stmts: vec![Stmt::Expr(Expr::Ident("lazy_dep".to_string()))], span: dummy_span() },
-            is_pub: false, must_use: false, span: dummy_span(),
+            is_pub: false, is_async: false, must_use: false, span: dummy_span(),
         }];
         let item = Item::LazyComponent(LazyComponentDef { component: c, span: dummy_span() });
         let mut deps = std::collections::HashSet::new();
@@ -1338,7 +1339,7 @@ mod tests {
                 name: "m".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("page_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             styles: vec![], render: RenderBlock {
                 body: TemplateNode::Element(Element {
@@ -1366,7 +1367,7 @@ mod tests {
                 name: "m".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("form_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             styles: vec![], render: None, is_pub: false, span: dummy_span(),
         });
@@ -1382,31 +1383,32 @@ mod tests {
         let ch = Item::Channel(ChannelDef {
             name: "Ch".to_string(),
             url: Expr::Ident("url_dep".to_string()),
+            provider: None,
             contract: Some("MyContract".to_string()),
             on_message: Some(Function {
                 name: "on_msg".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("msg_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }),
             on_connect: Some(Function {
                 name: "on_conn".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("conn_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }),
             on_disconnect: Some(Function {
                 name: "on_disc".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("disc_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }),
             reconnect: false, heartbeat_interval: None,
             methods: vec![Function {
                 name: "send".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("ch_meth_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             is_pub: false, span: dummy_span(),
         });
@@ -1495,7 +1497,7 @@ mod tests {
                 name: "m".to_string(), lifetimes: vec![], type_params: vec![],
                 params: vec![], return_type: None, trait_bounds: vec![],
                 body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
-                is_pub: false, must_use: false, span: dummy_span(),
+                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
             }],
             styles: vec![], transitions: vec![], trait_bounds: vec![],
             render: RenderBlock {
@@ -1853,7 +1855,7 @@ mod tests {
             return_type: Some(Type::Named("RetType".to_string())),
             trait_bounds: vec![],
             body: Block { stmts: vec![], span: dummy_span() },
-            is_pub: false, must_use: false, span: dummy_span(),
+            is_pub: false, is_async: false, must_use: false, span: dummy_span(),
         });
         let mut deps = std::collections::HashSet::new();
         collect_item_deps(&item, &mut deps);

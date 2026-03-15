@@ -66,7 +66,13 @@ impl Lexer {
                     TokenKind::Dot
                 }
             }
-            '?' => TokenKind::QuestionMark,
+            '?' => {
+                if self.match_char('.') {
+                    TokenKind::QuestionDot
+                } else {
+                    TokenKind::QuestionMark
+                }
+            }
             '#' => TokenKind::Hash,
             '%' => TokenKind::Percent,
             '&' => {
@@ -1078,6 +1084,26 @@ mod tests {
         assert_eq!(tokens[0].kind, TokenKind::Integer(0));
         assert_eq!(tokens[1].kind, TokenKind::DotDot);
         assert_eq!(tokens[2].kind, TokenKind::Integer(10));
+    }
+
+    #[test]
+    fn test_question_dot_token() {
+        let mut lexer = Lexer::new("a?.b");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("a".into()));
+        assert_eq!(tokens[1].kind, TokenKind::QuestionDot);
+        assert_eq!(tokens[2].kind, TokenKind::Ident("b".into()));
+    }
+
+    #[test]
+    fn test_question_dot_vs_question_mark() {
+        let mut lexer = Lexer::new("x? y?.z");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens[0].kind, TokenKind::Ident("x".into()));
+        assert_eq!(tokens[1].kind, TokenKind::QuestionMark);
+        assert_eq!(tokens[2].kind, TokenKind::Ident("y".into()));
+        assert_eq!(tokens[3].kind, TokenKind::QuestionDot);
+        assert_eq!(tokens[4].kind, TokenKind::Ident("z".into()));
     }
 
     #[test]
