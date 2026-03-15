@@ -108,6 +108,12 @@ pub struct WasmCodegen {
     /// Populated during codegen when payment/banking/map definitions declare a provider.
     /// The build step uses this to know which provider JS files to bundle alongside core.js.
     pub required_providers: HashSet<String>,
+    /// Payment definitions with their signal names, for resolving `PaymentName::status()`,
+    /// `PaymentName::token()`, `PaymentName::error()` to signal getters.
+    known_payment_signals: Vec<(String, Vec<String>)>,
+    /// Capability signal tracking — maps capability_name → signal_names for all 8 capabilities.
+    /// Used to resolve `CapName::status()`, `CapName::error()`, etc. to signal getters.
+    known_capability_signals: Vec<(String, String, Vec<String>)>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -211,7 +217,54 @@ impl WasmCodegen {
             used_runtime_categories: HashSet::new(),
             known_contracts: Vec::new(),
             required_providers: HashSet::new(),
+            known_payment_signals: Vec::new(),
+            known_capability_signals: Vec::new(),
         }
+    }
+
+    /// Emit reactive signal globals + signal creation code for a capability.
+    /// Returns the list of signal names for tracking.
+    /// `init_fn` is the function name where signal_create calls should go
+    /// (appended to the output directly as part of the calling function body).
+    fn emit_capability_signal_globals(&mut self, cap_name: &str, signals: &[(&str, &str)]) {
+        for (sig_name, comment) in signals {
+            self.line(&format!(
+                "(global $__sig_{}_{} (mut i32) (i32.const -1)) ;; signal ID: {} {}",
+                cap_name, sig_name, cap_name, comment
+            ));
+        }
+    }
+
+    /// Emit signal creation calls (call $signal_create + global.set) for a capability.
+    /// Should be called inside a function body.
+    fn emit_capability_signal_creates(&mut self, cap_name: &str, signals: &[(&str, i32)]) {
+        for (sig_name, initial) in signals {
+            self.line(&format!("  i32.const {}  ;; initial value", initial));
+            self.line("  call $signal_create");
+            self.line(&format!("  global.set $__sig_{}_{}", cap_name, sig_name));
+        }
+    }
+
+    /// Emit getter functions for capability signals.
+    /// For i32 signals: returns i32 via signal_get.
+    /// For str signals: returns i32 (ptr) via signal_get.
+    fn emit_capability_getters(&mut self, cap_name: &str, signals: &[&str]) {
+        for sig_name in signals {
+            self.line(&format!(
+                "(func ${}_get_{} (export \"{}_get_{}\") (result i32)",
+                cap_name, sig_name, cap_name, sig_name
+            ));
+            self.line(&format!("  global.get $__sig_{}_{}", cap_name, sig_name));
+            self.line("  call $signal_get");
+            self.line(")");
+        }
+    }
+
+    /// Emit a simple status setter that updates a signal.
+    fn emit_capability_set_status(&mut self, cap_name: &str, value: i32) {
+        self.line(&format!("  global.get $__sig_{}_status", cap_name));
+        self.line(&format!("  i32.const {}  ;; status", value));
+        self.line("  call $signal_set");
     }
 
     /// Pre-scan the AST to determine which runtime categories are actually
@@ -2701,6 +2754,24 @@ impl WasmCodegen {
     fn generate_form(&mut self, form: &FormDef) {
         self.line(&format!(";; === Form: {} ===", form.name));
 
+        // ── Reactive signals for form state ──────────────────────────
+        // Per-field value signals, per-field error signals, overall valid signal, submitting signal
+        self.emit_capability_signal_globals(&form.name, &[
+            ("valid", "form valid flag"),
+            ("submitting", "form submitting flag"),
+        ]);
+        // Per-field signals
+        for field in &form.fields {
+            self.line(&format!(
+                "(global $__sig_{}_{} (mut i32) (i32.const -1)) ;; signal ID: field {} value",
+                form.name, field.name, field.name
+            ));
+            self.line(&format!(
+                "(global $__sig_{}_{}_error (mut i32) (i32.const -1)) ;; signal ID: field {} error",
+                form.name, field.name, field.name
+            ));
+        }
+
         // Build schema JSON for form registration
         let mut schema_json = String::from("{\"fields\":[");
         for (i, field) in form.fields.iter().enumerate() {
@@ -2735,6 +2806,25 @@ impl WasmCodegen {
         self.emit(&format!("(func ${fn_name} (export \"{fn_name}\") (param $root i32)"));
         self.indent += 1;
 
+        // Create signals
+        self.line("  ;; Create form-level signals");
+        self.line("  i32.const 1  ;; initially valid");
+        self.line("  call $signal_create");
+        self.line(&format!("  global.set $__sig_{}_valid", form.name));
+        self.line("  i32.const 0  ;; not submitting");
+        self.line("  call $signal_create");
+        self.line(&format!("  global.set $__sig_{}_submitting", form.name));
+        // Per-field signal creation
+        for field in &form.fields {
+            self.line(&format!("  ;; Create signals for field: {}", field.name));
+            self.line("  i32.const 0  ;; empty value");
+            self.line("  call $signal_create");
+            self.line(&format!("  global.set $__sig_{}_{}", form.name, field.name));
+            self.line("  i32.const 0  ;; no error");
+            self.line("  call $signal_create");
+            self.line(&format!("  global.set $__sig_{}_{}_error", form.name, field.name));
+        }
+
         // Register form with runtime
         self.line(&format!(
             "(call $form_register (i32.const {}) (i32.const {}) (i32.const {}) (i32.const {}))",
@@ -2743,6 +2833,149 @@ impl WasmCodegen {
 
         self.indent -= 1;
         self.line(")");
+
+        // ── Lifecycle: validate — check all fields, return 1 if valid ──
+        self.line(&format!(
+            "(func ${}_validate (export \"{}_validate\") (result i32)",
+            form.name, form.name
+        ));
+        self.line("  (local $all_valid i32)");
+        self.line("  (local $field_val i32)");
+        self.line("  (local $field_len i32)");
+        self.line("  i32.const 1");
+        self.line("  local.set $all_valid");
+
+        for field in &form.fields {
+            for v in &field.validators {
+                match &v.kind {
+                    ValidatorKind::Required => {
+                        // Check len > 0
+                        self.line(&format!("  ;; validate {}: required", field.name));
+                        self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
+                        self.line("  call $signal_get");
+                        self.line("  call $string_len");
+                        self.line("  i32.eqz");
+                        self.line("  if");
+                        self.line("    i32.const 0");
+                        self.line("    local.set $all_valid");
+                        self.line("  end");
+                    }
+                    ValidatorKind::MinLength(n) => {
+                        self.line(&format!("  ;; validate {}: min_length({})", field.name, n));
+                        self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
+                        self.line("  call $signal_get");
+                        self.line("  call $string_len");
+                        self.line(&format!("  i32.const {}", n));
+                        self.line("  i32.lt_u");
+                        self.line("  if");
+                        self.line("    i32.const 0");
+                        self.line("    local.set $all_valid");
+                        self.line("  end");
+                    }
+                    ValidatorKind::MaxLength(n) => {
+                        self.line(&format!("  ;; validate {}: max_length({})", field.name, n));
+                        self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
+                        self.line("  call $signal_get");
+                        self.line("  call $string_len");
+                        self.line(&format!("  i32.const {}", n));
+                        self.line("  i32.gt_u");
+                        self.line("  if");
+                        self.line("    i32.const 0");
+                        self.line("    local.set $all_valid");
+                        self.line("  end");
+                    }
+                    ValidatorKind::Email => {
+                        self.line(&format!("  ;; validate {}: email", field.name));
+                        self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
+                        self.line("  call $signal_get");
+                        self.line("  call $string_len");
+                        self.line("  call $auth_validate_email");
+                        self.line("  i32.eqz");
+                        self.line("  if");
+                        self.line("    i32.const 0");
+                        self.line("    local.set $all_valid");
+                        self.line("  end");
+                    }
+                    _ => {
+                        // Other validators handled at registration time
+                    }
+                }
+            }
+        }
+
+        // Update the valid signal
+        self.line(&format!("  global.get $__sig_{}_valid", form.name));
+        self.line("  local.get $all_valid");
+        self.line("  call $signal_set");
+        self.line("  local.get $all_valid");
+        self.line(")");
+
+        // ── Lifecycle: submit — validate then call handler ──
+        self.line(&format!(
+            "(func ${}_submit (export \"{}_submit\") (param $cb_idx i32)",
+            form.name, form.name
+        ));
+        // Validate first
+        self.line(&format!("  call ${}_validate", form.name));
+        self.line("  if");
+        // Set submitting = 1
+        self.line(&format!("    global.get $__sig_{}_submitting", form.name));
+        self.line("    i32.const 1");
+        self.line("    call $signal_set");
+        // Fire callback
+        self.line("    local.get $cb_idx");
+        self.line("    call $__callback");
+        // Set submitting = 0
+        self.line(&format!("    global.get $__sig_{}_submitting", form.name));
+        self.line("    i32.const 0");
+        self.line("    call $signal_set");
+        self.line("  end");
+        self.line(")");
+
+        // ── Lifecycle: reset — clear all field values and errors ──
+        self.line(&format!(
+            "(func ${}_reset (export \"{}_reset\")",
+            form.name, form.name
+        ));
+        for field in &form.fields {
+            self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
+            self.line("  i32.const 0  ;; clear value");
+            self.line("  call $signal_set");
+            self.line(&format!("  global.get $__sig_{}_{}_error", form.name, field.name));
+            self.line("  i32.const 0  ;; clear error");
+            self.line("  call $signal_set");
+        }
+        self.line(&format!("  global.get $__sig_{}_valid", form.name));
+        self.line("  i32.const 1  ;; reset to valid");
+        self.line("  call $signal_set");
+        self.line(&format!("  global.get $__sig_{}_submitting", form.name));
+        self.line("  i32.const 0  ;; not submitting");
+        self.line("  call $signal_set");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&form.name, &["valid", "submitting"]);
+
+        // ── Convenience: is_valid ──
+        self.line(&format!(
+            "(func ${}_is_valid (export \"{}_is_valid\") (result i32)",
+            form.name, form.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_valid", form.name));
+        self.line("  call $signal_get");
+        self.line(")");
+
+        // Track capability signals
+        let mut signal_names = vec!["valid".into(), "submitting".into()];
+        for field in &form.fields {
+            signal_names.push(field.name.clone());
+            signal_names.push(format!("{}_error", field.name));
+        }
+        self.known_capability_signals.push((
+            form.name.clone(),
+            "form".into(),
+            signal_names,
+        ));
 
         // Generate methods, namespaced by form name to avoid redefinition
         // when multiple forms share method names like `on_submit`.
@@ -2769,15 +3002,57 @@ impl WasmCodegen {
         let url_offset = self.store_string(&url_str);
         let url_len = url_str.len();
 
-        // Generate channel registration function
+        // ── Reactive signals for channel state ──────────────────────────
+        // status: 0=disconnected, 1=connecting, 2=connected, 3=error
+        // last_message: string ptr (0 when no message)
+        // error_msg: string ptr (0 when no error)
+        self.emit_capability_signal_globals(&ch.name, &[
+            ("status", "channel status"),
+            ("last_message", "last received message"),
+            ("error_msg", "error message"),
+        ]);
+
+        // Global for reconnect attempt counter (exponential backoff)
+        self.line(&format!(
+            "(global $__channel_{}_reconnect_count (mut i32) (i32.const 0))",
+            ch.name
+        ));
+
+        // ── Lifecycle: init — creates signals ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            ch.name, ch.name
+        ));
+        self.emit_capability_signal_creates(&ch.name, &[
+            ("status", 0),
+            ("last_message", 0),
+            ("error_msg", 0),
+        ]);
+        self.line(")");
+
+        // Generate channel registration function (connect)
+        self.line(&format!("(func ${}_connect (export \"{}_connect\") (param $url_ptr i32) (param $url_len i32)", ch.name, ch.name));
+        // Set status to connecting (1)
+        self.emit_capability_set_status(&ch.name, 1);
+        // Reset reconnect counter
+        self.line(&format!("  i32.const 0"));
+        self.line(&format!("  global.set $__channel_{}_reconnect_count", ch.name));
+        self.line("  local.get $url_ptr");
+        self.line("  local.get $url_len");
+        // Reuse name ptr/len for the channel name
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  call $channel_connect_named");
+        self.line("  drop  ;; discard channel handle");
+        self.line(")");
+
+        // Legacy register function
         self.line(&format!("(func $__channel_register_{} (export \"__channel_register_{}\")", ch.name, ch.name));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
         self.line(&format!("  i32.const {}  ;; url ptr", url_offset));
         self.line(&format!("  i32.const {}  ;; url len", url_len));
         self.line("  call $channel_connect");
-        // channel_connect returns a handle i32 — discard it here since the
-        // channel is identified by name in subsequent calls.
         self.line("  drop  ;; discard channel handle — identified by name");
 
         // Set reconnect flag
@@ -2790,8 +3065,87 @@ impl WasmCodegen {
 
         self.line(")");
 
-        // Generate handler methods, namespaced by channel name to avoid
-        // redefinition when multiple channels share handler names like `on_message`.
+        // ── Lifecycle: send — sends a message on the channel ──
+        self.line(&format!(
+            "(func ${}_send (export \"{}_send\") (param $msg_ptr i32) (param $msg_len i32)",
+            ch.name, ch.name
+        ));
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  local.get $msg_ptr");
+        self.line("  local.get $msg_len");
+        self.line("  call $channel_send");
+        self.line(")");
+
+        // ── Lifecycle: close — disconnects the channel ──
+        self.line(&format!(
+            "(func ${}_close (export \"{}_close\")",
+            ch.name, ch.name
+        ));
+        self.emit_capability_set_status(&ch.name, 0);
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  call $channel_close");
+        self.line(")");
+
+        // ── Auto-reconnect with exponential backoff (pure WASM math) ──
+        // delay = min(reconnect_count * 1000, 30000)
+        self.line(&format!(
+            "(func ${}_reconnect (export \"{}_reconnect\")",
+            ch.name, ch.name
+        ));
+        self.line("  (local $delay i32)");
+        // Calculate delay: count * 1000
+        self.line(&format!("  global.get $__channel_{}_reconnect_count", ch.name));
+        self.line("  i32.const 1000");
+        self.line("  i32.mul");
+        self.line("  local.set $delay");
+        // Cap at 30000ms
+        self.line("  local.get $delay");
+        self.line("  i32.const 30000");
+        self.line("  i32.gt_u");
+        self.line("  if");
+        self.line("    i32.const 30000");
+        self.line("    local.set $delay");
+        self.line("  end");
+        // Increment counter
+        self.line(&format!("  global.get $__channel_{}_reconnect_count", ch.name));
+        self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line(&format!("  global.set $__channel_{}_reconnect_count", ch.name));
+        // Set status to connecting
+        self.emit_capability_set_status(&ch.name, 1);
+        // Schedule reconnect via timer
+        self.line("  local.get $delay");
+        // Use the register function index as callback
+        let reconnect_cb = self.global_handler_base;
+        self.global_handler_base += 1;
+        self.line(&format!("  i32.const {}  ;; callback idx for reconnect", reconnect_cb));
+        self.line("  call $timer_setTimeout");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&ch.name, &["status", "last_message", "error_msg"]);
+
+        // ── Convenience: is_connected ──
+        self.line(&format!(
+            "(func ${}_is_connected (export \"{}_is_connected\") (result i32)",
+            ch.name, ch.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", ch.name));
+        self.line("  call $signal_get");
+        self.line("  i32.const 2  ;; connected");
+        self.line("  i32.eq");
+        self.line(")");
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            ch.name.clone(),
+            "channel".into(),
+            vec!["status".into(), "last_message".into(), "error_msg".into()],
+        ));
+
+        // Generate handler methods, namespaced by channel name
         let ch_name = ch.name.clone();
         if let Some(ref handler) = ch.on_message {
             let mut namespaced = handler.clone();
@@ -2912,6 +3266,27 @@ impl WasmCodegen {
 
         let sandboxed = if payment.sandbox_mode { 1 } else { 0 };
 
+        // ── Reactive signals for payment state ──────────────────────────
+        // status: 0=idle, 1=loading, 2=success, 3=error
+        // error:  string ptr (0 when no error)
+        // token:  string ptr (payment method token after success)
+        let signal_names = vec!["status".into(), "error".into(), "token".into()];
+        self.known_payment_signals.push((payment.name.clone(), signal_names));
+
+        self.line(&format!(
+            "(global $__sig_{}_status (mut i32) (i32.const -1)) ;; signal ID: payment status",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__sig_{}_error (mut i32) (i32.const -1)) ;; signal ID: payment error",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__sig_{}_token (mut i32) (i32.const -1)) ;; signal ID: payment token",
+            payment.name
+        ));
+
+        // ── Payment register (called from __init_all) ──────────────────
         self.line(&format!("(func $__payment_register_{} (export \"__payment_register_{}\")", payment.name, payment.name));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
@@ -2937,11 +3312,36 @@ impl WasmCodegen {
             payment.name
         ));
 
-        // Mount function: calls generic $payment_mount — provider JS implements the SDK loading
+        // ── Lifecycle: init — called by __init_all, creates signals, sets status=idle ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            payment.name, payment.name
+        ));
+        // Create status signal with initial value 0 (idle)
+        self.line("  i32.const 0  ;; idle");
+        self.line("  call $signal_create");
+        self.line(&format!("  global.set $__sig_{}_status", payment.name));
+        // Create error signal with initial value 0 (null ptr)
+        self.line("  i32.const 0  ;; no error");
+        self.line("  call $signal_create");
+        self.line(&format!("  global.set $__sig_{}_error", payment.name));
+        // Create token signal with initial value 0 (null ptr)
+        self.line("  i32.const 0  ;; no token");
+        self.line("  call $signal_create");
+        self.line(&format!("  global.set $__sig_{}_token", payment.name));
+        // Register provider
+        self.line(&format!("  call $__payment_register_{}", payment.name));
+        self.line(")");
+
+        // ── Lifecycle: mount — loads provider, creates element in container ──
         self.line(&format!(
             "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $cb_idx i32)",
             payment.name, payment.name
         ));
+        // Set status to loading (1)
+        self.line(&format!("  global.get $__sig_{}_status", payment.name));
+        self.line("  i32.const 1  ;; loading");
+        self.line("  call $signal_set");
         if let Some(ref key_expr) = payment.public_key {
             if let Expr::StringLit(key) = key_expr {
                 let key_offset = self.store_string(key);
@@ -2974,7 +3374,25 @@ impl WasmCodegen {
         self.line("  call $payment_create_element");
         self.line(")");
 
-        // Confirm/submit function — generic across all providers
+        // ── Lifecycle: submit — calls confirm, updates status signal ──
+        self.line(&format!(
+            "(func ${}_submit (export \"{}_submit\") (param $secret_ptr i32) (param $secret_len i32)",
+            payment.name, payment.name
+        ));
+        // Set status to loading
+        self.line(&format!("  global.get $__sig_{}_status", payment.name));
+        self.line("  i32.const 1  ;; loading");
+        self.line("  call $signal_set");
+        self.line(&format!("  global.get $__payment_{}_provider_handle", payment.name));
+        self.line(&format!("  global.get $__payment_{}_element_handle", payment.name));
+        self.line("  local.get $secret_ptr");
+        self.line("  local.get $secret_len");
+        // Callback index for confirm result
+        self.line(&format!("  i32.const {}  ;; cb_idx", _cb_idx));
+        self.line("  call $payment_confirm");
+        self.line(")");
+
+        // Confirm/submit function (legacy) — kept for backward compat
         self.line(&format!(
             "(func ${}_confirm (export \"{}_confirm\") (param $provider_id i32) (param $element_id i32) (param $secret_ptr i32) (param $secret_len i32) (param $cb_idx i32)",
             payment.name, payment.name
@@ -2986,6 +3404,302 @@ impl WasmCodegen {
         self.line("  local.get $cb_idx");
         self.line("  call $payment_confirm");
         self.line(")");
+
+        // ── Lifecycle: reset — sets status back to idle, clears error/token ──
+        self.line(&format!(
+            "(func ${}_reset (export \"{}_reset\")",
+            payment.name, payment.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", payment.name));
+        self.line("  i32.const 0  ;; idle");
+        self.line("  call $signal_set");
+        self.line(&format!("  global.get $__sig_{}_error", payment.name));
+        self.line("  i32.const 0  ;; clear error");
+        self.line("  call $signal_set");
+        self.line(&format!("  global.get $__sig_{}_token", payment.name));
+        self.line("  i32.const 0  ;; clear token");
+        self.line("  call $signal_set");
+        self.line(")");
+
+        // ── Confirm callback wrapper — sets status/token/error signals, fires on:success/on:error ──
+        self.line(&format!(
+            "(func ${}_on_confirm_result (export \"{}_on_confirm_result\") (param $result i32) (param $token_ptr i32) (param $error_ptr i32)",
+            payment.name, payment.name
+        ));
+        self.line("  local.get $result");
+        self.line("  if  ;; result != 0 → success");
+        // Set status = 2 (success)
+        self.line(&format!("    global.get $__sig_{}_status", payment.name));
+        self.line("    i32.const 2  ;; success");
+        self.line("    call $signal_set");
+        // Set token signal
+        self.line(&format!("    global.get $__sig_{}_token", payment.name));
+        self.line("    local.get $token_ptr");
+        self.line("    call $signal_set");
+        if payment.on_success.is_some() {
+            self.line(&format!("    call ${}_on_success", payment.name));
+        }
+        self.line("  else  ;; error");
+        // Set status = 3 (error)
+        self.line(&format!("    global.get $__sig_{}_status", payment.name));
+        self.line("    i32.const 3  ;; error");
+        self.line("    call $signal_set");
+        // Set error signal
+        self.line(&format!("    global.get $__sig_{}_error", payment.name));
+        self.line("    local.get $error_ptr");
+        self.line("    call $signal_set");
+        if payment.on_error.is_some() {
+            self.line(&format!("    call ${}_on_error", payment.name));
+        }
+        self.line("  end");
+        self.line(")");
+
+        // ── Signal getters: PaymentName::status(), PaymentName::token(), PaymentName::error() ──
+        self.line(&format!(
+            "(func ${}_get_status (export \"{}_get_status\") (result i32)",
+            payment.name, payment.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", payment.name));
+        self.line("  call $signal_get");
+        self.line(")");
+
+        self.line(&format!(
+            "(func ${}_get_token (export \"{}_get_token\") (result i32)",
+            payment.name, payment.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_token", payment.name));
+        self.line("  call $signal_get");
+        self.line(")");
+
+        self.line(&format!(
+            "(func ${}_get_error (export \"{}_get_error\") (result i32)",
+            payment.name, payment.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_error", payment.name));
+        self.line("  call $signal_get");
+        self.line(")");
+
+        // ── Card validation (pure WASM arithmetic — no JS) ──────────────
+        // Luhn check on card number
+        self.line(&format!(
+            "(func $payment_validate_card (export \"payment_validate_card\") (param $ptr i32) (param $len i32) (result i32)"
+        ));
+        self.line("  (local $i i32)");
+        self.line("  (local $sum i32)");
+        self.line("  (local $digit i32)");
+        self.line("  (local $doubled i32)");
+        self.line("  (local $alt i32)");
+        self.line("  (local $idx i32)");
+        // Reject empty or too-short numbers
+        self.line("  local.get $len");
+        self.line("  i32.const 12");
+        self.line("  i32.lt_u");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        // Luhn algorithm: iterate right-to-left, double every second digit
+        self.line("    i32.const 0");
+        self.line("    local.set $sum");
+        self.line("    i32.const 0");
+        self.line("    local.set $alt");
+        self.line("    local.get $len");
+        self.line("    i32.const 1");
+        self.line("    i32.sub");
+        self.line("    local.set $i");
+        self.line("    block $done");
+        self.line("      loop $loop");
+        self.line("        local.get $i");
+        self.line("        i32.const 0");
+        self.line("        i32.lt_s");
+        self.line("        br_if $done");
+        // Read digit: mem[ptr + i] - 48 ('0')
+        self.line("        local.get $ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        i32.const 48");
+        self.line("        i32.sub");
+        self.line("        local.set $digit");
+        // If alt flag is set, double the digit
+        self.line("        local.get $alt");
+        self.line("        if");
+        self.line("          local.get $digit");
+        self.line("          i32.const 2");
+        self.line("          i32.mul");
+        self.line("          local.set $doubled");
+        self.line("          local.get $doubled");
+        self.line("          i32.const 9");
+        self.line("          i32.gt_u");
+        self.line("          if");
+        self.line("            local.get $doubled");
+        self.line("            i32.const 9");
+        self.line("            i32.sub");
+        self.line("            local.set $doubled");
+        self.line("          end");
+        self.line("          local.get $sum");
+        self.line("          local.get $doubled");
+        self.line("          i32.add");
+        self.line("          local.set $sum");
+        self.line("        else");
+        self.line("          local.get $sum");
+        self.line("          local.get $digit");
+        self.line("          i32.add");
+        self.line("          local.set $sum");
+        self.line("        end");
+        // Toggle alt flag
+        self.line("        i32.const 1");
+        self.line("        local.get $alt");
+        self.line("        i32.sub");
+        self.line("        local.set $alt");
+        // Decrement i
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.sub");
+        self.line("        local.set $i");
+        self.line("        br $loop");
+        self.line("      end");
+        self.line("    end");
+        // Valid if sum % 10 == 0
+        self.line("    local.get $sum");
+        self.line("    i32.const 10");
+        self.line("    i32.rem_u");
+        self.line("    i32.eqz");
+        self.line("  end");
+        self.line(")");
+
+        // Expiry validation: not expired (month 1-12, year >= current approx)
+        self.line("(func $payment_validate_expiry (export \"payment_validate_expiry\") (param $month i32) (param $year i32) (result i32)");
+        self.line("  (local $valid i32)");
+        self.line("  i32.const 1");
+        self.line("  local.set $valid");
+        // Month must be 1..12
+        self.line("  local.get $month");
+        self.line("  i32.const 1");
+        self.line("  i32.lt_u");
+        self.line("  if");
+        self.line("    i32.const 0");
+        self.line("    local.set $valid");
+        self.line("  end");
+        self.line("  local.get $month");
+        self.line("  i32.const 12");
+        self.line("  i32.gt_u");
+        self.line("  if");
+        self.line("    i32.const 0");
+        self.line("    local.set $valid");
+        self.line("  end");
+        // Year must be >= 2024 (reasonable minimum)
+        self.line("  local.get $year");
+        self.line("  i32.const 2024");
+        self.line("  i32.lt_u");
+        self.line("  if");
+        self.line("    i32.const 0");
+        self.line("    local.set $valid");
+        self.line("  end");
+        self.line("  local.get $valid");
+        self.line(")");
+
+        // CVC validation: 3-4 digits
+        self.line("(func $payment_validate_cvc (export \"payment_validate_cvc\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  (local $i i32)");
+        self.line("  (local $ch i32)");
+        // Length must be 3 or 4
+        self.line("  local.get $len");
+        self.line("  i32.const 3");
+        self.line("  i32.lt_u");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    local.get $len");
+        self.line("    i32.const 4");
+        self.line("    i32.gt_u");
+        self.line("    if (result i32)");
+        self.line("      i32.const 0");
+        self.line("    else");
+        // Check every char is a digit (0x30..0x39)
+        self.line("      i32.const 1  ;; assume valid");
+        self.line("      i32.const 0");
+        self.line("      local.set $i");
+        self.line("      block $done");
+        self.line("        loop $loop");
+        self.line("          local.get $i");
+        self.line("          local.get $len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $done");
+        self.line("          local.get $ptr");
+        self.line("          local.get $i");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.set $ch");
+        self.line("          local.get $ch");
+        self.line("          i32.const 48");
+        self.line("          i32.lt_u");
+        self.line("          if");
+        self.line("            drop  ;; drop the running valid flag");
+        self.line("            i32.const 0  ;; invalid");
+        self.line("            br $done");
+        self.line("          end");
+        self.line("          local.get $ch");
+        self.line("          i32.const 57");
+        self.line("          i32.gt_u");
+        self.line("          if");
+        self.line("            drop  ;; drop the running valid flag");
+        self.line("            i32.const 0  ;; invalid");
+        self.line("            br $done");
+        self.line("          end");
+        self.line("          local.get $i");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $i");
+        self.line("          br $loop");
+        self.line("        end");
+        self.line("      end");
+        self.line("    end");
+        self.line("  end");
+        self.line(")");
+
+        // ── ABA routing number validation (pure WASM arithmetic) ─────────
+        // ABA routing numbers are 9 digits with checksum: 3*d1 + 7*d2 + d3 + 3*d4 + 7*d5 + d6 + 3*d7 + 7*d8 + d9 ≡ 0 (mod 10)
+        self.line("(func $payment_validate_aba (export \"payment_validate_aba\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  (local $sum i32)");
+        self.line("  (local $d i32)");
+        // Must be exactly 9 digits
+        self.line("  local.get $len");
+        self.line("  i32.const 9");
+        self.line("  i32.ne");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    i32.const 0");
+        self.line("    local.set $sum");
+        // weights: 3,7,1,3,7,1,3,7,1
+        for (i, w) in [3,7,1,3,7,1,3,7,1].iter().enumerate() {
+            self.line(&format!("    local.get $ptr"));
+            self.line(&format!("    i32.const {}", i));
+            self.line("    i32.add");
+            self.line("    i32.load8_u");
+            self.line("    i32.const 48");
+            self.line("    i32.sub");
+            if *w != 1 {
+                self.line(&format!("    i32.const {}", w));
+                self.line("    i32.mul");
+            }
+            self.line("    local.get $sum");
+            self.line("    i32.add");
+            self.line("    local.set $sum");
+        }
+        self.line("    local.get $sum");
+        self.line("    i32.const 10");
+        self.line("    i32.rem_u");
+        self.line("    i32.eqz");
+        self.line("  end");
+        self.line(")");
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            payment.name.clone(),
+            "payment".into(),
+            vec!["status".into(), "error".into(), "token".into()],
+        ));
 
         if let Some(ref handler) = payment.on_success {
             self.generate_function(handler);
@@ -3014,6 +3728,16 @@ impl WasmCodegen {
         // Track required provider for build system bundling
         self.required_providers.insert(provider_str.clone());
 
+        // ── Reactive signals for banking state ──────────────────────────
+        // status: 0=idle, 1=connecting, 2=connected, 3=error
+        // account_id: string ptr (0 when not connected)
+        // error_msg: string ptr (0 when no error)
+        self.emit_capability_signal_globals(&banking.name, &[
+            ("status", "banking status"),
+            ("account_id", "account ID"),
+            ("error_msg", "error message"),
+        ]);
+
         // Register function
         self.line(&format!(
             "(func $__banking_register_{} (export \"__banking_register_{}\")",
@@ -3026,17 +3750,63 @@ impl WasmCodegen {
         self.line("  call $banking_init");
         self.line(")");
 
-        // Open function — generic across all providers. The provider JS file
-        // (e.g. providers/plaid.js) overrides banking.open with the actual SDK call.
+        // ── Lifecycle: init — creates signals, registers provider ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            banking.name, banking.name
+        ));
+        self.emit_capability_signal_creates(&banking.name, &[
+            ("status", 0),
+            ("account_id", 0),
+            ("error_msg", 0),
+        ]);
+        self.line(&format!("  call $__banking_register_{}", banking.name));
+        self.line(")");
+
+        // Open function — generic across all providers
         self.line(&format!(
             "(func ${}_open (export \"{}_open\") (param $token_ptr i32) (param $token_len i32) (param $cb_idx i32)",
             banking.name, banking.name
         ));
+        // Set status to connecting (1)
+        self.emit_capability_set_status(&banking.name, 1);
         self.line("  local.get $token_ptr");
         self.line("  local.get $token_len");
         self.line("  local.get $cb_idx");
         self.line("  call $banking_open");
         self.line(")");
+
+        // ── Lifecycle: disconnect — sets status back to idle ──
+        self.line(&format!(
+            "(func ${}_disconnect (export \"{}_disconnect\")",
+            banking.name, banking.name
+        ));
+        self.emit_capability_set_status(&banking.name, 0);
+        self.line(&format!("  global.get $__sig_{}_account_id", banking.name));
+        self.line("  i32.const 0  ;; clear account_id");
+        self.line("  call $signal_set");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&banking.name, &["status", "account_id", "error_msg"]);
+
+        // ── Convenience: is_connected ──
+        self.line(&format!(
+            "(func ${}_is_connected (export \"{}_is_connected\") (result i32)",
+            banking.name, banking.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", banking.name));
+        self.line("  call $signal_get");
+        self.line("  i32.const 2  ;; connected");
+        self.line("  i32.eq");
+        self.line(")");
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            banking.name.clone(),
+            "banking".into(),
+            vec!["status".into(), "account_id".into(), "error_msg".into()],
+        ));
 
         if let Some(ref handler) = banking.on_success {
             self.generate_function(handler);
@@ -3068,6 +3838,20 @@ impl WasmCodegen {
         // Track required provider for build system bundling
         self.required_providers.insert(provider_str.clone());
 
+        // ── Reactive signals for map state ──────────────────────────
+        // status: 0=loading, 1=ready, 2=error
+        // center_lat: fixed-point i32 (lat * 1_000_000)
+        // center_lng: fixed-point i32 (lng * 1_000_000)
+        // zoom: i32
+        // error_msg: string ptr
+        self.emit_capability_signal_globals(&map_def.name, &[
+            ("status", "map status"),
+            ("center_lat", "center latitude (fixed-point)"),
+            ("center_lng", "center longitude (fixed-point)"),
+            ("zoom", "zoom level"),
+            ("error_msg", "error message"),
+        ]);
+
         // Global for map object handle
         self.line(&format!(
             "(global $__map_{}_handle (mut i32) (i32.const 0))",
@@ -3086,16 +3870,32 @@ impl WasmCodegen {
         self.line("  call $map_init");
         self.line(")");
 
-        // Mount function — generic across all providers. The provider JS file
-        // (e.g. providers/mapbox.js) overrides map.mount with the actual SDK call.
         let lat = map_def.center.map(|(lat, _)| lat).unwrap_or(0.0);
         let lng = map_def.center.map(|(_, lng)| lng).unwrap_or(0.0);
         let zoom = map_def.zoom.unwrap_or(10.0);
 
+        // ── Lifecycle: init — creates signals, sets initial center/zoom ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            map_def.name, map_def.name
+        ));
+        self.emit_capability_signal_creates(&map_def.name, &[
+            ("status", 0),      // loading
+            ("center_lat", (lat * 1_000_000.0) as i32),
+            ("center_lng", (lng * 1_000_000.0) as i32),
+            ("zoom", zoom as i32),
+            ("error_msg", 0),
+        ]);
+        self.line(&format!("  call $__map_register_{}", map_def.name));
+        self.line(")");
+
+        // Mount function — generic across all providers
         self.line(&format!(
             "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $key_ptr i32) (param $key_len i32) (param $cb_idx i32)",
             map_def.name, map_def.name
         ));
+        // Set status to loading (0)
+        self.emit_capability_set_status(&map_def.name, 0);
         self.line("  local.get $container_id");
         self.line("  local.get $key_ptr");
         self.line("  local.get $key_len");
@@ -3117,6 +3917,50 @@ impl WasmCodegen {
         self.line("  call $map_add_marker");
         self.line(")");
 
+        // ── Lifecycle: set_center — updates center signals and calls map_set_center ──
+        self.line(&format!(
+            "(func ${}_set_center (export \"{}_set_center\") (param $lat i32) (param $lng i32)",
+            map_def.name, map_def.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_center_lat", map_def.name));
+        self.line("  local.get $lat");
+        self.line("  call $signal_set");
+        self.line(&format!("  global.get $__sig_{}_center_lng", map_def.name));
+        self.line("  local.get $lng");
+        self.line("  call $signal_set");
+        self.line(")");
+
+        // ── Lifecycle: set_zoom — updates zoom signal ──
+        self.line(&format!(
+            "(func ${}_set_zoom (export \"{}_set_zoom\") (param $z i32)",
+            map_def.name, map_def.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_zoom", map_def.name));
+        self.line("  local.get $z");
+        self.line("  call $signal_set");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&map_def.name, &["status", "center_lat", "center_lng", "zoom", "error_msg"]);
+
+        // ── Convenience: is_ready ──
+        self.line(&format!(
+            "(func ${}_is_ready (export \"{}_is_ready\") (result i32)",
+            map_def.name, map_def.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", map_def.name));
+        self.line("  call $signal_get");
+        self.line("  i32.const 1  ;; ready");
+        self.line("  i32.eq");
+        self.line(")");
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            map_def.name.clone(),
+            "map".into(),
+            vec!["status".into(), "center_lat".into(), "center_lng".into(), "zoom".into(), "error_msg".into()],
+        ));
+
         if let Some(ref handler) = map_def.on_ready {
             self.generate_function(handler);
         }
@@ -3136,6 +3980,16 @@ impl WasmCodegen {
 
         // Default session_storage to "cookie" for HttpOnly secure defaults
         let session_storage = auth.session_storage.clone().unwrap_or_else(|| "cookie".to_string());
+
+        // ── Reactive signals for auth state ──────────────────────────
+        // status: 0=unauthenticated, 1=loading, 2=authenticated, 3=error
+        // user_data: ptr to user data (0 when not authenticated)
+        // error_msg: string ptr (0 when no error)
+        self.emit_capability_signal_globals(&auth.name, &[
+            ("status", "auth status"),
+            ("user_data", "user data"),
+            ("error_msg", "error message"),
+        ]);
 
         // Build JSON config for providers
         let mut config = String::from("{\"providers\":{");
@@ -3171,6 +4025,19 @@ impl WasmCodegen {
         self.line(&format!("  i32.const {}  ;; config ptr", config_offset));
         self.line(&format!("  i32.const {}  ;; config len", config_len));
         self.line("  call $auth_init");
+        self.line(")");
+
+        // ── Lifecycle: init — creates signals, registers provider ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            auth.name, auth.name
+        ));
+        self.emit_capability_signal_creates(&auth.name, &[
+            ("status", 0),
+            ("user_data", 0),
+            ("error_msg", 0),
+        ]);
+        self.line(&format!("  call $__auth_register_{}", auth.name));
         self.line(")");
 
         // Emit set_cookie wrapper that appends HttpOnly; Secure; SameSite=Strict; Path=/
@@ -3213,7 +4080,7 @@ impl WasmCodegen {
         self.line("  call $string_contains");
         self.line(")");
 
-        // Emit check function — verifies session server-side via /api/me
+        // Emit check function — verifies session server-side via /api/me (fetch /api/me)
         let api_me = "/api/me";
         let api_me_offset = self.store_string(api_me);
         let api_me_len = api_me.len();
@@ -3222,10 +4089,139 @@ impl WasmCodegen {
             "(func ${}_check (export \"{}_check\") (result i32)",
             auth.name, auth.name
         ));
+        // Set status to loading
+        self.emit_capability_set_status(&auth.name, 1);
         self.line(&format!("  i32.const {}  ;; url ptr", api_me_offset));
         self.line(&format!("  i32.const {}  ;; url len", api_me_len));
         self.line("  call $http_fetch");
         self.line(")");
+
+        // ── Lifecycle: login — POST /api/login with email/pass ──
+        let api_login = "/api/login";
+        let api_login_offset = self.store_string(api_login);
+        let api_login_len = api_login.len();
+
+        self.line(&format!(
+            "(func ${}_login (export \"{}_login\") (param $email_ptr i32) (param $email_len i32) (param $pass_ptr i32) (param $pass_len i32) (param $cb_idx i32)",
+            auth.name, auth.name
+        ));
+        // Set status to loading
+        self.emit_capability_set_status(&auth.name, 1);
+        self.line(&format!("  i32.const {}  ;; url ptr", api_login_offset));
+        self.line(&format!("  i32.const {}  ;; url len", api_login_len));
+        self.line("  local.get $email_ptr");
+        self.line("  local.get $email_len");
+        self.line("  local.get $pass_ptr");
+        self.line("  local.get $pass_len");
+        self.line("  local.get $cb_idx");
+        self.line("  call $http_fetchWithCallback");
+        self.line(")");
+
+        // ── Lifecycle: logout — POST /api/logout ──
+        let api_logout = "/api/logout";
+        let api_logout_offset = self.store_string(api_logout);
+        let api_logout_len = api_logout.len();
+
+        self.line(&format!(
+            "(func ${}_logout (export \"{}_logout\") (param $cb_idx i32)",
+            auth.name, auth.name
+        ));
+        // Set status to loading
+        self.emit_capability_set_status(&auth.name, 1);
+        self.line(&format!("  i32.const {}  ;; url ptr", api_logout_offset));
+        self.line(&format!("  i32.const {}  ;; url len", api_logout_len));
+        self.line("  local.get $cb_idx");
+        self.line("  call $http_fetchWithCallback");
+        self.line(")");
+
+        // ── Validation: email (pure WASM string ops) ──
+        // Check: length > 0, contains '@', has '.' after '@'
+        self.line("(func $auth_validate_email (export \"auth_validate_email\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  (local $i i32)");
+        self.line("  (local $ch i32)");
+        self.line("  (local $at_pos i32)");
+        self.line("  (local $has_dot_after_at i32)");
+        // Empty check
+        self.line("  local.get $len");
+        self.line("  i32.eqz");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    i32.const -1  ;; at_pos = -1 (not found)");
+        self.line("    local.set $at_pos");
+        self.line("    i32.const 0");
+        self.line("    local.set $has_dot_after_at");
+        self.line("    i32.const 0");
+        self.line("    local.set $i");
+        self.line("    block $done");
+        self.line("      loop $loop");
+        self.line("        local.get $i");
+        self.line("        local.get $len");
+        self.line("        i32.ge_u");
+        self.line("        br_if $done");
+        self.line("        local.get $ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.set $ch");
+        // Check for '@' (0x40)
+        self.line("        local.get $ch");
+        self.line("        i32.const 64  ;; '@'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $i");
+        self.line("          local.set $at_pos");
+        self.line("        end");
+        // Check for '.' (0x2E) after '@'
+        self.line("        local.get $ch");
+        self.line("        i32.const 46  ;; '.'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $at_pos");
+        self.line("          i32.const -1");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            local.get $i");
+        self.line("            local.get $at_pos");
+        self.line("            i32.gt_u");
+        self.line("            if");
+        self.line("              i32.const 1");
+        self.line("              local.set $has_dot_after_at");
+        self.line("            end");
+        self.line("          end");
+        self.line("        end");
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $i");
+        self.line("        br $loop");
+        self.line("      end");
+        self.line("    end");
+        // Valid if at_pos != -1 && has_dot_after_at
+        self.line("    local.get $at_pos");
+        self.line("    i32.const -1");
+        self.line("    i32.ne");
+        self.line("    local.get $has_dot_after_at");
+        self.line("    i32.and");
+        self.line("  end");
+        self.line(")");
+
+        // ── Validation: password (min 8 chars) ──
+        self.line("(func $auth_validate_password (export \"auth_validate_password\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  local.get $len");
+        self.line("  i32.const 8");
+        self.line("  i32.ge_u");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&auth.name, &["status", "user_data", "error_msg"]);
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            auth.name.clone(),
+            "auth".into(),
+            vec!["status".into(), "user_data".into(), "error_msg".into()],
+        ));
 
         if let Some(ref handler) = auth.on_login {
             self.generate_function(handler);
@@ -3248,6 +4244,14 @@ impl WasmCodegen {
         let name_len = db.name.len();
         let version = db.version.unwrap_or(1);
 
+        // ── Reactive signals for db state ──────────────────────────
+        // status: 0=closed, 1=opening, 2=open, 3=error
+        // error_msg: string ptr (0 when no error)
+        self.emit_capability_signal_globals(&db.name, &[
+            ("status", "db status"),
+            ("error_msg", "error message"),
+        ]);
+
         // Emit global for the db handle
         self.line(&format!(
             "(global $__db_{}_handle (mut i32) (i32.const 0))",
@@ -3258,17 +4262,53 @@ impl WasmCodegen {
         let cb_idx = self.global_handler_base;
         self.global_handler_base += 1;
 
-        // Emit init function that opens the database
+        // Emit init function that opens the database and creates signals
         self.line(&format!(
             "(func ${}_init (export \"{}_init\")",
             db.name, db.name
         ));
+        // Create signals
+        self.emit_capability_signal_creates(&db.name, &[
+            ("status", 0),      // closed
+            ("error_msg", 0),
+        ]);
+        // Set status to opening (1)
+        self.emit_capability_set_status(&db.name, 1);
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
         self.line(&format!("  i32.const {}  ;; version", version));
         self.line(&format!("  i32.const {}  ;; callback idx", cb_idx));
         self.line("  call $db_open");
         self.line(")");
+
+        // ── Lifecycle: close — sets status back to closed ──
+        self.line(&format!(
+            "(func ${}_close (export \"{}_close\")",
+            db.name, db.name
+        ));
+        self.emit_capability_set_status(&db.name, 0);
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&db.name, &["status", "error_msg"]);
+
+        // ── Convenience: is_open ──
+        self.line(&format!(
+            "(func ${}_is_open (export \"{}_is_open\") (result i32)",
+            db.name, db.name
+        ));
+        self.line(&format!("  global.get $__sig_{}_status", db.name));
+        self.line("  call $signal_get");
+        self.line("  i32.const 2  ;; open");
+        self.line("  i32.eq");
+        self.line(")");
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            db.name.clone(),
+            "db".into(),
+            vec!["status".into(), "error_msg".into()],
+        ));
 
         // Determine default store name — use first store if defined, else "default"
         let default_store = if !db.stores.is_empty() {
@@ -3352,6 +4392,18 @@ impl WasmCodegen {
         let name_offset = self.store_string(&upload.name);
         let name_len = upload.name.len();
 
+        // ── Reactive signals for upload state ──────────────────────────
+        // status: 0=idle, 1=selecting, 2=uploading, 3=complete, 4=error
+        // progress: i32 0-100
+        // filename: string ptr
+        // error_msg: string ptr
+        self.emit_capability_signal_globals(&upload.name, &[
+            ("status", "upload status"),
+            ("progress", "upload progress 0-100"),
+            ("filename", "selected filename"),
+            ("error_msg", "error message"),
+        ]);
+
         let endpoint_str = match &upload.endpoint {
             Expr::StringLit(s) => s.clone(),
             _ => "/upload".to_string(),
@@ -3383,6 +4435,87 @@ impl WasmCodegen {
         self.line(&format!("  i32.const {}  ;; config len", config_len));
         self.line("  call $upload_init");
         self.line(")");
+
+        // ── Lifecycle: init — creates signals, registers upload ──
+        self.line(&format!(
+            "(func ${}_init (export \"{}_init\")",
+            upload.name, upload.name
+        ));
+        self.emit_capability_signal_creates(&upload.name, &[
+            ("status", 0),
+            ("progress", 0),
+            ("filename", 0),
+            ("error_msg", 0),
+        ]);
+        self.line(&format!("  call $__upload_register_{}", upload.name));
+        self.line(")");
+
+        // ── Lifecycle: select — opens file picker (calls upload.init syscall) ──
+        self.line(&format!(
+            "(func ${}_select (export \"{}_select\") (param $cb_idx i32)",
+            upload.name, upload.name
+        ));
+        self.emit_capability_set_status(&upload.name, 1); // selecting
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  local.get $cb_idx");
+        self.line("  call $upload_select");
+        self.line(")");
+
+        // ── Lifecycle: start — begins upload to URL ──
+        self.line(&format!(
+            "(func ${}_start (export \"{}_start\") (param $url_ptr i32) (param $url_len i32) (param $cb_idx i32)",
+            upload.name, upload.name
+        ));
+        self.emit_capability_set_status(&upload.name, 2); // uploading
+        // Reset progress to 0
+        self.line(&format!("  global.get $__sig_{}_progress", upload.name));
+        self.line("  i32.const 0");
+        self.line("  call $signal_set");
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  local.get $url_ptr");
+        self.line("  local.get $url_len");
+        self.line("  local.get $cb_idx");
+        self.line("  call $upload_start");
+        self.line(")");
+
+        // ── Lifecycle: cancel — cancels ongoing upload ──
+        self.line(&format!(
+            "(func ${}_cancel (export \"{}_cancel\")",
+            upload.name, upload.name
+        ));
+        self.emit_capability_set_status(&upload.name, 0); // idle
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line("  call $upload_cancel");
+        self.line(")");
+
+        // ── Validation: file size (pure WASM) ──
+        self.line("(func $upload_validate_size (export \"upload_validate_size\") (param $size i32) (param $max i32) (result i32)");
+        self.line("  local.get $size");
+        self.line("  local.get $max");
+        self.line("  i32.le_u");
+        self.line(")");
+
+        // ── Validation: file type — check if type string contains accept pattern ──
+        self.line("(func $upload_validate_type (export \"upload_validate_type\") (param $type_ptr i32) (param $type_len i32) (param $accept_ptr i32) (param $accept_len i32) (result i32)");
+        self.line("  local.get $type_ptr");
+        self.line("  local.get $type_len");
+        self.line("  local.get $accept_ptr");
+        self.line("  local.get $accept_len");
+        self.line("  call $string_contains");
+        self.line(")");
+
+        // ── Signal getters ──
+        self.emit_capability_getters(&upload.name, &["status", "progress", "filename", "error_msg"]);
+
+        // Track capability signals
+        self.known_capability_signals.push((
+            upload.name.clone(),
+            "upload".into(),
+            vec!["status".into(), "progress".into(), "filename".into(), "error_msg".into()],
+        ));
 
         if let Some(ref handler) = upload.on_progress {
             self.generate_function(handler);
@@ -24808,6 +25941,673 @@ mod db_and_auth_codegen_tests {
             "__init_all should call auth register");
         assert!(wat.contains("call $AppDB_init"),
             "__init_all should call db init");
+    }
+}
+
+#[cfg(test)]
+mod capability_primitive_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    fn block(stmts: Vec<Stmt>) -> Block {
+        Block { stmts, span: span() }
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment — signals, lifecycle, ABA validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn payment_emits_signal_globals_and_creates() {
+        let payment = PaymentDef {
+            name: "Checkout".into(),
+            provider: Some(Expr::StringLit("stripe".into())),
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_Checkout_status (mut i32)"),
+            "should emit status signal global");
+        assert!(output.contains("global $__sig_Checkout_error (mut i32)"),
+            "should emit error signal global");
+        assert!(output.contains("global $__sig_Checkout_token (mut i32)"),
+            "should emit token signal global");
+        assert!(output.contains("call $signal_create"),
+            "should call signal_create");
+    }
+
+    #[test]
+    fn payment_emits_lifecycle_functions() {
+        let payment = PaymentDef {
+            name: "Pay".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("Pay_init"), "should emit init function");
+        assert!(output.contains("Pay_submit"), "should emit submit function");
+        assert!(output.contains("Pay_reset"), "should emit reset function");
+        assert!(output.contains("Pay_mount"), "should emit mount function");
+    }
+
+    #[test]
+    fn payment_emits_getters_and_aba_validation() {
+        let payment = PaymentDef {
+            name: "CC".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("CC_get_status"), "should emit status getter");
+        assert!(output.contains("CC_get_token"), "should emit token getter");
+        assert!(output.contains("CC_get_error"), "should emit error getter");
+        assert!(output.contains("payment_validate_aba"), "should emit ABA routing validation");
+        assert!(output.contains("i32.const 9"), "ABA should check for 9 digits");
+    }
+
+    // -----------------------------------------------------------------------
+    // Auth — signals, lifecycle, validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn auth_emits_signal_globals_and_creates() {
+        let auth = AuthDef {
+            name: "AppAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_AppAuth_status (mut i32)"),
+            "should emit status signal global");
+        assert!(output.contains("global $__sig_AppAuth_user_data (mut i32)"),
+            "should emit user_data signal global");
+        assert!(output.contains("global $__sig_AppAuth_error_msg (mut i32)"),
+            "should emit error_msg signal global");
+    }
+
+    #[test]
+    fn auth_emits_lifecycle_login_logout() {
+        let auth = AuthDef {
+            name: "MyAuth".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("MyAuth_init"), "should emit init function");
+        assert!(output.contains("MyAuth_login"), "should emit login function");
+        assert!(output.contains("MyAuth_logout"), "should emit logout function");
+        assert!(output.contains("call $http_fetchWithCallback"),
+            "login/logout should use http_fetchWithCallback");
+    }
+
+    #[test]
+    fn auth_emits_email_password_validation() {
+        let auth = AuthDef {
+            name: "A".into(),
+            provider: None,
+            providers: vec![],
+            on_login: None,
+            on_logout: None,
+            on_error: None,
+            session_storage: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_auth(&auth);
+        let output = codegen.output.clone();
+        assert!(output.contains("auth_validate_email"), "should emit email validation");
+        assert!(output.contains("i32.const 64  ;; '@'"), "email validation should check for @");
+        assert!(output.contains("auth_validate_password"), "should emit password validation");
+        assert!(output.contains("i32.const 8"), "password validation should check min 8 chars");
+    }
+
+    // -----------------------------------------------------------------------
+    // DB — signals, close, getters
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn db_emits_signal_globals() {
+        let db = DbDef {
+            name: "TestDB".into(),
+            version: Some(1),
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_TestDB_status (mut i32)"),
+            "should emit status signal global");
+        assert!(output.contains("global $__sig_TestDB_error_msg (mut i32)"),
+            "should emit error_msg signal global");
+    }
+
+    #[test]
+    fn db_emits_lifecycle_close() {
+        let db = DbDef {
+            name: "AppDB".into(),
+            version: None,
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        assert!(output.contains("AppDB_close"), "should emit close function");
+        assert!(output.contains("AppDB_is_open"), "should emit is_open function");
+    }
+
+    #[test]
+    fn db_emits_getters() {
+        let db = DbDef {
+            name: "MyDB".into(),
+            version: None,
+            stores: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_db(&db);
+        let output = codegen.output.clone();
+        assert!(output.contains("MyDB_get_status"), "should emit status getter");
+        assert!(output.contains("MyDB_get_error_msg"), "should emit error_msg getter");
+        assert!(output.contains("call $signal_get"), "getters should read via signal_get");
+    }
+
+    // -----------------------------------------------------------------------
+    // Form — signals, validation, lifecycle
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn form_emits_per_field_signals() {
+        let form = FormDef {
+            name: "LoginForm".into(),
+            fields: vec![
+                FormFieldDef {
+                    name: "email".into(),
+                    ty: Type::Named("String".into()),
+                    validators: vec![],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+                FormFieldDef {
+                    name: "password".into(),
+                    ty: Type::Named("String".into()),
+                    validators: vec![],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+            ],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_form(&form);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_LoginForm_email (mut i32)"),
+            "should emit per-field email signal");
+        assert!(output.contains("global $__sig_LoginForm_password (mut i32)"),
+            "should emit per-field password signal");
+        assert!(output.contains("global $__sig_LoginForm_email_error (mut i32)"),
+            "should emit per-field email error signal");
+        assert!(output.contains("global $__sig_LoginForm_valid (mut i32)"),
+            "should emit form valid signal");
+        assert!(output.contains("global $__sig_LoginForm_submitting (mut i32)"),
+            "should emit form submitting signal");
+    }
+
+    #[test]
+    fn form_emits_validate_and_submit_lifecycle() {
+        let form = FormDef {
+            name: "ContactForm".into(),
+            fields: vec![
+                FormFieldDef {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    validators: vec![ValidatorDef {
+                        kind: ValidatorKind::Required,
+                        message: None,
+                        span: span(),
+                    }],
+                    label: None,
+                    placeholder: None,
+                    default_value: None,
+                    span: span(),
+                },
+            ],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_form(&form);
+        let output = codegen.output.clone();
+        assert!(output.contains("ContactForm_validate"), "should emit validate function");
+        assert!(output.contains("ContactForm_submit"), "should emit submit function");
+        assert!(output.contains("ContactForm_reset"), "should emit reset function");
+        assert!(output.contains("validate name: required"), "should validate required field");
+    }
+
+    #[test]
+    fn form_emits_getters() {
+        let form = FormDef {
+            name: "F".into(),
+            fields: vec![],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: None,
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_form(&form);
+        let output = codegen.output.clone();
+        assert!(output.contains("F_get_valid"), "should emit valid getter");
+        assert!(output.contains("F_get_submitting"), "should emit submitting getter");
+        assert!(output.contains("F_is_valid"), "should emit is_valid convenience");
+    }
+
+    // -----------------------------------------------------------------------
+    // Upload — signals, lifecycle, validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn upload_emits_signal_globals() {
+        let upload = UploadDef {
+            name: "FileUp".into(),
+            endpoint: Expr::StringLit("/upload".into()),
+            max_size: None,
+            accept: vec![],
+            chunked: false,
+            on_progress: None,
+            on_complete: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_upload(&upload);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_FileUp_status (mut i32)"),
+            "should emit status signal");
+        assert!(output.contains("global $__sig_FileUp_progress (mut i32)"),
+            "should emit progress signal");
+        assert!(output.contains("global $__sig_FileUp_filename (mut i32)"),
+            "should emit filename signal");
+        assert!(output.contains("global $__sig_FileUp_error_msg (mut i32)"),
+            "should emit error_msg signal");
+    }
+
+    #[test]
+    fn upload_emits_lifecycle_functions() {
+        let upload = UploadDef {
+            name: "Uploader".into(),
+            endpoint: Expr::StringLit("/api/upload".into()),
+            max_size: None,
+            accept: vec![],
+            chunked: false,
+            on_progress: None,
+            on_complete: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_upload(&upload);
+        let output = codegen.output.clone();
+        assert!(output.contains("Uploader_init"), "should emit init function");
+        assert!(output.contains("Uploader_select"), "should emit select function");
+        assert!(output.contains("Uploader_start"), "should emit start function");
+        assert!(output.contains("Uploader_cancel"), "should emit cancel function");
+    }
+
+    #[test]
+    fn upload_emits_validation_and_getters() {
+        let upload = UploadDef {
+            name: "U".into(),
+            endpoint: Expr::StringLit("/u".into()),
+            max_size: None,
+            accept: vec![],
+            chunked: false,
+            on_progress: None,
+            on_complete: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_upload(&upload);
+        let output = codegen.output.clone();
+        assert!(output.contains("upload_validate_size"), "should emit size validation");
+        assert!(output.contains("upload_validate_type"), "should emit type validation");
+        assert!(output.contains("U_get_status"), "should emit status getter");
+        assert!(output.contains("U_get_progress"), "should emit progress getter");
+        assert!(output.contains("U_get_filename"), "should emit filename getter");
+    }
+
+    // -----------------------------------------------------------------------
+    // Channel — signals, lifecycle, reconnect
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn channel_emits_signal_globals() {
+        let ch = ChannelDef {
+            name: "Chat".into(),
+            url: Expr::StringLit("/ws/chat".into()),
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: true,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_Chat_status (mut i32)"),
+            "should emit status signal");
+        assert!(output.contains("global $__sig_Chat_last_message (mut i32)"),
+            "should emit last_message signal");
+        assert!(output.contains("global $__sig_Chat_error_msg (mut i32)"),
+            "should emit error_msg signal");
+    }
+
+    #[test]
+    fn channel_emits_lifecycle_functions() {
+        let ch = ChannelDef {
+            name: "WS".into(),
+            url: Expr::StringLit("/ws".into()),
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: true,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("WS_init"), "should emit init function");
+        assert!(output.contains("WS_connect"), "should emit connect function");
+        assert!(output.contains("WS_send"), "should emit send function");
+        assert!(output.contains("WS_close"), "should emit close function");
+        assert!(output.contains("WS_is_connected"), "should emit is_connected");
+    }
+
+    #[test]
+    fn channel_emits_reconnect_with_backoff() {
+        let ch = ChannelDef {
+            name: "Live".into(),
+            url: Expr::StringLit("/ws".into()),
+            contract: None,
+            on_message: None,
+            on_connect: None,
+            on_disconnect: None,
+            reconnect: true,
+            heartbeat_interval: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_channel(&ch);
+        let output = codegen.output.clone();
+        assert!(output.contains("Live_reconnect"), "should emit reconnect function");
+        assert!(output.contains("i32.const 1000"), "reconnect should use 1000ms base");
+        assert!(output.contains("i32.const 30000"), "reconnect should cap at 30000ms");
+        assert!(output.contains("__channel_Live_reconnect_count"),
+            "should have reconnect counter global");
+        assert!(output.contains("call $timer_setTimeout"),
+            "reconnect should schedule via setTimeout");
+    }
+
+    // -----------------------------------------------------------------------
+    // Map — signals, lifecycle, getters
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn map_emits_signal_globals() {
+        let map = MapDef {
+            name: "StoreMap".into(),
+            provider: Some(Expr::StringLit("mapbox".into())),
+            center: Some((40.7128, -74.006)),
+            zoom: Some(12.0),
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_StoreMap_status (mut i32)"),
+            "should emit status signal");
+        assert!(output.contains("global $__sig_StoreMap_center_lat (mut i32)"),
+            "should emit center_lat signal");
+        assert!(output.contains("global $__sig_StoreMap_center_lng (mut i32)"),
+            "should emit center_lng signal");
+        assert!(output.contains("global $__sig_StoreMap_zoom (mut i32)"),
+            "should emit zoom signal");
+    }
+
+    #[test]
+    fn map_emits_lifecycle_functions() {
+        let map = MapDef {
+            name: "M".into(),
+            provider: None,
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map);
+        let output = codegen.output.clone();
+        assert!(output.contains("M_init"), "should emit init function");
+        assert!(output.contains("M_mount"), "should emit mount function");
+        assert!(output.contains("M_set_center"), "should emit set_center function");
+        assert!(output.contains("M_set_zoom"), "should emit set_zoom function");
+        assert!(output.contains("M_add_marker"), "should emit add_marker function");
+    }
+
+    #[test]
+    fn map_emits_getters_and_is_ready() {
+        let map = MapDef {
+            name: "Geo".into(),
+            provider: None,
+            center: None,
+            zoom: None,
+            style: None,
+            on_ready: None,
+            on_click: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_map(&map);
+        let output = codegen.output.clone();
+        assert!(output.contains("Geo_get_status"), "should emit status getter");
+        assert!(output.contains("Geo_get_center_lat"), "should emit center_lat getter");
+        assert!(output.contains("Geo_get_zoom"), "should emit zoom getter");
+        assert!(output.contains("Geo_is_ready"), "should emit is_ready convenience");
+        assert!(output.contains("i32.const 1  ;; ready"),
+            "is_ready should compare against 1");
+    }
+
+    // -----------------------------------------------------------------------
+    // Banking — signals, lifecycle, getters
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn banking_emits_signal_globals() {
+        let banking = BankingDef {
+            name: "AcctLink".into(),
+            provider: Some(Expr::StringLit("plaid".into())),
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("global $__sig_AcctLink_status (mut i32)"),
+            "should emit status signal");
+        assert!(output.contains("global $__sig_AcctLink_account_id (mut i32)"),
+            "should emit account_id signal");
+        assert!(output.contains("global $__sig_AcctLink_error_msg (mut i32)"),
+            "should emit error_msg signal");
+    }
+
+    #[test]
+    fn banking_emits_lifecycle_functions() {
+        let banking = BankingDef {
+            name: "Bank".into(),
+            provider: None,
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("Bank_init"), "should emit init function");
+        assert!(output.contains("Bank_open"), "should emit open function");
+        assert!(output.contains("Bank_disconnect"), "should emit disconnect function");
+        assert!(output.contains("call $signal_create"),
+            "init should create signals");
+    }
+
+    #[test]
+    fn banking_emits_getters_and_is_connected() {
+        let banking = BankingDef {
+            name: "BK".into(),
+            provider: None,
+            on_success: None,
+            on_exit: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_banking(&banking);
+        let output = codegen.output.clone();
+        assert!(output.contains("BK_get_status"), "should emit status getter");
+        assert!(output.contains("BK_get_account_id"), "should emit account_id getter");
+        assert!(output.contains("BK_get_error_msg"), "should emit error_msg getter");
+        assert!(output.contains("BK_is_connected"), "should emit is_connected");
+        assert!(output.contains("i32.const 2  ;; connected"),
+            "is_connected should compare against 2");
     }
 }
 
