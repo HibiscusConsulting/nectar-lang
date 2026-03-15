@@ -983,6 +983,7 @@ impl WasmCodegen {
                 ));
             }
             self.line("(type $__closure_type (func (param i32 i32) (result i32)))");
+            self.line("(type $__closure_type_2 (func (param i32 i32 i32) (result i32)))");
         }
 
         // Emit global __callback dispatcher that routes to per-component callbacks
@@ -9069,9 +9070,16 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.first() {
-                    self.line(";; apply map closure");
+                    self.line(";; apply map closure via call_indirect");
+                    self.emit_template_local(&format!("$__map_elem_{lbl}"));
+                    self.line(&format!("local.set $__map_elem_{lbl}"));
+                    // Push env ptr (i32.const 0 for non-captured closures)
+                    self.line("i32.const 0 ;; env ptr (no captures)");
+                    // Push the element value
+                    self.line(&format!("local.get $__map_elem_{lbl}"));
+                    // Push the closure table index
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type)");
                 }
                 self.line("i32.store");
                 self.line(&format!("local.get $__map_idx_{lbl}"));
@@ -9126,9 +9134,16 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.first() {
-                    self.line(";; apply filter predicate");
+                    self.line(";; apply filter predicate via call_indirect");
+                    self.emit_template_local(&format!("$__flt_elem_{lbl}"));
+                    self.line(&format!("local.set $__flt_elem_{lbl}"));
+                    // Push env ptr
+                    self.line("i32.const 0 ;; env ptr (no captures)");
+                    // Push the element value
+                    self.line(&format!("local.get $__flt_elem_{lbl}"));
+                    // Push the closure table index
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type)");
                 }
                 self.emit("(if");
                 self.indent += 1;
@@ -9201,6 +9216,8 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__fold_len_{lbl}"));
                 self.line("i32.ge_u");
                 self.line(&format!("br_if $__fold_brk_{brk}"));
+                // Push env ptr, acc, element for fold closure
+                self.line("i32.const 0 ;; env ptr (no captures)");
                 self.line(&format!("local.get $__fold_acc_{lbl}"));
                 self.line(&format!("local.get $__fold_src_{lbl}"));
                 self.line("i32.const 4");
@@ -9211,9 +9228,9 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.get(1) {
-                    self.line(";; apply fold closure");
+                    self.line(";; apply fold closure via call_indirect");
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type_2)");
                 }
                 self.line(&format!("local.set $__fold_acc_{lbl}"));
                 self.line(&format!("local.get $__fold_idx_{lbl}"));
@@ -9257,8 +9274,12 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.first() {
+                    self.emit_template_local(&format!("$__any_elem_{lbl}"));
+                    self.line(&format!("local.set $__any_elem_{lbl}"));
+                    self.line("i32.const 0 ;; env ptr");
+                    self.line(&format!("local.get $__any_elem_{lbl}"));
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type)");
                 }
                 self.emit("(if");
                 self.indent += 1;
@@ -9312,8 +9333,12 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.first() {
+                    self.emit_template_local(&format!("$__all_elem_{lbl}"));
+                    self.line(&format!("local.set $__all_elem_{lbl}"));
+                    self.line("i32.const 0 ;; env ptr");
+                    self.line(&format!("local.get $__all_elem_{lbl}"));
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type)");
                 }
                 self.line("i32.eqz");
                 self.emit("(if");
@@ -9531,7 +9556,8 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__red_len_{lbl}"));
                 self.line("i32.ge_u");
                 self.line(&format!("br_if $__red_brk_{brk}"));
-                // Push acc and current element
+                // Push env, acc, and current element for reduce closure
+                self.line("i32.const 0 ;; env ptr (no captures)");
                 self.line(&format!("local.get $__red_acc_{lbl}"));
                 self.line(&format!("local.get $__red_src_{lbl}"));
                 self.line("i32.const 4");
@@ -9542,9 +9568,9 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 if let Some(closure_arg) = args.first() {
-                    self.line(";; apply reduce closure");
+                    self.line(";; apply reduce closure via call_indirect");
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type_2)");
                 }
                 self.line(&format!("local.set $__red_acc_{lbl}"));
                 self.line(&format!("local.get $__red_idx_{lbl}"));
@@ -9590,11 +9616,12 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load");
                 self.line(&format!("local.set $__find_elem_{lbl}"));
-                // Apply predicate
+                // Apply predicate with env ptr
+                self.line("i32.const 0 ;; env ptr");
                 self.line(&format!("local.get $__find_elem_{lbl}"));
                 if let Some(closure_arg) = args.first() {
                     self.generate_expr(closure_arg);
-                    self.line("call_indirect (type 0)");
+                    self.line("call_indirect (type $__closure_type)");
                 }
                 // If truthy, store result and break
                 self.emit("(if");
@@ -17746,6 +17773,246 @@ mod closure_codegen_tests {
         assert!(codegen.closure_functions.len() == 1, "should generate one closure function");
         assert!(codegen.closure_func_names[0] == "$__closure_0", "closure should be named $__closure_0");
         assert!(codegen.needs_func_table, "should need function table");
+    }
+
+    #[test]
+    fn closure_with_capture_allocates_env() {
+        // A closure that captures a variable from the enclosing scope:
+        // let multiplier = 10;
+        // let f = |x: i32| x * multiplier;
+        let program = Program {
+            items: vec![Item::Function(Function {
+                name: "main".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Let {
+                            name: "multiplier".to_string(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::Integer(10),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "f".to_string(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::Closure {
+                                params: vec![("x".to_string(), Some(Type::Named("i32".to_string())))],
+                                body: Box::new(Expr::Binary {
+                                    op: BinOp::Mul,
+                                    left: Box::new(Expr::Ident("x".to_string())),
+                                    right: Box::new(Expr::Ident("multiplier".to_string())),
+                                }),
+                            },
+                            ownership: Ownership::Owned,
+                        },
+                    ],
+                    span: span(),
+                },
+                is_pub: true,
+                must_use: false,
+                span: span(),
+            })],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        let output = codegen.generate(&program);
+
+        // Should contain env allocation for captured variable
+        assert!(output.contains("call $alloc"), "should allocate env struct for captures");
+        assert!(output.contains("capture multiplier"), "should store captured var");
+        assert!(output.contains("$__closure_0"), "should generate closure function");
+        // The closure function should load from env
+        assert!(codegen.closure_functions[0].contains("$__env"), "closure should have env param");
+        assert!(codegen.closure_functions[0].contains("i32.load"), "closure should load from env");
+    }
+
+    #[test]
+    fn closure_with_multiple_captures() {
+        // let a = 1; let b = 2;
+        // let f = |x: i32| x + a + b;
+        let program = Program {
+            items: vec![Item::Function(Function {
+                name: "main".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Let {
+                            name: "a".to_string(),
+                            ty: None, mutable: false, secret: false,
+                            value: Expr::Integer(1),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "b".to_string(),
+                            ty: None, mutable: false, secret: false,
+                            value: Expr::Integer(2),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "f".to_string(),
+                            ty: None, mutable: false, secret: false,
+                            value: Expr::Closure {
+                                params: vec![("x".to_string(), None)],
+                                body: Box::new(Expr::Binary {
+                                    op: BinOp::Add,
+                                    left: Box::new(Expr::Binary {
+                                        op: BinOp::Add,
+                                        left: Box::new(Expr::Ident("x".to_string())),
+                                        right: Box::new(Expr::Ident("a".to_string())),
+                                    }),
+                                    right: Box::new(Expr::Ident("b".to_string())),
+                                }),
+                            },
+                            ownership: Ownership::Owned,
+                        },
+                    ],
+                    span: span(),
+                },
+                is_pub: true,
+                must_use: false,
+                span: span(),
+            })],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        let output = codegen.generate(&program);
+
+        // Should have env with 2 captured vars (8 bytes = 2 * 4)
+        assert!(output.contains("i32.const 8 ;; env size"), "should allocate 8 bytes for 2 captures");
+        assert!(output.contains("capture a"), "should store captured var a");
+        assert!(output.contains("capture b"), "should store captured var b");
+    }
+}
+
+#[cfg(test)]
+mod iterator_closure_integration_tests {
+    use super::*;
+    use crate::token::Span;
+
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
+
+    #[test]
+    fn map_uses_closure_type() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("arr".into())),
+            method: "map".into(),
+            args: vec![Expr::Closure {
+                params: vec![("x".into(), None)],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Mul,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(2)),
+                }),
+            }],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("call_indirect (type $__closure_type)"),
+            "map should use $__closure_type for closure calls");
+        assert!(output.contains("env ptr"),
+            "map should push env ptr for closure call");
+    }
+
+    #[test]
+    fn filter_uses_closure_type() {
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("arr".into())),
+            method: "filter".into(),
+            args: vec![Expr::Closure {
+                params: vec![("x".into(), None)],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Gt,
+                    left: Box::new(Expr::Ident("x".into())),
+                    right: Box::new(Expr::Integer(0)),
+                }),
+            }],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("call_indirect (type $__closure_type)"),
+            "filter should use $__closure_type for closure calls");
+        assert!(output.contains("env ptr"),
+            "filter should push env ptr for closure call");
+    }
+
+    #[test]
+    fn reduce_generates_loop_with_accumulator() {
+        // arr.reduce(|acc, x| acc + x, 0)
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("arr".into())),
+            method: "reduce".into(),
+            args: vec![
+                Expr::Closure {
+                    params: vec![("acc".into(), None), ("x".into(), None)],
+                    body: Box::new(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("acc".into())),
+                        right: Box::new(Expr::Ident("x".into())),
+                    }),
+                },
+                Expr::Integer(0),
+            ],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+
+        assert!(output.contains(".reduce()"), "should contain reduce comment");
+        assert!(output.contains("loop $__red_lp_"), "should generate a WASM loop");
+        assert!(output.contains("call_indirect (type $__closure_type_2)"),
+            "reduce should use $__closure_type_2 for binary closure calls");
+        assert!(output.contains("env ptr"),
+            "reduce should push env ptr");
+    }
+
+    #[test]
+    fn fold_generates_loop_with_accumulator() {
+        // arr.fold(0, |acc, x| acc + x)
+        let expr = Expr::MethodCall {
+            object: Box::new(Expr::Ident("arr".into())),
+            method: "fold".into(),
+            args: vec![
+                Expr::Integer(0),
+                Expr::Closure {
+                    params: vec![("acc".into(), None), ("x".into(), None)],
+                    body: Box::new(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("acc".into())),
+                        right: Box::new(Expr::Ident("x".into())),
+                    }),
+                },
+            ],
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&expr);
+        let output = codegen.output.clone();
+
+        assert!(output.contains(".fold()"), "should contain fold comment");
+        assert!(output.contains("loop $__fold_lp_"), "should generate a WASM loop");
+        assert!(output.contains("call_indirect (type $__closure_type_2)"),
+            "fold should use $__closure_type_2 for binary closure calls");
     }
 }
 
