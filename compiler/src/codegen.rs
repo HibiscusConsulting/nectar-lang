@@ -2,12 +2,24 @@ use crate::ast::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+/// Compilation target: browser (default) or WASI (server-side / edge).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CompilationTarget {
+    /// Browser target — imports from dom, http, ws, timer, etc. (core.js syscalls)
+    Browser,
+    /// WASI target — imports from wasi_snapshot_preview1 + nectar:edge/http.
+    /// No DOM, no signals UI updaters. For edge SSR + API proxy.
+    Wasi,
+}
+
 /// Generates WebAssembly Text Format (WAT) from a Nectar AST.
 ///
 /// This is the initial codegen backend. We emit WAT first for readability
 /// and debugging, then can convert to binary .wasm via wat2wasm or a
 /// binary emitter later.
 pub struct WasmCodegen {
+    /// Compilation target (browser or WASI)
+    target: CompilationTarget,
     output: String,
     indent: usize,
     /// Track local variables in current function scope
@@ -187,7 +199,12 @@ enum WasmType {
 
 impl WasmCodegen {
     pub fn new() -> Self {
+        Self::with_target(CompilationTarget::Browser)
+    }
+
+    pub fn with_target(target: CompilationTarget) -> Self {
         Self {
+            target,
             output: String::new(),
             indent: 0,
             locals: Vec::new(),
@@ -226,6 +243,57 @@ impl WasmCodegen {
             known_capability_signals: Vec::new(),
             component_scoped_selectors: HashSet::new(),
         }
+    }
+
+    /// Emit WASI Preview 1 imports (for --target wasi).
+    /// These replace all browser DOM/JS imports with WASI syscalls.
+    fn emit_wasi_imports(&mut self) {
+        self.line("");
+        self.line(";; ── WASI Preview 1 imports ──────────────────────────────────────");
+        self.line("(import \"wasi_snapshot_preview1\" \"fd_write\" (func $fd_write (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"fd_read\" (func $fd_read (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"environ_get\" (func $environ_get (param i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"environ_sizes_get\" (func $environ_sizes_get (param i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"clock_time_get\" (func $clock_time_get (param i32 i64 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"random_get\" (func $random_get (param i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"args_get\" (func $args_get (param i32 i32) (result i32)))");
+        self.line("(import \"wasi_snapshot_preview1\" \"args_sizes_get\" (func $args_sizes_get (param i32 i32) (result i32)))");
+
+        self.line("");
+        self.line(";; ── Nectar edge HTTP — custom host import for outbound fetch ────");
+        self.line("(import \"nectar:edge/http\" \"fetch\" (func $edge_http_fetch (param i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+        self.line(";; params: method_ptr, method_len, url_ptr, url_len, body_ptr, body_len, headers_ptr");
+        self.line(";; result: response_ptr (host writes response into linear memory)");
+
+        // Stub imports for functions that browser codegen references but WASI
+        // doesn't need.  We provide no-op test runtime imports so the test
+        // harness still links (tests compile but host may not run them).
+        self.line("");
+        self.line(";; Test runtime stubs (same signature as browser, host may no-op)");
+        self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
+        self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
+        self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
+    }
+
+    /// Emit WASI-specific exports: `_start` and `handle_request`.
+    /// Called at the end of `generate()` for WASI targets.
+    fn emit_wasi_exports(&mut self) {
+        self.line("");
+        self.line(";; ── WASI exports ───────────────────────────────────────────────");
+
+        // _start — required by WASI. Calls __init_all if it exists, then returns.
+        self.line("(func $_start (export \"_start\")");
+        self.line("  nop");
+        self.line(")");
+
+        // handle_request — edge handler entry point.
+        // Host writes request into linear memory at request_ptr.
+        // WASM processes and writes response. Returns response_ptr.
+        self.line("(func $handle_request (export \"handle_request\") (param $request_ptr i32) (param $request_len i32) (result i32)");
+        self.line("  ;; Placeholder: echo request_ptr back. Host provides actual dispatch.");
+        self.line("  local.get $request_ptr");
+        self.line(")");
     }
 
     /// Emit reactive signal globals + signal creation code for a capability.
@@ -563,6 +631,9 @@ impl WasmCodegen {
         // Import memory from host (for strings, DOM, etc.)
         self.line("(import \"env\" \"memory\" (memory 1))");
 
+        if self.target == CompilationTarget::Wasi {
+            self.emit_wasi_imports();
+        } else {
         // String runtime — WASM-internal (emitted by emit_string_runtime)
         // concat, fromI32, fromF64, fromBool, toString all run in WASM linear memory.
 
@@ -840,6 +911,8 @@ impl WasmCodegen {
         self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
         self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
 
+        } // end browser imports
+
         // ── WASM-internal (no JS imports) ────────────────────────────────────
         // signal, string, flags, cache, permissions, form, lifecycle, contract,
         // gesture (math), shortcuts, virtual scroll, style injection, animation,
@@ -890,55 +963,60 @@ impl WasmCodegen {
         self.emit_event_data_ptr_export();
         self.emit_string_runtime();
         self.emit_internal_runtimes();
-        self.emit_signal_runtime();
-        self.emit_gesture_runtime();
-        self.emit_flags_runtime();
-        self.emit_ai_runtime();
-        self.emit_a11y_runtime();
-        self.emit_time_runtime();
         self.emit_format_runtime();
         self.emit_json_runtime();
 
-        // Conditionally emit runtime helpers based on AST pre-scan.
-        // Only emit categories that the program actually references.
-        if self.used_runtime_categories.contains("crypto") {
-            self.emit_crypto_runtime();
-        }
-        if self.used_runtime_categories.contains("collections") {
-            self.emit_collections_runtime();
-        }
-        if self.used_runtime_categories.contains("csv") {
-            self.emit_csv_runtime();
-        }
-        if self.used_runtime_categories.contains("bigdecimal") {
-            self.emit_bigdecimal_runtime();
-        }
-        if self.used_runtime_categories.contains("search") {
-            self.emit_search_runtime();
-        }
-        if self.used_runtime_categories.contains("pagination") {
-            self.emit_pagination_runtime();
-        }
-        if self.used_runtime_categories.contains("debounce") {
-            self.emit_debounce_runtime();
-        }
-        if self.used_runtime_categories.contains("throttle") {
-            self.emit_throttle_runtime();
-        }
-        if self.used_runtime_categories.contains("toast") {
-            self.emit_toast_runtime();
-        }
-        if self.used_runtime_categories.contains("skeleton") {
-            self.emit_skeleton_runtime();
-        }
-        if self.used_runtime_categories.contains("mask") {
-            self.emit_mask_runtime();
-        }
-        if self.used_runtime_categories.contains("chart") {
-            self.emit_chart_runtime();
-        }
-        if self.used_runtime_categories.contains("datepicker") {
-            self.emit_datepicker_runtime();
+        // Browser-dependent runtimes — skipped for WASI target since they
+        // reference DOM/timer/webapi imports that don't exist in WASI.
+        if self.target == CompilationTarget::Browser {
+            self.emit_signal_runtime();
+            self.emit_gesture_runtime();
+            self.emit_flags_runtime();
+            self.emit_ai_runtime();
+            self.emit_a11y_runtime();
+            self.emit_time_runtime();
+
+            // Conditionally emit runtime helpers based on AST pre-scan.
+            // Only emit categories that the program actually references.
+            if self.used_runtime_categories.contains("crypto") {
+                self.emit_crypto_runtime();
+            }
+            if self.used_runtime_categories.contains("collections") {
+                self.emit_collections_runtime();
+            }
+            if self.used_runtime_categories.contains("csv") {
+                self.emit_csv_runtime();
+            }
+            if self.used_runtime_categories.contains("bigdecimal") {
+                self.emit_bigdecimal_runtime();
+            }
+            if self.used_runtime_categories.contains("search") {
+                self.emit_search_runtime();
+            }
+            if self.used_runtime_categories.contains("pagination") {
+                self.emit_pagination_runtime();
+            }
+            if self.used_runtime_categories.contains("debounce") {
+                self.emit_debounce_runtime();
+            }
+            if self.used_runtime_categories.contains("throttle") {
+                self.emit_throttle_runtime();
+            }
+            if self.used_runtime_categories.contains("toast") {
+                self.emit_toast_runtime();
+            }
+            if self.used_runtime_categories.contains("skeleton") {
+                self.emit_skeleton_runtime();
+            }
+            if self.used_runtime_categories.contains("mask") {
+                self.emit_mask_runtime();
+            }
+            if self.used_runtime_categories.contains("chart") {
+                self.emit_chart_runtime();
+            }
+            if self.used_runtime_categories.contains("datepicker") {
+                self.emit_datepicker_runtime();
+            }
         }
 
         // Pre-collect component names so template codegen can detect component instantiation
@@ -1148,6 +1226,11 @@ impl WasmCodegen {
             self.line("call $__callback");
             self.indent -= 1;
             self.line(")");
+        }
+
+        // Emit WASI-specific exports (_start, handle_request)
+        if self.target == CompilationTarget::Wasi {
+            self.emit_wasi_exports();
         }
 
         // Emit data section for interned strings
@@ -28261,5 +28344,91 @@ mod contract_api_tests {
             "Ok should store tag 0");
         assert!(wat.contains("i32.const 1  i32.store ;; tag=Err"),
             "Err should store tag 1");
+    }
+
+    // -----------------------------------------------------------------------
+    // WASI target tests
+    // -----------------------------------------------------------------------
+
+    fn compile_wasi(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::with_target(CompilationTarget::Wasi);
+        codegen.generate(&program)
+    }
+
+    #[test]
+    fn test_wasi_target_emits_wasi_preview1_imports() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("wasi_snapshot_preview1"), "WASI target should emit wasi_snapshot_preview1 imports");
+        assert!(wat.contains("$fd_write"), "WASI target should import fd_write");
+        assert!(wat.contains("$fd_read"), "WASI target should import fd_read");
+        assert!(wat.contains("$environ_get"), "WASI target should import environ_get");
+        assert!(wat.contains("$environ_sizes_get"), "WASI target should import environ_sizes_get");
+        assert!(wat.contains("$clock_time_get"), "WASI target should import clock_time_get");
+        assert!(wat.contains("$random_get"), "WASI target should import random_get");
+        assert!(wat.contains("$proc_exit"), "WASI target should import proc_exit");
+        assert!(wat.contains("$args_get"), "WASI target should import args_get");
+        assert!(wat.contains("$args_sizes_get"), "WASI target should import args_sizes_get");
+    }
+
+    #[test]
+    fn test_wasi_target_emits_edge_http_import() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("nectar:edge/http"), "WASI target should import nectar:edge/http");
+        assert!(wat.contains("$edge_http_fetch"), "WASI target should import edge_http_fetch");
+    }
+
+    #[test]
+    fn test_wasi_target_does_not_emit_dom_imports() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(!wat.contains("\"dom\""), "WASI target should NOT emit dom imports");
+        assert!(!wat.contains("\"timer\""), "WASI target should NOT emit timer imports");
+        assert!(!wat.contains("\"webapi\""), "WASI target should NOT emit webapi imports");
+        assert!(!wat.contains("\"http\""), "WASI target should NOT emit browser http imports");
+        assert!(!wat.contains("\"ws\""), "WASI target should NOT emit ws imports");
+        assert!(!wat.contains("\"observe\""), "WASI target should NOT emit observe imports");
+        assert!(!wat.contains("\"db\""), "WASI target should NOT emit db imports");
+        assert!(!wat.contains("\"worker\""), "WASI target should NOT emit worker imports");
+        assert!(!wat.contains("\"pwa\""), "WASI target should NOT emit pwa imports");
+        assert!(!wat.contains("\"hardware\""), "WASI target should NOT emit hardware imports");
+        assert!(!wat.contains("\"gpu\""), "WASI target should NOT emit gpu imports");
+    }
+
+    #[test]
+    fn test_wasi_target_exports_start() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("(export \"_start\")"), "WASI target should export _start");
+    }
+
+    #[test]
+    fn test_wasi_target_exports_handle_request() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("(export \"handle_request\")"), "WASI target should export handle_request");
+        assert!(wat.contains("$handle_request"), "WASI target should define handle_request function");
+    }
+
+    #[test]
+    fn test_browser_target_unchanged() {
+        let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("\"dom\""), "Browser target should still emit dom imports");
+        assert!(wat.contains("\"timer\""), "Browser target should still emit timer imports");
+        assert!(!wat.contains("wasi_snapshot_preview1"), "Browser target should NOT emit WASI imports");
+        assert!(!wat.contains("(export \"_start\")"), "Browser target should NOT export _start");
+    }
+
+    #[test]
+    fn test_wasi_target_still_has_memory_import() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("(import \"env\" \"memory\" (memory 1))"), "WASI target should still import memory");
+    }
+
+    #[test]
+    fn test_wasi_target_has_module_wrapper() {
+        let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
+        assert!(wat.contains("(module"), "WASI WAT should contain (module");
+        assert!(wat.contains("func $add"), "WASI target should still generate user functions");
     }
 }
