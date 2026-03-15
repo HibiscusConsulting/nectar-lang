@@ -706,8 +706,12 @@ impl WasmCodegen {
         self.line("(import \"dom\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"reloadModule\" (func $dom_reloadModule (param i32 i32 i32)))");
         self.line("(import \"dom\" \"injectStyles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"embedLoadSandboxed\" (func $embed_load_sandboxed (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"embedLoadScript\" (func $embed_load_script (param i32 i32 i32 i32 i32)))");
+        // Embed imports — only emit when program has embed definitions
+        let has_embed = program.items.iter().any(|i| matches!(i, Item::Embed(_)));
+        if has_embed {
+            self.line("(import \"dom\" \"embedLoadSandboxed\" (func $embed_load_sandboxed (param i32 i32 i32 i32)))");
+            self.line("(import \"dom\" \"embedLoadScript\" (func $embed_load_script (param i32 i32 i32 i32 i32)))");
+        }
         self.line("(import \"dom\" \"setProperty\" (func $dom_setProperty (param i32 i32 i32 i32)))");
         self.line("(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))");
 
@@ -26368,21 +26372,17 @@ mod coverage_codegen_tests {
     }
 
     #[test]
-    fn embed_load_sandboxed_import_present_in_preamble() {
-        // The WAT preamble must always include $embed_load_sandboxed and $embed_load_script
-        // imports so that embed blocks with sandbox: true can call them.
-        let wat = compile(r#"
+    fn embed_load_sandboxed_import_present_when_embed_used() {
+        // Embed imports are only emitted when the program has an embed definition.
+        // Programs without embeds should NOT have these imports (import tree shaking).
+        let wat_without = compile(r#"
             component Dummy {
                 render { <div>"x"</div> }
             }
         "#);
         assert!(
-            wat.contains("embedLoadSandboxed"),
-            "preamble must import embedLoadSandboxed"
-        );
-        assert!(
-            wat.contains("embedLoadScript"),
-            "preamble must import embedLoadScript"
+            !wat_without.contains("embedLoadSandboxed"),
+            "programs without embed should NOT import embedLoadSandboxed"
         );
     }
 
