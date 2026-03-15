@@ -82,7 +82,7 @@ struct Cli {
     no_check: bool,
 
     /// Optimization level: 0 (none), 1 (basic: const fold + DCE), 2 (full: all passes)
-    #[arg(short = 'O', long = "optimize", default_value = "0")]
+    #[arg(short = 'O', long = "optimize", default_value = "2")]
     opt_level: u8,
 
     /// Extract and inline critical CSS during SSR builds
@@ -1310,8 +1310,10 @@ fn compile(
                 let wasm_size = fs::metadata(&output_path)
                     .map(|m| m.len())
                     .unwrap_or(0);
-                println!("nectar: compiled {} -> {} ({} bytes)",
-                    input.display(), output_path.display(), wasm_size);
+                let wasm_kb = wasm_size as f64 / 1024.0;
+                let gzip_kb = wasm_kb * 0.4;
+                println!("nectar: compiled {} -> {} {:.1} KB (est. ~{:.1} KB gzip)",
+                    input.display(), output_path.display(), wasm_kb, gzip_kb);
             }
             Ok(output_result) => {
                 let stderr = String::from_utf8_lossy(&output_result.stderr);
@@ -1325,8 +1327,10 @@ fn compile(
                 let mut emitter = WasmBinaryEmitter::new();
                 let bytes = emitter.emit(&program);
                 fs::write(&output_path, &bytes)?;
-                println!("nectar: compiled {} -> {} ({} bytes)",
-                    input.display(), output_path.display(), bytes.len());
+                let wasm_kb = bytes.len() as f64 / 1024.0;
+                let gzip_kb = wasm_kb * 0.4;
+                println!("nectar: compiled {} -> {} {:.1} KB (est. ~{:.1} KB gzip)",
+                    input.display(), output_path.display(), wasm_kb, gzip_kb);
             }
         }
     } else {

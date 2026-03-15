@@ -440,7 +440,9 @@ export const wasmImports = {
     matchMedia(qPtr, qLen) { return matchMedia(R.__getString(qPtr, qLen)).matches ? 1 : 0; },
     intersectionObserver(cbIdx, optsPtr) {
       const opts = optsPtr ? R.__readOpts(optsPtr) : {};
-      return R.__registerObject(new IntersectionObserver(() => R.__cb(cbIdx), opts));
+      return R.__registerObject(new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) R.__cb(cbIdx);
+      }, opts));
     },
     observe(obsId, elId) { R.__getObject(obsId).observe(R.__getElement(elId)); },
     unobserve(obsId, elId) { R.__getObject(obsId).unobserve(R.__getElement(elId)); },
@@ -866,7 +868,7 @@ export const wasmImports = {
 
 // ── WASM instantiation helper ────────────────────────────────────────────────
 export async function instantiate(wasmUrl, extraImports = {}) {
-  const memory = (extraImports.env && extraImports.env.memory) || new WebAssembly.Memory({ initial: 16 });
+  const memory = (extraImports.env && extraImports.env.memory) || new WebAssembly.Memory({ initial: 256, maximum: 1024 });
   const merged = { env: { memory } };
   for (const [ns, fns] of Object.entries(wasmImports)) {
     merged[ns] = { ...fns, ...(extraImports[ns] || {}) };

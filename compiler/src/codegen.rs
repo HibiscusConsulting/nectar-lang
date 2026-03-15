@@ -112,6 +112,25 @@ pub struct WasmCodegen {
     /// "toast", "debounce", "throttle", "bigdecimal", "search",
     /// "pagination", "csv", "collections"
     used_runtime_categories: HashSet<String>,
+    /// Import namespace usage flags — set during AST pre-scan to determine which
+    /// browser API import blocks to emit. Only used namespaces get imports.
+    needs_http: bool,
+    needs_observe: bool,
+    needs_ws: bool,
+    needs_db: bool,
+    needs_worker: bool,
+    needs_pwa: bool,
+    needs_hardware: bool,
+    needs_payment: bool,
+    needs_banking: bool,
+    needs_map: bool,
+    needs_auth: bool,
+    needs_upload: bool,
+    needs_time: bool,
+    needs_streaming: bool,
+    needs_rtc: bool,
+    needs_gpu: bool,
+    needs_test: bool,
     /// Contract definitions in this program. Each entry is (contract_name, fields).
     /// Used to resolve `ContractName::call()`, `ContractName::parse()`,
     /// `ContractName::serialize()` to their generated WASM functions.
@@ -245,6 +264,23 @@ impl WasmCodegen {
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
             used_runtime_categories: HashSet::new(),
+            needs_http: false,
+            needs_observe: false,
+            needs_ws: false,
+            needs_db: false,
+            needs_worker: false,
+            needs_pwa: false,
+            needs_hardware: false,
+            needs_payment: false,
+            needs_banking: false,
+            needs_map: false,
+            needs_auth: false,
+            needs_upload: false,
+            needs_time: false,
+            needs_streaming: false,
+            needs_rtc: false,
+            needs_gpu: false,
+            needs_test: false,
             known_contracts: Vec::new(),
             required_providers: HashSet::new(),
             known_payment_signals: Vec::new(),
@@ -385,6 +421,9 @@ impl WasmCodegen {
 
     fn scan_component_for_runtime_deps(&mut self, c: &Component) {
         for method in &c.methods {
+            if method.name == "load_more" {
+                self.needs_observe = true;
+            }
             self.scan_block_for_runtime_deps(&method.body);
         }
         for field in &c.state {
@@ -423,7 +462,19 @@ impl WasmCodegen {
                     self.scan_block_for_runtime_deps(&tool.body);
                 }
             }
-            Item::Test(t) => self.scan_block_for_runtime_deps(&t.body),
+            Item::Test(t) => {
+                self.needs_test = true;
+                self.scan_block_for_runtime_deps(&t.body);
+            }
+            Item::Channel(_) => { self.needs_ws = true; }
+            Item::Auth(_) => { self.needs_auth = true; }
+            Item::Upload(_) => { self.needs_upload = true; }
+            Item::Db(_) => { self.needs_db = true; }
+            Item::Payment(_) => { self.needs_payment = true; }
+            Item::App(_) => { self.needs_pwa = true; }
+            Item::Contract(_) => { self.needs_http = true; }
+            Item::Embed(_) => {}
+            Item::Router(_) => {}
             _ => {}
         }
     }
@@ -648,9 +699,57 @@ impl WasmCodegen {
             for prefix in *prefixes {
                 if name.starts_with(prefix) || name.contains(&format!("::{}", prefix)) {
                     self.used_runtime_categories.insert(category.to_string());
-                    return;
                 }
             }
+        }
+        // Import namespace detection for pruning unused browser API imports
+        if name.starts_with("fetch") || name.contains("::fetch") || name.starts_with("http") {
+            self.needs_http = true;
+        }
+        if name.starts_with("observe") || name.contains("Observer") || name.contains("matchMedia") {
+            self.needs_observe = true;
+        }
+        if name.starts_with("ws::") || name.starts_with("WebSocket") {
+            self.needs_ws = true;
+        }
+        if name.starts_with("db::") || name.starts_with("indexedDB") || name.contains("::open") && name.starts_with("db") {
+            self.needs_db = true;
+        }
+        if name.starts_with("worker::") || name.starts_with("spawn") {
+            self.needs_worker = true;
+        }
+        if name.starts_with("pwa::") || name.contains("serviceWorker") || name.contains("cachePrecache") {
+            self.needs_pwa = true;
+        }
+        if name.starts_with("hardware::") || name.contains("haptic") || name.contains("biometric") || name.contains("camera") || name.contains("geolocation") {
+            self.needs_hardware = true;
+        }
+        if name.starts_with("payment::") {
+            self.needs_payment = true;
+        }
+        if name.starts_with("banking::") {
+            self.needs_banking = true;
+        }
+        if name.starts_with("map::") {
+            self.needs_map = true;
+        }
+        if name.starts_with("auth::") {
+            self.needs_auth = true;
+        }
+        if name.starts_with("upload::") {
+            self.needs_upload = true;
+        }
+        if name.starts_with("time::") || name.contains("::format") && name.starts_with("time") {
+            self.needs_time = true;
+        }
+        if name.starts_with("streaming::") || name.contains("streamFetch") || name.contains("sseConnect") {
+            self.needs_streaming = true;
+        }
+        if name.starts_with("rtc::") || name.contains("WebRTC") || name.contains("createPeer") {
+            self.needs_rtc = true;
+        }
+        if name.starts_with("gpu::") || name.contains("WebGPU") {
+            self.needs_gpu = true;
         }
     }
 
@@ -662,8 +761,9 @@ impl WasmCodegen {
         self.emit("(module");
         self.indent += 1;
 
-        // Import memory from host (for strings, DOM, etc.)
-        self.line("(import \"env\" \"memory\" (memory 1))");
+        // Import memory from host — page count patched at end of codegen
+        // based on actual static data size + heap headroom
+        self.line("(import \"env\" \"memory\" (memory __MEMORY_PAGES__))");
 
         if self.target == CompilationTarget::Wasi {
             self.emit_wasi_imports();
@@ -765,7 +865,8 @@ impl WasmCodegen {
         self.line("(import \"webapi\" \"perfMeasure\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
 
 
-        // ── HTTP — typed setters + fetch ─────────────────────────────────────
+        // ── HTTP — typed setters + fetch (only if program uses fetch/http) ────
+        if self.needs_http {
         self.line("");
         self.line(";; HTTP — browser fetch API (typed setters, no JSON)");
         self.line("(import \"http\" \"setMethod\" (func $http_setMethod (param i32 i32)))");
@@ -773,8 +874,10 @@ impl WasmCodegen {
         self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
         self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))");
         self.line("(import \"http\" \"fetchWithCallback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+        }
 
         // ── Observe — IntersectionObserver + matchMedia ──────────────────────
+        if self.needs_observe {
         self.line("");
         self.line(";; Observe — browser IntersectionObserver + matchMedia APIs");
         self.line("(import \"observe\" \"matchMedia\" (func $observe_matchMedia (param i32 i32) (result i32)))");
@@ -782,8 +885,10 @@ impl WasmCodegen {
         self.line("(import \"observe\" \"observe\" (func $observe_observe (param i32 i32)))");
         self.line("(import \"observe\" \"unobserve\" (func $observe_unobserve (param i32 i32)))");
         self.line("(import \"observe\" \"disconnect\" (func $observe_disconnect (param i32)))");
+        }
 
         // ── WebSocket ────────────────────────────────────────────────────────
+        if self.needs_ws {
         self.line("");
         self.line(";; WebSocket — browser WebSocket API");
         self.line("(import \"ws\" \"connect\" (func $ws_connect (param i32 i32) (result i32)))");
@@ -795,8 +900,10 @@ impl WasmCodegen {
         self.line("(import \"ws\" \"onClose\" (func $ws_onClose (param i32 i32)))");
         self.line("(import \"ws\" \"onError\" (func $ws_onError (param i32 i32)))");
         self.line("(import \"ws\" \"getReadyState\" (func $ws_getReadyState (param i32) (result i32)))");
+        }
 
         // ── IndexedDB — pure syscalls, WASM handles serialization ────────────
+        if self.needs_db {
         self.line("");
         self.line(";; Database — browser IndexedDB API (no JSON logic in JS)");
         self.line("(import \"db\" \"open\" (func $db_open (param i32 i32 i32 i32)))");
@@ -804,8 +911,10 @@ impl WasmCodegen {
         self.line("(import \"db\" \"get\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
         self.line("(import \"db\" \"delete\" (func $db_delete (param i32 i32 i32 i32 i32)))");
         self.line("(import \"db\" \"getAll\" (func $db_getAll (param i32 i32 i32 i32)))");
+        }
 
         // ── Workers ──────────────────────────────────────────────────────────
+        if self.needs_worker {
         self.line("");
         self.line(";; Workers — browser Web Worker API");
         self.line("(import \"worker\" \"spawn\" (func $worker_spawn (param i32 i32) (result i32)))");
@@ -815,56 +924,71 @@ impl WasmCodegen {
         self.line("(import \"worker\" \"postMessage\" (func $worker_postMessage (param i32 i32 i32)))");
         self.line("(import \"worker\" \"onMessage\" (func $worker_onMessage (param i32 i32)))");
         self.line("(import \"worker\" \"terminate\" (func $worker_terminate (param i32)))");
+        }
 
         // ── PWA — Service Worker + Push + Cache ──────────────────────────────
+        if self.needs_pwa {
         self.line("");
         self.line(";; PWA — browser Service Worker + Push APIs");
         self.line("(import \"pwa\" \"cachePrecache\" (func $pwa_cachePrecache (param i32 i32)))");
         self.line("(import \"pwa\" \"registerPush\" (func $pwa_registerPush (param i32)))");
         self.line("(import \"pwa\" \"registerServiceWorker\" (func $pwa_registerServiceWorker (param i32 i32 i32)))");
+        }
 
         // ── Hardware — device APIs ───────────────────────────────────────────
+        if self.needs_hardware {
         self.line("");
         self.line(";; Hardware — browser device APIs");
         self.line("(import \"hardware\" \"haptic\" (func $hardware_haptic (param i32)))");
         self.line("(import \"hardware\" \"biometricAuth\" (func $hardware_biometricAuth (param i32 i32 i32)))");
         self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
         self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
+        }
 
         // ── Payment — generic provider interface ──────────────────────────────
+        if self.needs_payment {
         self.line("");
         self.line(";; Payment — generic provider syscalls (mount widget, create element, confirm)");
         self.line("(import \"payment\" \"mount\" (func $payment_mount (param i32 i32 i32 i32)))");
         self.line("(import \"payment\" \"create_element\" (func $payment_create_element (param i32 i32 i32)))");
         self.line("(import \"payment\" \"confirm\" (func $payment_confirm (param i32 i32 i32 i32 i32)))");
+        }
 
         // ── Banking — generic provider interface ─────────────────────────────
+        if self.needs_banking {
         self.line("");
         self.line(";; Banking — generic provider syscalls (open link flow)");
         self.line("(import \"banking\" \"open\" (func $banking_open (param i32 i32 i32)))");
+        }
 
         // ── Map — generic provider interface ─────────────────────────────────
+        if self.needs_map {
         self.line("");
         self.line(";; Map — generic provider syscalls (mount map, add markers)");
         self.line("(import \"map\" \"mount\" (func $map_mount (param i32 i32 i32 f64 f64 f64 i32)))");
         self.line("(import \"map\" \"add_marker\" (func $map_add_marker (param i32 f64 f64)))");
+        }
 
         // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
+        if self.needs_auth {
         self.line("");
         self.line(";; Auth — browser cookie/navigation APIs (no parsing in JS)");
         self.line("(import \"auth\" \"login\" (func $auth_login (param i32 i32)))");
         self.line("(import \"auth\" \"logout\" (func $auth_logout (param i32 i32)))");
         self.line("(import \"auth\" \"getRawCookies\" (func $auth_getRawCookies (result i32)))");
         self.line("(import \"auth\" \"setCookie\" (func $auth_set_cookie (param i32 i32)))");
+        }
 
         // ── Upload — file picker + XHR ───────────────────────────────────────
+        if self.needs_upload {
         self.line("");
         self.line(";; Upload — browser file input + XHR APIs");
         self.line("(import \"upload\" \"init\" (func $upload_init (param i32 i32 i32 i32)))");
         self.line("(import \"upload\" \"start\" (func $upload_start (param i32 i32) (result i32)))");
         self.line("(import \"upload\" \"cancel\" (func $upload_cancel (param i32)))");
+        }
 
-        // ── Time — Intl + Date ───────────────────────────────────────────────
+        // ── Time — Intl + Date (always emitted — time/datetime runtimes depend on these)
         self.line("");
         self.line(";; Time — browser Intl + Date APIs");
         self.line("(import \"time\" \"now\" (func $time_now (result f64)))");
@@ -873,12 +997,15 @@ impl WasmCodegen {
         self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
 
         // ── Streaming — ReadableStream + EventSource ─────────────────────────
+        if self.needs_streaming {
         self.line("");
         self.line(";; Streaming — browser ReadableStream + EventSource APIs");
         self.line("(import \"streaming\" \"streamFetch\" (func $streaming_streamFetch (param i32 i32 i32)))");
         self.line("(import \"streaming\" \"sseConnect\" (func $streaming_sseConnect (param i32 i32 i32)))");
+        }
 
         // ── RTC — WebRTC peer connections, data channels, media tracks ────────
+        if self.needs_rtc {
         self.line("");
         self.line(";; RTC — browser WebRTC APIs (RTCPeerConnection, data channels, media)");
         self.line("(import \"rtc\" \"createPeer\" (func $rtc_createPeer (param i32) (result i32)))");
@@ -918,8 +1045,10 @@ impl WasmCodegen {
         self.line("(import \"rtc\" \"stopTrack\" (func $rtc_stopTrack (param i32)))");
         self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
         self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
+        }
 
         // ── GPU — WebGPU rendering, buffers, shaders, textures ───────────────
+        if self.needs_gpu {
         self.line("");
         self.line(";; GPU — browser WebGPU APIs (adapter, device, buffers, pipelines, rendering)");
         self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32) (result i32)))");
@@ -941,13 +1070,16 @@ impl WasmCodegen {
         self.line("(import \"gpu\" \"destroyTexture\" (func $gpu_destroyTexture (param i32)))");
         self.line("(import \"gpu\" \"getPreferredFormat\" (func $gpu_getPreferredFormat (result i32)))");
         self.line("(import \"gpu\" \"getAdapterInfo\" (func $gpu_getAdapterInfo (param i32) (result i32)))");
+        }
 
         // ── Test runtime — imported for test { } blocks ──────────────────────
+        if self.needs_test {
         self.line("");
         self.line(";; Test runtime — report pass/fail/summary to the host");
         self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
         self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
         self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
+        }
 
         } // end browser imports
 
@@ -969,7 +1101,7 @@ impl WasmCodegen {
         self.line("");
         self.line("(global $heap_ptr (mut i32) (i32.const __HEAP_START__))");
         self.line("");
-        // Event data region at 307200 (300KB). Layout (40 bytes):
+        // Event data region — allocated from heap at init time. Layout (40 bytes):
         //   +0  clientX (f64)
         //   +8  clientY (f64)
         //   +16 keyCode (i32)
@@ -977,7 +1109,7 @@ impl WasmCodegen {
         //   +24 key_ptr (i32)
         //   +28 key_len (i32)
         //   +32 target_elId (i32)
-        self.line("(global $__event_data_base i32 (i32.const 307200))");
+        self.line("(global $__event_data_base (mut i32) (i32.const 0))");
         self.line("");
         // Handler performance timing globals — stores the last handler execution time
         // as a formatted "X.XXms" string (ptr, len) for metric signals
@@ -989,10 +1121,12 @@ impl WasmCodegen {
         self.line("(global $__timing_display_op_el (mut i32) (i32.const 0))");
         self.line("");
         // Callback data table for parameterized event handlers in for-loops.
-        // Base address at 308000. Each entry is 8 bytes: [handler_idx: i32, data_ptr: i32].
+        // Allocated dynamically from heap at init time to avoid collision with
+        // heap allocations. Each entry is 8 bytes: [handler_idx: i32, data_ptr: i32].
+        // Reserve space for up to 16384 entries (128KB).
         // Dynamic callback indices start at 10000 to avoid collision with static indices.
         // $__cb_data_count tracks how many entries have been registered.
-        self.line("(global $__cb_data_table_base i32 (i32.const 308000))");
+        self.line("(global $__cb_data_table_base (mut i32) (i32.const 0))");
         self.line("(global $__cb_data_count (mut i32) (i32.const 0))");
         self.line("");
         // Async frame pointer — stores the current async continuation's frame
@@ -1164,10 +1298,94 @@ impl WasmCodegen {
                 }
             }
 
-            if !init_calls.is_empty() {
+            {
                 self.line("");
-                self.line(";; Auto-init: call all store/auth/db/theme/breakpoint inits");
+                self.line(";; Auto-init: allocate all reserved regions from heap + call inits");
                 self.line("(func $__init_all (export \"__init_all\")");
+
+                // Event data region (40 bytes, always needed)
+                self.line("  i32.const 64 ;; event data (40 bytes, padded to 64)");
+                self.line("  call $alloc");
+                self.line("  global.set $__event_data_base");
+
+                // Callback data table (16384 entries × 8 bytes = 128KB)
+                self.line("  i32.const 131072 ;; 16384 entries * 8 bytes");
+                self.line("  call $alloc");
+                self.line("  global.set $__cb_data_table_base");
+
+                // Signal table (1024 signals × 72 bytes = 72KB)
+                self.line("  i32.const 73728 ;; signal table: 1024 * 72 bytes");
+                self.line("  call $alloc");
+                self.line("  global.set $__sig_base");
+
+                // Pending signal notifications (1024 entries × 4 bytes = 4KB)
+                self.line("  i32.const 4096 ;; pending signals: 1024 * 4 bytes");
+                self.line("  call $alloc");
+                self.line("  global.set $__pending");
+
+                // Contract table (64 entries × 128 bytes = 8KB)
+                self.line("  i32.const 8192 ;; contract table");
+                self.line("  call $alloc");
+                self.line("  global.set $__contract_base");
+
+                // Permissions table (64 entries × 64 bytes = 4KB)
+                self.line("  i32.const 4096 ;; permissions table");
+                self.line("  call $alloc");
+                self.line("  global.set $__perm_base");
+
+                // Form table (64 entries × 64 bytes = 4KB)
+                self.line("  i32.const 4096 ;; form table");
+                self.line("  call $alloc");
+                self.line("  global.set $__form_base");
+
+                // Cleanup table (256 entries × 8 bytes = 2KB)
+                self.line("  i32.const 2048 ;; cleanup table");
+                self.line("  call $alloc");
+                self.line("  global.set $__cleanup_base");
+
+                // Cache table (64 entries × 80 bytes = 5KB)
+                self.line("  i32.const 5120 ;; cache table");
+                self.line("  call $alloc");
+                self.line("  global.set $__cache_base");
+
+                // Breakpoint table (32 entries × 12 bytes = 384 bytes)
+                self.line("  i32.const 384 ;; breakpoint table");
+                self.line("  call $alloc");
+                self.line("  global.set $__bp_base");
+
+                // Route table (128 entries × 32 bytes = 4KB)
+                self.line("  i32.const 4096 ;; route table");
+                self.line("  call $alloc");
+                self.line("  global.set $__route_base");
+
+                // SEO meta table (32 entries × 64 bytes = 2KB)
+                self.line("  i32.const 2048 ;; seo meta table");
+                self.line("  call $alloc");
+                self.line("  global.set $__seo_meta_base");
+
+                // Router path scratch (1KB)
+                self.line("  i32.const 1024 ;; router path scratch");
+                self.line("  call $alloc");
+                self.line("  global.set $__router_path_scratch");
+
+                // Conditional allocations based on program usage
+                if self.used_runtime_categories.contains("crypto") {
+                    self.line("  ;; Crypto work buffers");
+                    self.line("  i32.const 512 ;; crypto work buffer");
+                    self.line("  call $alloc");
+                    self.line("  global.set $__crypto_work");
+                    self.line("  i32.const 256 ;; crypto output buffer");
+                    self.line("  call $alloc");
+                    self.line("  global.set $__crypto_out");
+                }
+
+                if self.used_runtime_categories.contains("datepicker") {
+                    self.line("  ;; Datepicker state (64 instances × 12 bytes)");
+                    self.line("  i32.const 768 ;; datepicker table");
+                    self.line("  call $alloc");
+                    self.line("  global.set $__datepicker_base");
+                }
+
                 for call in &init_calls {
                     self.line(call);
                 }
@@ -1294,6 +1512,19 @@ impl WasmCodegen {
         // Align to 16-byte boundary for safety.
         let heap_start = (self.string_offset + 15) & !15;
         self.output = self.output.replace("__HEAP_START__", &heap_start.to_string());
+
+        // Calculate minimum memory pages: static data + heap headroom.
+        // Each WASM page = 64KB. We need enough for:
+        //   - interned strings (string_offset bytes)
+        //   - heap allocations (arrays, structs, closures at runtime)
+        //   - stack space for deep call chains
+        // Minimum 16 pages (1MB), scale up based on static data size.
+        let static_bytes = heap_start;
+        // Give 4x headroom for runtime heap allocations, minimum 1MB
+        let needed_bytes = std::cmp::max(static_bytes * 4, 1024 * 1024);
+        let memory_pages = (needed_bytes + 65535) / 65536; // round up to pages
+        self.output = self.output.replace("__MEMORY_PAGES__", &memory_pages.to_string());
+        eprintln!("nectar: memory: {} pages ({}KB static, {}KB total)", memory_pages, static_bytes / 1024, memory_pages * 64);
 
         self.indent -= 1;
         self.line(")");
@@ -3327,8 +3558,6 @@ impl WasmCodegen {
             self.line(&format!("(global $__lazy_cursor_{} (mut i32) (i32.const 0))", batch.uid));
             self.line(&format!("(global $__lazy_total_{} (mut i32) (i32.const 0))", batch.uid));
             self.line(&format!("(global $__lazy_data_{} (mut i32) (i32.const 0))", batch.uid));
-            self.line(&format!("(global $__lazy_sentinel_{} (mut i32) (i32.const 0))", batch.uid));
-            self.line(&format!("(global $__lazy_observer_{} (mut i32) (i32.const 0))", batch.uid));
         }
 
         for batch in self.lazy_batches.clone() {
@@ -3340,7 +3569,7 @@ impl WasmCodegen {
             self.defer_template_locals = true;
             self.template_locals.clear();
 
-            let batch_size = 20;
+            let batch_size = 50; // rAF drain: 50 items per frame
             let uid = batch.uid;
             let binding_var = format!("${}", batch.binding);
             let idx_var = format!("$__lb_idx_{}", uid);
@@ -3429,14 +3658,15 @@ impl WasmCodegen {
             self.line(&format!("local.get {}", end_var));
             self.line(&format!("global.set $__lazy_cursor_{}", uid));
 
-            // If cursor >= total, disconnect observer
+            // If more items remain, schedule next batch via rAF
             self.line(&format!("global.get $__lazy_cursor_{}", uid));
             self.line(&format!("global.get $__lazy_total_{}", uid));
-            self.line("i32.ge_u");
-            self.line("if ;; all items rendered — disconnect observer");
+            self.line("i32.lt_u");
+            self.line("if ;; more items — schedule next rAF batch");
             self.indent += 1;
-            self.line(&format!("global.get $__lazy_observer_{}", uid));
-            self.line("call $observe_disconnect");
+            self.line(&format!("i32.const {} ;; self-chain via rAF", batch.callback_idx));
+            self.line("call $timer_requestAnimationFrame");
+            self.line("drop");
             self.indent -= 1;
             self.line("end");
 
@@ -6457,7 +6687,21 @@ impl WasmCodegen {
                 }
             }
             if !handled {
+                // Defer locals so they are hoisted before instructions
+                let saved_output = std::mem::take(&mut self.output);
+                self.output = String::new();
+                self.defer_template_locals = true;
+                self.template_locals.clear();
+
                 self.generate_template(fallback, "$root");
+
+                let body_output = std::mem::take(&mut self.output);
+                self.output = saved_output;
+                for local_decl in std::mem::take(&mut self.template_locals) {
+                    self.line(&local_decl);
+                }
+                self.defer_template_locals = false;
+                self.output.push_str(&body_output);
             }
             self.indent -= 1;
             self.line(")");
@@ -7457,14 +7701,10 @@ impl WasmCodegen {
                     let binding_var = format!("${}", binding);
                     let block_label = format!("$lazy_break_{}", uid);
                     let loop_label = format!("$lazy_cont_{}", uid);
-                    let sentinel_var = format!("$__lazy_sent_{}", uid);
-                    let observer_var = format!("$__lazy_obs_{}", uid);
 
                     self.emit_template_local(&idx_var);
                     self.emit_template_local(&end_var);
                     self.emit_template_local(&binding_var);
-                    self.emit_template_local(&sentinel_var);
-                    self.emit_template_local(&observer_var);
 
                     self.line(&format!(";; lazy for {} — initial batch of {} items", binding, batch_size));
 
@@ -7571,47 +7811,20 @@ impl WasmCodegen {
                     self.line(&format!("local.get {}", end_var));
                     self.line(&format!("global.set $__lazy_cursor_{}", uid));
 
-                    // Create sentinel div and observer (only if total > batch_size)
-                    self.line(&format!(";; lazy for sentinel + IntersectionObserver"));
+                    // Schedule remaining items via rAF drain.
+                    // Each rAF callback renders a batch (50 items), then self-chains
+                    // until all items are rendered. No IntersectionObserver needed.
+                    self.line(";; lazy for — schedule rAF drain for remaining items");
                     self.line(&format!("global.get $__lazy_cursor_{}", uid));
                     self.line(&format!("global.get $__lazy_total_{}", uid));
                     self.line("i32.lt_u");
-                    self.line("if ;; more items remain — set up observer");
+                    self.line("if ;; more items remain — schedule rAF batch");
                     self.indent += 1;
-
-                    // Create sentinel <div>
-                    let sentinel_tag = self.store_string("div");
-                    self.line(&format!("i32.const {} ;; \"div\" tag ptr", sentinel_tag));
-                    self.line("i32.const 3 ;; \"div\" tag len");
-                    self.line("call $dom_createElement");
-                    self.line(&format!("local.set {}", sentinel_var));
-
-                    // Append sentinel to parent
-                    self.line(&format!("local.get {}", parent));
-                    self.line(&format!("local.get {}", sentinel_var));
-                    self.line("call $dom_appendChild");
-
-                    // Store sentinel element ID in global for disconnect later
-                    self.line(&format!("local.get {}", sentinel_var));
-                    self.line(&format!("global.set $__lazy_sentinel_{}", uid));
-
-                    // Create IntersectionObserver with batch callback index
                     self.line(&format!("i32.const {} ;; lazy batch callback index", cb_idx));
-                    self.line("i32.const 0 ;; no options");
-                    self.line("call $observe_intersectionObserver");
-                    self.line(&format!("local.set {}", observer_var));
-
-                    // Store observer ID in global for disconnect
-                    self.line(&format!("local.get {}", observer_var));
-                    self.line(&format!("global.set $__lazy_observer_{}", uid));
-
-                    // Observe the sentinel
-                    self.line(&format!("local.get {}", observer_var));
-                    self.line(&format!("local.get {}", sentinel_var));
-                    self.line("call $observe_observe");
-
+                    self.line("call $timer_requestAnimationFrame");
+                    self.line("drop ;; discard rAF handle");
                     self.indent -= 1;
-                    self.line("end ;; observer setup");
+                    self.line("end ;; rAF schedule");
 
                     // Record deferred batch function
                     self.lazy_batches.push(LazyBatch {
@@ -9397,16 +9610,52 @@ impl WasmCodegen {
     }
 
     fn emit_alloc_function(&mut self) {
-        self.line(";; Simple bump allocator");
+        self.line(";; Bump allocator with automatic memory.grow");
         self.emit("(func $alloc (export \"alloc\") (param $size i32) (result i32)");
         self.indent += 1;
         self.line("(local $ptr i32)");
+        self.line("(local $needed_pages i32)");
+        // Save current heap pointer as the allocation start
         self.line("global.get $heap_ptr");
         self.line("local.set $ptr");
+        // Bump heap pointer
         self.line("global.get $heap_ptr");
         self.line("local.get $size");
         self.line("i32.add");
         self.line("global.set $heap_ptr");
+        // Check if new heap_ptr exceeds current memory size
+        // memory.size returns pages, multiply by 65536 for bytes
+        self.line("global.get $heap_ptr");
+        self.line("memory.size");
+        self.line("i32.const 65536");
+        self.line("i32.mul");
+        self.line("i32.gt_u");
+        self.line("if ;; need more memory");
+        self.indent += 1;
+        // Calculate pages needed: (heap_ptr - current_size + 65535) / 65536
+        // Grow by at least 1 page, or enough to cover the allocation
+        self.line("global.get $heap_ptr");
+        self.line("memory.size");
+        self.line("i32.const 65536");
+        self.line("i32.mul");
+        self.line("i32.sub");
+        self.line("i32.const 65535");
+        self.line("i32.add");
+        self.line("i32.const 65536");
+        self.line("i32.div_u");
+        self.line("local.set $needed_pages");
+        // Double current size or grow needed pages, whichever is larger
+        self.line("memory.size");
+        self.line("local.get $needed_pages");
+        self.line("memory.size");
+        self.line("local.get $needed_pages");
+        self.line("i32.gt_u");
+        self.line("select");
+        self.line("memory.grow");
+        self.line("drop ;; -1 on failure, but we can't recover anyway");
+        self.indent -= 1;
+        self.line("end");
+        // Return the original pointer
         self.line("local.get $ptr");
         self.indent -= 1;
         self.line(")");
@@ -10215,9 +10464,9 @@ impl WasmCodegen {
     fn emit_internal_runtimes(&mut self) {
         self.line("");
         self.line(";; ── Contract runtime (WASM-internal) ────────────────────────────");
-        self.line(";; Schema table at 327680 (320KB). Entry = 128 bytes: name_ptr(4) name_len(4) schema_ptr(4) schema_len(4) hash_ptr(4) hash_len(4) pad(104)");
+        self.line(";; Schema table allocated from heap. Entry = 128 bytes: name_ptr(4) name_len(4) schema_ptr(4) schema_len(4) hash_ptr(4) hash_len(4) pad(104)");
         self.line("(global $__contract_count (mut i32) (i32.const 0))");
-        self.line("(global $__contract_base i32 (i32.const 327680))");
+        self.line("(global $__contract_base (mut i32) (i32.const 0))");
 
         // registerSchema: store schema entry
         self.emit("(func $contract_registerSchema (param $name_ptr i32) (param $name_len i32) (param $schema_ptr i32) (param $schema_len i32) (param $hash_ptr i32) (param $hash_len i32)");
@@ -10289,9 +10538,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Permissions runtime (WASM-internal) ──────────────────────────");
-        self.line(";; Permission table at 344064 (336KB). Entry = 64 bytes: comp_ptr(4) comp_len(4) perms_ptr(4) perms_len(4) pad(48)");
+        self.line(";; Permission table allocated from heap. Entry = 64 bytes: comp_ptr(4) comp_len(4) perms_ptr(4) perms_len(4) pad(48)");
         self.line("(global $__perm_count (mut i32) (i32.const 0))");
-        self.line("(global $__perm_base i32 (i32.const 344064))");
+        self.line("(global $__perm_base (mut i32) (i32.const 0))");
 
         self.emit("(func $permissions_registerPermissions (param $comp_ptr i32) (param $comp_len i32) (param $perms_ptr i32) (param $perms_len i32)");
         self.indent += 1;
@@ -10320,9 +10569,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Form runtime (WASM-internal) ─────────────────────────────────");
-        self.line(";; Form table at 360448 (352KB). Entry = 64 bytes: id_ptr(4) id_len(4) schema_ptr(4) schema_len(4) pad(48)");
+        self.line(";; Form table allocated from heap. Entry = 64 bytes: id_ptr(4) id_len(4) schema_ptr(4) schema_len(4) pad(48)");
         self.line("(global $__form_count (mut i32) (i32.const 0))");
-        self.line("(global $__form_base i32 (i32.const 360448))");
+        self.line("(global $__form_base (mut i32) (i32.const 0))");
 
         self.emit("(func $form_register (param $id_ptr i32) (param $id_len i32) (param $schema_ptr i32) (param $schema_len i32)");
         self.indent += 1;
@@ -10366,9 +10615,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Lifecycle runtime (WASM-internal) ────────────────────────────");
-        self.line(";; Cleanup table at 376832 (368KB). Entry = 8 bytes: component_id(4) callback_idx(4)");
+        self.line(";; Cleanup table allocated from heap. Entry = 8 bytes: component_id(4) callback_idx(4)");
         self.line("(global $__cleanup_count (mut i32) (i32.const 0))");
-        self.line("(global $__cleanup_base i32 (i32.const 376832))");
+        self.line("(global $__cleanup_base (mut i32) (i32.const 0))");
 
         self.emit("(func $lifecycle_register_cleanup (param $component_id i32) (param $cb_idx i32)");
         self.indent += 1;
@@ -10403,9 +10652,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Cache runtime (WASM-internal) ────────────────────────────────");
-        self.line(";; Cache table at 393216 (384KB). Entry = 80 bytes: key_ptr(4) key_len(4) value_ptr(4) value_len(4) ttl(4) timestamp(4) valid(4) pad(52)");
+        self.line(";; Cache table allocated from heap. Entry = 80 bytes: key_ptr(4) key_len(4) value_ptr(4) value_len(4) ttl(4) timestamp(4) valid(4) pad(52)");
         self.line("(global $__cache_count (mut i32) (i32.const 0))");
-        self.line("(global $__cache_base i32 (i32.const 393216))");
+        self.line("(global $__cache_base (mut i32) (i32.const 0))");
         self.line("(global $__cache_strategy (mut i32) (i32.const 0))"); // 0=LRU, 1=TTL
 
         self.emit("(func $cache_init (param $config_ptr i32) (param $config_len i32) (param $strategy_ptr i32) (param $strategy_len i32)");
@@ -10481,9 +10730,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Responsive runtime (WASM-internal) ───────────────────────────");
-        self.line(";; Breakpoint table at 409600 (400KB). Entry = 12 bytes: min_width(4) max_width(4) name_ptr(4)");
+        self.line(";; Breakpoint table allocated from heap. Entry = 12 bytes: min_width(4) max_width(4) name_ptr(4)");
         self.line("(global $__bp_count (mut i32) (i32.const 0))");
-        self.line("(global $__bp_base i32 (i32.const 409600))");
+        self.line("(global $__bp_base (mut i32) (i32.const 0))");
 
         self.emit("(func $responsive_register (param $json_ptr i32) (param $json_len i32)");
         self.indent += 1;
@@ -10505,9 +10754,9 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── Route table (WASM-internal) ──────────────────────────────────");
-        self.line(";; Route table at 425984 (416KB). Entry = 32 bytes: path_ptr(4) path_len(4) title_ptr(4) title_len(4) cb_idx(4) pad(12)");
+        self.line(";; Route table allocated from heap. Entry = 32 bytes: path_ptr(4) path_len(4) title_ptr(4) title_len(4) cb_idx(4) pad(12)");
         self.line("(global $__route_count (mut i32) (i32.const 0))");
-        self.line("(global $__route_base i32 (i32.const 425984))");
+        self.line("(global $__route_base (mut i32) (i32.const 0))");
 
         // SEO register route
         self.emit("(func $seo_register_route (param $path_ptr i32) (param $path_len i32) (param $title_ptr i32) (param $title_len i32)");
@@ -10525,7 +10774,7 @@ impl WasmCodegen {
         // SEO set meta: store meta tags (title, description, canonical, og_image) in linear memory
         // Meta table at 434176 (424KB). Entry = 64 bytes: title_ptr(4) title_len(4) desc_ptr(4) desc_len(4) canon_ptr(4) canon_len(4) og_ptr(4) og_len(4) pad(32)
         self.line("(global $__seo_meta_count (mut i32) (i32.const 0))");
-        self.line("(global $__seo_meta_base i32 (i32.const 434176))");
+        self.line("(global $__seo_meta_base (mut i32) (i32.const 0))");
         self.emit("(func $seo_set_meta (param $title_ptr i32) (param $title_len i32) (param $desc_ptr i32) (param $desc_len i32) (param $canon_ptr i32) (param $canon_len i32) (param $og_ptr i32) (param $og_len i32)");
         self.indent += 1;
         self.line("(local $addr i32)");
@@ -10565,7 +10814,7 @@ impl WasmCodegen {
         // Router container element ID — set during router_init
         self.line("(global $__router_container (mut i32) (i32.const 0))");
         // Scratch area for pathname from JS (JS writes path bytes here, then calls navigate)
-        self.line("(global $__router_path_scratch i32 (i32.const 458752))"); // 448KB offset
+        self.line("(global $__router_path_scratch (mut i32) (i32.const 0))");
 
         // router_init: register the container, read pathname via scratch area
         // The routes_config param is ignored (we use the route table directly)
@@ -11004,8 +11253,8 @@ impl WasmCodegen {
         self.line("  nop  ;; caching strategy config stored; applied via pwa.cachePrecache syscall");
         self.line(")");
 
-        if self.target == CompilationTarget::Browser {
-            // Browser target: channel/upload bridges that call ws.*/upload.* syscalls
+        if self.target == CompilationTarget::Browser && self.needs_ws {
+            // Browser target: channel bridges that call ws.* syscalls
 
             // channel_connect — wraps ws_connect with (name_ptr, name_len, url_ptr, url_len)
             self.emit("(func $channel_connect (param $name_ptr i32) (param $name_len i32) (param $url_ptr i32) (param $url_len i32) (result i32)");
@@ -11049,7 +11298,9 @@ impl WasmCodegen {
             self.emit("(func $channel_setReconnect (param $name_ptr i32) (param $name_len i32) (param $val i32)");
             self.line("  nop  ;; reconnect config stored in WASM global per channel");
             self.line(")");
+        }
 
+        if self.target == CompilationTarget::Browser && self.needs_upload {
             // upload_select — opens file picker via upload.init syscall
             self.emit("(func $upload_select (param $name_ptr i32) (param $name_len i32) (param $cb_idx i32)");
             self.indent += 1;
@@ -11109,17 +11360,11 @@ impl WasmCodegen {
     }
 
     /// Pure-WASM crypto runtime. All algorithms in linear memory, zero JS.
-    /// Scratch: 442368 (432KB). SHA-256 K constants in data segment.
+    /// K constants stored in string data section (read-only), work buffers allocated from heap.
     fn emit_crypto_runtime(&mut self) {
         self.line("");
         self.line(";; ══ Crypto runtime (pure WASM — no JS bridges) ═════════════════");
-        self.line("(global $__crypto_scratch i32 (i32.const 442368))");
-        self.line("(global $__crypto_work i32 (i32.const 443264))");
-        self.line("(global $__crypto_out i32 (i32.const 443776))");
-        self.line("(global $__crypto_hex i32 (i32.const 444032))");
-        self.line("(global $__crypto_xseed (mut i32) (i32.const 0x6A09E667))");
-        self.line("(data (i32.const 444032) \"0123456789abcdef\")");
-        // SHA-256 K constants
+        // K constants stored in string data section (read-only)
         let sha256_k: Vec<u32> = vec![
             0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
             0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
@@ -11130,12 +11375,16 @@ impl WasmCodegen {
             0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
             0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
         ];
-        let mut k_data = String::from("(data (i32.const 442368) \"");
-        for k in &sha256_k {
-            for b in &k.to_le_bytes() { k_data.push_str(&format!("\\{:02x}", b)); }
-        }
-        k_data.push_str("\")");
-        self.line(&k_data);
+        // Store K constants as raw bytes in the string data section
+        let k_bytes: Vec<u8> = sha256_k.iter().flat_map(|k| k.to_le_bytes()).collect();
+        let k_str: String = k_bytes.iter().map(|b| *b as char).collect();
+        let k_offset = self.store_string(&k_str);
+        let hex_offset = self.store_string("0123456789abcdef");
+        self.line(&format!("(global $__crypto_scratch i32 (i32.const {})) ;; K constants in string data", k_offset));
+        self.line("(global $__crypto_work (mut i32) (i32.const 0)) ;; allocated from heap at init");
+        self.line("(global $__crypto_out (mut i32) (i32.const 0)) ;; allocated from heap at init");
+        self.line(&format!("(global $__crypto_hex i32 (i32.const {})) ;; hex chars in string data", hex_offset));
+        self.line("(global $__crypto_xseed (mut i32) (i32.const 0x6A09E667))");
 
         // xorshift32 PRNG
         self.emit("(func $crypto_xorshift32 (result i32)");
@@ -11215,7 +11464,7 @@ impl WasmCodegen {
         self.line("  local.get $i  i32.const 64  i32.ge_u  br_if $rnd_done");
         self.line("  (local.set $t1 (i32.add (local.get $h) (i32.xor (i32.xor (i32.rotr (local.get $e) (i32.const 6)) (i32.rotr (local.get $e) (i32.const 11))) (i32.rotr (local.get $e) (i32.const 25)))))");
         self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.xor (i32.and (local.get $e) (local.get $f)) (i32.and (i32.xor (local.get $e) (i32.const -1)) (local.get $g)))))");
-        self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (i32.const 442368) (i32.mul (local.get $i) (i32.const 4))))))");
+        self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (global.get $__crypto_scratch) (i32.mul (local.get $i) (i32.const 4))))))");
         self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))))");
         self.line("  (local.set $t2 (i32.add (i32.xor (i32.xor (i32.rotr (local.get $a) (i32.const 2)) (i32.rotr (local.get $a) (i32.const 13))) (i32.rotr (local.get $a) (i32.const 22))) (i32.xor (i32.xor (i32.and (local.get $a) (local.get $b)) (i32.and (local.get $a) (local.get $c))) (i32.and (local.get $b) (local.get $c)))))");
         self.line("  local.get $g  local.set $h  local.get $f  local.set $g  local.get $e  local.set $f");
@@ -11506,15 +11755,15 @@ impl WasmCodegen {
         self.line("");
         self.line(";; ========== Signal runtime (WASM-internal) ==========");
         self.line(";; Reactive signal graph lives entirely in WASM linear memory.");
-        self.line(";; Signal table starts at 65536 (64KB). Each entry = 72 bytes.");
+        self.line(";; Signal table allocated from heap at init. Each entry = 72 bytes.");
         self.line(";; Layout: [value:i32, sub_count:i32, subs[15]:i32*15, pad:4]");
 
         // Globals
         self.line("(global $__sig_count (mut i32) (i32.const 0))");
-        self.line("(global $__sig_base i32 (i32.const 65536))");
+        self.line("(global $__sig_base (mut i32) (i32.const 0))");
         self.line("(global $__tracking (mut i32) (i32.const -1))");
         self.line("(global $__batch_depth (mut i32) (i32.const 0))");
-        self.line("(global $__pending i32 (i32.const 131072))");
+        self.line("(global $__pending (mut i32) (i32.const 0))");
         self.line("(global $__pending_count (mut i32) (i32.const 0))");
 
         // Type for effect callbacks: (func) — no params, no results
@@ -18503,7 +18752,7 @@ impl WasmCodegen {
         self.line("(global $__datepicker_id (mut i32) (i32.const 0))");
         // Storage for datepicker state: year, month, day per ID (fixed slots)
         // Up to 64 datepicker instances, each with 12 bytes (year, month, day as i32)
-        self.line("(global $__datepicker_base i32 (i32.const 310000))");
+        self.line("(global $__datepicker_base (mut i32) (i32.const 0))");
         self.line("");
 
         // $datepicker_is_leap_year(year) -> i32 (0 or 1)
@@ -22361,11 +22610,10 @@ mod comprehensive_codegen_tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn http_imports() {
+    fn http_imports_pruned_when_unused() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$http_fetch"), "should import http.fetch");
-        assert!(wat.contains("$http_setMethod"), "should import http.setMethod");
-        assert!(wat.contains("$http_addHeader"), "should import http.addHeader");
+        assert!(!wat.contains("$http_fetch"), "should NOT import http.fetch when unused");
+        assert!(!wat.contains("$http_setMethod"), "should NOT import http.setMethod when unused");
     }
 
     // -----------------------------------------------------------------------
@@ -22373,10 +22621,10 @@ mod comprehensive_codegen_tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn worker_imports() {
+    fn worker_imports_pruned_when_unused() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$worker_spawn"), "should import worker.spawn");
-        assert!(wat.contains("$worker_channelCreate"), "should import worker.channelCreate");
+        assert!(!wat.contains("$worker_spawn"), "should NOT import worker.spawn when unused");
+        assert!(!wat.contains("$worker_channelCreate"), "should NOT import worker.channelCreate when unused");
     }
 
     // -----------------------------------------------------------------------
@@ -22592,102 +22840,50 @@ mod coverage_codegen_tests {
     #[test]
     fn all_import_namespaces_present() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let namespaces = [
-            "\"dom\"", "\"timer\"", "\"webapi\"", "\"http\"", "\"observe\"",
-            "\"ws\"", "\"db\"", "\"worker\"", "\"pwa\"", "\"hardware\"",
-            "\"payment\"", "\"auth\"", "\"upload\"", "\"time\"", "\"streaming\"",
-            "\"rtc\"", "\"gpu\"",
+        // Core namespaces always present
+        let always_present = ["\"dom\"", "\"timer\"", "\"webapi\"", "\"time\""];
+        for ns in &always_present {
+            assert!(wat.contains(ns), "missing core import namespace: {}", ns);
+        }
+        // Optional namespaces pruned when unused
+        let pruned = [
+            "\"http\"", "\"observe\"", "\"ws\"", "\"db\"", "\"worker\"",
+            "\"pwa\"", "\"hardware\"", "\"payment\"", "\"auth\"", "\"upload\"",
+            "\"streaming\"", "\"rtc\"", "\"gpu\"",
         ];
-        for ns in &namespaces {
-            assert!(wat.contains(ns), "missing import namespace: {}", ns);
+        for ns in &pruned {
+            assert!(!wat.contains(ns), "namespace should be pruned when unused: {}", ns);
         }
     }
 
     #[test]
-    fn rtc_peer_connection_imports_present() {
+    fn rtc_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$rtc_createPeer",
-            "$rtc_createPeerWithIce",
-            "$rtc_createOffer",
-            "$rtc_createAnswer",
-            "$rtc_setLocalDescription",
-            "$rtc_setRemoteDescription",
-            "$rtc_addIceCandidate",
-            "$rtc_close",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing RTC import: {}", import);
-        }
+        assert!(!wat.contains("$rtc_createPeer"), "RTC imports should be pruned when unused");
     }
 
     #[test]
-    fn rtc_data_channel_imports_present() {
+    fn rtc_data_channel_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$rtc_createDataChannel",
-            "$rtc_dataChannelSend",
-            "$rtc_dataChannelSendBinary",
-            "$rtc_dataChannelClose",
-            "$rtc_dataChannelGetState",
-            "$rtc_onDataChannelMessage",
-            "$rtc_onDataChannelOpen",
-            "$rtc_onDataChannelClose",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing RTC data channel import: {}", import);
-        }
+        assert!(!wat.contains("$rtc_createDataChannel"), "RTC data channel imports should be pruned when unused");
     }
 
     #[test]
-    fn rtc_media_imports_present() {
+    fn rtc_media_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$rtc_addTrack",
-            "$rtc_removeTrack",
-            "$rtc_getUserMedia",
-            "$rtc_getDisplayMedia",
-            "$rtc_stopTrack",
-            "$rtc_setTrackEnabled",
-            "$rtc_getTrackKind",
-            "$rtc_attachStream",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing RTC media import: {}", import);
-        }
+        assert!(!wat.contains("$rtc_getUserMedia"), "RTC media imports should be pruned when unused");
     }
 
     #[test]
-    fn rtc_event_callback_imports_present() {
+    fn rtc_event_callback_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$rtc_onIceCandidate",
-            "$rtc_onIceCandidateFull",
-            "$rtc_onTrack",
-            "$rtc_onDataChannel",
-            "$rtc_onConnectionStateChange",
-            "$rtc_onIceConnectionStateChange",
-            "$rtc_onIceGatheringStateChange",
-            "$rtc_onSignalingStateChange",
-            "$rtc_onNegotiationNeeded",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing RTC event import: {}", import);
-        }
+        assert!(!wat.contains("$rtc_onIceCandidate"), "RTC event imports should be pruned when unused");
     }
 
     #[test]
-    fn rtc_state_query_imports_present() {
+    fn rtc_state_query_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$rtc_getConnectionState",
-            "$rtc_getIceConnectionState",
-            "$rtc_getSignalingState",
-            "$rtc_getStats",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing RTC state query import: {}", import);
-        }
+        assert!(!wat.contains("$rtc_getConnectionState"), "RTC state query imports should be pruned when unused");
     }
 
     // -----------------------------------------------------------------------
@@ -22695,72 +22891,33 @@ mod coverage_codegen_tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn gpu_initialization_imports_present() {
+    fn gpu_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$gpu_requestAdapter",
-            "$gpu_requestDevice",
-            "$gpu_getPreferredFormat",
-            "$gpu_getAdapterInfo",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing GPU initialization import: {}", import);
-        }
+        assert!(!wat.contains("$gpu_requestAdapter"), "GPU imports should be pruned when unused");
     }
 
     #[test]
-    fn gpu_resource_imports_present() {
+    fn gpu_resource_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$gpu_createBuffer",
-            "$gpu_writeBuffer",
-            "$gpu_createShaderModule",
-            "$gpu_createRenderPipeline",
-            "$gpu_createTexture",
-            "$gpu_createTextureView",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing GPU resource import: {}", import);
-        }
+        assert!(!wat.contains("$gpu_createBuffer"), "GPU resource imports should be pruned when unused");
     }
 
     #[test]
-    fn gpu_rendering_imports_present() {
+    fn gpu_rendering_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$gpu_beginRenderPass",
-            "$gpu_setPipeline",
-            "$gpu_setVertexBuffer",
-            "$gpu_draw",
-            "$gpu_submitRenderPass",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing GPU rendering import: {}", import);
-        }
+        assert!(!wat.contains("$gpu_beginRenderPass"), "GPU rendering imports should be pruned when unused");
     }
 
     #[test]
-    fn gpu_canvas_imports_present() {
+    fn gpu_canvas_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$gpu_configureCanvas",
-            "$gpu_getCurrentTexture",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing GPU canvas import: {}", import);
-        }
+        assert!(!wat.contains("$gpu_configureCanvas"), "GPU canvas imports should be pruned when unused");
     }
 
     #[test]
-    fn gpu_cleanup_imports_present() {
+    fn gpu_cleanup_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        let imports = [
-            "$gpu_destroyBuffer",
-            "$gpu_destroyTexture",
-        ];
-        for import in &imports {
-            assert!(wat.contains(import), "missing GPU cleanup import: {}", import);
-        }
+        assert!(!wat.contains("$gpu_destroyBuffer"), "GPU cleanup imports should be pruned when unused");
     }
 
     // -----------------------------------------------------------------------
@@ -26492,7 +26649,7 @@ mod coverage_codegen_tests {
         assert!(wat.contains("$crypto_hkdf_derive"), "WAT should contain HKDF");
         assert!(wat.contains("$crypto_ecdh_derive"), "WAT should contain ECDH");
         assert!(wat.contains("$crypto_generate_key_pair"), "WAT should contain key gen");
-        assert!(wat.contains("442368"), "WAT should reference crypto scratch memory");
+        assert!(wat.contains("$__crypto_scratch"), "WAT should reference crypto scratch global");
         assert!(wat.contains("0123456789abcdef"), "WAT should contain hex lookup table");
     }
 
@@ -27876,8 +28033,8 @@ mod parameterized_callback_tests {
     #[test]
     fn test_cb_data_table_globals_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__cb_data_table_base i32 (i32.const 308000))"),
-            "should emit callback data table base global");
+        assert!(wat.contains("(global $__cb_data_table_base (mut i32) (i32.const 0))"),
+            "should emit callback data table base global (heap-allocated at init)");
         assert!(wat.contains("(global $__cb_data_count (mut i32) (i32.const 0))"),
             "should emit callback data count global");
     }
@@ -28040,8 +28197,8 @@ mod event_data_tests {
     #[test]
     fn test_event_data_base_global() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__event_data_base i32 (i32.const 307200))"),
-            "should declare event data base global at 307200");
+        assert!(wat.contains("(global $__event_data_base (mut i32) (i32.const 0))"),
+            "should declare event data base global as heap-allocated");
     }
 
     #[test]
@@ -28049,6 +28206,35 @@ mod event_data_tests {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
         assert!(wat.contains("global.get $__event_data_base"),
             "__event_data_ptr should return the base address");
+    }
+
+    #[test]
+    fn test_init_all_allocates_reserved_regions() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.set $__event_data_base"), "init should allocate event data");
+        assert!(wat.contains("global.set $__sig_base"), "init should allocate signal table");
+        assert!(wat.contains("global.set $__pending"), "init should allocate pending table");
+        assert!(wat.contains("global.set $__contract_base"), "init should allocate contract table");
+        assert!(wat.contains("global.set $__route_base"), "init should allocate route table");
+    }
+
+    #[test]
+    fn test_signal_base_heap_allocated() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(global $__sig_base (mut i32) (i32.const 0))"),
+            "signal base should be heap-allocated (mut, init 0)");
+    }
+
+    #[test]
+    fn test_contract_imports_present_when_used() {
+        let wat = compile(r#"
+contract User {
+    name: String
+    age: i32
+}
+pub fn noop() -> i32 { return 0; }
+"#);
+        assert!(wat.contains("$http_fetch"), "contract should trigger HTTP imports");
     }
 
     #[test]
@@ -29719,8 +29905,9 @@ component ItemList {
         assert!(wat.contains("__lazy_cursor_"), "should emit lazy cursor global");
         assert!(wat.contains("__lazy_total_"), "should emit lazy total global");
         assert!(wat.contains("__lazy_data_"), "should emit lazy data global");
-        assert!(wat.contains("__lazy_sentinel_"), "should emit lazy sentinel global");
-        assert!(wat.contains("__lazy_observer_"), "should emit lazy observer global");
+        // rAF drain: no sentinel or observer globals needed
+        assert!(!wat.contains("__lazy_sentinel_"), "should NOT emit sentinel global (rAF drain)");
+        assert!(!wat.contains("__lazy_observer_"), "should NOT emit observer global (rAF drain)");
     }
 
     #[test]
@@ -29761,11 +29948,11 @@ component ItemList {
         let wat = compile(src);
         assert!(wat.contains("__lazy_batch_ItemList_"), "should emit lazy batch function");
         assert!(wat.contains("lazy batch render"), "should comment the batch function");
-        assert!(wat.contains("lazy batch: render next 20 items"), "should comment batch body");
+        assert!(wat.contains("lazy batch: render next 50 items"), "should comment batch body with rAF batch size");
     }
 
     #[test]
-    fn test_lazy_for_creates_observer() {
+    fn test_lazy_for_schedules_raf_drain() {
         let src = r#"
 component ItemList {
     let mut items: Vec<i32> = [1, 2, 3];
@@ -29780,13 +29967,13 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("call $observe_intersectionObserver"), "should create IntersectionObserver");
-        assert!(wat.contains("call $observe_observe"), "should observe the sentinel");
+        assert!(wat.contains("call $timer_requestAnimationFrame"), "should schedule rAF drain");
+        assert!(wat.contains("schedule rAF"), "should comment rAF scheduling");
         assert!(wat.contains("lazy batch callback index"), "should comment callback index");
     }
 
     #[test]
-    fn test_lazy_for_batch_disconnects_observer() {
+    fn test_lazy_for_batch_self_chains_via_raf() {
         let src = r#"
 component ItemList {
     let mut items: Vec<i32> = [1, 2, 3];
@@ -29801,8 +29988,9 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("call $observe_disconnect"), "batch function should disconnect observer when done");
-        assert!(wat.contains("all items rendered"), "should comment observer disconnect");
+        // Batch function should self-chain via rAF when more items remain
+        assert!(wat.contains("next rAF batch"), "batch function should schedule next rAF");
+        assert!(!wat.contains("call $observe_disconnect"), "should NOT use observer disconnect");
     }
 
     #[test]
@@ -30814,7 +31002,7 @@ mod contract_api_tests {
     #[test]
     fn test_wasi_target_still_has_memory_import() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("(import \"env\" \"memory\" (memory 1))"), "WASI target should still import memory");
+        assert!(wat.contains("(import \"env\" \"memory\" (memory "), "WASI target should still import memory");
     }
 
     #[test]
@@ -30894,27 +31082,27 @@ mod contract_api_tests {
     }
 
     #[test]
-    fn test_channel_connect_named_defined() {
+    fn test_channel_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $channel_connect_named"), "channel_connect_named should be defined");
+        assert!(!wat.contains("func $channel_connect_named"), "channel_connect_named should be pruned when unused");
     }
 
     #[test]
-    fn test_channel_send_defined() {
+    fn test_channel_send_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $channel_send"), "channel_send should be defined");
+        assert!(!wat.contains("func $channel_send"), "channel_send should be pruned when unused");
     }
 
     #[test]
-    fn test_channel_close_defined() {
+    fn test_channel_close_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $channel_close"), "channel_close should be defined");
+        assert!(!wat.contains("func $channel_close"), "channel_close should be pruned when unused");
     }
 
     #[test]
-    fn test_upload_select_defined() {
+    fn test_upload_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $upload_select"), "upload_select should be defined");
+        assert!(!wat.contains("func $upload_select"), "upload_select should be pruned when unused");
     }
 
     #[test]
