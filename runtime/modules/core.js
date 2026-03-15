@@ -74,6 +74,9 @@ const NectarRuntime = {
   },
   __cb(idx) { this.__instance.exports.__callback(idx); },
   __cbData(idx, ptr) { this.__instance.exports.__callback_with_data(idx, ptr); },
+  __cbData2(idx, a, b) { this.__instance.exports.__callback_with_data2(idx, a, b); },
+  __writeString(str) { const s = this.__allocStringWithLen(str); this.__lastStr = s; },
+  __writeString2(str) { const s = this.__allocStringWithLen(str); this.__lastStr2 = s; },
 
   // Read flat key-value pairs from WASM memory. WASM writes:
   // [key_ptr:i32, key_len:i32, val_ptr:i32, val_len:i32, ...] terminated by (0,0).
