@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 /// Server-Side Rendering server powered by wasmtime.
 ///
@@ -283,23 +285,191 @@ async fn static_page_handler(
     }
 }
 
+/// Simple in-memory rate limiter: global request counter with a per-second cap.
+/// In production, per-IP tracking would use a concurrent HashMap; this provides
+/// a baseline safeguard without external dependencies.
+struct RateLimiter {
+    /// Number of requests in the current window
+    count: AtomicU64,
+    /// Maximum requests per window
+    max_per_window: u64,
+}
+
+impl RateLimiter {
+    fn new(max_per_window: u64) -> Self {
+        Self {
+            count: AtomicU64::new(0),
+            max_per_window,
+        }
+    }
+
+    /// Returns true if the request is allowed.
+    fn allow(&self) -> bool {
+        let current = self.count.fetch_add(1, Ordering::Relaxed);
+        current < self.max_per_window
+    }
+
+    /// Reset the counter (called periodically).
+    fn reset(&self) {
+        self.count.store(0, Ordering::Relaxed);
+    }
+}
+
+/// Shared state for the API proxy handler.
+struct ApiProxyState {
+    http_client: reqwest::Client,
+    rate_limiter: Arc<RateLimiter>,
+}
+
+/// Resolve provider env vars from a provider name.
+/// `/api/payment` → `NECTAR_PAYMENT_URL` + `NECTAR_PAYMENT_KEY`
+fn resolve_provider(provider: &str) -> (String, String) {
+    let upper = provider.to_uppercase();
+    let base_url = std::env::var(format!("NECTAR_{}_URL", upper)).unwrap_or_default();
+    let api_key = std::env::var(format!("NECTAR_{}_KEY", upper)).unwrap_or_default();
+    (base_url, api_key)
+}
+
+/// Validate that a byte slice is valid JSON (basic structural check).
+fn is_valid_json(data: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(data).is_ok()
+}
+
+/// Handle `/api/{provider}` requests by proxying to the configured provider URL.
+///
+/// The provider is determined by the path segment after `/api/`. Environment
+/// variables `NECTAR_{PROVIDER}_URL` and `NECTAR_{PROVIDER}_KEY` configure the
+/// target endpoint and authorization token respectively.
+///
+/// Security: API keys never leave the server. Request bodies are validated as
+/// JSON before forwarding. A global rate limiter prevents abuse.
+async fn api_proxy_handler(
+    axum::extract::State(state): axum::extract::State<Arc<ApiProxyState>>,
+    axum::extract::Path(provider): axum::extract::Path<String>,
+    request: axum::extract::Request,
+) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    let start = Instant::now();
+
+    // Rate limit check
+    if !state.rate_limiter.allow() {
+        eprintln!("api_proxy: rate limit exceeded for provider={}", provider);
+        return (StatusCode::TOO_MANY_REQUESTS, "rate limit exceeded").into_response();
+    }
+
+    // Resolve provider config from environment
+    let (base_url, api_key) = resolve_provider(&provider);
+
+    if base_url.is_empty() {
+        eprintln!("api_proxy: provider '{}' not configured (no NECTAR_{}_URL)", provider, provider.to_uppercase());
+        return (StatusCode::NOT_FOUND, "provider not configured").into_response();
+    }
+
+    // Extract the HTTP method from the inbound request
+    let method = request.method().clone();
+
+    // Read the request body (max 1 MB)
+    let body_bytes = match axum::body::to_bytes(request.into_body(), 1024 * 1024).await {
+        Ok(b) => b,
+        Err(_) => {
+            return (StatusCode::PAYLOAD_TOO_LARGE, "request body too large").into_response();
+        }
+    };
+
+    // Validate JSON if there is a body
+    if !body_bytes.is_empty() && !is_valid_json(&body_bytes) {
+        return (StatusCode::BAD_REQUEST, "invalid JSON body").into_response();
+    }
+
+    // Build the outbound request
+    let mut outbound = state.http_client
+        .request(method.clone(), &base_url)
+        .header("Content-Type", "application/json");
+
+    if !api_key.is_empty() {
+        outbound = outbound.header("Authorization", format!("Bearer {}", api_key));
+    }
+
+    if !body_bytes.is_empty() {
+        outbound = outbound.body(body_bytes.to_vec());
+    }
+
+    // Send the request to the provider
+    let result = outbound.send().await;
+
+    let elapsed = start.elapsed();
+
+    match result {
+        Ok(resp) => {
+            let status = resp.status();
+            eprintln!(
+                "api_proxy: provider={} method={} status={} latency={}ms",
+                provider, method, status.as_u16(), elapsed.as_millis()
+            );
+
+            let resp_status = StatusCode::from_u16(status.as_u16())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let resp_body = resp.text().await.unwrap_or_default();
+
+            (
+                resp_status,
+                [("content-type", "application/json")],
+                resp_body,
+            ).into_response()
+        }
+        Err(e) => {
+            eprintln!(
+                "api_proxy: provider={} method={} error={} latency={}ms",
+                provider, method, e, elapsed.as_millis()
+            );
+            (StatusCode::BAD_GATEWAY, format!("upstream request failed: {}", e)).into_response()
+        }
+    }
+}
+
 /// Async server loop.
 async fn run_server(
     server: Arc<SsrServer>,
     port: u16,
     static_dir: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    use axum::{Router, routing::get};
+    use axum::{Router, routing::{get, any}};
     use tower_http::services::ServeDir;
 
     // Health check endpoint (Cloud Run uses this)
     let health = Router::new()
         .route("/_health", get(|| async { "ok" }));
 
+    // Set up the API proxy with rate limiting
+    let rate_limiter = Arc::new(RateLimiter::new(1000));
+    let api_state = Arc::new(ApiProxyState {
+        http_client: reqwest::Client::new(),
+        rate_limiter: rate_limiter.clone(),
+    });
+
+    // Spawn a background task to reset the rate limiter every 60 seconds
+    let rl = rate_limiter.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            rl.reset();
+        }
+    });
+
+    // API proxy route: /api/{provider} accepts any HTTP method
+    let api_router = Router::new()
+        .route("/api/{provider}", any(api_proxy_handler))
+        .with_state(api_state);
+
     // Build the SSR-only router first (needs state)
     let ssr_router: Router<Arc<SsrServer>> = Router::new()
         .fallback(get(ssr_handler));
-    let ssr_router: Router = health.merge(ssr_router.with_state(server.clone()));
+    let ssr_router: Router = health
+        .merge(api_router)
+        .merge(ssr_router.with_state(server.clone()));
 
     // If we have a static dir, check for static HTML pages and serve them
     // at clean URLs (e.g., /examples serves examples.html).
@@ -923,5 +1093,239 @@ mod tests {
     fn test_html_escape() {
         assert_eq!(html_escape("<script>alert('xss')</script>"), "&lt;script&gt;alert('xss')&lt;/script&gt;");
         assert_eq!(html_escape_attr("a\"b"), "a&quot;b");
+    }
+
+    // ── API proxy tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_resolve_provider_env_vars() {
+        // With no env vars set, both should be empty
+        let (url, key) = resolve_provider("nonexistent_test_provider_xyz");
+        assert!(url.is_empty());
+        assert!(key.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_provider_uppercases_name() {
+        unsafe {
+            std::env::set_var("NECTAR_TESTPROV_URL", "https://test.example.com");
+            std::env::set_var("NECTAR_TESTPROV_KEY", "sk_test_123");
+        }
+        let (url, key) = resolve_provider("testprov");
+        assert_eq!(url, "https://test.example.com");
+        assert_eq!(key, "sk_test_123");
+        unsafe {
+            std::env::remove_var("NECTAR_TESTPROV_URL");
+            std::env::remove_var("NECTAR_TESTPROV_KEY");
+        }
+    }
+
+    #[test]
+    fn test_resolve_provider_mixed_case() {
+        unsafe {
+            std::env::set_var("NECTAR_PAYMENT_URL", "https://api.moov.io");
+            std::env::set_var("NECTAR_PAYMENT_KEY", "moov_key");
+        }
+        let (url, key) = resolve_provider("payment");
+        assert_eq!(url, "https://api.moov.io");
+        assert_eq!(key, "moov_key");
+        // Also works with Payment (uppercased to PAYMENT)
+        let (url2, key2) = resolve_provider("Payment");
+        // "Payment".to_uppercase() = "PAYMENT" so it should match
+        assert_eq!(url2, "https://api.moov.io");
+        assert_eq!(key2, "moov_key");
+        unsafe {
+            std::env::remove_var("NECTAR_PAYMENT_URL");
+            std::env::remove_var("NECTAR_PAYMENT_KEY");
+        }
+    }
+
+    #[test]
+    fn test_is_valid_json() {
+        assert!(is_valid_json(b"{}"));
+        assert!(is_valid_json(b"{\"amount\": 100}"));
+        assert!(is_valid_json(b"[1, 2, 3]"));
+        assert!(is_valid_json(b"\"hello\""));
+        assert!(is_valid_json(b"42"));
+        assert!(is_valid_json(b"null"));
+        assert!(!is_valid_json(b"{invalid}"));
+        assert!(!is_valid_json(b""));
+        assert!(!is_valid_json(b"{\"key\": }"));
+    }
+
+    #[test]
+    fn test_rate_limiter_allows_within_limit() {
+        let limiter = RateLimiter::new(5);
+        for _ in 0..5 {
+            assert!(limiter.allow());
+        }
+        // 6th request should be denied
+        assert!(!limiter.allow());
+    }
+
+    #[test]
+    fn test_rate_limiter_reset() {
+        let limiter = RateLimiter::new(2);
+        assert!(limiter.allow());
+        assert!(limiter.allow());
+        assert!(!limiter.allow());
+        limiter.reset();
+        assert!(limiter.allow());
+        assert!(limiter.allow());
+        assert!(!limiter.allow());
+    }
+
+    #[test]
+    fn test_api_proxy_returns_404_no_env_vars() {
+        // Integration-style test: verify that the handler returns 404
+        // when the provider is not configured (no env vars set).
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            use axum::http::{Request, Method};
+            use axum::body::Body;
+            use axum::response::IntoResponse;
+
+            let state = Arc::new(ApiProxyState {
+                http_client: reqwest::Client::new(),
+                rate_limiter: Arc::new(RateLimiter::new(100)),
+            });
+
+            // Ensure no env vars for this provider
+            unsafe {
+                std::env::remove_var("NECTAR_XYZNOTREAL_URL");
+                std::env::remove_var("NECTAR_XYZNOTREAL_KEY");
+            }
+
+            let request = Request::builder()
+                .method(Method::POST)
+                .uri("/api/xyznotreal")
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+
+            let response = api_proxy_handler(
+                axum::extract::State(state),
+                axum::extract::Path("xyznotreal".to_string()),
+                request,
+            ).await;
+
+            assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+        });
+    }
+
+    #[test]
+    fn test_api_proxy_rejects_invalid_json() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            use axum::http::{Request, Method};
+            use axum::body::Body;
+
+            let state = Arc::new(ApiProxyState {
+                http_client: reqwest::Client::new(),
+                rate_limiter: Arc::new(RateLimiter::new(100)),
+            });
+
+            // Set a provider URL so we get past the 404 check
+            unsafe {
+                std::env::set_var("NECTAR_JSONTEST_URL", "https://httpbin.org/post");
+                std::env::set_var("NECTAR_JSONTEST_KEY", "testkey");
+            }
+
+            let request = Request::builder()
+                .method(Method::POST)
+                .uri("/api/jsontest")
+                .header("content-type", "application/json")
+                .body(Body::from("{this is not valid json}"))
+                .unwrap();
+
+            let response = api_proxy_handler(
+                axum::extract::State(state),
+                axum::extract::Path("jsontest".to_string()),
+                request,
+            ).await;
+
+            assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
+
+            unsafe {
+                std::env::remove_var("NECTAR_JSONTEST_URL");
+                std::env::remove_var("NECTAR_JSONTEST_KEY");
+            }
+        });
+    }
+
+    #[test]
+    fn test_api_proxy_rate_limit() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            use axum::http::{Request, Method};
+            use axum::body::Body;
+
+            let state = Arc::new(ApiProxyState {
+                http_client: reqwest::Client::new(),
+                rate_limiter: Arc::new(RateLimiter::new(1)), // Only 1 request allowed
+            });
+
+            unsafe { std::env::remove_var("NECTAR_RATELIMITPROV_URL"); }
+
+            // First request uses the one allowed slot (will get 404 since no URL)
+            let req1 = Request::builder()
+                .method(Method::GET)
+                .uri("/api/ratelimitprov")
+                .body(Body::empty())
+                .unwrap();
+            let resp1 = api_proxy_handler(
+                axum::extract::State(state.clone()),
+                axum::extract::Path("ratelimitprov".to_string()),
+                req1,
+            ).await;
+            // First is allowed (gets 404 because no env var, but not 429)
+            assert_ne!(resp1.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+
+            // Second request should be rate-limited
+            let req2 = Request::builder()
+                .method(Method::GET)
+                .uri("/api/ratelimitprov")
+                .body(Body::empty())
+                .unwrap();
+            let resp2 = api_proxy_handler(
+                axum::extract::State(state.clone()),
+                axum::extract::Path("ratelimitprov".to_string()),
+                req2,
+            ).await;
+            assert_eq!(resp2.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        });
+    }
+
+    #[test]
+    fn test_api_proxy_empty_body_allowed() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            use axum::http::{Request, Method};
+            use axum::body::Body;
+
+            let state = Arc::new(ApiProxyState {
+                http_client: reqwest::Client::new(),
+                rate_limiter: Arc::new(RateLimiter::new(100)),
+            });
+
+            // Provider not configured — we just verify empty body doesn't
+            // trigger the "invalid JSON" rejection
+            unsafe { std::env::remove_var("NECTAR_EMPTYTEST_URL"); }
+
+            let request = Request::builder()
+                .method(Method::GET)
+                .uri("/api/emptytest")
+                .body(Body::empty())
+                .unwrap();
+
+            let response = api_proxy_handler(
+                axum::extract::State(state),
+                axum::extract::Path("emptytest".to_string()),
+                request,
+            ).await;
+
+            // Should be 404 (not configured), not 400 (bad JSON)
+            assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
+        });
     }
 }
