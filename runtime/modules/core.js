@@ -421,6 +421,14 @@ export const wasmImports = {
       this._m = null; this._b = null; this._h = null;
       return R.__registerObject(fetch(R.__getString(urlPtr, urlLen), o));
     },
+    fetchWithCallback(urlPtr, urlLen, cbIdx) {
+      const o = { method: this._m || 'GET', headers: this._h || undefined, body: this._b || undefined };
+      this._m = null; this._b = null; this._h = null;
+      fetch(R.__getString(urlPtr, urlLen), o).then(r => r.text()).then(text => {
+        const s = R.__allocStringWithLen(text);
+        R.__cbData(cbIdx, s.ptr);
+      });
+    },
   },
 
   // ── Observer — IntersectionObserver, matchMedia ────────────────────────
