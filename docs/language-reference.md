@@ -1,6 +1,8 @@
 # Nectar Language Reference
 
-This document is the complete reference for the Nectar programming language. It covers every language construct, from lexical structure to templates, with syntax, semantics, and examples.
+This document is the reference for the Nectar programming language. It covers every language construct, from lexical structure to templates, with syntax, semantics, and examples.
+
+> **Accuracy note**: Features marked with **(PLANNED)** are parsed by the compiler but do not yet have working codegen or runtime support. Do not rely on them for production code. Everything else compiles to working WASM.
 
 ---
 
@@ -15,28 +17,31 @@ This document is the complete reference for the Nectar programming language. It 
 7. [Structs and Enums](#structs-and-enums)
 8. [Traits](#traits)
 9. [Expressions](#expressions)
-10. [Statements](#statements)
-11. [Patterns](#patterns)
-12. [Modules](#modules)
-13. [Templates](#templates)
-14. [Agents](#agents)
-15. [Routers](#routers)
-16. [Contracts](#contracts)
-17. [Pages](#pages)
-18. [Forms](#forms)
-19. [Channels](#channels)
-20. [Auth](#auth)
-21. [Payment](#payment)
-22. [Upload](#upload)
-23. [Db](#db)
-24. [Cache](#cache)
-25. [Embed](#embed)
-26. [Pdf](#pdf)
-27. [App (PWA)](#app-pwa)
-28. [Theme](#theme)
-29. [Breakpoints](#breakpoints)
-30. [Animations](#animations)
-31. [Testing](#testing)
+10. [String Operations](#string-operations)
+11. [Array Operations and Iterators](#array-operations-and-iterators)
+12. [Error Handling (Result, Option, ?)](#error-handling)
+13. [Statements](#statements)
+14. [Patterns](#patterns)
+15. [Modules](#modules)
+16. [Templates](#templates)
+17. [Agents](#agents)
+18. [Routers](#routers)
+19. [Contracts](#contracts)
+20. [Pages](#pages)
+21. [Forms](#forms)
+22. [Channels](#channels)
+23. [Auth](#auth)
+24. [Payment](#payment)
+25. [Upload](#upload)
+26. [Db](#db)
+27. [Cache](#cache)
+28. [Embed](#embed)
+29. [Pdf](#pdf)
+30. [App (PWA)](#app-pwa)
+31. [Theme](#theme)
+32. [Breakpoints](#breakpoints)
+33. [Animations](#animations)
+34. [Testing](#testing)
 
 ---
 
@@ -175,9 +180,9 @@ let names: [String] = ["Alice", "Bob"];
 let empty: [f64] = [];
 ```
 
-### Tuples
+### Tuples **(PLANNED)**
 
-Tuples combine a fixed number of values of potentially different types:
+Tuples combine a fixed number of values of potentially different types. Parsed but no codegen:
 
 ```nectar
 let pair: (i32, String) = (42, "hello");
@@ -295,9 +300,9 @@ The `own` keyword can explicitly mark owned transfer:
 let data = own create_data();
 ```
 
-### Destructuring
+### Destructuring **(PLANNED)**
 
-Variables can be destructured from tuples, arrays, and structs:
+Variables can be destructured from tuples, arrays, and structs. Parsed but no codegen:
 
 ```nectar
 // Tuple destructuring
@@ -338,9 +343,9 @@ pub fn api_handler(request: Request) -> Response {
 }
 ```
 
-### Async Functions
+### Async Functions **(PLANNED)**
 
-Prefix `fn` with `async` for asynchronous functions:
+Prefix `fn` with `async` for asynchronous functions. Parsed by the compiler but no async runtime exists yet:
 
 ```nectar
 async fn fetch_data(url: String) -> String {
@@ -349,9 +354,9 @@ async fn fetch_data(url: String) -> String {
 }
 ```
 
-### Generic Functions
+### Generic Functions **(PLANNED)**
 
-Functions can have type parameters:
+Functions can have type parameters. Parsed but no monomorphization codegen exists yet:
 
 ```nectar
 fn identity<T>(value: T) -> T {
@@ -363,9 +368,9 @@ fn first<'a, T>(items: &'a [T]) -> &'a T {
 }
 ```
 
-### Where Clauses (Trait Bounds)
+### Where Clauses (Trait Bounds) **(PLANNED)**
 
-Constrain type parameters with `where`:
+Constrain type parameters with `where`. Parsed but no codegen:
 
 ```nectar
 fn print_all<T>(items: [T]) where T: Display {
@@ -607,9 +612,9 @@ component UserProfile(id: u32) {
 
 **Skeleton blocks are optional.** Components without a `skeleton` block render their `render` content immediately as before.
 
-### Generic Components
+### Generic Components **(PLANNED)**
 
-Components can accept type parameters with optional trait bounds:
+Components can accept type parameters with optional trait bounds. Parsed but no codegen:
 
 ```nectar
 component List<T>(items: [T]) where T: Display {
@@ -922,9 +927,9 @@ trait Drawable {
 }
 ```
 
-### Generic Traits
+### Generic Traits **(PLANNED)**
 
-Traits can have type parameters:
+Traits can have type parameters. Parsed but no codegen:
 
 ```nectar
 trait Container<T> {
@@ -933,9 +938,9 @@ trait Container<T> {
 }
 ```
 
-### Trait Bounds
+### Trait Bounds **(PLANNED)**
 
-Use trait bounds to constrain generic type parameters:
+Use trait bounds to constrain generic type parameters. Parsed but no codegen:
 
 ```nectar
 fn print_item<T>(item: T) where T: Display {
@@ -1060,6 +1065,14 @@ for todo in &mut self.todos {
 }
 ```
 
+Iterate over integer ranges:
+
+```nectar
+for i in 0..10 {
+    process(i);   // i = 0, 1, 2, ..., 9
+}
+```
+
 ### While Loops
 
 ```nectar
@@ -1070,7 +1083,7 @@ while count < 10 {
 
 ### Closures
 
-Closures (lambdas) capture variables from their environment:
+Closures (lambdas) are used primarily as arguments to map/filter/reduce:
 
 ```nectar
 // With type annotations
@@ -1078,9 +1091,6 @@ let add = |a: i32, b: i32| a + b;
 
 // Without type annotations
 let double = |x| x * 2;
-
-// No parameters
-let greet = || println("hello");
 
 // Block body
 let process = |item: Item| {
@@ -1095,9 +1105,11 @@ Closures can also be written with `fn` syntax in certain positions:
 items.filter(fn(t: &Todo) -> bool { !t.done })
 ```
 
-### Await Expressions
+> **Note**: Environment capture in closures has limited codegen. Simple closures as callback arguments (map/filter/reduce) work. Complex closures capturing multiple outer variables are less reliable.
 
-Await an asynchronous operation:
+### Await Expressions **(PLANNED)**
+
+Await an asynchronous operation. Parsed but no async runtime:
 
 ```nectar
 let response = await fetch("https://api.example.com/data");
@@ -1120,9 +1132,9 @@ let response = fetch("https://api.example.com/posts", {
 });
 ```
 
-### Spawn and Channel Expressions
+### Spawn and Channel Expressions **(PLANNED)**
 
-Concurrency primitives:
+Concurrency primitives. Parsed but no Web Worker runtime:
 
 ```nectar
 // Spawn work on a background thread
@@ -1138,9 +1150,9 @@ ch.send(42);
 let value = ch.recv();
 ```
 
-### Parallel Expressions
+### Parallel Expressions **(PLANNED)**
 
-Run multiple expressions concurrently:
+Run multiple expressions concurrently. Parsed but no runtime:
 
 ```nectar
 parallel {
@@ -1184,9 +1196,9 @@ navigate("/user/42");
 navigate(f"/posts/{post_id}");
 ```
 
-### Stream Expressions
+### Stream Expressions **(PLANNED)**
 
-Process async data as it arrives:
+Process async data as it arrives. Parsed but no streaming runtime:
 
 ```nectar
 for chunk in stream fetch("https://api.example.com/stream") {
@@ -1194,9 +1206,9 @@ for chunk in stream fetch("https://api.example.com/stream") {
 }
 ```
 
-### Suspend Expressions
+### Suspend Expressions **(PLANNED)**
 
-Show fallback content while loading:
+Show fallback content while loading. Parsed, limited codegen:
 
 ```nectar
 suspend(<LoadingSpinner />) {
@@ -1221,9 +1233,9 @@ let msg = f"Hello {name}, you have {count} items";
 let url = f"https://api.example.com/users/{id}";
 ```
 
-### Prompt Templates
+### Prompt Templates **(PLANNED)**
 
-AI prompt templates with interpolation:
+AI prompt templates with interpolation. Parsed but no AI runtime:
 
 ```nectar
 let p = prompt "Summarize the following document: {document}";
@@ -1258,6 +1270,211 @@ let result = {
 
 ---
 
+## String Operations
+
+Nectar strings support built-in methods that compile directly to WASM. No imports needed.
+
+### Length
+
+```nectar
+let s = "hello";
+let n = s.len();  // 5
+```
+
+### Case Conversion
+
+```nectar
+let upper = s.to_upper();  // "HELLO"
+let lower = s.to_lower();  // "hello"
+```
+
+### Trimming
+
+```nectar
+let trimmed = s.trim();  // removes leading/trailing whitespace
+```
+
+### Splitting
+
+```nectar
+let parts = s.split(",");  // returns [String]
+```
+
+### Contains
+
+```nectar
+let has = s.contains("ell");  // true
+```
+
+### String Formatting
+
+Use `format()` to convert values to strings:
+
+```nectar
+let text = format("{}", 42);        // "42"
+let msg = format("count: {}", n);   // "count: 5"
+```
+
+Or use format string literals:
+
+```nectar
+let msg = f"Hello {name}, count is {count}";
+```
+
+> **Note**: `format()` is the more battle-tested path for int-to-string conversion. Format strings (`f"..."`) are parsed and have codegen but are less proven.
+
+---
+
+## Array Operations and Iterators
+
+### Array Literals and Indexing
+
+```nectar
+let items = [1, 2, 3, 4, 5];
+let first = items[0];         // 1
+let third = items[2];         // 3
+```
+
+### Length and Push
+
+```nectar
+let n = items.len();          // 5
+items.push(6);                // appends to array
+```
+
+### Contains
+
+```nectar
+let has = items.contains(3);  // true
+```
+
+### Map
+
+Transform each element, returning a new array:
+
+```nectar
+let doubled = items.map(|x| x * 2);
+// or with explicit types:
+let doubled = items.map(fn(x: i32) -> i32 { x * 2 });
+```
+
+### Filter
+
+Select elements matching a predicate:
+
+```nectar
+let evens = items.filter(|x| x % 2 == 0);
+let active = todos.filter(fn(t: &Todo) -> bool { !t.done });
+```
+
+### Reduce
+
+Fold elements into a single value:
+
+```nectar
+let sum = items.reduce(0, |acc, x| acc + x);
+```
+
+### Range Expressions
+
+Range expressions produce integer sequences for use in for loops:
+
+```nectar
+for i in 0..10 {
+    // i goes from 0 to 9 (exclusive end)
+    process(i);
+}
+
+for i in start..end {
+    // dynamic range
+}
+```
+
+### Lazy For Loops
+
+For large collections, `lazy for` renders only the first 20 items initially, then uses IntersectionObserver to load more as the user scrolls:
+
+```nectar
+{lazy for item in self.items {
+    <div>{item.name}</div>
+}}
+```
+
+This compiles to a batch function in the WASM function table that renders the next 20 items each time the sentinel element becomes visible.
+
+---
+
+## Error Handling
+
+### Result Type
+
+`Result<T, E>` represents an operation that may succeed or fail:
+
+```nectar
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+fn parse(input: String) -> Result<i32, String> {
+    // ...
+}
+```
+
+### Option Type
+
+`Option<T>` represents a value that may or may not be present:
+
+```nectar
+let found: Option<User> = None;
+let found: Option<User> = Some(user);
+```
+
+### The `?` Operator
+
+The `?` postfix operator unwraps a `Result` or `Option`, propagating the error on failure:
+
+```nectar
+fn load_config() -> Result<Config, String> {
+    let text = read_file("config.toml")?;
+    let config = parse_toml(text)?;
+    return Ok(config);
+}
+```
+
+### Try/Catch
+
+Structured error handling:
+
+```nectar
+try {
+    let data = parse(input)?;
+    process(data);
+} catch err {
+    log_error(err);
+}
+```
+
+> **Note**: Try/catch has limited codegen. The `?` operator is more reliable.
+
+### Pattern Matching on Result/Option
+
+```nectar
+match result {
+    Ok(value) => use_value(value),
+    Err(msg) => show_error(msg),
+}
+
+match maybe_user {
+    Some(user) => show_profile(user),
+    None => show_login(),
+}
+```
+
+> **Note**: Matching on Ok/Err/Some/None works well. Custom enum variant matching is more limited.
+
+---
+
 ## Statements
 
 ### Let Statements
@@ -1267,8 +1484,8 @@ Bind a value to a name:
 ```nectar
 let x = 42;
 let mut name: String = "Nectar";
-let (a, b) = get_pair();
-let User { name, email, .. } = user;
+let (a, b) = get_pair();           // PLANNED: tuple destructuring not yet in codegen
+let User { name, email, .. } = user; // PLANNED: struct destructuring not yet in codegen
 ```
 
 ### Signal Statements
@@ -1290,9 +1507,9 @@ return 42;
 return Ok(result);
 ```
 
-### Yield Statements
+### Yield Statements **(PLANNED)**
 
-Emit a value from a stream:
+Emit a value from a stream. Parsed but no generator runtime:
 
 ```nectar
 yield chunk;
@@ -1350,9 +1567,9 @@ AuthStatus::LoggedIn(user) => show_user(user),
 None => show_empty(),
 ```
 
-### Tuple Pattern
+### Tuple Pattern **(PLANNED)**
 
-Destructure a tuple:
+Destructure a tuple. Parsed but no codegen:
 
 ```nectar
 let (x, y) = point;
@@ -1360,17 +1577,17 @@ let (x, y) = point;
 (x, _) => use_x_only(x),
 ```
 
-### Struct Pattern
+### Struct Pattern **(PLANNED)**
 
-Destructure a struct, with an optional `..` to ignore remaining fields:
+Destructure a struct, with an optional `..` to ignore remaining fields. Parsed but no codegen:
 
 ```nectar
 let User { name, age, .. } = user;
 ```
 
-### Array Pattern
+### Array Pattern **(PLANNED)**
 
-Destructure an array:
+Destructure an array. Parsed but no codegen:
 
 ```nectar
 let [first, second, ..] = items;
@@ -1494,6 +1711,8 @@ The `bind:property` syntax creates two-way data binding between a signal and a f
 <input type="checkbox" bind:checked={is_active} />
 ```
 
+> **Note**: Parsed and codegen exists, but less battle-tested than `on:click` handlers.
+
 ### ARIA Attributes
 
 Accessibility attributes are first-class:
@@ -1556,6 +1775,18 @@ Expressions inside curly braces render their value:
     </article>
 }}
 ```
+
+### Lazy List Rendering
+
+For large collections, `lazy for` renders only the first 20 items initially and uses IntersectionObserver to load more as the user scrolls:
+
+```nectar
+{lazy for item in self.items {
+    <div class="card">{item.name}</div>
+}}
+```
+
+The compiler emits a batch function in the WASM function table that renders the next 20 items each time a sentinel element becomes visible. Range-based lazy for (`lazy for i in 0..1000`) is also supported.
 
 ### Match in Templates
 
@@ -1758,7 +1989,7 @@ navigate("/user/42");
 
 ## Contracts
 
-Contracts define type-safe API boundaries. The compiler validates that API responses match the contract at compile time, and the runtime validates at the wire level.
+Contracts define type-safe API boundaries. The compiler validates that API responses match the contract at compile time, and the WASM runtime validates at the wire level using a built-in JSON parser (no JS `JSON.parse`).
 
 ### Contract Definition
 
@@ -1773,6 +2004,28 @@ contract UserResponse {
 ```
 
 Fields can be any type, including inline enums. The `?` suffix makes a field nullable (wraps in `Option<T>`).
+
+### What the compiler generates
+
+For each contract, the compiler emits:
+- **`$__contract_register_<Name>`** -- registers the contract schema (name, fields, types) in WASM memory
+- **`$__contract_validate_<Name>`** -- validates a JSON buffer against the contract fields using the WASM JSON parser (`$json_parse` + `$json_get_field`)
+- A deterministic hash of the contract shape for cache invalidation
+
+### Using Contracts
+
+```nectar
+// Parse a JSON response against a contract
+let user = UserResponse::parse(json_ptr, json_len);
+```
+
+### Contract Inference
+
+The `contract_infer` module can infer contract shapes from fetch response patterns at compile time.
+
+### Contract Verification
+
+The `contract_verify` module validates at compile time that contract field types are consistent across usages.
 
 Contracts can be bound to `channel` definitions (`channel ChatRoom -> ChatMessage`) and `cache` queries (`query get_users() : fetch(...) -> UserResponse`).
 

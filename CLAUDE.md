@@ -28,7 +28,7 @@ This is not a guideline. This is the entire point of the language.
 cargo build                          # from /compiler or workspace root
 
 # Run all tests
-cargo test                           # 1500+ tests
+cargo test                           # 2248 tests
 
 # Run tests for a specific module
 cargo test --lib parser              # just parser tests
@@ -56,27 +56,30 @@ nectar --lsp                         # LSP server
 
 ```
 nectar-lang/
-├── compiler/src/              # Rust compiler — single binary, 60K+ lines
+├── compiler/src/              # Rust compiler — single binary, 87K+ lines
 │   ├── main.rs                # CLI entry point (clap)
 │   ├── lexer.rs               # Tokenizer
 │   ├── token.rs               # Token types
-│   ├── parser.rs              # Parser → AST (~7500 lines)
-│   ├── ast.rs                 # AST node types (~1200 lines)
-│   ├── type_checker.rs        # Type checking (~6800 lines)
-│   ├── borrow_checker.rs      # Ownership/borrowing rules (~4000 lines)
-│   ├── codegen.rs             # AST → WAT (~8200 lines, largest file)
+│   ├── parser.rs              # Parser → AST (~10K lines)
+│   ├── ast.rs                 # AST node types (~1370 lines)
+│   ├── type_checker.rs        # Type checking (~8700 lines)
+│   ├── borrow_checker.rs      # Ownership/borrowing rules (~4200 lines)
+│   ├── codegen.rs             # AST → WAT (~25K lines, largest file)
 │   ├── wasm_binary.rs         # WAT → .wasm binary (~3200 lines)
 │   ├── wasm_opt.rs            # WASM optimization passes
 │   ├── const_fold.rs          # Constant folding
 │   ├── dce.rs                 # Dead code elimination
 │   ├── tree_shake.rs          # Tree shaking
 │   ├── exhaustiveness.rs      # Pattern match exhaustiveness checking
-│   ├── formatter.rs           # nectar fmt (~3800 lines)
-│   ├── linter.rs              # nectar lint (~3400 lines)
+│   ├── contract_infer.rs      # Contract shape inference from fetch responses
+│   ├── contract_verify.rs     # Compile-time contract validation
+│   ├── formatter.rs           # nectar fmt (~4200 lines)
+│   ├── linter.rs              # nectar lint (~3800 lines)
 │   ├── lsp.rs                 # Language server protocol
-│   ├── ssr.rs                 # Server-side rendering
+│   ├── ssr.rs                 # Server-side rendering (~1900 lines)
+│   ├── ssr_server.rs          # SSR HTTP server (~930 lines)
 │   ├── devserver.rs           # nectar dev (hot reload)
-│   ├── stdlib.rs              # Standard library definitions (~3000 lines)
+│   ├── stdlib.rs              # Standard library definitions (~4300 lines)
 │   ├── package.rs             # Package management
 │   ├── registry.rs            # Package registry client
 │   ├── resolver.rs            # Dependency resolution
@@ -87,8 +90,8 @@ nectar-lang/
 │   ├── optimizer.rs           # Optimization coordinator
 │   └── sourcemap.rs           # Source map generation
 ├── runtime/modules/
-│   └── core.js                # THE ONLY JS file — 660 lines, 16 namespaces, browser API syscalls ONLY
-├── examples/                  # 39 .nectar example files
+│   └── core.js                # THE ONLY JS file — ~890 lines, 16 namespaces, browser API syscalls ONLY
+├── examples/                  # 37 .nectar example files
 ├── docs/                      # Language reference, architecture, runtime API, toolchain, AI integration
 ├── website/                   # Project website (written in Nectar)
 ├── CONTRIBUTING.md            # Architecture rules — READ THIS BEFORE ANY CHANGES
@@ -104,11 +107,17 @@ Lexer → Token stream
      │
 Parser → AST
      │
-Type checker + Borrow checker
+Type checker + Borrow checker + Contract inference/verification
      │
 Optimizations (const folding, DCE, tree shaking)
      │
 Codegen → WAT (WebAssembly Text Format)
+  ├── Signal subscriptions (signal_subscribe with function table indices)
+  ├── Reactive conditionals (updater functions for {if signal ...} blocks)
+  ├── Lazy for-loops (initial batch of 20, IntersectionObserver pagination)
+  ├── WASM JSON parser ($json_parse, $json_get_field — no JS JSON.parse)
+  ├── Contract validation ($__contract_validate_<Name>)
+  └── Function table for callbacks (call_indirect)
      │
 wasm_binary → .wasm
      │
@@ -203,7 +212,7 @@ None of the above?
 **Every change must have test coverage. No exceptions.**
 
 - Tests are inline Rust tests (`#[cfg(test)] mod tests { ... }`) in each source file
-- The codebase has 1500+ tests. Do not reduce this number.
+- The codebase has 2248 tests. Do not reduce this number.
 - **Every new feature, bug fix, or refactor must include corresponding tests**
 - **Every code path must be tested** — happy paths, edge cases, error conditions, boundary values
 - Match the existing test style in that file
@@ -236,9 +245,83 @@ cargo tarpaulin --out json           # Coverage report
 | `tree_shake.rs` | Unused functions/types removed, used ones preserved |
 | `exhaustiveness.rs` | Pattern completeness for enums, structs, nested patterns |
 | `ssr.rs` | Server rendering output, hydration markers |
+| `ssr_server.rs` | SSR HTTP server responses, streaming |
+| `contract_infer.rs` | Shape inference from fetch patterns, field extraction |
+| `contract_verify.rs` | Compile-time contract validation, type mismatches |
+| `codegen.rs` (JSON) | WASM JSON parser output ($json_parse, $json_get_field), contract parse codegen |
+| `codegen.rs` (lazy for) | Lazy for-loop batching, sentinel/observer setup, batch function emission |
+| `codegen.rs` (reactive) | Reactive conditional updaters, signal subscription, function table entries |
+| `codegen.rs` (callbacks) | Parameterized callback codegen, call_indirect with captured args |
 | `package.rs` | Manifest parsing, validation |
 | `registry.rs` | Package fetch, version resolution |
 | `resolver.rs` | Dependency graphs, conflict resolution |
+
+## What Actually Works vs Aspirational
+
+Features are parsed and have codegen at different levels of maturity. This is the honest status.
+
+### Works end-to-end (parse → type-check → codegen → WASM runs in browser)
+
+- Components with props, signals, methods, render blocks, scoped styles
+- Stores with signals, actions, computed values, effects
+- Routers with static/parameterized/wildcard routes, fallback, guards, layouts, call_indirect navigation
+- Contracts with field validation, WASM JSON parser, schema registration
+- Signals with DOM subscriptions (signal_subscribe + function table updaters)
+- Reactive conditionals ({if signal ...} in templates with live DOM updates)
+- Lazy for-loops (initial batch of 20, IntersectionObserver-driven pagination)
+- For/while loops, if/else, match (Ok/Err/Some/None + custom enum variants with limitations)
+- String operations: len, push, contains, trim, to_upper, to_lower, split
+- Array operations: len, push, contains, map, filter, reduce
+- Range expressions (start..end) in for loops
+- Format strings f"..." and format() function
+- Arithmetic, comparison, logical, compound assignment operators
+- Struct/enum definitions, impl blocks, field access, method calls
+- Array indexing (items[i])
+- Function table for callbacks (on:click with call_indirect)
+- ? operator (parsed as Expr::Try, codegen exists)
+- Try/catch (parsed and has limited codegen)
+- Result<T,E> and Option<T> types
+- Pages with meta/schema blocks
+- Forms with field validation
+- Channels (WebSocket), Auth, Payment, Upload, Db, Cache, Embed, Pdf, App/PWA, Theme
+- Animations: spring, keyframes, stagger
+- Lazy components
+- navigate() for programmatic routing
+- Borrow checker, ownership, move semantics
+- Dead code elimination, tree shaking, constant folding
+- SSR with hydration markers, critical CSS extraction
+- WASM binary encoding
+
+### Parsed but aspirational (no working runtime or incomplete codegen)
+
+- `async fn` / `await` -- parsed, no async runtime in WASM
+- Generic types / monomorphization -- parsed, no codegen
+- Trait / impl dispatch -- parsed, no vtable generation
+- Tuple types and destructuring -- parsed, no codegen
+- Struct destructuring -- parsed, no codegen
+- `break` / `continue` in loops -- not in codegen
+- `spawn {}` / `parallel {}` -- parsed, no Web Worker runtime
+- `channel<T>()` concurrency primitives -- parsed, no concurrency runtime
+- `yield` / generator streams -- parsed, no generator runtime
+- `for chunk in stream fetch(url)` -- parsed, no streaming runtime
+- `suspend(<Fallback />) { ... }` -- parsed, limited codegen
+- `bind:value={signal}` -- parsed and codegen exists, less tested than on:click
+- Dynamic imports `import("./module")` -- parsed, limited codegen
+- `prompt "..."` AI templates -- parsed, no AI runtime
+- WebRTC -- parsed, runtime imports exist but untested end-to-end
+- Full lifetime annotations -- parsed, limited enforcement
+- Closures with environment capture -- parsed, limited codegen
+
+### Important gotchas for AI sessions
+
+- Use `format("{}", value)` not `value.to_string()` for int-to-string conversion
+- No `String::from()` -- string literals are directly usable
+- No `Vec::new()` -- use `[]` for empty arrays
+- `match` on strings does not work -- use `if/else` chains
+- No `println!` macro -- use `webapi.consoleLog()` or render in templates
+- map/filter/reduce return arrays directly, no `.collect()`
+- Modulo: `%` operator exists but use `i - (i / n) * n` if unsure
+- Custom enum variant matching is limited compared to Ok/Err/Some/None
 
 ## Git Conventions
 
