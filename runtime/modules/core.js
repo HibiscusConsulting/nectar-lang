@@ -261,6 +261,7 @@ export const wasmImports = {
     getValue(elId) { return R.__allocString(String(R.__getElement(elId).value ?? '')); },
 
     setTitle(ptr, len) { document.title = R.__getString(ptr, len); },
+    clearChildren(elId) { R.__getElement(elId).innerHTML = ''; },
 
     // Read-only DOM measurements (cannot go through flush — need return values)
     getScrollTop(elId) { return R.__getElement(elId).scrollTop; },
