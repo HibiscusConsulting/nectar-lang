@@ -1420,13 +1420,48 @@ impl WasmCodegen {
             (offset, f.name.len())
         }).collect();
 
+        // Check if any field is an array or nested contract type
+        let has_array_fields = contract.fields.iter().any(|f| matches!(&f.ty, Type::Array(_)));
+        let has_nested_fields = contract.fields.iter().any(|f| Self::is_nested_contract_type(&f.ty));
+
+        // ── _parse_from_obj: already-parsed object pointer → struct pointer ──
+        // Used by nested contract fields. Same logic as _parse but skips json_parse.
+        self.line("");
+        self.emit(&format!(
+            "(func ${}_parse_from_obj (param $obj i32) (result i32)",
+            contract.name
+        ));
+        self.indent += 1;
+        self.line("(local $struct_ptr i32) (local $type i32) (local $data i32)");
+        if has_array_fields {
+            self.line("(local $arr_base i32) (local $arr_len i32) (local $arr_i i32) (local $vec_ptr i32) (local $vec_data i32) (local $elem_data i32)");
+        }
+        if has_nested_fields {
+            self.line("(local $nested_obj i32)");
+        }
+
+        // Allocate struct
+        self.line(&format!(";; Allocate struct ({} fields x 4 bytes = {} bytes)", field_count, struct_size));
+        self.line(&format!("i32.const {}", struct_size));
+        self.line("call $alloc");
+        self.line("local.set $struct_ptr");
+
+        // Extract each field
+        self.emit_contract_parse_fields(contract, &field_name_offsets);
+
+        self.line("local.get $struct_ptr");
+        self.indent -= 1;
+        self.line(")");
+
+        // ── _parse: JSON bytes → struct pointer ──
+        // Calls $json_parse, then delegates to _parse_from_obj.
         self.line("");
         self.emit(&format!(
             "(func ${}_parse (param $json_ptr i32) (param $json_len i32) (result i32)",
             contract.name
         ));
         self.indent += 1;
-        self.line("(local $obj i32) (local $struct_ptr i32) (local $type i32) (local $data i32)");
+        self.line("(local $obj i32)");
 
         // Parse JSON string into structured representation
         self.line(";; Parse JSON");
@@ -1437,7 +1472,6 @@ impl WasmCodegen {
 
         // $json_parse returns a 12-byte entry [type, data_lo, data_hi].
         // For an object, data_lo (offset 4) is the object pointer we pass to $json_get_field.
-        // Read data_lo from the parsed result.
         self.line(";; Get object pointer from parsed result (data_lo at offset 4)");
         self.line("local.get $obj");
         self.line("i32.const 4");
@@ -1445,34 +1479,9 @@ impl WasmCodegen {
         self.line("i32.load");
         self.line("local.set $obj");
 
-        // Allocate struct
-        self.line(&format!(";; Allocate struct ({} fields x 4 bytes = {} bytes)", field_count, struct_size));
-        self.line(&format!("i32.const {}", struct_size));
-        self.line("call $alloc");
-        self.line("local.set $struct_ptr");
-
-        // Extract each field
-        for (i, field) in contract.fields.iter().enumerate() {
-            let (name_offset, name_len) = field_name_offsets[i];
-            let byte_offset = i * 4;
-
-            self.line(&format!(";; Field: {} (offset {})", field.name, byte_offset));
-            self.line("local.get $obj");
-            self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
-            self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
-            self.line("call $json_get_field");
-            self.line("local.set $data  ;; data_lo");
-            self.line("local.set $type  ;; type tag");
-            self.line("local.get $struct_ptr");
-            self.line("local.get $data");
-            if byte_offset == 0 {
-                self.line("i32.store");
-            } else {
-                self.line(&format!("i32.store offset={}", byte_offset));
-            }
-        }
-
-        self.line("local.get $struct_ptr");
+        // Delegate to _parse_from_obj
+        self.line("local.get $obj");
+        self.line(&format!("call ${}_parse_from_obj", contract.name));
         self.indent -= 1;
         self.line(")");
 
@@ -1487,6 +1496,13 @@ impl WasmCodegen {
         ));
         self.indent += 1;
         self.line("(local $fields_ptr i32)");
+        if has_array_fields {
+            self.line("(local $vec_ptr i32) (local $vec_len i32) (local $vec_data i32)");
+            self.line("(local $arr_entries i32) (local $arr_i i32) (local $elem_val i32)");
+        }
+        if has_nested_fields {
+            self.line("(local $nested_json_ptr i32) (local $nested_json_len i32)");
+        }
 
         // Allocate field array: 20 bytes per field
         let fields_array_size = field_count * 20;
@@ -1501,17 +1517,9 @@ impl WasmCodegen {
             let field_array_offset = i * 20;
             let struct_byte_offset = i * 4;
 
-            // Determine the JSON type tag for this field's type
-            let json_type_tag = match &field.ty {
-                Type::Named(name) => match name.as_str() {
-                    "i32" | "i64" | "u32" | "u64" => 2,  // integer
-                    "f32" | "f64" => 2,                    // number (same tag)
-                    "bool" => 3,                           // boolean
-                    "String" | "DateTime" => 1,            // string
-                    _ => 4,                                // object
-                },
-                Type::Array(_) => 5,                       // array
-                _ => 4,                                    // object
+            let effective_ty = match &field.ty {
+                Type::Option(inner) => inner.as_ref(),
+                other => other,
             };
 
             self.line(&format!(";; Field entry: {} (array offset {})", field.name, field_array_offset));
@@ -1530,25 +1538,203 @@ impl WasmCodegen {
             self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
             self.line(&format!("i32.store offset={}", field_array_offset + 4));
 
-            // type (offset 8)
-            self.line("local.get $fields_ptr");
-            self.line(&format!("i32.const {} ;; type tag", json_type_tag));
-            self.line(&format!("i32.store offset={}", field_array_offset + 8));
+            match effective_ty {
+                Type::Array(inner_ty) => {
+                    // Array field: read Vec, build 12-byte entries, set type=5
+                    self.line(&format!(";; Array field: {}", field.name));
 
-            // data_lo (offset 12) — read from struct
-            self.line("local.get $fields_ptr");
-            self.line("local.get $struct_ptr");
-            if struct_byte_offset == 0 {
-                self.line("i32.load");
-            } else {
-                self.line(&format!("i32.load offset={}", struct_byte_offset));
+                    // Read Vec header from struct
+                    self.line("local.get $struct_ptr");
+                    if struct_byte_offset == 0 {
+                        self.line("i32.load");
+                    } else {
+                        self.line(&format!("i32.load offset={}", struct_byte_offset));
+                    }
+                    self.line("local.set $vec_ptr");
+                    self.line("local.get $vec_ptr");
+                    self.line("i32.load");           // length
+                    self.line("local.set $vec_len");
+                    self.line("local.get $vec_ptr");
+                    self.line("i32.load offset=8");   // data_ptr
+                    self.line("local.set $vec_data");
+
+                    // Allocate 12-byte entries for the array
+                    self.line("local.get $vec_len");
+                    self.line("i32.const 12");
+                    self.line("i32.mul");
+                    self.line("call $alloc");
+                    self.line("local.set $arr_entries");
+
+                    // Determine element type tag
+                    let elem_type_tag = match inner_ty.as_ref() {
+                        Type::Named(name) => match name.as_str() {
+                            "i32" | "i64" | "u32" | "u64" => 2,
+                            "f32" | "f64" => 2,
+                            "bool" => 3,
+                            "String" | "DateTime" => 1,
+                            _ => 6, // nested contract: pre-serialize to JSON
+                        },
+                        _ => 2,
+                    };
+
+                    let is_nested_element = matches!(inner_ty.as_ref(), Type::Named(n) if Self::is_nested_contract_type(inner_ty));
+
+                    // Build 12-byte entries from Vec data
+                    self.line("i32.const 0");
+                    self.line("local.set $arr_i");
+                    self.line("block $ser_arr_done");
+                    self.line("  loop $ser_arr_loop");
+                    self.line("    local.get $arr_i");
+                    self.line("    local.get $vec_len");
+                    self.line("    i32.ge_u");
+                    self.line("    br_if $ser_arr_done");
+
+                    // Read element value from Vec data
+                    self.line("    local.get $vec_data");
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 4");
+                    self.line("    i32.mul");
+                    self.line("    i32.add");
+                    self.line("    i32.load");
+                    self.line("    local.set $elem_val");
+
+                    if is_nested_element {
+                        if let Type::Named(inner_name) = inner_ty.as_ref() {
+                            // Nested contract element: serialize to JSON
+                            self.line(&format!("    ;; Serialize nested {} element", inner_name));
+                            self.line("    local.get $elem_val");
+                            self.line(&format!("    call ${}_serialize", inner_name));
+                            self.line("    local.set $nested_json_len");
+                            self.line("    local.set $nested_json_ptr");
+                        }
+                    }
+
+                    // Write 12-byte entry: [type, data_lo, data_hi]
+                    // type
+                    self.line("    local.get $arr_entries");
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 12");
+                    self.line("    i32.mul");
+                    self.line("    i32.add");
+                    self.line(&format!("    i32.const {} ;; element type tag", elem_type_tag));
+                    self.line("    i32.store");
+                    // data_lo
+                    self.line("    local.get $arr_entries");
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 12");
+                    self.line("    i32.mul");
+                    self.line("    i32.add");
+                    self.line("    i32.const 4");
+                    self.line("    i32.add");
+                    if is_nested_element {
+                        self.line("    local.get $nested_json_ptr");
+                    } else {
+                        self.line("    local.get $elem_val");
+                    }
+                    self.line("    i32.store");
+                    // data_hi
+                    self.line("    local.get $arr_entries");
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 12");
+                    self.line("    i32.mul");
+                    self.line("    i32.add");
+                    self.line("    i32.const 8");
+                    self.line("    i32.add");
+                    if is_nested_element {
+                        self.line("    local.get $nested_json_len");
+                    } else {
+                        self.line("    i32.const 0");
+                    }
+                    self.line("    i32.store");
+
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 1");
+                    self.line("    i32.add");
+                    self.line("    local.set $arr_i");
+                    self.line("    br $ser_arr_loop");
+                    self.line("  end");
+                    self.line("end");
+
+                    // type tag = 5 (array)
+                    self.line("local.get $fields_ptr");
+                    self.line("i32.const 5 ;; type tag");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 8));
+
+                    // data_lo = arr_entries base
+                    self.line("local.get $fields_ptr");
+                    self.line("local.get $arr_entries");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 12));
+
+                    // data_hi = vec_len
+                    self.line("local.get $fields_ptr");
+                    self.line("local.get $vec_len");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 16));
+                }
+                Type::Named(name) if Self::is_nested_contract_type(effective_ty) => {
+                    // Nested contract field: serialize to JSON, then use type=6 (raw)
+                    self.line(&format!(";; Nested contract field: {}", field.name));
+
+                    // Read nested struct pointer from parent struct
+                    self.line("local.get $struct_ptr");
+                    if struct_byte_offset == 0 {
+                        self.line("i32.load");
+                    } else {
+                        self.line(&format!("i32.load offset={}", struct_byte_offset));
+                    }
+                    // Call nested contract's _serialize
+                    self.line(&format!("call ${}_serialize", name));
+                    self.line("local.set $nested_json_len");
+                    self.line("local.set $nested_json_ptr");
+
+                    // type = 6 (raw pre-serialized JSON)
+                    self.line("local.get $fields_ptr");
+                    self.line("i32.const 6 ;; type tag (raw JSON)");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 8));
+
+                    // data_lo = json_ptr
+                    self.line("local.get $fields_ptr");
+                    self.line("local.get $nested_json_ptr");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 12));
+
+                    // data_hi = json_len
+                    self.line("local.get $fields_ptr");
+                    self.line("local.get $nested_json_len");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 16));
+                }
+                _ => {
+                    // Primitive field: existing behavior
+                    let json_type_tag = match effective_ty {
+                        Type::Named(name) => match name.as_str() {
+                            "i32" | "i64" | "u32" | "u64" => 2,
+                            "f32" | "f64" => 2,
+                            "bool" => 3,
+                            "String" | "DateTime" => 1,
+                            _ => 4,
+                        },
+                        _ => 4,
+                    };
+
+                    // type (offset 8)
+                    self.line("local.get $fields_ptr");
+                    self.line(&format!("i32.const {} ;; type tag", json_type_tag));
+                    self.line(&format!("i32.store offset={}", field_array_offset + 8));
+
+                    // data_lo (offset 12) — read from struct
+                    self.line("local.get $fields_ptr");
+                    self.line("local.get $struct_ptr");
+                    if struct_byte_offset == 0 {
+                        self.line("i32.load");
+                    } else {
+                        self.line(&format!("i32.load offset={}", struct_byte_offset));
+                    }
+                    self.line(&format!("i32.store offset={}", field_array_offset + 12));
+
+                    // data_hi (offset 16) — 0 for simple types
+                    self.line("local.get $fields_ptr");
+                    self.line("i32.const 0");
+                    self.line(&format!("i32.store offset={}", field_array_offset + 16));
+                }
             }
-            self.line(&format!("i32.store offset={}", field_array_offset + 12));
-
-            // data_hi (offset 16) — 0 for simple types
-            self.line("local.get $fields_ptr");
-            self.line("i32.const 0");
-            self.line(&format!("i32.store offset={}", field_array_offset + 16));
         }
 
         // Call $json_serialize_object
@@ -1651,6 +1837,165 @@ impl WasmCodegen {
             Type::Array(_) => "array".into(),
             Type::Option(inner) => self.type_to_json_schema_type(inner),
             _ => "object".into(),
+        }
+    }
+
+    /// Check if a Type refers to a nested contract (non-primitive named type).
+    fn is_nested_contract_type(ty: &Type) -> bool {
+        match ty {
+            Type::Named(name) => !matches!(name.as_str(),
+                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" | "bool" | "String" | "DateTime"
+            ),
+            Type::Option(inner) => Self::is_nested_contract_type(inner),
+            _ => false,
+        }
+    }
+
+    /// Emit the field extraction logic shared by _parse and _parse_from_obj.
+    /// Expects $obj, $struct_ptr, $type, $data locals to already exist.
+    /// For array fields, expects $arr_base, $arr_len, $arr_i, $vec_ptr, $vec_data, $elem_data.
+    /// For nested fields, expects $nested_obj.
+    fn emit_contract_parse_fields(&mut self, contract: &ContractDef, field_name_offsets: &[(u32, usize)]) {
+        for (i, field) in contract.fields.iter().enumerate() {
+            let (name_offset, name_len) = field_name_offsets[i];
+            let byte_offset = i * 4;
+
+            let effective_ty = match &field.ty {
+                Type::Option(inner) => inner.as_ref(),
+                other => other,
+            };
+
+            match effective_ty {
+                Type::Array(_inner_ty) => {
+                    // Array field: use json_get_field3 to get (type, data_lo=arr_base, data_hi=arr_len)
+                    self.line(&format!(";; Field: {} (array, offset {})", field.name, byte_offset));
+                    self.line("local.get $obj");
+                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
+                    self.line("call $json_get_field3");
+                    self.line("local.set $arr_len  ;; data_hi = array length");
+                    self.line("local.set $arr_base ;; data_lo = array base pointer");
+                    self.line("local.set $type     ;; type tag (5=array)");
+
+                    // Allocate Vec header: [length: i32, capacity: i32, data_ptr: i32]
+                    self.line(";; Allocate Vec header (12 bytes)");
+                    self.line("i32.const 12");
+                    self.line("call $alloc");
+                    self.line("local.set $vec_ptr");
+
+                    // Allocate Vec data: arr_len * 4 bytes
+                    self.line(";; Allocate Vec data (arr_len * 4 bytes)");
+                    self.line("local.get $arr_len");
+                    self.line("i32.const 4");
+                    self.line("i32.mul");
+                    self.line("call $alloc");
+                    self.line("local.set $vec_data");
+
+                    // Write Vec header
+                    self.line("local.get $vec_ptr");
+                    self.line("local.get $arr_len");
+                    self.line("i32.store");           // length
+                    self.line("local.get $vec_ptr");
+                    self.line("local.get $arr_len");
+                    self.line("i32.store offset=4");   // capacity
+                    self.line("local.get $vec_ptr");
+                    self.line("local.get $vec_data");
+                    self.line("i32.store offset=8");   // data_ptr
+
+                    // Iterate and populate Vec data
+                    self.line("i32.const 0");
+                    self.line("local.set $arr_i");
+                    self.line("block $arr_done");
+                    self.line("  loop $arr_loop");
+                    self.line("    local.get $arr_i");
+                    self.line("    local.get $arr_len");
+                    self.line("    i32.ge_u");
+                    self.line("    br_if $arr_done");
+                    // Get element at index
+                    self.line("    local.get $arr_base");
+                    self.line("    local.get $arr_i");
+                    self.line("    call $json_get_array_element");
+                    self.line("    local.set $elem_data ;; element data_lo");
+                    self.line("    drop               ;; drop type tag");
+
+                    // For nested array element types, call the nested contract's _parse_from_obj
+                    match _inner_ty.as_ref() {
+                        Type::Named(inner_name) if Self::is_nested_contract_type(_inner_ty) => {
+                            // Nested contract in array: call _parse_from_obj
+                            self.line(&format!("    ;; Parse nested {} element", inner_name));
+                            self.line("    local.get $elem_data");
+                            self.line(&format!("    call ${}_parse_from_obj", inner_name));
+                            self.line("    local.set $elem_data");
+                        }
+                        _ => {
+                            // Primitive element: elem_data is the value directly
+                        }
+                    }
+
+                    // Store element in Vec data
+                    self.line("    local.get $vec_data");
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 4");
+                    self.line("    i32.mul");
+                    self.line("    i32.add");
+                    self.line("    local.get $elem_data");
+                    self.line("    i32.store");
+                    // Increment
+                    self.line("    local.get $arr_i");
+                    self.line("    i32.const 1");
+                    self.line("    i32.add");
+                    self.line("    local.set $arr_i");
+                    self.line("    br $arr_loop");
+                    self.line("  end");
+                    self.line("end");
+
+                    // Store Vec pointer in struct
+                    self.line("local.get $struct_ptr");
+                    self.line("local.get $vec_ptr");
+                    if byte_offset == 0 {
+                        self.line("i32.store");
+                    } else {
+                        self.line(&format!("i32.store offset={}", byte_offset));
+                    }
+                }
+                Type::Named(name) if Self::is_nested_contract_type(effective_ty) => {
+                    // Nested contract field: get the object data, call _parse_from_obj
+                    self.line(&format!(";; Field: {} (nested {}, offset {})", field.name, name, byte_offset));
+                    self.line("local.get $obj");
+                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
+                    self.line("call $json_get_field");
+                    self.line("local.set $data  ;; data_lo (object pointer)");
+                    self.line("local.set $type  ;; type tag (4=object)");
+                    self.line("local.get $data");
+                    self.line(&format!("call ${}_parse_from_obj", name));
+                    self.line("local.set $data");
+                    self.line("local.get $struct_ptr");
+                    self.line("local.get $data");
+                    if byte_offset == 0 {
+                        self.line("i32.store");
+                    } else {
+                        self.line(&format!("i32.store offset={}", byte_offset));
+                    }
+                }
+                _ => {
+                    // Primitive field: existing behavior
+                    self.line(&format!(";; Field: {} (offset {})", field.name, byte_offset));
+                    self.line("local.get $obj");
+                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
+                    self.line("call $json_get_field");
+                    self.line("local.set $data  ;; data_lo");
+                    self.line("local.set $type  ;; type tag");
+                    self.line("local.get $struct_ptr");
+                    self.line("local.get $data");
+                    if byte_offset == 0 {
+                        self.line("i32.store");
+                    } else {
+                        self.line(&format!("i32.store offset={}", byte_offset));
+                    }
+                }
+            }
         }
     }
 
@@ -19427,6 +19772,120 @@ impl WasmCodegen {
         self.line(")");
         self.line("");
 
+        // ── $json_get_field3 ──
+        // Same as $json_get_field but returns (type, data_lo, data_hi).
+        // Needed for array fields where data_hi holds the element count.
+        self.emit("(func $json_get_field3 (param $obj_ptr i32) (param $key_ptr i32) (param $key_len i32) (result i32 i32 i32)");
+        self.indent += 1;
+        self.line("(local $count i32) (local $fields i32) (local $i i32)");
+        self.line("(local $fkey_ptr i32) (local $fkey_len i32) (local $match i32) (local $j i32)");
+        self.line("(local $offset i32)");
+        self.line("local.get $obj_ptr");
+        self.line("i32.load");
+        self.line("local.set $count");
+        self.line("local.get $obj_ptr");
+        self.line("i32.const 4");
+        self.line("i32.add");
+        self.line("i32.load");
+        self.line("local.set $fields");
+        self.line("i32.const 0");
+        self.line("local.set $i");
+        self.line("block $not_found");
+        self.line("  loop $search");
+        self.line("    local.get $i");
+        self.line("    local.get $count");
+        self.line("    i32.ge_u");
+        self.line("    br_if $not_found");
+        self.line("    local.get $i");
+        self.line("    i32.const 20");
+        self.line("    i32.mul");
+        self.line("    local.set $offset");
+        self.line("    local.get $fields");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fkey_ptr");
+        self.line("    local.get $fields");
+        self.line("    local.get $offset");
+        self.line("    i32.add");
+        self.line("    i32.const 4");
+        self.line("    i32.add");
+        self.line("    i32.load");
+        self.line("    local.set $fkey_len");
+        self.line("    local.get $fkey_len");
+        self.line("    local.get $key_len");
+        self.line("    i32.eq");
+        self.line("    if");
+        self.line("      i32.const 1");
+        self.line("      local.set $match");
+        self.line("      i32.const 0");
+        self.line("      local.set $j");
+        self.line("      block $mismatch");
+        self.line("        loop $cmp");
+        self.line("          local.get $j");
+        self.line("          local.get $key_len");
+        self.line("          i32.ge_u");
+        self.line("          br_if $mismatch");
+        self.line("          local.get $fkey_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          local.get $key_ptr");
+        self.line("          local.get $j");
+        self.line("          i32.add");
+        self.line("          i32.load8_u");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            i32.const 0");
+        self.line("            local.set $match");
+        self.line("            br $mismatch");
+        self.line("          end");
+        self.line("          local.get $j");
+        self.line("          i32.const 1");
+        self.line("          i32.add");
+        self.line("          local.set $j");
+        self.line("          br $cmp");
+        self.line("        end");
+        self.line("      end");
+        self.line("      local.get $match");
+        self.line("      if");
+        // Found — return (value_type, value_lo, value_hi)
+        self.line("        local.get $fields");
+        self.line("        local.get $offset");
+        self.line("        i32.add");
+        self.line("        i32.const 8");
+        self.line("        i32.add");
+        self.line("        i32.load"); // value_type
+        self.line("        local.get $fields");
+        self.line("        local.get $offset");
+        self.line("        i32.add");
+        self.line("        i32.const 12");
+        self.line("        i32.add");
+        self.line("        i32.load"); // value_lo
+        self.line("        local.get $fields");
+        self.line("        local.get $offset");
+        self.line("        i32.add");
+        self.line("        i32.const 16");
+        self.line("        i32.add");
+        self.line("        i32.load"); // value_hi
+        self.line("        return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i");
+        self.line("    i32.const 1");
+        self.line("    i32.add");
+        self.line("    local.set $i");
+        self.line("    br $search");
+        self.line("  end");
+        self.line("end");
+        // Not found
+        self.line("i32.const 0");
+        self.line("i32.const 0");
+        self.line("i32.const 0");
+        self.indent -= 1;
+        self.line(")");
+        self.line("");
+
         // ── $json_get_array_element ──
         // Gets element at index from a parsed array.
         // arr_ptr points to the element array base, arr_len from data_hi.
@@ -19709,6 +20168,16 @@ impl WasmCodegen {
         self.line("  local.get $vlo"); // arr_base
         self.line("  local.get $vhi"); // arr_len
         self.line("  call $json_serialize_array_inner");
+        self.line("  return");
+        self.line("end");
+        // raw pre-serialized JSON (type=6) — write bytes directly without quoting
+        self.line("local.get $vtype");
+        self.line("i32.const 6");
+        self.line("i32.eq");
+        self.line("if");
+        self.line("  local.get $vlo"); // json_ptr
+        self.line("  local.get $vhi"); // json_len
+        self.line("  call $json_write_bytes");
         self.line("  return");
         self.line("end");
         self.indent -= 1;
@@ -29383,6 +29852,7 @@ component ItemList {
         assert!(wat.contains("func $json_parse_string"), "should emit $json_parse_string");
         assert!(wat.contains("func $json_parse_number"), "should emit $json_parse_number");
         assert!(wat.contains("func $json_get_field"), "should emit $json_get_field");
+        assert!(wat.contains("func $json_get_field3"), "should emit $json_get_field3");
         assert!(wat.contains("func $json_get_array_element"), "should emit $json_get_array_element");
         assert!(wat.contains("func $json_array_length"), "should emit $json_array_length");
     }
@@ -29568,6 +30038,146 @@ mod contract_api_tests {
         assert_eq!(codegen.known_contracts.len(), 1, "should track one contract");
         assert_eq!(codegen.known_contracts[0].0, "OrderResponse", "should store contract name");
         assert_eq!(codegen.known_contracts[0].1.len(), 2, "should store 2 fields");
+    }
+
+    #[test]
+    fn contract_array_field_parse() {
+        let contract = ContractDef {
+            name: "UserWithRoles".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "roles".into(), ty: Type::Array(Box::new(Type::Named("String".into()))), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _parse function exists
+        assert!(output.contains("func $UserWithRoles_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
+            "should emit $UserWithRoles_parse");
+        // _parse_from_obj function exists
+        assert!(output.contains("func $UserWithRoles_parse_from_obj (param $obj i32) (result i32)"),
+            "should emit $UserWithRoles_parse_from_obj");
+        // _parse delegates to _parse_from_obj
+        assert!(output.contains("call $UserWithRoles_parse_from_obj"),
+            "_parse should call _parse_from_obj");
+        // Array field uses json_get_field3
+        assert!(output.contains("call $json_get_field3"),
+            "array field should use $json_get_field3");
+        // Array field iterates with json_get_array_element
+        assert!(output.contains("call $json_get_array_element"),
+            "array field should iterate with $json_get_array_element");
+        // Vec header allocation (12 bytes)
+        assert!(output.contains("Allocate Vec header"),
+            "array field should allocate Vec header");
+    }
+
+    #[test]
+    fn contract_nested_field_parse() {
+        let contract = ContractDef {
+            name: "AdminUser".into(),
+            fields: vec![
+                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "email".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField { name: "organization".into(), ty: Type::Named("Organization".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _parse_from_obj exists
+        assert!(output.contains("func $AdminUser_parse_from_obj (param $obj i32) (result i32)"),
+            "should emit $AdminUser_parse_from_obj");
+        // Nested field calls Organization_parse_from_obj
+        assert!(output.contains("call $Organization_parse_from_obj"),
+            "nested field should call $Organization_parse_from_obj");
+        // Nested field comment
+        assert!(output.contains("nested Organization"),
+            "should have nested field comment");
+    }
+
+    #[test]
+    fn contract_array_field_serialize() {
+        let contract = ContractDef {
+            name: "RoleList".into(),
+            fields: vec![
+                ContractField { name: "user_id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "roles".into(), ty: Type::Array(Box::new(Type::Named("String".into()))), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _serialize handles array fields
+        assert!(output.contains("func $RoleList_serialize (param $struct_ptr i32) (result i32 i32)"),
+            "should emit $RoleList_serialize");
+        // Array field reads Vec header
+        assert!(output.contains("Array field: roles"),
+            "_serialize should handle array field");
+        // Uses type tag 5 for array
+        assert!(output.contains("i32.const 5 ;; type tag"),
+            "_serialize should use type=5 for arrays");
+    }
+
+    #[test]
+    fn contract_nested_field_serialize() {
+        let contract = ContractDef {
+            name: "OrderWithUser".into(),
+            fields: vec![
+                ContractField { name: "order_id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+                ContractField { name: "user".into(), ty: Type::Named("UserRow".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        // _serialize handles nested contract fields
+        assert!(output.contains("Nested contract field: user"),
+            "_serialize should handle nested contract field");
+        // Calls the nested contract's _serialize
+        assert!(output.contains("call $UserRow_serialize"),
+            "_serialize should call nested contract's _serialize");
+        // Uses type tag 6 (raw pre-serialized JSON)
+        assert!(output.contains("i32.const 6 ;; type tag (raw JSON)"),
+            "_serialize should use type=6 for nested contracts");
+    }
+
+    #[test]
+    fn contract_parse_from_obj_emitted_for_all_contracts() {
+        // Every contract should get a _parse_from_obj function
+        let contract = ContractDef {
+            name: "SimpleContract".into(),
+            fields: vec![
+                ContractField { name: "value".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
+            ],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_contract(&contract);
+        let output = codegen.output.clone();
+
+        assert!(output.contains("func $SimpleContract_parse_from_obj (param $obj i32) (result i32)"),
+            "even simple contracts should have _parse_from_obj");
+        assert!(output.contains("func $SimpleContract_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
+            "simple contracts should still have _parse");
     }
 
     #[test]
