@@ -847,6 +847,235 @@ fn cmd_lint(input: &PathBuf, _fix: bool) -> anyhow::Result<()> {
 }
 
 // ---------------------------------------------------------------------------
+// Use-import resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve `use` imports in a program.
+///
+/// For each `Item::Use(use_path)`, this function:
+/// 1. Checks if the first segment names an already-loaded `mod` in the program,
+///    and if so the items are already available via the mod's inline items.
+/// 2. Otherwise, tries to load `<segment>.nectar` from `source_dir`, parses it,
+///    and injects items (filtered by name or glob) into the program.
+///
+/// Imported items are prepended so they are visible to type checking and codegen.
+fn resolve_use_imports(program: &mut ast::Program, source_dir: &std::path::Path) {
+    use std::collections::HashSet;
+
+    // Collect which module names are already loaded via `mod` declarations.
+    let loaded_mod_names: HashSet<String> = program
+        .items
+        .iter()
+        .filter_map(|item| {
+            if let ast::Item::Mod(mod_def) = item {
+                Some(mod_def.name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Gather the list of (module_name, wanted_names) pairs from `use` statements
+    // that reference modules NOT already present via `mod`.
+    // For modules loaded via `mod`, the items are already available as inline children.
+    let mut to_load: Vec<(String, UseImportKind)> = Vec::new();
+
+    for item in &program.items {
+        if let ast::Item::Use(use_path) = item {
+            if use_path.segments.is_empty() {
+                continue;
+            }
+            let module_name = &use_path.segments[0];
+
+            // If the module is already loaded via `mod`, we need to extract items from it.
+            // If not, we need to load from a file.
+            let kind = if use_path.glob {
+                UseImportKind::Glob
+            } else if let Some(ref group) = use_path.group {
+                UseImportKind::Names(
+                    group.iter().map(|g| g.name.clone()).collect(),
+                )
+            } else if use_path.segments.len() >= 2 {
+                UseImportKind::Names(vec![
+                    use_path.segments.last().unwrap().clone(),
+                ])
+            } else {
+                continue;
+            };
+
+            to_load.push((module_name.clone(), kind));
+        }
+    }
+
+    if to_load.is_empty() {
+        return;
+    }
+
+    let mut extra_items: Vec<ast::Item> = Vec::new();
+    let mut files_loaded: HashSet<String> = HashSet::new();
+    // Cache parsed file items so we don't re-parse the same file.
+    let mut file_items_cache: std::collections::HashMap<String, Vec<ast::Item>> =
+        std::collections::HashMap::new();
+
+    for (module_name, kind) in &to_load {
+        // If this module was loaded via `mod`, extract items from the mod's inline items.
+        if loaded_mod_names.contains(module_name) {
+            // Find the mod item and extract wanted items from it.
+            let mod_item_names: Vec<String> = program
+                .items
+                .iter()
+                .filter_map(|item| {
+                    if let ast::Item::Mod(mod_def) = item {
+                        if mod_def.name == *module_name {
+                            mod_def.items.as_ref().map(|items| {
+                                items.iter().filter_map(|i| item_name(i)).collect::<Vec<_>>()
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .flatten()
+                .collect();
+            // Items from mod are already in the program tree; codegen handles
+            // them. No extra injection needed if they are properly resolved
+            // during name lookup.
+            let _ = mod_item_names;
+            continue;
+        }
+
+        // Load from file.
+        if !file_items_cache.contains_key(module_name) {
+            let file_path = source_dir.join(format!("{}.nectar", module_name));
+            if !file_path.exists() {
+                continue;
+            }
+            if !files_loaded.insert(module_name.clone()) {
+                continue;
+            }
+            let source = match fs::read_to_string(&file_path) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let mut lexer = Lexer::new(&source);
+            let tokens = match lexer.tokenize() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            let mut parser = Parser::new(tokens);
+            let (module_program, errors) = parser.parse_program_recovering();
+            if !errors.is_empty() {
+                continue;
+            }
+            file_items_cache.insert(module_name.clone(), module_program.items);
+        }
+
+        if let Some(module_items) = file_items_cache.get(module_name) {
+            match kind {
+                UseImportKind::Glob => {
+                    // Import all public items.
+                    // We need to take ownership, so drain from the cache later.
+                }
+                UseImportKind::Names(names) => {
+                    for name in names {
+                        // Find item indices to avoid borrowing issues.
+                        let found_idx = module_items.iter().position(|i| {
+                            item_name(i).map_or(false, |n| n == *name)
+                        });
+                        let _ = found_idx; // We'll drain below.
+                    }
+                }
+            }
+        }
+    }
+
+    // Now drain items from the cache, filtering by kind.
+    // We re-iterate to_load and take items from the cache.
+    let mut consumed_cache: std::collections::HashMap<String, Vec<ast::Item>> =
+        std::collections::HashMap::new();
+    std::mem::swap(&mut consumed_cache, &mut file_items_cache);
+
+    for (module_name, kind) in &to_load {
+        if loaded_mod_names.contains(module_name) {
+            continue;
+        }
+        if let Some(module_items) = consumed_cache.get_mut(module_name) {
+            match kind {
+                UseImportKind::Glob => {
+                    // Import all public items.
+                    let pub_items: Vec<ast::Item> = module_items
+                        .drain(..)
+                        .filter(|i| item_is_pub(i))
+                        .collect();
+                    extra_items.extend(pub_items);
+                }
+                UseImportKind::Names(names) => {
+                    // Import named items. Since we might import from the same
+                    // module multiple times, we scan without draining.
+                    for name in names {
+                        let idx = module_items.iter().position(|i| {
+                            item_name(i).map_or(false, |n| n == *name)
+                        });
+                        if let Some(idx) = idx {
+                            extra_items.push(module_items.remove(idx));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !extra_items.is_empty() {
+        // Prepend imported items so they are visible during type checking / codegen.
+        extra_items.append(&mut program.items);
+        program.items = extra_items;
+    }
+}
+
+#[derive(Clone)]
+enum UseImportKind {
+    Glob,
+    Names(Vec<String>),
+}
+
+/// Check whether a top-level item has the `pub` visibility modifier.
+fn item_is_pub(item: &ast::Item) -> bool {
+    match item {
+        ast::Item::Function(f) => f.is_pub,
+        ast::Item::Struct(s) => s.is_pub,
+        ast::Item::Enum(e) => e.is_pub,
+        ast::Item::Store(s) => s.is_pub,
+        ast::Item::Component(_) => true, // components are always importable
+        ast::Item::Contract(c) => c.is_pub,
+        ast::Item::Agent(_) => true,
+        ast::Item::Trait(_) => true,
+        ast::Item::Page(p) => p.is_pub,
+        ast::Item::Form(f) => f.is_pub,
+        _ => false,
+    }
+}
+
+/// Get the name of a top-level item (if it has one).
+fn item_name(item: &ast::Item) -> Option<String> {
+    match item {
+        ast::Item::Function(f) => Some(f.name.clone()),
+        ast::Item::Struct(s) => Some(s.name.clone()),
+        ast::Item::Enum(e) => Some(e.name.clone()),
+        ast::Item::Store(s) => Some(s.name.clone()),
+        ast::Item::Component(c) => Some(c.name.clone()),
+        ast::Item::Contract(c) => Some(c.name.clone()),
+        ast::Item::Trait(t) => Some(t.name.clone()),
+        ast::Item::Agent(a) => Some(a.name.clone()),
+        ast::Item::Impl(i) => Some(i.target.clone()),
+        ast::Item::Page(p) => Some(p.name.clone()),
+        ast::Item::Form(f) => Some(f.name.clone()),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Compilation
 // ---------------------------------------------------------------------------
 
@@ -899,6 +1128,12 @@ fn compile(
         program = module_loader::ModuleLoader::compile_project(input)
             .map_err(|e| anyhow::anyhow!("module loading error: {}", e))?;
     }
+
+    // Resolve `use` imports: find referenced items from loaded modules (or
+    // from sibling .nectar files) and inject them into the program so that
+    // type checking and codegen can see them.
+    let source_dir = input.parent().unwrap_or_else(|| std::path::Path::new("."));
+    resolve_use_imports(&mut program, source_dir);
 
     if emit_ast {
         println!("{:#?}", program);
@@ -1599,5 +1834,83 @@ mod tests {
             }
             _ => panic!("expected Serve command"),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_use_imports: named import from sibling file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resolve_use_imports_named_item() {
+        let dir = TempDir::new().unwrap();
+        // Write a module file with a public struct
+        fs::write(
+            dir.path().join("models.nectar"),
+            "pub struct Product {\n    name: String,\n    price: i32,\n}\n",
+        ).unwrap();
+
+        // Write a main file that imports Product
+        let main_path = write_temp_file(
+            &dir,
+            "main.nectar",
+            "use models::Product;\nfn main() -> i32 { 0 }\n",
+        );
+
+        let result = compile(
+            &main_path,
+            Some(dir.path().join("out.wat")),
+            false, false, false, false, false, true, 0, false,
+        );
+        assert!(result.is_ok(), "compile with use import failed: {:?}", result);
+        let wat = fs::read_to_string(dir.path().join("out.wat")).unwrap();
+        assert!(wat.contains("module"), "output should be valid WAT");
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_use_imports: glob import from sibling file
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resolve_use_imports_glob() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("utils.nectar"),
+            "pub fn add(a: i32, b: i32) -> i32 { a + b }\npub fn sub(a: i32, b: i32) -> i32 { a - b }\n",
+        ).unwrap();
+
+        let main_path = write_temp_file(
+            &dir,
+            "main.nectar",
+            "use utils::*;\nfn main() -> i32 { add(1, 2) }\n",
+        );
+
+        let result = compile(
+            &main_path,
+            Some(dir.path().join("out.wat")),
+            false, false, false, false, false, true, 0, false,
+        );
+        assert!(result.is_ok(), "compile with glob import failed: {:?}", result);
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_use_imports: missing module file is graceful
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resolve_use_imports_missing_module() {
+        let dir = TempDir::new().unwrap();
+        let main_path = write_temp_file(
+            &dir,
+            "main.nectar",
+            "use nonexistent::Foo;\nfn main() -> i32 { 0 }\n",
+        );
+
+        // Should still compile — missing module is silently skipped
+        let result = compile(
+            &main_path,
+            Some(dir.path().join("out.wat")),
+            false, false, false, false, false, true, 0, false,
+        );
+        assert!(result.is_ok(), "compile with missing module should not hard-fail: {:?}", result);
     }
 }
