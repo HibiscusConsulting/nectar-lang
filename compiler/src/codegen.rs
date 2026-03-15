@@ -114,6 +114,11 @@ pub struct WasmCodegen {
     /// Capability signal tracking — maps capability_name → signal_names for all 8 capabilities.
     /// Used to resolve `CapName::status()`, `CapName::error()`, etc. to signal getters.
     known_capability_signals: Vec<(String, String, Vec<String>)>,
+    /// Scoped CSS selectors for the current component. When a component has
+    /// styles, class selectors (`.foo`) are rewritten to `ComponentName__foo`.
+    /// This set contains the original class names (without the dot) so that
+    /// template elements with `class="foo"` can be rewritten at compile time.
+    component_scoped_selectors: HashSet<String>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -219,6 +224,7 @@ impl WasmCodegen {
             required_providers: HashSet::new(),
             known_payment_signals: Vec::new(),
             known_capability_signals: Vec::new(),
+            component_scoped_selectors: HashSet::new(),
         }
     }
 
@@ -1803,6 +1809,22 @@ impl WasmCodegen {
         }).map(|s| s.name.clone()).collect();
         self.component_props = prop_names;
         self.component_name = comp_name.clone();
+        // Build the set of scoped CSS class selectors for compile-time class rewriting.
+        // A selector like ".card" extracts "card"; compound selectors like ".card .title"
+        // extract both "card" and "title". Non-class selectors and CSS custom property
+        // blocks (:root) are left unscoped.
+        self.component_scoped_selectors.clear();
+        for style in &comp.styles {
+            for part in style.selector.split_whitespace() {
+                if let Some(cls) = part.strip_prefix('.') {
+                    // Strip pseudo-classes/elements (e.g. ".btn:hover" -> "btn")
+                    let cls = cls.split(':').next().unwrap_or(cls);
+                    if !cls.is_empty() {
+                        self.component_scoped_selectors.insert(cls.to_string());
+                    }
+                }
+            }
+        }
         self.component_method_names = comp.methods.iter().map(|m| m.name.clone()).collect();
 
         // Register this component's handler range in the global callback registry
@@ -2560,6 +2582,7 @@ impl WasmCodegen {
         self.in_component_mount = false;
         self.component_fields.clear();
         self.component_name.clear();
+        self.component_scoped_selectors.clear();
     }
 
     fn generate_page(&mut self, page: &PageDef) {
@@ -5118,6 +5141,7 @@ impl WasmCodegen {
         self.in_component_mount = false;
         self.component_fields.clear();
         self.component_name.clear();
+        self.component_scoped_selectors.clear();
     }
 
     fn generate_agent(&mut self, agent: &AgentDef) {
@@ -5388,6 +5412,40 @@ impl WasmCodegen {
         json
     }
 
+    /// Scope a CSS selector by prefixing class selectors with `CompName__`.
+    /// CSS custom-property blocks (`:root`) and element selectors are left as-is.
+    fn scope_css_selector(comp_name: &str, selector: &str) -> String {
+        // :root and other pseudo-element-only selectors stay global
+        let trimmed = selector.trim();
+        if trimmed.starts_with(":root") {
+            return selector.to_string();
+        }
+
+        let mut scoped = String::new();
+        for (i, part) in selector.split_whitespace().enumerate() {
+            if i > 0 {
+                scoped.push(' ');
+            }
+            if let Some(cls) = part.strip_prefix('.') {
+                // Separate the class name from pseudo-classes/pseudo-elements
+                // e.g. ".btn:hover" -> class="btn", pseudo=":hover"
+                let (class_name, pseudo) = match cls.find(':') {
+                    Some(idx) => (&cls[..idx], &cls[idx..]),
+                    None => (cls, ""),
+                };
+                scoped.push('.');
+                scoped.push_str(comp_name);
+                scoped.push_str("__");
+                scoped.push_str(class_name);
+                scoped.push_str(pseudo);
+            } else {
+                // Element selectors, *, combinators, etc. — keep as-is
+                scoped.push_str(part);
+            }
+        }
+        scoped
+    }
+
     fn generate_style_injection(&mut self, comp_name: &str, styles: &[StyleBlock]) {
         if styles.is_empty() {
             return;
@@ -5396,10 +5454,14 @@ impl WasmCodegen {
         self.line("");
         self.line(&format!(";; scoped styles for {}", comp_name));
 
-        // Build CSS string from style blocks
+        // Build CSS string from style blocks with scoped selectors.
+        // Class selectors are prefixed with ComponentName__ so that
+        // `.card` in ProductCard becomes `.ProductCard__card`.
+        // CSS custom properties (:root) are left global for theming.
         let mut css = String::new();
         for block in styles {
-            css.push_str(&block.selector);
+            let scoped_selector = Self::scope_css_selector(comp_name, &block.selector);
+            css.push_str(&scoped_selector);
             css.push_str(" { ");
             for (prop, val) in &block.properties {
                 css.push_str(prop);
@@ -5637,13 +5699,32 @@ impl WasmCodegen {
                 for attr in &el.attributes {
                     match attr {
                         Attribute::Static { name, value } => {
+                            // Scoped CSS: rewrite class attribute values at compile time.
+                            // Each space-separated class name is checked against the
+                            // component's scoped selectors; matching ones get the
+                            // ComponentName__ prefix.
+                            let effective_value = if name == "class" && !self.component_scoped_selectors.is_empty() {
+                                let comp = &self.component_name;
+                                value.split_whitespace()
+                                    .map(|cls| {
+                                        if self.component_scoped_selectors.contains(cls) {
+                                            format!("{}__{}", comp, cls)
+                                        } else {
+                                            cls.to_string()
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ")
+                            } else {
+                                value.clone()
+                            };
                             let name_offset = self.store_string(name);
-                            let val_offset = self.store_string(value);
+                            let val_offset = self.store_string(&effective_value);
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", name_offset));
                             self.line(&format!("i32.const {}", name.len()));
                             self.line(&format!("i32.const {}", val_offset));
-                            self.line(&format!("i32.const {}", value.len()));
+                            self.line(&format!("i32.const {}", effective_value.len()));
                             self.line("call $dom_setAttr");
                             // Auto-register timing display elements
                             if name == "id" && value == "timing-display" {
@@ -22735,6 +22816,288 @@ mod coverage_codegen_tests {
         assert!(output.contains("scoped styles for Styled"), "should have style injection");
         assert!(output.contains("style_injectStyles"), "should call style_injectStyles");
         assert!(output.contains("transitions for Styled"), "should have transitions");
+    }
+
+    // -----------------------------------------------------------------------
+    // Scoped CSS — compile-time class rewriting
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scoped_css_selector_prefixed_with_component_name() {
+        // Verify that .card in ProductCard becomes .ProductCard__card
+        let scoped = WasmCodegen::scope_css_selector("ProductCard", ".card");
+        assert_eq!(scoped, ".ProductCard__card");
+        // Compound selectors
+        let scoped2 = WasmCodegen::scope_css_selector("ProductCard", ".card .title");
+        assert_eq!(scoped2, ".ProductCard__card .ProductCard__title");
+    }
+
+    #[test]
+    fn scoped_css_emitted_with_scoped_selectors() {
+        // The CSS string stored in linear memory should use scoped selectors
+        let comp = Component {
+            name: "Card".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".wrapper".into(),
+                properties: vec![("padding".into(), "8px".into())],
+                span: span(),
+            }],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        // The interned string table should contain the scoped selector
+        let has_scoped = codegen.strings.iter().any(|(s, _)| s.contains(".Card__wrapper"));
+        assert!(has_scoped, "CSS string should contain scoped selector .Card__wrapper");
+        let has_unscoped = codegen.strings.iter().any(|(s, _)| s.contains(".wrapper {") && !s.contains("Card__wrapper"));
+        assert!(!has_unscoped, "CSS string should NOT contain unscoped .wrapper selector");
+    }
+
+    #[test]
+    fn scoped_css_inject_styles_called_during_mount() {
+        // Verify injectStyles is called inside the mount function
+        let comp = Component {
+            name: "Badge".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".tag".into(),
+                properties: vec![("color".into(), "blue".into())],
+                span: span(),
+            }],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        let output = codegen.output.clone();
+        // The mount function should call style_injectStyles
+        assert!(output.contains("call $style_injectStyles"), "mount must call injectStyles");
+        // And the call should appear after the mount function signature
+        let mount_pos = output.find("Badge_mount").unwrap_or(0);
+        let inject_pos = output.find("call $style_injectStyles").unwrap_or(0);
+        assert!(inject_pos > mount_pos, "injectStyles should be called inside mount");
+    }
+
+    #[test]
+    fn scoped_css_different_components_no_shared_classes() {
+        // Two components with the same .title class produce different scoped names
+        let comp_a = Component {
+            name: "Header".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".title".into(),
+                properties: vec![("font-size".into(), "24px".into())],
+                span: span(),
+            }],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: "h1".into(),
+                    attributes: vec![Attribute::Static { name: "class".into(), value: "title".into() }],
+                    children: vec![],
+                    span: span(),
+                }),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let comp_b = Component {
+            name: "Footer".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".title".into(),
+                properties: vec![("font-size".into(), "12px".into())],
+                span: span(),
+            }],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: "p".into(),
+                    attributes: vec![Attribute::Static { name: "class".into(), value: "title".into() }],
+                    children: vec![],
+                    span: span(),
+                }),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp_a);
+        let has_header = codegen.strings.iter().any(|(s, _)| s == "Header__title");
+        assert!(has_header, "Header should scope class to Header__title");
+
+        codegen.generate_component(&comp_b);
+        let has_footer = codegen.strings.iter().any(|(s, _)| s == "Footer__title");
+        assert!(has_footer, "Footer should scope class to Footer__title");
+
+        // Verify they are different strings
+        let header_offset = codegen.strings.iter().find(|(s, _)| s == "Header__title").map(|(_, o)| *o);
+        let footer_offset = codegen.strings.iter().find(|(s, _)| s == "Footer__title").map(|(_, o)| *o);
+        assert_ne!(header_offset, footer_offset, "Header__title and Footer__title must be different interned strings");
+    }
+
+    #[test]
+    fn scoped_css_variables_not_scoped() {
+        // :root selectors with CSS custom properties must remain global
+        let scoped = WasmCodegen::scope_css_selector("Theme", ":root");
+        assert_eq!(scoped, ":root", ":root selector must NOT be scoped");
+
+        // A component with :root styles should emit them unscoped
+        let comp = Component {
+            name: "Theme".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![
+                StyleBlock {
+                    selector: ":root".into(),
+                    properties: vec![("--bg".into(), "#0b0e14".into()), ("--fg".into(), "#fff".into())],
+                    span: span(),
+                },
+                StyleBlock {
+                    selector: ".container".into(),
+                    properties: vec![("background".into(), "var(--bg)".into())],
+                    span: span(),
+                },
+            ],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        // The CSS should have :root unscooped and .container scoped
+        let css_string = codegen.strings.iter().find(|(s, _)| s.contains(":root") && s.contains("--bg"));
+        assert!(css_string.is_some(), "should have :root CSS variables in string table");
+        let css = &css_string.unwrap().0;
+        assert!(css.contains(":root {"), ":root must remain unscoped");
+        assert!(css.contains(".Theme__container"), ".container must be scoped to Theme__container");
+        assert!(!css.contains("Theme__:root"), ":root must NOT be prefixed with component name");
+    }
+
+    #[test]
+    fn scoped_css_class_attribute_rewritten_in_template() {
+        // When a component has styles, class="card" in the template should become
+        // class="CompName__card" in the emitted WAT
+        let comp = Component {
+            name: "ProductCard".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![],
+            methods: vec![],
+            styles: vec![StyleBlock {
+                selector: ".card".into(),
+                properties: vec![("padding".into(), "16px".into())],
+                span: span(),
+            }],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Element(Element {
+                    tag: "div".into(),
+                    attributes: vec![Attribute::Static { name: "class".into(), value: "card".into() }],
+                    children: vec![],
+                    span: span(),
+                }),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_component(&comp);
+        // The interned strings should have "ProductCard__card" (the rewritten class)
+        let has_scoped_class = codegen.strings.iter().any(|(s, _)| s == "ProductCard__card");
+        assert!(has_scoped_class, "class attribute value should be rewritten to ProductCard__card");
+        // And should NOT have the bare "card" as a class value (it may appear as part of
+        // the component name or CSS selector string, but not as a standalone interned string
+        // used for the class attribute)
+        let bare_card_count = codegen.strings.iter().filter(|(s, _)| s == "card").count();
+        assert_eq!(bare_card_count, 0, "bare 'card' should not be interned as class value");
+    }
+
+    #[test]
+    fn scoped_css_pseudo_selectors_preserved() {
+        // .btn:hover should become .Comp__btn:hover (pseudo preserved)
+        let scoped = WasmCodegen::scope_css_selector("Comp", ".btn:hover");
+        assert_eq!(scoped, ".Comp__btn:hover");
+        let scoped2 = WasmCodegen::scope_css_selector("Comp", ".link::after");
+        assert_eq!(scoped2, ".Comp__link::after");
     }
 
     // -----------------------------------------------------------------------
