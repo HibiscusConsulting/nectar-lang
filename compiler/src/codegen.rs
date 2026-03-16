@@ -3333,9 +3333,12 @@ impl WasmCodegen {
             self.global_handler_base = base + comp.methods.len() as u32;
         }
 
-        // Generate methods (non-handler versions)
+        // Generate methods (non-handler versions) — namespaced to avoid
+        // collisions when multiple components define methods with the same name.
         for method in &comp.methods {
-            self.generate_function(method);
+            let mut namespaced = method.clone();
+            namespaced.name = format!("{}_{}", comp_name, method.name);
+            self.generate_function(&namespaced);
         }
 
         // Generate on_destroy lifecycle cleanup function
