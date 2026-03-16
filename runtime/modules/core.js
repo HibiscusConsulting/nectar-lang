@@ -864,6 +864,84 @@ export const wasmImports = {
       },
     };
   })(),
+
+  // ── Canvas 2D — WASM-driven rendering (no DOM element creation) ───────
+  // Used by --render=canvas and --render=hybrid modes.
+  // WASM computes layout in linear memory, then calls these syscalls to paint.
+  canvas: (() => {
+    const ctxMap = new Map(); // id -> CanvasRenderingContext2D
+    let nextId = 1;
+    const __ctx = (id) => ctxMap.get(id);
+
+    return {
+      init(width, height) {
+        const c = document.createElement('canvas');
+        c.width = width; c.height = height;
+        c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
+        document.body.appendChild(c);
+        const ctx = c.getContext('2d');
+        const id = nextId++;
+        ctxMap.set(id, ctx);
+        return id;
+      },
+      clear(id) {
+        const ctx = __ctx(id);
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      },
+      fillRect(id, x, y, w, h, colorPtr) {
+        const ctx = __ctx(id);
+        ctx.fillStyle = R.__getString(colorPtr, 7);
+        ctx.fillRect(x, y, w, h);
+      },
+      strokeRect(id, x, y, w, h, colorPtr) {
+        const ctx = __ctx(id);
+        ctx.strokeStyle = R.__getString(colorPtr, 7);
+        ctx.strokeRect(x, y, w, h);
+      },
+      fillText(id, textPtr, textLen, x, y, colorPtr) {
+        const ctx = __ctx(id);
+        ctx.fillStyle = R.__getString(colorPtr, 7);
+        ctx.fillText(R.__getString(textPtr, textLen), x, y);
+      },
+      setFont(id, fontPtr, fontLen) {
+        __ctx(id).font = R.__getString(fontPtr, fontLen);
+      },
+      setFillColor(id, r, g, b) {
+        __ctx(id).fillStyle = `rgb(${r},${g},${b})`;
+      },
+      drawImage(id, srcPtr, srcLen, x, y, w, h) {
+        const ctx = __ctx(id);
+        const src = R.__getString(srcPtr, srcLen);
+        // Cache Image objects to avoid re-decoding
+        if (!ctx._imgCache) ctx._imgCache = new Map();
+        let img = ctx._imgCache.get(src);
+        if (img && img.complete) {
+          ctx.drawImage(img, x, y, w, h);
+        } else if (!img) {
+          img = new Image();
+          img.src = src;
+          ctx._imgCache.set(src, img);
+          img.onload = () => ctx.drawImage(img, x, y, w, h);
+        }
+      },
+      measureText(id, textPtr, textLen) {
+        return Math.ceil(__ctx(id).measureText(R.__getString(textPtr, textLen)).width);
+      },
+      setScroll(id, y) {
+        __ctx(id)._scrollY = y;
+      },
+      getScroll(id) {
+        return __ctx(id)._scrollY || 0;
+      },
+      beginPath(id) { __ctx(id).beginPath(); },
+      roundRect(id, x, y, w, h, r) { __ctx(id).roundRect(x, y, w, h, r); },
+      fill(id) { __ctx(id).fill(); },
+      clip(id) { __ctx(id).clip(); },
+      save(id) { __ctx(id).save(); },
+      restore(id) { __ctx(id).restore(); },
+      requestFrame(cbIdx) { requestAnimationFrame(() => R.__cb(cbIdx)); },
+    };
+  })(),
 };
 
 // ── WASM instantiation helper ────────────────────────────────────────────────

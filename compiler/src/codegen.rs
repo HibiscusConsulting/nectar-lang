@@ -12,6 +12,20 @@ pub enum CompilationTarget {
     Wasi,
 }
 
+/// Render mode — determines how the component template produces visible output.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RenderMode {
+    /// Traditional DOM rendering via innerHTML + createElement + signal updaters.
+    /// Content is crawlable, selectable, accessible. ~250ms for 10K items.
+    Dom,
+    /// Pure Canvas 2D rendering — WASM computes layout, calls canvas draw APIs.
+    /// Sub-1ms for any item count but no SEO, no accessibility, no text selection.
+    Canvas,
+    /// Hybrid: Canvas for visible rendering + hidden DOM for SEO/accessibility.
+    /// Best of both: canvas speed + crawlable/accessible hidden DOM.
+    Hybrid,
+}
+
 /// Generates WebAssembly Text Format (WAT) from a Nectar AST.
 ///
 /// This is the initial codegen backend. We emit WAT first for readability
@@ -20,6 +34,8 @@ pub enum CompilationTarget {
 pub struct WasmCodegen {
     /// Compilation target (browser or WASI)
     target: CompilationTarget,
+    /// Render mode (dom, canvas, hybrid)
+    render_mode: RenderMode,
     output: String,
     indent: usize,
     /// Track local variables in current function scope
@@ -242,9 +258,16 @@ impl WasmCodegen {
         Self::with_target(CompilationTarget::Browser)
     }
 
+    pub fn with_render_mode(target: CompilationTarget, render_mode: RenderMode) -> Self {
+        let mut s = Self::with_target(target);
+        s.render_mode = render_mode;
+        s
+    }
+
     pub fn with_target(target: CompilationTarget) -> Self {
         Self {
             target,
+            render_mode: RenderMode::Dom,
             output: String::new(),
             indent: 0,
             locals: Vec::new(),
@@ -1092,6 +1115,30 @@ impl WasmCodegen {
         self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
         self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
         self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
+        }
+
+        // ── Canvas 2D — imported for canvas/hybrid render modes ─────────────
+        if self.render_mode == RenderMode::Canvas || self.render_mode == RenderMode::Hybrid {
+        self.line("");
+        self.line(";; Canvas 2D — WASM-driven rendering (no DOM element creation)");
+        self.line("(import \"canvas\" \"init\" (func $canvas_init (param i32 i32) (result i32)))");
+        self.line("(import \"canvas\" \"clear\" (func $canvas_clear (param i32)))");
+        self.line("(import \"canvas\" \"fillRect\" (func $canvas_fillRect (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"strokeRect\" (func $canvas_strokeRect (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"fillText\" (func $canvas_fillText (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"setFont\" (func $canvas_setFont (param i32 i32 i32)))");
+        self.line("(import \"canvas\" \"setFillColor\" (func $canvas_setFillColor (param i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"drawImage\" (func $canvas_drawImage (param i32 i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"measureText\" (func $canvas_measureText (param i32 i32 i32) (result i32)))");
+        self.line("(import \"canvas\" \"setScroll\" (func $canvas_setScroll (param i32 i32)))");
+        self.line("(import \"canvas\" \"getScroll\" (func $canvas_getScroll (result i32)))");
+        self.line("(import \"canvas\" \"beginPath\" (func $canvas_beginPath (param i32)))");
+        self.line("(import \"canvas\" \"roundRect\" (func $canvas_roundRect (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"canvas\" \"fill\" (func $canvas_fill (param i32)))");
+        self.line("(import \"canvas\" \"clip\" (func $canvas_clip (param i32)))");
+        self.line("(import \"canvas\" \"save\" (func $canvas_save (param i32)))");
+        self.line("(import \"canvas\" \"restore\" (func $canvas_restore (param i32)))");
+        self.line("(import \"canvas\" \"requestFrame\" (func $canvas_requestFrame (param i32)))");
         }
 
         } // end browser imports
