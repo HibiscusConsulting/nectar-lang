@@ -874,70 +874,41 @@ export const wasmImports = {
   // Used by --render=canvas and --render=hybrid modes.
   // WASM computes layout in linear memory, then calls these syscalls to paint.
   canvas: (() => {
-    const ctxMap = new Map(); // id -> CanvasRenderingContext2D
+    const ctxMap = new Map();
     let nextId = 1;
     const __ctx = (id) => ctxMap.get(id);
+    const dpr = typeof devicePixelRatio !== 'undefined' ? devicePixelRatio : 1;
 
     return {
+      // Original API (for compiler-generated canvas imports)
       init(width, height) {
         const c = document.createElement('canvas');
-        c.width = width; c.height = height;
+        c.width = width * dpr; c.height = height * dpr;
         c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
         document.body.appendChild(c);
         const ctx = c.getContext('2d');
+        ctx.scale(dpr, dpr);
         const id = nextId++;
         ctxMap.set(id, ctx);
         return id;
       },
-      clear(id) {
-        const ctx = __ctx(id);
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      },
-      fillRect(id, x, y, w, h, colorPtr) {
-        const ctx = __ctx(id);
-        ctx.fillStyle = R.__getStringZ(colorPtr);
-        ctx.fillRect(x, y, w, h);
-      },
-      strokeRect(id, x, y, w, h, colorPtr) {
-        const ctx = __ctx(id);
-        ctx.strokeStyle = R.__getStringZ(colorPtr);
-        ctx.strokeRect(x, y, w, h);
-      },
-      fillText(id, textPtr, textLen, x, y, colorPtr) {
-        const ctx = __ctx(id);
-        ctx.fillStyle = R.__getStringZ(colorPtr);
-        ctx.fillText(R.__getString(textPtr, textLen), x, y);
-      },
-      setFont(id, fontPtr, fontLen) {
-        __ctx(id).font = R.__getString(fontPtr, fontLen);
-      },
-      setFillColor(id, r, g, b) {
-        __ctx(id).fillStyle = `rgb(${r},${g},${b})`;
-      },
+      clear(id) { const ctx = __ctx(id); ctx.clearRect(0, 0, ctx.canvas.width / dpr, ctx.canvas.height / dpr); },
+      fillRect(id, x, y, w, h, colorPtr) { const ctx = __ctx(id); ctx.fillStyle = R.__getStringZ(colorPtr); ctx.fillRect(x, y, w, h); },
+      strokeRect(id, x, y, w, h, colorPtr) { const ctx = __ctx(id); ctx.strokeStyle = R.__getStringZ(colorPtr); ctx.strokeRect(x, y, w, h); },
+      fillText(id, textPtr, textLen, x, y, colorPtr) { const ctx = __ctx(id); ctx.fillStyle = R.__getStringZ(colorPtr); ctx.fillText(R.__getString(textPtr, textLen), x, y); },
+      setFont(id, fontPtr, fontLen) { __ctx(id).font = R.__getString(fontPtr, fontLen); },
+      setFillColor(id, r, g, b) { __ctx(id).fillStyle = `rgb(${r},${g},${b})`; },
       drawImage(id, srcPtr, srcLen, x, y, w, h) {
         const ctx = __ctx(id);
         const src = srcLen > 0 ? R.__getString(srcPtr, srcLen) : R.__getStringZ(srcPtr);
-        // Cache Image objects to avoid re-decoding
         if (!ctx._imgCache) ctx._imgCache = new Map();
         let img = ctx._imgCache.get(src);
-        if (img && img.complete) {
-          ctx.drawImage(img, x, y, w, h);
-        } else if (!img) {
-          img = new Image();
-          img.src = src;
-          ctx._imgCache.set(src, img);
-          img.onload = () => ctx.drawImage(img, x, y, w, h);
-        }
+        if (img && img.complete && img.naturalWidth > 0) { ctx.drawImage(img, x, y, w, h); }
+        else if (!img) { img = new Image(); img.src = src; ctx._imgCache.set(src, img); img.onload = () => { if (R.__instance?.exports?.app_render) R.__instance.exports.app_render(); }; }
       },
-      measureText(id, textPtr, textLen) {
-        return Math.ceil(__ctx(id).measureText(R.__getString(textPtr, textLen)).width);
-      },
-      setScroll(id, y) {
-        __ctx(id)._scrollY = y;
-      },
-      getScroll(id) {
-        return __ctx(id)._scrollY || 0;
-      },
+      measureText(id, textPtr, textLen) { return Math.ceil(__ctx(id).measureText(R.__getString(textPtr, textLen)).width); },
+      setScroll(id, y) { __ctx(id)._scrollY = y; },
+      getScroll(id) { return __ctx(id)._scrollY || 0; },
       beginPath(id) { __ctx(id).beginPath(); },
       roundRect(id, x, y, w, h, r) { __ctx(id).roundRect(x, y, w, h, r); },
       fill(id) { __ctx(id).fill(); },
@@ -945,6 +916,49 @@ export const wasmImports = {
       save(id) { __ctx(id).save(); },
       restore(id) { __ctx(id).restore(); },
       requestFrame(cbIdx) { requestAnimationFrame(() => R.__cb(cbIdx)); },
+
+      // ── Direct RGBA API (for nectar-layout WASM canvas_app) ────
+      // These use RGBA values directly instead of string pointers.
+      canvas_init(w, h) {
+        const c = document.createElement('canvas');
+        c.id = 'nectar-canvas';
+        c.width = w * dpr; c.height = h * dpr;
+        c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1';
+        document.body.appendChild(c);
+        const ctx = c.getContext('2d');
+        ctx.scale(dpr, dpr);
+        const id = nextId++;
+        ctxMap.set(id, ctx);
+        return id;
+      },
+      canvas_clear(id) { const ctx = __ctx(id); ctx.clearRect(0, 0, ctx.canvas.width / dpr, ctx.canvas.height / dpr); },
+      canvas_fill_rect(id, x, y, w, h, r, g, b, a) { const ctx = __ctx(id); ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`; ctx.fillRect(x, y, w, h); },
+      canvas_stroke_rect(id, x, y, w, h, r, g, b, a, lw) { const ctx = __ctx(id); ctx.strokeStyle = `rgba(${r},${g},${b},${a/255})`; ctx.lineWidth = lw; ctx.strokeRect(x, y, w, h); },
+      canvas_round_rect(id, x, y, w, h, radius, r, g, b, a) { const ctx = __ctx(id); ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`; ctx.beginPath(); ctx.roundRect(x, y, w, h, radius); ctx.fill(); },
+      canvas_fill_text(id, ptr, len, x, y, r, g, b, size, bold) {
+        const ctx = __ctx(id);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.font = `${bold ? 'bold ' : ''}${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.fillText(R.__getString(ptr, len), x, y);
+      },
+      canvas_draw_image(id, srcPtr, srcLen, x, y, w, h, clipRadius) {
+        const ctx = __ctx(id);
+        const src = R.__getString(srcPtr, srcLen);
+        if (!ctx._imgCache) ctx._imgCache = new Map();
+        let img = ctx._imgCache.get(src);
+        if (img && img.complete && img.naturalWidth > 0) {
+          if (clipRadius > 0) { ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, [clipRadius, clipRadius, 0, 0]); ctx.clip(); }
+          ctx.drawImage(img, x, y, w, h);
+          if (clipRadius > 0) ctx.restore();
+        } else if (!img) {
+          img = new Image(); img.src = src; ctx._imgCache.set(src, img);
+          img.onload = () => { if (R.__instance?.exports?.app_render) R.__instance.exports.app_render(); };
+        }
+      },
+      canvas_measure_text(id, ptr, len, size) { const ctx = __ctx(id); ctx.font = `${size}px -apple-system, sans-serif`; return Math.ceil(ctx.measureText(R.__getString(ptr, len)).width); },
+      canvas_get_width() { return window.innerWidth; },
+      canvas_get_height() { return window.innerHeight; },
+      canvas_request_frame(cbIdx) { requestAnimationFrame(() => R.__cb(cbIdx)); },
     };
   })(),
 };
