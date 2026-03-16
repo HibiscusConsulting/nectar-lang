@@ -103,58 +103,121 @@ fn set_text(tree: &mut ElementTree, id: u32, text: &str) {
 
 fn build_ui(state: &mut AppState) {
     let tree = &mut state.tree;
-    let root = tree.root_id(); // ID 1
+    let root = tree.root_id();
 
-    // Root: vertical stack, full width
+    // Root: vertical, full width, hug height (content determines scroll)
     set_style(tree, root, "direction", "vertical");
     set_style(tree, root, "width", &format!("{}px", state.vw));
     set_style(tree, root, "height", "hug");
-    set_style(tree, root, "gap", "12");
-    set_style(tree, root, "padding", "20");
+    set_style(tree, root, "gap", "0");
+    set_style(tree, root, "padding", "0");
     state.root_id = root;
 
-    // ── Header ───────────────────────────────────
-    let header = add_el(tree, "div", root);
-    set_style(tree, header, "direction", "vertical");
-    set_style(tree, header, "padding", "16");
-    set_style(tree, header, "height", "hug");
-    set_style(tree, header, "background-color", "#131720");
+    // ══ Section card (the big rounded container) ══
+    let section = add_el(tree, "div", root);
+    set_style(tree, section, "direction", "vertical");
+    set_style(tree, section, "height", "hug");
+    set_style(tree, section, "padding", "32");
+    set_style(tree, section, "gap", "20");
+    set_style(tree, section, "background-color", "#131720");
+    set_style(tree, section, "border-radius", "16");
 
-    let title = add_el(tree, "div", header);
-    set_text(tree, title, "Nectar Canvas Mode");
-    set_style(tree, title, "font-size", "24px");
+    // ── Title row: "E-Commerce Product Grid" + badge ──
+    let title_row = add_el(tree, "div", section);
+    set_style(tree, title_row, "direction", "horizontal");
+    set_style(tree, title_row, "gap", "12");
+    set_style(tree, title_row, "height", "hug");
+    set_style(tree, title_row, "align", "center");
+
+    let title = add_el(tree, "div", title_row);
+    set_text(tree, title, "E-Commerce Product Grid");
+    set_style(tree, title, "font-size", "26px");
     set_style(tree, title, "font-weight", "bold");
     set_style(tree, title, "color", "#f97316");
     set_style(tree, title, "height", "hug");
+    set_style(tree, title, "width", "hug");
 
-    let subtitle = add_el(tree, "div", header);
-    set_text(tree, subtitle, "WASM Layout Engine · Canvas 2D · Zero DOM");
-    set_style(tree, subtitle, "font-size", "12px");
-    set_style(tree, subtitle, "color", "#8b949e");
-    set_style(tree, subtitle, "height", "hug");
+    let badge = add_el(tree, "div", title_row);
+    set_text(tree, badge, "per-card signals");
+    set_style(tree, badge, "font-size", "11px");
+    set_style(tree, badge, "font-weight", "bold");
+    set_style(tree, badge, "color", "#3fb950");
+    set_style(tree, badge, "background-color", "#1a2e1a");
+    set_style(tree, badge, "padding", "4");
+    set_style(tree, badge, "height", "hug");
+    set_style(tree, badge, "width", "hug");
+    set_style(tree, badge, "border-radius", "6");
 
-    // ── Category pills row ───────────────────────
-    let pills_row = add_el(tree, "div", root);
+    // ── Controls row: search + cart + clear ──
+    let controls = add_el(tree, "div", section);
+    set_style(tree, controls, "direction", "horizontal");
+    set_style(tree, controls, "gap", "12");
+    set_style(tree, controls, "height", "hug");
+    set_style(tree, controls, "align", "center");
+
+    let search = add_el(tree, "div", controls);
+    set_text(tree, search, "Search products...");
+    set_style(tree, search, "font-size", "14px");
+    set_style(tree, search, "color", "#6e7681");
+    set_style(tree, search, "background-color", "#1a1f2e");
+    set_style(tree, search, "padding", "12");
+    set_style(tree, search, "height", "44px");
+    set_style(tree, search, "border-radius", "10");
+
+    let cart_btn = add_el(tree, "div", controls);
+    set_text(tree, cart_btn, "Cart 0");
+    set_style(tree, cart_btn, "font-size", "14px");
+    set_style(tree, cart_btn, "font-weight", "bold");
+    set_style(tree, cart_btn, "color", "#000000");
+    set_style(tree, cart_btn, "background-color", "#f97316");
+    set_style(tree, cart_btn, "padding", "12");
+    set_style(tree, cart_btn, "height", "44px");
+    set_style(tree, cart_btn, "width", "120px");
+    set_style(tree, cart_btn, "border-radius", "10");
+
+    let clear_btn = add_el(tree, "div", controls);
+    set_text(tree, clear_btn, "Clear");
+    set_style(tree, clear_btn, "font-size", "14px");
+    set_style(tree, clear_btn, "font-weight", "bold");
+    set_style(tree, clear_btn, "color", "#8b949e");
+    set_style(tree, clear_btn, "background-color", "#1a1f2e");
+    set_style(tree, clear_btn, "padding", "12");
+    set_style(tree, clear_btn, "height", "44px");
+    set_style(tree, clear_btn, "width", "80px");
+    set_style(tree, clear_btn, "border-radius", "10");
+
+    // ── Category pills ──
+    let pills_row = add_el(tree, "div", section);
     set_style(tree, pills_row, "direction", "horizontal");
     set_style(tree, pills_row, "gap", "10");
     set_style(tree, pills_row, "wrap", "true");
     set_style(tree, pills_row, "height", "hug");
 
     let pill_labels = ["All", "Electronics", "Clothing", "Home", "Sports", "Books"];
-    for label in &pill_labels {
+    for (idx, label) in pill_labels.iter().enumerate() {
         let pill = add_el(tree, "div", pills_row);
         set_text(tree, pill, label);
         set_style(tree, pill, "font-size", "13px");
+        set_style(tree, pill, "font-weight", "bold");
         set_style(tree, pill, "padding", "8");
         set_style(tree, pill, "width", "hug");
-        set_style(tree, pill, "height", "hug");
+        set_style(tree, pill, "height", "36px");
+        set_style(tree, pill, "border-radius", "20");
+        if idx == state.active_cat {
+            set_style(tree, pill, "background-color", "#f97316");
+            set_style(tree, pill, "color", "#000000");
+        } else {
+            set_style(tree, pill, "color", "#8b949e");
+            set_style(tree, pill, "border", "2px solid #2a2f3e");
+        }
     }
 
-    // ── Sort row ─────────────────────────────────
-    let sort_row = add_el(tree, "div", root);
+    // ── Sort row ──
+    let sort_row = add_el(tree, "div", section);
     set_style(tree, sort_row, "direction", "horizontal");
     set_style(tree, sort_row, "gap", "8");
     set_style(tree, sort_row, "height", "hug");
+    set_style(tree, sort_row, "align", "center");
 
     let sort_label = add_el(tree, "div", sort_row);
     set_text(tree, sort_label, "Sort:");
@@ -163,47 +226,71 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, sort_label, "width", "hug");
     set_style(tree, sort_label, "height", "hug");
 
-    for label in &["Price ^", "Price v", "Name A-Z"] {
+    for (i, label) in ["Price ↑", "Price ↓", "Name A→Z"].iter().enumerate() {
         let btn = add_el(tree, "div", sort_row);
         set_text(tree, btn, label);
         set_style(tree, btn, "font-size", "12px");
-        set_style(tree, btn, "padding", "6");
+        set_style(tree, btn, "font-weight", "bold");
+        set_style(tree, btn, "padding", "8");
         set_style(tree, btn, "width", "hug");
-        set_style(tree, btn, "height", "hug");
+        set_style(tree, btn, "height", "32px");
+        set_style(tree, btn, "border-radius", "8");
+        if state.sort_order == (i + 1) as u8 {
+            set_style(tree, btn, "background-color", "#f97316");
+            set_style(tree, btn, "color", "#000000");
+        } else {
+            set_style(tree, btn, "color", "#8b949e");
+            set_style(tree, btn, "border", "1px solid #2a2f3e");
+        }
     }
 
-    // ── Metrics grid ─────────────────────────────
-    let metrics = add_el(tree, "div", root);
+    // ── Metrics grid (3 columns via wrap) ──
+    let metrics = add_el(tree, "div", section);
     set_style(tree, metrics, "direction", "horizontal");
     set_style(tree, metrics, "gap", "12");
     set_style(tree, metrics, "wrap", "true");
     set_style(tree, metrics, "height", "hug");
 
-    let metric_labels = ["FETCH + COMPILE", "TREE BUILD", "LAYOUT", "TOTAL", "PRODUCTS", "CATEGORY", "CART", "SORT", "SIGNAL FIRES"];
-    for label in &metric_labels {
+    let metric_defs: [(&str, &str, &str); 9] = [
+        ("FETCH + COMPILE", "—", "#58a6ff"),
+        ("HEAP INIT", "—", "#3fb950"),
+        ("MOUNT 10K", "—", "#f97316"),
+        ("TOTAL", "—", "#bc8cff"),
+        ("LAST OP", "—", "#f97316"),
+        ("PRODUCTS", "10000", "#58a6ff"),
+        ("CART", "0", "#f97316"),
+        ("CATEGORY", "all", "#3fb950"),
+        ("SORT", "default", "#bc8cff"),
+    ];
+    // Width = (section_width - padding*2 - gap*2) / 3
+    let metric_w = ((state.vw - 64.0 - 24.0) / 3.0).floor().max(100.0);
+    for (label, value, color) in &metric_defs {
         let card = add_el(tree, "div", metrics);
         set_style(tree, card, "direction", "vertical");
-        set_style(tree, card, "width", "140px");
-        set_style(tree, card, "height", "44px");
-        set_style(tree, card, "padding", "8");
+        set_style(tree, card, "width", &format!("{}px", metric_w));
+        set_style(tree, card, "height", "80px");
+        set_style(tree, card, "padding", "16");
         set_style(tree, card, "background-color", "#1a1f2e");
+        set_style(tree, card, "border-radius", "12");
+        set_style(tree, card, "align", "center");
 
         let lbl = add_el(tree, "div", card);
         set_text(tree, lbl, label);
-        set_style(tree, lbl, "font-size", "9px");
+        set_style(tree, lbl, "font-size", "10px");
+        set_style(tree, lbl, "font-weight", "bold");
         set_style(tree, lbl, "color", "#8b949e");
         set_style(tree, lbl, "height", "hug");
 
         let val = add_el(tree, "div", card);
-        set_text(tree, val, "—");
-        set_style(tree, val, "font-size", "14px");
+        set_text(tree, val, value);
+        set_style(tree, val, "font-size", "22px");
         set_style(tree, val, "font-weight", "bold");
-        set_style(tree, val, "color", "#58a6ff");
+        set_style(tree, val, "color", color);
         set_style(tree, val, "height", "hug");
     }
 
-    // ── Product grid ─────────────────────────────
-    let grid = add_el(tree, "div", root);
+    // ── Product grid ──
+    let grid = add_el(tree, "div", section);
     set_style(tree, grid, "direction", "horizontal");
     set_style(tree, grid, "gap", "16");
     set_style(tree, grid, "wrap", "true");
@@ -222,55 +309,70 @@ fn build_ui(state: &mut AppState) {
         let card = add_el(tree, "div", grid);
         set_style(tree, card, "direction", "vertical");
         set_style(tree, card, "width", "260px");
-        set_style(tree, card, "height", "310px");
+        set_style(tree, card, "height", "340px");
         set_style(tree, card, "background-color", "#1a1f2e");
+        set_style(tree, card, "border-radius", "12");
         state.card_ids.push(card);
 
-        // Image placeholder
+        // Image
         let img = add_el(tree, "div", card);
         set_style(tree, img, "height", "180px");
+        set_style(tree, img, "border-radius", "12");
         if let Some(el) = tree.get_mut(img) {
             el.attributes.insert("src".into(), p.img_src.clone());
         }
         state.img_ids.push(img);
 
+        // Body (below image)
+        let body = add_el(tree, "div", card);
+        set_style(tree, body, "direction", "vertical");
+        set_style(tree, body, "padding", "12");
+        set_style(tree, body, "gap", "4");
+        set_style(tree, body, "height", "hug");
+
         // Name
-        let name_el = add_el(tree, "div", card);
+        let name_el = add_el(tree, "div", body);
         set_text(tree, name_el, &p.name);
-        set_style(tree, name_el, "font-size", "13px");
+        set_style(tree, name_el, "font-size", "14px");
         set_style(tree, name_el, "font-weight", "bold");
         set_style(tree, name_el, "color", "#e6edf3");
-        set_style(tree, name_el, "padding", "4");
         set_style(tree, name_el, "height", "hug");
         state.name_ids.push(name_el);
 
         // Category
-        let cat_el = add_el(tree, "div", card);
+        let cat_el = add_el(tree, "div", body);
         set_text(tree, cat_el, p.category);
         set_style(tree, cat_el, "font-size", "10px");
         set_style(tree, cat_el, "color", "#6e7681");
         set_style(tree, cat_el, "height", "hug");
         state.cat_ids.push(cat_el);
 
+        // Stars
+        let stars_el = add_el(tree, "div", body);
+        set_text(tree, stars_el, "★★★★☆");
+        set_style(tree, stars_el, "font-size", "12px");
+        set_style(tree, stars_el, "color", "#f97316");
+        set_style(tree, stars_el, "height", "hug");
+
         // Price
-        let price_el = add_el(tree, "div", card);
+        let price_el = add_el(tree, "div", body);
         set_text(tree, price_el, &p.price_display);
-        set_style(tree, price_el, "font-size", "18px");
+        set_style(tree, price_el, "font-size", "20px");
         set_style(tree, price_el, "font-weight", "bold");
         set_style(tree, price_el, "color", "#3fb950");
-        set_style(tree, price_el, "padding", "4");
         set_style(tree, price_el, "height", "hug");
         state.price_ids.push(price_el);
 
         // Add to Cart button
-        let btn = add_el(tree, "div", card);
+        let btn = add_el(tree, "div", body);
         set_text(tree, btn, "Add to Cart");
-        set_style(tree, btn, "font-size", "12px");
+        set_style(tree, btn, "font-size", "13px");
         set_style(tree, btn, "font-weight", "bold");
         set_style(tree, btn, "background-color", "#f97316");
         set_style(tree, btn, "color", "#000000");
-        set_style(tree, btn, "padding", "8");
-        set_style(tree, btn, "height", "30px");
+        set_style(tree, btn, "padding", "10");
+        set_style(tree, btn, "height", "36px");
+        set_style(tree, btn, "border-radius", "8");
         set_style(tree, btn, "align", "center");
     }
 }
@@ -429,14 +531,32 @@ unsafe fn render_node(
     // Cull off-screen
     if y + h < -50.0 || y > vh + 50.0 { return; }
 
+    // Border radius
+    let radius = el.styles.get("border-radius")
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(0.0);
+
     // Background
     if let Some(bg) = el.styles.get("background-color") {
         let (r, g, b) = parse_hex_color(bg);
-        canvas_round_rect(cvs, x, y, w, h, 8.0, r, g, b, 255);
+        if radius > 0.0 {
+            canvas_round_rect(cvs, x, y, w, h, radius, r, g, b, 255);
+        } else {
+            canvas_fill_rect(cvs, x, y, w, h, r, g, b, 255);
+        }
     }
 
-    // Border (for metric cards)
-    if el.styles.get("background-color").is_some() && w > 50.0 {
+    // Border
+    if let Some(border) = el.styles.get("border") {
+        // Parse "2px solid #2a2f3e"
+        let parts: Vec<&str> = border.split_whitespace().collect();
+        if parts.len() >= 3 {
+            let lw = parts[0].trim_end_matches("px").parse::<f32>().unwrap_or(1.0);
+            let (br, bg, bb) = parse_hex_color(parts[2]);
+            canvas_stroke_rect(cvs, x, y, w, h, br, bg, bb, 255, lw);
+        }
+    } else if el.styles.get("background-color").is_some() && w > 50.0 && h > 30.0 {
+        // Default subtle border on bg-colored elements
         canvas_stroke_rect(cvs, x, y, w, h, 42, 47, 62, 255, 1.0);
     }
 
