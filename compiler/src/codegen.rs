@@ -1254,6 +1254,11 @@ impl WasmCodegen {
             if self.used_runtime_categories.contains("datepicker") {
                 self.emit_datepicker_runtime();
             }
+
+            // Canvas rendering runtime — layout engine, render loop, scroll, hit testing
+            if self.render_mode == RenderMode::Canvas || self.render_mode == RenderMode::Hybrid {
+                self.emit_canvas_runtime();
+            }
         }
 
         // Pre-collect component names so template codegen can detect component instantiation
@@ -19555,6 +19560,348 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("i32.const 0");
         self.line("i32.store");
+        self.indent -= 1;
+        self.line(")");
+    }
+
+    /// Canvas rendering runtime — layout table, render, scroll, hit testing.
+    /// All layout computation runs in WASM. Canvas 2D draw calls are syscalls.
+    ///
+    /// Layout table: each element = 64 bytes
+    ///   +0  type (i32): 0=rect, 1=text, 2=image, 3=container
+    ///   +4  x (i32)
+    ///   +8  y (i32)
+    ///   +12 w (i32)
+    ///   +16 h (i32)
+    ///   +20 text_ptr (i32) — for text/image elements
+    ///   +24 text_len (i32)
+    ///   +28 color_ptr (i32) — fill color string ptr
+    ///   +32 parent_idx (i32) — index of parent element (-1 for root)
+    ///   +36 cb_idx (i32) — click handler callback index (-1 for none)
+    ///   +40 font_size (i32) — font size in px (0 = default)
+    ///   +44 border_radius (i32)
+    ///   +48 bg_color_ptr (i32) — background color string ptr
+    ///   +52 visible (i32) — 1 if visible, 0 if clipped by scroll
+    ///   +56 data_ptr (i32) — arbitrary data (e.g. product struct ptr)
+    ///   +60 pad (i32)
+    fn emit_canvas_runtime(&mut self) {
+        self.line("");
+        self.line(";; ══ Canvas rendering runtime (WASM-internal layout engine) ══════");
+
+        // Globals
+        self.line("(global $__cvs_id (mut i32) (i32.const 0))   ;; canvas context ID from canvas.init");
+        self.line("(global $__cvs_layout_base (mut i32) (i32.const 0)) ;; heap-allocated layout table");
+        self.line("(global $__cvs_layout_count (mut i32) (i32.const 0)) ;; number of layout elements");
+        self.line("(global $__cvs_layout_cap (mut i32) (i32.const 0))  ;; capacity");
+        self.line("(global $__cvs_scroll_y (mut i32) (i32.const 0))    ;; current scroll offset");
+        self.line("(global $__cvs_viewport_h (mut i32) (i32.const 0))  ;; viewport height");
+        self.line("(global $__cvs_viewport_w (mut i32) (i32.const 0))  ;; viewport width");
+        self.line("(global $__cvs_content_h (mut i32) (i32.const 0))   ;; total content height");
+        self.line("(global $__cvs_dirty (mut i32) (i32.const 1))       ;; needs re-render");
+        self.line("(global $__cvs_render_cb (mut i32) (i32.const -1))  ;; render loop callback index");
+
+        // $cvs_init(width, height) — create canvas, allocate layout table
+        self.line("");
+        self.emit("(func $cvs_init (export \"cvs_init\") (param $w i32) (param $h i32)");
+        self.indent += 1;
+        self.line("local.get $w");
+        self.line("local.get $h");
+        self.line("call $canvas_init");
+        self.line("global.set $__cvs_id");
+        self.line("local.get $w");
+        self.line("global.set $__cvs_viewport_w");
+        self.line("local.get $h");
+        self.line("global.set $__cvs_viewport_h");
+        // Allocate layout table: 16384 elements * 64 bytes = 1MB
+        self.line("i32.const 1048576 ;; 16384 * 64 bytes");
+        self.line("call $alloc");
+        self.line("global.set $__cvs_layout_base");
+        self.line("i32.const 16384");
+        self.line("global.set $__cvs_layout_cap");
+        self.line("i32.const 0");
+        self.line("global.set $__cvs_layout_count");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_add_element(type, x, y, w, h, text_ptr, text_len, color_ptr, parent, cb_idx) -> i32 (index)
+        self.line("");
+        self.emit("(func $cvs_add (export \"cvs_add\") (param $type i32) (param $x i32) (param $y i32) (param $w i32) (param $h i32) (param $text_ptr i32) (param $text_len i32) (param $color_ptr i32) (param $parent i32) (param $cb_idx i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $idx i32) (local $addr i32)");
+        self.line("global.get $__cvs_layout_count");
+        self.line("local.set $idx");
+        // addr = base + idx * 64
+        self.line("global.get $__cvs_layout_base");
+        self.line("local.get $idx");
+        self.line("i32.const 64");
+        self.line("i32.mul");
+        self.line("i32.add");
+        self.line("local.set $addr");
+        // Store fields
+        self.line("local.get $addr  local.get $type  i32.store");          // +0 type
+        self.line("local.get $addr  local.get $x  i32.store offset=4");    // +4 x
+        self.line("local.get $addr  local.get $y  i32.store offset=8");    // +8 y
+        self.line("local.get $addr  local.get $w  i32.store offset=12");   // +12 w
+        self.line("local.get $addr  local.get $h  i32.store offset=16");   // +16 h
+        self.line("local.get $addr  local.get $text_ptr  i32.store offset=20"); // +20 text_ptr
+        self.line("local.get $addr  local.get $text_len  i32.store offset=24"); // +24 text_len
+        self.line("local.get $addr  local.get $color_ptr  i32.store offset=28"); // +28 color_ptr
+        self.line("local.get $addr  local.get $parent  i32.store offset=32");    // +32 parent
+        self.line("local.get $addr  local.get $cb_idx  i32.store offset=36");    // +36 cb_idx
+        self.line("local.get $addr  i32.const 14  i32.store offset=40");   // +40 font_size=14
+        self.line("local.get $addr  i32.const 0  i32.store offset=44");    // +44 border_radius=0
+        self.line("local.get $addr  i32.const 0  i32.store offset=48");    // +48 bg_color_ptr=0
+        self.line("local.get $addr  i32.const 1  i32.store offset=52");    // +52 visible=1
+        self.line("local.get $addr  i32.const 0  i32.store offset=56");    // +56 data_ptr=0
+        // Increment count
+        self.line("local.get $idx");
+        self.line("i32.const 1");
+        self.line("i32.add");
+        self.line("global.set $__cvs_layout_count");
+        // Mark dirty
+        self.line("i32.const 1  global.set $__cvs_dirty");
+        self.line("local.get $idx");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_set_bg(idx, bg_color_ptr) — set background color
+        self.line("");
+        self.emit("(func $cvs_set_bg (param $idx i32) (param $ptr i32)");
+        self.indent += 1;
+        self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
+        self.line("local.get $ptr  i32.store offset=48");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_set_font_size(idx, size) — set font size
+        self.line("");
+        self.emit("(func $cvs_set_font_size (param $idx i32) (param $size i32)");
+        self.indent += 1;
+        self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
+        self.line("local.get $size  i32.store offset=40");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_set_radius(idx, r) — set border radius
+        self.line("");
+        self.emit("(func $cvs_set_radius (param $idx i32) (param $r i32)");
+        self.indent += 1;
+        self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
+        self.line("local.get $r  i32.store offset=44");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_set_data(idx, data_ptr) — attach arbitrary data to element
+        self.line("");
+        self.emit("(func $cvs_set_data (param $idx i32) (param $ptr i32)");
+        self.indent += 1;
+        self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
+        self.line("local.get $ptr  i32.store offset=56");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_render — walk layout table, draw visible elements to canvas
+        self.line("");
+        self.emit("(func $cvs_render (export \"cvs_render\")");
+        self.indent += 1;
+        self.line("(local $i i32) (local $addr i32) (local $type i32)");
+        self.line("(local $x i32) (local $y i32) (local $w i32) (local $h i32)");
+        self.line("(local $text_ptr i32) (local $text_len i32) (local $color_ptr i32)");
+        self.line("(local $screen_y i32) (local $font_size i32) (local $radius i32) (local $bg_ptr i32)");
+
+        // Clear canvas
+        self.line("global.get $__cvs_id");
+        self.line("call $canvas_clear");
+
+        // Set default font
+        let default_font = self.store_string("14px -apple-system, BlinkMacSystemFont, sans-serif");
+        self.line(&format!("global.get $__cvs_id  i32.const {}  i32.const 48  call $canvas_setFont", default_font));
+
+        // Loop through all elements
+        self.line("i32.const 0  local.set $i");
+        self.line("block $done");
+        self.line("  loop $render_loop");
+        self.line("    local.get $i  global.get $__cvs_layout_count  i32.ge_u  br_if $done");
+
+        // Load element addr
+        self.line("    global.get $__cvs_layout_base  local.get $i  i32.const 64  i32.mul  i32.add  local.set $addr");
+        self.line("    local.get $addr  i32.load  local.set $type");
+        self.line("    local.get $addr  i32.load offset=4  local.set $x");
+        self.line("    local.get $addr  i32.load offset=8  local.set $y");
+        self.line("    local.get $addr  i32.load offset=12  local.set $w");
+        self.line("    local.get $addr  i32.load offset=16  local.set $h");
+        self.line("    local.get $addr  i32.load offset=20  local.set $text_ptr");
+        self.line("    local.get $addr  i32.load offset=24  local.set $text_len");
+        self.line("    local.get $addr  i32.load offset=28  local.set $color_ptr");
+        self.line("    local.get $addr  i32.load offset=40  local.set $font_size");
+        self.line("    local.get $addr  i32.load offset=44  local.set $radius");
+        self.line("    local.get $addr  i32.load offset=48  local.set $bg_ptr");
+
+        // Compute screen_y = y - scroll_y
+        self.line("    local.get $y  global.get $__cvs_scroll_y  i32.sub  local.set $screen_y");
+
+        // Cull: skip if entirely off screen
+        self.line("    local.get $screen_y  local.get $h  i32.add  i32.const 0  i32.lt_s");
+        self.line("    if  local.get $i  i32.const 1  i32.add  local.set $i  br $render_loop  end");
+        self.line("    local.get $screen_y  global.get $__cvs_viewport_h  i32.gt_s");
+        self.line("    if  local.get $i  i32.const 1  i32.add  local.set $i  br $render_loop  end");
+
+        // Draw background if bg_ptr != 0
+        self.line("    local.get $bg_ptr  i32.const 0  i32.ne");
+        self.line("    if");
+        self.line("      local.get $radius  i32.const 0  i32.gt_s");
+        self.line("      if");
+        // Rounded rect background (draw as plain rect — roundRect needs fillStyle set via JS)
+        self.line("        global.get $__cvs_id  local.get $x  local.get $screen_y  local.get $w  local.get $h  local.get $bg_ptr  call $canvas_fillRect");
+        self.line("      else");
+        // Plain rect background
+        self.line("        global.get $__cvs_id  local.get $x  local.get $screen_y  local.get $w  local.get $h  local.get $bg_ptr  call $canvas_fillRect");
+        self.line("      end");
+        self.line("    end");
+
+        // Draw based on type
+        // Type 0: rect (border only)
+        self.line("    local.get $type  i32.eqz");
+        self.line("    if");
+        self.line("      local.get $color_ptr  i32.const 0  i32.ne");
+        self.line("      if");
+        self.line("        global.get $__cvs_id  local.get $x  local.get $screen_y  local.get $w  local.get $h  local.get $color_ptr  call $canvas_strokeRect");
+        self.line("      end");
+        self.line("    end");
+
+        // Type 1: text
+        self.line("    local.get $type  i32.const 1  i32.eq");
+        self.line("    if");
+        self.line("      local.get $text_ptr  i32.const 0  i32.ne");
+        self.line("      if");
+        // Set font if custom size
+        self.line("        local.get $font_size  i32.const 14  i32.ne");
+        self.line("        if");
+        // Build font string: "<size>px -apple-system, sans-serif" — for simplicity use default
+        self.line("        end");
+        self.line("        global.get $__cvs_id  local.get $text_ptr  local.get $text_len  local.get $x  local.get $screen_y  local.get $font_size  i32.add  local.get $color_ptr  call $canvas_fillText");
+        self.line("      end");
+        self.line("    end");
+
+        // Type 2: image
+        self.line("    local.get $type  i32.const 2  i32.eq");
+        self.line("    if");
+        self.line("      local.get $text_ptr  i32.const 0  i32.ne");
+        self.line("      if");
+        self.line("        global.get $__cvs_id  local.get $text_ptr  local.get $text_len  local.get $x  local.get $screen_y  local.get $w  local.get $h  call $canvas_drawImage");
+        self.line("      end");
+        self.line("    end");
+
+        // Next element
+        self.line("    local.get $i  i32.const 1  i32.add  local.set $i");
+        self.line("    br $render_loop");
+        self.line("  end");
+        self.line("end");
+
+        // Mark clean
+        self.line("i32.const 0  global.set $__cvs_dirty");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_hit_test(x, y) -> i32 (element index, or -1)
+        // Walk layout table in reverse (top elements drawn last = highest z)
+        self.line("");
+        self.emit("(func $cvs_hit_test (export \"cvs_hit_test\") (param $mx i32) (param $my i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $i i32) (local $addr i32)");
+        self.line("(local $x i32) (local $y i32) (local $w i32) (local $h i32) (local $cb i32)");
+        // Adjust mouse y for scroll
+        self.line("local.get $my  global.get $__cvs_scroll_y  i32.add  local.set $my");
+        self.line("global.get $__cvs_layout_count  i32.const 1  i32.sub  local.set $i");
+        self.line("block $found");
+        self.line("  loop $scan");
+        self.line("    local.get $i  i32.const 0  i32.lt_s  br_if $found");
+        self.line("    global.get $__cvs_layout_base  local.get $i  i32.const 64  i32.mul  i32.add  local.set $addr");
+        self.line("    local.get $addr  i32.load offset=36  local.set $cb"); // cb_idx
+        self.line("    local.get $cb  i32.const -1  i32.ne");  // has handler?
+        self.line("    if");
+        self.line("      local.get $addr  i32.load offset=4  local.set $x");
+        self.line("      local.get $addr  i32.load offset=8  local.set $y");
+        self.line("      local.get $addr  i32.load offset=12  local.set $w");
+        self.line("      local.get $addr  i32.load offset=16  local.set $h");
+        // Check bounds: mx >= x && mx < x+w && my >= y && my < y+h
+        self.line("      local.get $mx  local.get $x  i32.ge_s");
+        self.line("      local.get $mx  local.get $x  local.get $w  i32.add  i32.lt_s");
+        self.line("      i32.and");
+        self.line("      local.get $my  local.get $y  i32.ge_s");
+        self.line("      i32.and");
+        self.line("      local.get $my  local.get $y  local.get $h  i32.add  i32.lt_s");
+        self.line("      i32.and");
+        self.line("      if");
+        self.line("        local.get $i  return");
+        self.line("      end");
+        self.line("    end");
+        self.line("    local.get $i  i32.const 1  i32.sub  local.set $i");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("i32.const -1");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_on_click(x, y) — hit test + dispatch callback
+        self.line("");
+        self.emit("(func $cvs_on_click (export \"cvs_on_click\") (param $mx i32) (param $my i32)");
+        self.indent += 1;
+        self.line("(local $hit i32) (local $addr i32) (local $cb i32) (local $data i32)");
+        self.line("local.get $mx  local.get $my  call $cvs_hit_test  local.set $hit");
+        self.line("local.get $hit  i32.const -1  i32.ne");
+        self.line("if");
+        self.line("  global.get $__cvs_layout_base  local.get $hit  i32.const 64  i32.mul  i32.add  local.set $addr");
+        self.line("  local.get $addr  i32.load offset=36  local.set $cb");
+        self.line("  local.get $addr  i32.load offset=56  local.set $data");
+        // Dispatch: if data != 0, call __callback_with_data; else call __callback
+        self.line("  local.get $data  i32.const 0  i32.ne");
+        self.line("  if");
+        self.line("    local.get $cb  local.get $data  call $__callback_with_data");
+        self.line("  else");
+        self.line("    local.get $cb  call $__callback");
+        self.line("  end");
+        // Re-render after click
+        self.line("  i32.const 1  global.set $__cvs_dirty");
+        self.line("end");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_on_scroll(delta_y) — update scroll offset, mark dirty
+        self.line("");
+        self.emit("(func $cvs_on_scroll (export \"cvs_on_scroll\") (param $delta i32)");
+        self.indent += 1;
+        self.line("(local $new_y i32) (local $max_y i32)");
+        // new_y = scroll_y + delta
+        self.line("global.get $__cvs_scroll_y  local.get $delta  i32.add  local.set $new_y");
+        // max_y = content_h - viewport_h
+        self.line("global.get $__cvs_content_h  global.get $__cvs_viewport_h  i32.sub  local.set $max_y");
+        // Clamp: if new_y < 0, new_y = 0
+        self.line("local.get $new_y  i32.const 0  i32.lt_s");
+        self.line("if  i32.const 0  local.set $new_y  end");
+        // Clamp: if new_y > max_y, new_y = max_y
+        self.line("local.get $new_y  local.get $max_y  i32.gt_s");
+        self.line("if  local.get $max_y  local.set $new_y  end");
+        self.line("local.get $new_y  global.set $__cvs_scroll_y");
+        self.line("i32.const 1  global.set $__cvs_dirty");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_clear_layout — reset layout table (for re-render after state change)
+        self.line("");
+        self.emit("(func $cvs_clear_layout (export \"cvs_clear_layout\")");
+        self.indent += 1;
+        self.line("i32.const 0  global.set $__cvs_layout_count");
+        self.line("i32.const 1  global.set $__cvs_dirty");
+        self.indent -= 1;
+        self.line(")");
+
+        // $cvs_set_content_height(h) — set total scrollable content height
+        self.line("");
+        self.emit("(func $cvs_set_content_h (export \"cvs_set_content_h\") (param $h i32)");
+        self.indent += 1;
+        self.line("local.get $h  global.set $__cvs_content_h");
         self.indent -= 1;
         self.line(")");
     }
