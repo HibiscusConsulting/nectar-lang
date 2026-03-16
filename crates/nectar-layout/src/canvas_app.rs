@@ -305,6 +305,15 @@ pub extern "C" fn app_render() {
                 canvas_fill_text(id, btn.as_ptr(), 11, x + 90.0, y + 288.0, 0, 0, 0, 12.0, 1);
             }
 
+            // ── Apple-style scrollbar ─────────────────────
+            let content_h = state.content_height();
+            if content_h > vh {
+                let track_h = vh - GRID_TOP - 10.0;
+                let thumb_h = (vh / content_h * track_h).max(40.0);
+                let thumb_y = GRID_TOP + 5.0 + (sy / (content_h - vh)) * (track_h - thumb_h);
+                canvas_round_rect(id, vw - 10.0, thumb_y, 6.0, thumb_h, 3.0, 255, 255, 255, 80);
+            }
+
             // ── Footer stats ─────────────────────────────
             canvas_fill_rect(id, vw - 380.0, vh - 26.0, 372.0, 20.0, 11, 14, 20, 220);
             let mut fbuf = [0u8; 96];
