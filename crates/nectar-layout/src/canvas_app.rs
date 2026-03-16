@@ -263,13 +263,14 @@ pub extern "C" fn app_render() {
                 canvas_fill_text(id, mbuf.as_ptr(), vlen as u32, mx + 12.0, my + 32.0, vr, vg, vb, 14.0, 1);
             }
 
-            // ── Product grid ─────────────────────────────
+            // ── Product grid (clipped below chrome) ─────
+            canvas_fill_rect(id, 0.0, GRID_TOP, vw, vh - GRID_TOP, 11, 14, 20, 255); // clear grid area
             let mut drawn = 0u32;
             for i in 0..state.products.len() {
                 let (x, raw_y) = state.card_pos(i);
                 let y = raw_y - sy;
 
-                if y + 316.0 < 0.0 || y > vh { continue; }
+                if y + 316.0 < GRID_TOP || y > vh { continue; }
                 drawn += 1;
 
                 let p = &state.products[i];
@@ -305,10 +306,18 @@ pub extern "C" fn app_render() {
             }
 
             // ── Footer stats ─────────────────────────────
-            canvas_fill_rect(id, vw - 280.0, vh - 26.0, 272.0, 20.0, 11, 14, 20, 220);
-            let mut fbuf = [0u8; 64];
+            canvas_fill_rect(id, vw - 380.0, vh - 26.0, 372.0, 20.0, 11, 14, 20, 220);
+            let mut fbuf = [0u8; 96];
             let flen = fmt_into(&mut fbuf, format_args!("{} visible | scroll {}/{}", drawn, sy as u32, state.max_scroll() as u32));
-            canvas_fill_text(id, fbuf.as_ptr(), flen as u32, vw - 274.0, vh - 12.0, 110, 118, 129, 11.0, 0);
+            canvas_fill_text(id, fbuf.as_ptr(), flen as u32, vw - 374.0, vh - 12.0, 110, 118, 129, 11.0, 0);
+
+            // ── Vim mode indicator ───────────────────────
+            let vim_on = FOCUS.with(|f| f.borrow().vim_mode);
+            if vim_on {
+                canvas_round_rect(id, vw - 120.0, 10.0, 110.0, 28.0, 6.0, 63, 185, 80, 255);
+                let vim = b"VIM MODE";
+                canvas_fill_text(id, vim.as_ptr(), 8, vw - 108.0, 30.0, 0, 0, 0, 12.0, 1);
+            }
         }
     });
 }
@@ -597,6 +606,48 @@ pub extern "C" fn app_keydown(key_code: u32, char_ptr: *const u8, char_len: u32,
 }
 
 // ── Mouse drag (text selection) ──────────────────────────────
+
+/// Returns cursor type: 0=default, 1=pointer, 2=text
+#[no_mangle]
+pub extern "C" fn app_cursor(mx: f32, my: f32) -> u32 {
+    // Back link
+    if mx < 200.0 && my < 50.0 { return 1; }
+
+    // Category pills
+    let pill_widths: [f32; 6] = [
+        3.0*8.5+32.0, 11.0*8.5+32.0, 8.0*8.5+32.0,
+        4.0*8.5+32.0, 6.0*8.5+32.0, 5.0*8.5+32.0,
+    ];
+    let mut px: f32 = 40.0;
+    for w in &pill_widths {
+        if mx >= px && mx <= px + w && my >= PILLS_Y && my <= PILLS_Y + PILLS_H { return 1; }
+        px += w + 10.0;
+    }
+
+    // Sort buttons
+    let sort_widths: [f32; 3] = [7.0*8.0+24.0, 7.0*8.0+24.0, 8.0*8.0+24.0];
+    let mut sx: f32 = 85.0;
+    for w in &sort_widths {
+        if mx >= sx && mx <= sx + w && my >= SORT_Y && my <= SORT_Y + SORT_H { return 1; }
+        sx += w + 8.0;
+    }
+
+    // Cart button
+    STATE.with(|s| {
+        let state = s.borrow();
+        let cart_x = state.vw - 160.0;
+        if mx >= cart_x && mx <= cart_x + 120.0 && my >= PILLS_Y && my <= PILLS_Y + PILLS_H { return 1; }
+
+        // Product card buttons
+        for i in 0..state.products.len() {
+            let (x, raw_y) = state.card_pos(i);
+            let y = raw_y - state.scroll_y;
+            if y + 316.0 < 0.0 || y > state.vh { continue; }
+            if mx >= x+14.0 && mx <= x+246.0 && my >= y+268.0 && my <= y+298.0 { return 1; }
+        }
+        0
+    })
+}
 
 #[no_mangle]
 pub extern "C" fn app_mousedown(mx: f32, my: f32) {
