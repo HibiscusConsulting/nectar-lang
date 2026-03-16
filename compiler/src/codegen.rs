@@ -9834,6 +9834,8 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("local.set $total_len");
         self.line("local.get $total_len");
+        self.line("i32.const 1");
+        self.line("i32.add");
         self.line("call $alloc");
         self.line("local.set $out_ptr");
         // Copy a
@@ -9848,6 +9850,12 @@ impl WasmCodegen {
         self.line("local.get $b_ptr");
         self.line("local.get $b_len");
         self.line("memory.copy");
+        // Null-terminate so str_len works on the result
+        self.line("local.get $out_ptr");
+        self.line("local.get $total_len");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store8");
         // Return (ptr, len)
         self.line("local.get $out_ptr");
         self.line("local.get $total_len");
@@ -9958,6 +9966,11 @@ impl WasmCodegen {
         self.line("  i32.store8");
         self.line("  local.get $buf");
         self.line("  i32.const 1");
+        self.line("  i32.add");
+        self.line("  i32.const 0");
+        self.line("  i32.store8 ;; null-terminate");
+        self.line("  local.get $buf");
+        self.line("  i32.const 1");
         self.line("  return");
         self.line("end");
         // Extract digits (reversed)
@@ -9988,9 +10001,11 @@ impl WasmCodegen {
         self.line("    br $digits");
         self.line("  end");
         self.line("end");
-        // Allocate final buffer with optional '-' prefix, reversed
+        // Allocate final buffer with optional '-' prefix, reversed (+1 for null terminator)
         self.line("local.get $neg");
         self.line("local.get $len");
+        self.line("i32.add");
+        self.line("i32.const 1");
         self.line("i32.add");
         self.line("call $alloc");
         self.line("local.set $ptr");
@@ -10030,6 +10045,15 @@ impl WasmCodegen {
         self.line("    br $rev");
         self.line("  end");
         self.line("end");
+        // Null-terminate
+        self.line("local.get $ptr");
+        self.line("local.get $neg");
+        self.line("local.get $len");
+        self.line("i32.add");
+        self.line("i32.add");
+        self.line("i32.const 0");
+        self.line("i32.store8 ;; null-terminate");
+        // Return (ptr, total_len)
         self.line("local.get $ptr");
         self.line("local.get $neg");
         self.line("local.get $len");
