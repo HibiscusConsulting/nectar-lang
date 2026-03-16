@@ -8,6 +8,8 @@ Nectar exists to prove that the web does not need JavaScript. It is a compiled-t
 
 This is not a guideline. This is the entire point of the language.
 
+**We are building a system for others to use.** Every architectural decision must work at scale, from first principles, without shortcuts. No hardcoded pixel positions when a layout engine should handle it. No JS workarounds when WASM can do it. No "fix it later" — other developers will build on this foundation. The layout engine, the signal system, the rendering pipeline — these are the primitives of a new web platform. They must be correct, fast, and composable. If something takes 450ms when it should take 10ms, that's a bug in the engine, not a reason to bypass it.
+
 ## Project Overview
 
 - Users write `.nectar` files; the Rust compiler produces `.wasm` + a single JS syscall file (`core.js`, ~3 KB gzip)
