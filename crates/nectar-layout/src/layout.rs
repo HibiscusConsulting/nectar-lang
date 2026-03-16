@@ -660,6 +660,17 @@ fn resolve_style(el: &crate::element::Element) -> LayoutStyle {
     let styles = &el.styles;
     let mut ls = LayoutStyle::default();
 
+    // Fast path: fixed dimensions bypass full style parsing
+    if let Some(w) = el.fixed_width {
+        ls.width = SizePolicy::Fixed(w);
+    }
+    if let Some(h) = el.fixed_height {
+        ls.height = SizePolicy::Fixed(h);
+    }
+    if el.fixed_width.is_some() && el.fixed_height.is_some() && styles.is_empty() {
+        return ls;
+    }
+
     // Direction: Nectar-native or CSS flex-direction
     if let Some(dir) = styles.get("direction") {
         ls.direction = match dir.as_str() {
