@@ -140,8 +140,48 @@ pub fn compute(tree: &mut ElementTree, viewport_w: f32, viewport_h: f32, measure
     measure_node(1, tree, &ctx, &mut intrinsics, measurer);
 
     // Phase 3: layout pass — assign positions and resolved sizes top-down
-    // Root gets the full viewport
     layout_node(tree, &ctx, &intrinsics, 1, 0.0, 0.0, viewport_w, viewport_h, measurer);
+
+    // Phase 4: propagate actual heights bottom-up for Hug containers
+    // Wrapping containers now have correct heights from layout_wrap.
+    // Propagate upward so parent Hug containers also get correct heights.
+    propagate_hug_heights(tree, &ctx, 1);
+}
+
+/// Bottom-up pass: recompute Hug container heights from actual child positions.
+/// This fixes the chain: wrap container → Hug parent → Hug grandparent.
+fn propagate_hug_heights(tree: &mut ElementTree, ctx: &LayoutContext, id: u32) {
+    let kids = ctx.children(id).to_vec();
+
+    // Recurse children first (bottom-up)
+    for &kid in &kids {
+        propagate_hug_heights(tree, ctx, kid);
+    }
+
+    let style = ctx.style(id);
+    if !matches!(style.height, SizePolicy::Hug) || kids.is_empty() {
+        return;
+    }
+
+    // Compute actual height from children's final positions + sizes
+    let el_y = tree.get(id).map(|e| e.layout.y).unwrap_or(0.0);
+    let mut max_bottom: f32 = 0.0;
+
+    for &kid in &kids {
+        if let Some(child) = tree.get(kid) {
+            let child_bottom = child.layout.y + child.layout.height;
+            max_bottom = max_bottom.max(child_bottom);
+        }
+    }
+
+    // New height = (furthest child bottom - my top) + bottom padding
+    let new_h = (max_bottom - el_y) + style.pad.bottom;
+
+    if let Some(el) = tree.get_mut(id) {
+        if new_h > el.layout.height {
+            el.layout.height = new_h;
+        }
+    }
 }
 
 // ── Context (pre-collected data to avoid borrow fights) ────────────────────
@@ -1528,5 +1568,36 @@ mod tests {
         println!("child: w={} h={}", c.layout.width, c.layout.height);
         assert!(r.layout.height < 100.0, "root should hug child, got h={}", r.layout.height);
         assert!(c.layout.height < 50.0, "child should hug text, got h={}", c.layout.height);
+    }
+
+    #[test]
+    fn test_horizontal_wrap_9_items_3_cols() {
+        let mut tree = ElementTree::new();
+        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(1).unwrap().styles.insert("width".into(), "1000px".into());
+        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
+
+        let wrap = tree.create("div");
+        tree.append_child(1, wrap);
+        tree.get_mut(wrap).unwrap().styles.insert("direction".into(), "horizontal".into());
+        tree.get_mut(wrap).unwrap().styles.insert("wrap".into(), "true".into());
+        tree.get_mut(wrap).unwrap().styles.insert("gap".into(), "12".into());
+        tree.get_mut(wrap).unwrap().styles.insert("height".into(), "hug".into());
+
+        // 9 items at 300px each = 3 per row (300*3 + 12*2 = 924 < 1000)
+        for _ in 0..9 {
+            let item = tree.create("div");
+            tree.append_child(wrap, item);
+            tree.get_mut(item).unwrap().styles.insert("width".into(), "300px".into());
+            tree.get_mut(item).unwrap().styles.insert("height".into(), "80px".into());
+        }
+
+        layout_tree(&mut tree, 1000.0, 999999.0);
+
+        let w = tree.get(wrap).unwrap();
+        println!("wrap container: w={} h={}", w.layout.width, w.layout.height);
+        // 3 rows of 80px + 2 gaps of 12 = 264
+        assert!(w.layout.height > 200.0, "wrap should have 3 rows, got h={}", w.layout.height);
+        assert!(w.layout.height < 300.0, "wrap height should be ~264, got h={}", w.layout.height);
     }
 }
