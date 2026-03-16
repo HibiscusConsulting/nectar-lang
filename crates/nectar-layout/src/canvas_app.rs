@@ -35,6 +35,25 @@ struct AppState {
     t_tree: f32,
     t_layout: f32,
     t_total: f32,
+    // Text selection
+    sel_product: i32,      // product index being selected (-1 = none)
+    sel_field: u8,         // 0=name, 1=category, 2=price, 10+=metric
+    sel_start_char: u32,   // start character offset
+    sel_end_char: u32,     // end character offset
+    sel_dragging: bool,    // mouse is held down during selection
+    // All selectable text regions (rebuilt each render)
+    text_regions: Vec<TextRegion>,
+}
+
+struct TextRegion {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    text: String,
+    char_w: f32,
+    product_idx: i32,  // -1 for non-product text
+    field: u8,
 }
 
 impl AppState {
@@ -88,6 +107,12 @@ thread_local! {
         t_tree: 0.0,
         t_layout: 0.0,
         t_total: 0.0,
+        sel_product: -1,
+        sel_field: 0,
+        sel_start_char: 0,
+        sel_end_char: 0,
+        sel_dragging: false,
+        text_regions: Vec::new(),
     });
 }
 
@@ -361,17 +386,36 @@ pub extern "C" fn app_render() {
                 canvas_fill_rect(id, x, y + 162.0, 260.0, 18.0, 63, 185, 80, 220);
                 canvas_fill_text(id, p.stock.as_ptr(), p.stock.len() as u32, x + 8.0, y + 175.0, 0, 0, 0, 9.0, 1);
 
-                // Name
+                // Selection highlight helper
+                let sel_prod = state.sel_product;
+                let sel_field = state.sel_field;
+                let sel_s = state.sel_start_char.min(state.sel_end_char);
+                let sel_e = state.sel_start_char.max(state.sel_end_char);
+                let has_sel = sel_prod == i as i32 && sel_s != sel_e;
+
+                // Name: baseline y+200, font 13px bold
+                if has_sel && sel_field == 0 {
+                    let cw: f32 = 8.0;
+                    canvas_fill_rect(id, x + 14.0 + sel_s as f32 * cw, y + 187.0, (sel_e - sel_s) as f32 * cw, 15.0, 65, 140, 255, 100);
+                }
                 canvas_fill_text(id, p.name.as_ptr(), p.name.len() as u32, x + 14.0, y + 200.0, 230, 237, 243, 13.0, 1);
 
-                // Category
+                // Category: baseline y+216, font 10px
+                if has_sel && sel_field == 1 {
+                    let cw: f32 = 6.0;
+                    canvas_fill_rect(id, x + 14.0 + sel_s as f32 * cw, y + 207.0, (sel_e - sel_s) as f32 * cw, 11.0, 65, 140, 255, 100);
+                }
                 canvas_fill_text(id, p.category.as_ptr(), p.category.len() as u32, x + 14.0, y + 216.0, 110, 118, 129, 10.0, 0);
 
                 // Stars
                 let stars = "★★★★☆";
                 canvas_fill_text(id, stars.as_ptr(), stars.len() as u32, x + 14.0, y + 234.0, 249, 115, 22, 12.0, 0);
 
-                // Price
+                // Price: baseline y+258, font 18px bold
+                if has_sel && sel_field == 2 {
+                    let cw: f32 = 11.0;
+                    canvas_fill_rect(id, x + 14.0 + sel_s as f32 * cw, y + 241.0, (sel_e - sel_s) as f32 * cw, 19.0, 65, 140, 255, 100);
+                }
                 canvas_fill_text(id, p.price_display.as_ptr(), p.price_display.len() as u32, x + 14.0, y + 258.0, 63, 185, 80, 18.0, 1);
 
                 // Add to Cart button
@@ -510,6 +554,32 @@ fn build_product(i: u32) -> Product {
     let si = i % 10;
     let stock = if si == 0 { "OUT OF STOCK" } else if si == 5 { "LOW STOCK" } else { "IN STOCK" };
     Product { name, category: CATS[cat_idx], price_cents: pc, price_display, img_src, stock }
+}
+
+/// Find word boundaries around a character position in text.
+fn word_bounds(text: &str, pos: usize) -> (usize, usize) {
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let pos = pos.min(len);
+
+    // Find start: walk backward to whitespace/punctuation
+    let mut start = pos;
+    while start > 0 && bytes[start - 1].is_ascii_alphanumeric() {
+        start -= 1;
+    }
+
+    // Find end: walk forward to whitespace/punctuation
+    let mut end = pos;
+    while end < len && bytes[end].is_ascii_alphanumeric() {
+        end += 1;
+    }
+
+    // If we landed on whitespace, select at least one char
+    if start == end && pos < len {
+        end = pos + 1;
+    }
+
+    (start, end)
 }
 
 fn fmt_into(buf: &mut [u8], args: std::fmt::Arguments) -> usize {
@@ -744,33 +814,134 @@ pub extern "C" fn app_cursor(mx: f32, my: f32) -> u32 {
             let y = raw_y - state.scroll_y;
             if y + 316.0 < 0.0 || y > state.vh { continue; }
             if mx >= x+14.0 && mx <= x+246.0 && my >= y+268.0 && my <= y+298.0 { return 1; }
+            // Text cursor over name/category/price
+            if mx >= x+14.0 && mx <= x+246.0 {
+                if (my >= y+187.0 && my <= y+202.0) || (my >= y+207.0 && my <= y+218.0) || (my >= y+241.0 && my <= y+260.0) {
+                    return 2; // text cursor
+                }
+            }
         }
         0
     })
 }
 
+/// Hit test a text field within a product card.
+/// Returns (product_index, field, char_offset) or (-1, 0, 0) if no hit.
+fn hit_test_text(mx: f32, my: f32, state: &AppState) -> (i32, u8, u32) {
+    let sy = state.scroll_y;
+    let char_w: f32 = 8.0; // approximate character width at 13px font
+
+    for i in 0..state.products.len() {
+        let (x, raw_y) = state.card_pos(i);
+        let y = raw_y - sy;
+        if y + 316.0 < GRID_TOP || y > state.vh { continue; }
+
+        let p = &state.products[i];
+
+        // Name: baseline y+200, font 13px. Hit zone y+187 to y+202
+        if mx >= x + 14.0 && mx <= x + 246.0 && my >= y + 187.0 && my <= y + 202.0 {
+            let char_pos = ((mx - x - 14.0) / char_w).max(0.0) as u32;
+            return (i as i32, 0, char_pos.min(p.name.len() as u32));
+        }
+
+        // Category: baseline y+216, font 10px. Hit zone y+207 to y+218
+        if mx >= x + 14.0 && mx <= x + 246.0 && my >= y + 207.0 && my <= y + 218.0 {
+            let char_pos = ((mx - x - 14.0) / (char_w * 0.75)).max(0.0) as u32;
+            return (i as i32, 1, char_pos.min(p.category.len() as u32));
+        }
+
+        // Price: baseline y+258, font 18px. Hit zone y+241 to y+260
+        if mx >= x + 14.0 && mx <= x + 246.0 && my >= y + 241.0 && my <= y + 260.0 {
+            let char_pos = ((mx - x - 14.0) / (char_w * 1.3)).max(0.0) as u32;
+            return (i as i32, 2, char_pos.min(p.price_display.len() as u32));
+        }
+    }
+    (-1, 0, 0)
+}
+
+/// Get the text content for a product field
+fn get_field_text<'a>(product: &'a Product, field: u8) -> &'a str {
+    match field {
+        0 => &product.name,
+        1 => product.category,
+        2 => &product.price_display,
+        _ => "",
+    }
+}
+
+/// click_count: 1=single, 2=double (select word), 3=triple (select all)
 #[no_mangle]
-pub extern "C" fn app_mousedown(mx: f32, my: f32) {
-    // Start potential text selection drag
-    FOCUS.with(|f| {
-        let mut focus = f.borrow_mut();
-        focus.selection_start = None;
-        // If clicking on an editable element, set cursor position
-        // and prepare for drag selection
+pub extern "C" fn app_mousedown(mx: f32, my: f32, click_count: u32) {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let (prod, field, char_pos) = hit_test_text(mx, my, &state);
+        state.sel_product = prod;
+        state.sel_field = field;
+        state.sel_dragging = prod >= 0;
+
+        if prod < 0 { return; }
+
+        // Copy text data to avoid borrow conflict
+        let text_owned = get_field_text(&state.products[prod as usize], field).to_string();
+
+        match click_count {
+            2 => {
+                let (ws, we) = word_bounds(&text_owned, char_pos as usize);
+                state.sel_start_char = ws as u32;
+                state.sel_end_char = we as u32;
+            }
+            3 => {
+                state.sel_start_char = 0;
+                state.sel_end_char = text_owned.len() as u32;
+            }
+            _ => {
+                state.sel_start_char = char_pos;
+                state.sel_end_char = char_pos;
+            }
+        }
     });
 }
 
 #[no_mangle]
 pub extern "C" fn app_mousemove(mx: f32, my: f32, buttons: u32) {
-    // If left button held (buttons & 1), extend text selection
-    if buttons & 1 != 0 {
-        FOCUS.with(|f| {
-            let mut focus = f.borrow_mut();
-            if focus.selection_start.is_some() {
-                // Extend selection to current mouse position
-            }
-        });
-    }
+    if buttons & 1 == 0 { return; }
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if !state.sel_dragging { return; }
+        let (prod, field, char_pos) = hit_test_text(mx, my, &state);
+        // Only extend if still on the same product and field
+        if prod == state.sel_product && field == state.sel_field {
+            state.sel_end_char = char_pos;
+        }
+    });
+}
+
+/// Get selected text. Returns length written to buffer, 0 if no selection.
+#[no_mangle]
+pub extern "C" fn app_get_selection(buf_ptr: *mut u8, buf_cap: u32) -> u32 {
+    STATE.with(|s| {
+        let state = s.borrow();
+        if state.sel_product < 0 { return 0; }
+        if state.sel_start_char == state.sel_end_char { return 0; }
+        let idx = state.sel_product as usize;
+        if idx >= state.products.len() { return 0; }
+        let text = get_field_text(&state.products[idx], state.sel_field);
+        let start = (state.sel_start_char.min(state.sel_end_char)) as usize;
+        let end = (state.sel_start_char.max(state.sel_end_char)) as usize;
+        let start = start.min(text.len());
+        let end = end.min(text.len());
+        let selected = &text[start..end];
+        let len = selected.len().min(buf_cap as usize);
+        unsafe { std::ptr::copy_nonoverlapping(selected.as_ptr(), buf_ptr, len); }
+        len as u32
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn app_mouseup(_mx: f32, _my: f32) {
+    STATE.with(|s| {
+        s.borrow_mut().sel_dragging = false;
+    });
 }
 
 // ── Right-click context menu ─────────────────────────────────
