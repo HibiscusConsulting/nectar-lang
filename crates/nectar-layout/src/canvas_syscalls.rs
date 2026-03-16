@@ -32,6 +32,9 @@ extern "C" {
     // Browser search (Cmd+F) — scroll hidden DOM element into view
     pub fn search_scroll_to(element_index: u32);
 
+    // Navigation — browser location change
+    pub fn navigate(url_ptr: *const u8, url_len: u32);
+
     // Hybrid mode — read browser-computed layout from hidden DOM
     // Writes x, y, w, h as f32s into the provided buffer (16 bytes)
     pub fn dom_get_rect(element_id: u32, out_ptr: *mut f32);
@@ -80,6 +83,8 @@ pub unsafe fn input_overlay_hide() {}
 pub unsafe fn input_overlay_get_value(_p: *mut u8, _c: u32) -> u32 { 0 }
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe fn search_scroll_to(_i: u32) {}
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn navigate(_p: *const u8, _l: u32) {}
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe fn dom_get_rect(_id: u32, _out: *mut f32) {}
 #[cfg(not(target_arch = "wasm32"))]

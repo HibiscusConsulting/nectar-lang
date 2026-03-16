@@ -64,6 +64,8 @@ struct AppState {
     cat_ids: Vec<u32>,      // product category text element IDs
     price_ids: Vec<u32>,    // product price text element IDs
     img_ids: Vec<u32>,      // product image element IDs
+    // Pending navigation (set by click, read by JS)
+    nav_url: Option<String>,
     // Text selection
     sel_element: i32,       // element ID being selected (-1 = none)
     sel_start_char: u32,
@@ -477,6 +479,7 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
         cat_ids: Vec::new(),
         price_ids: Vec::new(),
         img_ids: Vec::new(),
+        nav_url: None,
         sel_element: -1,
         sel_start_char: 0,
         sel_end_char: 0,
@@ -519,6 +522,7 @@ pub extern "C" fn app_lazy_init(vw: f32, vh: f32, t_fetch: f32) {
         pill_ids: Vec::new(), sort_ids: Vec::new(), cart_text_id: 0,
         card_ids: Vec::new(), name_ids: Vec::new(), cat_ids: Vec::new(),
         price_ids: Vec::new(), img_ids: Vec::new(),
+        nav_url: None,
         sel_element: -1, sel_start_char: 0, sel_end_char: 0, sel_dragging: false,
     };
 
@@ -739,6 +743,21 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
                 }
             } else {
                 break;
+            }
+        }
+
+        // Nav tab routing — call navigate syscall directly
+        let nav_routes: [(&str, &str); 5] = [
+            ("Home", "/"),
+            ("E-Commerce", "/app/"),
+            ("Canvas*", "/app/canvas-test.html"),
+            ("React 18", "/app/react.html"),
+            ("Svelte 5", "/app/svelte.html"),
+        ];
+        for (label, url) in &nav_routes {
+            if text == *label {
+                unsafe { navigate(url.as_ptr(), url.len() as u32); }
+                return;
             }
         }
 
