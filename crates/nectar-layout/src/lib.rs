@@ -20,3 +20,4 @@
 pub mod element;
 pub mod layout;
 pub mod measure;
+pub mod wasm_api;

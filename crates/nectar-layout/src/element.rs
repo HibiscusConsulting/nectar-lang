@@ -19,6 +19,9 @@ pub struct Element {
     pub properties: HashMap<String, String>,
     pub layout: LayoutNode,
     pub scroll_offset: (f32, f32),
+    /// Fast path: fixed dimensions bypass style parsing.
+    pub fixed_width: Option<f32>,
+    pub fixed_height: Option<f32>,
 }
 
 impl Element {
@@ -36,6 +39,28 @@ impl Element {
             properties: HashMap::new(),
             layout: LayoutNode::default(),
             scroll_offset: (0.0, 0.0),
+            fixed_width: None,
+            fixed_height: None,
+        }
+    }
+
+    /// Minimal constructor — zero HashMap allocation. For batch creation.
+    pub fn new_minimal(tag: &str) -> Self {
+        Self {
+            tag: tag.to_string(),
+            text: None,
+            inner_html: None,
+            attributes: HashMap::with_capacity(0),
+            styles: HashMap::with_capacity(0),
+            classes: HashSet::with_capacity(0),
+            children: Vec::new(),
+            parent: None,
+            event_listeners: HashMap::with_capacity(0),
+            properties: HashMap::with_capacity(0),
+            layout: LayoutNode::default(),
+            scroll_offset: (0.0, 0.0),
+            fixed_width: None,
+            fixed_height: None,
         }
     }
 
@@ -70,17 +95,50 @@ impl ElementTree {
         }
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.elements.reserve(additional);
+    }
+
     pub fn create(&mut self, tag: &str) -> u32 {
         let el = Element::new(tag);
-        // Find free slot or push
-        for (i, slot) in self.elements.iter_mut().enumerate() {
-            if i < 2 { continue; }
-            if slot.is_none() {
-                *slot = Some(el);
-                self.dirty = true;
-                return i as u32;
-            }
+        let id = self.elements.len() as u32;
+        self.elements.push(Some(el));
+        self.dirty = true;
+        id
+    }
+
+    /// Batch-create N identical elements with fixed dimensions.
+    /// Returns the first ID. All elements are sequential: first_id..first_id+count.
+    pub fn batch_create_fixed(&mut self, tag: &str, width: f32, height: f32, count: usize) -> u32 {
+        let first_id = self.elements.len() as u32;
+        let tag_string = tag.to_string();
+        for _ in 0..count {
+            self.elements.push(Some(Element {
+                tag: tag_string.clone(),
+                text: None,
+                inner_html: None,
+                attributes: HashMap::new(),
+                styles: HashMap::new(),
+                classes: HashSet::new(),
+                children: Vec::new(),
+                parent: None,
+                event_listeners: HashMap::new(),
+                properties: HashMap::new(),
+                layout: LayoutNode::default(),
+                scroll_offset: (0.0, 0.0),
+                fixed_width: Some(width),
+                fixed_height: Some(height),
+            }));
         }
+        self.dirty = true;
+        first_id
+    }
+
+    /// Create an element with fixed width/height — avoids HashMap allocation.
+    pub fn create_fixed(&mut self, tag: &str, width: f32, height: f32) -> u32 {
+        let mut el = Element::new_minimal(tag);
+        el.fixed_width = Some(width);
+        el.fixed_height = Some(height);
         let id = self.elements.len() as u32;
         self.elements.push(Some(el));
         self.dirty = true;
