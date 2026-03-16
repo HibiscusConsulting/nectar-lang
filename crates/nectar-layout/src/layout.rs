@@ -48,6 +48,14 @@ pub enum Justify {
     SpaceBetween,
 }
 
+/// Anchor point within a Layer parent. Combines horizontal + vertical alignment.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Anchor {
+    TopLeft, TopCenter, TopRight,
+    CenterLeft, Center, CenterRight,
+    BottomLeft, BottomCenter, BottomRight,
+}
+
 /// Resolved layout style for one element — parsed from element's styles map.
 #[derive(Debug, Clone)]
 pub struct LayoutStyle {
@@ -64,6 +72,8 @@ pub struct LayoutStyle {
     pub max_height: Option<f32>,
     pub scroll: bool,
     pub wrap: bool,
+    /// Anchor point within a Layer parent (default: TopLeft)
+    pub anchor: Anchor,
 }
 
 impl Default for LayoutStyle {
@@ -82,6 +92,7 @@ impl Default for LayoutStyle {
             max_height: None,
             scroll: false,
             wrap: false,
+            anchor: Anchor::TopLeft,
         }
     }
 }
@@ -372,19 +383,40 @@ fn layout_node(
                 let offset_bottom = kid_el_styles.and_then(|s| s.get("bottom")).and_then(|v| parse_px(v));
                 let offset_right = kid_el_styles.and_then(|s| s.get("right")).and_then(|v| parse_px(v));
 
-                let kid_x = if let Some(left) = offset_left {
-                    content_x + left
-                } else if let Some(right) = offset_right {
-                    content_x + content_w - kid_w - right
+                let (kid_x, kid_y) = if kid_style.anchor != Anchor::TopLeft {
+                    // Anchor-based positioning
+                    let (ax, ay) = match kid_style.anchor {
+                        Anchor::TopLeft => (content_x, content_y),
+                        Anchor::TopCenter => (content_x + (content_w - kid_w) / 2.0, content_y),
+                        Anchor::TopRight => (content_x + content_w - kid_w, content_y),
+                        Anchor::CenterLeft => (content_x, content_y + (content_h - kid_h) / 2.0),
+                        Anchor::Center => (content_x + (content_w - kid_w) / 2.0, content_y + (content_h - kid_h) / 2.0),
+                        Anchor::CenterRight => (content_x + content_w - kid_w, content_y + (content_h - kid_h) / 2.0),
+                        Anchor::BottomLeft => (content_x, content_y + content_h - kid_h),
+                        Anchor::BottomCenter => (content_x + (content_w - kid_w) / 2.0, content_y + content_h - kid_h),
+                        Anchor::BottomRight => (content_x + content_w - kid_w, content_y + content_h - kid_h),
+                    };
+                    // Pixel offsets on top of anchor
+                    let ax = if let Some(l) = offset_left { ax + l } else if let Some(r) = offset_right { ax - r } else { ax };
+                    let ay = if let Some(t) = offset_top { ay + t } else if let Some(b) = offset_bottom { ay - b } else { ay };
+                    (ax, ay)
                 } else {
-                    content_x
-                };
-                let kid_y = if let Some(top) = offset_top {
-                    content_y + top
-                } else if let Some(bottom) = offset_bottom {
-                    content_y + content_h - kid_h - bottom
-                } else {
-                    content_y
+                    // Legacy CSS-style positioning (top/left/right/bottom from edges)
+                    let kx = if let Some(left) = offset_left {
+                        content_x + left
+                    } else if let Some(right) = offset_right {
+                        content_x + content_w - kid_w - right
+                    } else {
+                        content_x
+                    };
+                    let ky = if let Some(top) = offset_top {
+                        content_y + top
+                    } else if let Some(bottom) = offset_bottom {
+                        content_y + content_h - kid_h - bottom
+                    } else {
+                        content_y
+                    };
+                    (kx, ky)
                 };
 
                 layout_node(tree, ctx, intrinsics, kid, kid_x, kid_y, kid_w, kid_h, measurer);
@@ -803,6 +835,22 @@ fn resolve_style(el: &crate::element::Element) -> LayoutStyle {
         ls.wrap = w == "true";
     } else if let Some(fw) = styles.get("flex-wrap") {
         ls.wrap = fw == "wrap";
+    }
+
+    // Anchor (for Layer children)
+    if let Some(a) = styles.get("anchor") {
+        ls.anchor = match a.as_str() {
+            "top-left" => Anchor::TopLeft,
+            "top-center" | "top" => Anchor::TopCenter,
+            "top-right" => Anchor::TopRight,
+            "center-left" | "left" => Anchor::CenterLeft,
+            "center" => Anchor::Center,
+            "center-right" | "right" => Anchor::CenterRight,
+            "bottom-left" => Anchor::BottomLeft,
+            "bottom-center" | "bottom" => Anchor::BottomCenter,
+            "bottom-right" => Anchor::BottomRight,
+            _ => Anchor::TopLeft,
+        };
     }
 
     // Text nodes: always hug
