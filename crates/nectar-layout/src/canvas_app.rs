@@ -104,37 +104,65 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
         // Create canvas
         state.canvas_id = unsafe { canvas_init(vw, vh) };
 
-        // Build 10K products — all computation in WASM
+        // Build 10K products — all in WASM
         let mut products = Vec::with_capacity(10000);
         for i in 0u32..10000 {
-            let cat_idx = (i % 5) as usize;
-            let pc = (i * 7 + 499) % 10000;
-            let dollars = pc / 100;
-            let cents = pc % 100;
-
-            let mut price_display = String::with_capacity(8);
-            let _ = write!(price_display, "${}.{:02}", dollars, cents);
-
-            let mut img_src = String::with_capacity(16);
-            let _ = write!(img_src, "img/p{}.jpg", i);
-
-            let mut name = String::with_capacity(14);
-            let _ = write!(name, "Product #{}", i);
-
-            let si = i % 10;
-            let stock = if si == 0 { "OUT OF STOCK" } else if si == 5 { "LOW STOCK" } else { "IN STOCK" };
-
-            products.push(Product {
-                name,
-                category: CATS[cat_idx],
-                price_cents: pc,
-                price_display,
-                img_src,
-                stock,
-            });
+            products.push(build_product(i));
         }
         state.products = products;
     });
+}
+
+// ══════════════════════════════════════════════════════════════
+// LAZY CANVAS MODE — rAF drain, sub-millisecond first paint
+// ══════════════════════════════════════════════════════════════
+
+/// Lazy init: build only the first batch, render immediately.
+/// Call app_lazy_build_batch via rAF to fill in the rest.
+#[no_mangle]
+pub extern "C" fn app_lazy_init(vw: f32, vh: f32, t_fetch: f32) {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.vw = vw;
+        state.vh = vh;
+        state.t_fetch = t_fetch;
+        state.canvas_id = unsafe { canvas_init(vw, vh) };
+
+        // Build only enough products to fill the viewport
+        let cols = state.cols();
+        let visible_rows = ((vh - GRID_TOP) / 316.0).ceil() as u32 + 1;
+        let initial_count = (cols as u32 * visible_rows).min(10000);
+
+        let mut products = Vec::with_capacity(10000);
+        for i in 0..initial_count {
+            products.push(build_product(i));
+        }
+        state.products = products;
+    });
+}
+
+/// Build next batch of products. Returns 1 if more remain, 0 if done.
+/// Call via rAF: if (app_lazy_build_batch()) requestAnimationFrame(again)
+#[no_mangle]
+pub extern "C" fn app_lazy_build_batch() -> u32 {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let current = state.products.len() as u32;
+        if current >= 10000 {
+            return 0;
+        }
+        let batch_end = (current + 500).min(10000); // 500 per frame
+        for i in current..batch_end {
+            state.products.push(build_product(i));
+        }
+        if batch_end >= 10000 { 0 } else { 1 }
+    })
+}
+
+/// How many products are built so far
+#[no_mangle]
+pub extern "C" fn app_lazy_product_count() -> u32 {
+    STATE.with(|s| s.borrow().products.len() as u32)
 }
 
 /// Build hidden accessibility DOM — call AFTER app_init, AFTER first render.
@@ -467,6 +495,22 @@ pub extern "C" fn app_get_back_clicked(mx: f32, my: f32) -> u32 {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
+
+fn build_product(i: u32) -> Product {
+    let cat_idx = (i % 5) as usize;
+    let pc = (i * 7 + 499) % 10000;
+    let dollars = pc / 100;
+    let cents = pc % 100;
+    let mut price_display = String::with_capacity(8);
+    let _ = write!(price_display, "${}.{:02}", dollars, cents);
+    let mut img_src = String::with_capacity(16);
+    let _ = write!(img_src, "img/p{}.jpg", i);
+    let mut name = String::with_capacity(14);
+    let _ = write!(name, "Product #{}", i);
+    let si = i % 10;
+    let stock = if si == 0 { "OUT OF STOCK" } else if si == 5 { "LOW STOCK" } else { "IN STOCK" };
+    Product { name, category: CATS[cat_idx], price_cents: pc, price_display, img_src, stock }
+}
 
 fn fmt_into(buf: &mut [u8], args: std::fmt::Arguments) -> usize {
     let mut cursor = std::io::Cursor::new(&mut buf[..]);
