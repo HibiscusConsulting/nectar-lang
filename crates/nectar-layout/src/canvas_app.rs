@@ -708,3 +708,32 @@ pub extern "C" fn app_is_vim_mode() -> u32 { 0 }
 
 #[no_mangle]
 pub extern "C" fn app_debug_sel() -> i32 { -1 }
+
+/// Debug: dump first N elements' layout to console via canvas_fill_text
+#[no_mangle]
+pub extern "C" fn app_debug_layout(count: u32) {
+    with_state(|state| {
+        for (id, el) in state.tree.iter() {
+            if id as u32 >= count + 2 { break; }
+            if id < 2 { continue; }
+            let l = &el.layout;
+            let tag = &el.tag;
+            let text = el.text.as_deref().unwrap_or("");
+            let txt = if text.len() > 20 { &text[..20] } else { text };
+            // Print to stderr (visible in browser console as WASM stderr)
+            let mut buf = [0u8; 128];
+            let len = {
+                let mut c = std::io::Cursor::new(&mut buf[..]);
+                let _ = std::io::Write::write_fmt(&mut c, format_args!(
+                    "id={} tag={} x={:.0} y={:.0} w={:.0} h={:.0} text=\"{}\"",
+                    id, tag, l.x, l.y, l.width, l.height, txt
+                ));
+                c.position() as usize
+            };
+            // Draw it as text on the canvas at y=id*14
+            unsafe {
+                canvas_fill_text(state.canvas_id, buf.as_ptr(), len as u32, 10.0, (id as f32) * 14.0, 255, 255, 0, 10.0, 0);
+            }
+        }
+    });
+}
