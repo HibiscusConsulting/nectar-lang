@@ -296,9 +296,10 @@ fn layout_node(
 
     let style = ctx.style(id).clone();
 
-    // Resolve own size
-    let resolved_w = resolve_size(style.width, available_w, style.min_width, style.max_width);
-    let mut resolved_h = resolve_size(style.height, available_h, style.min_height, style.max_height);
+    // Resolve own size (using intrinsic for Hug)
+    let intrinsic = intrinsics.get(&id).copied().unwrap_or((0.0, 0.0));
+    let resolved_w = resolve_size_with_intrinsic(style.width, available_w, intrinsic.0, style.min_width, style.max_width);
+    let mut resolved_h = resolve_size_with_intrinsic(style.height, available_h, intrinsic.1, style.min_height, style.max_height);
 
     // For text nodes with Hug height, re-measure with the resolved width constraint
     // so that text wraps properly and the height reflects wrapped lines.
@@ -1315,5 +1316,125 @@ mod tests {
         assert_eq!(cw, 180.0); // 200 - 10 - 10
         assert_eq!(ch, 90.0);  // 100 - 5 - 5
     }
-}
 
+    // ── Canvas demo structure test ─────────────────────────────────
+    #[test]
+    fn test_vertical_hug_with_horizontal_children() {
+        let mut tree = ElementTree::new();
+
+        // Root: vertical, hug height, 1400px width
+        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(1).unwrap().styles.insert("width".into(), "1400px".into());
+        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(1).unwrap().styles.insert("gap".into(), "12".into());
+        tree.get_mut(1).unwrap().styles.insert("padding".into(), "20".into());
+
+        // Header: vertical, hug height
+        let header = tree.create("div");
+        tree.append_child(1, header);
+        tree.get_mut(header).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(header).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(header).unwrap().styles.insert("padding".into(), "16".into());
+
+        // Title text in header
+        let title = tree.create("div");
+        tree.append_child(header, title);
+        tree.get_mut(title).unwrap().text = Some("E-Commerce Product Grid".into());
+        tree.get_mut(title).unwrap().styles.insert("font-size".into(), "24px".into());
+        tree.get_mut(title).unwrap().styles.insert("height".into(), "hug".into());
+
+        // Pills row: horizontal, hug, wrap
+        let pills = tree.create("div");
+        tree.append_child(1, pills);
+        tree.get_mut(pills).unwrap().styles.insert("direction".into(), "horizontal".into());
+        tree.get_mut(pills).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(pills).unwrap().styles.insert("gap".into(), "10".into());
+        tree.get_mut(pills).unwrap().styles.insert("wrap".into(), "true".into());
+
+        // 6 pill children
+        for label in &["All", "Electronics", "Clothing", "Home", "Sports", "Books"] {
+            let pill = tree.create("div");
+            tree.append_child(pills, pill);
+            tree.get_mut(pill).unwrap().text = Some(label.to_string());
+            tree.get_mut(pill).unwrap().styles.insert("width".into(), "hug".into());
+            tree.get_mut(pill).unwrap().styles.insert("height".into(), "hug".into());
+            tree.get_mut(pill).unwrap().styles.insert("padding".into(), "8".into());
+        }
+
+        // Product grid: horizontal, wrap, hug height
+        let grid = tree.create("div");
+        tree.append_child(1, grid);
+        tree.get_mut(grid).unwrap().styles.insert("direction".into(), "horizontal".into());
+        tree.get_mut(grid).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(grid).unwrap().styles.insert("gap".into(), "16".into());
+        tree.get_mut(grid).unwrap().styles.insert("wrap".into(), "true".into());
+
+        // 10 product cards
+        for _ in 0..10 {
+            let card = tree.create("div");
+            tree.append_child(grid, card);
+            tree.get_mut(card).unwrap().styles.insert("width".into(), "260px".into());
+            tree.get_mut(card).unwrap().styles.insert("height".into(), "340px".into());
+        }
+
+        layout_tree(&mut tree, 1400.0, 999999.0);
+
+        // Root should hug its content
+        let root = tree.get(1).unwrap();
+        println!("root: x={} y={} w={} h={}", root.layout.x, root.layout.y, root.layout.width, root.layout.height);
+        assert!(root.layout.height > 0.0, "root height should be > 0");
+        assert!(root.layout.height < 10000.0, "root height should be reasonable");
+
+        // Header should be compact (not filling viewport)
+        let h = tree.get(header).unwrap();
+        println!("header: x={} y={} w={} h={}", h.layout.x, h.layout.y, h.layout.width, h.layout.height);
+        assert!(h.layout.height < 100.0, "header should be compact, got {}", h.layout.height);
+
+        // Pills should be compact
+        let p = tree.get(pills).unwrap();
+        println!("pills: x={} y={} w={} h={}", p.layout.x, p.layout.y, p.layout.width, p.layout.height);
+        assert!(p.layout.height < 60.0, "pills should be compact, got {}", p.layout.height);
+
+        // Grid should start below header + pills
+        let g = tree.get(grid).unwrap();
+        println!("grid: x={} y={} w={} h={}", g.layout.x, g.layout.y, g.layout.width, g.layout.height);
+        assert!(g.layout.y > 50.0, "grid should start below chrome, got y={}", g.layout.y);
+        assert!(g.layout.y < 200.0, "grid should not be too far down, got y={}", g.layout.y);
+
+        // Cards should be in rows of 5 (1400px - 40padding = 1360 / 276 = 4.9 → 5 per row)
+        // 10 cards = 2 rows × 340px + gap = ~696px
+        assert!(g.layout.height > 600.0, "grid should contain 2 rows of cards, got h={}", g.layout.height);
+        assert!(g.layout.height < 800.0, "grid height should be ~700px, got h={}", g.layout.height);
+
+        // First card position
+        let first_card_id = tree.get(grid).unwrap().children[0];
+        let fc = tree.get(first_card_id).unwrap();
+        println!("first card: x={} y={} w={} h={}", fc.layout.x, fc.layout.y, fc.layout.width, fc.layout.height);
+        assert_eq!(fc.layout.width, 260.0);
+        assert_eq!(fc.layout.height, 340.0);
+    }
+
+    #[test]
+    fn test_simple_hug_vertical() {
+        let mut tree = ElementTree::new();
+        // Root: vertical, hug
+        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(1).unwrap().styles.insert("width".into(), "800px".into());
+
+        let child = tree.create("div");
+        tree.append_child(1, child);
+        tree.get_mut(child).unwrap().text = Some("Hello".into());
+        tree.get_mut(child).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(child).unwrap().styles.insert("font-size".into(), "16px".into());
+
+        layout_tree(&mut tree, 800.0, 999999.0);
+
+        let r = tree.get(1).unwrap();
+        let c = tree.get(child).unwrap();
+        println!("root: w={} h={}", r.layout.width, r.layout.height);
+        println!("child: w={} h={}", c.layout.width, c.layout.height);
+        assert!(r.layout.height < 100.0, "root should hug child, got h={}", r.layout.height);
+        assert!(c.layout.height < 50.0, "child should hug text, got h={}", c.layout.height);
+    }
+}

@@ -40,7 +40,8 @@ impl TextMeasurer for EstimateMeasurer {
     fn measure(&mut self, text: &str, style: &TextStyle, _max_width: Option<f32>) -> (f32, f32) {
         let char_width = style.font_size * 0.6;
         let width = text.len() as f32 * char_width;
-        let height = style.font_size * style.line_height;
+        // line_height is already in pixels (e.g. 19.2 for font_size=16, not 1.2)
+        let height = style.line_height;
         (width, height)
     }
 }
