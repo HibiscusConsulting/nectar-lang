@@ -67,16 +67,22 @@ pub extern "C" fn hybrid_init(vw: f32, vh: f32, t_fetch: f32) {
         let style_gap_val = b"16px";
         let style_pad = b"padding";
         let style_pad_val = b"40px";
-        let style_vis = b"visibility";
-        let style_hidden = b"hidden";
+        let style_opacity = b"opacity";
+        let style_zero = b"0";
+        let style_pos = b"position";
+        let style_abs = b"absolute";
+        let style_pe = b"pointer-events";
+        let style_none = b"none";
 
         unsafe {
             dom_set_style_hybrid(state.container_id, style_display.as_ptr(), 7, style_grid.as_ptr(), 4);
             dom_set_style_hybrid(state.container_id, style_gtc.as_ptr(), 22, style_gtc_val.as_ptr(), 37);
             dom_set_style_hybrid(state.container_id, style_gap.as_ptr(), 3, style_gap_val.as_ptr(), 4);
             dom_set_style_hybrid(state.container_id, style_pad.as_ptr(), 7, style_pad_val.as_ptr(), 4);
-            // Hidden but takes space (for layout computation)
-            dom_set_style_hybrid(state.container_id, style_vis.as_ptr(), 10, style_hidden.as_ptr(), 6);
+            // Invisible but accessible — screen readers read it, crawlers index it
+            dom_set_style_hybrid(state.container_id, style_opacity.as_ptr(), 7, style_zero.as_ptr(), 1);
+            dom_set_style_hybrid(state.container_id, style_pos.as_ptr(), 8, style_abs.as_ptr(), 8);
+            dom_set_style_hybrid(state.container_id, style_pe.as_ptr(), 14, style_none.as_ptr(), 4);
         }
 
         // Create 10K product card DOM elements
