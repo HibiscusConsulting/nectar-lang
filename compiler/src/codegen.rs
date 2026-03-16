@@ -3152,8 +3152,12 @@ impl WasmCodegen {
             self.line(") ;; end $eb_ok");
         }
 
-        // Generate the DOM tree from the render block
-        self.generate_template(&comp.render.body, "$root");
+        // Generate the render tree from the render block
+        if self.render_mode == RenderMode::Canvas || self.render_mode == RenderMode::Hybrid {
+            self.generate_canvas_template(&comp.render.body, -1, 0, 0);
+        } else {
+            self.generate_template(&comp.render.body, "$root");
+        }
 
         // Capture the generated template code
         template_output = std::mem::take(&mut self.output);
@@ -7114,6 +7118,285 @@ impl WasmCodegen {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Canvas template codegen — emits $cvs_add calls instead of DOM calls.
+    /// Layout is computed with a simple vertical flow: each element gets a y
+    /// position based on the running cursor. For-loops compute grid layout.
+    /// parent_idx: index of parent layout element (-1 for root)
+    /// x, y: current position offset
+    fn generate_canvas_template(&mut self, node: &TemplateNode, parent_idx: i32, x: i32, y: i32) {
+        match node {
+            TemplateNode::Element(el) => {
+                let uid = self.next_label();
+                let idx_var = format!("$__cvs_el_{}", uid);
+                self.emit_template_local(&idx_var);
+
+                // Determine element dimensions based on tag
+                let (w, h) = match el.tag.as_str() {
+                    "div" => (0, 0),  // container — sized by children
+                    "button" => (200, 36),
+                    "span" => (200, 20),
+                    "h1" => (600, 40),
+                    "h2" => (400, 32),
+                    "h3" => (300, 28),
+                    "p" => (600, 20),
+                    "img" => (260, 180),
+                    "input" => (400, 36),
+                    "header" => (0, 0),
+                    "nav" => (0, 0),
+                    "footer" => (0, 0),
+                    "label" => (200, 20),
+                    "table" | "tr" | "td" => (0, 0),
+                    "a" => (200, 20),
+                    _ => (200, 30),
+                };
+
+                // Check for static text content to extract for display
+                let mut text_ptr_expr = "i32.const 0".to_string();
+                let mut text_len_expr = "i32.const 0".to_string();
+
+                // Check first child for text literal
+                if let Some(TemplateNode::TextLiteral(text)) = el.children.first() {
+                    let offset = self.store_string(text);
+                    text_ptr_expr = format!("i32.const {}", offset);
+                    text_len_expr = format!("i32.const {}", text.len());
+                }
+
+                // Get color from class name or default
+                let default_color = self.store_string("#e6edf3");
+                let color_ptr_expr = format!("i32.const {}", default_color);
+
+                // Determine type: 0=rect, 1=text, 2=image, 3=container
+                let elem_type = match el.tag.as_str() {
+                    "img" => 2,
+                    "div" | "header" | "nav" | "footer" | "section" => 3,
+                    "span" | "p" | "h1" | "h2" | "h3" | "label" | "a" | "button" | "td" => 1,
+                    _ => 0,
+                };
+
+                // For img elements, extract src attribute as text_ptr
+                if el.tag == "img" {
+                    for attr in &el.attributes {
+                        if let Attribute::Dynamic { name, value } = attr {
+                            if name == "src" {
+                                self.line(";; canvas img src");
+                                // cvs_add(type=2, x, y, w, h, src_ptr, src_len, color_ptr=0, parent, cb=-1)
+                                self.line(&format!("i32.const 2 ;; image"));
+                                self.line(&format!("i32.const {} ;; x", x));
+                                self.line(&format!("i32.const {} ;; y", y));
+                                self.line(&format!("i32.const {} ;; w", w));
+                                self.line(&format!("i32.const {} ;; h", h));
+                                self.generate_expr(value);
+                                if !Self::expr_returns_ptr_len(value) {
+                                    self.line("call $str_len");
+                                }
+                                self.line("i32.const 0 ;; no color");
+                                self.line(&format!("i32.const {} ;; parent", parent_idx));
+                                self.line("i32.const -1 ;; no click handler");
+                                self.line("call $cvs_add");
+                                self.line(&format!("local.set {}", idx_var));
+                                return; // img is a leaf
+                            }
+                        }
+                    }
+                }
+
+                // Resolve click handler if present
+                let mut cb_expr = "i32.const -1".to_string();
+                for attr in &el.attributes {
+                    if let Attribute::EventHandler { handler, .. } = attr {
+                        let handler_idx = self.resolve_handler_index(handler);
+                        cb_expr = format!("i32.const {}", handler_idx);
+                    }
+                }
+
+                // Emit cvs_add call
+                self.line(&format!(";; canvas element: <{}>", el.tag));
+                self.line(&format!("i32.const {} ;; type", elem_type));
+                self.line(&format!("i32.const {} ;; x", x));
+                self.line(&format!("i32.const {} ;; y", y));
+                self.line(&format!("i32.const {} ;; w", if w > 0 { w } else { 1400 }));
+                self.line(&format!("i32.const {} ;; h", if h > 0 { h } else { 40 }));
+                self.line(&text_ptr_expr);
+                self.line(&text_len_expr);
+                self.line(&color_ptr_expr);
+                self.line(&format!("i32.const {} ;; parent", parent_idx));
+                self.line(&cb_expr);
+                self.line("call $cvs_add");
+                self.line(&format!("local.set {}", idx_var));
+
+                // Process children with vertical flow
+                let mut child_y = y + if h > 0 { h } else { 0 };
+                for child in &el.children {
+                    // Skip text literal if we already used it
+                    if matches!(child, TemplateNode::TextLiteral(_)) {
+                        continue;
+                    }
+                    self.generate_canvas_template(child, uid as i32, x, child_y);
+                    child_y += 30; // simple vertical spacing
+                }
+            }
+            TemplateNode::TextLiteral(text) => {
+                let uid = self.next_label();
+                let idx_var = format!("$__cvs_el_{}", uid);
+                self.emit_template_local(&idx_var);
+                let offset = self.store_string(text);
+                let color = self.store_string("#e6edf3");
+                self.line(&format!(";; canvas text: \"{}\"", if text.len() > 30 { &text[..30] } else { text }));
+                self.line("i32.const 1 ;; text type");
+                self.line(&format!("i32.const {} ;; x", x));
+                self.line(&format!("i32.const {} ;; y", y));
+                self.line(&format!("i32.const {} ;; w", text.len() * 8));
+                self.line("i32.const 20 ;; h");
+                self.line(&format!("i32.const {} ;; text_ptr", offset));
+                self.line(&format!("i32.const {} ;; text_len", text.len()));
+                self.line(&format!("i32.const {} ;; color", color));
+                self.line(&format!("i32.const {} ;; parent", parent_idx));
+                self.line("i32.const -1 ;; no handler");
+                self.line("call $cvs_add");
+                self.line(&format!("local.set {}", idx_var));
+            }
+            TemplateNode::Expression(expr) => {
+                let uid = self.next_label();
+                let idx_var = format!("$__cvs_el_{}", uid);
+                self.emit_template_local(&idx_var);
+                let color = self.store_string("#e6edf3");
+                self.line(";; canvas dynamic expression");
+                self.line("i32.const 1 ;; text type");
+                self.line(&format!("i32.const {} ;; x", x));
+                self.line(&format!("i32.const {} ;; y", y));
+                self.line("i32.const 200 ;; w");
+                self.line("i32.const 20 ;; h");
+                self.generate_expr(expr);
+                if !Self::expr_returns_ptr_len(expr) {
+                    self.line("call $string_fromI32");
+                }
+                self.line(&format!("i32.const {} ;; color", color));
+                self.line(&format!("i32.const {} ;; parent", parent_idx));
+                self.line("i32.const -1 ;; no handler");
+                self.line("call $cvs_add");
+                self.line(&format!("local.set {}", idx_var));
+            }
+            TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
+                // For canvas: compute grid layout for all items
+                let uid = self.next_label();
+                let binding_var = format!("${}", binding);
+                let idx_var = format!("$__cvs_for_idx_{}", uid);
+                let len_var = format!("$__cvs_for_len_{}", uid);
+                let arr_var = format!("$__cvs_for_arr_{}", uid);
+                let data_var = format!("$__cvs_for_data_{}", uid);
+                let col_var = format!("$__cvs_for_col_{}", uid);
+                let row_var = format!("$__cvs_for_row_{}", uid);
+                let cx_var = format!("$__cvs_for_cx_{}", uid);
+                let cy_var = format!("$__cvs_for_cy_{}", uid);
+
+                self.emit_template_local(&binding_var);
+                self.emit_template_local(&idx_var);
+                self.emit_template_local(&len_var);
+                self.emit_template_local(&arr_var);
+                self.emit_template_local(&data_var);
+                self.emit_template_local(&col_var);
+                self.emit_template_local(&row_var);
+                self.emit_template_local(&cx_var);
+                self.emit_template_local(&cy_var);
+
+                // Grid layout constants
+                let card_w = 260;
+                let card_h = 300;
+                let gap = 16;
+                let padding = 40;
+                let cols = 5; // approximate columns for 1400px width
+
+                self.line(&format!(";; canvas for-loop grid layout ({} items)", binding));
+
+                // Evaluate iterator (array)
+                self.generate_expr(iterator);
+                self.line(&format!("local.set {}", arr_var));
+                self.line(&format!("local.get {}  i32.load  local.set {}", arr_var, len_var));
+                self.line(&format!("local.get {}  i32.load offset=8  local.set {}", arr_var, data_var));
+                self.line(&format!("i32.const 0  local.set {}", idx_var));
+
+                // Loop
+                let block_label = format!("$cvs_for_break_{}", uid);
+                let loop_label = format!("$cvs_for_cont_{}", uid);
+                self.line(&format!("block {}", block_label));
+                self.indent += 1;
+                self.line(&format!("loop {}", loop_label));
+                self.indent += 1;
+
+                // Break if idx >= len
+                self.line(&format!("local.get {}  local.get {}  i32.ge_u  br_if {}", idx_var, len_var, block_label));
+
+                // Load current element
+                self.line(&format!("local.get {}  local.get {}  i32.const 4  i32.mul  i32.add  i32.load  local.set {}", data_var, idx_var, binding_var));
+
+                // Compute grid position
+                // col = idx % cols
+                self.line(&format!("local.get {}  i32.const {}  i32.rem_u  local.set {}", idx_var, cols, col_var));
+                // row = idx / cols
+                self.line(&format!("local.get {}  i32.const {}  i32.div_u  local.set {}", idx_var, cols, row_var));
+                // cx = padding + col * (card_w + gap)
+                self.line(&format!("i32.const {}  local.get {}  i32.const {}  i32.mul  i32.add  local.set {}", padding, col_var, card_w + gap, cx_var));
+                // cy = y + row * (card_h + gap)
+                self.line(&format!("i32.const {}  local.get {}  i32.const {}  i32.mul  i32.add  local.set {}", y, row_var, card_h + gap, cy_var));
+
+                // Generate children for each item using cx, cy as position
+                self.for_loop_bindings.push(binding.clone());
+                for child in children {
+                    // For each child, we'd emit canvas layout calls
+                    // For now, emit a card with key fields
+                    self.generate_canvas_template(child, parent_idx, 0, 0);
+                    // The x/y from generate_canvas_template are constants from the match,
+                    // but we need dynamic cx/cy. This requires the canvas template to
+                    // accept local vars not constants. For the prototype, emit inline:
+                }
+                self.for_loop_bindings.pop();
+
+                // Increment
+                self.line(&format!("local.get {}  i32.const 1  i32.add  local.set {}", idx_var, idx_var));
+                self.line(&format!("br {}", loop_label));
+
+                self.indent -= 1;
+                self.line("end");
+                self.indent -= 1;
+                self.line("end");
+
+                // Set content height
+                self.line(&format!(";; set content height for scroll"));
+                self.line(&format!("local.get {}  i32.const {}  i32.div_u  i32.const 1  i32.add  i32.const {}  i32.mul  i32.const {}  i32.add", len_var, cols, card_h + gap, y));
+                self.line("call $cvs_set_content_h");
+            }
+            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+                // For canvas: evaluate condition, emit children if true
+                self.generate_expr(condition);
+                self.line("if");
+                self.indent += 1;
+                for child in then_children {
+                    self.generate_canvas_template(child, parent_idx, x, y);
+                }
+                self.indent -= 1;
+                if let Some(else_nodes) = else_children {
+                    self.line("else");
+                    self.indent += 1;
+                    for child in else_nodes {
+                        self.generate_canvas_template(child, parent_idx, x, y);
+                    }
+                    self.indent -= 1;
+                }
+                self.line("end");
+            }
+            TemplateNode::Fragment(children) => {
+                let mut child_y = y;
+                for child in children {
+                    self.generate_canvas_template(child, parent_idx, x, child_y);
+                    child_y += 30;
+                }
+            }
+            _ => {
+                // Other node types: skip for canvas prototype
+            }
         }
     }
 
@@ -19666,7 +19949,7 @@ impl WasmCodegen {
 
         // $cvs_set_bg(idx, bg_color_ptr) — set background color
         self.line("");
-        self.emit("(func $cvs_set_bg (param $idx i32) (param $ptr i32)");
+        self.emit("(func $cvs_set_bg (export \"cvs_set_bg\") (param $idx i32) (param $ptr i32)");
         self.indent += 1;
         self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
         self.line("local.get $ptr  i32.store offset=48");
@@ -19675,7 +19958,7 @@ impl WasmCodegen {
 
         // $cvs_set_font_size(idx, size) — set font size
         self.line("");
-        self.emit("(func $cvs_set_font_size (param $idx i32) (param $size i32)");
+        self.emit("(func $cvs_set_font_size (export \"cvs_set_font_size\") (param $idx i32) (param $size i32)");
         self.indent += 1;
         self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
         self.line("local.get $size  i32.store offset=40");
@@ -19684,7 +19967,7 @@ impl WasmCodegen {
 
         // $cvs_set_radius(idx, r) — set border radius
         self.line("");
-        self.emit("(func $cvs_set_radius (param $idx i32) (param $r i32)");
+        self.emit("(func $cvs_set_radius (export \"cvs_set_radius\") (param $idx i32) (param $r i32)");
         self.indent += 1;
         self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
         self.line("local.get $r  i32.store offset=44");
@@ -19693,7 +19976,7 @@ impl WasmCodegen {
 
         // $cvs_set_data(idx, data_ptr) — attach arbitrary data to element
         self.line("");
-        self.emit("(func $cvs_set_data (param $idx i32) (param $ptr i32)");
+        self.emit("(func $cvs_set_data (export \"cvs_set_data\") (param $idx i32) (param $ptr i32)");
         self.indent += 1;
         self.line("global.get $__cvs_layout_base  local.get $idx  i32.const 64  i32.mul  i32.add");
         self.line("local.get $ptr  i32.store offset=56");
