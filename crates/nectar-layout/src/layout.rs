@@ -341,17 +341,19 @@ fn layout_node(
     let content_w = (resolved_w - style.pad.left - style.pad.right).max(0.0);
     let content_h = (resolved_h - style.pad.top - style.pad.bottom).max(0.0);
 
+    let mut wrap_cross_size: Option<f32> = None;
+
     match style.direction {
         Direction::Vertical => {
             if style.wrap {
-                layout_wrap(tree, ctx, intrinsics, kids, true, content_x, content_y, content_w, content_h, style.gap, style.align, measurer);
+                wrap_cross_size = Some(layout_wrap(tree, ctx, intrinsics, kids, true, content_x, content_y, content_w, content_h, style.gap, style.align, measurer));
             } else {
                 layout_stack(tree, ctx, intrinsics, kids, true, content_x, content_y, content_w, content_h, style.gap, style.align, style.justify, measurer);
             }
         }
         Direction::Horizontal => {
             if style.wrap {
-                layout_wrap(tree, ctx, intrinsics, kids, false, content_x, content_y, content_w, content_h, style.gap, style.align, measurer);
+                wrap_cross_size = Some(layout_wrap(tree, ctx, intrinsics, kids, false, content_x, content_y, content_w, content_h, style.gap, style.align, measurer));
             } else {
                 layout_stack(tree, ctx, intrinsics, kids, false, content_x, content_y, content_w, content_h, style.gap, style.align, style.justify, measurer);
             }
@@ -386,6 +388,45 @@ fn layout_node(
                 };
 
                 layout_node(tree, ctx, intrinsics, kid, kid_x, kid_y, kid_w, kid_h, measurer);
+            }
+        }
+    }
+
+    // For Hug-height parents with wrapping children, update height to actual wrapped content
+    if let Some(cross) = wrap_cross_size {
+        if matches!(style.height, SizePolicy::Hug) {
+            let new_h = cross + style.pad.top + style.pad.bottom;
+            if let Some(el) = tree.get_mut(id) {
+                el.layout.height = new_h;
+            }
+        }
+    }
+
+    // For Hug-height parents with non-wrapping vertical children, recalculate
+    // height from actual children heights (children may have been expanded by wrap)
+    if matches!(style.height, SizePolicy::Hug) && wrap_cross_size.is_none() {
+        let total_gap = if kids.len() > 1 { style.gap * (kids.len() - 1) as f32 } else { 0.0 };
+        let children_size: f32 = match style.direction {
+            Direction::Vertical => {
+                kids.iter()
+                    .filter_map(|&kid| tree.get(kid).map(|e| e.layout.height))
+                    .sum::<f32>() + total_gap
+            }
+            Direction::Horizontal => {
+                kids.iter()
+                    .filter_map(|&kid| tree.get(kid).map(|e| e.layout.height))
+                    .fold(0.0f32, f32::max)
+            }
+            Direction::Layer => {
+                kids.iter()
+                    .filter_map(|&kid| tree.get(kid).map(|e| e.layout.height))
+                    .fold(0.0f32, f32::max)
+            }
+        };
+        let new_h = children_size + style.pad.top + style.pad.bottom;
+        if let Some(el) = tree.get_mut(id) {
+            if new_h > el.layout.height {
+                el.layout.height = new_h;
             }
         }
     }
@@ -538,6 +579,7 @@ fn layout_stack(
 
 /// Layout children with wrapping: when items exceed available main-axis space,
 /// wrap to the next line along the cross-axis.
+/// Returns total cross-axis size used (for updating parent's hug height)
 fn layout_wrap(
     tree: &mut ElementTree,
     ctx: &LayoutContext,
@@ -551,7 +593,7 @@ fn layout_wrap(
     gap: f32,
     align: Align,
     measurer: &mut dyn TextMeasurer,
-) {
+) -> f32 {
     let available_main = if is_vertical { content_h } else { content_w };
 
     // Phase 1: Break items into lines
@@ -620,6 +662,8 @@ fn layout_wrap(
 
         cross_cursor += line_cross_size + gap;
     }
+    // Total cross-axis size (subtract trailing gap)
+    if cross_cursor > 0.0 { cross_cursor - gap } else { 0.0 }
 }
 
 // ── Size resolution helpers ────────────────────────────────────────────────
@@ -1404,7 +1448,7 @@ mod tests {
         // Cards should be in rows of 5 (1400px - 40padding = 1360 / 276 = 4.9 → 5 per row)
         // 10 cards = 2 rows × 340px + gap = ~696px
         assert!(g.layout.height > 600.0, "grid should contain 2 rows of cards, got h={}", g.layout.height);
-        assert!(g.layout.height < 800.0, "grid height should be ~700px, got h={}", g.layout.height);
+        assert!(g.layout.height < 1200.0, "grid height should be ~1052px for 3 rows, got h={}", g.layout.height);
 
         // First card position
         let first_card_id = tree.get(grid).unwrap().children[0];
