@@ -56,6 +56,9 @@ struct AppState {
     // Element IDs for key UI parts
     root_id: u32,
     grid_id: u32,
+    pill_ids: Vec<u32>,     // category pill element IDs (6)
+    sort_ids: Vec<u32>,     // sort button element IDs (3)
+    cart_text_id: u32,      // cart button text element ID
     card_ids: Vec<u32>,     // product card container IDs
     name_ids: Vec<u32>,     // product name text element IDs
     cat_ids: Vec<u32>,      // product category text element IDs
@@ -217,7 +220,15 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, search, "border-radius", "10");
 
     let cart_btn = add_el(tree, "div", controls);
-    set_text(tree, cart_btn, "Cart 0");
+    let mut cart_label_buf = [0u8; 16];
+    let cart_label_len = {
+        let mut c = std::io::Cursor::new(&mut cart_label_buf[..]);
+        let _ = std::io::Write::write_fmt(&mut c, format_args!("Cart {}", state.cart_count));
+        c.position() as usize
+    };
+    let cart_text = std::str::from_utf8(&cart_label_buf[..cart_label_len]).unwrap_or("Cart 0");
+    set_text(tree, cart_btn, cart_text);
+    state.cart_text_id = cart_btn;
     set_style(tree, cart_btn, "font-size", "14px");
     set_style(tree, cart_btn, "font-weight", "bold");
     set_style(tree, cart_btn, "color", "#000000");
@@ -245,9 +256,11 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, pills_row, "wrap", "true");
     set_style(tree, pills_row, "height", "hug");
 
+    state.pill_ids.clear();
     let pill_labels = ["All", "Electronics", "Clothing", "Home", "Sports", "Books"];
     for (idx, label) in pill_labels.iter().enumerate() {
         let pill = add_el(tree, "div", pills_row);
+        state.pill_ids.push(pill);
         set_text(tree, pill, label);
         set_style(tree, pill, "font-size", "13px");
         set_style(tree, pill, "font-weight", "bold");
@@ -278,8 +291,10 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, sort_label, "width", "hug");
     set_style(tree, sort_label, "height", "hug");
 
+    state.sort_ids.clear();
     for (i, label) in ["Price ↑", "Price ↓", "Name A→Z"].iter().enumerate() {
         let btn = add_el(tree, "div", sort_row);
+        state.sort_ids.push(btn);
         set_text(tree, btn, label);
         set_style(tree, btn, "font-size", "12px");
         set_style(tree, btn, "font-weight", "bold");
@@ -454,6 +469,9 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
         t_fetch, t_tree: 0.0, t_layout: 0.0, t_total: 0.0,
         root_id: 1,
         grid_id: 0,
+        pill_ids: Vec::new(),
+        sort_ids: Vec::new(),
+        cart_text_id: 0,
         card_ids: Vec::new(),
         name_ids: Vec::new(),
         cat_ids: Vec::new(),
@@ -498,6 +516,7 @@ pub extern "C" fn app_lazy_init(vw: f32, vh: f32, t_fetch: f32) {
         scroll_y: 0.0, vw, vh,
         t_fetch, t_tree: 0.0, t_layout: 0.0, t_total: 0.0,
         root_id: 1, grid_id: 0,
+        pill_ids: Vec::new(), sort_ids: Vec::new(), cart_text_id: 0,
         card_ids: Vec::new(), name_ids: Vec::new(), cat_ids: Vec::new(),
         price_ids: Vec::new(), img_ids: Vec::new(),
         sel_element: -1, sel_start_char: 0, sel_end_char: 0, sel_dragging: false,
@@ -707,62 +726,79 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
         let text = state.tree.get(hit_id).and_then(|e| e.text.clone()).unwrap_or_default();
         let bg = state.tree.get(hit_id).and_then(|e| e.styles.get("background-color").cloned()).unwrap_or_default();
 
-        // Category pills
-        let pill_map = [("All", 0), ("Electronics", 1), ("Clothing", 2), ("Home", 3), ("Sports", 4), ("Books", 5)];
+        // Category pills — O(1) style swap, no rebuild
+        let pill_map = [("All", 0usize), ("Electronics", 1), ("Clothing", 2), ("Home", 3), ("Sports", 4), ("Books", 5)];
         for (label, idx) in &pill_map {
-            if text == *label {
+            if text == *label && state.pill_ids.len() == 6 {
+                // Deactivate old pill
+                let old = state.active_cat;
+                if old < 6 {
+                    let old_id = state.pill_ids[old];
+                    set_style(&mut state.tree, old_id, "background-color", "");
+                    set_style(&mut state.tree, old_id, "color", "#8b949e");
+                    set_style(&mut state.tree, old_id, "border", "2px solid #2a2f3e");
+                }
+                // Activate new pill
                 state.active_cat = *idx;
+                let new_id = state.pill_ids[*idx];
+                set_style(&mut state.tree, new_id, "background-color", "#f97316");
+                set_style(&mut state.tree, new_id, "color", "#000000");
+                set_style(&mut state.tree, new_id, "border", "");
                 state.signal_fires += 1;
-                // Rebuild UI to update active pill styling
-                state.tree = ElementTree::new();
-                build_ui(state);
-                layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
                 return;
             }
         }
 
-        // Sort buttons
-        let sort_map = [("Price ↑", 1u8), ("Price ↓", 2), ("Name A→Z", 3)];
-        for (label, order) in &sort_map {
-            if text == *label {
+        // Sort buttons — O(1) style swap
+        let sort_map = [("Price ↑", 0usize, 1u8), ("Price ↓", 1, 2), ("Name A→Z", 2, 3)];
+        for (label, si, order) in &sort_map {
+            if text == *label && state.sort_ids.len() == 3 {
+                // Deactivate old
+                for (j, &sid) in state.sort_ids.iter().enumerate() {
+                    if j == *si { continue; }
+                    set_style(&mut state.tree, sid, "background-color", "");
+                    set_style(&mut state.tree, sid, "color", "#8b949e");
+                    set_style(&mut state.tree, sid, "border", "1px solid #2a2f3e");
+                }
+                // Activate new
+                let new_id = state.sort_ids[*si];
+                set_style(&mut state.tree, new_id, "background-color", "#f97316");
+                set_style(&mut state.tree, new_id, "color", "#000000");
+                set_style(&mut state.tree, new_id, "border", "");
                 state.sort_order = *order;
                 state.signal_fires += 1;
-                state.tree = ElementTree::new();
-                build_ui(state);
-                layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
                 return;
             }
         }
 
-        // Cart button (reset)
-        if text.starts_with("Cart") {
-            state.cart_count = 0;
-            state.signal_fires += 1;
-            state.tree = ElementTree::new();
-            build_ui(state);
-            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
-            return;
-        }
-
-        // Add to Cart buttons
+        // Add to Cart — O(1) text update
         if text == "Add to Cart" {
             state.cart_count += 1;
             state.signal_fires += 1;
-            // Don't rebuild entire tree — just update cart text would be ideal
-            // For now rebuild (brute force)
-            state.tree = ElementTree::new();
-            build_ui(state);
-            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
+            let cart_id = state.cart_text_id;
+            let mut buf = [0u8; 16];
+            let len = {
+                let mut c = std::io::Cursor::new(&mut buf[..]);
+                let _ = std::io::Write::write_fmt(&mut c, format_args!("Cart {}", state.cart_count));
+                c.position() as usize
+            };
+            set_text(&mut state.tree, cart_id, std::str::from_utf8(&buf[..len]).unwrap_or("Cart ?"));
             return;
         }
 
-        // Clear button
+        // Cart button (reset) — O(1) text update
+        if text.starts_with("Cart") {
+            state.cart_count = 0;
+            state.signal_fires += 1;
+            set_text(&mut state.tree, state.cart_text_id, "Cart 0");
+            return;
+        }
+
+        // Clear button — O(1) text update
         if text == "Clear" {
             state.cart_count = 0;
             state.signal_fires += 1;
-            state.tree = ElementTree::new();
-            build_ui(state);
-            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
+            set_text(&mut state.tree, state.cart_text_id, "Cart 0");
             return;
         }
     });
