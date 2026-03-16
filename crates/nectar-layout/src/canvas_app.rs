@@ -408,3 +408,270 @@ fn fmt_into(buf: &mut [u8], args: std::fmt::Arguments) -> usize {
     let _ = std::io::Write::write_fmt(&mut cursor, args);
     cursor.position() as usize
 }
+
+// ══════════════════════════════════════════════════════════════
+// INPUT HANDLING — ported from nectar-runtime/src/input/mod.rs
+// All computation in WASM. JS only forwards raw events.
+// ══════════════════════════════════════════════════════════════
+
+// ── Focus management ─────────────────────────────────────────
+
+/// Focus tracking state
+struct FocusState {
+    focused_id: Option<u32>,
+    cursor_pos: usize,
+    selection_start: Option<usize>,
+    cursor_visible: bool,
+    cursor_frame: u32,
+    vim_mode: bool,       // Ctrl+Shift+V toggles
+    input_values: Vec<(u32, String)>,  // (element_id, value)
+    undo_stacks: Vec<(u32, Vec<(String, usize)>)>,
+    redo_stacks: Vec<(u32, Vec<(String, usize)>)>,
+    focusable_ids: Vec<u32>,  // ordered list of focusable element IDs
+}
+
+thread_local! {
+    static FOCUS: RefCell<FocusState> = RefCell::new(FocusState {
+        focused_id: None,
+        cursor_pos: 0,
+        selection_start: None,
+        cursor_visible: true,
+        cursor_frame: 0,
+        vim_mode: false,
+        input_values: Vec::new(),
+        undo_stacks: Vec::new(),
+        redo_stacks: Vec::new(),
+        focusable_ids: Vec::new(),
+    });
+}
+
+// ── Key codes (match JS KeyboardEvent.key values) ────────────
+const KEY_BACKSPACE: u32 = 8;
+const KEY_TAB: u32 = 9;
+const KEY_ENTER: u32 = 13;
+const KEY_ESCAPE: u32 = 27;
+const KEY_LEFT: u32 = 37;
+const KEY_UP: u32 = 38;
+const KEY_RIGHT: u32 = 39;
+const KEY_DOWN: u32 = 40;
+const KEY_DELETE: u32 = 46;
+const KEY_HOME: u32 = 36;
+const KEY_END: u32 = 35;
+
+// ── Keyboard input ───────────────────────────────────────────
+
+/// Handle a key press. Called from JS with key code and modifier flags.
+/// modifiers: bit 0 = shift, bit 1 = ctrl/cmd, bit 2 = alt
+#[no_mangle]
+pub extern "C" fn app_keydown(key_code: u32, char_ptr: *const u8, char_len: u32, modifiers: u32) {
+    let is_shift = modifiers & 1 != 0;
+    let is_cmd = modifiers & 2 != 0;
+    let is_alt = modifiers & 4 != 0;
+
+    // Vim mode toggle: Ctrl+Shift+V
+    if is_cmd && is_shift && key_code == 86 { // 'V'
+        FOCUS.with(|f| {
+            let mut focus = f.borrow_mut();
+            focus.vim_mode = !focus.vim_mode;
+        });
+        return;
+    }
+
+    FOCUS.with(|f| {
+        let mut focus = f.borrow_mut();
+
+        // ── Vim mode navigation ──────────────────────
+        if focus.vim_mode {
+            STATE.with(|s| {
+                let mut state = s.borrow_mut();
+                match key_code {
+                    // hjkl navigation
+                    72 => state.scroll_y = (state.scroll_y - 40.0).max(0.0),   // h = scroll left (or up)
+                    74 => { // j = scroll down
+                        let max = state.max_scroll();
+                        state.scroll_y = (state.scroll_y + 60.0).min(max);
+                    }
+                    75 => state.scroll_y = (state.scroll_y - 60.0).max(0.0),   // k = scroll up
+                    76 => { // l = scroll right (or down)
+                        let max = state.max_scroll();
+                        state.scroll_y = (state.scroll_y + 40.0).min(max);
+                    }
+                    // gg = top (just g for now)
+                    71 => state.scroll_y = 0.0,
+                    // G = bottom
+                    _ if key_code == 71 && is_shift => {
+                        state.scroll_y = state.max_scroll();
+                    }
+                    // Escape exits vim mode
+                    KEY_ESCAPE => focus.vim_mode = false,
+                    _ => {}
+                }
+            });
+            return;
+        }
+
+        // ── Tab navigation ───────────────────────────
+        if key_code == KEY_TAB {
+            // For now, cycle through category pills (indices 0-5)
+            STATE.with(|s| {
+                let mut state = s.borrow_mut();
+                if is_shift {
+                    state.active_cat = if state.active_cat == 0 { 5 } else { state.active_cat - 1 };
+                } else {
+                    state.active_cat = if state.active_cat >= 5 { 0 } else { state.active_cat + 1 };
+                }
+                state.signal_fires += 1;
+            });
+            return;
+        }
+
+        // ── Cmd+A: select all (for future text input) ────
+        if is_cmd && key_code == 65 {
+            focus.selection_start = Some(0);
+            // cursor_pos = end of text
+            return;
+        }
+
+        // ── Cmd+C: copy ──────────────────────────────
+        if is_cmd && key_code == 67 {
+            if let (Some(start), pos) = (focus.selection_start, focus.cursor_pos) {
+                // Copy selected text to clipboard
+                // For now: copy product info if a card is focused
+            }
+            return;
+        }
+
+        // ── Cmd+V: paste ─────────────────────────────
+        if is_cmd && key_code == 86 {
+            let mut buf = [0u8; 1024];
+            let len = unsafe { clipboard_read(buf.as_mut_ptr(), 1024) };
+            if len > 0 {
+                // Insert pasted text at cursor position
+            }
+            return;
+        }
+
+        // ── Cmd+Z: undo ──────────────────────────────
+        if is_cmd && key_code == 90 {
+            // Undo last action
+            return;
+        }
+
+        // ── Cmd+F: find ──────────────────────────────
+        if is_cmd && key_code == 70 {
+            // Don't prevent default — let browser open its native find bar
+            // which searches the hidden SEO DOM. When the browser highlights
+            // a match in the hidden DOM, we sync the canvas scroll position.
+            return;
+        }
+
+        // ── Arrow keys ───────────────────────────────
+        match key_code {
+            KEY_UP => {
+                STATE.with(|s| {
+                    let mut state = s.borrow_mut();
+                    state.scroll_y = (state.scroll_y - 60.0).max(0.0);
+                });
+            }
+            KEY_DOWN => {
+                STATE.with(|s| {
+                    let mut state = s.borrow_mut();
+                    let max = state.max_scroll();
+                    state.scroll_y = (state.scroll_y + 60.0).min(max);
+                });
+            }
+            KEY_HOME => {
+                STATE.with(|s| {
+                    s.borrow_mut().scroll_y = 0.0;
+                });
+            }
+            KEY_END => {
+                STATE.with(|s| {
+                    let mut state = s.borrow_mut();
+                    state.scroll_y = state.max_scroll();
+                });
+            }
+            _ => {}
+        }
+    });
+}
+
+// ── Mouse drag (text selection) ──────────────────────────────
+
+#[no_mangle]
+pub extern "C" fn app_mousedown(mx: f32, my: f32) {
+    // Start potential text selection drag
+    FOCUS.with(|f| {
+        let mut focus = f.borrow_mut();
+        focus.selection_start = None;
+        // If clicking on an editable element, set cursor position
+        // and prepare for drag selection
+    });
+}
+
+#[no_mangle]
+pub extern "C" fn app_mousemove(mx: f32, my: f32, buttons: u32) {
+    // If left button held (buttons & 1), extend text selection
+    if buttons & 1 != 0 {
+        FOCUS.with(|f| {
+            let mut focus = f.borrow_mut();
+            if focus.selection_start.is_some() {
+                // Extend selection to current mouse position
+            }
+        });
+    }
+}
+
+// ── Right-click context menu ─────────────────────────────────
+
+#[no_mangle]
+pub extern "C" fn app_contextmenu(mx: f32, my: f32) -> u32 {
+    // Hit test — if on a product card, return the card index
+    // JS can show a native context menu with product-specific options
+    STATE.with(|s| {
+        let state = s.borrow();
+        for i in 0..state.products.len() {
+            let (x, raw_y) = state.card_pos(i);
+            let y = raw_y - state.scroll_y;
+            if mx >= x && mx <= x + 260.0 && my >= y && my <= y + 310.0 {
+                return i as u32;
+            }
+        }
+        u32::MAX // no hit
+    })
+}
+
+// ── Cmd+F search sync ────────────────────────────────────────
+// When the browser's native find bar highlights text in the hidden
+// SEO DOM, this function syncs the canvas scroll position.
+
+#[no_mangle]
+pub extern "C" fn app_search_sync(product_index: u32) {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if (product_index as usize) < state.products.len() {
+            let (_, y) = state.card_pos(product_index as usize);
+            state.scroll_y = (y - state.vh / 3.0).clamp(0.0, state.max_scroll());
+        }
+    });
+}
+
+// ── Vim mode status ──────────────────────────────────────────
+
+#[no_mangle]
+pub extern "C" fn app_is_vim_mode() -> u32 {
+    FOCUS.with(|f| if f.borrow().vim_mode { 1 } else { 0 })
+}
+
+// ── Cursor blink tick (called per frame) ─────────────────────
+
+#[no_mangle]
+pub extern "C" fn app_tick_cursor() {
+    FOCUS.with(|f| {
+        let mut focus = f.borrow_mut();
+        focus.cursor_frame += 1;
+        if focus.cursor_frame % 30 == 0 {
+            focus.cursor_visible = !focus.cursor_visible;
+        }
+    });
+}

@@ -19,6 +19,18 @@ extern "C" {
     // Viewport
     pub fn canvas_get_width() -> f32;
     pub fn canvas_get_height() -> f32;
+
+    // Clipboard
+    pub fn clipboard_write(ptr: *const u8, len: u32);
+    pub fn clipboard_read(buf_ptr: *mut u8, buf_cap: u32) -> u32;
+
+    // Form input overlay — positions a real <input> element over canvas region
+    pub fn input_overlay_show(x: f32, y: f32, w: f32, h: f32, value_ptr: *const u8, value_len: u32, element_id: u32);
+    pub fn input_overlay_hide();
+    pub fn input_overlay_get_value(buf_ptr: *mut u8, buf_cap: u32) -> u32;
+
+    // Browser search (Cmd+F) — scroll hidden DOM element into view
+    pub fn search_scroll_to(element_index: u32);
 }
 
 // Stubs for non-WASM targets (native tests)
@@ -44,3 +56,15 @@ pub unsafe fn canvas_measure_text(_id: u32, _p: *const u8, _l: u32, _s: f32) -> 
 pub unsafe fn canvas_get_width() -> f32 { 1400.0 }
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe fn canvas_get_height() -> f32 { 900.0 }
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn clipboard_write(_p: *const u8, _l: u32) {}
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn clipboard_read(_p: *mut u8, _c: u32) -> u32 { 0 }
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn input_overlay_show(_x: f32, _y: f32, _w: f32, _h: f32, _vp: *const u8, _vl: u32, _id: u32) {}
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn input_overlay_hide() {}
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn input_overlay_get_value(_p: *mut u8, _c: u32) -> u32 { 0 }
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn search_scroll_to(_i: u32) {}
