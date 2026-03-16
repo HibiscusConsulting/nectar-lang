@@ -159,10 +159,6 @@ enum Commands {
         #[arg(long, default_value = "browser")]
         target: String,
 
-        /// Render mode: "dom" (default), "canvas" (pure canvas), "hybrid" (canvas + hidden DOM)
-        #[arg(long, default_value = "dom")]
-        render: String,
-
         /// Verify inferred API contracts against a live staging URL.
         /// Halts the build if any contract mismatches are found.
         #[arg(long)]
@@ -271,7 +267,6 @@ fn main() -> anyhow::Result<()> {
             critical_css,
             flags,
             target,
-            render,
             verify_contracts,
         }) => {
             // Resolve dependencies first, then compile.
@@ -284,7 +279,7 @@ fn main() -> anyhow::Result<()> {
             let input = input.ok_or_else(|| {
                 anyhow::anyhow!("no input file specified for `nectar build`")
             })?;
-            compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, &render, verify_contracts)
+            compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, verify_contracts)
         }
         Some(Commands::Test { input, filter, watch }) => cmd_test(&input, filter, watch),
         Some(Commands::Fmt { input, check, stdin }) => cmd_fmt(input, check, stdin),
@@ -327,7 +322,6 @@ fn main() -> anyhow::Result<()> {
                 cli.opt_level,
                 cli.critical_css,
                 "browser",
-                "dom",
                 None,
             )
         }
@@ -1110,7 +1104,6 @@ fn compile(
     opt_level: u8,
     critical_css_flag: bool,
     target: &str,
-    render: &str,
     verify_contracts_url: Option<String>,
 ) -> anyhow::Result<()> {
     let source = fs::read_to_string(input)
@@ -1233,13 +1226,6 @@ fn compile(
         _ => codegen::CompilationTarget::Browser,
     };
 
-    // Resolve render mode
-    let render_mode = match render {
-        "canvas" => codegen::RenderMode::Canvas,
-        "hybrid" => codegen::RenderMode::Hybrid,
-        _ => codegen::RenderMode::Dom,
-    };
-
     if ssr {
         // SSR JavaScript module output
         let mut ssr_codegen = if critical_css_flag {
@@ -1269,7 +1255,7 @@ fn compile(
         println!("nectar: compiled SSR module {} -> {}", input.display(), output_path.display());
     } else if hydrate {
         // Hydration client bundle — emit WASM with hydration markers
-        let mut codegen = WasmCodegen::with_render_mode(compilation_target, render_mode);
+        let mut codegen = WasmCodegen::with_target(compilation_target);
         let wat = codegen.generate(&program);
 
         if !codegen.codegen_errors.is_empty() {
@@ -1287,7 +1273,7 @@ fn compile(
         println!("nectar: compiled hydration bundle {} -> {}", input.display(), output_path.display());
     } else if emit_wasm {
         // Binary .wasm output — generate WAT then convert via wat2wasm
-        let mut codegen = WasmCodegen::with_render_mode(compilation_target, render_mode);
+        let mut codegen = WasmCodegen::with_target(compilation_target);
         let wat = codegen.generate(&program);
 
         if !codegen.codegen_errors.is_empty() {
@@ -1349,7 +1335,7 @@ fn compile(
         }
     } else {
         // WAT text output
-        let mut codegen = WasmCodegen::with_render_mode(compilation_target, render_mode);
+        let mut codegen = WasmCodegen::with_target(compilation_target);
         let wat = codegen.generate(&program);
 
         if !codegen.codegen_errors.is_empty() {
@@ -1436,7 +1422,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile failed: {:?}", result);
         assert!(output.exists());
@@ -1455,7 +1441,7 @@ mod tests {
         let result = compile(
             &input,
             None,
-            true, false, false, false, false, false, 0, false, "browser", "dom", None,
+            true, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok());
     }
@@ -1471,7 +1457,7 @@ mod tests {
         let result = compile(
             &input,
             None,
-            false, true, false, false, false, false, 0, false, "browser", "dom", None,
+            false, true, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok());
     }
@@ -1488,7 +1474,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, true, false, false, false, 0, false, "browser", "dom", None,
+            false, false, true, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile wasm failed: {:?}", result);
         assert!(output.exists());
@@ -1506,7 +1492,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, true, false, false, 0, false, "browser", "dom", None,
+            false, false, false, true, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile ssr failed: {:?}", result);
         assert!(output.exists());
@@ -1524,7 +1510,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, true, false, false, 0, true, "browser", "dom", None,
+            false, false, false, true, false, false, 0, true, "browser", None,
         );
         assert!(result.is_ok(), "compile ssr+css failed: {:?}", result);
         assert!(output.exists());
@@ -1542,7 +1528,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, true, false, 0, false, "browser", "dom", None,
+            false, false, false, false, true, false, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile hydrate failed: {:?}", result);
         assert!(output.exists());
@@ -1561,7 +1547,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile no_check failed: {:?}", result);
     }
@@ -1578,7 +1564,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 1, false, "browser", "dom", None,
+            false, false, false, false, false, false, 1, false, "browser", None,
         );
         assert!(result.is_ok(), "compile O1 failed: {:?}", result);
     }
@@ -1591,7 +1577,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 2, false, "browser", "dom", None,
+            false, false, false, false, false, false, 2, false, "browser", None,
         );
         assert!(result.is_ok(), "compile O2 failed: {:?}", result);
     }
@@ -1605,7 +1591,7 @@ mod tests {
         let path = PathBuf::from("/tmp/nonexistent_xyz.nectar");
         let result = compile(
             &path, None,
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -1622,7 +1608,7 @@ mod tests {
         let input = write_temp_file(&dir, "bad.nectar", "fn { broken syntax !!!");
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -1639,7 +1625,7 @@ mod tests {
         let input = write_temp_file(&dir, "borrow_err.nectar", BORROW_ERROR_PROGRAM);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -1656,7 +1642,7 @@ mod tests {
         let input = write_temp_file(&dir, "hello.nectar", SIMPLE_PROGRAM);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile default path failed: {:?}", result);
         let expected_output = dir.path().join("hello.wat");
@@ -1946,7 +1932,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile with use import failed: {:?}", result);
         let wat = fs::read_to_string(dir.path().join("out.wat")).unwrap();
@@ -1974,7 +1960,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile with glob import failed: {:?}", result);
     }
@@ -1996,7 +1982,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "compile with missing module should not hard-fail: {:?}", result);
     }
@@ -2013,7 +1999,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "wasi", "dom", None,
+            false, false, false, false, false, false, 0, false, "wasi", None,
         );
         assert!(result.is_ok(), "compile wasi failed: {:?}", result);
         assert!(output.exists());
@@ -2031,7 +2017,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "wasi", "dom", None,
+            false, false, false, false, false, false, 0, false, "wasi", None,
         );
         assert!(result.is_ok(), "compile wasi failed: {:?}", result);
         let content = fs::read_to_string(&output).unwrap();
@@ -2061,7 +2047,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         // Should compile successfully — contract inference runs but doesn't block
         assert!(result.is_ok(), "compile with fetch should succeed: {:?}", result);
@@ -2101,7 +2087,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", "dom", None,
+            false, false, false, false, false, true, 0, false, "browser", None,
         );
         assert!(result.is_ok(), "no_check compile should succeed: {:?}", result);
     }
@@ -2125,7 +2111,7 @@ fn check(c: Color) -> i32 {
         let input = write_temp_file(&dir, "exhaust.nectar", program_with_match);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", "dom", None,
+            false, false, false, false, false, false, 0, false, "browser", None,
         );
         // This should fail if the match is non-exhaustive.
         // If the parser/type-checker doesn't catch it, the test is still valid:

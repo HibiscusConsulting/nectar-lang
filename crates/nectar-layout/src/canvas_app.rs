@@ -134,15 +134,19 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
             });
         }
         state.products = products;
+    });
+}
 
-        // Build hidden DOM for accessibility, Cmd+F, and screen readers.
-        // Each product gets a real DOM element with text content.
-        // The container is opacity:0, pointer-events:none — invisible
-        // but accessible to screen readers and browser find.
+/// Build hidden accessibility DOM — call AFTER app_init, AFTER first render.
+/// Only needed for hybrid mode. Pure canvas mode skips this.
+/// Runs via requestIdleCallback so it doesn't block first paint.
+#[no_mangle]
+pub extern "C" fn app_build_a11y_dom() {
+    STATE.with(|s| {
+        let state = s.borrow();
         unsafe {
             let root = dom_get_root();
 
-            // Style container as CSS grid (browser computes layout)
             let k_display = b"display";
             let v_grid = b"grid";
             let k_gtc = b"grid-template-columns";
@@ -160,7 +164,6 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
             for p in &state.products {
                 let el = dom_create_element(tag_article.as_ptr(), 7);
 
-                // Accessible text content: name, category, price
                 let mut text_buf = [0u8; 64];
                 let text_len = {
                     let mut c = std::io::Cursor::new(&mut text_buf[..]);
@@ -171,11 +174,6 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
                 };
                 dom_set_text_hybrid(el, text_buf.as_ptr(), text_len as u32);
 
-                // Image src for SEO
-                let k_src = b"src";
-                dom_set_attr_hybrid(el, k_src.as_ptr(), 3, p.img_src.as_ptr(), p.img_src.len() as u32);
-
-                // Accessible role
                 let k_role = b"role";
                 let v_article = b"article";
                 dom_set_attr_hybrid(el, k_role.as_ptr(), 4, v_article.as_ptr(), 7);
