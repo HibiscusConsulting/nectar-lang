@@ -1634,4 +1634,83 @@ mod tests {
         assert!(w.layout.height > 200.0, "wrap should have 3 rows, got h={}", w.layout.height);
         assert!(w.layout.height < 300.0, "wrap height should be ~264, got h={}", w.layout.height);
     }
+
+    #[test]
+    fn test_demo_section_with_metrics_and_grid() {
+        let mut tree = ElementTree::new();
+
+        // Root: vertical, hug, 1400px
+        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(1).unwrap().styles.insert("width".into(), "1400px".into());
+        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(1).unwrap().styles.insert("padding".into(), "24".into());
+        tree.get_mut(1).unwrap().styles.insert("gap".into(), "16".into());
+        tree.get_mut(1).unwrap().styles.insert("align".into(), "center".into());
+
+        // Section card
+        let section = tree.create("div");
+        tree.append_child(1, section);
+        tree.get_mut(section).unwrap().styles.insert("direction".into(), "vertical".into());
+        tree.get_mut(section).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(section).unwrap().styles.insert("max-width".into(), "1400px".into());
+        tree.get_mut(section).unwrap().styles.insert("padding".into(), "32".into());
+        tree.get_mut(section).unwrap().styles.insert("gap".into(), "20".into());
+
+        // Title (hug)
+        let title = tree.create("div");
+        tree.append_child(section, title);
+        tree.get_mut(title).unwrap().text = Some("E-Commerce".into());
+        tree.get_mut(title).unwrap().styles.insert("height".into(), "hug".into());
+        tree.get_mut(title).unwrap().styles.insert("font-size".into(), "24px".into());
+
+        // Metrics: horizontal wrap, 9 items at ~430px each (3 per row)
+        let metrics = tree.create("div");
+        tree.append_child(section, metrics);
+        tree.get_mut(metrics).unwrap().styles.insert("direction".into(), "horizontal".into());
+        tree.get_mut(metrics).unwrap().styles.insert("wrap".into(), "true".into());
+        tree.get_mut(metrics).unwrap().styles.insert("gap".into(), "12".into());
+        tree.get_mut(metrics).unwrap().styles.insert("height".into(), "hug".into());
+
+        let metric_w = ((1400.0 - 48.0f32).min(1400.0) - 64.0 - 24.0) / 3.0;
+        for _ in 0..9 {
+            let card = tree.create("div");
+            tree.append_child(metrics, card);
+            tree.get_mut(card).unwrap().styles.insert("width".into(), format!("{}px", metric_w));
+            tree.get_mut(card).unwrap().styles.insert("height".into(), "80px".into());
+        }
+
+        // Product grid: horizontal wrap, 10 cards at 260px
+        let grid = tree.create("div");
+        tree.append_child(section, grid);
+        tree.get_mut(grid).unwrap().styles.insert("direction".into(), "horizontal".into());
+        tree.get_mut(grid).unwrap().styles.insert("wrap".into(), "true".into());
+        tree.get_mut(grid).unwrap().styles.insert("gap".into(), "16".into());
+        tree.get_mut(grid).unwrap().styles.insert("height".into(), "hug".into());
+
+        for _ in 0..10 {
+            let card = tree.create("div");
+            tree.append_child(grid, card);
+            tree.get_mut(card).unwrap().styles.insert("width".into(), "260px".into());
+            tree.get_mut(card).unwrap().styles.insert("height".into(), "340px".into());
+        }
+
+        layout_tree(&mut tree, 1400.0, 999999.0);
+
+        let s = tree.get(section).unwrap();
+        let t = tree.get(title).unwrap();
+        let m = tree.get(metrics).unwrap();
+        let g = tree.get(grid).unwrap();
+
+        println!("section: y={} h={}", s.layout.y, s.layout.height);
+        println!("title:   y={} h={}", t.layout.y, t.layout.height);
+        println!("metrics: y={} h={}", m.layout.y, m.layout.height);
+        println!("grid:    y={} h={}", g.layout.y, g.layout.height);
+
+        // Metrics should have 3 rows: 3 * 80 + 2 * 12 = 264
+        assert!(m.layout.height > 200.0, "metrics should be 3 rows, got h={}", m.layout.height);
+
+        // Grid should start BELOW metrics (no overlap)
+        let metrics_bottom = m.layout.y + m.layout.height;
+        assert!(g.layout.y >= metrics_bottom, "grid y={} should be >= metrics bottom={}", g.layout.y, metrics_bottom);
+    }
 }
