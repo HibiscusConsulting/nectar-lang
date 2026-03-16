@@ -53,10 +53,11 @@ pub struct WasmCodegen {
     component_fields: Vec<String>,
     /// Current component name (for global signal variable naming)
     component_name: String,
-    /// Deferred signal→DOM updater functions: (func_name, global_el_name, signal_global_name, expr_option)
-    /// When expr_option is Some, the updater re-evaluates the full expression (e.g. format("...", self.field)).
+    /// Deferred signal→DOM updater functions.
+    /// When expr is Some, the updater re-evaluates the full expression (e.g. format("...", self.field)).
     /// When None, the updater reads the signal directly and converts via string_fromI32.
-    signal_updaters: Vec<(String, String, String, Option<Expr>)>,
+    /// When attr_name is Some, the updater calls dom_setAttr instead of dom_setText.
+    signal_updaters: Vec<SignalUpdater>,
     /// Names of components defined in this program (for detecting component instantiation)
     known_components: Vec<String>,
     /// Prop names for the current component being generated (String props passed as ptr+len pairs)
@@ -181,6 +182,18 @@ struct CondUpdater {
     else_children: Option<Vec<TemplateNode>>,
 }
 
+/// Describes a signal→DOM updater (text content or attribute).
+#[derive(Clone)]
+struct SignalUpdater {
+    func_name: String,
+    global_el: String,
+    sig_global: String,
+    expr: Option<Expr>,
+    /// If Some, this is an attribute updater (calls dom_setAttr with this attr name).
+    /// If None, this is a text updater (calls dom_setText).
+    attr_name: Option<String>,
+}
+
 /// Describes a deferred lazy for-loop batch function.
 /// When a `{lazy for ...}` template is encountered, the initial 20 items are
 /// rendered inline.  A `LazyBatch` is recorded so that a batch-render function
@@ -248,7 +261,7 @@ impl WasmCodegen {
             in_handler_body: false,
             component_fields: Vec::new(),
             component_name: String::new(),
-            signal_updaters: Vec::new(),
+            signal_updaters: Vec::<SignalUpdater>::new(),
             known_components: Vec::new(),
             component_props: Vec::new(),
             component_prop_defs: Vec::new(),
@@ -3347,47 +3360,71 @@ impl WasmCodegen {
         }
 
         // Emit dynamic element globals (one per signal binding occurrence)
-        let updater_globals: Vec<String> = self.signal_updaters.iter().map(|(_, g, _, _)| g.clone()).collect();
+        let updater_globals: Vec<String> = self.signal_updaters.iter().map(|u| u.global_el.clone()).collect();
         for global_el in &updater_globals {
             self.line(&format!("(global {} (mut i32) (i32.const -1))", global_el));
         }
 
         // Emit signal→DOM updater functions (WASM-internal, called via call_indirect)
-        for (func_name, global_el, sig_global, expr_opt) in self.signal_updaters.clone() {
+        for updater in self.signal_updaters.clone() {
             self.line("");
-            self.emit(&format!("(func {} ;; reactive DOM updater", func_name));
+            self.emit(&format!("(func {} ;; reactive DOM updater", updater.func_name));
             self.indent += 1;
             self.line("(local $ptr i32)");
             self.line("(local $len i32)");
 
-            if let Some(ref wrapped_expr) = expr_opt {
-                // Re-evaluate the full expression (e.g. format("{}", self.field))
-                // The expression produces (ptr, len) for string-returning exprs
-                let is_string_expr = matches!(
-                    wrapped_expr,
-                    Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::StringLit(_)
-                );
+            if let Some(ref wrapped_expr) = updater.expr {
+                // Re-evaluate the full expression
                 self.generate_expr(wrapped_expr);
-                if !is_string_expr {
-                    // Non-string expression — convert i32 result to string
+                // Determine what's on the stack based on expression type
+                let returns_ptr_len = matches!(
+                    wrapped_expr,
+                    Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
+                );
+                let returns_single_ptr = matches!(
+                    wrapped_expr,
+                    Expr::StringLit(_) | Expr::If { .. }
+                );
+                if returns_ptr_len {
+                    // Stack has (ptr, len)
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                } else if returns_single_ptr {
+                    // Stack has single i32 (string ptr) — use str_len to get (ptr, len)
+                    self.line("call $str_len");
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                } else {
+                    // Numeric — convert to string
                     self.line("call $string_fromI32");
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
                 }
-                self.line("local.set $len");
-                self.line("local.set $ptr");
             } else {
                 // Direct signal read: get signal value, convert to string
-                self.line(&format!("global.get {}", sig_global));
+                self.line(&format!("global.get {}", updater.sig_global));
                 self.line("call $signal_get");
                 self.line("call $string_fromI32");
                 self.line("local.set $len");
                 self.line("local.set $ptr");
             }
 
-            // Update DOM element text
-            self.line(&format!("global.get {}", global_el));
-            self.line("local.get $ptr");
-            self.line("local.get $len");
-            self.line("call $dom_setText");
+            if let Some(ref attr) = updater.attr_name {
+                // Attribute updater — call dom_setAttr
+                let attr_offset = self.store_string(attr);
+                self.line(&format!("global.get {}", updater.global_el));
+                self.line(&format!("i32.const {} ;; \"{}\" attr name ptr", attr_offset, attr));
+                self.line(&format!("i32.const {} ;; attr name len", attr.len()));
+                self.line("local.get $ptr");
+                self.line("local.get $len");
+                self.line("call $dom_setAttr");
+            } else {
+                // Text updater — call dom_setText
+                self.line(&format!("global.get {}", updater.global_el));
+                self.line("local.get $ptr");
+                self.line("local.get $len");
+                self.line("call $dom_setText");
+            }
             self.indent -= 1;
             self.line(")");
         }
@@ -3469,33 +3506,61 @@ impl WasmCodegen {
             cond_queue.extend(nested_cond_updaters);
 
             // Emit globals for the inner updaters (must be at module level, after function close)
-            for (func_name, global_el, _, _) in &cond_updaters_inner {
-                self.line(&format!("(global {} (mut i32) (i32.const -1))", global_el));
-                self.closure_func_names.push(func_name.clone());
+            for updater in &cond_updaters_inner {
+                self.line(&format!("(global {} (mut i32) (i32.const -1))", updater.global_el));
+                self.closure_func_names.push(updater.func_name.clone());
             }
 
             // Emit updater functions for the inner updaters
-            for (func_name, global_el, sig_global, expr_opt) in &cond_updaters_inner {
+            for updater in &cond_updaters_inner {
                 self.line("");
-                self.emit(&format!("(func {} ;; reactive DOM updater (inside cond)", func_name));
+                self.emit(&format!("(func {} ;; reactive DOM updater (inside cond)", updater.func_name));
                 self.indent += 1;
                 self.line("(local $ptr i32)");
                 self.line("(local $len i32)");
-                if let Some(wrapped_expr) = expr_opt {
+                if let Some(ref wrapped_expr) = updater.expr {
                     self.generate_expr(wrapped_expr);
-                    self.line("local.set $len");
-                    self.line("local.set $ptr");
+                    let returns_ptr_len = matches!(
+                        wrapped_expr,
+                        Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
+                    );
+                    let returns_single_ptr = matches!(
+                        wrapped_expr,
+                        Expr::StringLit(_) | Expr::If { .. }
+                    );
+                    if returns_ptr_len {
+                        self.line("local.set $len");
+                        self.line("local.set $ptr");
+                    } else if returns_single_ptr {
+                        self.line("call $str_len");
+                        self.line("local.set $len");
+                        self.line("local.set $ptr");
+                    } else {
+                        self.line("call $string_fromI32");
+                        self.line("local.set $len");
+                        self.line("local.set $ptr");
+                    }
                 } else {
-                    self.line(&format!("global.get {}", sig_global));
+                    self.line(&format!("global.get {}", updater.sig_global));
                     self.line("call $signal_get");
                     self.line("call $string_fromI32");
                     self.line("local.set $len");
                     self.line("local.set $ptr");
                 }
-                self.line(&format!("global.get {}", global_el));
-                self.line("local.get $ptr");
-                self.line("local.get $len");
-                self.line("call $dom_setText");
+                if let Some(ref attr) = updater.attr_name {
+                    let attr_offset = self.store_string(attr);
+                    self.line(&format!("global.get {}", updater.global_el));
+                    self.line(&format!("i32.const {}", attr_offset));
+                    self.line(&format!("i32.const {}", attr.len()));
+                    self.line("local.get $ptr");
+                    self.line("local.get $len");
+                    self.line("call $dom_setAttr");
+                } else {
+                    self.line(&format!("global.get {}", updater.global_el));
+                    self.line("local.get $ptr");
+                    self.line("local.get $len");
+                    self.line("call $dom_setText");
+                }
                 self.indent -= 1;
                 self.line(")");
             }
@@ -7120,6 +7185,39 @@ impl WasmCodegen {
                                 self.line("call $str_len");
                             }
                             self.line("call $dom_setAttr");
+
+                            // Reactive attribute updates: if this dynamic attribute
+                            // references signals, subscribe so it re-evaluates on change.
+                            if self.in_component_mount && self.for_loop_bindings.is_empty() {
+                                let attr_signal_fields = self.extract_signal_fields_from_expr(value);
+                                if !attr_signal_fields.is_empty() {
+                                    let value_clone = value.clone();
+                                    for field in &attr_signal_fields {
+                                        let uid = self.next_label();
+                                        let global_el = format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
+                                        let sig_global = format!("$__sig_{}_{}", self.component_name, field);
+                                        let func_name = format!("$__update_attr_{}_{}_{}", self.component_name, field, uid);
+
+                                        self.line(&format!("local.get {}", var));
+                                        self.line(&format!("global.set {}", global_el));
+
+                                        let table_idx = self.closure_func_names.len();
+                                        self.closure_func_names.push(func_name.clone());
+                                        self.needs_func_table = true;
+                                        self.line(&format!("global.get {}", sig_global));
+                                        self.line(&format!("i32.const {}", table_idx));
+                                        self.line("call $signal_subscribe");
+
+                                        self.signal_updaters.push(SignalUpdater {
+                                            func_name,
+                                            global_el,
+                                            sig_global,
+                                            expr: Some(value_clone.clone()),
+                                            attr_name: Some(name.clone()),
+                                        });
+                                    }
+                                }
+                            }
                         }
                         Attribute::EventHandler { event, handler } => {
                             let event_offset = self.store_string(event);
@@ -7390,7 +7488,9 @@ impl WasmCodegen {
                     self.line("call $signal_subscribe");
 
                     // Record updater to emit later (after mount function)
-                    self.signal_updaters.push((func_name, global_el, sig_global, None));
+                    self.signal_updaters.push(SignalUpdater {
+                        func_name, global_el, sig_global, expr: None, attr_name: None,
+                    });
                 }
 
                 // If signal fields are referenced inside a wrapper expression (e.g. format(...)),
@@ -7417,7 +7517,9 @@ impl WasmCodegen {
                         self.line("call $signal_subscribe");
 
                         // Record updater with the full expression for re-evaluation
-                        self.signal_updaters.push((func_name, global_el, sig_global, Some(expr_clone.clone())));
+                        self.signal_updaters.push(SignalUpdater {
+                            func_name, global_el, sig_global, expr: Some(expr_clone.clone()), attr_name: None,
+                        });
                     }
                 }
 
