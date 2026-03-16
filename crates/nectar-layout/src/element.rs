@@ -16,9 +16,20 @@ pub struct Element {
     pub children: Vec<u32>,
     pub parent: Option<u32>,
     pub event_listeners: HashMap<String, u32>,
+    pub focused: bool,
     pub properties: HashMap<String, String>,
     pub layout: LayoutNode,
     pub scroll_offset: (f32, f32),
+    /// Cursor position in text (byte offset). Used for text input elements.
+    pub cursor_pos: usize,
+    /// Selection start (byte offset). If Some, selection spans from selection_start to cursor_pos.
+    pub selection_start: Option<usize>,
+    /// Undo stack: previous (value, cursor_pos) states.
+    pub undo_stack: Vec<(String, usize)>,
+    /// Redo stack: states popped by undo, restored by redo.
+    pub redo_stack: Vec<(String, usize)>,
+    /// Frame number of last scroll activity (for overlay scrollbar fade).
+    pub last_scroll_frame: u32,
     /// Fast path: fixed dimensions bypass style parsing.
     pub fixed_width: Option<f32>,
     pub fixed_height: Option<f32>,
@@ -36,9 +47,15 @@ impl Element {
             children: Vec::new(),
             parent: None,
             event_listeners: HashMap::new(),
+            focused: false,
             properties: HashMap::new(),
             layout: LayoutNode::default(),
             scroll_offset: (0.0, 0.0),
+            cursor_pos: 0,
+            selection_start: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            last_scroll_frame: 0,
             fixed_width: None,
             fixed_height: None,
         }
@@ -46,26 +63,32 @@ impl Element {
 
     /// Minimal constructor — zero HashMap allocation. For batch creation.
     pub fn new_minimal(tag: &str) -> Self {
-        Self {
-            tag: tag.to_string(),
-            text: None,
-            inner_html: None,
-            attributes: HashMap::with_capacity(0),
-            styles: HashMap::with_capacity(0),
-            classes: HashSet::with_capacity(0),
-            children: Vec::new(),
-            parent: None,
-            event_listeners: HashMap::with_capacity(0),
-            properties: HashMap::with_capacity(0),
-            layout: LayoutNode::default(),
-            scroll_offset: (0.0, 0.0),
-            fixed_width: None,
-            fixed_height: None,
-        }
+        let mut el = Self::new(tag);
+        el.attributes = HashMap::with_capacity(0);
+        el.styles = HashMap::with_capacity(0);
+        el.classes = HashSet::with_capacity(0);
+        el.event_listeners = HashMap::with_capacity(0);
+        el.properties = HashMap::with_capacity(0);
+        el
     }
 
     pub fn is_editable(&self) -> bool {
         matches!(self.tag.as_str(), "input" | "textarea")
+            || self.attributes.get("contenteditable").map(|v| v == "true").unwrap_or(false)
+    }
+
+    pub fn input_value(&self) -> &str {
+        self.properties.get("value").map(|s| s.as_str()).unwrap_or("")
+    }
+
+    pub fn set_input_value(&mut self, val: String) {
+        self.properties.insert("value".to_string(), val);
+    }
+
+    pub fn push_undo(&mut self) {
+        let val = self.input_value().to_string();
+        self.undo_stack.push((val, self.cursor_pos));
+        self.redo_stack.clear();
     }
 
     pub fn is_focusable(&self) -> bool {
@@ -73,6 +96,7 @@ impl Element {
             || matches!(self.tag.as_str(), "button" | "a" | "select")
             || self.attributes.contains_key("tabindex")
     }
+
 }
 
 /// The element tree — a flat pool of elements indexed by handle.
@@ -95,6 +119,146 @@ impl ElementTree {
         }
     }
 
+    pub fn create_element(&mut self, tag: &str) -> u32 {
+        let id = self.elements.len() as u32;
+        self.elements.push(Some(Element::new(tag)));
+        self.dirty = true;
+        id
+    }
+
+    pub fn create_text_node(&mut self, text: &str) -> u32 {
+        let id = self.elements.len() as u32;
+        let mut el = Element::new("#text");
+        el.text = Some(text.to_string());
+        self.elements.push(Some(el));
+        self.dirty = true;
+        id
+    }
+
+    pub fn ensure_capacity(&mut self, id: u32) {
+        while self.elements.len() <= id as usize {
+            self.elements.push(None);
+        }
+    }
+
+    pub fn set_element(&mut self, id: u32, element: Element) {
+        self.ensure_capacity(id);
+        self.elements[id as usize] = Some(element);
+        self.dirty = true;
+    }
+
+    pub fn move_element(&mut self, from: u32, to: u32) {
+        self.ensure_capacity(to);
+        if let Some(el) = self.elements[from as usize].take() {
+            self.elements[to as usize] = Some(el);
+        }
+        self.dirty = true;
+    }
+
+    pub fn set_attr(&mut self, id: u32, key: &str, value: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.attributes.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    pub fn remove_attr(&mut self, id: u32, key: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.attributes.remove(key);
+        }
+    }
+
+    pub fn class_add(&mut self, id: u32, class: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.classes.insert(class.to_string());
+        }
+    }
+
+    pub fn class_remove(&mut self, id: u32, class: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.classes.remove(class);
+        }
+    }
+
+    pub fn class_toggle(&mut self, id: u32, class: &str) {
+        if let Some(el) = self.get_mut(id) {
+            if !el.classes.remove(class) {
+                el.classes.insert(class.to_string());
+            }
+        }
+    }
+
+    pub fn insert_before(&mut self, parent_id: u32, new_id: u32, ref_id: u32) {
+        if let Some(parent) = self.get_mut(parent_id) {
+            if let Some(pos) = parent.children.iter().position(|&c| c == ref_id) {
+                parent.children.insert(pos, new_id);
+            } else {
+                parent.children.push(new_id);
+            }
+        }
+        if let Some(child) = self.get_mut(new_id) {
+            child.parent = Some(parent_id);
+        }
+    }
+
+    pub fn set_property(&mut self, id: u32, key: &str, value: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.properties.insert(key.to_string(), value.to_string());
+        }
+    }
+
+    pub fn add_event(&mut self, id: u32, event: &str, cb_index: u32) {
+        if let Some(el) = self.get_mut(id) {
+            el.event_listeners.insert(event.to_string(), cb_index);
+        }
+    }
+
+    pub fn remove_event(&mut self, id: u32, event: &str) {
+        if let Some(el) = self.get_mut(id) {
+            el.event_listeners.remove(event);
+        }
+    }
+
+    pub fn find_by_id(&self, id_attr: &str) -> Option<u32> {
+        for (i, slot) in self.elements.iter().enumerate() {
+            if let Some(el) = slot {
+                if el.attributes.get("id").map(|s| s.as_str()) == Some(id_attr) {
+                    return Some(i as u32);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn query_selector(&self, selector: &str) -> Option<u32> {
+        if let Some(id) = selector.strip_prefix('#') {
+            return self.find_by_id(id);
+        }
+        if let Some(class) = selector.strip_prefix('.') {
+            for (i, slot) in self.elements.iter().enumerate() {
+                if let Some(el) = slot {
+                    if el.classes.contains(class) {
+                        return Some(i as u32);
+                    }
+                }
+            }
+            return None;
+        }
+        for (i, slot) in self.elements.iter().enumerate() {
+            if let Some(el) = slot {
+                if el.tag == selector {
+                    return Some(i as u32);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn root(&self) -> Option<&Element> { self.get(1) }
+
+    pub fn element_count(&self) -> usize {
+        self.elements.iter().filter(|e| e.is_some()).count()
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         self.elements.reserve(additional);
     }
@@ -113,22 +277,10 @@ impl ElementTree {
         let first_id = self.elements.len() as u32;
         let tag_string = tag.to_string();
         for _ in 0..count {
-            self.elements.push(Some(Element {
-                tag: tag_string.clone(),
-                text: None,
-                inner_html: None,
-                attributes: HashMap::new(),
-                styles: HashMap::new(),
-                classes: HashSet::new(),
-                children: Vec::new(),
-                parent: None,
-                event_listeners: HashMap::new(),
-                properties: HashMap::new(),
-                layout: LayoutNode::default(),
-                scroll_offset: (0.0, 0.0),
-                fixed_width: Some(width),
-                fixed_height: Some(height),
-            }));
+            let mut el = Element::new(&tag_string);
+            el.fixed_width = Some(width);
+            el.fixed_height = Some(height);
+            self.elements.push(Some(el));
         }
         self.dirty = true;
         first_id
@@ -257,4 +409,35 @@ impl ElementTree {
 
     pub fn root_id(&self) -> u32 { 1 }
     pub fn len(&self) -> usize { self.elements.iter().filter(|s| s.is_some()).count() }
+
+    pub fn focus(&mut self, id: u32) {
+        if let Some(old) = self.focused_element {
+            if let Some(el) = self.get_mut(old) { el.focused = false; }
+        }
+        if let Some(el) = self.get_mut(id) { el.focused = true; }
+        self.focused_element = Some(id);
+        self.dirty = true;
+    }
+
+    pub fn blur(&mut self, id: u32) {
+        if let Some(el) = self.get_mut(id) { el.focused = false; }
+        if self.focused_element == Some(id) { self.focused_element = None; }
+        self.dirty = true;
+    }
+
+    /// Return focusable element IDs in tree order.
+    pub fn focusable_elements_in_order(&self) -> Vec<u32> {
+        let mut result = Vec::new();
+        self.collect_focusable(1, &mut result);
+        result
+    }
+
+    fn collect_focusable(&self, id: u32, out: &mut Vec<u32>) {
+        if let Some(el) = self.get(id) {
+            if el.is_focusable() { out.push(id); }
+            for &child in &el.children {
+                self.collect_focusable(child, out);
+            }
+        }
+    }
 }
