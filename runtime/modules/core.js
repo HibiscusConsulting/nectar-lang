@@ -58,6 +58,11 @@ const NectarRuntime = {
   __getString(ptr, len) {
     return this.__decoder.decode(new Uint8Array(this.__memory.buffer, ptr, len));
   },
+  __getStringZ(ptr) {
+    let len = 0;
+    while (new Uint8Array(this.__memory.buffer)[ptr + len] !== 0 && len < 4096) len++;
+    return this.__decoder.decode(new Uint8Array(this.__memory.buffer, ptr, len));
+  },
   __allocString(str) {
     const bytes = this.__encoder.encode(str);
     const ptr = this.__instance.exports.alloc(bytes.length + 1);
@@ -890,17 +895,17 @@ export const wasmImports = {
       },
       fillRect(id, x, y, w, h, colorPtr) {
         const ctx = __ctx(id);
-        ctx.fillStyle = R.__getString(colorPtr, 7);
+        ctx.fillStyle = R.__getStringZ(colorPtr);
         ctx.fillRect(x, y, w, h);
       },
       strokeRect(id, x, y, w, h, colorPtr) {
         const ctx = __ctx(id);
-        ctx.strokeStyle = R.__getString(colorPtr, 7);
+        ctx.strokeStyle = R.__getStringZ(colorPtr);
         ctx.strokeRect(x, y, w, h);
       },
       fillText(id, textPtr, textLen, x, y, colorPtr) {
         const ctx = __ctx(id);
-        ctx.fillStyle = R.__getString(colorPtr, 7);
+        ctx.fillStyle = R.__getStringZ(colorPtr);
         ctx.fillText(R.__getString(textPtr, textLen), x, y);
       },
       setFont(id, fontPtr, fontLen) {
@@ -911,7 +916,7 @@ export const wasmImports = {
       },
       drawImage(id, srcPtr, srcLen, x, y, w, h) {
         const ctx = __ctx(id);
-        const src = R.__getString(srcPtr, srcLen);
+        const src = srcLen > 0 ? R.__getString(srcPtr, srcLen) : R.__getStringZ(srcPtr);
         // Cache Image objects to avoid re-decoding
         if (!ctx._imgCache) ctx._imgCache = new Map();
         let img = ctx._imgCache.get(src);
