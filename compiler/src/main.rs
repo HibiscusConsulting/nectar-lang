@@ -85,6 +85,11 @@ struct Cli {
     #[arg(short = 'O', long = "optimize", default_value = "2")]
     opt_level: u8,
 
+    /// Render mode: "dom" (default — traditional Blink DOM), "canvas" (pure canvas,
+    /// no DOM), "hybrid" (canvas visible + hidden DOM for SEO/accessibility)
+    #[arg(long, default_value = "dom")]
+    render: String,
+
     /// Extract and inline critical CSS during SSR builds
     #[arg(long)]
     critical_css: bool,
