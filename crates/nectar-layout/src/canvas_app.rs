@@ -554,7 +554,8 @@ pub extern "C" fn app_render() {
             canvas_fill_rect(id, 0.0, 0.0, vw, vh, 11, 14, 20, 255);
 
             // Walk tree depth-first, paint each element
-            render_node(id, &state.tree, state.root_id, sy, vw, vh, &state.products, &state.img_ids);
+            render_node(id, &state.tree, state.root_id, sy, vw, vh, &state.products, &state.img_ids,
+                state.sel_element, state.sel_start_char, state.sel_end_char);
         }
     });
 }
@@ -569,6 +570,9 @@ unsafe fn render_node(
     vh: f32,
     products: &[Product],
     img_ids: &[u32],
+    sel_element: i32,
+    sel_start: u32,
+    sel_end: u32,
 ) {
     let el = match tree.get(node_id) {
         Some(e) => e,
@@ -642,12 +646,23 @@ unsafe fn render_node(
 
         let text_y = y + el.layout.padding.top + font_size;
         let text_x = x + el.layout.padding.left;
+        let char_w = font_size * 0.6;
+
+        // Selection highlight
+        if sel_element == node_id as i32 && sel_start != sel_end {
+            let s = sel_start.min(sel_end);
+            let e = sel_start.max(sel_end);
+            let hx = text_x + s as f32 * char_w;
+            let hw = (e - s) as f32 * char_w;
+            canvas_fill_rect(cvs, hx, text_y - font_size, hw, font_size + 4.0, 65, 140, 255, 100);
+        }
+
         canvas_fill_text(cvs, text.as_ptr(), text.len() as u32, text_x, text_y, cr, cg, cb, font_size, if bold { 1 } else { 0 });
     }
 
     // Recurse children
     for &child_id in &el.children {
-        render_node(cvs, tree, child_id, sy, vw, vh, products, img_ids);
+        render_node(cvs, tree, child_id, sy, vw, vh, products, img_ids, sel_element, sel_start, sel_end);
     }
 }
 
@@ -719,10 +734,13 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
             }
         }
 
-        // Cart button
+        // Cart button (reset)
         if text.starts_with("Cart") {
             state.cart_count = 0;
             state.signal_fires += 1;
+            state.tree = ElementTree::new();
+            build_ui(state);
+            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
             return;
         }
 
@@ -730,6 +748,11 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
         if text == "Add to Cart" {
             state.cart_count += 1;
             state.signal_fires += 1;
+            // Don't rebuild entire tree — just update cart text would be ideal
+            // For now rebuild (brute force)
+            state.tree = ElementTree::new();
+            build_ui(state);
+            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
             return;
         }
 
@@ -737,6 +760,9 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
         if text == "Clear" {
             state.cart_count = 0;
             state.signal_fires += 1;
+            state.tree = ElementTree::new();
+            build_ui(state);
+            layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
             return;
         }
     });
@@ -760,13 +786,21 @@ pub extern "C" fn app_get_back_clicked(mx: f32, my: f32) -> u32 {
 
 #[no_mangle]
 pub extern "C" fn app_cursor(mx: f32, my: f32) -> u32 {
-    if mx < 200.0 && my < 50.0 { return 1; } // back link
     with_state(|state| {
         let hit = state.tree.hit_test(mx, my + state.scroll_y);
         if let Some(hit_id) = hit {
             if let Some(el) = state.tree.get(hit_id) {
-                if el.text.is_some() { return 2; } // text cursor
-                if el.styles.get("background-color").map(|c| c == "#f97316").unwrap_or(false) { return 1; } // button
+                let text = el.text.as_deref().unwrap_or("");
+                let bg = el.styles.get("background-color").map(|s| s.as_str()).unwrap_or("");
+                let has_border = el.styles.contains_key("border");
+
+                // Pointer on buttons (orange bg, bordered pills, sort buttons, nav tabs)
+                if bg == "#f97316" || bg == "#1a2e1a" { return 1; }
+                if has_border && !text.is_empty() { return 1; }
+                if text == "Add to Cart" || text.starts_with("Cart") || text == "Clear" { return 1; }
+
+                // Text cursor on product text
+                if !text.is_empty() && !has_border && bg != "#f97316" { return 2; }
             }
         }
         0
@@ -774,13 +808,62 @@ pub extern "C" fn app_cursor(mx: f32, my: f32) -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn app_mousedown(mx: f32, my: f32, _click_count: u32) {
-    // TODO: text selection using tree hit test
+pub extern "C" fn app_mousedown(mx: f32, my: f32, click_count: u32) {
+    with_state(|state| {
+        let hit = state.tree.hit_test(mx, my + state.scroll_y);
+        let hit_id = match hit { Some(id) => id, None => { state.sel_element = -1; return; } };
+        let el = match state.tree.get(hit_id) { Some(e) => e, None => return };
+        let text = match &el.text { Some(t) => t.clone(), None => { state.sel_element = -1; return; } };
+
+        // Calculate character position from x offset
+        let font_size = el.styles.get("font-size").and_then(|v| v.trim_end_matches("px").parse::<f32>().ok()).unwrap_or(14.0);
+        let char_w = font_size * 0.6;
+        let text_x = el.layout.x + el.layout.padding.left;
+        let char_pos = ((mx - text_x) / char_w).max(0.0) as u32;
+        let char_pos = char_pos.min(text.len() as u32);
+
+        state.sel_element = hit_id as i32;
+        state.sel_dragging = true;
+
+        match click_count {
+            2 => {
+                // Double click: select word
+                let pos = char_pos as usize;
+                let bytes = text.as_bytes();
+                let mut start = pos;
+                while start > 0 && bytes.get(start - 1).map(|b| b.is_ascii_alphanumeric()).unwrap_or(false) { start -= 1; }
+                let mut end = pos;
+                while end < bytes.len() && bytes.get(end).map(|b| b.is_ascii_alphanumeric()).unwrap_or(false) { end += 1; }
+                if start == end && pos < bytes.len() { end = pos + 1; }
+                state.sel_start_char = start as u32;
+                state.sel_end_char = end as u32;
+            }
+            3 => {
+                // Triple click: select all
+                state.sel_start_char = 0;
+                state.sel_end_char = text.len() as u32;
+            }
+            _ => {
+                state.sel_start_char = char_pos;
+                state.sel_end_char = char_pos;
+            }
+        }
+    });
 }
 
 #[no_mangle]
-pub extern "C" fn app_mousemove(mx: f32, my: f32, buttons: u32) {
-    // TODO: extend text selection
+pub extern "C" fn app_mousemove(mx: f32, _my: f32, buttons: u32) {
+    if buttons & 1 == 0 { return; }
+    with_state(|state| {
+        if state.sel_element < 0 || !state.sel_dragging { return; }
+        let el = match state.tree.get(state.sel_element as u32) { Some(e) => e, None => return };
+        let text_len = el.text.as_ref().map(|t| t.len()).unwrap_or(0);
+        let font_size = el.styles.get("font-size").and_then(|v| v.trim_end_matches("px").parse::<f32>().ok()).unwrap_or(14.0);
+        let char_w = font_size * 0.6;
+        let text_x = el.layout.x + el.layout.padding.left;
+        let char_pos = ((mx - text_x) / char_w).max(0.0) as u32;
+        state.sel_end_char = char_pos.min(text_len as u32);
+    });
 }
 
 #[no_mangle]
@@ -789,7 +872,22 @@ pub extern "C" fn app_mouseup(_mx: f32, _my: f32) {
 }
 
 #[no_mangle]
-pub extern "C" fn app_get_selection(buf_ptr: *mut u8, buf_cap: u32) -> u32 { 0 }
+pub extern "C" fn app_get_selection(buf_ptr: *mut u8, buf_cap: u32) -> u32 {
+    with_state(|state| {
+        if state.sel_element < 0 { return 0; }
+        if state.sel_start_char == state.sel_end_char { return 0; }
+        let el = match state.tree.get(state.sel_element as u32) { Some(e) => e, None => return 0 };
+        let text = match &el.text { Some(t) => t, None => return 0 };
+        let start = state.sel_start_char.min(state.sel_end_char) as usize;
+        let end = state.sel_start_char.max(state.sel_end_char) as usize;
+        let start = start.min(text.len());
+        let end = end.min(text.len());
+        let selected = &text[start..end];
+        let len = selected.len().min(buf_cap as usize);
+        unsafe { std::ptr::copy_nonoverlapping(selected.as_ptr(), buf_ptr, len); }
+        len as u32
+    })
+}
 
 #[no_mangle]
 pub extern "C" fn app_search_sync(product_index: u32) {
