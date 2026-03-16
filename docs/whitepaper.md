@@ -321,6 +321,56 @@ JavaScript's prototype chain is a persistent attack vector. Modifying `Object.pr
 
 ---
 
+## 6.5 Render Modes — DOM, Canvas, Hybrid
+
+Nectar supports three render modes, selectable per page:
+
+```nectar
+page Home      { render: "dom" }     // marketing — SEO-first
+page Dashboard { render: "canvas" }  // behind auth — max speed
+page Catalog   { render: "hybrid" }  // both: canvas speed + SEO
+```
+
+### Comparison
+
+| | DOM | Canvas | Hybrid |
+|---|---|---|---|
+| **10K render** | 250-320ms | **25ms** | ~30ms |
+| **Reactive update** | 0.10ms | 0.10ms | 0.10ms |
+| **SEO/crawlers** | Full | None | Full (hidden DOM) |
+| **Accessibility** | Native | None* | Full (hidden DOM) |
+| **Text selection** | Native | WASM-driven* | Native (hidden DOM) |
+| **Cmd+F search** | Native | Via hidden DOM* | Native (hidden DOM) |
+| **Form autofill** | Native | Overlay `<input>`* | Native (hidden DOM) |
+| **Bundle size** | 48 KB | 156 KB (layout engine) | ~200 KB |
+| **DOM nodes** | 10,000+ | 1 (`<canvas>`) | 10,000+ (hidden) |
+| **Memory** | Browser-managed | WASM linear memory | Both |
+| **Implementation** | Stable | Experimental* | Planned |
+
+\* Canvas mode features marked with asterisks are implemented but experimental.
+
+### DOM Mode (default)
+
+The browser's layout engine (CSS) computes positions. Nectar generates DOM elements via `innerHTML` and updates them via signal-subscribed `dom_setAttr`/`dom_setText` calls. The 250ms floor on 10K items is the cost of `createElement` — identical across Nectar, Svelte, and any framework that uses the DOM.
+
+**Best for:** Marketing pages, content sites, SEO-critical pages, accessibility-critical applications.
+
+### Canvas Mode (experimental)
+
+The `nectar-layout` crate — extracted from `nectar-runtime` — compiles to WASM and runs the same layout engine used for native desktop rendering. All product data, layout computation, rendering, state management, and event handling run in WASM. The browser provides 12 canvas 2D syscalls (each 1-3 lines). Total JS: ~60 lines of event forwarding.
+
+**25ms for 10K products** — 10x faster than Svelte, 50x faster than React. Zero DOM nodes for products.
+
+**Best for:** Dashboards, data visualization, admin panels, any page behind auth where SEO doesn't matter.
+
+### Hybrid Mode (planned)
+
+Render the DOM normally but hidden (`display:none`). Read `getBoundingClientRect()` for each element — the browser computes layout. Paint to canvas using browser-computed positions. The hidden DOM stays live for crawlers, screen readers, Cmd+F, and text selection.
+
+**Best for:** Product catalogs, e-commerce, any page that needs both speed and SEO.
+
+---
+
 ## 7. Current Limitations
 
 Nectar is a working language with 2,421 compiler tests, but several features remain aspirational:

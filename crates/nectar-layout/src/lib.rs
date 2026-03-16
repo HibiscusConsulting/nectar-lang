@@ -23,3 +23,4 @@ pub mod measure;
 pub mod wasm_api;
 pub mod canvas_syscalls;
 pub mod canvas_app;
+pub mod hybrid_app;
