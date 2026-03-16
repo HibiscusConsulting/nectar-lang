@@ -108,7 +108,8 @@ fn build_ui(state: &mut AppState) {
     // Root: vertical stack, full width
     set_style(tree, root, "direction", "vertical");
     set_style(tree, root, "width", &format!("{}px", state.vw));
-    set_style(tree, root, "gap", "16");
+    set_style(tree, root, "height", "hug");
+    set_style(tree, root, "gap", "12");
     set_style(tree, root, "padding", "20");
     state.root_id = root;
 
@@ -124,11 +125,13 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, title, "font-size", "24px");
     set_style(tree, title, "font-weight", "bold");
     set_style(tree, title, "color", "#f97316");
+    set_style(tree, title, "height", "hug");
 
     let subtitle = add_el(tree, "div", header);
     set_text(tree, subtitle, "WASM Layout Engine · Canvas 2D · Zero DOM");
     set_style(tree, subtitle, "font-size", "12px");
     set_style(tree, subtitle, "color", "#8b949e");
+    set_style(tree, subtitle, "height", "hug");
 
     // ── Category pills row ───────────────────────
     let pills_row = add_el(tree, "div", root);
@@ -204,6 +207,7 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, grid, "direction", "horizontal");
     set_style(tree, grid, "gap", "16");
     set_style(tree, grid, "wrap", "true");
+    set_style(tree, grid, "height", "hug");
     state.grid_id = grid;
 
     state.card_ids.clear();
@@ -310,7 +314,7 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
     build_ui(&mut state);
 
     // Run layout
-    layout::compute(&mut state.tree, vw, vh * 200.0, &mut state.measurer);
+    layout::compute(&mut state.tree, vw, 999999.0, &mut state.measurer);
 
     STATE.with(|s| { *s.borrow_mut() = Some(state); });
 }
@@ -346,7 +350,7 @@ pub extern "C" fn app_lazy_init(vw: f32, vh: f32, t_fetch: f32) {
     };
 
     build_ui(&mut state);
-    layout::compute(&mut state.tree, vw, vh * 200.0, &mut state.measurer);
+    layout::compute(&mut state.tree, vw, 999999.0, &mut state.measurer);
     STATE.with(|s| { *s.borrow_mut() = Some(state); });
 }
 
@@ -362,7 +366,7 @@ pub extern "C" fn app_lazy_build_batch() -> u32 {
         // Rebuild UI with new products
         state.tree = ElementTree::new();
         build_ui(state);
-        layout::compute(&mut state.tree, state.vw, state.vh * 200.0, &mut state.measurer);
+        layout::compute(&mut state.tree, state.vw, state.vh, &mut state.measurer);
         if batch_end >= 10000 { 0 } else { 1 }
     })
 }
@@ -521,7 +525,7 @@ pub extern "C" fn app_resize(vw: f32, vh: f32) {
         state.vh = vh;
         // Re-layout
         set_style(&mut state.tree, state.root_id, "width", &format!("{}px", vw));
-        layout::compute(&mut state.tree, vw, vh * 200.0, &mut state.measurer);
+        layout::compute(&mut state.tree, vw, 999999.0, &mut state.measurer);
     });
 }
 
