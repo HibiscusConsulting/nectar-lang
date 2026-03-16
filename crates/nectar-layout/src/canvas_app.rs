@@ -59,6 +59,7 @@ struct AppState {
     pill_ids: Vec<u32>,     // category pill element IDs (6)
     sort_ids: Vec<u32>,     // sort button element IDs (3)
     cart_text_id: u32,      // cart button text element ID
+    metric_val_ids: Vec<u32>, // metric value element IDs (9)
     card_ids: Vec<u32>,     // product card container IDs
     name_ids: Vec<u32>,     // product name text element IDs
     cat_ids: Vec<u32>,      // product category text element IDs
@@ -320,16 +321,17 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, metrics, "wrap", "true");
     set_style(tree, metrics, "height", "hug");
 
+    state.metric_val_ids.clear();
     let metric_defs: [(&str, &str, &str); 9] = [
         ("FETCH + COMPILE", "—", "#58a6ff"),
-        ("HEAP INIT", "—", "#3fb950"),
-        ("MOUNT 10K", "—", "#f97316"),
+        ("TREE BUILD", "—", "#3fb950"),
+        ("LAYOUT", "—", "#f97316"),
         ("TOTAL", "—", "#bc8cff"),
-        ("LAST OP", "—", "#f97316"),
         ("PRODUCTS", "10000", "#58a6ff"),
-        ("CART", "0", "#f97316"),
         ("CATEGORY", "all", "#3fb950"),
+        ("CART", "0", "#f97316"),
         ("SORT", "default", "#bc8cff"),
+        ("SIGNAL FIRES", "0", "#bc8cff"),
     ];
     // Width = (section_width - padding*2 - gap*2) / 3
     let metric_w = ((state.vw - 64.0 - 24.0) / 3.0).floor().max(100.0);
@@ -356,6 +358,7 @@ fn build_ui(state: &mut AppState) {
         set_style(tree, val, "font-weight", "bold");
         set_style(tree, val, "color", color);
         set_style(tree, val, "height", "hug");
+        state.metric_val_ids.push(val);
     }
 
     // ── Product grid ──
@@ -474,6 +477,7 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
         pill_ids: Vec::new(),
         sort_ids: Vec::new(),
         cart_text_id: 0,
+        metric_val_ids: Vec::new(),
         card_ids: Vec::new(),
         name_ids: Vec::new(),
         cat_ids: Vec::new(),
@@ -519,7 +523,7 @@ pub extern "C" fn app_lazy_init(vw: f32, vh: f32, t_fetch: f32) {
         scroll_y: 0.0, vw, vh,
         t_fetch, t_tree: 0.0, t_layout: 0.0, t_total: 0.0,
         root_id: 1, grid_id: 0,
-        pill_ids: Vec::new(), sort_ids: Vec::new(), cart_text_id: 0,
+        pill_ids: Vec::new(), sort_ids: Vec::new(), cart_text_id: 0, metric_val_ids: Vec::new(),
         card_ids: Vec::new(), name_ids: Vec::new(), cat_ids: Vec::new(),
         price_ids: Vec::new(), img_ids: Vec::new(),
         nav_url: None,
@@ -559,7 +563,71 @@ pub extern "C" fn app_set_timings(t_tree: f32, t_layout: f32, t_total: f32) {
         state.t_tree = t_tree;
         state.t_layout = t_layout;
         state.t_total = t_total;
+
+        // Update metric value elements — O(1) per metric
+        if state.metric_val_ids.len() >= 9 {
+            let mut buf = [0u8; 32];
+
+            // 0: FETCH + COMPILE
+            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_fetch));
+            set_text(&mut state.tree, state.metric_val_ids[0], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 1: TREE BUILD
+            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_tree));
+            set_text(&mut state.tree, state.metric_val_ids[1], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 2: LAYOUT
+            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_layout));
+            set_text(&mut state.tree, state.metric_val_ids[2], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 3: TOTAL
+            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_total));
+            set_text(&mut state.tree, state.metric_val_ids[3], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 4: PRODUCTS
+            let len = fmt_buf(&mut buf, format_args!("{}", state.products.len()));
+            set_text(&mut state.tree, state.metric_val_ids[4], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 5: CATEGORY
+            let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat - 1] };
+            set_text(&mut state.tree, state.metric_val_ids[5], cat);
+
+            // 6: CART
+            let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
+            set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+            // 7: SORT
+            let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
+            set_text(&mut state.tree, state.metric_val_ids[7], sort);
+
+            // 8: SIGNAL FIRES
+            let len = fmt_buf(&mut buf, format_args!("{}", state.signal_fires));
+            set_text(&mut state.tree, state.metric_val_ids[8], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+        }
     });
+}
+
+fn update_dynamic_metrics(state: &mut AppState) {
+    if state.metric_val_ids.len() < 9 { return; }
+    let mut buf = [0u8; 32];
+
+    let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
+    set_text(&mut state.tree, state.metric_val_ids[5], cat);
+
+    let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
+    set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
+    set_text(&mut state.tree, state.metric_val_ids[7], sort);
+
+    let len = fmt_buf(&mut buf, format_args!("{}", state.signal_fires));
+    set_text(&mut state.tree, state.metric_val_ids[8], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+}
+
+fn fmt_buf(buf: &mut [u8], args: std::fmt::Arguments) -> usize {
+    let mut cursor = std::io::Cursor::new(&mut buf[..]);
+    let _ = std::io::Write::write_fmt(&mut cursor, args);
+    cursor.position() as usize
 }
 
 // ── Render: walk tree, paint to canvas ───────────────────────
@@ -780,6 +848,7 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
                 set_style(&mut state.tree, new_id, "color", "#000000");
                 set_style(&mut state.tree, new_id, "border", "");
                 state.signal_fires += 1;
+                update_dynamic_metrics(state);
                 return;
             }
         }
@@ -802,6 +871,7 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
                 set_style(&mut state.tree, new_id, "border", "");
                 state.sort_order = *order;
                 state.signal_fires += 1;
+                update_dynamic_metrics(state);
                 return;
             }
         }
@@ -818,6 +888,7 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
                 c.position() as usize
             };
             set_text(&mut state.tree, cart_id, std::str::from_utf8(&buf[..len]).unwrap_or("Cart ?"));
+            update_dynamic_metrics(state);
             return;
         }
 
@@ -826,6 +897,7 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
             state.cart_count = 0;
             state.signal_fires += 1;
             set_text(&mut state.tree, state.cart_text_id, "Cart 0");
+            update_dynamic_metrics(state);
             return;
         }
 
@@ -834,6 +906,7 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
             state.cart_count = 0;
             state.signal_fires += 1;
             set_text(&mut state.tree, state.cart_text_id, "Cart 0");
+            update_dynamic_metrics(state);
             return;
         }
     });
