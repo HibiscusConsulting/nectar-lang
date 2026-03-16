@@ -392,8 +392,11 @@ impl ElementTree {
             }
         }
 
-        // If this element has a click listener, it's a hit
-        if el.event_listeners.contains_key("click") {
+        // Return this element (deepest ancestor that contains the point)
+        // If it has a click listener, great. If not, caller can walk up.
+        // For text elements and interactive elements, return them directly.
+        if el.text.is_some() || el.event_listeners.contains_key("click")
+            || el.styles.get("background-color").is_some() {
             return Some(id);
         }
 
