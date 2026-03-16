@@ -76,13 +76,22 @@ pub extern "C" fn hybrid_init(vw: f32, vh: f32, t_fetch: f32) {
 
         unsafe {
             dom_set_style_hybrid(state.container_id, style_display.as_ptr(), 7, style_grid.as_ptr(), 4);
-            dom_set_style_hybrid(state.container_id, style_gtc.as_ptr(), 22, style_gtc_val.as_ptr(), 37);
+            dom_set_style_hybrid(state.container_id, style_gtc.as_ptr(), 21, style_gtc_val.as_ptr(), 37);
             dom_set_style_hybrid(state.container_id, style_gap.as_ptr(), 3, style_gap_val.as_ptr(), 4);
             dom_set_style_hybrid(state.container_id, style_pad.as_ptr(), 7, style_pad_val.as_ptr(), 4);
             // Invisible but accessible — screen readers read it, crawlers index it
             dom_set_style_hybrid(state.container_id, style_opacity.as_ptr(), 7, style_zero.as_ptr(), 1);
             dom_set_style_hybrid(state.container_id, style_pos.as_ptr(), 8, style_abs.as_ptr(), 8);
             dom_set_style_hybrid(state.container_id, style_pe.as_ptr(), 14, style_none.as_ptr(), 4);
+            // Push below header/metrics chrome (100px header + padding)
+            let k_top = b"top";
+            let v_top = b"100px";
+            dom_set_style_hybrid(state.container_id, k_top.as_ptr(), 3, v_top.as_ptr(), 5);
+            let k_left = b"left";
+            let v_zero_px = b"0";
+            dom_set_style_hybrid(state.container_id, k_left.as_ptr(), 4, v_zero_px.as_ptr(), 1);
+            let k_right = b"right";
+            dom_set_style_hybrid(state.container_id, k_right.as_ptr(), 5, v_zero_px.as_ptr(), 1);
         }
 
         // Create 10K product card DOM elements
@@ -171,8 +180,33 @@ pub extern "C" fn hybrid_render() {
             canvas_fill_rect(id, 0.0, 0.0, vw, 60.0, 19, 23, 32, 255);
             let title = b"Nectar Hybrid Mode";
             canvas_fill_text(id, title.as_ptr(), title.len() as u32, vw/2.0 - 120.0, 38.0, 249, 115, 22, 24.0, 1);
-            let sub = b"Hidden DOM layout + Canvas paint + Full SEO";
-            canvas_fill_text(id, sub.as_ptr(), sub.len() as u32, vw/2.0 - 180.0, 55.0, 139, 148, 158, 12.0, 0);
+            let sub = b"Hidden DOM layout + Canvas paint + Full SEO + Accessibility";
+            canvas_fill_text(id, sub.as_ptr(), sub.len() as u32, vw/2.0 - 220.0, 55.0, 139, 148, 158, 12.0, 0);
+
+            // Back link
+            let back = b"< Back to DOM Demo";
+            canvas_fill_text(id, back.as_ptr(), back.len() as u32, 20.0, 30.0, 249, 115, 22, 13.0, 1);
+
+            // Metrics row
+            let metrics_y: f32 = 70.0;
+            let m_w = (vw - 80.0 - 24.0) / 3.0;
+            let metric_labels: [&[u8]; 3] = [b"DOM BUILD", b"LAYOUT READ", b"TOTAL"];
+            let metric_vals: [f32; 3] = [state.t_dom, state.t_layout, state.t_dom + state.t_layout + state.t_fetch];
+            let metric_colors: [(u32,u32,u32); 3] = [(88,166,255), (63,185,80), (188,140,255)];
+            for mi in 0..3 {
+                let mx = 40.0 + mi as f32 * (m_w + 12.0);
+                canvas_round_rect(id, mx, metrics_y, m_w, 40.0, 8.0, 26, 31, 46, 255);
+                canvas_stroke_rect(id, mx, metrics_y, m_w, 40.0, 42, 47, 62, 255, 1.0);
+                canvas_fill_text(id, metric_labels[mi].as_ptr(), metric_labels[mi].len() as u32, mx + 12.0, metrics_y + 14.0, 139, 148, 158, 9.0, 1);
+                let mut mbuf = [0u8; 16];
+                let mlen = {
+                    let mut c = std::io::Cursor::new(&mut mbuf[..]);
+                    let _ = std::io::Write::write_fmt(&mut c, format_args!("{:.1}ms", metric_vals[mi]));
+                    c.position() as usize
+                };
+                let (cr,cg,cb) = metric_colors[mi];
+                canvas_fill_text(id, mbuf.as_ptr(), mlen as u32, mx + 12.0, metrics_y + 32.0, cr, cg, cb, 14.0, 1);
+            }
 
             // Paint product cards at DOM-computed positions
             let mut drawn = 0u32;
