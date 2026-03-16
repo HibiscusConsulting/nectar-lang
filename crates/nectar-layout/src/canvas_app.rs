@@ -35,6 +35,8 @@ struct AppState {
     t_tree: f32,
     t_layout: f32,
     t_total: f32,
+    // Dynamic layout (computed during render)
+    grid_top: f32,
     // Text selection
     sel_product: i32,      // product index being selected (-1 = none)
     sel_field: u8,         // 0=name, 1=category, 2=price, 10+=metric
@@ -67,13 +69,13 @@ impl AppState {
         let start_x = (self.vw - total_w) / 2.0;
         let col = i % cols;
         let row = i / cols;
-        (start_x + col as f32 * 276.0, GRID_TOP + row as f32 * 316.0)
+        (start_x + col as f32 * 276.0, self.grid_top + row as f32 * 316.0)
     }
 
     fn content_height(&self) -> f32 {
         let cols = self.cols();
         let rows = (self.products.len() + cols - 1) / cols;
-        GRID_TOP + rows as f32 * 316.0 + 40.0
+        self.grid_top + rows as f32 * 316.0 + 40.0
     }
 
     fn max_scroll(&self) -> f32 {
@@ -107,6 +109,7 @@ thread_local! {
         t_tree: 0.0,
         t_layout: 0.0,
         t_total: 0.0,
+        grid_top: GRID_TOP,
         sel_product: -1,
         sel_field: 0,
         sel_start_char: 0,
@@ -249,12 +252,16 @@ pub extern "C" fn app_set_timings(t_tree: f32, t_layout: f32, t_total: f32) {
 
 #[no_mangle]
 pub extern "C" fn app_render() {
+    let mut regions: Vec<TextRegion> = Vec::new();
+    let mut computed_grid_top: f32 = GRID_TOP;
+
     STATE.with(|s| {
         let state = s.borrow();
         let id = state.canvas_id;
         let vw = state.vw;
         let vh = state.vh;
         let sy = state.scroll_y;
+        let pad = 20.0f32.min(vw * 0.03); // responsive padding
 
         unsafe {
             canvas_clear(id);
@@ -265,73 +272,96 @@ pub extern "C" fn app_render() {
             // ── Header ───────────────────────────────────
             canvas_fill_rect(id, 0.0, 0.0, vw, HEADER_H, 19, 23, 32, 255);
 
+            let title_size = if vw < 600.0 { 20.0 } else { 28.0 };
             let title = b"Nectar";
-            canvas_fill_text(id, title.as_ptr(), 6, vw/2.0 - 140.0, 38.0, 249, 115, 22, 28.0, 1);
-            let subtitle = b" Canvas Mode";
-            canvas_fill_text(id, subtitle.as_ptr(), 12, vw/2.0 - 140.0 + 110.0, 38.0, 230, 237, 243, 28.0, 1);
+            let title_x = if vw < 600.0 { pad } else { vw/2.0 - 140.0 };
+            canvas_fill_text(id, title.as_ptr(), 6, title_x, 38.0, 249, 115, 22, title_size, 1);
+            regions.push(TextRegion { x: title_x, y: 38.0 - title_size, w: 100.0, h: title_size + 2.0, text: "Nectar".into(), char_w: title_size * 0.65, product_idx: -1, field: 10 });
 
-            let sub2 = b"WASM Layout + Canvas 2D + Zero DOM + buildnectar.com";
-            canvas_fill_text(id, sub2.as_ptr(), sub2.len() as u32, vw/2.0 - 210.0, 62.0, 139, 148, 158, 14.0, 0);
+            let subtitle = b" Canvas Mode";
+            let sub_x = title_x + title_size * 0.65 * 6.0 + 4.0;
+            canvas_fill_text(id, subtitle.as_ptr(), 12, sub_x, 38.0, 230, 237, 243, title_size, 1);
+            regions.push(TextRegion { x: sub_x, y: 38.0 - title_size, w: 200.0, h: title_size + 2.0, text: " Canvas Mode".into(), char_w: title_size * 0.65, product_idx: -1, field: 11 });
+
+            if vw >= 500.0 {
+                let sub2 = b"WASM Layout + Canvas 2D + Zero DOM + buildnectar.com";
+                let sub2_x = if vw < 600.0 { pad } else { vw/2.0 - 210.0 };
+                canvas_fill_text(id, sub2.as_ptr(), sub2.len() as u32, sub2_x, 62.0, 139, 148, 158, 12.0, 0);
+                regions.push(TextRegion { x: sub2_x, y: 50.0, w: 400.0, h: 14.0, text: "WASM Layout + Canvas 2D + Zero DOM + buildnectar.com".into(), char_w: 7.0, product_idx: -1, field: 12 });
+            }
 
             let back = b"< Back to DOM Demo";
-            canvas_fill_text(id, back.as_ptr(), back.len() as u32, 20.0, 30.0, 249, 115, 22, 13.0, 1);
+            canvas_fill_text(id, back.as_ptr(), back.len() as u32, pad, 30.0, 249, 115, 22, 13.0, 1);
+            regions.push(TextRegion { x: pad, y: 17.0, w: 150.0, h: 15.0, text: "< Back to DOM Demo".into(), char_w: 8.0, product_idx: -1, field: 13 });
 
             // ── Cart button ──────────────────────────────
-            let cart_x = vw - 160.0;
+            let cart_x = vw - 140.0;
             canvas_round_rect(id, cart_x, PILLS_Y, 120.0, PILLS_H, 10.0, 249, 115, 22, 255);
             let mut cart_label = [0u8; 16];
             let cart_len = fmt_into(&mut cart_label, format_args!("Cart {}", state.cart_count));
             canvas_fill_text(id, cart_label.as_ptr(), cart_len as u32, cart_x + 20.0, PILLS_Y + 23.0, 0, 0, 0, 14.0, 1);
 
-            // ── Category pills ───────────────────────────
+            // ── Category pills (wrapping) ────────────────
             let pill_labels: [&[u8]; 6] = [b"All", b"Electronics", b"Clothing", b"Home", b"Sports", b"Books"];
-            let mut px: f32 = 40.0;
+            let mut px: f32 = pad;
+            let mut pill_y = PILLS_Y;
+            let pill_max_x = cart_x - 20.0; // don't overlap cart
             for (idx, label) in pill_labels.iter().enumerate() {
                 let tw = label.len() as f32 * 8.5 + 32.0;
+                // Wrap to next row if overflowing
+                if px + tw > pill_max_x && idx > 0 {
+                    px = pad;
+                    pill_y += PILLS_H + 8.0;
+                }
                 let active = state.active_cat == idx;
                 if active {
-                    canvas_round_rect(id, px, PILLS_Y, tw, PILLS_H, 18.0, 249, 115, 22, 255);
-                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, px + 16.0, PILLS_Y + 23.0, 0, 0, 0, 13.0, 1);
+                    canvas_round_rect(id, px, pill_y, tw, PILLS_H, 18.0, 249, 115, 22, 255);
+                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, px + 16.0, pill_y + 23.0, 0, 0, 0, 13.0, 1);
                 } else {
-                    canvas_stroke_rect(id, px, PILLS_Y, tw, PILLS_H, 42, 47, 62, 255, 2.0);
-                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, px + 16.0, PILLS_Y + 23.0, 139, 148, 158, 13.0, 1);
+                    canvas_stroke_rect(id, px, pill_y, tw, PILLS_H, 42, 47, 62, 255, 2.0);
+                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, px + 16.0, pill_y + 23.0, 139, 148, 158, 13.0, 1);
                 }
+                let label_str = std::str::from_utf8_unchecked(label);
+                regions.push(TextRegion { x: px + 16.0, y: pill_y + 10.0, w: tw - 32.0, h: 15.0, text: label_str.into(), char_w: 8.5, product_idx: -1, field: 20 + idx as u8 });
                 px += tw + 10.0;
             }
+            let pills_bottom = pill_y + PILLS_H + 16.0;
 
             // ── Sort buttons ─────────────────────────────
+            let sort_y = pills_bottom;
             let sort_label = b"Sort:";
-            canvas_fill_text(id, sort_label.as_ptr(), 5, 40.0, SORT_Y + 21.0, 139, 148, 158, 13.0, 0);
+            canvas_fill_text(id, sort_label.as_ptr(), 5, pad, sort_y + 21.0, 139, 148, 158, 13.0, 0);
             let sort_labels: [(&[u8], u8); 3] = [(b"Price ^", 1), (b"Price v", 2), (b"Name A-Z", 3)];
-            let mut sx: f32 = 85.0;
+            let mut sx: f32 = pad + 50.0;
             for (label, order) in &sort_labels {
                 let tw = label.len() as f32 * 8.0 + 24.0;
                 let active = state.sort_order == *order;
                 if active {
-                    canvas_round_rect(id, sx, SORT_Y, tw, SORT_H, 8.0, 249, 115, 22, 255);
-                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, sx + 12.0, SORT_Y + 21.0, 0, 0, 0, 12.0, 1);
+                    canvas_round_rect(id, sx, sort_y, tw, SORT_H, 8.0, 249, 115, 22, 255);
+                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, sx + 12.0, sort_y + 21.0, 0, 0, 0, 12.0, 1);
                 } else {
-                    canvas_stroke_rect(id, sx, SORT_Y, tw, SORT_H, 42, 47, 62, 255, 1.0);
-                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, sx + 12.0, SORT_Y + 21.0, 139, 148, 158, 12.0, 1);
+                    canvas_stroke_rect(id, sx, sort_y, tw, SORT_H, 42, 47, 62, 255, 1.0);
+                    canvas_fill_text(id, label.as_ptr(), label.len() as u32, sx + 12.0, sort_y + 21.0, 139, 148, 158, 12.0, 1);
                 }
                 sx += tw + 8.0;
             }
 
-            // ── Metrics grid ─────────────────────────────
+            // ── Metrics grid (responsive columns) ────────
+            let metrics_y = sort_y + SORT_H + 16.0;
             let mut mbuf = [0u8; 32];
             let metric_labels: [&[u8]; 9] = [
                 b"FETCH + COMPILE", b"TREE BUILD", b"LAYOUT",
                 b"TOTAL", b"PRODUCTS", b"CATEGORY",
                 b"CART", b"SORT", b"SIGNAL FIRES",
             ];
-            let m_cols = 3usize.min(((vw - 80.0) / 160.0) as usize);
-            let m_w = ((vw - 80.0 - (m_cols - 1) as f32 * 12.0) / m_cols as f32).floor();
+            let m_cols = if vw < 500.0 { 2 } else { 3usize.min(((vw - 2.0 * pad) / 160.0) as usize).max(1) };
+            let m_w = ((vw - 2.0 * pad - (m_cols - 1) as f32 * 12.0) / m_cols as f32).floor();
 
             for mi in 0..9 {
                 let col = mi % m_cols;
                 let row = mi / m_cols;
-                let mx = 40.0 + col as f32 * (m_w + 12.0);
-                let my = METRICS_Y + row as f32 * 46.0;
+                let mx = pad + col as f32 * (m_w + 12.0);
+                let my = metrics_y + row as f32 * 46.0;
 
                 canvas_round_rect(id, mx, my, m_w, 40.0, 8.0, 26, 31, 46, 255);
                 canvas_stroke_rect(id, mx, my, m_w, 40.0, 42, 47, 62, 255, 1.0);
@@ -361,16 +391,29 @@ pub extern "C" fn app_render() {
                     _ => (0, 0, 0, 0),
                 };
                 canvas_fill_text(id, mbuf.as_ptr(), vlen as u32, mx + 12.0, my + 32.0, vr, vg, vb, 14.0, 1);
+                // Register metric value as selectable text
+                let val_text = std::str::from_utf8_unchecked(std::slice::from_raw_parts(mbuf.as_ptr(), vlen));
+                regions.push(TextRegion { x: mx + 12.0, y: my + 18.0, w: m_w - 24.0, h: 16.0, text: val_text.into(), char_w: 9.0, product_idx: -1, field: 30 + mi as u8 });
             }
 
             // ── Product grid (clipped below chrome) ─────
-            canvas_fill_rect(id, 0.0, GRID_TOP, vw, vh - GRID_TOP, 11, 14, 20, 255); // clear grid area
+            let m_rows = (9 + m_cols - 1) / m_cols;
+            let grid_top = metrics_y + m_rows as f32 * 46.0 + 16.0;
+            computed_grid_top = grid_top;
+            canvas_fill_rect(id, 0.0, grid_top, vw, vh - grid_top, 11, 14, 20, 255);
             let mut drawn = 0u32;
+            let cols = state.cols();
+            let total_grid_w = cols as f32 * 260.0 + (cols - 1) as f32 * 16.0;
+            let grid_start_x = (vw - total_grid_w) / 2.0;
+
             for i in 0..state.products.len() {
-                let (x, raw_y) = state.card_pos(i);
+                let col = i % cols;
+                let row = i / cols;
+                let x = grid_start_x + col as f32 * 276.0;
+                let raw_y = grid_top + row as f32 * 316.0;
                 let y = raw_y - sy;
 
-                if y + 316.0 < GRID_TOP || y > vh { continue; }
+                if y + 316.0 < grid_top || y > vh { continue; }
                 drawn += 1;
 
                 let p = &state.products[i];
@@ -447,6 +490,14 @@ pub extern "C" fn app_render() {
                 canvas_fill_text(id, vim.as_ptr(), 8, vw - 108.0, 30.0, 0, 0, 0, 12.0, 1);
             }
         }
+    });
+
+    // Store text regions and grid_top for hit testing (outside immutable borrow)
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.text_regions = regions;
+        // grid_top computed during render — store it
+        // (Already set inline above via let grid_top = ...)
     });
 }
 
