@@ -324,17 +324,19 @@ fn build_ui(state: &mut AppState) {
     state.metric_val_ids.clear();
     let metric_defs: [(&str, &str, &str); 9] = [
         ("FETCH + COMPILE", "—", "#58a6ff"),
-        ("TREE BUILD", "—", "#3fb950"),
-        ("LAYOUT", "—", "#f97316"),
+        ("HEAP INIT", "—", "#3fb950"),
+        ("MOUNT 10K", "—", "#f97316"),
         ("TOTAL", "—", "#bc8cff"),
+        ("LAST OP", "—", "#f97316"),
         ("PRODUCTS", "10000", "#58a6ff"),
-        ("CATEGORY", "all", "#3fb950"),
         ("CART", "0", "#f97316"),
+        ("CATEGORY", "all", "#3fb950"),
         ("SORT", "default", "#bc8cff"),
-        ("SIGNAL FIRES", "0", "#bc8cff"),
     ];
     // Width = (section_width - padding*2 - gap*2) / 3
-    let metric_w = ((state.vw - 64.0 - 24.0) / 3.0).floor().max(100.0);
+    // Section inner width = min(vw, 1400) - padding(64) - root_padding(48)
+    let section_inner = (state.vw - 48.0).min(1400.0) - 64.0;
+    let metric_w = ((section_inner - 24.0) / 3.0).floor().max(100.0);
     for (label, value, color) in &metric_defs {
         let card = add_el(tree, "div", metrics);
         set_style(tree, card, "direction", "vertical");
@@ -572,11 +574,11 @@ pub extern "C" fn app_set_timings(t_tree: f32, t_layout: f32, t_total: f32) {
             let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_fetch));
             set_text(&mut state.tree, state.metric_val_ids[0], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
-            // 1: TREE BUILD
+            // 1: HEAP INIT
             let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_tree));
             set_text(&mut state.tree, state.metric_val_ids[1], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
-            // 2: LAYOUT
+            // 2: MOUNT 10K
             let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_layout));
             set_text(&mut state.tree, state.metric_val_ids[2], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
@@ -584,25 +586,24 @@ pub extern "C" fn app_set_timings(t_tree: f32, t_layout: f32, t_total: f32) {
             let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_total));
             set_text(&mut state.tree, state.metric_val_ids[3], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
-            // 4: PRODUCTS
-            let len = fmt_buf(&mut buf, format_args!("{}", state.products.len()));
-            set_text(&mut state.tree, state.metric_val_ids[4], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+            // 4: LAST OP
+            set_text(&mut state.tree, state.metric_val_ids[4], "—");
 
-            // 5: CATEGORY
-            let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat - 1] };
-            set_text(&mut state.tree, state.metric_val_ids[5], cat);
+            // 5: PRODUCTS
+            let len = fmt_buf(&mut buf, format_args!("{}", state.products.len()));
+            set_text(&mut state.tree, state.metric_val_ids[5], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
             // 6: CART
             let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
             set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
-            // 7: SORT
-            let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
-            set_text(&mut state.tree, state.metric_val_ids[7], sort);
+            // 7: CATEGORY
+            let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
+            set_text(&mut state.tree, state.metric_val_ids[7], cat);
 
-            // 8: SIGNAL FIRES
-            let len = fmt_buf(&mut buf, format_args!("{}", state.signal_fires));
-            set_text(&mut state.tree, state.metric_val_ids[8], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+            // 8: SORT
+            let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
+            set_text(&mut state.tree, state.metric_val_ids[8], sort);
         }
     });
 }
@@ -611,17 +612,17 @@ fn update_dynamic_metrics(state: &mut AppState) {
     if state.metric_val_ids.len() < 9 { return; }
     let mut buf = [0u8; 32];
 
-    let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
-    set_text(&mut state.tree, state.metric_val_ids[5], cat);
-
+    // 6: CART
     let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
     set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
 
-    let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
-    set_text(&mut state.tree, state.metric_val_ids[7], sort);
+    // 7: CATEGORY
+    let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
+    set_text(&mut state.tree, state.metric_val_ids[7], cat);
 
-    let len = fmt_buf(&mut buf, format_args!("{}", state.signal_fires));
-    set_text(&mut state.tree, state.metric_val_ids[8], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+    // 8: SORT
+    let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
+    set_text(&mut state.tree, state.metric_val_ids[8], sort);
 }
 
 fn fmt_buf(buf: &mut [u8], args: std::fmt::Arguments) -> usize {
