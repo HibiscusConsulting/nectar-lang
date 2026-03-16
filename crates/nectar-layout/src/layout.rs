@@ -148,38 +148,72 @@ pub fn compute(tree: &mut ElementTree, viewport_w: f32, viewport_h: f32, measure
     propagate_hug_heights(tree, &ctx, 1);
 }
 
-/// Bottom-up pass: recompute Hug container heights from actual child positions.
-/// This fixes the chain: wrap container → Hug parent → Hug grandparent.
+/// Bottom-up pass: recompute Hug container heights from actual child positions,
+/// then reposition siblings. This is the fundamental fix:
+/// in a vertical stack, every child pushes the next child down by its height.
 fn propagate_hug_heights(tree: &mut ElementTree, ctx: &LayoutContext, id: u32) {
     let kids = ctx.children(id).to_vec();
 
-    // Recurse children first (bottom-up)
+    // First, recurse into all children (bottom-up)
     for &kid in &kids {
         propagate_hug_heights(tree, ctx, kid);
     }
 
+    if kids.is_empty() { return; }
+
     let style = ctx.style(id);
-    if !matches!(style.height, SizePolicy::Hug) || kids.is_empty() {
-        return;
-    }
 
-    // Compute actual height from children's final positions + sizes
-    let el_y = tree.get(id).map(|e| e.layout.y).unwrap_or(0.0);
-    let mut max_bottom: f32 = 0.0;
+    // For vertical non-wrapping containers: check if any child's height
+    // was expanded by wrapping. If so, reposition all siblings.
+    if matches!(style.direction, Direction::Vertical) && !style.wrap && matches!(style.height, SizePolicy::Hug) {
+        let el_y = tree.get(id).map(|e| e.layout.y).unwrap_or(0.0);
+        let gap = style.gap;
 
-    for &kid in &kids {
-        if let Some(child) = tree.get(kid) {
-            let child_bottom = child.layout.y + child.layout.height;
-            max_bottom = max_bottom.max(child_bottom);
+        // Check if repositioning is needed by computing expected vs actual total
+        let mut cursor_y = el_y + style.pad.top;
+        let mut needs_reposition = false;
+
+        for (i, &kid) in kids.iter().enumerate() {
+            if let Some(child) = tree.get(kid) {
+                if (child.layout.y - cursor_y).abs() > 0.5 {
+                    needs_reposition = true;
+                }
+                cursor_y += child.layout.height;
+                if i < kids.len() - 1 { cursor_y += gap; }
+            }
         }
-    }
 
-    // New height = (furthest child bottom - my top) + bottom padding
-    let new_h = (max_bottom - el_y) + style.pad.bottom;
+        if needs_reposition {
+            cursor_y = el_y + style.pad.top;
+            for (i, &kid) in kids.iter().enumerate() {
+                if let Some(child) = tree.get_mut(kid) {
+                    child.layout.y = cursor_y;
+                    cursor_y += child.layout.height;
+                    if i < kids.len() - 1 { cursor_y += gap; }
+                }
+            }
+        }
 
-    if let Some(el) = tree.get_mut(id) {
-        if new_h > el.layout.height {
+        // Update own height
+        let new_h = (cursor_y - el_y) + style.pad.bottom;
+        if let Some(el) = tree.get_mut(id) {
             el.layout.height = new_h;
+        }
+    } else if matches!(style.height, SizePolicy::Hug) {
+        // For horizontal/layer/wrap containers: just update height from max child bottom
+        let el_y = tree.get(id).map(|e| e.layout.y).unwrap_or(0.0);
+        let mut max_bottom: f32 = 0.0;
+        for &kid in &kids {
+            if let Some(child) = tree.get(kid) {
+                let child_bottom = child.layout.y + child.layout.height;
+                max_bottom = max_bottom.max(child_bottom);
+            }
+        }
+        let new_h = (max_bottom - el_y) + style.pad.bottom;
+        if let Some(el) = tree.get_mut(id) {
+            if new_h > el.layout.height {
+                el.layout.height = new_h;
+            }
         }
     }
 }
