@@ -722,9 +722,25 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
             None => return,
         };
 
-        // Read the clicked element's text to dispatch action
-        let text = state.tree.get(hit_id).and_then(|e| e.text.clone()).unwrap_or_default();
-        let bg = state.tree.get(hit_id).and_then(|e| e.styles.get("background-color").cloned()).unwrap_or_default();
+        // Read the clicked element's text — walk up to parent if no text
+        let mut check_id = hit_id;
+        let mut text = String::new();
+        for _ in 0..5 {
+            if let Some(el) = state.tree.get(check_id) {
+                if let Some(ref t) = el.text {
+                    text = t.clone();
+                    break;
+                }
+                // Walk to parent
+                if let Some(pid) = el.parent {
+                    check_id = pid;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
 
         // Category pills — O(1) style swap, no rebuild
         let pill_map = [("All", 0usize), ("Electronics", 1), ("Clothing", 2), ("Home", 3), ("Sports", 4), ("Books", 5)];
