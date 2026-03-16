@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::element::ElementTree;
 use crate::measure::{TextMeasurer, TextStyle};
 
@@ -56,7 +54,8 @@ pub enum Anchor {
     BottomLeft, BottomCenter, BottomRight,
 }
 
-/// Resolved layout style for one element — parsed from element's styles map.
+/// Resolved layout style for one element — struct with named fields.
+/// No HashMap lookups, no string parsing during layout. The style IS the struct.
 #[derive(Debug, Clone)]
 pub struct LayoutStyle {
     pub direction: Direction,
@@ -74,6 +73,15 @@ pub struct LayoutStyle {
     pub wrap: bool,
     /// Anchor point within a Layer parent (default: TopLeft)
     pub anchor: Anchor,
+    /// display: none — element contributes zero size and is skipped during layout.
+    pub display_none: bool,
+    /// white-space: nowrap — prevents text re-measurement with width constraint.
+    pub white_space_nowrap: bool,
+    /// Position offsets within a Layer parent.
+    pub offset_top: Option<f32>,
+    pub offset_right: Option<f32>,
+    pub offset_bottom: Option<f32>,
+    pub offset_left: Option<f32>,
 }
 
 impl Default for LayoutStyle {
@@ -93,6 +101,107 @@ impl Default for LayoutStyle {
             scroll: false,
             wrap: false,
             anchor: Anchor::TopLeft,
+            display_none: false,
+            white_space_nowrap: false,
+            offset_top: None,
+            offset_right: None,
+            offset_bottom: None,
+            offset_left: None,
+        }
+    }
+}
+
+impl LayoutStyle {
+    /// Apply a single CSS-style property to this layout style. Called eagerly on set_style.
+    pub fn apply_property(&mut self, prop: &str, value: &str) {
+        match prop {
+            "direction" => {
+                self.direction = match value {
+                    "horizontal" | "row" => Direction::Horizontal,
+                    "vertical" | "column" => Direction::Vertical,
+                    "layer" | "stack" => Direction::Layer,
+                    _ => Direction::Vertical,
+                };
+            }
+            "flex-direction" => {
+                self.direction = match value {
+                    "row" | "row-reverse" => Direction::Horizontal,
+                    _ => Direction::Vertical,
+                };
+            }
+            "gap" => {
+                if let Some(v) = parse_px(value) { self.gap = v; }
+            }
+            "pad" | "padding" => {
+                self.pad = parse_edges(value);
+            }
+            "padding-top" => { if let Some(v) = parse_px(value) { self.pad.top = v; } }
+            "padding-right" => { if let Some(v) = parse_px(value) { self.pad.right = v; } }
+            "padding-bottom" => { if let Some(v) = parse_px(value) { self.pad.bottom = v; } }
+            "padding-left" => { if let Some(v) = parse_px(value) { self.pad.left = v; } }
+            "align" | "align-items" => {
+                self.align = match value {
+                    "start" | "flex-start" => Align::Start,
+                    "center" => Align::Center,
+                    "end" | "flex-end" => Align::End,
+                    "stretch" => Align::Stretch,
+                    _ => Align::Stretch,
+                };
+            }
+            "justify" | "justify-content" => {
+                self.justify = match value {
+                    "start" | "flex-start" => Justify::Start,
+                    "center" => Justify::Center,
+                    "end" | "flex-end" => Justify::End,
+                    "space-between" => Justify::SpaceBetween,
+                    _ => Justify::Start,
+                };
+            }
+            "width" => { self.width = parse_size_policy(value); }
+            "height" => { self.height = parse_size_policy(value); }
+            "size" => {
+                let policy = parse_size_policy(value);
+                self.width = policy;
+                self.height = policy;
+            }
+            "min-width" => { self.min_width = parse_px(value); }
+            "max-width" => { self.max_width = parse_px(value); }
+            "min-height" => { self.min_height = parse_px(value); }
+            "max-height" => { self.max_height = parse_px(value); }
+            "scroll" => {
+                self.scroll = value == "true" || value == "vertical" || value == "horizontal" || value == "both";
+            }
+            "overflow" => {
+                self.scroll = value == "auto" || value == "scroll";
+            }
+            "wrap" | "flex-wrap" => {
+                self.wrap = value == "true" || value == "wrap";
+            }
+            "anchor" => {
+                self.anchor = match value {
+                    "top-left" => Anchor::TopLeft,
+                    "top-center" | "top" => Anchor::TopCenter,
+                    "top-right" => Anchor::TopRight,
+                    "center-left" | "left" => Anchor::CenterLeft,
+                    "center" => Anchor::Center,
+                    "center-right" | "right" => Anchor::CenterRight,
+                    "bottom-left" => Anchor::BottomLeft,
+                    "bottom-center" | "bottom" => Anchor::BottomCenter,
+                    "bottom-right" => Anchor::BottomRight,
+                    _ => Anchor::TopLeft,
+                };
+            }
+            "display" => {
+                self.display_none = value == "none";
+            }
+            "white-space" => {
+                self.white_space_nowrap = value == "nowrap";
+            }
+            "top" => { self.offset_top = parse_px(value); }
+            "right" => { self.offset_right = parse_px(value); }
+            "bottom" => { self.offset_bottom = parse_px(value); }
+            "left" => { self.offset_left = parse_px(value); }
+            _ => {} // Visual-only properties (color, background-color, etc.) — not layout-relevant
         }
     }
 }
@@ -132,20 +241,41 @@ impl LayoutNode {
 /// Compute layout for the entire element tree.
 /// Two-pass: measure (bottom-up intrinsic sizes) then layout (top-down positioning).
 pub fn compute(tree: &mut ElementTree, viewport_w: f32, viewport_h: f32, measurer: &mut dyn TextMeasurer) {
-    // Phase 1: collect all styles and children (avoids borrow issues during traversal)
+    #[cfg(not(target_arch = "wasm32"))]
+    let t0 = std::time::Instant::now();
+
+    // Phase 1: collect styles (just struct clones — no parsing) and children
     let ctx = LayoutContext::build(tree);
 
+    #[cfg(not(target_arch = "wasm32"))]
+    let t1 = std::time::Instant::now();
+
     // Phase 2: measure pass — compute intrinsic sizes bottom-up
-    let mut intrinsics: HashMap<u32, (f32, f32)> = HashMap::new();
-    measure_node(1, tree, &ctx, &mut intrinsics, measurer);
+    let cap = tree.capacity();
+    let mut intrinsics: Vec<(f32, f32)> = vec![(0.0, 0.0); cap];
+    let mut measured: Vec<bool> = vec![false; cap];
+    measure_node(1, tree, &ctx, &mut intrinsics, &mut measured, measurer);
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let t2 = std::time::Instant::now();
 
     // Phase 3: layout pass — assign positions and resolved sizes top-down
     layout_node(tree, &ctx, &intrinsics, 1, 0.0, 0.0, viewport_w, viewport_h, measurer);
 
+    #[cfg(not(target_arch = "wasm32"))]
+    let t3 = std::time::Instant::now();
+
     // Phase 4: propagate actual heights bottom-up for Hug containers
-    // Wrapping containers now have correct heights from layout_wrap.
-    // Propagate upward so parent Hug containers also get correct heights.
     propagate_hug_heights(tree, &ctx, 1);
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let t4 = std::time::Instant::now();
+        eprintln!("  Phase 1 (context): {:?}", t1 - t0);
+        eprintln!("  Phase 2 (measure): {:?}", t2 - t1);
+        eprintln!("  Phase 3 (layout):  {:?}", t3 - t2);
+        eprintln!("  Phase 4 (propagate): {:?}", t4 - t3);
+    }
 }
 
 /// Bottom-up pass: recompute Hug container heights from actual child positions,
@@ -219,43 +349,56 @@ fn propagate_hug_heights(tree: &mut ElementTree, ctx: &LayoutContext, id: u32) {
 }
 
 // ── Context (pre-collected data to avoid borrow fights) ────────────────────
+// Uses Vec indexed by element ID for O(1) access — no HashMap hashing overhead.
 
 struct LayoutContext {
-    styles: HashMap<u32, LayoutStyle>,
-    children: HashMap<u32, Vec<u32>>,
+    styles: Vec<LayoutStyle>,          // indexed by element ID
+    children: Vec<Vec<u32>>,           // indexed by element ID
+    present: Vec<bool>,                // which IDs have elements
 }
 
 impl LayoutContext {
     fn build(tree: &ElementTree) -> Self {
-        let mut styles = HashMap::new();
-        let mut children = HashMap::new();
+        let cap = tree.capacity();
+        let mut styles = Vec::with_capacity(cap);
+        let mut children = Vec::with_capacity(cap);
+        let mut present = Vec::with_capacity(cap);
+
+        // Pre-fill to capacity
+        let default_style = LayoutStyle::default();
+        styles.resize_with(cap, || default_style.clone());
+        children.resize_with(cap, Vec::new);
+        present.resize(cap, false);
 
         for (id, el) in tree.iter() {
-            // Fast path: fixed-size elements with no styles skip resolve_style
-            if el.fixed_width.is_some() && el.fixed_height.is_some() && el.styles.is_empty() {
-                let mut ls = LayoutStyle::default();
-                ls.width = SizePolicy::Fixed(el.fixed_width.unwrap());
-                ls.height = SizePolicy::Fixed(el.fixed_height.unwrap());
-                styles.insert(id, ls);
-            } else {
-                styles.insert(id, resolve_style(el));
+            let idx = id as usize;
+            // The style IS the struct — no parsing, no HashMap lookups, just clone.
+            let mut style = el.style.clone();
+
+            // Text nodes always hug
+            if el.tag == "#text" {
+                style.width = SizePolicy::Hug;
+                style.height = SizePolicy::Hug;
             }
-            // Only clone children vec if element has children
+
+            styles[idx] = style;
             if !el.children.is_empty() {
-                children.insert(id, el.children.clone());
+                children[idx] = el.children.clone();
             }
+            present[idx] = true;
         }
 
-        Self { styles, children }
+        Self { styles, children, present }
     }
 
+    #[inline]
     fn style(&self, id: u32) -> &LayoutStyle {
-        static DEFAULT: std::sync::LazyLock<LayoutStyle> = std::sync::LazyLock::new(LayoutStyle::default);
-        self.styles.get(&id).unwrap_or(&DEFAULT)
+        &self.styles[id as usize]
     }
 
+    #[inline]
     fn children(&self, id: u32) -> &[u32] {
-        self.children.get(&id).map(|v| v.as_slice()).unwrap_or(&[])
+        &self.children[id as usize]
     }
 }
 
@@ -267,22 +410,22 @@ fn measure_node(
     id: u32,
     tree: &ElementTree,
     ctx: &LayoutContext,
-    intrinsics: &mut HashMap<u32, (f32, f32)>,
+    intrinsics: &mut Vec<(f32, f32)>,
+    measured: &mut Vec<bool>,
     measurer: &mut dyn TextMeasurer,
 ) -> (f32, f32) {
-    if let Some(&cached) = intrinsics.get(&id) {
-        return cached;
-    }
-
-    // display: none — element contributes zero size
-    if let Some(el) = tree.get(id) {
-        if el.styles.get("display").map(|v| v == "none").unwrap_or(false) {
-            intrinsics.insert(id, (0.0, 0.0));
-            return (0.0, 0.0);
-        }
+    let idx = id as usize;
+    if measured[idx] {
+        return intrinsics[idx];
     }
 
     let style = ctx.style(id);
+
+    // display: none — element contributes zero size
+    if style.display_none {
+        measured[idx] = true;
+        return (0.0, 0.0);
+    }
     let kids = ctx.children(id);
 
     // Leaf node: text content — measure intrinsic (unwrapped) size
@@ -309,14 +452,15 @@ fn measure_node(
         };
         let result = (constrain(w, style.min_width, style.max_width),
                       constrain(h, style.min_height, style.max_height));
-        intrinsics.insert(id, result);
+        intrinsics[idx] = result;
+        measured[idx] = true;
         return result;
     }
 
     // Measure all children first
     let child_sizes: Vec<(f32, f32)> = kids
         .iter()
-        .map(|&kid| measure_node(kid, tree, ctx, intrinsics, measurer))
+        .map(|&kid| measure_node(kid, tree, ctx, intrinsics, measured, measurer))
         .collect();
 
     let total_gap = if kids.len() > 1 {
@@ -359,7 +503,8 @@ fn measure_node(
 
     let result = (constrain(w, style.min_width, style.max_width),
                   constrain(h, style.min_height, style.max_height));
-    intrinsics.insert(id, result);
+    intrinsics[idx] = result;
+    measured[idx] = true;
     result
 }
 
@@ -369,7 +514,7 @@ fn measure_node(
 fn layout_node(
     tree: &mut ElementTree,
     ctx: &LayoutContext,
-    intrinsics: &HashMap<u32, (f32, f32)>,
+    intrinsics: &[(f32, f32)],
     id: u32,
     x: f32,
     y: f32,
@@ -377,23 +522,21 @@ fn layout_node(
     available_h: f32,
     measurer: &mut dyn TextMeasurer,
 ) {
-    // display: none — skip layout entirely, zero out dimensions
-    if let Some(el) = tree.get(id) {
-        if el.styles.get("display").map(|v| v == "none").unwrap_or(false) {
-            if let Some(el) = tree.get_mut(id) {
-                el.layout.x = x;
-                el.layout.y = y;
-                el.layout.width = 0.0;
-                el.layout.height = 0.0;
-            }
-            return;
-        }
-    }
-
     let style = ctx.style(id).clone();
 
+    // display: none — skip layout entirely, zero out dimensions
+    if style.display_none {
+        if let Some(el) = tree.get_mut(id) {
+            el.layout.x = x;
+            el.layout.y = y;
+            el.layout.width = 0.0;
+            el.layout.height = 0.0;
+        }
+        return;
+    }
+
     // Resolve own size (using intrinsic for Hug)
-    let intrinsic = intrinsics.get(&id).copied().unwrap_or((0.0, 0.0));
+    let intrinsic = intrinsics[id as usize];
     let resolved_w = resolve_size_with_intrinsic(style.width, available_w, intrinsic.0, style.min_width, style.max_width);
     let mut resolved_h = resolve_size_with_intrinsic(style.height, available_h, intrinsic.1, style.min_height, style.max_height);
 
@@ -403,8 +546,7 @@ fn layout_node(
     if let Some(el) = tree.get(id) {
         if el.tag == "#text" {
             if let Some(text) = &el.text {
-                let nowrap = el.styles.get("white-space").map(|v| v == "nowrap").unwrap_or(false);
-                if matches!(style.height, SizePolicy::Hug) && !nowrap {
+                if matches!(style.height, SizePolicy::Hug) && !style.white_space_nowrap {
                     let text_style = resolve_text_style(el);
                     let content_w = (resolved_w - style.pad.left - style.pad.right).max(0.0);
                     let (_, wrapped_h) = measurer.measure(text, &text_style, Some(content_w));
@@ -458,15 +600,14 @@ fn layout_node(
             // Every child gets the full content area, offset by top/left/right/bottom if present
             for &kid in kids {
                 let kid_style = ctx.style(kid);
-                let kid_w = resolve_size_with_intrinsic(kid_style.width, content_w, intrinsics.get(&kid).map(|s| s.0).unwrap_or(0.0), kid_style.min_width, kid_style.max_width);
-                let kid_h = resolve_size_with_intrinsic(kid_style.height, content_h, intrinsics.get(&kid).map(|s| s.1).unwrap_or(0.0), kid_style.min_height, kid_style.max_height);
+                let kid_w = resolve_size_with_intrinsic(kid_style.width, content_w, intrinsics[kid as usize].0, kid_style.min_width, kid_style.max_width);
+                let kid_h = resolve_size_with_intrinsic(kid_style.height, content_h, intrinsics[kid as usize].1, kid_style.min_height, kid_style.max_height);
 
-                // Position offsets within the layer (for tooltip/dropdown positioning)
-                let kid_el_styles = tree.get(kid).map(|e| &e.styles);
-                let offset_top = kid_el_styles.and_then(|s| s.get("top")).and_then(|v| parse_px(v));
-                let offset_left = kid_el_styles.and_then(|s| s.get("left")).and_then(|v| parse_px(v));
-                let offset_bottom = kid_el_styles.and_then(|s| s.get("bottom")).and_then(|v| parse_px(v));
-                let offset_right = kid_el_styles.and_then(|s| s.get("right")).and_then(|v| parse_px(v));
+                // Position offsets within the layer (from LayoutStyle struct — no HashMap lookup)
+                let offset_top = kid_style.offset_top;
+                let offset_left = kid_style.offset_left;
+                let offset_bottom = kid_style.offset_bottom;
+                let offset_right = kid_style.offset_right;
 
                 let (kid_x, kid_y) = if kid_style.anchor != Anchor::TopLeft {
                     // Anchor-based positioning
@@ -553,7 +694,7 @@ fn layout_node(
 fn layout_stack(
     tree: &mut ElementTree,
     ctx: &LayoutContext,
-    intrinsics: &HashMap<u32, (f32, f32)>,
+    intrinsics: &[(f32, f32)],
     kids: &[u32],
     is_vertical: bool,
     content_x: f32,
@@ -577,17 +718,13 @@ fn layout_stack(
 
     for &kid in kids {
         // display: none children contribute zero space
-        let is_hidden = tree.get(kid)
-            .and_then(|el| el.styles.get("display"))
-            .map(|v| v == "none")
-            .unwrap_or(false);
-        if is_hidden {
+        let kid_style = ctx.style(kid);
+        if kid_style.display_none {
             child_main_sizes.push(0.0);
             continue;
         }
 
-        let kid_style = ctx.style(kid);
-        let kid_intrinsic = intrinsics.get(&kid).copied().unwrap_or((0.0, 0.0));
+        let kid_intrinsic = intrinsics[kid as usize];
         let kid_intrinsic_main = if is_vertical { kid_intrinsic.1 } else { kid_intrinsic.0 };
 
         let main_policy = if is_vertical { kid_style.height } else { kid_style.width };
@@ -648,7 +785,7 @@ fn layout_stack(
 
     for (i, &kid) in kids.iter().enumerate() {
         let kid_style = ctx.style(kid);
-        let kid_intrinsic = intrinsics.get(&kid).copied().unwrap_or((0.0, 0.0));
+        let kid_intrinsic = intrinsics[kid as usize];
         let main_size = child_main_sizes[i];
 
         // Cross-axis sizing
@@ -700,7 +837,7 @@ fn layout_stack(
 fn layout_wrap(
     tree: &mut ElementTree,
     ctx: &LayoutContext,
-    intrinsics: &HashMap<u32, (f32, f32)>,
+    intrinsics: &[(f32, f32)],
     kids: &[u32],
     is_vertical: bool,
     content_x: f32,
@@ -720,7 +857,7 @@ fn layout_wrap(
 
     for &kid in kids {
         let kid_style = ctx.style(kid);
-        let kid_intrinsic = intrinsics.get(&kid).copied().unwrap_or((0.0, 0.0));
+        let kid_intrinsic = intrinsics[kid as usize];
         let kid_main = if is_vertical { kid_intrinsic.1 } else { kid_intrinsic.0 };
         let kid_cross = if is_vertical { kid_intrinsic.0 } else { kid_intrinsic.1 };
 
@@ -818,134 +955,8 @@ fn constrain_opt(v: f32, min: Option<f32>, max: Option<f32>) -> f32 {
 // Parse from element's styles HashMap into structured LayoutStyle.
 // Supports both Nectar-native properties and CSS-legacy for compatibility.
 
-fn resolve_style(el: &crate::element::Element) -> LayoutStyle {
-    let styles = &el.styles;
-    let mut ls = LayoutStyle::default();
-
-    // Fast path: fixed dimensions bypass full style parsing
-    if let Some(w) = el.fixed_width {
-        ls.width = SizePolicy::Fixed(w);
-    }
-    if let Some(h) = el.fixed_height {
-        ls.height = SizePolicy::Fixed(h);
-    }
-    if el.fixed_width.is_some() && el.fixed_height.is_some() && styles.is_empty() {
-        return ls;
-    }
-
-    // Direction: Nectar-native or CSS flex-direction
-    if let Some(dir) = styles.get("direction") {
-        ls.direction = match dir.as_str() {
-            "horizontal" | "row" => Direction::Horizontal,
-            "vertical" | "column" => Direction::Vertical,
-            "layer" | "stack" => Direction::Layer,
-            _ => Direction::Vertical,
-        };
-    } else if let Some(fd) = styles.get("flex-direction") {
-        ls.direction = match fd.as_str() {
-            "row" | "row-reverse" => Direction::Horizontal,
-            _ => Direction::Vertical,
-        };
-    }
-
-    // Gap
-    if let Some(g) = styles.get("gap").and_then(|v| parse_px(v)) {
-        ls.gap = g;
-    }
-
-    // Padding
-    if let Some(p) = styles.get("pad").or_else(|| styles.get("padding")) {
-        ls.pad = parse_edges(p);
-    }
-    // Individual padding overrides
-    if let Some(v) = styles.get("padding-top").and_then(|v| parse_px(v)) { ls.pad.top = v; }
-    if let Some(v) = styles.get("padding-right").and_then(|v| parse_px(v)) { ls.pad.right = v; }
-    if let Some(v) = styles.get("padding-bottom").and_then(|v| parse_px(v)) { ls.pad.bottom = v; }
-    if let Some(v) = styles.get("padding-left").and_then(|v| parse_px(v)) { ls.pad.left = v; }
-
-    // Align (cross-axis)
-    if let Some(a) = styles.get("align").or_else(|| styles.get("align-items")) {
-        ls.align = match a.as_str() {
-            "start" | "flex-start" => Align::Start,
-            "center" => Align::Center,
-            "end" | "flex-end" => Align::End,
-            "stretch" => Align::Stretch,
-            _ => Align::Stretch,
-        };
-    }
-
-    // Justify (main-axis)
-    if let Some(j) = styles.get("justify").or_else(|| styles.get("justify-content")) {
-        ls.justify = match j.as_str() {
-            "start" | "flex-start" => Justify::Start,
-            "center" => Justify::Center,
-            "end" | "flex-end" => Justify::End,
-            "space-between" => Justify::SpaceBetween,
-            _ => Justify::Start,
-        };
-    }
-
-    // Width
-    if let Some(w) = styles.get("width") {
-        ls.width = parse_size_policy(w);
-    }
-
-    // Height
-    if let Some(h) = styles.get("height") {
-        ls.height = parse_size_policy(h);
-    }
-
-    // Nectar-native "size" shorthand: sets both axes
-    if let Some(s) = styles.get("size") {
-        let policy = parse_size_policy(s);
-        ls.width = policy;
-        ls.height = policy;
-    }
-
-    // Min/max constraints
-    ls.min_width = styles.get("min-width").and_then(|v| parse_px(v));
-    ls.max_width = styles.get("max-width").and_then(|v| parse_px(v));
-    ls.min_height = styles.get("min-height").and_then(|v| parse_px(v));
-    ls.max_height = styles.get("max-height").and_then(|v| parse_px(v));
-
-    // Scroll
-    if let Some(s) = styles.get("scroll") {
-        ls.scroll = s == "true" || s == "vertical" || s == "horizontal" || s == "both";
-    } else if let Some(o) = styles.get("overflow") {
-        ls.scroll = o == "auto" || o == "scroll";
-    }
-
-    // Wrap
-    if let Some(w) = styles.get("wrap") {
-        ls.wrap = w == "true";
-    } else if let Some(fw) = styles.get("flex-wrap") {
-        ls.wrap = fw == "wrap";
-    }
-
-    // Anchor (for Layer children)
-    if let Some(a) = styles.get("anchor") {
-        ls.anchor = match a.as_str() {
-            "top-left" => Anchor::TopLeft,
-            "top-center" | "top" => Anchor::TopCenter,
-            "top-right" => Anchor::TopRight,
-            "center-left" | "left" => Anchor::CenterLeft,
-            "center" => Anchor::Center,
-            "center-right" | "right" => Anchor::CenterRight,
-            "bottom-left" => Anchor::BottomLeft,
-            "bottom-center" | "bottom" => Anchor::BottomCenter,
-            "bottom-right" => Anchor::BottomRight,
-            _ => Anchor::TopLeft,
-        };
-    }
-
-    // Text nodes: always hug
-    if el.tag == "#text" {
-        ls.width = SizePolicy::Hug;
-        ls.height = SizePolicy::Hug;
-    }
-
-    ls
-}
+// resolve_style is no longer needed — LayoutStyle::apply_property is called eagerly
+// on every set_style() call. LayoutContext::build just clones el.style.
 
 fn parse_size_policy(value: &str) -> SizePolicy {
     let v = value.trim();
@@ -1500,58 +1511,58 @@ mod tests {
         let mut tree = ElementTree::new();
 
         // Root: vertical, hug height, 1400px width
-        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(1).unwrap().styles.insert("width".into(), "1400px".into());
-        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(1).unwrap().styles.insert("gap".into(), "12".into());
-        tree.get_mut(1).unwrap().styles.insert("padding".into(), "20".into());
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "width", "1400px");
+        tree.set_style(1, "height", "hug");
+        tree.set_style(1, "gap", "12");
+        tree.set_style(1, "padding", "20");
 
         // Header: vertical, hug height
         let header = tree.create("div");
         tree.append_child(1, header);
-        tree.get_mut(header).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(header).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(header).unwrap().styles.insert("padding".into(), "16".into());
+        tree.set_style(header, "direction", "vertical");
+        tree.set_style(header, "height", "hug");
+        tree.set_style(header, "padding", "16");
 
         // Title text in header
         let title = tree.create("div");
         tree.append_child(header, title);
         tree.get_mut(title).unwrap().text = Some("E-Commerce Product Grid".into());
-        tree.get_mut(title).unwrap().styles.insert("font-size".into(), "24px".into());
-        tree.get_mut(title).unwrap().styles.insert("height".into(), "hug".into());
+        tree.set_style(title, "font-size", "24px");
+        tree.set_style(title, "height", "hug");
 
         // Pills row: horizontal, hug, wrap
         let pills = tree.create("div");
         tree.append_child(1, pills);
-        tree.get_mut(pills).unwrap().styles.insert("direction".into(), "horizontal".into());
-        tree.get_mut(pills).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(pills).unwrap().styles.insert("gap".into(), "10".into());
-        tree.get_mut(pills).unwrap().styles.insert("wrap".into(), "true".into());
+        tree.set_style(pills, "direction", "horizontal");
+        tree.set_style(pills, "height", "hug");
+        tree.set_style(pills, "gap", "10");
+        tree.set_style(pills, "wrap", "true");
 
         // 6 pill children
         for label in &["All", "Electronics", "Clothing", "Home", "Sports", "Books"] {
             let pill = tree.create("div");
             tree.append_child(pills, pill);
             tree.get_mut(pill).unwrap().text = Some(label.to_string());
-            tree.get_mut(pill).unwrap().styles.insert("width".into(), "hug".into());
-            tree.get_mut(pill).unwrap().styles.insert("height".into(), "hug".into());
-            tree.get_mut(pill).unwrap().styles.insert("padding".into(), "8".into());
+            tree.set_style(pill, "width", "hug");
+            tree.set_style(pill, "height", "hug");
+            tree.set_style(pill, "padding", "8");
         }
 
         // Product grid: horizontal, wrap, hug height
         let grid = tree.create("div");
         tree.append_child(1, grid);
-        tree.get_mut(grid).unwrap().styles.insert("direction".into(), "horizontal".into());
-        tree.get_mut(grid).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(grid).unwrap().styles.insert("gap".into(), "16".into());
-        tree.get_mut(grid).unwrap().styles.insert("wrap".into(), "true".into());
+        tree.set_style(grid, "direction", "horizontal");
+        tree.set_style(grid, "height", "hug");
+        tree.set_style(grid, "gap", "16");
+        tree.set_style(grid, "wrap", "true");
 
         // 10 product cards
         for _ in 0..10 {
             let card = tree.create("div");
             tree.append_child(grid, card);
-            tree.get_mut(card).unwrap().styles.insert("width".into(), "260px".into());
-            tree.get_mut(card).unwrap().styles.insert("height".into(), "340px".into());
+            tree.set_style(card, "width", "260px");
+            tree.set_style(card, "height", "340px");
         }
 
         layout_tree(&mut tree, 1400.0, 999999.0);
@@ -1595,15 +1606,15 @@ mod tests {
     fn test_simple_hug_vertical() {
         let mut tree = ElementTree::new();
         // Root: vertical, hug
-        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(1).unwrap().styles.insert("width".into(), "800px".into());
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "height", "hug");
+        tree.set_style(1, "width", "800px");
 
         let child = tree.create("div");
         tree.append_child(1, child);
         tree.get_mut(child).unwrap().text = Some("Hello".into());
-        tree.get_mut(child).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(child).unwrap().styles.insert("font-size".into(), "16px".into());
+        tree.set_style(child, "height", "hug");
+        tree.set_style(child, "font-size", "16px");
 
         layout_tree(&mut tree, 800.0, 999999.0);
 
@@ -1618,23 +1629,23 @@ mod tests {
     #[test]
     fn test_horizontal_wrap_9_items_3_cols() {
         let mut tree = ElementTree::new();
-        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(1).unwrap().styles.insert("width".into(), "1000px".into());
-        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "width", "1000px");
+        tree.set_style(1, "height", "hug");
 
         let wrap = tree.create("div");
         tree.append_child(1, wrap);
-        tree.get_mut(wrap).unwrap().styles.insert("direction".into(), "horizontal".into());
-        tree.get_mut(wrap).unwrap().styles.insert("wrap".into(), "true".into());
-        tree.get_mut(wrap).unwrap().styles.insert("gap".into(), "12".into());
-        tree.get_mut(wrap).unwrap().styles.insert("height".into(), "hug".into());
+        tree.set_style(wrap, "direction", "horizontal");
+        tree.set_style(wrap, "wrap", "true");
+        tree.set_style(wrap, "gap", "12");
+        tree.set_style(wrap, "height", "hug");
 
         // 9 items at 300px each = 3 per row (300*3 + 12*2 = 924 < 1000)
         for _ in 0..9 {
             let item = tree.create("div");
             tree.append_child(wrap, item);
-            tree.get_mut(item).unwrap().styles.insert("width".into(), "300px".into());
-            tree.get_mut(item).unwrap().styles.insert("height".into(), "80px".into());
+            tree.set_style(item, "width", "300px");
+            tree.set_style(item, "height", "80px");
         }
 
         layout_tree(&mut tree, 1000.0, 999999.0);
@@ -1651,58 +1662,58 @@ mod tests {
         let mut tree = ElementTree::new();
 
         // Root: vertical, hug, 1400px
-        tree.get_mut(1).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(1).unwrap().styles.insert("width".into(), "1400px".into());
-        tree.get_mut(1).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(1).unwrap().styles.insert("padding".into(), "24".into());
-        tree.get_mut(1).unwrap().styles.insert("gap".into(), "16".into());
-        tree.get_mut(1).unwrap().styles.insert("align".into(), "center".into());
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "width", "1400px");
+        tree.set_style(1, "height", "hug");
+        tree.set_style(1, "padding", "24");
+        tree.set_style(1, "gap", "16");
+        tree.set_style(1, "align", "center");
 
         // Section card
         let section = tree.create("div");
         tree.append_child(1, section);
-        tree.get_mut(section).unwrap().styles.insert("direction".into(), "vertical".into());
-        tree.get_mut(section).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(section).unwrap().styles.insert("max-width".into(), "1400px".into());
-        tree.get_mut(section).unwrap().styles.insert("padding".into(), "32".into());
-        tree.get_mut(section).unwrap().styles.insert("gap".into(), "20".into());
+        tree.set_style(section, "direction", "vertical");
+        tree.set_style(section, "height", "hug");
+        tree.set_style(section, "max-width", "1400px");
+        tree.set_style(section, "padding", "32");
+        tree.set_style(section, "gap", "20");
 
         // Title (hug)
         let title = tree.create("div");
         tree.append_child(section, title);
         tree.get_mut(title).unwrap().text = Some("E-Commerce".into());
-        tree.get_mut(title).unwrap().styles.insert("height".into(), "hug".into());
-        tree.get_mut(title).unwrap().styles.insert("font-size".into(), "24px".into());
+        tree.set_style(title, "height", "hug");
+        tree.set_style(title, "font-size", "24px");
 
         // Metrics: horizontal wrap, 9 items at ~430px each (3 per row)
         let metrics = tree.create("div");
         tree.append_child(section, metrics);
-        tree.get_mut(metrics).unwrap().styles.insert("direction".into(), "horizontal".into());
-        tree.get_mut(metrics).unwrap().styles.insert("wrap".into(), "true".into());
-        tree.get_mut(metrics).unwrap().styles.insert("gap".into(), "12".into());
-        tree.get_mut(metrics).unwrap().styles.insert("height".into(), "hug".into());
+        tree.set_style(metrics, "direction", "horizontal");
+        tree.set_style(metrics, "wrap", "true");
+        tree.set_style(metrics, "gap", "12");
+        tree.set_style(metrics, "height", "hug");
 
         let metric_w = ((1400.0 - 48.0f32).min(1400.0) - 64.0 - 24.0) / 3.0;
         for _ in 0..9 {
             let card = tree.create("div");
             tree.append_child(metrics, card);
-            tree.get_mut(card).unwrap().styles.insert("width".into(), format!("{}px", metric_w));
-            tree.get_mut(card).unwrap().styles.insert("height".into(), "80px".into());
+            tree.set_style(card, "width", &format!("{}px", metric_w));
+            tree.set_style(card, "height", "80px");
         }
 
         // Product grid: horizontal wrap, 10 cards at 260px
         let grid = tree.create("div");
         tree.append_child(section, grid);
-        tree.get_mut(grid).unwrap().styles.insert("direction".into(), "horizontal".into());
-        tree.get_mut(grid).unwrap().styles.insert("wrap".into(), "true".into());
-        tree.get_mut(grid).unwrap().styles.insert("gap".into(), "16".into());
-        tree.get_mut(grid).unwrap().styles.insert("height".into(), "hug".into());
+        tree.set_style(grid, "direction", "horizontal");
+        tree.set_style(grid, "wrap", "true");
+        tree.set_style(grid, "gap", "16");
+        tree.set_style(grid, "height", "hug");
 
         for _ in 0..10 {
             let card = tree.create("div");
             tree.append_child(grid, card);
-            tree.get_mut(card).unwrap().styles.insert("width".into(), "260px".into());
-            tree.get_mut(card).unwrap().styles.insert("height".into(), "340px".into());
+            tree.set_style(card, "width", "260px");
+            tree.set_style(card, "height", "340px");
         }
 
         layout_tree(&mut tree, 1400.0, 999999.0);
@@ -1723,5 +1734,149 @@ mod tests {
         // Grid should start BELOW metrics (no overlap)
         let metrics_bottom = m.layout.y + m.layout.height;
         assert!(g.layout.y >= metrics_bottom, "grid y={} should be >= metrics bottom={}", g.layout.y, metrics_bottom);
+    }
+
+    #[test]
+    fn bench_40k_elements_layout() {
+        let mut tree = ElementTree::new();
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "width", "1400px");
+        tree.set_style(1, "height", "hug");
+
+        let grid = tree.create("div");
+        tree.append_child(1, grid);
+        tree.set_style(grid, "direction", "horizontal");
+        tree.set_style(grid, "wrap", "true");
+        tree.set_style(grid, "gap", "16");
+        tree.set_style(grid, "height", "hug");
+
+        for i in 0..10000u32 {
+            let card = tree.create("div");
+            tree.append_child(grid, card);
+            tree.set_style(card, "width", "260px");
+            tree.set_style(card, "height", "340px");
+
+            let name = tree.create("div");
+            tree.append_child(card, name);
+            tree.get_mut(name).unwrap().text = Some(format!("Product #{}", i));
+            tree.set_style(name, "height", "hug");
+
+            let price = tree.create("div");
+            tree.append_child(card, price);
+            tree.get_mut(price).unwrap().text = Some("$4.99".into());
+            tree.set_style(price, "height", "hug");
+
+            let btn = tree.create("div");
+            tree.append_child(card, btn);
+            tree.get_mut(btn).unwrap().text = Some("Add to Cart".into());
+            tree.set_style(btn, "height", "36px");
+        }
+
+        println!("Tree: {} elements", tree.element_count());
+        let t0 = std::time::Instant::now();
+        let mut measurer = EstimateMeasurer;
+        compute(&mut tree, 1400.0, 999999.0, &mut measurer);
+        let elapsed = t0.elapsed();
+        println!("Layout compute: {:?}", elapsed);
+        assert!(elapsed.as_millis() < 100, "Layout of 40K should be <100ms, got {:?}", elapsed);
+    }
+
+    #[test]
+    fn test_canvas_app_structure_metrics_then_grid() {
+        // Reproduce exact canvas app structure: section with multiple children
+        // including wrap metrics and wrap product grid
+        let mut tree = ElementTree::new();
+
+        // Root: vertical, hug
+        tree.set_style(1, "direction", "vertical");
+        tree.set_style(1, "width", "1400px");
+        tree.set_style(1, "height", "hug");
+        tree.set_style(1, "padding", "24");
+        tree.set_style(1, "gap", "16");
+        tree.set_style(1, "align", "center");
+
+        // Section: vertical, hug, padding, gap
+        let section = tree.create("div");
+        tree.append_child(1, section);
+        tree.set_style(section, "direction", "vertical");
+        tree.set_style(section, "height", "hug");
+        tree.set_style(section, "max-width", "1400px");
+        tree.set_style(section, "padding", "32");
+        tree.set_style(section, "gap", "20");
+
+        // Title
+        let title = tree.create("div");
+        tree.append_child(section, title);
+        tree.get_mut(title).unwrap().text = Some("Title".into());
+        tree.set_style(title, "height", "hug");
+
+        // Controls row
+        let controls = tree.create("div");
+        tree.append_child(section, controls);
+        tree.set_style(controls, "direction", "horizontal");
+        tree.set_style(controls, "height", "44px");
+
+        // Pills row
+        let pills = tree.create("div");
+        tree.append_child(section, pills);
+        tree.set_style(pills, "direction", "horizontal");
+        tree.set_style(pills, "wrap", "true");
+        tree.set_style(pills, "height", "hug");
+        tree.set_style(pills, "gap", "10");
+        for label in &["All", "Electronics", "Clothing"] {
+            let pill = tree.create("div");
+            tree.append_child(pills, pill);
+            tree.get_mut(pill).unwrap().text = Some(label.to_string());
+            tree.set_style(pill, "width", "hug");
+            tree.set_style(pill, "height", "36px");
+            tree.set_style(pill, "padding", "8");
+        }
+
+        // Sort row
+        let sort = tree.create("div");
+        tree.append_child(section, sort);
+        tree.set_style(sort, "direction", "horizontal");
+        tree.set_style(sort, "height", "32px");
+
+        // Metrics: horizontal wrap, 9 items at ~420px each = 3 per row
+        let metrics = tree.create("div");
+        tree.append_child(section, metrics);
+        tree.set_style(metrics, "direction", "horizontal");
+        tree.set_style(metrics, "wrap", "true");
+        tree.set_style(metrics, "gap", "12");
+        tree.set_style(metrics, "height", "hug");
+        let metric_w = ((1400.0f32 - 48.0 - 64.0 - 24.0) / 3.0).floor();
+        for _ in 0..9 {
+            let card = tree.create("div");
+            tree.append_child(metrics, card);
+            tree.set_style(card, "width", &format!("{}px", metric_w));
+            tree.set_style(card, "height", "80px");
+        }
+
+        // Grid: horizontal wrap, 20 cards at 260px
+        let grid = tree.create("div");
+        tree.append_child(section, grid);
+        tree.set_style(grid, "direction", "horizontal");
+        tree.set_style(grid, "wrap", "true");
+        tree.set_style(grid, "gap", "16");
+        tree.set_style(grid, "height", "hug");
+        for _ in 0..20 {
+            let card = tree.create("div");
+            tree.append_child(grid, card);
+            tree.set_style(card, "width", "260px");
+            tree.set_style(card, "height", "340px");
+        }
+
+        layout_tree(&mut tree, 1400.0, 999999.0);
+
+        let m = tree.get(metrics).unwrap();
+        let g = tree.get(grid).unwrap();
+        println!("metrics: y={} h={}", m.layout.y, m.layout.height);
+        println!("grid:    y={} h={}", g.layout.y, g.layout.height);
+
+        let metrics_bottom = m.layout.y + m.layout.height;
+        assert!(g.layout.y >= metrics_bottom,
+            "grid y={} must be >= metrics bottom={} (metrics y={} h={})",
+            g.layout.y, metrics_bottom, m.layout.y, m.layout.height);
     }
 }

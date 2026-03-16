@@ -3,7 +3,7 @@
 //! nectar-runtime's ElementTree.
 
 use std::collections::{HashMap, HashSet};
-use crate::layout::LayoutNode;
+use crate::layout::{LayoutNode, LayoutStyle};
 
 /// A UI element — the universal building block.
 pub struct Element {
@@ -11,6 +11,8 @@ pub struct Element {
     pub text: Option<String>,
     pub inner_html: Option<String>,
     pub attributes: HashMap<String, String>,
+    /// Visual-only styles (color, background-color, border, font-*, etc.)
+    /// Layout properties are stored in `style: LayoutStyle` and set eagerly.
     pub styles: HashMap<String, String>,
     pub classes: HashSet<String>,
     pub children: Vec<u32>,
@@ -19,6 +21,9 @@ pub struct Element {
     pub focused: bool,
     pub properties: HashMap<String, String>,
     pub layout: LayoutNode,
+    /// Layout style — struct with named fields. No HashMap lookups during layout.
+    /// Updated eagerly on set_style() calls.
+    pub style: LayoutStyle,
     pub scroll_offset: (f32, f32),
     /// Cursor position in text (byte offset). Used for text input elements.
     pub cursor_pos: usize,
@@ -30,9 +35,6 @@ pub struct Element {
     pub redo_stack: Vec<(String, usize)>,
     /// Frame number of last scroll activity (for overlay scrollbar fade).
     pub last_scroll_frame: u32,
-    /// Fast path: fixed dimensions bypass style parsing.
-    pub fixed_width: Option<f32>,
-    pub fixed_height: Option<f32>,
 }
 
 impl Element {
@@ -50,14 +52,13 @@ impl Element {
             focused: false,
             properties: HashMap::new(),
             layout: LayoutNode::default(),
+            style: LayoutStyle::default(),
             scroll_offset: (0.0, 0.0),
             cursor_pos: 0,
             selection_start: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             last_scroll_frame: 0,
-            fixed_width: None,
-            fixed_height: None,
         }
     }
 
@@ -109,8 +110,9 @@ pub struct ElementTree {
 impl ElementTree {
     pub fn new() -> Self {
         let mut root = Element::new("body");
-        root.styles.insert("width".into(), "100%".into());
-        root.styles.insert("height".into(), "100%".into());
+        use crate::layout::SizePolicy;
+        root.style.width = SizePolicy::Fill(1.0);
+        root.style.height = SizePolicy::Fill(1.0);
 
         Self {
             elements: vec![None, Some(root)], // 0 = null, 1 = root
@@ -274,12 +276,13 @@ impl ElementTree {
     /// Batch-create N identical elements with fixed dimensions.
     /// Returns the first ID. All elements are sequential: first_id..first_id+count.
     pub fn batch_create_fixed(&mut self, tag: &str, width: f32, height: f32, count: usize) -> u32 {
+        use crate::layout::SizePolicy;
         let first_id = self.elements.len() as u32;
         let tag_string = tag.to_string();
         for _ in 0..count {
             let mut el = Element::new(&tag_string);
-            el.fixed_width = Some(width);
-            el.fixed_height = Some(height);
+            el.style.width = SizePolicy::Fixed(width);
+            el.style.height = SizePolicy::Fixed(height);
             self.elements.push(Some(el));
         }
         self.dirty = true;
@@ -288,9 +291,10 @@ impl ElementTree {
 
     /// Create an element with fixed width/height — avoids HashMap allocation.
     pub fn create_fixed(&mut self, tag: &str, width: f32, height: f32) -> u32 {
+        use crate::layout::SizePolicy;
         let mut el = Element::new_minimal(tag);
-        el.fixed_width = Some(width);
-        el.fixed_height = Some(height);
+        el.style.width = SizePolicy::Fixed(width);
+        el.style.height = SizePolicy::Fixed(height);
         let id = self.elements.len() as u32;
         self.elements.push(Some(el));
         self.dirty = true;
@@ -355,6 +359,9 @@ impl ElementTree {
 
     pub fn set_style(&mut self, id: u32, prop: &str, value: &str) {
         if let Some(el) = self.get_mut(id) {
+            // Eagerly parse layout properties into the struct — zero cost during layout.
+            el.style.apply_property(prop, value);
+            // Also store in HashMap for visual properties (color, background, border, etc.)
             el.styles.insert(prop.to_string(), value.to_string());
             self.dirty = true;
         }
@@ -396,7 +403,7 @@ impl ElementTree {
         // If it has a click listener, great. If not, caller can walk up.
         // For text elements and interactive elements, return them directly.
         if el.text.is_some() || el.event_listeners.contains_key("click")
-            || el.styles.get("background-color").is_some() {
+            || el.styles.contains_key("background-color") {
             return Some(id);
         }
 
@@ -412,6 +419,7 @@ impl ElementTree {
 
     pub fn root_id(&self) -> u32 { 1 }
     pub fn len(&self) -> usize { self.elements.iter().filter(|s| s.is_some()).count() }
+    pub fn capacity(&self) -> usize { self.elements.len() }
 
     pub fn focus(&mut self, id: u32) {
         if let Some(old) = self.focused_element {

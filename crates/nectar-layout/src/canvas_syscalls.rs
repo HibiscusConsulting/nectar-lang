@@ -35,6 +35,9 @@ extern "C" {
     // Navigation — browser location change
     pub fn navigate(url_ptr: *const u8, url_len: u32);
 
+    // Performance timing
+    pub fn performance_now() -> f64;
+
     // Hybrid mode — read browser-computed layout from hidden DOM
     // Writes x, y, w, h as f32s into the provided buffer (16 bytes)
     pub fn dom_get_rect(element_id: u32, out_ptr: *mut f32);
@@ -99,3 +102,5 @@ pub unsafe fn dom_set_style_hybrid(_id: u32, _pp: *const u8, _pl: u32, _vp: *con
 pub unsafe fn dom_append_child_hybrid(_p: u32, _c: u32) {}
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe fn dom_get_root() -> u32 { 1 }
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe fn performance_now() -> f64 { 0.0 }

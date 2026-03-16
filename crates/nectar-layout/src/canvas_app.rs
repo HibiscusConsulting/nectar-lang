@@ -94,9 +94,7 @@ fn add_el(tree: &mut ElementTree, tag: &str, parent: u32) -> u32 {
 }
 
 fn set_style(tree: &mut ElementTree, id: u32, prop: &str, val: &str) {
-    if let Some(el) = tree.get_mut(id) {
-        el.styles.insert(prop.into(), val.into());
-    }
+    tree.set_style(id, prop, val);
 }
 
 fn set_text(tree: &mut ElementTree, id: u32, text: &str) {
@@ -314,7 +312,7 @@ fn build_ui(state: &mut AppState) {
         }
     }
 
-    // ── Metrics grid (3 columns via wrap) ──
+    // ── Metrics: 3 rows × 3 columns via horizontal wrap ──
     let metrics = add_el(tree, "div", section);
     set_style(tree, metrics, "direction", "horizontal");
     set_style(tree, metrics, "gap", "12");
@@ -333,19 +331,20 @@ fn build_ui(state: &mut AppState) {
         ("CATEGORY", "all", "#3fb950"),
         ("SORT", "default", "#bc8cff"),
     ];
-    // Width = (section_width - padding*2 - gap*2) / 3
-    // Section inner width = min(vw, 1400) - padding(64) - root_padding(48)
-    let section_inner = (state.vw - 48.0).min(1400.0) - 64.0;
-    let metric_w = ((section_inner - 24.0) / 3.0).floor().max(100.0);
+    // Each metric card: fixed width = (max-width - section_padding*2 - 2*gap) / 3
+    // Section max-width=1400, padding=32 each side → inner=1336, 3 cols with gap 12 → (1336-24)/3 = 437
+    // But actual section width depends on viewport. Use min(vw-48, 1400) for section width.
+    let section_w = (state.vw - 48.0).min(1400.0); // root padding 24*2
+    let metrics_inner = section_w - 64.0; // section padding 32*2
+    let metric_w = ((metrics_inner - 24.0) / 3.0).floor().max(120.0);
     for (label, value, color) in &metric_defs {
         let card = add_el(tree, "div", metrics);
         set_style(tree, card, "direction", "vertical");
-        set_style(tree, card, "width", &format!("{}px", metric_w));
+        set_style(tree, card, "width", &format!("{}px", metric_w as u32));
         set_style(tree, card, "height", "80px");
         set_style(tree, card, "padding", "16");
         set_style(tree, card, "background-color", "#1a1f2e");
         set_style(tree, card, "border-radius", "12");
-        set_style(tree, card, "align", "center");
 
         let lbl = add_el(tree, "div", card);
         set_text(tree, lbl, label);
@@ -363,14 +362,86 @@ fn build_ui(state: &mut AppState) {
         state.metric_val_ids.push(val);
     }
 
-    // Product grid: NOT in the element tree. Cards are rendered directly
-    // by the renderer using arithmetic (260px × 340px grid with 16px gap).
-    // This keeps the tree at ~50 elements instead of 60K+.
-    // The grid_id marks where products start in the visual flow.
-    let grid_placeholder = add_el(tree, "div", section);
-    set_style(tree, grid_placeholder, "height", "hug");
-    set_text(tree, grid_placeholder, ""); // empty placeholder
-    state.grid_id = grid_placeholder;
+    // Product grid: horizontal wrap container holding ALL product cards in the element tree.
+    // The layout engine positions everything — no arithmetic bypass.
+    let grid = add_el(tree, "div", section);
+    set_style(tree, grid, "direction", "horizontal");
+    set_style(tree, grid, "wrap", "true");
+    set_style(tree, grid, "gap", "16");
+    set_style(tree, grid, "height", "hug");
+    state.grid_id = grid;
+
+    // Build product cards as real elements in the tree
+    state.card_ids.clear();
+    state.name_ids.clear();
+    state.cat_ids.clear();
+    state.price_ids.clear();
+    state.img_ids.clear();
+
+    tree.reserve(state.products.len() * 6 + 10);
+
+    for i in 0..state.products.len() {
+        let p = &state.products[i];
+
+        // Card container: fixed 260×340
+        let card = add_el(tree, "div", grid);
+        set_style(tree, card, "width", "260px");
+        set_style(tree, card, "height", "340px");
+        set_style(tree, card, "direction", "vertical");
+        set_style(tree, card, "background-color", "#1a1f2e");
+        set_style(tree, card, "border-radius", "12");
+        set_style(tree, card, "border", "1px solid #2a2f3e");
+        state.card_ids.push(card);
+
+        // Image: 260×180
+        let img = add_el(tree, "img", card);
+        set_style(tree, img, "width", "260px");
+        set_style(tree, img, "height", "180px");
+        tree.set_attribute(img, "src", &p.img_src);
+        state.img_ids.push(img);
+
+        // Name
+        let name_el = add_el(tree, "div", card);
+        set_text(tree, name_el, &p.name);
+        set_style(tree, name_el, "height", "hug");
+        set_style(tree, name_el, "padding", "4 14");
+        set_style(tree, name_el, "font-size", "14px");
+        set_style(tree, name_el, "font-weight", "bold");
+        set_style(tree, name_el, "color", "#e6edf3");
+        state.name_ids.push(name_el);
+
+        // Category
+        let cat_el = add_el(tree, "div", card);
+        set_text(tree, cat_el, p.category);
+        set_style(tree, cat_el, "height", "hug");
+        set_style(tree, cat_el, "padding", "0 14");
+        set_style(tree, cat_el, "font-size", "10px");
+        set_style(tree, cat_el, "color", "#6e7681");
+        state.cat_ids.push(cat_el);
+
+        // Price
+        let price_el = add_el(tree, "div", card);
+        set_text(tree, price_el, &p.price_display);
+        set_style(tree, price_el, "height", "hug");
+        set_style(tree, price_el, "padding", "4 14");
+        set_style(tree, price_el, "font-size", "20px");
+        set_style(tree, price_el, "font-weight", "bold");
+        set_style(tree, price_el, "color", "#3fb950");
+        state.price_ids.push(price_el);
+
+        // Add to Cart button
+        let btn = add_el(tree, "div", card);
+        set_text(tree, btn, "Add to Cart");
+        set_style(tree, btn, "height", "36px");
+        set_style(tree, btn, "padding", "8 14");
+        set_style(tree, btn, "font-size", "13px");
+        set_style(tree, btn, "font-weight", "bold");
+        set_style(tree, btn, "color", "#000000");
+        set_style(tree, btn, "background-color", "#f97316");
+        set_style(tree, btn, "border-radius", "8");
+        set_style(tree, btn, "align", "center");
+        set_style(tree, btn, "justify", "center");
+    }
 }
 
 // ── Init ─────────────────────────────────────────────────────
@@ -379,10 +450,14 @@ fn build_ui(state: &mut AppState) {
 pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
     let canvas_id = unsafe { canvas_init(vw, vh) };
 
+    let t0 = unsafe { performance_now() };
+
     let mut products = Vec::with_capacity(10000);
     for i in 0u32..10000 {
         products.push(build_product(i));
     }
+
+    let t1 = unsafe { performance_now() };
 
     let mut state = AppState {
         canvas_id,
@@ -416,8 +491,21 @@ pub extern "C" fn app_init(vw: f32, vh: f32, t_fetch: f32) {
 
     build_ui(&mut state);
 
+    let t2 = unsafe { performance_now() };
+
     // Run layout
     layout::compute(&mut state.tree, vw, 999999.0, &mut state.measurer);
+
+    let t3 = unsafe { performance_now() };
+
+    // Store real timings measured inside WASM
+    state.t_tree = (t1 - t0) as f32;      // HEAP INIT: product data generation
+    state.t_layout = (t2 - t1) as f32;    // MOUNT 10K: tree build (UI + 10K products)
+    state.t_total = t_fetch + (t3 - t0) as f32; // TOTAL: fetch + compile + all init
+
+    // Update the metric display elements with real timing data
+    update_timing_metrics(&mut state);
+
 
     STATE.with(|s| { *s.borrow_mut() = Some(state); });
 }
@@ -484,50 +572,53 @@ pub extern "C" fn app_lazy_product_count() -> u32 {
 #[no_mangle]
 pub extern "C" fn app_set_timings(t_tree: f32, t_layout: f32, t_total: f32) {
     with_state(|state| {
-        state.t_tree = t_tree;
-        state.t_layout = t_layout;
-        state.t_total = t_total;
+        // Only overwrite if JS provides non-zero values — WASM sets these internally now
+        if t_tree > 0.0 { state.t_tree = t_tree; }
+        if t_layout > 0.0 { state.t_layout = t_layout; }
+        if t_total > 0.0 { state.t_total = t_total; }
 
-        // Update metric value elements — O(1) per metric
-        if state.metric_val_ids.len() >= 9 {
-            let mut buf = [0u8; 32];
-
-            // 0: FETCH + COMPILE
-            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_fetch));
-            set_text(&mut state.tree, state.metric_val_ids[0], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 1: HEAP INIT
-            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_tree));
-            set_text(&mut state.tree, state.metric_val_ids[1], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 2: MOUNT 10K
-            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_layout));
-            set_text(&mut state.tree, state.metric_val_ids[2], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 3: TOTAL
-            let len = fmt_buf(&mut buf, format_args!("{:.2}ms", t_total));
-            set_text(&mut state.tree, state.metric_val_ids[3], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 4: LAST OP
-            set_text(&mut state.tree, state.metric_val_ids[4], "—");
-
-            // 5: PRODUCTS
-            let len = fmt_buf(&mut buf, format_args!("{}", state.products.len()));
-            set_text(&mut state.tree, state.metric_val_ids[5], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 6: CART
-            let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
-            set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
-
-            // 7: CATEGORY
-            let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
-            set_text(&mut state.tree, state.metric_val_ids[7], cat);
-
-            // 8: SORT
-            let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
-            set_text(&mut state.tree, state.metric_val_ids[8], sort);
-        }
+        update_timing_metrics(state);
     });
+}
+
+fn update_timing_metrics(state: &mut AppState) {
+    if state.metric_val_ids.len() < 9 { return; }
+    let mut buf = [0u8; 32];
+
+    // 0: FETCH + COMPILE
+    let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_fetch));
+    set_text(&mut state.tree, state.metric_val_ids[0], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 1: HEAP INIT (product data generation)
+    let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_tree));
+    set_text(&mut state.tree, state.metric_val_ids[1], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 2: MOUNT 10K (tree build: UI chrome + 10K product elements)
+    let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_layout));
+    set_text(&mut state.tree, state.metric_val_ids[2], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 3: TOTAL
+    let len = fmt_buf(&mut buf, format_args!("{:.2}ms", state.t_total));
+    set_text(&mut state.tree, state.metric_val_ids[3], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 4: LAST OP
+    set_text(&mut state.tree, state.metric_val_ids[4], "—");
+
+    // 5: PRODUCTS
+    let len = fmt_buf(&mut buf, format_args!("{}", state.products.len()));
+    set_text(&mut state.tree, state.metric_val_ids[5], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 6: CART
+    let len = fmt_buf(&mut buf, format_args!("{}", state.cart_count));
+    set_text(&mut state.tree, state.metric_val_ids[6], std::str::from_utf8(&buf[..len]).unwrap_or("?"));
+
+    // 7: CATEGORY
+    let cat = if state.active_cat == 0 { "all" } else { CATS[state.active_cat.min(5) - 1] };
+    set_text(&mut state.tree, state.metric_val_ids[7], cat);
+
+    // 8: SORT
+    let sort = match state.sort_order { 1 => "price-asc", 2 => "price-desc", 3 => "name-asc", _ => "default" };
+    set_text(&mut state.tree, state.metric_val_ids[8], sort);
 }
 
 fn update_dynamic_metrics(state: &mut AppState) {
@@ -567,77 +658,16 @@ pub extern "C" fn app_render() {
             canvas_clear(id);
             canvas_fill_rect(id, 0.0, 0.0, vw, vh, 11, 14, 20, 255);
 
-            // Walk chrome tree (header, nav, pills, sort, metrics — ~50 elements)
+            // Walk the entire tree — all elements including 10K product cards
             render_node(id, &state.tree, state.root_id, sy, vw, vh, &state.products, &state.img_ids,
                 state.sel_element, state.sel_start_char, state.sel_end_char);
 
-            // Product grid: direct arithmetic rendering (no tree, no layout engine)
-            // Get grid placeholder position as the starting point
-            let grid_y = state.tree.get(state.grid_id)
-                .map(|e| e.layout.y)
-                .unwrap_or(400.0);
-            let card_w: f32 = 260.0;
-            let card_h: f32 = 340.0;
-            let gap: f32 = 16.0;
-            let section_x = state.tree.get(state.grid_id)
-                .and_then(|e| e.parent)
-                .and_then(|pid| state.tree.get(pid))
-                .map(|p| p.layout.x + p.layout.padding.left)
-                .unwrap_or(32.0);
-            let section_w = state.tree.get(state.grid_id)
-                .and_then(|e| e.parent)
-                .and_then(|pid| state.tree.get(pid))
-                .map(|p| p.layout.width - p.layout.padding.left - p.layout.padding.right)
-                .unwrap_or(vw - 64.0);
-            let cols = ((section_w + gap) / (card_w + gap)).max(1.0) as usize;
-
-            for i in 0..state.products.len() {
-                let col = i % cols;
-                let row = i / cols;
-                let x = section_x + col as f32 * (card_w + gap);
-                let y = grid_y + row as f32 * (card_h + gap) - sy;
-
-                if y + card_h < -50.0 || y > vh + 50.0 { continue; }
-
-                let p = &state.products[i];
-
-                // Card bg
-                canvas_round_rect(id, x, y, card_w, card_h, 12.0, 26, 31, 46, 255);
-                canvas_stroke_rect(id, x, y, card_w, card_h, 42, 47, 62, 255, 1.0);
-
-                // Image
-                canvas_draw_image(id, p.img_src.as_ptr(), p.img_src.len() as u32, x, y, card_w, 180.0, 12.0);
-
-                // Stock badge
-                canvas_fill_rect(id, x, y + 162.0, card_w, 18.0, 63, 185, 80, 220);
-                canvas_fill_text(id, p.stock.as_ptr(), p.stock.len() as u32, x + 8.0, y + 175.0, 0, 0, 0, 9.0, 1);
-
-                // Name
-                canvas_fill_text(id, p.name.as_ptr(), p.name.len() as u32, x + 14.0, y + 200.0, 230, 237, 243, 14.0, 1);
-
-                // Category
-                canvas_fill_text(id, p.category.as_ptr(), p.category.len() as u32, x + 14.0, y + 218.0, 110, 118, 129, 10.0, 0);
-
-                // Stars
-                let stars = "★★★★☆";
-                canvas_fill_text(id, stars.as_ptr(), stars.len() as u32, x + 14.0, y + 236.0, 249, 115, 22, 12.0, 0);
-
-                // Price
-                canvas_fill_text(id, p.price_display.as_ptr(), p.price_display.len() as u32, x + 14.0, y + 260.0, 63, 185, 80, 20.0, 1);
-
-                // Add to Cart button
-                canvas_round_rect(id, x + 14.0, y + 272.0, card_w - 28.0, 36.0, 8.0, 249, 115, 22, 255);
-                let btn = b"Add to Cart";
-                canvas_fill_text(id, btn.as_ptr(), 11, x + card_w / 2.0 - 35.0, y + 295.0, 0, 0, 0, 13.0, 1);
-            }
-
             // Apple-style scrollbar
-            let total_rows = (state.products.len() + cols - 1) / cols;
-            let content_h = grid_y + total_rows as f32 * (card_h + gap);
-            if content_h > vh {
+            let root_h = state.tree.get(state.root_id).map(|e| e.layout.height).unwrap_or(vh);
+            if root_h > vh {
                 let track_h = vh - 10.0;
-                let thumb_h = (vh / content_h * track_h).max(40.0);
-                let thumb_y = 5.0 + (sy / (content_h - vh)) * (track_h - thumb_h);
+                let thumb_h = (vh / root_h * track_h).max(40.0);
+                let thumb_y = 5.0 + (sy / (root_h - vh)) * (track_h - thumb_h);
                 canvas_round_rect(id, vw - 10.0, thumb_y, 6.0, thumb_h, 3.0, 255, 255, 255, 80);
             }
         }
@@ -702,17 +732,15 @@ unsafe fn render_node(
 
     // Image (if element has src attribute)
     if let Some(src) = el.attributes.get("src") {
-        canvas_draw_image(cvs, src.as_ptr(), src.len() as u32, x, y, w, h, 8.0);
+        canvas_draw_image(cvs, src.as_ptr(), src.len() as u32, x, y, w, h, radius.max(8.0));
 
-        // Stock badge (for product images)
-        if h > 100.0 {
-            // Find which product this image belongs to
-            for (i, &img_id) in img_ids.iter().enumerate() {
-                if img_id == node_id && i < products.len() {
-                    let stock = products[i].stock;
+        // Stock badge (for product images) — O(1) lookup via binary search on sorted img_ids
+        if h > 100.0 && !img_ids.is_empty() {
+            if let Ok(idx) = img_ids.binary_search(&node_id) {
+                if idx < products.len() {
+                    let stock = products[idx].stock;
                     canvas_fill_rect(cvs, x, y + h - 18.0, w, 18.0, 63, 185, 80, 220);
                     canvas_fill_text(cvs, stock.as_ptr(), stock.len() as u32, x + 8.0, y + h - 5.0, 0, 0, 0, 9.0, 1);
-                    break;
                 }
             }
         }
@@ -771,16 +799,8 @@ fn parse_hex_color(hex: &str) -> (u32, u32, u32) {
 #[no_mangle]
 pub extern "C" fn app_scroll(delta: f32) {
     with_state(|state| {
-        // Content height = grid start + all product rows
-        let grid_y = state.tree.get(state.grid_id).map(|e| e.layout.y).unwrap_or(400.0);
-        let section_w = state.tree.get(state.grid_id)
-            .and_then(|e| e.parent)
-            .and_then(|pid| state.tree.get(pid))
-            .map(|p| p.layout.width - p.layout.padding.left - p.layout.padding.right)
-            .unwrap_or(state.vw - 64.0);
-        let cols = ((section_w + 16.0) / 276.0).max(1.0) as usize;
-        let rows = (state.products.len() + cols - 1) / cols;
-        let content_h = grid_y + rows as f32 * 356.0 + 40.0;
+        // Content height from the layout engine — the tree knows the total height
+        let content_h = state.tree.get(state.root_id).map(|e| e.layout.height).unwrap_or(state.vh);
         let max = (content_h - state.vh).max(0.0);
         state.scroll_y = (state.scroll_y + delta).clamp(0.0, max);
     });
@@ -911,37 +931,8 @@ pub extern "C" fn app_click(mx: f32, my: f32) {
             return;
         }
 
-        // Product card "Add to Cart" buttons — check by position (not in tree)
-        let grid_y = state.tree.get(state.grid_id).map(|e| e.layout.y).unwrap_or(400.0);
-        let section_w = state.tree.get(state.grid_id)
-            .and_then(|e| e.parent)
-            .and_then(|pid| state.tree.get(pid))
-            .map(|p| p.layout.width - p.layout.padding.left - p.layout.padding.right)
-            .unwrap_or(state.vw - 64.0);
-        let section_x = state.tree.get(state.grid_id)
-            .and_then(|e| e.parent)
-            .and_then(|pid| state.tree.get(pid))
-            .map(|p| p.layout.x + p.layout.padding.left)
-            .unwrap_or(32.0);
-        let cols = ((section_w + 16.0) / 276.0).max(1.0) as usize;
-        let doc_y = my + state.scroll_y;
-
-        for i in 0..state.products.len() {
-            let col = i % cols;
-            let row = i / cols;
-            let cx = section_x + col as f32 * 276.0;
-            let cy = grid_y + row as f32 * 356.0;
-            // Add to Cart button: x+14, y+272, 232×36
-            if mx >= cx + 14.0 && mx <= cx + 246.0 && doc_y >= cy + 272.0 && doc_y <= cy + 308.0 {
-                state.cart_count += 1;
-                state.signal_fires += 1;
-                let mut buf = [0u8; 16];
-                let len = fmt_buf(&mut buf, format_args!("Cart {}", state.cart_count));
-                set_text(&mut state.tree, state.cart_text_id, std::str::from_utf8(&buf[..len]).unwrap_or("Cart ?"));
-                update_dynamic_metrics(state);
-                return;
-            }
-        }
+        // Product cards are now in the tree — hit_test finds them and
+        // the "Add to Cart" text check above handles the click.
     });
 }
 
