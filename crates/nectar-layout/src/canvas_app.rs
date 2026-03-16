@@ -105,18 +105,70 @@ fn build_ui(state: &mut AppState) {
     let tree = &mut state.tree;
     let root = tree.root_id();
 
-    // Root: vertical, full width, hug height (content determines scroll)
+    // Root: vertical, full width, hug height, centered children
     set_style(tree, root, "direction", "vertical");
     set_style(tree, root, "width", &format!("{}px", state.vw));
     set_style(tree, root, "height", "hug");
-    set_style(tree, root, "gap", "0");
-    set_style(tree, root, "padding", "0");
+    set_style(tree, root, "gap", "16");
+    set_style(tree, root, "padding", "24");
+    set_style(tree, root, "align", "center");
     state.root_id = root;
 
-    // ══ Section card (the big rounded container) ══
+    // ══ Header: "Demo App" + subtitle ══
+    let header = add_el(tree, "div", root);
+    set_style(tree, header, "direction", "vertical");
+    set_style(tree, header, "height", "hug");
+    set_style(tree, header, "align", "center");
+    set_style(tree, header, "padding", "16");
+
+    let app_title = add_el(tree, "div", header);
+    set_text(tree, app_title, "Demo App");
+    set_style(tree, app_title, "font-size", "28px");
+    set_style(tree, app_title, "font-weight", "bold");
+    set_style(tree, app_title, "color", "#e6edf3");
+    set_style(tree, app_title, "height", "hug");
+    set_style(tree, app_title, "width", "hug");
+
+    let app_sub = add_el(tree, "div", header);
+    set_text(tree, app_sub, "WebAssembly + Signals — buildnectar.com");
+    set_style(tree, app_sub, "font-size", "13px");
+    set_style(tree, app_sub, "color", "#8b949e");
+    set_style(tree, app_sub, "height", "hug");
+    set_style(tree, app_sub, "width", "hug");
+
+    // ══ Nav tabs ══
+    let nav = add_el(tree, "div", root);
+    set_style(tree, nav, "direction", "horizontal");
+    set_style(tree, nav, "gap", "8");
+    set_style(tree, nav, "wrap", "true");
+    set_style(tree, nav, "height", "hug");
+    set_style(tree, nav, "justify", "center");
+
+    let nav_tabs = [
+        ("Home", "/", "#3fb950"),
+        ("E-Commerce", "/app/", "#f97316"),
+        ("Canvas*", "#", "#3fb950"),
+        ("React 18", "/app/react.html", "#58a6ff"),
+        ("Svelte 5", "/app/svelte.html", "#ff3e00"),
+    ];
+    for (label, _href, color) in &nav_tabs {
+        let tab = add_el(tree, "div", nav);
+        set_text(tree, tab, label);
+        set_style(tree, tab, "font-size", "13px");
+        set_style(tree, tab, "font-weight", "bold");
+        set_style(tree, tab, "padding", "10");
+        set_style(tree, tab, "width", "hug");
+        set_style(tree, tab, "height", "hug");
+        set_style(tree, tab, "border-radius", "10");
+        set_style(tree, tab, "border", &format!("2px solid {}", color));
+        set_style(tree, tab, "color", color);
+    }
+
+    // ══ Section card (the big rounded container, max-width centered) ══
     let section = add_el(tree, "div", root);
     set_style(tree, section, "direction", "vertical");
     set_style(tree, section, "height", "hug");
+    set_style(tree, section, "max-width", "1400px");
     set_style(tree, section, "padding", "32");
     set_style(tree, section, "gap", "20");
     set_style(tree, section, "background-color", "#131720");
@@ -631,9 +683,61 @@ pub extern "C" fn app_scroll(delta: f32) {
 pub extern "C" fn app_click(mx: f32, my: f32) {
     with_state(|state| {
         let hit = state.tree.hit_test(mx, my + state.scroll_y);
-        if let Some(_hit_id) = hit {
-            // TODO: dispatch click handlers
+        let hit_id = match hit {
+            Some(id) => id,
+            None => return,
+        };
+
+        // Read the clicked element's text to dispatch action
+        let text = state.tree.get(hit_id).and_then(|e| e.text.clone()).unwrap_or_default();
+        let bg = state.tree.get(hit_id).and_then(|e| e.styles.get("background-color").cloned()).unwrap_or_default();
+
+        // Category pills
+        let pill_map = [("All", 0), ("Electronics", 1), ("Clothing", 2), ("Home", 3), ("Sports", 4), ("Books", 5)];
+        for (label, idx) in &pill_map {
+            if text == *label {
+                state.active_cat = *idx;
+                state.signal_fires += 1;
+                // Rebuild UI to update active pill styling
+                state.tree = ElementTree::new();
+                build_ui(state);
+                layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
+                return;
+            }
+        }
+
+        // Sort buttons
+        let sort_map = [("Price ↑", 1u8), ("Price ↓", 2), ("Name A→Z", 3)];
+        for (label, order) in &sort_map {
+            if text == *label {
+                state.sort_order = *order;
+                state.signal_fires += 1;
+                state.tree = ElementTree::new();
+                build_ui(state);
+                layout::compute(&mut state.tree, state.vw, 999999.0, &mut state.measurer);
+                return;
+            }
+        }
+
+        // Cart button
+        if text.starts_with("Cart") {
+            state.cart_count = 0;
             state.signal_fires += 1;
+            return;
+        }
+
+        // Add to Cart buttons
+        if text == "Add to Cart" {
+            state.cart_count += 1;
+            state.signal_fires += 1;
+            return;
+        }
+
+        // Clear button
+        if text == "Clear" {
+            state.cart_count = 0;
+            state.signal_fires += 1;
+            return;
         }
     });
 }
