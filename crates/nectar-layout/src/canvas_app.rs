@@ -116,6 +116,7 @@ fn build_ui(state: &mut AppState) {
     let header = add_el(tree, "div", root);
     set_style(tree, header, "direction", "vertical");
     set_style(tree, header, "padding", "16");
+    set_style(tree, header, "height", "hug");
     set_style(tree, header, "background-color", "#131720");
 
     let title = add_el(tree, "div", header);
@@ -134,6 +135,7 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, pills_row, "direction", "horizontal");
     set_style(tree, pills_row, "gap", "10");
     set_style(tree, pills_row, "wrap", "true");
+    set_style(tree, pills_row, "height", "hug");
 
     let pill_labels = ["All", "Electronics", "Clothing", "Home", "Sports", "Books"];
     for label in &pill_labels {
@@ -149,6 +151,7 @@ fn build_ui(state: &mut AppState) {
     let sort_row = add_el(tree, "div", root);
     set_style(tree, sort_row, "direction", "horizontal");
     set_style(tree, sort_row, "gap", "8");
+    set_style(tree, sort_row, "height", "hug");
 
     let sort_label = add_el(tree, "div", sort_row);
     set_text(tree, sort_label, "Sort:");
@@ -171,13 +174,14 @@ fn build_ui(state: &mut AppState) {
     set_style(tree, metrics, "direction", "horizontal");
     set_style(tree, metrics, "gap", "12");
     set_style(tree, metrics, "wrap", "true");
+    set_style(tree, metrics, "height", "hug");
 
     let metric_labels = ["FETCH + COMPILE", "TREE BUILD", "LAYOUT", "TOTAL", "PRODUCTS", "CATEGORY", "CART", "SORT", "SIGNAL FIRES"];
     for label in &metric_labels {
         let card = add_el(tree, "div", metrics);
         set_style(tree, card, "direction", "vertical");
-        set_style(tree, card, "width", "200px");
-        set_style(tree, card, "height", "40px");
+        set_style(tree, card, "width", "140px");
+        set_style(tree, card, "height", "44px");
         set_style(tree, card, "padding", "8");
         set_style(tree, card, "background-color", "#1a1f2e");
 
