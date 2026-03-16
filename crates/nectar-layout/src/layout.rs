@@ -231,8 +231,19 @@ impl LayoutContext {
         let mut children = HashMap::new();
 
         for (id, el) in tree.iter() {
-            styles.insert(id, resolve_style(el));
-            children.insert(id, el.children.clone());
+            // Fast path: fixed-size elements with no styles skip resolve_style
+            if el.fixed_width.is_some() && el.fixed_height.is_some() && el.styles.is_empty() {
+                let mut ls = LayoutStyle::default();
+                ls.width = SizePolicy::Fixed(el.fixed_width.unwrap());
+                ls.height = SizePolicy::Fixed(el.fixed_height.unwrap());
+                styles.insert(id, ls);
+            } else {
+                styles.insert(id, resolve_style(el));
+            }
+            // Only clone children vec if element has children
+            if !el.children.is_empty() {
+                children.insert(id, el.children.clone());
+            }
         }
 
         Self { styles, children }
