@@ -369,6 +369,41 @@ Render the DOM normally but hidden (`display:none`). Read `getBoundingClientRect
 
 **Best for:** Product catalogs, e-commerce, any page that needs both speed and SEO.
 
+### Unified Style System — Write Once, Render Anywhere
+
+A key architectural decision: the same component styles work across all three render modes. The developer writes styles once; the compiler translates them to the appropriate target.
+
+**DOM mode** emits CSS — scoped class names, custom properties, media queries. The browser's CSS engine handles layout and paint.
+
+**Canvas/Hybrid mode** uses `nectar-layout`, a stack-based layout engine extracted from `nectar-runtime` (the native desktop runtime). It accepts CSS property names directly:
+
+| CSS (DOM mode) | Nectar Layout (Canvas/Hybrid) |
+|---|---|
+| `display: flex; flex-direction: column` | `direction: vertical` |
+| `display: flex; flex-direction: row` | `direction: horizontal` |
+| `position: absolute; z-index` | `direction: layer` |
+| `flex: 1` | `Fill(1.0)` |
+| `width: fit-content` | `Hug` |
+| `width: 260px` | `Fixed(260)` |
+| `gap`, `padding`, `align-items`, `justify-content` | Same names, same values |
+| `flex-wrap: wrap` | `wrap: true` |
+| `overflow: scroll` | `scroll: true` |
+| `min-width` / `max-width` | Same names |
+
+The layout engine's `resolve_style()` function parses both Nectar-native properties (`direction: horizontal`) and CSS-legacy properties (`flex-direction: row`). Existing component styles compile without changes.
+
+**Theme tokens** (`var(--accent)`) are resolved at compile time in canvas mode — the compiler substitutes the concrete value since there's no CSS engine at runtime. **Breakpoints** check `canvas_get_width()` instead of `@media` queries. **Scoped styles** generate unique class prefixes in DOM mode and direct style lookups in canvas mode.
+
+The same `nectar-layout` crate powers three platforms:
+
+| Platform | Layout Engine | Renderer |
+|---|---|---|
+| **Browser (DOM)** | Browser CSS engine | Browser paint |
+| **Browser (Canvas/Hybrid)** | `nectar-layout.wasm` | Canvas 2D syscalls |
+| **Native Desktop** | `nectar-runtime` (same Rust code) | wgpu GPU shaders |
+
+One layout algorithm. Three renderers. Same `.nectar` source file.
+
 ---
 
 ## 7. Current Limitations
