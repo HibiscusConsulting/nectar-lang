@@ -1,0 +1,88 @@
+// Canvas Demo — Honeycomb widget showcase
+// Compiles to WASM, runs on Honeycomb rendering engine
+
+component WidgetDemo() {
+    let mut cart_count: i32 = 0;
+
+    fn add_to_cart(&mut self) {
+        self.cart_count = self.cart_count + 1;
+    }
+
+    fn clear_cart(&mut self) {
+        self.cart_count = 0;
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: hug; gap: 16; padding: 24; align: center">
+            // Header
+            <div style="direction: vertical; height: hug; align: center; padding: 16">
+                <div style="font-size: 28px; font-weight: bold; color: #e6edf3; height: hug; width: hug">"Demo App"</div>
+                <div style="font-size: 13px; color: #8b949e; height: hug; width: hug">"Nectar + Honeycomb — buildnectar.com"</div>
+            </div>
+
+            // Main section
+            <div style="direction: vertical; height: hug; max-width: 1400px; padding: 32; gap: 20; background-color: #131720; border-radius: 16">
+                // Title
+                <div style="font-size: 26px; font-weight: bold; color: #f97316; height: hug; width: hug">"Widget Showcase"</div>
+
+                // Search
+                <input style="font-size: 14px; color: #e6edf3; background-color: #1a1f2e; padding: 12; height: 44px; border-radius: 10; cursor: text" placeholder="Search..." />
+
+                // Controls row
+                <div style="direction: horizontal; gap: 12; height: hug; align: center">
+                    <button on:click={self.add_to_cart} style="font-size: 14px; font-weight: bold; color: #000000; background-color: #f97316; padding: 12; height: 44px; width: 120px; border-radius: 10; cursor: pointer">"Add to Cart"</button>
+                    <button on:click={self.clear_cart} style="font-size: 14px; font-weight: bold; color: #8b949e; background-color: #1a1f2e; padding: 12; height: 44px; width: 80px; border-radius: 10; cursor: pointer">"Clear"</button>
+                </div>
+
+                // Widget row
+                <div style="direction: horizontal; gap: 24; height: hug; align: center">
+                    <checkbox style="width: 140px; height: 24px; padding: 4; cursor: pointer">"In Stock Only"</checkbox>
+                    <toggle style="width: 150px; height: 28px; padding: 2; cursor: pointer">"Dark Mode"</toggle>
+                    <slider style="width: 160px; height: 24px; padding: 8; cursor: pointer" />
+                    <progress style="width: 160px; height: 40px; padding: 4">"Loading"</progress>
+                    <dropdown style="width: 140px; height: 36px; padding: 8 12; background-color: #1a1f2e; border-radius: 8; cursor: pointer" options="Electronics;Clothing;Home;Sports;Books">"Electronics"</dropdown>
+                </div>
+
+                // Color picker, date picker, file picker
+                <div style="direction: horizontal; gap: 16; height: hug; align: center">
+                    <colorpicker style="width: 200px; height: 160px; padding: 8; background-color: #1a1f2e; border-radius: 8" />
+                    <datepicker style="width: 160px; height: 36px; padding: 8 12; background-color: #1a1f2e; border-radius: 8; cursor: pointer">"2026-03-17"</datepicker>
+                    <filepicker style="width: 140px; height: 36px; padding: 8 16; background-color: #1a1f2e; border-radius: 8; cursor: pointer">"Upload File"</filepicker>
+                </div>
+
+                // Simple text input
+                <div style="direction: horizontal; gap: 12; height: hug; align: center">
+                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Name:"</div>
+                    <input style="font-size: 14px; color: #e6edf3; background-color: #1a1f2e; padding: 8 12; height: 36px; width: 200px; border-radius: 8; border: 1px solid #2a2f3e; cursor: text" placeholder="Enter your name" />
+                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Email:"</div>
+                    <input style="font-size: 14px; color: #e6edf3; background-color: #1a1f2e; padding: 8 12; height: 36px; width: 250px; border-radius: 8; border: 1px solid #2a2f3e; cursor: text" placeholder="user@example.com" />
+                </div>
+
+                // Textarea
+                <textarea style="width: fill; height: 120px; font-size: 14px; color: #e6edf3; background-color: #1a1f2e; padding: 12; border-radius: 8; border: 1px solid #2a2f3e; cursor: text" placeholder="Type a message..." />
+
+                // Link
+                <a href="https://buildnectar.com" style="font-size: 14px; color: #58a6ff; cursor: pointer">"Visit buildnectar.com"</a>
+
+                // Table
+                <div style="direction: vertical; height: hug; border: 1px solid #2a2f3e; border-radius: 8">
+                    <div style="direction: horizontal; height: hug; background-color: #161b22">
+                        <div style="font-size: 12px; font-weight: bold; color: #8b949e; padding: 10 12; width: 200px; height: hug">"Product"</div>
+                        <div style="font-size: 12px; font-weight: bold; color: #8b949e; padding: 10 12; width: 200px; height: hug">"Price"</div>
+                        <div style="font-size: 12px; font-weight: bold; color: #8b949e; padding: 10 12; width: 200px; height: hug">"Status"</div>
+                    </div>
+                    <div style="direction: horizontal; height: hug">
+                        <div style="font-size: 13px; color: #e6edf3; padding: 8 12; width: 200px; height: hug">"Widget Pro"</div>
+                        <div style="font-size: 13px; color: #3fb950; padding: 8 12; width: 200px; height: hug">"$49.99"</div>
+                        <div style="font-size: 13px; color: #e6edf3; padding: 8 12; width: 200px; height: hug">"In Stock"</div>
+                    </div>
+                    <div style="direction: horizontal; height: hug; background-color: #0d1117">
+                        <div style="font-size: 13px; color: #e6edf3; padding: 8 12; width: 200px; height: hug">"Layout Engine"</div>
+                        <div style="font-size: 13px; color: #3fb950; padding: 8 12; width: 200px; height: hug">"$99.99"</div>
+                        <div style="font-size: 13px; color: #f97316; padding: 8 12; width: 200px; height: hug">"Low Stock"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -300,11 +300,25 @@ impl DevServer {
         if parts.len() < 2 {
             return Ok(());
         }
-        let path = parts[1];
+        // Strip query string (?v=7, ?t=123, etc.) — only the path matters for file lookup.
+        let path = parts[1].split('?').next().unwrap_or(parts[1]);
 
         // Check for WebSocket upgrade.
         if request.contains("Upgrade: websocket") || request.contains("upgrade: websocket") {
             return Self::handle_websocket_upgrade(&mut stream, &request, ws_clients);
+        }
+
+        // Canvas SSR endpoint: serve pre-serialized element tree
+        if path == "/__ssr_tree" {
+            let tree_path = build_dir.join("ssr_tree.bin");
+            let response = if let Some((body, _)) = serve_file(&tree_path) {
+                http_response(200, "application/octet-stream", &body)
+            } else {
+                http_response(404, "text/plain", b"SSR tree not found - run nectar build --ssr first")
+            };
+            stream.write_all(&response)?;
+            stream.flush()?;
+            return Ok(());
         }
 
         // Serve static files from build_dir.
