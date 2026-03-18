@@ -7130,6 +7130,42 @@ impl WasmCodegen {
                 self.line("call $dom_createElement");
                 self.line(&format!("local.set {}", var));
 
+                // Honeycomb widget: apply default styles if user didn't provide a style attr
+                let has_style_attr = el.attributes.iter().any(|a| matches!(a, Attribute::Static { name, .. } if name == "style"));
+                if !has_style_attr {
+                    let defaults = honeycomb::catalog::default_styles(&el.tag);
+                    if !defaults.is_empty() {
+                        // Build default style string and set as attribute
+                        let style_str: String = defaults.iter()
+                            .map(|(k, v)| format!("{}: {}", k, v))
+                            .collect::<Vec<_>>()
+                            .join("; ");
+                        let style_name = self.store_string("style");
+                        let style_val = self.store_string(&style_str);
+                        self.line(&format!("local.get {}", var));
+                        self.line(&format!("i32.const {}", style_name));
+                        self.line("i32.const 5");
+                        self.line(&format!("i32.const {}", style_val));
+                        self.line(&format!("i32.const {}", style_str.len()));
+                        self.line("call $dom_setAttr");
+                    }
+                }
+
+                // Set widget-specific element properties via attribute flags
+                if let Some(widget) = honeycomb::catalog::lookup(&el.tag) {
+                    if widget.focusable {
+                        // Mark as focusable by setting tabindex
+                        let ti_name = self.store_string("tabindex");
+                        let ti_val = self.store_string("0");
+                        self.line(&format!("local.get {}", var));
+                        self.line(&format!("i32.const {}", ti_name));
+                        self.line("i32.const 8");
+                        self.line(&format!("i32.const {}", ti_val));
+                        self.line("i32.const 1");
+                        self.line("call $dom_setAttr");
+                    }
+                }
+
                 // Set attributes
                 for attr in &el.attributes {
                     match attr {
@@ -20872,6 +20908,7 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
     }
+
 }
 
 #[cfg(test)]

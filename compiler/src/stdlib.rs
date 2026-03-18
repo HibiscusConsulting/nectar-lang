@@ -120,7 +120,6 @@ impl StdLib {
         stdlib.register_wizard_functions();
         stdlib.register_rtc_functions();
         stdlib.register_gpu_functions();
-
         stdlib
     }
 
@@ -3678,6 +3677,7 @@ impl StdLib {
 
         for f in fns { self.register_fn(f); }
     }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -4297,4 +4297,5 @@ mod tests {
             }
         }
     }
+
 }
