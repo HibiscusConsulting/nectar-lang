@@ -113,6 +113,9 @@ pub struct WasmCodegen {
     /// "toast", "debounce", "throttle", "bigdecimal", "search",
     /// "pagination", "csv", "collections"
     used_runtime_categories: HashSet<String>,
+    /// Widget tags found in templates — drives Prune registration in Honeycomb.
+    /// Only widgets that appear in templates get registered → WASM linker strips the rest.
+    used_widget_tags: HashSet<String>,
     /// Import namespace usage flags — set during AST pre-scan to determine which
     /// browser API import blocks to emit. Only used namespaces get imports.
     needs_http: bool,
@@ -277,6 +280,7 @@ impl WasmCodegen {
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
             used_runtime_categories: HashSet::new(),
+            used_widget_tags: HashSet::new(),
             needs_http: false,
             needs_observe: false,
             needs_ws: false,
@@ -635,6 +639,10 @@ impl WasmCodegen {
     fn scan_template_for_runtime_deps(&mut self, node: &TemplateNode) {
         match node {
             TemplateNode::Element(el) => {
+                // Collect widget tags for Prune registration
+                if honeycomb::catalog::is_widget(&el.tag) {
+                    self.used_widget_tags.insert(el.tag.clone());
+                }
                 for child in &el.children { self.scan_template_for_runtime_deps(child); }
                 for attr in &el.attributes {
                     match attr {
