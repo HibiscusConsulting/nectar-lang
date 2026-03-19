@@ -1,0 +1,71 @@
+// Trading Terminal — Real-time financial data grid
+// Demonstrates: 1000+ price updates/sec, signal-driven cell updates, flash animation
+// Bloomberg/TradingView-style UI rendered on canvas via Honeycomb
+
+component TradingTerminal() {
+    let mut stock_count: i32 = 500;
+    let mut update_count: i32 = 0;
+    let mut updates_per_sec: i32 = 0;
+    let mut running: bool = true;
+
+    fn toggle_running(&mut self) {
+        if self.running {
+            self.running = false;
+        } else {
+            self.running = true;
+        }
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: hug; background-color: #0a0e17; gap: 0">
+            // Header
+            <div style="direction: horizontal; gap: 16; align: center; height: 40px; padding: 0 12; background-color: #131722; border-bottom: 1px solid #2a2e39">
+                <div style="font-size: 16px; font-weight: 700; color: #d1d4dc">"Trading Terminal"</div>
+                <div style="font-size: 12px; color: #089981">{format("{} stocks", self.stock_count)}</div>
+                <div style="font-size: 12px; color: #787b86">{format("{} updates | {} upd/sec", self.update_count, self.updates_per_sec)}</div>
+                <div style="padding: 4 12; background-color: #2a2e39; border-radius: 4; cursor: pointer; font-size: 12px; color: #d1d4dc" on:click={self.toggle_running}>
+                    "Pause"
+                </div>
+            </div>
+
+            // Column headers
+            <div style="direction: horizontal; height: 28px; background-color: #131722; border-bottom: 1px solid #2a2e39; padding: 0 4">
+                <div style="width: 80px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"SYMBOL"</div>
+                <div style="width: 160px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"NAME"</div>
+                <div style="width: 80px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"LAST"</div>
+                <div style="width: 72px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"CHG"</div>
+                <div style="width: 64px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"CHG %"</div>
+                <div style="width: 72px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"VOLUME"</div>
+                <div style="width: 72px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"HIGH"</div>
+                <div style="width: 72px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"LOW"</div>
+                <div style="width: 80px; padding: 6 8; font-size: 11px; font-weight: 500; color: #787b86">"MKT CAP"</div>
+            </div>
+
+            // Stock rows
+            <div style="direction: vertical; height: hug; background-color: #0a0e17">
+                {for i in 0..self.stock_count {
+                    <div style="direction: horizontal; height: 28px; border-bottom: 1px solid #1a1e2d; padding: 0 4">
+                        // Symbol
+                        <div style="width: 80px; padding: 4 8; font-size: 13px; font-weight: 600; color: #d1d4dc">{format("STK{}", i)}</div>
+                        // Name
+                        <div style="width: 160px; padding: 4 8; font-size: 12px; color: #787b86">{format("Company #{}", i)}</div>
+                        // Last price
+                        <div style="width: 80px; padding: 4 8; font-size: 12px; color: #d1d4dc">{format("${}.{:02}", 50 + (i * 7) % 450, (i * 13) % 100)}</div>
+                        // Change (colored)
+                        <div style="width: 72px; padding: 4 8; font-size: 12px; color: #089981">{format("+{}.{:02}", (i * 3) % 10, (i * 17) % 100)}</div>
+                        // Change %
+                        <div style="width: 64px; padding: 4 8; font-size: 12px; color: #089981">{format("+{}.{}%", (i * 3) % 5, (i * 7) % 10)}</div>
+                        // Volume
+                        <div style="width: 72px; padding: 4 8; font-size: 12px; color: #787b86">{format("{}K", (i * 31 + 100) % 9999)}</div>
+                        // High
+                        <div style="width: 72px; padding: 4 8; font-size: 12px; color: #787b86">{format("${}", 55 + (i * 7) % 450)}</div>
+                        // Low
+                        <div style="width: 72px; padding: 4 8; font-size: 12px; color: #787b86">{format("${}", 45 + (i * 7) % 450)}</div>
+                        // Market cap
+                        <div style="width: 80px; padding: 4 8; font-size: 12px; color: #787b86">{format("{}B", (i * 17 + 1) % 999)}</div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}
