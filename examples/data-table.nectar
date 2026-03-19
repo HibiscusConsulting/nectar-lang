@@ -1,0 +1,95 @@
+// Real-Time Data Table — 500 rows, sortable columns
+// Demonstrates: closures, sort_by, while loops, array state, data-driven rendering
+// Every Rust Vec/Iterator method works — .sort_by(), .push(), .reverse(), .len()
+
+component DataTable() {
+    let mut sort_col: i32 = -1;
+    let mut row_count: i32 = 500;
+    let mut order: [i32] = [];
+
+    fn init_order(&mut self) {
+        let mut i: i32 = 0;
+        while i < self.row_count {
+            self.order.push(i);
+            i = i + 1;
+        }
+    }
+
+    fn sort_by_id(&mut self) {
+        self.sort_col = 0;
+        self.order.sort();
+    }
+
+    fn sort_by_name(&mut self) {
+        self.sort_col = 1;
+        self.order.sort();
+    }
+
+    fn sort_by_price(&mut self) {
+        self.sort_col = 2;
+        self.order.sort_by(|a, b| {
+            let pa: i32 = 50 + (a * 7) % 500;
+            let pb: i32 = 50 + (b * 7) % 500;
+            pa.cmp(pb)
+        });
+    }
+
+    fn sort_by_change(&mut self) {
+        self.sort_col = 3;
+        self.order.sort_by(|a, b| {
+            let ca: i32 = (a * 13) % 20;
+            let cb: i32 = (b * 13) % 20;
+            ca.cmp(cb)
+        });
+    }
+
+    fn sort_by_volume(&mut self) {
+        self.sort_col = 4;
+        self.order.sort_by(|a, b| {
+            let va: i32 = (a * 31 + 1000) % 50000;
+            let vb: i32 = (b * 31 + 1000) % 50000;
+            va.cmp(vb)
+        });
+    }
+
+    fn sort_by_sector(&mut self) {
+        self.sort_col = 5;
+        self.order.sort_by(|a, b| {
+            let sa: i32 = a % 10;
+            let sb: i32 = b % 10;
+            sa.cmp(sb)
+        });
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: hug; background-color: #0b0e14; padding: 16; gap: 0">
+            <div style="direction: horizontal; gap: 16; align: center; height: 48px; padding: 0 8">
+                <div style="font-size: 20px; font-weight: 700; color: #e6edf3">"Data Table"</div>
+                <div style="font-size: 14px; color: #3fb950">{format("{} rows", self.row_count)}</div>
+                <div style="font-size: 13px; color: #8b949e">{format("Sort col: {}", self.sort_col)}</div>
+            </div>
+
+            <div style="direction: horizontal; background-color: #131720; height: 32px">
+                <div style="width: 60px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_id}>"ID"</div>
+                <div style="width: 180px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_name}>"COMPANY"</div>
+                <div style="width: 90px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_price}>"PRICE"</div>
+                <div style="width: 80px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_change}>"CHANGE"</div>
+                <div style="width: 110px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_volume}>"VOLUME"</div>
+                <div style="width: 90px; padding: 6 8; font-size: 11px; font-weight: 700; color: #8b949e; cursor: pointer" on:click={self.sort_by_sector}>"SECTOR"</div>
+            </div>
+
+            <div style="direction: vertical; height: hug; background-color: #0d1117">
+                {for i in self.order {
+                    <div style="direction: horizontal; height: 30px; border-bottom: 1px solid #1a1f2e">
+                        <div style="width: 60px; padding: 6 8; font-size: 12px; color: #6e7681">{format("{}", i)}</div>
+                        <div style="width: 180px; padding: 6 8; font-size: 12px; color: #e6edf3">{format("Company #{}", i)}</div>
+                        <div style="width: 90px; padding: 6 8; font-size: 12px; color: #e6edf3">{format("${}", 50 + (i * 7) % 500)}</div>
+                        <div style="width: 80px; padding: 6 8; font-size: 12px; color: #3fb950">{format("+{}%", (i * 13) % 20)}</div>
+                        <div style="width: 110px; padding: 6 8; font-size: 12px; color: #8b949e">{format("{}", (i * 31 + 1000) % 50000)}</div>
+                        <div style="width: 90px; padding: 6 8; font-size: 12px; color: #8b949e">{format("Sec {}", i % 10)}</div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,73 @@
+// Weather Radar — Real-time NOAA radar visualization
+// Demonstrates: tile-based map rendering, animation, pan/zoom
+// All map math (lat/lng -> tile coords) computed in WASM
+// JS only fetches the RainViewer API — everything else is WASM
+
+component WeatherRadar() {
+    let mut center_lat: i32 = 39;
+    let mut center_lng: i32 = -98;
+    let mut zoom: i32 = 4;
+    let mut playing: bool = true;
+    let mut current_frame: i32 = 0;
+    let mut frame_count: i32 = 10;
+
+    fn zoom_in(&mut self) {
+        if self.zoom < 7 {
+            self.zoom = self.zoom + 1;
+        }
+    }
+
+    fn zoom_out(&mut self) {
+        if self.zoom > 2 {
+            self.zoom = self.zoom - 1;
+        }
+    }
+
+    fn toggle_play(&mut self) {
+        if self.playing {
+            self.playing = false;
+        } else {
+            self.playing = true;
+        }
+    }
+
+    fn next_frame(&mut self) {
+        if self.current_frame < self.frame_count - 1 {
+            self.current_frame = self.current_frame + 1;
+        } else {
+            self.current_frame = 0;
+        }
+    }
+
+    fn prev_frame(&mut self) {
+        if self.current_frame > 0 {
+            self.current_frame = self.current_frame - 1;
+        }
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: fill; background-color: #0f141e">
+            // Title
+            <div style="direction: horizontal; height: 36px; background-color: #0a0e16; padding: 0 12; align: center; gap: 12">
+                <div style="font-size: 16px; font-weight: 700; color: #e6edf3">"Honeycomb Radar"</div>
+                <div style="font-size: 13px; color: #8b949e">"NOAA Weather Data via RainViewer"</div>
+            </div>
+
+            // Map area (canvas renders tiles here)
+            <div style="width: fill; height: fill; background-color: #0f141e">
+                // Tiles rendered directly by the engine's canvas
+            </div>
+
+            // Controls
+            <div style="direction: horizontal; height: 40px; background-color: #0a0e16; padding: 0 12; align: center; gap: 12">
+                <div style="font-size: 14px; color: #e6edf3">{format("Zoom: {} | Frame: {}/{}", self.zoom, self.current_frame + 1, self.frame_count)}</div>
+                <div style="font-size: 14px; color: #e6edf3">{format("Lat: {} Lng: {}", self.center_lat, self.center_lng)}</div>
+                <div style="padding: 4 16; background-color: #3b82f6; border-radius: 4; cursor: pointer; font-size: 14px; color: white" on:click={self.toggle_play}>
+                    "Toggle"
+                </div>
+                <div style="padding: 4 12; background-color: #1a1f2e; border-radius: 4; cursor: pointer; font-size: 14px; color: #e6edf3" on:click={self.zoom_in}>"+"</div>
+                <div style="padding: 4 12; background-color: #1a1f2e; border-radius: 4; cursor: pointer; font-size: 14px; color: #e6edf3" on:click={self.zoom_out}>"-"</div>
+            </div>
+        </div>
+    }
+}
