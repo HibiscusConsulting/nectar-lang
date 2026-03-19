@@ -162,6 +162,9 @@ pub struct WasmCodegen {
     /// This set contains the original class names (without the dot) so that
     /// template elements with `class="foo"` can be rewritten at compile time.
     component_scoped_selectors: HashSet<String>,
+    /// Bloom target: class name → Vec<(property, value)> for inline style emission.
+    /// Built from component style blocks, used to emit setStyle instead of setAttribute("class").
+    bloom_class_styles: HashMap<String, Vec<(String, String)>>,
     /// Responsive breakpoints defined by `breakpoints { ... }` blocks.
     /// Stored at codegen time so that `@name { ... }` patterns in component
     /// style blocks can be expanded to `@media (min-width: value)` at compile time.
@@ -311,6 +314,7 @@ impl WasmCodegen {
             known_payment_signals: Vec::new(),
             known_capability_signals: Vec::new(),
             component_scoped_selectors: HashSet::new(),
+            bloom_class_styles: HashMap::new(),
             breakpoint_defs: Vec::new(),
             codegen_errors: Vec::new(),
         }
@@ -447,6 +451,56 @@ impl WasmCodegen {
         self.line("(import \"env\" \"set_drag_data\" (func $db_getAll (param i32 i32 i32 i32)))");
     }
 
+    /// Transform CSS property/value pairs into Honeycomb-native equivalents.
+    /// Called at compile time for Bloom target — no CSS runtime needed.
+    fn bloom_transform_css_property(prop: &str, val: &str) -> Vec<(String, String)> {
+        match prop {
+            // display:flex → flex-direction:row (Honeycomb uses direction, not display)
+            "display" if val == "flex" => {
+                vec![("flex-direction".to_string(), "row".to_string())]
+            }
+            // display:grid → flex-direction:row + wrap (approximate grid with wrapped flex)
+            "display" if val == "grid" => {
+                vec![
+                    ("flex-direction".to_string(), "row".to_string()),
+                    ("wrap".to_string(), "true".to_string()),
+                ]
+            }
+            // display:block/inline → vertical stack (Honeycomb default)
+            "display" if val == "block" || val == "inline" || val == "inline-block" => {
+                vec![]
+            }
+            // background shorthand with color value → background-color
+            "background" if val.starts_with('#') || val.starts_with("rgba(") || val.starts_with("rgb(") => {
+                vec![("background-color".to_string(), val.to_string())]
+            }
+            // flex-wrap → Honeycomb wrap
+            "flex-wrap" if val == "wrap" => {
+                vec![("wrap".to_string(), "true".to_string())]
+            }
+            // flex:1 → width:fill
+            "flex" if val == "1" || val.starts_with("1 ") => {
+                vec![("width".to_string(), "fill".to_string())]
+            }
+            // Convert rem to px for font-size
+            "font-size" if val.ends_with("rem") => {
+                let rem: f32 = val.trim_end_matches("rem").parse().unwrap_or(1.0);
+                vec![("font-size".to_string(), format!("{}px", rem * 16.0))]
+            }
+            // Skip properties Honeycomb doesn't support
+            "margin" | "margin-top" | "margin-bottom" | "margin-left" | "margin-right"
+            | "box-sizing" | "text-transform" | "letter-spacing"
+            | "outline" | "content-visibility" | "contain-intrinsic-size"
+            | "object-fit" | "font-family" | "font-variant-numeric"
+            | "grid-template-columns" | "text-decoration" | "overflow"
+            | "text-align" | "white-space" | "transition" | "box-shadow" => {
+                vec![]
+            }
+            // Everything else passes through (padding, gap, border, color, etc.)
+            _ => vec![(prop.to_string(), val.to_string())],
+        }
+    }
+
     /// Bloom target — all imports in "env" namespace with unique snake_case names.
     /// Same signatures as browser target, compatible with wasmtime's name-based linker.
     fn emit_bloom_imports(&mut self, _program: &Program) {
@@ -490,7 +544,7 @@ impl WasmCodegen {
         self.line("(import \"env\" \"dom_print\" (func $dom_print (param i32)))");
         self.line("(import \"env\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))");
-        self.line("(import \"env\" \"inject_styles\" (func $dom_injectStyles (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"env\" \"inject_styles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
         self.line("(import \"env\" \"set_property\" (func $dom_setProperty (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"get_value\" (func $dom_getValue (param i32) (result i32)))");
         // Timer
@@ -999,7 +1053,7 @@ impl WasmCodegen {
         if name.starts_with("streaming::") || name.contains("streamFetch") || name.contains("sseConnect") {
             self.needs_streaming = true;
         }
-        if name.starts_with("rtc::") || name.contains("WebRTC") || name.contains("createPeer") {
+        if name.starts_with("rtc::") || name.starts_with("rtc_") || name.contains("WebRTC") || name.contains("createPeer") {
             self.needs_rtc = true;
         }
         if name.starts_with("gpu::") || name.contains("WebGPU") {
@@ -1302,11 +1356,12 @@ impl WasmCodegen {
         self.line("(import \"rtc\" \"getIceConnectionState\" (func $rtc_getIceConnectionState (param i32) (result i32)))");
         self.line("(import \"rtc\" \"getSignalingState\" (func $rtc_getSignalingState (param i32) (result i32)))");
         self.line("(import \"rtc\" \"attachStream\" (func $rtc_attachStream (param i32 i32)))");
-        self.line("(import \"rtc\" \"getUserMedia\" (func $rtc_getUserMedia (param i32 i32)))");
-        self.line("(import \"rtc\" \"getDisplayMedia\" (func $rtc_getDisplayMedia (param i32 i32)))");
+        self.line("(import \"rtc\" \"getUserMedia\" (func $rtc_getUserMedia (param i32 i32) (result i32)))");
+        self.line("(import \"rtc\" \"getDisplayMedia\" (func $rtc_getDisplayMedia (param i32 i32) (result i32)))");
         self.line("(import \"rtc\" \"stopTrack\" (func $rtc_stopTrack (param i32)))");
         self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
         self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
+        self.line("(import \"rtc\" \"getStreamTracks\" (func $rtc_getStreamTracks (param i32) (result i32)))");
         }
 
         // ── GPU — WebGPU rendering, buffers, shaders, textures ───────────────
@@ -3199,6 +3254,29 @@ impl WasmCodegen {
                 }
             }
         }
+        // Bloom target: build class→styles map for inline style emission
+        // Transform CSS shorthands to Honeycomb-native property values at compile time
+        if self.target == CompilationTarget::Bloom {
+            self.bloom_class_styles.clear();
+            for style in &comp.styles {
+                let sel = style.selector.trim();
+                if let Some(cls) = sel.strip_prefix('.') {
+                    let cls = cls.split(':').next().unwrap_or(cls);
+                    let cls = cls.split(' ').next().unwrap_or(cls);
+                    if !cls.is_empty() {
+                        let transformed: Vec<(String, String)> = style.properties.iter()
+                            .flat_map(|(prop, val)| {
+                                Self::bloom_transform_css_property(prop, val)
+                            })
+                            .collect();
+                        self.bloom_class_styles.entry(cls.to_string())
+                            .or_default()
+                            .extend(transformed);
+                    }
+                }
+            }
+        }
+
         self.component_method_names = comp.methods.iter().map(|m| m.name.clone()).collect();
 
         // Register this component's handler range in the global callback registry
@@ -7419,10 +7497,40 @@ impl WasmCodegen {
                 for attr in &el.attributes {
                     match attr {
                         Attribute::Static { name, value } => {
-                            // Scoped CSS: rewrite class attribute values at compile time.
-                            // Each space-separated class name is checked against the
-                            // component's scoped selectors; matching ones get the
-                            // ComponentName__ prefix.
+                            // Bloom target: inline styles from class → setStyle calls
+                            if self.target == CompilationTarget::Bloom && name == "class" {
+                                // Still emit the class attribute (for inspector/debugging)
+                                let name_offset = self.store_string(name);
+                                let val_offset = self.store_string(value);
+                                self.line(&format!("local.get {}", var));
+                                self.line(&format!("i32.const {}", name_offset));
+                                self.line(&format!("i32.const {}", name.len()));
+                                self.line(&format!("i32.const {}", val_offset));
+                                self.line(&format!("i32.const {}", value.len()));
+                                self.line("call $dom_setAttr");
+
+                                // Now emit setStyle for each CSS property from each class
+                                let classes_to_resolve: Vec<String> = value.split_whitespace()
+                                    .map(|s| s.to_string())
+                                    .collect();
+                                let bloom_styles = self.bloom_class_styles.clone();
+                                for cls in &classes_to_resolve {
+                                    if let Some(props) = bloom_styles.get(cls) {
+                                        for (prop, pval) in props {
+                                            let prop_offset = self.store_string(prop);
+                                            let val_offset = self.store_string(pval);
+                                            self.line(&format!(";; Bloom: .{} {{ {}: {} }}", cls, prop, pval));
+                                            self.line(&format!("local.get {}", var));
+                                            self.line(&format!("i32.const {}", prop_offset));
+                                            self.line(&format!("i32.const {}", prop.len()));
+                                            self.line(&format!("i32.const {}", val_offset));
+                                            self.line(&format!("i32.const {}", pval.len()));
+                                            self.line("call $dom_setStyle");
+                                        }
+                                    }
+                                }
+                            } else {
+                            // Browser/Canvas target: rewrite class names as before
                             let effective_value = if name == "class" && !self.component_scoped_selectors.is_empty() {
                                 let comp = &self.component_name;
                                 value.split_whitespace()
@@ -7446,6 +7554,7 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", effective_value.len()));
                             self.line("call $dom_setAttr");
+                            } // end else (non-Bloom)
                             // Auto-register timing display elements
                             if name == "id" && value == "timing-display" {
                                 self.line(";; auto-register initial load timing element");
@@ -7626,14 +7735,35 @@ impl WasmCodegen {
                 self.line("call $dom_appendChild");
             }
             TemplateNode::TextLiteral(text) => {
-                let var = format!("$text_{}", self.next_label());
-                self.emit_template_local(&var);
-                let text_offset = self.store_string(text);
-                self.line(&format!(";; text: \"{}\"", text));
-                self.line(&format!("local.get {}", parent));
-                self.line(&format!("i32.const {}", text_offset));
-                self.line(&format!("i32.const {}", text.len()));
-                self.line("call $dom_setText");
+                if self.target == CompilationTarget::Bloom {
+                    // Bloom: wrap text in a <span> so it participates in stack layout.
+                    // setText on a parent with children causes overlap in Honeycomb.
+                    let var = format!("$text_{}", self.next_label());
+                    self.emit_template_local(&var);
+                    let tag_offset = self.store_string("span");
+                    let text_offset = self.store_string(text);
+                    self.line(&format!(";; text span: \"{}\"", text));
+                    self.line(&format!("i32.const {}", tag_offset));
+                    self.line("i32.const 4");
+                    self.line("call $dom_createElement");
+                    self.line(&format!("local.set {}", var));
+                    self.line(&format!("local.get {}", var));
+                    self.line(&format!("i32.const {}", text_offset));
+                    self.line(&format!("i32.const {}", text.len()));
+                    self.line("call $dom_setText");
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("local.get {}", var));
+                    self.line("call $dom_appendChild");
+                } else {
+                    let var = format!("$text_{}", self.next_label());
+                    self.emit_template_local(&var);
+                    let text_offset = self.store_string(text);
+                    self.line(&format!(";; text: \"{}\"", text));
+                    self.line(&format!("local.get {}", parent));
+                    self.line(&format!("i32.const {}", text_offset));
+                    self.line(&format!("i32.const {}", text.len()));
+                    self.line("call $dom_setText");
+                }
             }
             TemplateNode::Expression(expr) => {
                 self.line(";; dynamic expression");
@@ -8981,6 +9111,27 @@ impl WasmCodegen {
                         "random_float"        => "$webapi_randomFloat",
                         "performance_now"     => "$webapi_now",
                         "request_animation_frame" => "$webapi_requestAnimationFrame",
+                        // RTC — WebRTC peer connections, media, data channels
+                        "rtc_create_peer"            => "$rtc_createPeer",
+                        "rtc_create_offer"           => "$rtc_createOffer",
+                        "rtc_create_answer"          => "$rtc_createAnswer",
+                        "rtc_set_local_description"  => "$rtc_setLocalDescription",
+                        "rtc_set_remote_description" => "$rtc_setRemoteDescription",
+                        "rtc_add_ice_candidate"      => "$rtc_addIceCandidate",
+                        "rtc_close"                  => "$rtc_close",
+                        "rtc_get_user_media"         => "$rtc_getUserMedia",
+                        "rtc_get_display_media"      => "$rtc_getDisplayMedia",
+                        "rtc_add_track"              => "$rtc_addTrack",
+                        "rtc_remove_track"           => "$rtc_removeTrack",
+                        "rtc_stop_track"             => "$rtc_stopTrack",
+                        "rtc_set_track_enabled"      => "$rtc_setTrackEnabled",
+                        "rtc_get_track_kind"         => "$rtc_getTrackKind",
+                        "rtc_attach_stream"          => "$rtc_attachStream",
+                        "rtc_get_connection_state"   => "$rtc_getConnectionState",
+                        "rtc_create_data_channel"    => "$rtc_createDataChannel",
+                        "rtc_data_channel_send"      => "$rtc_dataChannelSend",
+                        "rtc_data_channel_close"     => "$rtc_dataChannelClose",
+                        "rtc_get_stats"              => "$rtc_getStats",
                         // Not a web API built-in — call by user-defined name
                         _ => "",
                     };
@@ -9847,6 +9998,10 @@ impl WasmCodegen {
                 for (i, elem) in elements.iter().enumerate() {
                     self.line(&format!("local.get {}", data_var));
                     self.generate_expr(elem);
+                    // String elements push (ptr, len) — drop len, store only ptr
+                    if matches!(elem, Expr::StringLit(_)) {
+                        self.line("drop ;; discard str len for array elem");
+                    }
                     if i == 0 {
                         self.line(&format!("i32.store ;; elem[{}]", i));
                     } else {
@@ -13810,7 +13965,17 @@ impl WasmCodegen {
                             "$http_addHeader" |
                             "$http_fetchWithCallback" |
                             "$router_navigate" |
-                            "$router_navigate_with_query"
+                            "$router_navigate_with_query" |
+                            // RTC void functions
+                            "$rtc_close" |
+                            "$rtc_setLocalDescription" |
+                            "$rtc_setRemoteDescription" |
+                            "$rtc_addIceCandidate" |
+                            "$rtc_removeTrack" |
+                            "$rtc_stopTrack" |
+                            "$rtc_setTrackEnabled" |
+                            "$rtc_attachStream" |
+                            "$rtc_dataChannelClose"
                         );
                     }
                 }
@@ -13831,6 +13996,17 @@ impl WasmCodegen {
             // Function calls to store actions are void — they don't return values
             Expr::FnCall { callee, .. } => {
                 if let Expr::Ident(name) = callee.as_ref() {
+                    // Bare RTC/webapi void functions
+                    if matches!(name.as_str(),
+                        "rtc_close" | "rtc_set_local_description" | "rtc_set_remote_description" |
+                        "rtc_add_ice_candidate" | "rtc_remove_track" | "rtc_stop_track" |
+                        "rtc_set_track_enabled" | "rtc_attach_stream" | "rtc_data_channel_close" |
+                        "console_log" | "console_warn" | "console_error" |
+                        "localStorage_set" | "localStorage_remove" |
+                        "clipboard_write" | "push_state" | "replace_state"
+                    ) {
+                        return true;
+                    }
                     if name.contains("::") {
                         let parts: Vec<&str> = name.splitn(2, "::").collect();
                         if parts.len() == 2 {
@@ -13994,6 +14170,27 @@ impl WasmCodegen {
             // PDF — WASM-internal pdf creation function
             "pdf::create"   => "$__pdf_create_".into(),
             "pdf::print"    => "$dom_print".into(),
+            // RTC — map snake_case stdlib names to camelCase WAT imports
+            "rtc_create_peer" | "rtc::create_peer" | "rtc::createPeer" => "$rtc_createPeer".into(),
+            "rtc_create_offer" | "rtc::create_offer" | "rtc::createOffer" => "$rtc_createOffer".into(),
+            "rtc_create_answer" | "rtc::create_answer" | "rtc::createAnswer" => "$rtc_createAnswer".into(),
+            "rtc_set_local_description" | "rtc::set_local_description" | "rtc::setLocalDescription" => "$rtc_setLocalDescription".into(),
+            "rtc_set_remote_description" | "rtc::set_remote_description" | "rtc::setRemoteDescription" => "$rtc_setRemoteDescription".into(),
+            "rtc_add_ice_candidate" | "rtc::add_ice_candidate" | "rtc::addIceCandidate" => "$rtc_addIceCandidate".into(),
+            "rtc_close" | "rtc::close" => "$rtc_close".into(),
+            "rtc_get_user_media" | "rtc::get_user_media" | "rtc::getUserMedia" => "$rtc_getUserMedia".into(),
+            "rtc_get_display_media" | "rtc::get_display_media" | "rtc::getDisplayMedia" => "$rtc_getDisplayMedia".into(),
+            "rtc_add_track" | "rtc::add_track" | "rtc::addTrack" => "$rtc_addTrack".into(),
+            "rtc_remove_track" | "rtc::remove_track" | "rtc::removeTrack" => "$rtc_removeTrack".into(),
+            "rtc_stop_track" | "rtc::stop_track" | "rtc::stopTrack" => "$rtc_stopTrack".into(),
+            "rtc_set_track_enabled" | "rtc::set_track_enabled" | "rtc::setTrackEnabled" => "$rtc_setTrackEnabled".into(),
+            "rtc_get_track_kind" | "rtc::get_track_kind" | "rtc::getTrackKind" => "$rtc_getTrackKind".into(),
+            "rtc_attach_stream" | "rtc::attach_stream" | "rtc::attachStream" => "$rtc_attachStream".into(),
+            "rtc_get_connection_state" | "rtc::get_connection_state" | "rtc::getConnectionState" => "$rtc_getConnectionState".into(),
+            "rtc_create_data_channel" | "rtc::create_data_channel" | "rtc::createDataChannel" => "$rtc_createDataChannel".into(),
+            "rtc_data_channel_send" | "rtc::data_channel_send" | "rtc::dataChannelSend" => "$rtc_dataChannelSend".into(),
+            "rtc_data_channel_close" | "rtc::data_channel_close" | "rtc::dataChannelClose" => "$rtc_dataChannelClose".into(),
+            "rtc_get_stats" | "rtc::get_stats" | "rtc::getStats" => "$rtc_getStats".into(),
             _ => {
                 let wasm_name = qualified.replace("::", "_");
                 format!("${}", wasm_name)

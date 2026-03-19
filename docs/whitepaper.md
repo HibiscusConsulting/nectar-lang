@@ -357,7 +357,7 @@ The browser's layout engine (CSS) computes positions. Nectar generates DOM eleme
 
 ### Canvas Mode (experimental)
 
-The `nectar-layout` crate — extracted from `nectar-runtime` — compiles to WASM and runs the same layout engine used for native desktop rendering. All product data, layout computation, rendering, state management, and event handling run in WASM. The browser provides 12 canvas 2D syscalls (each 1-3 lines). Total JS: ~60 lines of event forwarding.
+Honeycomb — Nectar's canvas rendering engine — compiles to WASM and runs a stack-based layout engine with Canvas 2D painting. All product data, layout computation, rendering, state management, and event handling run in WASM. The browser provides 12 canvas 2D syscalls (each 1-3 lines). Total JS: ~60 lines of event forwarding.
 
 **25ms for 10K products** — 10x faster than Svelte, 50x faster than React. Zero DOM nodes for products.
 
@@ -375,7 +375,7 @@ A key architectural decision: the same component styles work across all three re
 
 **DOM mode** emits CSS — scoped class names, custom properties, media queries. The browser's CSS engine handles layout and paint.
 
-**Canvas/Hybrid mode** uses `nectar-layout`, a stack-based layout engine extracted from `nectar-runtime` (the native desktop runtime). It accepts CSS property names directly:
+**Canvas/Hybrid mode** uses Honeycomb, a stack-based layout engine and canvas rendering engine. It accepts CSS property names directly:
 
 | CSS (DOM mode) | Nectar Layout (Canvas/Hybrid) |
 |---|---|
@@ -394,15 +394,15 @@ The layout engine's `resolve_style()` function parses both Nectar-native propert
 
 **Theme tokens** (`var(--accent)`) are resolved at compile time in canvas mode — the compiler substitutes the concrete value since there's no CSS engine at runtime. **Breakpoints** check `canvas_get_width()` instead of `@media` queries. **Scoped styles** generate unique class prefixes in DOM mode and direct style lookups in canvas mode.
 
-The same `nectar-layout` crate powers three platforms:
+Honeycomb powers multiple platforms:
 
-| Platform | Layout Engine | Renderer |
-|---|---|---|
-| **Browser (DOM)** | Browser CSS engine | Browser paint |
-| **Browser (Canvas/Hybrid)** | `nectar-layout.wasm` | Canvas 2D syscalls |
-| **Native Desktop** | `nectar-runtime` (same Rust code) | wgpu GPU shaders |
+| Platform | Layout Engine | Renderer | Status |
+|---|---|---|---|
+| **Browser (DOM)** | Browser CSS engine | Browser paint | Stable |
+| **Browser (Canvas/Hybrid)** | Honeycomb (WASM) | Canvas 2D syscalls | Beta |
+| **Native Desktop (Pollen)** | Honeycomb (native binary) | wgpu GPU shaders | In Development |
 
-One layout algorithm. Three renderers. Same `.nectar` source file.
+One layout algorithm. Multiple renderers. Same `.nectar` source file.
 
 ---
 

@@ -87,6 +87,16 @@ That's it. No bundler, no node_modules, no build pipeline.
 
 Nectar compiles to static files (WASM + JS). Deploy anywhere you'd deploy a website.
 
+**Nectar Deploy** (managed platform — in development):
+
+```bash
+nectar deploy --project my-app
+```
+
+One command provisions hosting, database, auth, payments, caching, file storage, and WebSocket channels based on the keywords in your source code. See [Platform](#platform) below.
+
+**Self-host** — deploy the static output anywhere:
+
 | Platform | How |
 |---|---|
 | **AWS** | Upload to S3, serve via CloudFront |
@@ -95,7 +105,6 @@ Nectar compiles to static files (WASM + JS). Deploy anywhere you'd deploy a webs
 | **Render** | Create a Static Site, point to your build directory |
 | **Vercel** | `vercel deploy` with the build output directory |
 | **Netlify** | Drag and drop, or connect your repo |
-| **Cloudflare Pages** | Connect repo, set build command to `nectar build` |
 | **GitHub Pages** | Push build output to `gh-pages` branch |
 
 For SSR (`nectar build --ssr`), deploy to any platform that runs a web server (Render Web Service, AWS Lambda, Cloud Run, etc.).
@@ -155,6 +164,29 @@ See [`examples/`](examples/) for complete working apps:
 
 [See all 39 examples ->](examples/)
 
+## Platform
+
+Nectar is one part of a larger ecosystem:
+
+| Component | Status | Description |
+|---|---|---|
+| **Nectar** | Beta | The language and compiler — `.nectar` to `.wasm` |
+| **Honeycomb** | Beta | Canvas rendering engine — replaces the browser's DOM/CSS/paint pipeline with a WASM-native element tree, stack-based layout engine, and Canvas 2D renderer |
+| **Pollen** | In Development | Native desktop/mobile runtime — replaces Electron with a lightweight WASM-first shell (no V8, no Chromium, no GC) |
+| **Bloom** | Planned | WASM-first browser — executes WASM natively without a JS engine intermediary, eliminating the WASM-to-JS bridge entirely |
+| **Nectar Deploy** | In Development | Managed hosting + services platform — language keywords (`auth`, `db`, `payment`, `cache`, `channel`, `upload`) map directly to managed infrastructure provisioned on deploy |
+
+### Render Modes
+
+The same `.nectar` source compiles to two rendering backends:
+
+```bash
+nectar build app.nectar --render=dom      # Browser DOM (default) — SSR, SEO, accessibility
+nectar build app.nectar --render=canvas   # Honeycomb — WASM layout + Canvas 2D, zero DOM nodes
+```
+
+See [Render Modes](docs/render-modes.md) for details.
+
 ## Documentation
 
 | Doc | Contents |
@@ -162,6 +194,7 @@ See [`examples/`](examples/) for complete working apps:
 | [Getting Started](docs/getting-started.md) | Install, first app, dev server |
 | [Language Reference](docs/language-reference.md) | Full syntax, types, ownership, components, stores |
 | [Architecture](docs/architecture.md) | Compiler pipeline, runtime, WASM bridge |
+| [Render Modes](docs/render-modes.md) | DOM, Canvas, and Hybrid rendering modes |
 | [Runtime API](docs/runtime-api.md) | JS syscall layer, command buffer, WASM imports |
 | [Toolchain](docs/toolchain.md) | CLI commands, formatter, linter, LSP |
 | [AI Integration](docs/nectar-for-ai.md) | Agents, tools, prompts, streaming |

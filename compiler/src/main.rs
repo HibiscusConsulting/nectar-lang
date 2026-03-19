@@ -165,7 +165,7 @@ enum Commands {
         #[arg(long)]
         verify_contracts: Option<String>,
 
-        /// Emit a complete canvas app: .wasm + index.html host + devtools.
+        /// Emit a complete canvas cell: .wasm + index.html host + devtools.
         /// Output is a directory ready to serve.
         #[arg(long)]
         canvas: bool,
@@ -1162,7 +1162,7 @@ opt-level = {}
     fs::write(build_dir.join("src/lib.rs"), &rust_source)?;
 
     // Step 4: Compile to WASM
-    println!("nectar: compiling canvas app...");
+    println!("nectar: compiling canvas cell...");
     let cargo_result = std::process::Command::new("cargo")
         .arg("build")
         .arg("--target")
@@ -1204,9 +1204,9 @@ opt-level = {}
     let _ = fs::remove_dir_all(&build_dir);
 
     let wasm_kb = fs::metadata(&wasm_path).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0);
-    println!("nectar: canvas app built -> {}/", out_dir.display());
+    println!("nectar: canvas cell built -> {}/", out_dir.display());
     println!("  index.html  (host — canvas syscalls only)");
-    println!("  app.wasm    ({:.1} KB) — single binary (app + Honeycomb engine)", wasm_kb);
+    println!("  app.wasm    ({:.1} KB) — single binary (cell + Honeycomb engine)", wasm_kb);
     println!();
     println!("  Serve with: cd {} && python3 -m http.server 8080", out_dir.display());
 
@@ -1279,7 +1279,32 @@ const imports = {{ env: {{
   app_callback: () => {{}},
   file_picker_open: () => 0,
   media_create: () => 0, media_play: () => {{}}, media_pause: () => {{}}, media_destroy: () => {{}},
+  // HTTP fetch — 1-line bridges to browser fetch() API
+  fetch_request: (up,ul,method,bp,bl,cb) => {{
+    const url = dec.decode(new Uint8Array(W.memory.buffer,up,ul));
+    const opts = {{ method: ['GET','POST','PUT','DELETE','PATCH'][method]||'GET', headers: {{..._fh}} }};
+    if (bl > 0) opts.body = new Uint8Array(W.memory.buffer,bp,bl).slice();
+    _fh = {{}};
+    fetch(url,opts).then(async r => {{ _fs=r.status; _fb=new Uint8Array(await r.arrayBuffer()); if(W.__callback)W.__callback(cb); W.app_render(); }}).catch(()=>{{_fs=0;_fb=new Uint8Array(0);}});
+  }},
+  fetch_set_header: (kp,kl,vp,vl) => {{ _fh[dec.decode(new Uint8Array(W.memory.buffer,kp,kl))]=dec.decode(new Uint8Array(W.memory.buffer,vp,vl)); }},
+  fetch_response_status: () => _fs,
+  fetch_response_body: (bp,bc) => {{ const n=Math.min(_fb.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(_fb.subarray(0,n)); return n; }},
+  // Storage — 1-line bridges to browser localStorage
+  storage_get: (kp,kl,bp,bc) => {{ const v=localStorage.getItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))); if(!v)return 0; const b=new TextEncoder().encode(v); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; }},
+  storage_set: (kp,kl,vp,vl) => localStorage.setItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl)),dec.decode(new Uint8Array(W.memory.buffer,vp,vl))),
+  storage_remove: (kp,kl) => localStorage.removeItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))),
+  // Routing — 1-line bridges to browser location.hash
+  get_location_hash: (bp,bc) => {{ const h=location.hash.slice(1); const b=new TextEncoder().encode(h); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; }},
+  set_location_hash: (p,l) => {{ location.hash=dec.decode(new Uint8Array(W.memory.buffer,p,l)); }},
+  on_hashchange: (cb) => window.addEventListener('hashchange',()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }}),
+  // Timers — 1-line bridges to browser setTimeout/setInterval
+  set_timeout: (cb,ms) => setTimeout(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
+  set_interval: (cb,ms) => setInterval(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
+  clear_interval: (id) => clearInterval(id),
+  clear_timeout: (id) => clearTimeout(id),
 }}}};
+let _fh={{}}, _fs=0, _fb=new Uint8Array(0);
 
 const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm'), imports);
 W = instance.exports;

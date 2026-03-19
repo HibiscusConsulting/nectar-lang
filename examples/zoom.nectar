@@ -1,240 +1,75 @@
-// zoom.nectar — Peer-to-peer video calling in Nectar
+// zoom.nectar — Peer-to-peer video call cell
 //
-// Demonstrates: WebRTC peer connections, WebSocket signaling,
-// camera/mic capture, reactive UI, real-time state management.
-//
-// Zero JavaScript. The entire call stack runs in WASM:
-// - Signaling via WebSocket channel
-// - SDP offer/answer exchange
-// - ICE candidate trickle
-// - Media track management
-// - UI rendering via honeycomb layout engine
+// Uses real WebRTC: peer connections, camera/mic capture,
+// SDP offer/answer, ICE candidates.
+// Runs natively in pollen with webrtc-rs + camera.rs + media.rs.
 
-contract SignalMessage {
-    type: String,
-    sdp: String,
-    candidate: String,
-    sdp_mid: String,
-    from: String,
-    room: String,
-}
+component ZoomApp() {
+    let mut status: String = "Ready";
+    let mut peer_id: i32 = 0;
+    let mut media_id: i32 = 0;
+    let mut in_call: bool = false;
+    let mut is_muted: bool = false;
+    let mut cam_off: bool = false;
 
-store CallState {
-    signal peer_id: i32 = 0;
-    signal local_stream: i32 = 0;
-    signal remote_stream: i32 = 0;
-    signal connected: bool = false;
-    signal muted: bool = false;
-    signal video_off: bool = false;
-    signal room_id: String = "";
-    signal status: String = "idle";
-
-    action set_connected(&mut self, val: bool) {
-        self.connected = val;
-        if val {
-            self.status = "Connected";
-        } else {
-            self.status = "Disconnected";
-        }
+    fn join(&mut self) {
+        self.media_id = rtc_get_user_media(true, true);
+        self.peer_id = rtc_create_peer(["stun:stun.l.google.com:19302"]);
+        rtc_add_track(self.peer_id, self.media_id, self.media_id);
+        self.in_call = true;
+        self.status = "In call";
     }
 
-    action set_status(&mut self, s: String) {
-        self.status = s;
-    }
-}
-
-channel Signaling -> SignalMessage {
-    url: "wss://signal.example.com/ws",
-    reconnect: true,
-    heartbeat: 15000,
-
-    on_connect fn() {
-        CallState.set_status("Signal server connected");
-    }
-
-    on_message fn(msg: SignalMessage) {
-        if msg.type == "offer" {
-            handle_offer(msg.sdp, msg.from);
+    fn leave(&mut self) {
+        if self.peer_id > 0 {
+            rtc_close(self.peer_id);
         }
-        if msg.type == "answer" {
-            handle_answer(msg.sdp);
-        }
-        if msg.type == "ice-candidate" {
-            handle_ice_candidate(msg.candidate, msg.sdp_mid);
-        }
-        if msg.type == "peer-joined" {
-            CallState.set_status("Peer joined — initiating call");
-            start_call();
-        }
-    }
-
-    on_disconnect fn() {
-        CallState.set_status("Signal server disconnected");
-    }
-}
-
-fn start_call() {
-    let peer = CallState.peer_id;
-    if peer == 0 { return; }
-
-    // Create and send offer
-    let offer_sdp = rtc_create_offer(peer);
-    rtc_set_local_description(peer, "offer", offer_sdp);
-    Signaling.send(format("{}", SignalMessage {
-        type: "offer",
-        sdp: offer_sdp,
-        candidate: "",
-        sdp_mid: "",
-        from: "self",
-        room: CallState.room_id,
-    }));
-}
-
-fn handle_offer(sdp: String, from: String) {
-    let peer = CallState.peer_id;
-    if peer == 0 { return; }
-
-    rtc_set_remote_description(peer, "offer", sdp);
-    let answer_sdp = rtc_create_answer(peer);
-    rtc_set_local_description(peer, "answer", answer_sdp);
-    Signaling.send(format("{}", SignalMessage {
-        type: "answer",
-        sdp: answer_sdp,
-        candidate: "",
-        sdp_mid: "",
-        from: "self",
-        room: CallState.room_id,
-    }));
-}
-
-fn handle_answer(sdp: String) {
-    let peer = CallState.peer_id;
-    if peer == 0 { return; }
-    rtc_set_remote_description(peer, "answer", sdp);
-}
-
-fn handle_ice_candidate(candidate: String, sdp_mid: String) {
-    let peer = CallState.peer_id;
-    if peer == 0 { return; }
-    rtc_add_ice_candidate(peer, candidate, sdp_mid);
-}
-
-component VideoCall() {
-    fn on_mount(&mut self) {
-        // Create peer connection with STUN server
-        let peer = rtc_create_peer(["stun:stun.l.google.com:19302"]);
-        CallState.peer_id = peer;
-
-        // Get local camera and microphone
-        let stream = rtc_get_user_media(true, true);
-        CallState.local_stream = stream;
-
-        // Add local tracks to peer connection
-        rtc_add_track(peer, stream, stream);
-
-        CallState.set_status("Camera ready — waiting for peer");
+        self.in_call = false;
+        self.status = "Call ended";
     }
 
     fn toggle_mute(&mut self) {
-        CallState.muted = !CallState.muted;
-        let stream = CallState.local_stream;
-        if stream > 0 {
-            // Toggle audio track
-            rtc_set_track_enabled(stream, !CallState.muted);
+        self.is_muted = !self.is_muted;
+        if self.media_id > 0 {
+            rtc_set_track_enabled(self.media_id, !self.is_muted);
         }
     }
 
-    fn toggle_video(&mut self) {
-        CallState.video_off = !CallState.video_off;
-        let stream = CallState.local_stream;
-        if stream > 0 {
-            rtc_set_track_enabled(stream, !CallState.video_off);
+    fn toggle_cam(&mut self) {
+        self.cam_off = !self.cam_off;
+        if self.media_id > 0 {
+            rtc_set_track_enabled(self.media_id, !self.cam_off);
         }
-    }
-
-    fn hang_up(&mut self) {
-        let peer = CallState.peer_id;
-        if peer > 0 {
-            rtc_close(peer);
-        }
-        CallState.set_connected(false);
-        CallState.set_status("Call ended");
-    }
-
-    fn join_room(&mut self) {
-        CallState.room_id = "default-room";
-        CallState.set_status("Joining room...");
-        Signaling.send(format("{}", SignalMessage {
-            type: "join",
-            sdp: "",
-            candidate: "",
-            sdp_mid: "",
-            from: "self",
-            room: "default-room",
-        }));
     }
 
     render {
         <div style="background-color: #0f0f0f; width: 100%; height: 100%; flex-direction: column;">
-
-            // ── Video grid ──
             <div style="flex-direction: row; width: 100%; height: fill; padding: 16px; gap: 16px;">
-
-                // Remote video (large)
                 <div style="width: fill; height: fill; background-color: #1a1a2e; border-radius: 12px; align-items: center; justify-content: center;">
-                    {if CallState.connected}
-                        <div data-nid="remote-video" style="width: 100%; height: 100%; border-radius: 12px;"></div>
-                    {else}
-                        <div style="flex-direction: column; align-items: center; gap: 8px;">
-                            <span style="color: #6b7280; font-size: 48px;">"📹"</span>
-                            <span style="color: #6b7280; font-size: 16px;">"Waiting for peer..."</span>
-                        </div>
-                    {/if}
+                    <span style="color: #6b7280; font-size: 18px;">"Remote Video"</span>
                 </div>
-
-                // Local video (small, picture-in-picture)
                 <div style="width: 240px; height: 180px; background-color: #16213e; border-radius: 12px; align-items: center; justify-content: center;">
-                    <div data-nid="local-video" style="width: 100%; height: 100%; border-radius: 12px;"></div>
-                    {if CallState.video_off}
-                        <div style="width: 100%; height: 100%; background-color: #1a1a2e; border-radius: 12px; align-items: center; justify-content: center;">
-                            <span style="color: #6b7280; font-size: 24px;">"Camera off"</span>
-                        </div>
-                    {/if}
+                    <span style="color: #94a3b8; font-size: 13px;">"Local Preview"</span>
                 </div>
             </div>
 
-            // ── Status bar ──
-            <div style="height: 32px; padding: 8px; align-items: center; justify-content: center;">
-                <span style="color: #9ca3af; font-size: 13px;">{CallState.status}</span>
+            <div style="height: 32px; padding: 8px; flex-direction: row; justify-content: center;">
+                <span style="color: #9ca3af; font-size: 13px;">{format("{}", self.status)}</span>
             </div>
 
-            // ── Controls bar ──
             <div style="height: 80px; flex-direction: row; align-items: center; justify-content: center; gap: 16px; padding: 16px;">
-
-                // Mute button
-                <button on:click={self.toggle_mute} style="width: 56px; height: 56px; border-radius: 28px; background-color: {if CallState.muted} #ef4444 {else} #374151 {/if}; align-items: center; justify-content: center;">
-                    <span style="color: #ffffff; font-size: 20px;">
-                        {if CallState.muted} "🔇" {else} "🎤" {/if}
-                    </span>
+                <button on:click={self.toggle_mute} style="width: 64px; height: 48px; border-radius: 24px; background-color: #374151;">
+                    <span style="color: #ffffff; font-size: 13px;">"Mute"</span>
                 </button>
-
-                // Video toggle
-                <button on:click={self.toggle_video} style="width: 56px; height: 56px; border-radius: 28px; background-color: {if CallState.video_off} #ef4444 {else} #374151 {/if}; align-items: center; justify-content: center;">
-                    <span style="color: #ffffff; font-size: 20px;">
-                        {if CallState.video_off} "📷" {else} "🎥" {/if}
-                    </span>
+                <button on:click={self.toggle_cam} style="width: 64px; height: 48px; border-radius: 24px; background-color: #374151;">
+                    <span style="color: #ffffff; font-size: 13px;">"Camera"</span>
                 </button>
-
-                // Join / Hang up
-                {if CallState.connected}
-                    <button on:click={self.hang_up} style="width: 72px; height: 56px; border-radius: 28px; background-color: #ef4444; align-items: center; justify-content: center;">
-                        <span style="color: #ffffff; font-size: 20px;">"📞"</span>
-                    </button>
-                {else}
-                    <button on:click={self.join_room} style="width: 72px; height: 56px; border-radius: 28px; background-color: #22c55e; align-items: center; justify-content: center;">
-                        <span style="color: #ffffff; font-size: 20px;">"📞"</span>
-                    </button>
-                {/if}
+                <button on:click={self.join} style="width: 72px; height: 48px; border-radius: 24px; background-color: #22c55e;">
+                    <span style="color: #ffffff; font-size: 13px;">"Join"</span>
+                </button>
+                <button on:click={self.leave} style="width: 72px; height: 48px; border-radius: 24px; background-color: #ef4444;">
+                    <span style="color: #ffffff; font-size: 13px;">"End"</span>
+                </button>
             </div>
         </div>
     }
