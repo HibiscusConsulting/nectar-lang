@@ -1306,22 +1306,7 @@ const imports = {{ env: {{
 }}}};
 let _fh={{}}, _fs=0, _fb=new Uint8Array(0);
 
-// WASM-first detection — if the browser provides native syscalls (Bloom, Pollen),
-// skip the JS bridges entirely. The WASM binary is identical — only the host changes.
-const isWasmFirst = typeof navigator !== 'undefined' &&
-    (navigator.userAgent.includes('Bloom') || navigator.userAgent.includes('Pollen') ||
-     window.__wasm_first === true);
-
-if (isWasmFirst) {{
-    // WASM-first browser — syscalls are native (Rust via wasmtime/wgpu).
-    // No JS bridges needed. The browser provides them.
-    console.log('%c[Nectar]%c WASM-first runtime detected — native syscalls', 'color:#3fb950;font-weight:bold', 'color:inherit');
-}}
-
-const {{ instance }} = await WebAssembly.instantiateStreaming(
-    fetch('app.wasm'),
-    isWasmFirst ? undefined : imports
-);
+const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm'), imports);
 W = instance.exports;
 
 // 1. nectar_init builds the element tree via Honeycomb's wasm_api
