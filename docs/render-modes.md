@@ -71,7 +71,7 @@ The template syntax is identical across all three modes. The compiler generates 
 | Tab navigation | Native | WASM-driven | WASM-driven |
 | Bundle size | 48 KB | 165 KB | 165 KB |
 | DOM nodes | All visible | 1 (`<canvas>`) | All hidden |
-| Layout engine | Browser CSS | nectar-layout (WASM) | Browser CSS |
+| Layout engine | Browser CSS | Honeycomb (WASM) | Browser CSS |
 | Paint engine | Browser | Canvas 2D | Canvas 2D |
 
 ## When to Use Each Mode
@@ -144,7 +144,7 @@ component ProductCard {
 
 ### Canvas/Hybrid Mode — Stacks
 
-Canvas and hybrid modes use `nectar-layout`, a stack-based layout engine. Three layout directions, three sizing policies:
+Canvas and hybrid modes use Honeycomb's stack-based layout engine. Three layout directions, three sizing policies:
 
 **Directions:**
 - `Vertical` — children stack top to bottom (like `flex-direction: column`)
@@ -181,9 +181,9 @@ The layout engine uses a two-pass algorithm:
 
 2. **Layout pass (top-down):** Given available space from the parent, compute final position and size. Distribute `Fill` weights proportionally. Align and justify children. Recursively layout children with constrained space.
 
-This is the same algorithm used by `nectar-runtime` for native desktop rendering. The same Rust code compiles to:
-- Native binary (for desktop apps via wgpu)
+This is the same layout algorithm used by Honeycomb, Nectar's canvas rendering engine. The same Rust code compiles to:
 - WASM (for browser canvas/hybrid mode)
+- Native binary (planned — for desktop apps via Pollen runtime and wgpu)
 
 ## Style Reuse Across Modes
 
@@ -212,7 +212,7 @@ The developer writes styles once. The compiler translates to the appropriate tar
   dom_setAttr        canvas_fillRect    + canvas_fillRect (visible)
   dom_setText        canvas_fillText    + dom_get_rect (sync)
   |                 |                  |
-  Browser CSS       nectar-layout.wasm  Browser CSS (layout)
+  Browser CSS       Honeycomb (WASM)    Browser CSS (layout)
   Browser paint     Canvas 2D (paint)   Canvas 2D (paint)
 ```
 

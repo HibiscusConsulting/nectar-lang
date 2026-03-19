@@ -104,6 +104,20 @@ All compiler modules live in `compiler/src/`:
 | Standard library | `stdlib.rs` | Built-in types and functions |
 | CLI entry point | `main.rs` | Command-line interface |
 
+### Honeycomb (Canvas Rendering Engine)
+
+When compiling with `--render=canvas`, the compiler targets Honeycomb instead of the browser DOM. Honeycomb is a separate crate that provides:
+
+- **ElementTree** — a flat `Vec<Option<Element>>` pool indexed by `u32` handles, replacing the browser's DOM tree
+- **LayoutStyle / LayoutNode** — typed structs for layout (direction, gap, padding, align, justify, sizing policies). No CSS parsing, no HashMap lookups on the hot path.
+- **VisualStyle** — typed fields for rendering (background color, border, font size, opacity). No string-based style lookups.
+- **Stack-based layout engine** — two-pass algorithm (measure bottom-up, layout top-down) with `Fill(weight)` / `Hug` / `Fixed(px)` sizing policies
+- **Canvas 2D renderer** — walks the element tree, culls off-screen elements, and issues `canvas_fill_rect` / `canvas_fill_text` / `canvas_draw_image` syscalls
+- **Signal system** — `O(1)` per-binding updates with `SignalEffect` variants (`SetText`, `SetVisible`, `SetChecked`, `SetStyle`). Only affected subtrees re-layout.
+- **Widget catalog** — static `WidgetDef` definitions for checkbox, toggle, slider, dropdown, datepicker, etc. with default styles and focusability
+
+The WASM→host boundary in canvas mode is 6 canvas syscalls (init, clear, fill_rect, fill_text, measure_text, draw_image). Everything else — layout, hit testing, signals, state, event routing — is pure WASM.
+
 ---
 
 ## Lexer

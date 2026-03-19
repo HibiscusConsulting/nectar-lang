@@ -1675,6 +1675,91 @@ impl TypeChecker {
             });
         }
 
+        // Register RTC (WebRTC) namespace functions
+        {
+            let string_array = Ty::Array(Box::new(Ty::String_));
+            self.fn_sigs.insert("rtc_create_peer".to_string(), Ty::Function {
+                params: vec![string_array],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("rtc_create_offer".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("rtc_create_answer".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("rtc_set_local_description".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_set_remote_description".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_add_ice_candidate".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_close".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_get_user_media".to_string(), Ty::Function {
+                params: vec![Ty::Bool, Ty::Bool],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("rtc_get_display_media".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("rtc_add_track".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("rtc_remove_track".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_stop_track".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_set_track_enabled".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::Bool],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_get_track_kind".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("rtc_attach_stream".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_get_connection_state".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+            self.fn_sigs.insert("rtc_create_data_channel".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("rtc_data_channel_send".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_data_channel_close".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("rtc_get_stats".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::String_),
+            });
+        }
+
         for item in &program.items {
             match item {
                 Item::Struct(s) => {
@@ -2691,7 +2776,8 @@ impl TypeChecker {
                         "chart", "csv", "compress", "animate", "theme", "mask",
                         "combobox", "editor", "syntax", "media", "image", "qr",
                         "share", "wizard", "maps", "responsive",
-                        "geolocation", "camera", "biometric", "haptic"];
+                        "geolocation", "camera", "biometric", "haptic",
+                        "rtc", "gpu"];
                     if stdlib_ns.contains(&name.as_str()) {
                         return Ty::Struct(name.clone());
                     }
