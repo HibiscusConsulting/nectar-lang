@@ -1,0 +1,92 @@
+// Real-Time WebSocket Dashboard — signal-driven metric updates
+// Demonstrates: O(1) signal updates per binding, no VDOM diffing
+// Each metric card is a signal subscriber — update is a single field write
+
+component Dashboard() {
+    let mut messages_per_sec: i32 = 0;
+    let mut total_messages: i32 = 0;
+    let mut uptime_sec: i32 = 0;
+    let mut cpu_percent: i32 = 0;
+    let mut memory_mb: i32 = 0;
+    let mut network_mbps: i32 = 0;
+    let mut active_connections: i32 = 0;
+    let mut error_rate: i32 = 0;
+    let mut request_latency_ms: i32 = 0;
+    let mut throughput_rps: i32 = 0;
+    let mut queue_depth: i32 = 0;
+    let mut disk_io_mbps: i32 = 0;
+    let mut metric_count: i32 = 9;
+
+    fn simulate_tick(&mut self) {
+        self.messages_per_sec = 800 + (self.uptime_sec * 7) % 400;
+        self.total_messages = self.total_messages + self.messages_per_sec;
+        self.uptime_sec = self.uptime_sec + 1;
+        self.cpu_percent = 35 + (self.uptime_sec * 13) % 50;
+        self.memory_mb = 2048 + (self.uptime_sec * 3) % 1024;
+        self.network_mbps = 120 + (self.uptime_sec * 11) % 80;
+        self.active_connections = 5000 + (self.uptime_sec * 17) % 3000;
+        self.error_rate = (self.uptime_sec * 7) % 30;
+        self.request_latency_ms = 2 + (self.uptime_sec * 23) % 15;
+        self.throughput_rps = 15000 + (self.uptime_sec * 31) % 10000;
+        self.queue_depth = (self.uptime_sec * 3) % 500;
+        self.disk_io_mbps = 50 + (self.uptime_sec * 19) % 100;
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: fill; background-color: #0b0e14; padding: 20; gap: 16">
+            // Title bar
+            <div style="direction: horizontal; align: center; gap: 12; height: 40px">
+                <div style="font-size: 22px; font-weight: 700; color: #e6edf3">"Real-Time Dashboard"</div>
+                <div style="padding: 4 12; background-color: #16a34a; border-radius: 12; font-size: 12px; color: #ffffff; font-weight: 600">"LIVE"</div>
+                <div style="font-size: 13px; color: #8b949e">{format("{} msg/sec | {} total", self.messages_per_sec, self.total_messages)}</div>
+            </div>
+
+            // Metrics grid — each card is a signal binding
+            <div style="direction: horizontal; wrap: true; gap: 12">
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"CPU USAGE"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #3fb950">{format("{}%", self.cpu_percent)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"MEMORY"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #58a6ff">{format("{} MB", self.memory_mb)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"NETWORK I/O"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #f97316">{format("{} Mbps", self.network_mbps)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"CONNECTIONS"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #bc8cff">{format("{}", self.active_connections)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"LATENCY"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #3fb950">{format("{}ms", self.request_latency_ms)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"THROUGHPUT"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #58a6ff">{format("{} rps", self.throughput_rps)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"ERROR RATE"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #f85149">{format("{}%", self.error_rate)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"QUEUE DEPTH"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #f97316">{format("{}", self.queue_depth)}</div>
+                </div>
+                <div style="width: 200px; padding: 16; background-color: #131720; border-radius: 8">
+                    <div style="font-size: 11px; color: #8b949e; font-weight: 600">"DISK I/O"</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #bc8cff">{format("{} MB/s", self.disk_io_mbps)}</div>
+                </div>
+            </div>
+
+            // Status bar
+            <div style="direction: horizontal; padding: 12; background-color: #131720; border-radius: 8; gap: 24; align: center">
+                <div style="font-size: 13px; color: #8b949e">{format("Uptime: {}s", self.uptime_sec)}</div>
+                <div style="font-size: 13px; color: #3fb950">"Signals: O(1) per binding — no VDOM diff"</div>
+                <button on:click={self.simulate_tick} style="padding: 8 16; background-color: #3b82f6; border-radius: 6; cursor: pointer; font-size: 13px; color: #ffffff; font-weight: 600">"Simulate Tick"</button>
+            </div>
+        </div>
+    }
+}

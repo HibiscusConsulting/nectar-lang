@@ -3,6 +3,7 @@ mod lexer;
 mod ast;
 mod parser;
 mod codegen;
+mod rust_codegen;
 mod wasm_binary;
 mod borrow_checker;
 mod stdlib;
@@ -163,6 +164,11 @@ enum Commands {
         /// Halts the build if any contract mismatches are found.
         #[arg(long)]
         verify_contracts: Option<String>,
+
+        /// Emit a complete canvas app: .wasm + index.html host + devtools.
+        /// Output is a directory ready to serve.
+        #[arg(long)]
+        canvas: bool,
     },
     /// Compile and run test blocks
     Test {
@@ -268,6 +274,7 @@ fn main() -> anyhow::Result<()> {
             flags,
             target,
             verify_contracts,
+            canvas,
         }) => {
             // Resolve dependencies first, then compile.
             if let Err(e) = cmd_install() {
@@ -279,7 +286,11 @@ fn main() -> anyhow::Result<()> {
             let input = input.ok_or_else(|| {
                 anyhow::anyhow!("no input file specified for `nectar build`")
             })?;
-            compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, verify_contracts)
+            if canvas {
+                build_canvas_app(&input, output, no_check, opt_level, &target, verify_contracts)
+            } else {
+                compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, verify_contracts)
+            }
         }
         Some(Commands::Test { input, filter, watch }) => cmd_test(&input, filter, watch),
         Some(Commands::Fmt { input, check, stdin }) => cmd_fmt(input, check, stdin),
@@ -1089,6 +1100,255 @@ fn item_name(item: &ast::Item) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
+// Canvas app build — nectar build --canvas
+// Outputs a complete directory: .wasm + index.html + devtools
+// ---------------------------------------------------------------------------
+
+fn build_canvas_app(
+    input: &PathBuf,
+    output: Option<PathBuf>,
+    no_check: bool,
+    opt_level: u8,
+    _target: &str,
+    _verify_contracts: Option<String>,
+) -> anyhow::Result<()> {
+    let out_dir = output.unwrap_or_else(|| {
+        let stem = input.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        PathBuf::from(format!("{}-build", stem))
+    });
+    fs::create_dir_all(&out_dir)?;
+
+    // Step 1: Parse the .nectar source
+    let source = fs::read_to_string(input)?;
+    let mut lexer = Lexer::new(&source);
+    let tokens = lexer.tokenize().map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut parser = Parser::new(tokens);
+    let (program, errors) = parser.parse_program_recovering();
+    if !errors.is_empty() {
+        for e in &errors { eprintln!("error: {}:{}: {}", e.span.line, e.span.col, e.message); }
+        return Err(anyhow::anyhow!("{} parse errors", errors.len()));
+    }
+
+    // Step 2: Generate Rust source from AST
+    let mut codegen = rust_codegen::RustCodegen::new();
+    let rust_source = codegen.generate(&program);
+
+    // Step 3: Create a temporary Cargo project
+    let build_dir = std::env::temp_dir().join(format!("nectar-canvas-{}", std::process::id()));
+    fs::create_dir_all(build_dir.join("src"))?;
+
+    // Resolve absolute path to honeycomb crate
+    let honeycomb_path = fs::canonicalize("../honeycomb")
+        .or_else(|_| fs::canonicalize("honeycomb"))
+        .unwrap_or_else(|_| PathBuf::from("../honeycomb"));
+
+    fs::write(build_dir.join("Cargo.toml"), format!(
+        r#"[package]
+name = "nectar-app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+honeycomb = {{ path = "{}" }}
+
+[profile.release]
+opt-level = {}
+"#, honeycomb_path.display(), if opt_level >= 2 { "s" } else { "2" }))?;
+
+    fs::write(build_dir.join("src/lib.rs"), &rust_source)?;
+
+    // Step 4: Compile to WASM
+    println!("nectar: compiling canvas app...");
+    let cargo_result = std::process::Command::new("cargo")
+        .arg("build")
+        .arg("--target")
+        .arg("wasm32-unknown-unknown")
+        .arg("--release")
+        .arg("--manifest-path")
+        .arg(build_dir.join("Cargo.toml"))
+        .output()?;
+
+    if !cargo_result.status.success() {
+        let stderr = String::from_utf8_lossy(&cargo_result.stderr);
+        // Save the generated Rust for debugging
+        let debug_path = out_dir.join("generated.rs");
+        fs::write(&debug_path, &rust_source)?;
+        eprintln!("nectar: generated Rust saved to {} for debugging", debug_path.display());
+        // Show only error lines, not warnings
+        for line in stderr.lines() {
+            if line.contains("error[E") || line.contains("error:") || line.starts_with("  -->") {
+                eprintln!("{}", line);
+            }
+        }
+        return Err(anyhow::anyhow!("cargo build failed — generated Rust has errors"));
+    }
+
+    // Step 5: Copy the resulting WASM
+    let wasm_src = build_dir
+        .join("target/wasm32-unknown-unknown/release/nectar_app.wasm");
+    let wasm_path = out_dir.join("app.wasm");
+    fs::copy(&wasm_src, &wasm_path)?;
+
+    // Step 6: Generate index.html (minimal canvas host — just canvas syscalls)
+    let app_name = input.file_stem().unwrap_or_default().to_string_lossy();
+    let html = generate_canvas_html(&app_name);
+    fs::write(out_dir.join("index.html"), &html)?;
+
+    // Save generated Rust for inspection
+    let _ = fs::copy(build_dir.join("src/lib.rs"), out_dir.join("generated.rs"));
+    // Clean up temp build dir
+    let _ = fs::remove_dir_all(&build_dir);
+
+    let wasm_kb = fs::metadata(&wasm_path).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0);
+    println!("nectar: canvas app built -> {}/", out_dir.display());
+    println!("  index.html  (host — canvas syscalls only)");
+    println!("  app.wasm    ({:.1} KB) — single binary (app + Honeycomb engine)", wasm_kb);
+    println!();
+    println!("  Serve with: cd {} && python3 -m http.server 8080", out_dir.display());
+
+    Ok(())
+}
+
+fn find_honeycomb_wasm() -> Option<PathBuf> {
+    let candidates = [
+        PathBuf::from("../honeycomb/target/wasm32-unknown-unknown/release/honeycomb.wasm"),
+        PathBuf::from("target/wasm32-unknown-unknown/release/honeycomb.wasm"),
+        PathBuf::from("honeycomb.wasm"),
+    ];
+    candidates.into_iter().find(|p| p.exists())
+}
+
+fn generate_canvas_html(app_name: &str) -> String {
+    // Single WASM binary — .nectar app compiled with Honeycomb into one module.
+    // JS provides only canvas syscalls (1-line bridges to Canvas 2D API).
+    // The WASM exports app_init(vw, vh) and app_render().
+    // Zero logic in JS. Just dispatch table + canvas syscalls (1-line browser API bridges).
+    format!(r##"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{app_name}</title>
+<style>*{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}canvas{{display:block}}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(async () => {{
+const cvs = document.getElementById('c');
+let dpr = window.devicePixelRatio || 1;
+cvs.width = window.innerWidth * dpr;
+cvs.height = window.innerHeight * dpr;
+cvs.style.width = window.innerWidth + 'px';
+cvs.style.height = window.innerHeight + 'px';
+let ctx = cvs.getContext('2d');
+ctx.scale(dpr, dpr);
+const dec = new TextDecoder();
+
+// Single WASM binary — app + Honeycomb compiled together.
+// JS provides ONLY canvas syscalls (1-line bridges to Canvas 2D API).
+let W;
+const imports = {{ env: {{
+  canvas_init: (w,h) => {{ cvs.width=w*dpr; cvs.height=h*dpr; cvs.style.width=w+'px'; cvs.style.height=h+'px'; ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr); return 1; }},
+  canvas_clear: (id) => ctx.clearRect(0,0,window.innerWidth,window.innerHeight),
+  canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
+  canvas_fill_rect: (id,x,y,w,h,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.fillRect(x,y,w,h); }},
+  canvas_stroke_rect: (id,x,y,w,h,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); }},
+  canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); }},
+  canvas_fill_text: (id,p,l,x,y,r,g,b,sz,bold) => {{ ctx.fillStyle=`rgb(${{r}},${{g}},${{b}})`; ctx.font=`${{bold?'bold ':''}}${{sz}}px -apple-system,BlinkMacSystemFont,sans-serif`; ctx.fillText(dec.decode(new Uint8Array(W.memory.buffer,p,l)),x,y); }},
+  canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {{}},
+  canvas_draw_image_clip: () => {{}},
+  canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
+  canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight,
+  clipboard_write: (p,l) => navigator.clipboard?.writeText(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
+  clipboard_read: () => 0,
+  input_overlay_show: () => {{}}, input_overlay_hide: () => {{}}, input_overlay_get_value: () => 0,
+  search_scroll_to: () => {{}},
+  navigate: (p,l) => {{ window.location.href=dec.decode(new Uint8Array(W.memory.buffer,p,l)); }},
+  performance_now: () => performance.now(),
+  canvas_draw_line: (id,x1,y1,x2,y2,r,g,b,a,w) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }},
+  canvas_save: (id) => ctx.save(), canvas_restore: (id) => ctx.restore(),
+  canvas_clip_rect: (id,x,y,w,h) => {{ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); }},
+  canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => {{ ctx.fillStyle=`rgba(${{cr}},${{cg}},${{cb}},${{ca/255}})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }},
+  canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); }},
+  console_log: (p,l) => console.log(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
+  app_callback: () => {{}},
+  file_picker_open: () => 0,
+  media_create: () => 0, media_play: () => {{}}, media_pause: () => {{}}, media_destroy: () => {{}},
+}}}};
+
+const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm'), imports);
+W = instance.exports;
+
+// 1. nectar_init builds the element tree via Honeycomb's wasm_api
+// 2. app_init detects the pre-built tree, sets up layout + render pipeline
+if (W.nectar_init) W.nectar_init(window.innerWidth, window.innerHeight);
+W.app_init(window.innerWidth, window.innerHeight, 0);
+W.app_render();
+
+// Full event wiring — all Honeycomb exports
+window.addEventListener('resize', () => {{
+  dpr = window.devicePixelRatio || 1;
+  cvs.width = window.innerWidth * dpr; cvs.height = window.innerHeight * dpr;
+  cvs.style.width = window.innerWidth + 'px'; cvs.style.height = window.innerHeight + 'px';
+  ctx = cvs.getContext('2d'); ctx.scale(dpr, dpr);
+  if (W.app_resize) W.app_resize(window.innerWidth, window.innerHeight);
+  if (W.app_render) W.app_render();
+}});
+cvs.addEventListener('wheel', e => {{
+  e.preventDefault();
+  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);
+  if (W.app_scroll) W.app_scroll(e.deltaY);
+  if (W.app_render) W.app_render();
+}}, {{ passive: false }});
+cvs.addEventListener('click', e => {{
+  if (W.app_click) W.app_click(e.offsetX, e.offsetY);
+  if (W.app_render) W.app_render();
+}});
+cvs.addEventListener('mousedown', e => {{
+  if (W.app_mousedown) W.app_mousedown(e.offsetX, e.offsetY, e.detail);
+  if (W.app_render) W.app_render();
+}});
+cvs.addEventListener('mouseup', e => {{
+  if (W.app_mouseup) W.app_mouseup(e.offsetX, e.offsetY);
+  if (W.app_render) W.app_render();
+}});
+let _raf = 0;
+cvs.addEventListener('mousemove', e => {{
+  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, e.buttons);
+  if (W.app_cursor) {{
+    const c = W.app_cursor(e.offsetX, e.offsetY);
+    cvs.style.cursor = ['default','pointer','text','not-allowed'][c] || 'default';
+  }}
+  if (!_raf) {{ _raf = requestAnimationFrame(() => {{ if (W.app_render) W.app_render(); _raf = 0; }}); }}
+}});
+document.addEventListener('keydown', e => {{
+  const mod = (e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0);
+  const ch = e.key.length === 1 ? new TextEncoder().encode(e.key) : new Uint8Array(0);
+  if (ch.length) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
+  if (W.app_keydown) W.app_keydown(e.keyCode, ch.length ? 32*1024*1024 : 0, ch.length, mod);
+  if (W.app_render) W.app_render();
+  if (e.key !== 'F5' && e.key !== 'F12' && !(e.key === 'r' && (e.ctrlKey||e.metaKey))) e.preventDefault();
+}});
+// Touch
+cvs.addEventListener('touchstart', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }}, {{ passive: false }});
+cvs.addEventListener('touchmove', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }}, {{ passive: false }});
+cvs.addEventListener('touchend', e => {{ if (W.app_touchend) W.app_touchend(0, 0); if (W.app_render) W.app_render(); }});
+// Caret blink
+setInterval(() => {{ if (W.app_needs_animation && W.app_needs_animation() && W.app_render) W.app_render(); }}, 500);
+
+console.log('%c[Nectar Canvas]%c .nectar + Honeycomb — single WASM binary', 'color:#f97316;font-weight:bold', 'color:inherit');
+}})();
+</script>
+</body>
+</html>"##)
+}
+
+// ---------------------------------------------------------------------------
 // Compilation
 // ---------------------------------------------------------------------------
 
@@ -1223,6 +1483,8 @@ fn compile(
     // Resolve compilation target
     let compilation_target = match target {
         "wasi" => codegen::CompilationTarget::Wasi,
+        "canvas" => codegen::CompilationTarget::Canvas,
+        "bloom" => codegen::CompilationTarget::Bloom,
         _ => codegen::CompilationTarget::Browser,
     };
 

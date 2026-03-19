@@ -10,6 +10,14 @@ pub enum CompilationTarget {
     /// WASI target — imports from wasi_snapshot_preview1 + nectar:edge/http.
     /// No DOM, no signals UI updaters. For edge SSR + API proxy.
     Wasi,
+    /// Canvas target — imports Honeycomb canvas syscalls directly.
+    /// No DOM imports. Element tree built via Honeycomb's API, rendered to canvas.
+    /// Produces a single WASM binary (app + engine linked together).
+    Canvas,
+    /// Bloom target — imports from "env" namespace with unique snake_case names.
+    /// For Bloom browser's wasmtime host. Same as Browser but all in "env" namespace
+    /// with unique function names (no aliasing).
+    Bloom,
 }
 
 /// Generates WebAssembly Text Format (WAT) from a Nectar AST.
@@ -310,6 +318,231 @@ impl WasmCodegen {
 
     /// Emit WASI Preview 1 imports (for --target wasi).
     /// These replace all browser DOM/JS imports with WASI syscalls.
+    /// Canvas target imports — all from "env" namespace, matching Honeycomb's wasm_api exports.
+    /// Uses the same internal $dom_* function names so the rest of codegen doesn't change.
+    /// These are direct WASM function calls into Honeycomb — no JS bridge.
+    fn emit_canvas_imports(&mut self, program: &Program) {
+        self.line("");
+        self.line(";; ── Honeycomb Canvas Engine imports (env namespace) ──────────────");
+        self.line(";; Element tree API — same signatures as DOM, routed to Honeycomb's element tree");
+        self.line("(import \"env\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
+        self.line("(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))");
+        self.line("(import \"env\" \"flush\" (func $dom_flush (param i32 i32)))");
+        self.line("(import \"env\" \"get_element_by_id\" (func $dom_getElementById (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"query_selector\" (func $dom_querySelector (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"create_element\" (func $dom_createElement (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_text\" (func $dom_setText (param i32 i32 i32)))");
+        self.line("(import \"env\" \"append_child\" (func $dom_appendChild (param i32 i32)))");
+        self.line("(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"create_text_node\" (func $dom_createTextNode (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"get_body\" (func $dom_getBody (result i32)))");
+        self.line("(import \"env\" \"get_head\" (func $dom_getHead (result i32)))");
+        self.line("(import \"env\" \"get_root\" (func $dom_getRoot (result i32)))");
+        self.line("(import \"env\" \"get_root\" (func $dom_getDocumentElement (result i32)))");
+        self.line("(import \"env\" \"add_event_listener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"remove_event_listener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"clear_children\" (func $dom_clearChildren (param i32)))");
+        self.line("(import \"env\" \"lazy_mount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_title\" (func $dom_setTitle (param i32 i32)))");
+        self.line("(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))");
+        self.line("(import \"env\" \"get_scroll_left\" (func $dom_getScrollLeft (param i32) (result f64)))");
+        self.line("(import \"env\" \"get_client_height\" (func $dom_getClientHeight (param i32) (result i32)))");
+        self.line("(import \"env\" \"get_client_width\" (func $dom_getClientWidth (param i32) (result i32)))");
+        self.line("(import \"env\" \"get_window_width\" (func $dom_getWindowWidth (result i32)))");
+        self.line("(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $dom_getOuterHtml (result i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"get_drag_data\" (func $dom_getDragData (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"prevent_default\" (func $dom_preventDefault))");
+        self.line("(import \"env\" \"load_script\" (func $dom_loadScript (param i32 i32 i32)))");
+        self.line("(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"decode_image\" (func $dom_decodeImage (param i32 i32 i32)))");
+        self.line("(import \"env\" \"progressive_image\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"dom_print\" (func $dom_print (param i32)))");
+        self.line("(import \"env\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))");
+        self.line("(import \"env\" \"inject_styles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_attribute\" (func $dom_setProperty (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"get_value\" (func $dom_getValue (param i32) (result i32)))");
+
+        // Canvas syscalls — the only actual browser API bridges
+        self.line("");
+        self.line(";; Canvas syscalls — 1-line JS bridges to Canvas 2D API");
+        self.line("(import \"env\" \"canvas_init\" (func $canvas_init (param f32 f32) (result i32)))");
+        self.line("(import \"env\" \"canvas_clear\" (func $canvas_clear (param i32)))");
+        self.line("(import \"env\" \"canvas_fill_rect\" (func $canvas_fill_rect (param i32 f32 f32 f32 f32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"canvas_fill_text\" (func $canvas_fill_text (param i32 i32 i32 f32 f32 i32 i32 i32 f32 i32)))");
+        self.line("(import \"env\" \"canvas_measure_text\" (func $canvas_measure_text (param i32 i32 i32 f32) (result f32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_now (result f64)))");
+        self.line("(import \"env\" \"console_log\" (func $webapi_consoleLog (param i32 i32)))");
+        self.line("(import \"env\" \"console_log\" (func $webapi_consoleWarn (param i32 i32)))");
+        self.line("(import \"env\" \"console_log\" (func $webapi_consoleError (param i32 i32)))");
+
+        // Honeycomb layout + render
+        self.line("");
+        self.line(";; Honeycomb engine — layout and render");
+        self.line("(import \"env\" \"compute_layout\" (func $honeycomb_compute_layout (param f32 f32)))");
+        self.line("(import \"env\" \"app_render\" (func $honeycomb_render))");
+
+        // Timer stubs — canvas apps use requestAnimationFrame from the host
+        self.line("");
+        self.line(";; Timer — routed to canvas host");
+        self.line("(import \"env\" \"performance_now\" (func $timer_setTimeout (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_clearTimeout (param i32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_setInterval (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_clearInterval (param i32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_requestAnimationFrame (param i32) (result i32)))");
+        self.line("(import \"env\" \"performance_now\" (func $timer_cancelAnimationFrame (param i32)))");
+
+        // Storage/clipboard/URL stubs (canvas mode — most are noops)
+        self.line("");
+        self.line(";; Web API stubs for canvas mode");
+        self.line("(import \"env\" \"get_value\" (func $webapi_localStorageGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_localStorageRemove (param i32 i32)))");
+        self.line("(import \"env\" \"get_value\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))");
+        self.line("(import \"env\" \"get_value\" (func $webapi_clipboardRead (param i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationHref (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationSearch (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationHash (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationPathname (result i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_pushState (param i32 i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_replaceState (param i32 i32)))");
+        self.line("(import \"env\" \"prevent_default\" (func $webapi_onPopState (param i32)))");
+        self.line("(import \"env\" \"get_value\" (func $webapi_envGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $webapi_canShare (result i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_title\" (func $webapi_perfMark (param i32 i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
+
+        // HTTP stubs for canvas mode
+        if self.needs_http {
+            self.line("");
+            self.line(";; HTTP stubs — canvas mode");
+            self.line("(import \"env\" \"set_title\" (func $http_setMethod (param i32 i32)))");
+            self.line("(import \"env\" \"set_title\" (func $http_setBody (param i32 i32)))");
+            self.line("(import \"env\" \"set_text\" (func $http_addHeader (param i32 i32 i32 i32)))");
+            self.line("(import \"env\" \"get_element_by_id\" (func $http_fetch (param i32 i32) (result i32)))");
+            self.line("(import \"env\" \"set_text\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+        }
+
+        // Time — routed to performance_now
+        self.line("");
+        self.line(";; Time — canvas mode");
+        self.line("(import \"env\" \"performance_now\" (func $time_now (result f64)))");
+        self.line("(import \"env\" \"set_text\" (func $time_format (param f64 i32 i32) (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $time_getTimezoneOffset (result i32)))");
+        self.line("(import \"env\" \"set_text\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
+
+        // DB — IndexedDB stubs for canvas mode
+        self.line("");
+        self.line(";; DB stubs — canvas mode");
+        self.line("(import \"env\" \"set_drag_data\" (func $db_open (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"download\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_attribute\" (func $db_delete (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $db_getAll (param i32 i32 i32 i32)))");
+    }
+
+    /// Bloom target — all imports in "env" namespace with unique snake_case names.
+    /// Same signatures as browser target, compatible with wasmtime's name-based linker.
+    fn emit_bloom_imports(&mut self, _program: &Program) {
+        self.line("");
+        self.line(";; ── Bloom WASM runtime imports (env namespace, unique names) ──");
+        // DOM
+        self.line("(import \"env\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
+        self.line("(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))");
+        self.line("(import \"env\" \"flush\" (func $dom_flush (param i32 i32)))");
+        self.line("(import \"env\" \"get_element_by_id\" (func $dom_getElementById (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"query_selector\" (func $dom_querySelector (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"create_element\" (func $dom_createElement (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_text\" (func $dom_setText (param i32 i32 i32)))");
+        self.line("(import \"env\" \"append_child\" (func $dom_appendChild (param i32 i32)))");
+        self.line("(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"create_text_node\" (func $dom_createTextNode (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"get_body\" (func $dom_getBody (result i32)))");
+        self.line("(import \"env\" \"get_head\" (func $dom_getHead (result i32)))");
+        self.line("(import \"env\" \"get_root\" (func $dom_getRoot (result i32)))");
+        self.line("(import \"env\" \"get_document_element\" (func $dom_getDocumentElement (result i32)))");
+        self.line("(import \"env\" \"add_event_listener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"remove_event_listener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"clear_children\" (func $dom_clearChildren (param i32)))");
+        self.line("(import \"env\" \"lazy_mount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"set_title\" (func $dom_setTitle (param i32 i32)))");
+        self.line("(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))");
+        self.line("(import \"env\" \"get_scroll_left\" (func $dom_getScrollLeft (param i32) (result f64)))");
+        self.line("(import \"env\" \"get_client_height\" (func $dom_getClientHeight (param i32) (result i32)))");
+        self.line("(import \"env\" \"get_client_width\" (func $dom_getClientWidth (param i32) (result i32)))");
+        self.line("(import \"env\" \"get_window_width\" (func $dom_getWindowWidth (result i32)))");
+        self.line("(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))");
+        self.line("(import \"env\" \"get_outer_html\" (func $dom_getOuterHtml (result i32)))");
+        self.line("(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"get_drag_data\" (func $dom_getDragData (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"prevent_default\" (func $dom_preventDefault))");
+        self.line("(import \"env\" \"load_script\" (func $dom_loadScript (param i32 i32 i32)))");
+        self.line("(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"decode_image\" (func $dom_decodeImage (param i32 i32 i32)))");
+        self.line("(import \"env\" \"progressive_image\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"dom_print\" (func $dom_print (param i32)))");
+        self.line("(import \"env\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))");
+        self.line("(import \"env\" \"inject_styles\" (func $dom_injectStyles (param i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"env\" \"set_property\" (func $dom_setProperty (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"get_value\" (func $dom_getValue (param i32) (result i32)))");
+        // Timer
+        self.line("(import \"env\" \"set_timeout\" (func $timer_setTimeout (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"clear_timeout\" (func $timer_clearTimeout (param i32)))");
+        self.line("(import \"env\" \"set_interval\" (func $timer_setInterval (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"clear_interval\" (func $timer_clearInterval (param i32)))");
+        self.line("(import \"env\" \"request_animation_frame\" (func $timer_requestAnimationFrame (param i32) (result i32)))");
+        self.line("(import \"env\" \"cancel_animation_frame\" (func $timer_cancelAnimationFrame (param i32)))");
+        self.line("(import \"env\" \"timer_now\" (func $timer_now (result f64)))");
+        // WebAPI
+        self.line("(import \"env\" \"local_storage_get\" (func $webapi_localStorageGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"local_storage_set\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"local_storage_remove\" (func $webapi_localStorageRemove (param i32 i32)))");
+        self.line("(import \"env\" \"session_storage_get\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"session_storage_set\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))");
+        self.line("(import \"env\" \"clipboard_read\" (func $webapi_clipboardRead (param i32)))");
+        self.line("(import \"env\" \"get_location_href\" (func $webapi_getLocationHref (result i32)))");
+        self.line("(import \"env\" \"get_location_search\" (func $webapi_getLocationSearch (result i32)))");
+        self.line("(import \"env\" \"get_location_hash\" (func $webapi_getLocationHash (result i32)))");
+        self.line("(import \"env\" \"get_location_pathname\" (func $webapi_getLocationPathname (result i32)))");
+        self.line("(import \"env\" \"push_state\" (func $webapi_pushState (param i32 i32)))");
+        self.line("(import \"env\" \"replace_state\" (func $webapi_replaceState (param i32 i32)))");
+        self.line("(import \"env\" \"console_log\" (func $webapi_consoleLog (param i32 i32)))");
+        self.line("(import \"env\" \"console_warn\" (func $webapi_consoleWarn (param i32 i32)))");
+        self.line("(import \"env\" \"console_error\" (func $webapi_consoleError (param i32 i32)))");
+        self.line("(import \"env\" \"on_pop_state\" (func $webapi_onPopState (param i32)))");
+        self.line("(import \"env\" \"env_get\" (func $webapi_envGet (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"can_share\" (func $webapi_canShare (result i32)))");
+        self.line("(import \"env\" \"native_share\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"perf_mark\" (func $webapi_perfMark (param i32 i32)))");
+        self.line("(import \"env\" \"perf_measure\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
+        // HTTP
+        self.line("(import \"env\" \"http_set_method\" (func $http_setMethod (param i32 i32)))");
+        self.line("(import \"env\" \"http_set_body\" (func $http_setBody (param i32 i32)))");
+        self.line("(import \"env\" \"http_add_header\" (func $http_addHeader (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"http_fetch\" (func $http_fetch (param i32 i32) (result i32)))");
+        self.line("(import \"env\" \"http_fetch_with_callback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+        // DB
+        self.line("(import \"env\" \"db_open\" (func $db_open (param i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"db_put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"db_get\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"db_delete\" (func $db_delete (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"env\" \"db_get_all\" (func $db_getAll (param i32 i32 i32 i32)))");
+        // Time
+        self.line("(import \"env\" \"time_now\" (func $time_now (result f64)))");
+        self.line("(import \"env\" \"time_format\" (func $time_format (param f64 i32 i32) (result i32)))");
+        self.line("(import \"env\" \"time_get_timezone_offset\" (func $time_getTimezoneOffset (result i32)))");
+        self.line("(import \"env\" \"time_format_date\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
+    }
+
     fn emit_wasi_imports(&mut self) {
         self.line("");
         self.line(";; ── WASI Preview 1 imports ──────────────────────────────────────");
@@ -788,6 +1021,12 @@ impl WasmCodegen {
 
         if self.target == CompilationTarget::Wasi {
             self.emit_wasi_imports();
+        } else if self.target == CompilationTarget::Canvas {
+            eprintln!("nectar: [codegen] Canvas target — emitting Honeycomb env imports");
+            self.emit_canvas_imports(program);
+        } else if self.target == CompilationTarget::Bloom {
+            eprintln!("nectar: [codegen] Bloom target — emitting env namespace imports");
+            self.emit_bloom_imports(program);
         } else {
         // String runtime — WASM-internal (emitted by emit_string_runtime)
         // concat, fromI32, fromF64, fromBool, toString all run in WASM linear memory.
@@ -1009,13 +1248,15 @@ impl WasmCodegen {
         self.line("(import \"upload\" \"cancel\" (func $upload_cancel (param i32)))");
         }
 
-        // ── Time — Intl + Date (always emitted — time/datetime runtimes depend on these)
+        // ── Time — Intl + Date (canvas target handles these in emit_canvas_imports)
+        if self.target != CompilationTarget::Canvas && self.target != CompilationTarget::Bloom {
         self.line("");
         self.line(";; Time — browser Intl + Date APIs");
         self.line("(import \"time\" \"now\" (func $time_now (result f64)))");
         self.line("(import \"time\" \"format\" (func $time_format (param f64 i32 i32) (result i32)))");
         self.line("(import \"time\" \"getTimezoneOffset\" (func $time_getTimezoneOffset (result i32)))");
         self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
+        }
 
         // ── Streaming — ReadableStream + EventSource ─────────────────────────
         if self.needs_streaming {
@@ -1163,9 +1404,9 @@ impl WasmCodegen {
         self.emit_format_runtime();
         self.emit_json_runtime();
 
-        // Browser-dependent runtimes — skipped for WASI target since they
+        // Browser/Canvas runtimes — skipped for WASI target since they
         // reference DOM/timer/webapi imports that don't exist in WASI.
-        if self.target == CompilationTarget::Browser {
+        if self.target != CompilationTarget::Wasi {
             self.emit_signal_runtime();
             self.emit_gesture_runtime();
             self.emit_flags_runtime();
