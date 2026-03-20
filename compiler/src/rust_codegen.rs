@@ -9,11 +9,21 @@
 
 use crate::ast::*;
 
+/// A detected filter pattern: {for x in self.items { {if self.state_field == "All" || x.item_field == self.state_field { ... }} }}
+#[derive(Debug, Clone)]
+struct FilterPattern {
+    state_field: String,   // e.g. "active_cat" — the state field that controls filtering
+    item_field: String,    // e.g. "category" — the product field used as filter key
+}
+
 pub struct RustCodegen {
     output: String,
     indent: usize,
-    in_handler: bool, // true when inside a handler (state is `state.field`), false in render (needs STATE.with)
-    current_comp: String, // current component name for state access
+    in_handler: bool,
+    current_comp: String,
+    handler_indices: std::collections::HashMap<String, usize>,
+    filter_patterns: Vec<FilterPattern>, // detected from template analysis
+    last_element_var: String, // last element variable created by emit_template_node
 }
 
 impl RustCodegen {
@@ -23,6 +33,9 @@ impl RustCodegen {
             indent: 0,
             in_handler: false,
             current_comp: String::new(),
+            handler_indices: std::collections::HashMap::new(),
+            filter_patterns: Vec::new(),
+            last_element_var: String::new(),
         }
     }
 
@@ -67,7 +80,7 @@ impl RustCodegen {
         self.line("use serde::Deserialize;");
         self.line("");
         self.line("/// Scratch buffer for fetch responses, storage reads, hash reads");
-        self.line("const SCRATCH_SIZE: usize = 1024 * 1024; // 1MB");
+        self.line("const SCRATCH_SIZE: usize = 256 * 1024; // 256KB");
         self.line("static mut SCRATCH: [u8; SCRATCH_SIZE] = [0u8; SCRATCH_SIZE];");
         self.line("");
         self.line("/// Helper: read a string from WASM memory via syscall that writes into a buffer");
@@ -123,15 +136,145 @@ impl RustCodegen {
         self.line("    unsafe { fetch_set_header(\"Authorization\".as_ptr(), 13, val.as_ptr(), val.len() as u32); }");
         self.line("}");
         self.line("");
-        self.line("thread_local! {");
-        self.line("    static TREE: RefCell<ElementTree> = RefCell::new(ElementTree::new());");
-        self.line("    static MEASURER: RefCell<EstimateMeasurer> = RefCell::new(EstimateMeasurer);");
-        self.line("}");
-        self.line("");
         self.line("fn with_tree<R>(f: impl FnOnce(&mut ElementTree) -> R) -> R {");
-        self.line("    TREE.with(|t| f(&mut t.borrow_mut()))");
+        self.line("    honeycomb::wasm_api::TREE.with(|t| f(&mut t.borrow_mut()))");
         self.line("}");
         self.line("");
+        self.line("fn perf_now() -> f64 { unsafe { performance_now() } }");
+        self.line("");
+        // Update registered metric text nodes — tries AppState.tree first, falls back to wasm_api::TREE
+        self.line("fn update_metric_text(name: &str, value: &str) {");
+        self.line("    honeycomb::canvas_app::METRIC_TEXT_IDS.with(|m| {");
+        self.line("        let ids: Vec<(String, u32)> = m.borrow().clone();");
+        self.line("        // Try AppState.tree (normal runtime) — if STATE exists");
+        self.line("        let found = honeycomb::canvas_app::STATE.with(|s| {");
+        self.line("            if let Some(ref mut app) = *s.borrow_mut() {");
+        self.line("                for (n, id) in &ids {");
+        self.line("                    if n == name {");
+        self.line("                        if let Some(el) = app.tree.get_mut(*id) { el.text = Some(value.to_string()); }");
+        self.line("                    }");
+        self.line("                }");
+        self.line("                true");
+        self.line("            } else { false }");
+        self.line("        });");
+        self.line("        // Fall back to wasm_api::TREE (during init, before app_init)");
+        self.line("        if !found {");
+        self.line("            honeycomb::wasm_api::TREE.with(|t| {");
+        self.line("                let mut tree = t.borrow_mut();");
+        self.line("                for (n, id) in &ids {");
+        self.line("                    if n == name {");
+        self.line("                        if let Some(el) = tree.get_mut(*id) { el.text = Some(value.to_string()); }");
+        self.line("                    }");
+        self.line("                }");
+        self.line("            });");
+        self.line("        }");
+        self.line("    });");
+        self.line("}");
+        self.line("");
+        self.line("fn filter_by(attr: &str, value: &str) {");
+        self.line("    honeycomb::canvas_app::wasm_filter_by_attr(");
+        self.line("        attr.as_ptr(), attr.len() as u32, value.as_ptr(), value.len() as u32);");
+        self.line("}");
+        self.line("fn to_ms_string(start: f64, end: f64) -> String {");
+        self.line("    let elapsed = ((end - start) * 100.0) as i32;");
+        self.line("    let d = elapsed / 100;");
+        self.line("    let c = elapsed - d * 100;");
+        self.line("    if c < 10 { format!(\"{}ms\", d) } else { format!(\"{}.{}ms\", d, c) }");
+        self.line("}");
+        self.line("");
+    }
+
+    /// Scan template tree for filter patterns: {for x in self.items { {if self.field == "All" || x.attr == self.field { ... }} }}
+    fn detect_filter_patterns(&mut self, node: &TemplateNode, for_binding: Option<&str>) {
+        match node {
+            TemplateNode::TemplateFor { binding, children, .. } => {
+                for child in children {
+                    self.detect_filter_patterns(child, Some(binding));
+                }
+            }
+            TemplateNode::TemplateIf { condition, then_children, .. } if for_binding.is_some() => {
+                // Inside a {for}, look for condition that references self.X
+                if let Some(pattern) = self.extract_filter_from_condition(condition, for_binding.unwrap()) {
+                    self.filter_patterns.push(pattern);
+                }
+                for child in then_children {
+                    self.detect_filter_patterns(child, for_binding);
+                }
+            }
+            TemplateNode::Element(el) => {
+                for child in &el.children {
+                    self.detect_filter_patterns(child, for_binding);
+                }
+            }
+            TemplateNode::Fragment(children) => {
+                for child in children {
+                    self.detect_filter_patterns(child, for_binding);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Extract filter pattern from a condition expression.
+    /// Looks for: self.X == "All" || binding.Y == self.X
+    fn extract_filter_from_condition(&self, expr: &Expr, binding: &str) -> Option<FilterPattern> {
+        // Handle: self.field == "All" || product.field == self.field
+        if let Expr::Binary { op: BinOp::Or, left, right } = expr {
+            let state_field = self.find_self_field_in_eq(left)?;
+            let item_field = self.find_binding_field_in_eq(right, binding)?;
+            return Some(FilterPattern { state_field, item_field });
+        }
+        // Handle: product.field == self.field (without the "All" check)
+        if let Expr::Binary { op: BinOp::Eq, .. } = expr {
+            if let (Some(item_field), Some(state_field)) = (
+                self.find_binding_field_in_eq(expr, binding),
+                self.find_self_field_in_eq(expr),
+            ) {
+                return Some(FilterPattern { state_field, item_field });
+            }
+        }
+        None
+    }
+
+    /// Find self.X in an equality expression
+    fn find_self_field_in_eq(&self, expr: &Expr) -> Option<String> {
+        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+            if let Expr::FieldAccess { object, field } = &**left {
+                if matches!(**object, Expr::SelfExpr) { return Some(field.clone()); }
+            }
+            if let Expr::FieldAccess { object, field } = &**right {
+                if matches!(**object, Expr::SelfExpr) { return Some(field.clone()); }
+            }
+        }
+        None
+    }
+
+    /// Find binding.Y in an equality expression
+    fn find_binding_field_in_eq(&self, expr: &Expr, binding: &str) -> Option<String> {
+        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+            if let Expr::FieldAccess { object, field } = &**left {
+                if let Expr::Ident(name) = &**object {
+                    if name == binding { return Some(field.clone()); }
+                }
+            }
+            if let Expr::FieldAccess { object, field } = &**right {
+                if let Expr::Ident(name) = &**object {
+                    if name == binding { return Some(field.clone()); }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if a handler only assigns to a specific state field
+    fn handler_only_sets_field(&self, method: &Function, field_name: &str) -> bool {
+        if method.body.stmts.len() != 1 { return false; }
+        if let Stmt::Expr(Expr::Assign { target, .. }) = &method.body.stmts[0] {
+            if let Expr::FieldAccess { object, field } = &**target {
+                return matches!(**object, Expr::SelfExpr) && field == field_name;
+            }
+        }
+        false
     }
 
     fn emit_struct(&mut self, s: &StructDef) {
@@ -163,8 +306,9 @@ impl RustCodegen {
             self.line(&format!("{}: {},", field.name, rust_type));
         }
         // Element IDs for reactive updates
-        self.line("// Element IDs (stored for signal updates)");
         self.line("_element_ids: Vec<u32>,");
+        // Card tracking for O(1) filter toggle (card_id, category_string)
+        self.line("_card_cats: Vec<(u32, String)>,");
         self.indent -= 1;
         self.line("}");
         self.line("");
@@ -176,9 +320,16 @@ impl RustCodegen {
         self.indent += 2;
         for field in &comp.state {
             let default = self.expr_to_rust(&field.initializer, "");
-            self.line(&format!("{}: {},", field.name, default));
+            // String fields need .to_string() when initialized from a string literal
+            let ty_str = field.ty.as_ref().map(|t| self.type_to_rust(t)).unwrap_or_default();
+            if ty_str == "String" && default.starts_with('"') {
+                self.line(&format!("{}: {}.to_string(),", field.name, default));
+            } else {
+                self.line(&format!("{}: {},", field.name, default));
+            }
         }
         self.line("_element_ids: Vec::new(),");
+        self.line("_card_cats: Vec::new(),");
         self.indent -= 2;
         self.line("    });");
         self.line("}");
@@ -207,6 +358,20 @@ impl RustCodegen {
         self.indent += 1;
         self.line("let root = tree.root_id();");
 
+        // Detect filter patterns in template: {for x in items { {if self.field == ... { }} }}
+        self.filter_patterns.clear();
+        self.detect_filter_patterns(&comp.render.body, None);
+
+        // Build handler index map: non-init methods → callback indices
+        self.handler_indices.clear();
+        let mut cb_idx = 0;
+        for method in &comp.methods {
+            if !method.name.starts_with("init") {
+                self.handler_indices.insert(method.name.clone(), cb_idx);
+                cb_idx += 1;
+            }
+        }
+
         // Emit render block body — uses local variables, not self.field
         self.in_handler = false; // use local vars, not state.field
         self.emit_template_node(&comp.render.body, "root", name);
@@ -227,6 +392,7 @@ impl RustCodegen {
         match node {
             TemplateNode::Element(el) => {
                 let var = format!("el_{}", self.fresh_id());
+                self.last_element_var = var.clone();
                 self.line(&format!("let {} = tree.create(\"{}\");", var, el.tag));
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
 
@@ -246,6 +412,9 @@ impl RustCodegen {
                                 }
                             } else if name == "placeholder" {
                                 self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.placeholder = Some(\"{}\".into()); }}", var, value));
+                            } else if name == "pill" {
+                                // Register category pill for active state styling
+                                self.line(&format!("honeycomb::canvas_app::register_pill(\"{}\".as_ptr(), {}, {});", value, value.len(), var));
                             }
                         }
                         Attribute::Dynamic { name, value } => {
@@ -255,15 +424,22 @@ impl RustCodegen {
                                 // Parse it at runtime by splitting on semicolons
                                 self.line(&format!("{{ let _style_val = {}; for _part in _style_val.split(';') {{ let _part = _part.trim(); if let Some((_p, _v)) = _part.split_once(':') {{ tree.set_style({}, _p.trim(), _v.trim()); }} }} }}", val_rust, var));
                             } else {
-                                // Dynamic attribute — set as attribute
-                                self.line(&format!("{{ let _attr_val = {}; tree.set_attribute({}, \"{}\", &_attr_val); }}", val_rust, var, name));
+                                // Dynamic attribute — set as attribute (borrow to avoid move)
+                                self.line(&format!("tree.set_attribute({}, \"{}\", &{});", var, name, val_rust));
+                                // Register filterable elements for O(n) filter toggle
+                                if name == "category" {
+                                    self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", var, val_rust, val_rust));
+                                }
                             }
                         }
                         Attribute::EventHandler { event, handler } => {
                             if event == "click" {
                                 if let Some(method_name) = self.extract_handler_name(handler) {
-                                    self.line(&format!("// on:click -> {}", method_name));
-                                    self.line(&format!("tree.add_event({}, \"click\", 0); // callback wired in event loop", var));
+                                    let idx = self.handler_indices.get(&method_name).copied().unwrap_or(0);
+                                    self.line(&format!("// on:click -> {} (cb_idx={})", method_name, idx));
+                                    self.line(&format!("tree.add_event({}, \"click\", {});", var, idx));
+                                    // Clickable elements get pointer cursor + focusable (hover/active states)
+                                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.visual.cursor = 1; el.focusable = true; }}", var));
                                 }
                             }
                         }
@@ -302,6 +478,30 @@ impl RustCodegen {
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
                 let rust_expr = self.expr_to_rust(expr, comp_name);
                 self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
+                // Register metric text nodes for direct updates without tree rebuild
+                // Handles {self.field} and {format("{}", self.field)}
+                let field_name = match &**expr {
+                    Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => {
+                        Some(field.clone())
+                    }
+                    Expr::FnCall { callee, args } => {
+                        // format("{}", self.field) → register as "field"
+                        if let Expr::Ident(name) = &**callee {
+                            if name == "format" && args.len() == 2 {
+                                if let Expr::FieldAccess { object, field } = &args[1] {
+                                    if matches!(**object, Expr::SelfExpr) {
+                                        Some(field.clone())
+                                    } else { None }
+                                } else { None }
+                            } else { None }
+                        } else { None }
+                    }
+                    _ => None,
+                };
+                if let Some(field) = field_name {
+                    self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});",
+                        field, field.len(), var));
+                }
             }
             TemplateNode::Fragment(children) => {
                 for child in children {
@@ -310,15 +510,39 @@ impl RustCodegen {
             }
             TemplateNode::TemplateFor { binding, iterator, children, .. } => {
                 let iter_rust = self.expr_to_rust(iterator, comp_name);
-                // Use reference iteration for Vec types, value iteration for ranges
                 if iter_rust.contains("..") {
                     self.line(&format!("for {} in {} {{", binding, iter_rust));
                 } else {
                     self.line(&format!("for {} in &{} {{", binding, iter_rust));
                 }
                 self.indent += 1;
+
+                // Check if children contain a TemplateIf that matches a filter pattern.
+                // If so, skip the {if} (render all items) and auto-register for filtering.
+                let filter_for_this_loop = self.filter_patterns.iter().find(|fp| {
+                    children.iter().any(|c| matches!(c, TemplateNode::TemplateIf { .. }))
+                }).cloned();
+
                 for child in children {
-                    self.emit_template_node(child, parent_var, comp_name);
+                    if let (Some(fp), TemplateNode::TemplateIf { then_children, .. }) = (&filter_for_this_loop, child) {
+                        // Emit the then_children directly (skip the {if} — all items rendered)
+                        // Auto-register the first element for filtering
+                        for (ci, tc) in then_children.iter().enumerate() {
+                            self.emit_template_node(tc, parent_var, comp_name);
+                            // After the first element child, auto-register it for filtering
+                            if ci == 0 {
+                                if let TemplateNode::Element(_) = tc {
+                                    let card_var = self.last_element_var.clone();
+                                    let filter_val = format!("{}.{}", binding, fp.item_field);
+                                    self.line(&format!("// Auto-detected filter pattern: register for O(n) filtering"));
+                                    self.line(&format!("tree.set_attribute({}, \"{}\", &{});", card_var, fp.item_field, filter_val));
+                                    self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", card_var, filter_val, filter_val));
+                                }
+                            }
+                        }
+                    } else {
+                        self.emit_template_node(child, parent_var, comp_name);
+                    }
                 }
                 self.indent -= 1;
                 self.line("}");
@@ -350,6 +574,12 @@ impl RustCodegen {
 
         self.line(&format!("fn {}_{}() {{", comp_name.to_lowercase(), method.name));
         self.indent += 1;
+
+        // Time the entire handler cycle (state update + tree rebuild + layout)
+        if !is_init {
+            self.line("let _op_t0 = perf_now();");
+        }
+
         self.line(&format!("{}_STATE.with(|s| {{", comp_name.to_uppercase()));
         self.indent += 1;
         self.line("let mut state = s.borrow_mut();");
@@ -366,15 +596,39 @@ impl RustCodegen {
 
         // Init methods don't re-render — they're called before first mount
         if !is_init {
-            self.line("// Re-render after state change");
-            self.line("with_tree(|tree| {");
-            self.indent += 1;
-            self.line("let root = tree.root_id();");
-            self.line("if let Some(el) = tree.get_mut(root) { el.children.clear(); }");
-            self.indent -= 1;
-            self.line("});");
-            self.line(&format!("{}_mount();", comp_name.to_lowercase()));
-            self.line("render();");
+            // Auto-detect filter handlers by matching handler body against template patterns.
+            // If a handler only assigns to a state field that controls a {if} inside a {for},
+            // use O(n) display_none toggle instead of full tree rebuild.
+            let filter_match = self.filter_patterns.iter().find(|fp| {
+                self.handler_only_sets_field(method, &fp.state_field)
+            }).cloned();
+            let is_sort = method.body.stmts.iter().any(|s| {
+                let dbg = format!("{:?}", s);
+                dbg.contains("sort_asc") || dbg.contains("sort_desc") || dbg.contains("sort_str")
+            });
+            if let Some(ref fp) = filter_match {
+                self.line("// O(n) filter: auto-detected from template {if} pattern");
+                self.line(&format!("let _fv = {}_STATE.with(|s| s.borrow().{}.clone());", comp_name.to_uppercase(), fp.state_field));
+                self.line("honeycomb::canvas_app::apply_filter(&_fv);");
+            } else if is_sort {
+                // Sort already called apply_sort_permutation inline via .sort_asc/.sort_desc
+                // No tree rebuild needed — just update metrics
+            } else {
+                self.line("// Re-render after state change");
+                self.line("with_tree(|tree| {");
+                self.indent += 1;
+                self.line("let root = tree.root_id();");
+                self.line("if let Some(el) = tree.get_mut(root) { el.children.clear(); }");
+                self.indent -= 1;
+                self.line("});");
+                self.line(&format!("{}_mount();", comp_name.to_lowercase()));
+                self.line("render();");
+            }
+            // Record total handler time + update text node
+            self.line("let _op_elapsed = to_ms_string(_op_t0, perf_now());");
+            self.line(&format!("{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
+                comp_name.to_uppercase()));
+            self.line("update_metric_text(\"last_op_ms\", &_op_elapsed);");
         }
 
         self.indent -= 1;
@@ -386,7 +640,11 @@ impl RustCodegen {
         match stmt {
             Stmt::Expr(Expr::Assign { target, value }) => {
                 let target_rust = self.expr_to_rust(target, comp_name);
-                let value_rust = self.expr_to_rust(value, comp_name);
+                let mut value_rust = self.expr_to_rust(value, comp_name);
+                // String literal assigned to a String variable needs .to_string()
+                if value_rust.starts_with('"') {
+                    value_rust = format!("{}.to_string()", value_rust);
+                }
                 self.line(&format!("{} = {};", target_rust, value_rust));
             }
             Stmt::Expr(Expr::While { condition, body }) => {
@@ -438,8 +696,13 @@ impl RustCodegen {
             Stmt::Return(None) => {
                 self.line("return;");
             }
-            Stmt::Let { name, value, mutable, .. } => {
-                let val = self.expr_to_rust(value, comp_name);
+            Stmt::Let { name, value, mutable, ty, .. } => {
+                let mut val = self.expr_to_rust(value, comp_name);
+                // String fields initialized from string literals need .to_string()
+                let is_string_type = ty.as_ref().map(|t| self.type_to_rust(t) == "String").unwrap_or(false);
+                if is_string_type && val.starts_with('"') {
+                    val = format!("{}.to_string()", val);
+                }
                 if *mutable {
                     self.line(&format!("let mut {} = {};", name, val));
                 } else {
@@ -522,9 +785,31 @@ impl RustCodegen {
             Expr::MethodCall { object, method, args } => {
                 let obj = self.expr_to_rust(object, comp_name);
                 let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
-                // .cmp() takes a reference — auto-add & to the argument
                 if method == "cmp" && a.len() == 1 && !a[0].starts_with('&') {
                     format!("{}.cmp(&{})", obj, a[0])
+                } else if method == "len" {
+                    format!("{}.len() as i32", obj)
+                } else if method == "swap" && a.len() == 2 {
+                    // .swap() takes usize indices — auto-cast from i32
+                    format!("{}.swap({} as usize, {} as usize)", obj, a[0], a[1])
+                } else if method == "contains" && a.len() == 1 {
+                    // .contains() on String takes &str — auto-borrow
+                    format!("{}.contains(&{})", obj, a[0])
+                } else if method == "sort_asc" && a.len() == 1 {
+                    let field = a[0].trim_matches('"');
+                    format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}", obj=obj, field=field)
+                } else if method == "sort_desc" && a.len() == 1 {
+                    let field = a[0].trim_matches('"');
+                    format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}", obj=obj, field=field)
+                } else if method == "sort_str_asc" && a.len() == 1 {
+                    // Argsort by string field — sort indices in-place, no string cloning
+                    let field = a[0].trim_matches('"');
+                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_unstable_by(|&a, &b| {obj}[a as usize].{field}.cmp(&{obj}[b as usize].{field})); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                } else if method == "sort_str_desc" && a.len() == 1 {
+                    let field = a[0].trim_matches('"');
+                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_unstable_by(|&a, &b| {obj}[b as usize].{field}.cmp(&{obj}[a as usize].{field})); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                } else if method == "reverse" {
+                    format!("{}.reverse()", obj)
                 } else {
                     format!("{}.{}({})", obj, method, a.join(", "))
                 }
@@ -548,7 +833,7 @@ impl RustCodegen {
             Expr::Index { object, index } => {
                 let obj = self.expr_to_rust(object, comp_name);
                 let idx = self.expr_to_rust(index, comp_name);
-                format!("{}[{}]", obj, idx)
+                format!("{}[{} as usize]", obj, idx)
             }
             Expr::Assign { target, value } => {
                 let t = self.expr_to_rust(target, comp_name);
@@ -558,7 +843,12 @@ impl RustCodegen {
             Expr::StructInit { name, fields } => {
                 let field_strs: Vec<String> = fields.iter().map(|(fname, fval)| {
                     let v = self.expr_to_rust(fval, comp_name);
-                    format!("{}: {}", fname, v)
+                    // String literal values in struct init need .to_string() for String fields
+                    if v.starts_with('"') {
+                        format!("{}: {}.to_string()", fname, v)
+                    } else {
+                        format!("{}: {}", fname, v)
+                    }
                 }).collect();
                 format!("{} {{ {} }}", name, field_strs.join(", "))
             }
@@ -622,11 +912,11 @@ impl RustCodegen {
             if let Item::Component(c) = item { Some(c.name.clone()) } else { None }
         }).unwrap_or_else(|| "App".to_string());
 
-        self.line("// ── Render loop ──────────────────────────────────────");
+        self.line("// ── Render: layout only (painting done by Honeycomb's app_render) ──");
         self.line("");
         self.line("fn render() {");
         self.indent += 1;
-        self.line("TREE.with(|t| {");
+        self.line("honeycomb::wasm_api::TREE.with(|t| {");
         self.indent += 1;
         self.line("let mut tree = t.borrow_mut();");
         self.line("let mut measurer = EstimateMeasurer;");
@@ -652,16 +942,101 @@ impl RustCodegen {
                 .collect()
         }).unwrap_or_default();
 
+        // Check if there's an init method that triggers a fetch (init_data, init_load, etc.)
+        // and a corresponding on_*_loaded callback
+        let has_fetch_init = comp.as_ref().map(|c| {
+            c.methods.iter().any(|m| m.name.starts_with("init_data") || m.name.starts_with("init_load"))
+        }).unwrap_or(false);
+
+        let fetch_callback_idx = comp.as_ref().and_then(|c| {
+            let non_init: Vec<&str> = c.methods.iter()
+                .filter(|m| !m.name.starts_with("init"))
+                .map(|m| m.name.as_str())
+                .collect();
+            non_init.iter().position(|n| n.contains("loaded") || n.contains("response"))
+        });
+
         self.line("#[no_mangle]");
         self.line(&format!("pub extern \"C\" fn nectar_init(_vw: f32, _vh: f32) {{"));
         self.indent += 1;
-        // Call init methods first (populate arrays, etc.)
+        self.line("let _init_t0 = perf_now();");
         for init_fn in &init_methods {
             self.line(&format!("{}();", init_fn));
         }
         self.line(&format!("{}_mount();", comp_name.to_lowercase()));
+        // Record total init time (heap + mount) + update text node
+        self.line("let _init_elapsed = to_ms_string(_init_t0, perf_now());");
+        self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _init_elapsed.clone());",
+            comp_name.to_uppercase()));
+        self.line("update_metric_text(\"total_ms\", &_init_elapsed);");
+        // Also update heap_ms text node
+        self.line(&format!("let _heap = {}_STATE.with(|s| s.borrow().heap_ms.clone());", comp_name.to_uppercase()));
+        self.line("update_metric_text(\"heap_ms\", &_heap);");
+
+        // Auto-fetch if init_data/init_load exists with a matching on_*_loaded callback
+        if has_fetch_init {
+            if let Some(cb_idx) = fetch_callback_idx {
+                self.line("// Auto-fetch: init_data detected, firing fetch with callback");
+                self.line(&format!("fetch_get(\"http://localhost:3031/api/products\", {});", cb_idx));
+            }
+        }
+
         self.indent -= 1;
         self.line("}");
+        self.line("");
+
+        // Callback dispatcher — called by JS when async operations complete (fetch, timers)
+        // Each handler method gets a callback index. The __callback export dispatches by index.
+        if let Some(comp) = comp {
+            let handlers: Vec<&str> = comp.methods.iter()
+                .filter(|m| !m.name.starts_with("init"))
+                .map(|m| m.name.as_str())
+                .collect();
+            if !handlers.is_empty() {
+                self.line("#[no_mangle]");
+                self.line("pub extern \"C\" fn __callback(idx: u32) {");
+                self.indent += 1;
+
+                // For fetch callbacks, parse JSON response before calling handler
+                if let Some(cb_idx) = fetch_callback_idx {
+                    self.line(&format!("if idx == {} {{", cb_idx));
+                    self.indent += 1;
+                    self.line("// Parse fetch response as JSON into component state");
+                    self.line("let (_status, body) = read_response();");
+                    self.line(&format!("{}_STATE.with(|s| {{", comp_name.to_uppercase()));
+                    self.indent += 1;
+                    self.line("let mut state = s.borrow_mut();");
+                    // Find the first Vec<StructType> field and deserialize into it
+                    for field in &comp.state {
+                        if let Some(ref ty) = field.ty {
+                            let ty_str = self.type_to_rust(ty);
+                            if ty_str.starts_with("Vec<") && !ty_str.contains("i32") && !ty_str.contains("f32") && !ty_str.contains("bool") && !ty_str.contains("String") {
+                                self.line(&format!("if let Ok(parsed) = serde_json::from_slice::<{}>(&body) {{", ty_str));
+                                self.indent += 1;
+                                self.line(&format!("state.{} = parsed;", field.name));
+                                self.indent -= 1;
+                                self.line("}");
+                            }
+                        }
+                    }
+                    self.indent -= 1;
+                    self.line("});");
+                    self.indent -= 1;
+                    self.line("}");
+                }
+
+                self.line("match idx {");
+                self.indent += 1;
+                for (i, name) in handlers.iter().enumerate() {
+                    self.line(&format!("{} => {}_{}(),", i, comp_name.to_lowercase(), name));
+                }
+                self.line("_ => {}");
+                self.indent -= 1;
+                self.line("}");
+                self.indent -= 1;
+                self.line("}");
+            }
+        }
     }
 
     fn type_to_rust(&self, ty: &Type) -> String {

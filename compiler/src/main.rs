@@ -1262,8 +1262,12 @@ const imports = {{ env: {{
   canvas_stroke_rect: (id,x,y,w,h,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); }},
   canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); }},
   canvas_fill_text: (id,p,l,x,y,r,g,b,sz,bold) => {{ ctx.fillStyle=`rgb(${{r}},${{g}},${{b}})`; ctx.font=`${{bold?'bold ':''}}${{sz}}px -apple-system,BlinkMacSystemFont,sans-serif`; ctx.fillText(dec.decode(new Uint8Array(W.memory.buffer,p,l)),x,y); }},
-  canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {{}},
-  canvas_draw_image_clip: () => {{}},
+  canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {{
+    const url = dec.decode(new Uint8Array(W.memory.buffer,sp,sl));
+    if (!_imgCache[url]) {{ const img = new Image(); img.crossOrigin='anonymous'; img.onload=()=>{{ if(W.app_render) W.app_render(); }}; img.src=url; _imgCache[url]=img; }}
+    const img = _imgCache[url]; if (img && img.complete && img.naturalWidth > 0) {{ try {{ if(cr>0){{ ctx.save(); ctx.beginPath(); ctx.roundRect(x,y,w,h,cr); ctx.clip(); ctx.drawImage(img,x,y,w,h); ctx.restore(); }} else {{ ctx.drawImage(img,x,y,w,h); }} }} catch(e){{}} }}
+  }},
+  canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => {{ const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){{ try{{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}}catch(e){{}} }} }},
   canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
   canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight,
   clipboard_write: (p,l) => navigator.clipboard?.writeText(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
@@ -1278,7 +1282,7 @@ const imports = {{ env: {{
   canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => {{ ctx.fillStyle=`rgba(${{cr}},${{cg}},${{cb}},${{ca/255}})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }},
   canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); }},
   console_log: (p,l) => console.log(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
-  app_callback: () => {{}},
+  app_callback: (idx) => {{ if(W.__callback) W.__callback(idx); }},
   file_picker_open: () => 0,
   media_create: () => 0, media_play: () => {{}}, media_pause: () => {{}}, media_destroy: () => {{}},
   // HTTP fetch — 1-line bridges to browser fetch() API
@@ -1306,16 +1310,19 @@ const imports = {{ env: {{
   clear_interval: (id) => clearInterval(id),
   clear_timeout: (id) => clearTimeout(id),
 }}}};
-let _fh={{}}, _fs=0, _fb=new Uint8Array(0);
+let _fh={{}}, _fs=0, _fb=new Uint8Array(0), _imgCache={{}};
 
-const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm'), imports);
+try {{
+const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm?v='+Date.now()), imports);
 W = instance.exports;
-
-// 1. nectar_init builds the element tree via Honeycomb's wasm_api
-// 2. app_init detects the pre-built tree, sets up layout + render pipeline
-if (W.nectar_init) W.nectar_init(window.innerWidth, window.innerHeight);
-W.app_init(window.innerWidth, window.innerHeight, 0);
+if (W.nectar_init) {{
+  // .nectar app — build tree via nectar_init, then app_init picks it up from wasm_api::TREE
+  W.nectar_init(window.innerWidth, window.innerHeight - 48);
+}}
+// app_init detects pre-built tree (compiler_tree) and uses it; otherwise builds demo
+W.app_init(window.innerWidth, window.innerHeight - 48, 0);
 W.app_render();
+}} catch(e) {{ document.body.style.color='#f00'; document.body.style.padding='20px'; document.body.style.fontSize='14px'; document.body.style.fontFamily='monospace'; document.body.innerText='WASM Error: '+e.message+'\n\n'+e.stack; console.error(e); }}
 
 // Full event wiring — all Honeycomb exports
 window.addEventListener('resize', () => {{
@@ -1356,10 +1363,11 @@ cvs.addEventListener('mousemove', e => {{
 document.addEventListener('keydown', e => {{
   const mod = (e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0);
   const ch = e.key.length === 1 ? new TextEncoder().encode(e.key) : new Uint8Array(0);
-  if (ch.length) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
+  if (ch.length && 32*1024*1024 + ch.length <= W.memory.buffer.byteLength) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
   if (W.app_keydown) W.app_keydown(e.keyCode, ch.length ? 32*1024*1024 : 0, ch.length, mod);
   if (W.app_render) W.app_render();
-  if (e.key !== 'F5' && e.key !== 'F12' && !(e.key === 'r' && (e.ctrlKey||e.metaKey))) e.preventDefault();
+  // Allow ALL browser shortcuts through — only block bare keys with no modifier
+  if (e.metaKey||e.ctrlKey||e.altKey||e.key.length>1) return;
 }});
 // Touch
 cvs.addEventListener('touchstart', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }}, {{ passive: false }});

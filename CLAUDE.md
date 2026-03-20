@@ -362,3 +362,139 @@ This is the exhaustive list of browser APIs that justify JS code. If a browser A
 - **requestAnimationFrame** — window.requestAnimationFrame()
 
 If it's not on this list, the answer is Rust/WASM.
+
+## Canvas Mode — Building .nectar Apps with Honeycomb
+
+### The Pipeline
+
+```
+demo.nectar → nectar build --canvas → app.wasm + index.html
+```
+
+The Rust codegen backend (`compiler/src/rust_codegen.rs`) compiles `.nectar` into Rust source that links against Honeycomb (the rendering engine). `cargo build --target wasm32-unknown-unknown` produces a single WASM binary containing both the app and the engine.
+
+### How It Works
+
+1. **`nectar_init`** — generated export that calls the component's `init()` method (builds state in WASM), then `mount()` (builds the element tree in `wasm_api::TREE`)
+2. **`app_init`** — Honeycomb's init detects the pre-built tree via `compiler_tree = wasm_api::TREE.len() > 1`, takes it into `AppState.tree`, sets up the canvas, runs layout
+3. **`app_render`** — Honeycomb's render loop walks `AppState.tree`, paints via canvas syscalls
+4. **`app_click`** — hit tests, walks up ancestors for event listeners, calls `app_callback(cb_idx)` which triggers the JS bridge → `__callback(idx)` → dispatches to the right handler
+5. **After callback** — sync code in `app_click` detects if the handler rebuilt the tree in `wasm_api::TREE` and swaps it back into `AppState.tree`
+
+### Building a Component — Treat It Like React
+
+When building any `.nectar` component, apply the same UX standards you would in React/Svelte/Vue. The rendering engine is different but the design requirements are identical:
+
+**Every clickable element MUST have:**
+- `on:click={self.handler_name}` — wires the event listener
+- The codegen automatically adds `cursor: pointer` and `focusable: true` (hover/active states)
+
+**Layout fundamentals:**
+- Use `width: fill; max-width: 1280px` for centered content, NOT fixed `width: 1280px`
+- Parent needs `align: center` to center fixed/max-width children
+- Use `wrap: true` on horizontal containers for responsive behavior
+- Touch targets: `min-height: 44px` on all interactive elements (Apple HIG)
+- Use `width: hug; height: hug` on text elements and pills to prevent stretching
+
+**Color system (use distinct surface levels):**
+- Page bg: `#09090b`
+- Card/surface: `#18181b`
+- Elevated surface: `#27272a`
+- Border: `#27272a`
+- Primary text: `#fafafa`
+- Secondary text: `#a1a1aa`
+- Muted text: `#71717a`
+- Accent/CTA: brand color (e.g. `#ffa11e` for PayHive)
+- Use accent color ONLY on CTAs — not on prices, not on metrics, not on every element
+
+**Product cards need:**
+- Product image (or placeholder)
+- Product name (15px, 600 weight, primary text)
+- Category (12px, muted)
+- Star rating (12px, amber `#f59e0b`)
+- Price (18px, 700 weight, primary text) — NOT accent color
+- Stock badge (green for in stock, red for sold out, yellow for low stock)
+- Add to Cart button (accent bg, dark text, 44px min-height, pointer cursor)
+- Proper price formatting: pad cents (`$4.03` not `$4.3`)
+
+**E-commerce pages need:**
+- Promo banner (thin, accent bg, centered text)
+- Nav bar with links (not tech stack taglines)
+- Breadcrumbs
+- Search input
+- Category filter pills (active state = accent bg)
+- Sort controls
+- Product grid (wrapping, responsive card widths)
+- Performance metrics as subtle footer, NOT inline with store UI
+
+### Available Honeycomb Style Properties
+
+**Layout:** `direction` (vertical/horizontal), `width`, `height`, `padding` (+ `-top`/`-right`/`-bottom`/`-left`), `gap`, `align` (start/center/end), `justify` (start/center/end/space-between), `wrap` (true/false), `max-width`, `min-width`, `min-height`, `max-height`, `scroll` (true/false), `position` (sticky/fixed), `z-index`, `display` (none)
+
+**Visual:** `background-color`, `border-radius`, `border-width`, `border-color`, `font-size`, `font-weight`, `color`, `line-height`, `opacity`, `text-decoration` (underline/line-through), `text-overflow` (ellipsis)
+
+**Sizing:** `fill` (stretch to parent), `hug` (shrink to content), `Npx` (fixed pixels)
+
+### Event Handling Architecture
+
+- `.nectar` `on:click={self.method}` → codegen registers `tree.add_event(id, "click", cb_idx)` with unique callback index
+- Non-init methods are numbered 0, 1, 2... in declaration order
+- `__callback(idx)` export dispatches: `match idx { 0 => handler_0(), 1 => handler_1(), ... }`
+- Each handler: updates state → clears tree children → re-mounts → re-layouts
+- `app_click` in Honeycomb walks up ancestors to find the event listener (bubbling)
+- After callback returns, syncs rebuilt tree from `wasm_api::TREE` back to `AppState.tree`
+- Cursor also bubbles up ancestors — text inside a button shows pointer, not text cursor
+
+### Critical Gotchas (Learned the Hard Way)
+
+**`app_init` must NOT override compiler tree root height:**
+When `app_init` takes a compiler-built tree from `wasm_api::TREE`, do NOT set `root.style.height = SizePolicy::Hug`. If the .nectar app uses `height: fill` on its root, Hug creates a circular dependency (Fill inside Hug = 0 height). This makes hit_test return None for ALL coordinates — click, hover, scroll, everything silently breaks. The page renders fine (render_node doesn't check bounds), but no interaction works.
+
+**All Honeycomb event handlers must guard against STATE being None:**
+When a .nectar app calls `nectar_init` + `app_init`, STATE gets set. But if `app_init` fails or isn't called, every `with_state` call panics. ALL event handlers (`app_click`, `app_scroll`, `app_resize`, `app_mousemove`, `app_mousedown`, `app_mouseup`, `app_cursor`, `app_keydown`, `app_touchstart/move/end`, etc.) must check `STATE.with(|s| s.borrow().is_some())` and return early if None.
+
+**String literals in Rust codegen need `.to_string()`:**
+- `let` declarations with `String` type and string literal value → add `.to_string()`
+- Assignments of string literals → add `.to_string()`
+- Struct init fields with string literal values → add `.to_string()`
+- Without this, Rust gets `&str` vs `String` type mismatches
+
+**Array operations need auto-casting:**
+- `.len()` returns `usize`, Nectar uses `i32` → codegen emits `.len() as i32`
+- Array indexing with `i32` → codegen emits `[i as usize]`
+- `.swap(i, j)` → codegen emits `.swap(i as usize, j as usize)`
+
+**Keyboard handler must not block browser shortcuts:**
+The canvas keydown handler calls `preventDefault()`. It MUST allow through any key with modifiers (Cmd/Ctrl/Alt) and function keys. The rule: `if (e.metaKey||e.ctrlKey||e.altKey||e.key.length>1) return;` — only block bare single-character keys. Previous approach of whitelisting specific shortcuts always missed some (Cmd+I, Cmd+L, Cmd+K, etc.).
+
+**WASM memory bounds for keyboard input:**
+The keydown handler writes keyboard character data at offset 32MB in WASM memory. Small apps may not have 32MB allocated. Guard with: `if (ch.length && 32*1024*1024 + ch.length <= W.memory.buffer.byteLength)` before the `Uint8Array.set()` call.
+
+### Performance Patterns
+
+**Sort: Use built-in sort, never bubble sort:**
+- `.sort_asc("field")` → codegen emits `sort_unstable_by(|a, b| a.field.cmp(&b.field))` — O(n log n)
+- `.sort_desc("field")` → codegen emits `sort_unstable_by(|a, b| b.field.cmp(&a.field))`
+- `.reverse()` → O(n)
+- NEVER use nested while-loop swap sort — O(n²) = 500ms for 10K items vs <5ms with built-in sort
+
+**Handler timing is automatic:**
+The codegen wraps every non-init handler with `perf_now()` at start and writes `last_op_ms = to_ms_string(start, end)` after the full cycle (state update + tree rebuild + layout). This measures the REAL cost, not just the state assignment.
+
+**Current performance bottleneck — full tree rebuild:**
+Every handler clears and rebuilds the entire element tree. For 10K products × 8 elements per card = 80K+ element creations per interaction. The hand-written Honeycomb demo achieves 0.4ms filter by toggling `display_none` on existing cards. The compiled .nectar pipeline takes ~17ms because it rebuilds everything. Fix: store card element IDs during mount, toggle visibility on filter instead of rebuilding. This is the next optimization target.
+
+**Template conditionals for filtering:**
+`{if}` inside `{for}` works: `{for product in self.products { {if self.active_cat == "All" || product.category == self.active_cat { <div>...</div> }} }}`. This filters at mount time. Combined with handler re-mount, it provides functional filtering but rebuilds the tree each time.
+
+### Codegen Prelude Helpers
+
+The Rust codegen automatically generates these helper functions:
+- `with_tree(f)` — access `wasm_api::TREE`
+- `perf_now()` → `performance_now()` (safe wrapper)
+- `to_ms_string(start, end)` → formats elapsed time as "X.XXms"
+- `fetch_get(url, cb_idx)`, `fetch_post(url, body, cb_idx)` — HTTP
+- `read_response()` → `(status, body_bytes)`
+- `read_storage(key)`, `write_storage(key, val)`, `remove_storage(key)` — localStorage
+- `get_hash()`, `set_hash(hash)` — URL hash routing
+- `set_auth_header(token)` — Bearer token for fetch
