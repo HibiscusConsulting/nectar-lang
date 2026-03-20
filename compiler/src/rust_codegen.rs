@@ -80,7 +80,7 @@ impl RustCodegen {
         self.line("use serde::Deserialize;");
         self.line("");
         self.line("/// Scratch buffer for fetch responses, storage reads, hash reads");
-        self.line("const SCRATCH_SIZE: usize = 256 * 1024; // 256KB");
+        self.line("const SCRATCH_SIZE: usize = 4 * 1024 * 1024; // 4MB — handles 10K+ product API responses");
         self.line("static mut SCRATCH: [u8; SCRATCH_SIZE] = [0u8; SCRATCH_SIZE];");
         self.line("");
         self.line("/// Helper: read a string from WASM memory via syscall that writes into a buffer");
@@ -141,33 +141,32 @@ impl RustCodegen {
         self.line("}");
         self.line("");
         self.line("fn perf_now() -> f64 { unsafe { performance_now() } }");
+        self.line("static mut INIT_START: f64 = 0.0;");
         self.line("");
-        // Update registered metric text nodes — tries AppState.tree first, falls back to wasm_api::TREE
+        // Update registered metric text nodes — tries wasm_api::TREE first (handler may have rebuilt there),
+        // then AppState.tree, to handle both in-handler and post-sync contexts.
         self.line("fn update_metric_text(name: &str, value: &str) {");
         self.line("    honeycomb::canvas_app::METRIC_TEXT_IDS.with(|m| {");
         self.line("        let ids: Vec<(String, u32)> = m.borrow().clone();");
-        self.line("        // Try AppState.tree (normal runtime) — if STATE exists");
-        self.line("        let found = honeycomb::canvas_app::STATE.with(|s| {");
+        self.line("        // Try wasm_api::TREE first (handler may have just rebuilt here)");
+        self.line("        honeycomb::wasm_api::TREE.with(|t| {");
+        self.line("            let mut tree = t.borrow_mut();");
+        self.line("            for (n, id) in &ids {");
+        self.line("                if n == name {");
+        self.line("                    if let Some(el) = tree.get_mut(*id) { el.text = Some(value.to_string()); }");
+        self.line("                }");
+        self.line("            }");
+        self.line("        });");
+        self.line("        // Also try AppState.tree (for filter/sort that don't rebuild)");
+        self.line("        honeycomb::canvas_app::STATE.with(|s| {");
         self.line("            if let Some(ref mut app) = *s.borrow_mut() {");
         self.line("                for (n, id) in &ids {");
         self.line("                    if n == name {");
         self.line("                        if let Some(el) = app.tree.get_mut(*id) { el.text = Some(value.to_string()); }");
         self.line("                    }");
         self.line("                }");
-        self.line("                true");
-        self.line("            } else { false }");
+        self.line("            }");
         self.line("        });");
-        self.line("        // Fall back to wasm_api::TREE (during init, before app_init)");
-        self.line("        if !found {");
-        self.line("            honeycomb::wasm_api::TREE.with(|t| {");
-        self.line("                let mut tree = t.borrow_mut();");
-        self.line("                for (n, id) in &ids {");
-        self.line("                    if n == name {");
-        self.line("                        if let Some(el) = tree.get_mut(*id) { el.text = Some(value.to_string()); }");
-        self.line("                    }");
-        self.line("                }");
-        self.line("            });");
-        self.line("        }");
         self.line("    });");
         self.line("}");
         self.line("");
@@ -338,22 +337,28 @@ impl RustCodegen {
         // Mount function — builds the element tree
         self.line(&format!("fn {}_mount() {{", name.to_lowercase()));
         self.indent += 1;
-        // Read state into local variables BEFORE entering the tree closure.
+        // Borrow state for the duration of mount — avoid cloning Vec<Product> (40K String allocs)
+        self.line(&format!("{}_STATE.with(|_state_cell| {{", name.to_uppercase()));
+        self.indent += 1;
+        self.line("let _state_ref = _state_cell.borrow();");
+        // Create local refs/copies for each field
         for field in &comp.state {
             let ty = if let Some(ref t) = field.ty {
                 self.type_to_rust(t)
             } else {
                 "i32".to_string()
             };
-            if ty.starts_with("Vec") || ty == "String" {
-                self.line(&format!("let {} = {}_STATE.with(|s| s.borrow().{}.clone());",
-                    field.name, name.to_uppercase(), field.name));
+            if ty.starts_with("Vec") {
+                // Borrow by reference — zero allocation
+                self.line(&format!("let {} = &_state_ref.{};", field.name, field.name));
+            } else if ty == "String" {
+                // Clone strings (small, needed as owned for text nodes)
+                self.line(&format!("let {} = _state_ref.{}.clone();", field.name, field.name));
             } else {
-                self.line(&format!("let {} = {}_STATE.with(|s| s.borrow().{});",
-                    field.name, name.to_uppercase(), field.name));
+                // Copy scalars
+                self.line(&format!("let {} = _state_ref.{};", field.name, field.name));
             }
         }
-        self.line("");
         self.line("with_tree(|tree| {");
         self.indent += 1;
         self.line("let root = tree.root_id();");
@@ -377,7 +382,9 @@ impl RustCodegen {
         self.emit_template_node(&comp.render.body, "root", name);
 
         self.indent -= 1;
-        self.line("});");
+        self.line("});"); // close with_tree
+        self.indent -= 1;
+        self.line("});"); // close STATE.with
         self.indent -= 1;
         self.line("}");
         self.line("");
@@ -458,9 +465,42 @@ impl RustCodegen {
                     }
                 }
 
-                // Children
-                for child in &el.children {
-                    self.emit_template_node(child, &var, comp_name);
+                // Children — optimize: if single text/expression child, inline on parent element
+                if el.children.len() == 1 {
+                    match &el.children[0] {
+                        TemplateNode::TextLiteral(text) => {
+                            let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+                            self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(\"{}\".into()); }}", var, escaped));
+                        }
+                        TemplateNode::Expression(expr) => {
+                            let rust_expr = self.expr_to_rust(expr, comp_name);
+                            self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
+                            // Register metric text nodes
+                            let field_name = match &**expr {
+                                Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => Some(field.clone()),
+                                Expr::FnCall { callee, args } => {
+                                    if let Expr::Ident(name) = &**callee {
+                                        if name == "format" && args.len() == 2 {
+                                            if let Expr::FieldAccess { object, field } = &args[1] {
+                                                if matches!(**object, Expr::SelfExpr) { Some(field.clone()) } else { None }
+                                            } else { None }
+                                        } else { None }
+                                    } else { None }
+                                }
+                                _ => None,
+                            };
+                            if let Some(field) = field_name {
+                                self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});", field, field.len(), var));
+                            }
+                        }
+                        _ => {
+                            self.emit_template_node(&el.children[0], &var, comp_name);
+                        }
+                    }
+                } else {
+                    for child in &el.children {
+                        self.emit_template_node(child, &var, comp_name);
+                    }
                 }
             }
             TemplateNode::TextLiteral(text) => {
@@ -513,7 +553,7 @@ impl RustCodegen {
                 if iter_rust.contains("..") {
                     self.line(&format!("for {} in {} {{", binding, iter_rust));
                 } else {
-                    self.line(&format!("for {} in &{} {{", binding, iter_rust));
+                    self.line(&format!("for {} in {}.iter() {{", binding, iter_rust));
                 }
                 self.indent += 1;
 
@@ -629,6 +669,19 @@ impl RustCodegen {
             self.line(&format!("{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
                 comp_name.to_uppercase()));
             self.line("update_metric_text(\"last_op_ms\", &_op_elapsed);");
+
+            // For data-loaded callbacks, also update total_ms to show full pipeline time
+            if method.name.contains("loaded") || method.name.contains("response") {
+                self.line("// Full pipeline time: init → fetch → parse → render");
+                self.line("let _total = to_ms_string(unsafe { INIT_START }, perf_now());");
+                self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _total.clone());",
+                    comp_name.to_uppercase()));
+                self.line("update_metric_text(\"total_ms\", &_total);");
+                // Also update product count
+                self.line(&format!("let _pc = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().product_count));",
+                    comp_name.to_uppercase()));
+                self.line("update_metric_text(\"product_count\", &_pc);");
+            }
         }
 
         self.indent -= 1;
@@ -960,6 +1013,7 @@ impl RustCodegen {
         self.line(&format!("pub extern \"C\" fn nectar_init(_vw: f32, _vh: f32) {{"));
         self.indent += 1;
         self.line("let _init_t0 = perf_now();");
+        self.line("unsafe { INIT_START = _init_t0; }");
         for init_fn in &init_methods {
             self.line(&format!("{}();", init_fn));
         }
@@ -977,7 +1031,7 @@ impl RustCodegen {
         if has_fetch_init {
             if let Some(cb_idx) = fetch_callback_idx {
                 self.line("// Auto-fetch: init_data detected, firing fetch with callback");
-                self.line(&format!("fetch_get(\"http://localhost:3031/api/products\", {});", cb_idx));
+                self.line(&format!("fetch_get(\"/api/products?per_page=10000\", {});", cb_idx));
             }
         }
 
@@ -1002,7 +1056,9 @@ impl RustCodegen {
                     self.line(&format!("if idx == {} {{", cb_idx));
                     self.indent += 1;
                     self.line("// Parse fetch response as JSON into component state");
+                    self.line("let _t_copy = perf_now();");
                     self.line("let (_status, body) = read_response();");
+                    self.line("let _t_copied = perf_now();");
                     self.line(&format!("{}_STATE.with(|s| {{", comp_name.to_uppercase()));
                     self.indent += 1;
                     self.line("let mut state = s.borrow_mut();");
@@ -1021,6 +1077,14 @@ impl RustCodegen {
                     }
                     self.indent -= 1;
                     self.line("});");
+                    self.line("let _t_parsed = perf_now();");
+                    // Log timing breakdown
+                    self.line("{");
+                    self.indent += 1;
+                    self.line("let msg = format!(\"FETCH BREAKDOWN: copy={:.2}ms serde_parse={:.2}ms body={}bytes\", _t_copied - _t_copy, _t_parsed - _t_copied, body.len());");
+                    self.line("unsafe { console_log(msg.as_ptr(), msg.len() as u32); }");
+                    self.indent -= 1;
+                    self.line("}");
                     self.indent -= 1;
                     self.line("}");
                 }
