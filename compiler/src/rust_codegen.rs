@@ -1171,7 +1171,7 @@ impl RustCodegen {
         self.line("let mut measurer = EstimateMeasurer;");
         self.line("let vw = unsafe { canvas_get_width() };");
         self.line("let vh = unsafe { canvas_get_height() };");
-        self.line("layout::compute(&mut tree, vw, vh, &mut measurer);");
+        self.line("layout::compute(&mut tree, vw, 999999.0, &mut measurer);");
         self.indent -= 1;
         self.line("});");
         self.indent -= 1;
