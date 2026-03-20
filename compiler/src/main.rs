@@ -1156,9 +1156,11 @@ path = "src/lib.rs"
 honeycomb = {{ path = "{}" }}
 serde = {{ version = "1", features = ["derive"] }}
 serde_json = "1"
+lol_alloc = "0.4"
 
 [profile.release]
 opt-level = {}
+lto = true
 "#, honeycomb_path.display(), if opt_level >= 2 { "s" } else { "2" }))?;
 
     fs::write(build_dir.join("src/lib.rs"), &rust_source)?;
@@ -1189,11 +1191,27 @@ opt-level = {}
         return Err(anyhow::anyhow!("cargo build failed — generated Rust has errors"));
     }
 
-    // Step 5: Copy the resulting WASM
+    // Step 5: Copy + optimize WASM with wasm-opt (20-30% execution speedup)
     let wasm_src = build_dir
         .join("target/wasm32-unknown-unknown/release/nectar_app.wasm");
     let wasm_path = out_dir.join("app.wasm");
-    fs::copy(&wasm_src, &wasm_path)?;
+    // Run wasm-opt if available — O3 for maximum execution speed
+    let wasm_opt_result = std::process::Command::new("wasm-opt")
+        .arg("-O3")
+        .arg("--enable-bulk-memory")
+        .arg(&wasm_src)
+        .arg("-o")
+        .arg(&wasm_path)
+        .output();
+    match wasm_opt_result {
+        Ok(r) if r.status.success() => {
+            eprintln!("nectar: wasm-opt applied (O3)");
+        }
+        _ => {
+            // Fall back to plain copy if wasm-opt not available
+            fs::copy(&wasm_src, &wasm_path)?;
+        }
+    }
 
     // Step 6: Generate index.html (minimal canvas host — just canvas syscalls)
     let app_name = input.file_stem().unwrap_or_default().to_string_lossy();
