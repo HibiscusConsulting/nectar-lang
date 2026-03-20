@@ -1235,18 +1235,38 @@ fn generate_canvas_html(app_name: &str) -> String {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{app_name}</title>
-<style>*{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}canvas{{display:block}}</style>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+*{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}canvas{{display:block}}
+nav{{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
+nav .logo{{color:#f97316;font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}}
+nav .links{{display:flex;gap:4px}}
+nav .links a{{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}}
+nav .links a:hover{{color:#e6edf3;background:rgba(255,255,255,0.06)}}
+nav .links a.active{{color:#e6edf3;background:rgba(249,115,22,0.12)}}
+</style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<nav>
+  <a href="/" class="logo">Nectar</a>
+  <div class="links">
+    <a href="/nectar" class="active">Demo</a>
+    <a href="/trading">Trading</a>
+    <a href="/svelte">Svelte 5</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank">GitHub</a>
+    <a href="/">Home</a>
+  </div>
+</nav>
+<canvas id="c" style="margin-top:48px"></canvas>
 <script>
 (async () => {{
 const cvs = document.getElementById('c');
 let dpr = window.devicePixelRatio || 1;
+const navH = 48;
 cvs.width = window.innerWidth * dpr;
-cvs.height = window.innerHeight * dpr;
+cvs.height = (window.innerHeight - navH) * dpr;
 cvs.style.width = window.innerWidth + 'px';
-cvs.style.height = window.innerHeight + 'px';
+cvs.style.height = (window.innerHeight - navH) + 'px';
 let ctx = cvs.getContext('2d');
 ctx.scale(dpr, dpr);
 const dec = new TextDecoder();
@@ -1269,7 +1289,7 @@ const imports = {{ env: {{
   }},
   canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => {{ const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){{ try{{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}}catch(e){{}} }} }},
   canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
-  canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight,
+  canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight - 48,
   clipboard_write: (p,l) => navigator.clipboard?.writeText(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
   clipboard_read: () => 0,
   input_overlay_show: () => {{}}, input_overlay_hide: () => {{}}, input_overlay_get_value: () => 0,
@@ -1327,10 +1347,10 @@ W.app_render();
 // Full event wiring — all Honeycomb exports
 window.addEventListener('resize', () => {{
   dpr = window.devicePixelRatio || 1;
-  cvs.width = window.innerWidth * dpr; cvs.height = window.innerHeight * dpr;
-  cvs.style.width = window.innerWidth + 'px'; cvs.style.height = window.innerHeight + 'px';
+  cvs.width = window.innerWidth * dpr; cvs.height = (window.innerHeight - navH) * dpr;
+  cvs.style.width = window.innerWidth + 'px'; cvs.style.height = (window.innerHeight - navH) + 'px';
   ctx = cvs.getContext('2d'); ctx.scale(dpr, dpr);
-  if (W.app_resize) W.app_resize(window.innerWidth, window.innerHeight);
+  if (W.app_resize) W.app_resize(window.innerWidth, window.innerHeight - navH);
   if (W.app_render) W.app_render();
 }});
 cvs.addEventListener('wheel', e => {{
