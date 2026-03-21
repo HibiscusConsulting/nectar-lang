@@ -354,8 +354,120 @@ impl LspServer {
 
     fn on_completion(&self, params: CompletionParams) -> Vec<CompletionItem> {
         let mut items = Vec::new();
+        let uri = &params.text_document.uri;
+        let position = &params.position;
 
-        // Keyword completions
+        // Check if this is a dot-completion by examining the character before the cursor.
+        let is_dot = self.is_dot_completion(uri, position);
+
+        // If dot-completion, find the identifier before the dot and resolve its type
+        // to return only the relevant struct fields and impl methods.
+        if is_dot {
+            let ident_before_dot = self.get_identifier_before_dot(uri, position);
+            if let Some(doc) = self.documents.get(uri) {
+                if let Some(program) = &doc.program {
+                    // Try to resolve the type of the identifier before the dot.
+                    let resolved_type = self.resolve_identifier_type(
+                        &ident_before_dot, program, position,
+                    );
+
+                    if let Some(type_name) = resolved_type {
+                        // Return only fields and methods of the resolved type
+                        for item in &program.items {
+                            if let Item::Struct(s) = item {
+                                if s.name == type_name {
+                                    for field in &s.fields {
+                                        items.push(CompletionItem {
+                                            label: field.name.clone(),
+                                            kind: 5, // Field
+                                            detail: Some(format!("{}: {:?}", field.name, field.ty)),
+                                        });
+                                    }
+                                }
+                            }
+                            if let Item::Impl(imp) = item {
+                                if imp.target == type_name {
+                                    for method in &imp.methods {
+                                        items.push(CompletionItem {
+                                            label: method.name.clone(),
+                                            kind: 2, // Method
+                                            detail: Some(format!("{}::{}", imp.target, method.name)),
+                                        });
+                                    }
+                                }
+                            }
+                            // Component state fields via self.
+                            if ident_before_dot == "self" {
+                                if let Item::Component(c) = item {
+                                    // Check if cursor is inside this component
+                                    if self.span_contains(&c.span, position.line + 1, position.character + 1) {
+                                        for field in &c.state {
+                                            items.push(CompletionItem {
+                                                label: field.name.clone(),
+                                                kind: 5, // Field
+                                                detail: Some(format!("signal {}", field.name)),
+                                            });
+                                        }
+                                        for method in &c.methods {
+                                            items.push(CompletionItem {
+                                                label: method.name.clone(),
+                                                kind: 2, // Method
+                                                detail: Some(format!("{}.{}", c.name, method.name)),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Add built-in methods for common types
+                        for builtin in &["len", "push", "pop", "contains", "map", "filter", "reduce",
+                                         "trim", "to_upper", "to_lower", "split", "starts_with", "ends_with"] {
+                            items.push(CompletionItem {
+                                label: builtin.to_string(),
+                                kind: 2, // Method
+                                detail: Some("built-in method".to_string()),
+                            });
+                        }
+                        return items;
+                    }
+
+                    // If we couldn't resolve the type, return all fields/methods
+                    // as a fallback (better than nothing).
+                    for item in &program.items {
+                        if let Item::Struct(s) = item {
+                            for field in &s.fields {
+                                items.push(CompletionItem {
+                                    label: field.name.clone(),
+                                    kind: 5, // Field
+                                    detail: Some(format!("{}.{}", s.name, field.name)),
+                                });
+                            }
+                        }
+                        if let Item::Impl(imp) = item {
+                            for method in &imp.methods {
+                                items.push(CompletionItem {
+                                    label: method.name.clone(),
+                                    kind: 2, // Method
+                                    detail: Some(format!("{}::{}", imp.target, method.name)),
+                                });
+                            }
+                        }
+                    }
+                    // Add built-in methods for common types
+                    for builtin in &["len", "push", "pop", "contains", "map", "filter", "reduce",
+                                     "trim", "to_upper", "to_lower", "split", "starts_with", "ends_with"] {
+                        items.push(CompletionItem {
+                            label: builtin.to_string(),
+                            kind: 2, // Method
+                            detail: Some("built-in method".to_string()),
+                        });
+                    }
+                }
+            }
+            return items;
+        }
+
+        // Not dot-completion — return keywords + top-level names (full completion).
         let keywords = [
             "let", "mut", "fn", "component", "render", "struct", "enum",
             "impl", "trait", "if", "else", "match", "for", "in", "while",
@@ -375,8 +487,6 @@ impl LspServer {
             });
         }
 
-        // Component/function/struct name completions from the current document.
-        let uri = &params.text_document.uri;
         if let Some(doc) = self.documents.get(uri) {
             if let Some(program) = &doc.program {
                 for item in &program.items {
@@ -419,16 +529,8 @@ impl LspServer {
                         _ => {}
                     }
                 }
-            }
-        }
-
-        // Field/method completions based on type info.
-        // We look for a "." trigger at the cursor position and try to resolve
-        // the type of the expression before the dot.
-        let _position = &params.position;
-        if let Some(doc) = self.documents.get(uri) {
-            if let Some(program) = &doc.program {
-                // Extract struct field completions for any struct in scope
+                // Also include struct fields and impl methods in non-dot context
+                // (useful for code that references fields directly).
                 for item in &program.items {
                     if let Item::Struct(s) = item {
                         for field in &s.fields {
@@ -453,6 +555,106 @@ impl LspServer {
         }
 
         items
+    }
+
+    /// Check if the cursor is positioned right after a `.` (dot completion).
+    fn is_dot_completion(&self, uri: &str, position: &Position) -> bool {
+        if position.character == 0 {
+            return false;
+        }
+        if let Some(doc) = self.documents.get(uri) {
+            let lines: Vec<&str> = doc.text.lines().collect();
+            if let Some(line) = lines.get(position.line as usize) {
+                let col = (position.character - 1) as usize;
+                if col < line.len() {
+                    return line.as_bytes()[col] == b'.';
+                }
+            }
+        }
+        false
+    }
+
+    /// Extract the identifier name before the dot at the cursor position.
+    fn get_identifier_before_dot(&self, uri: &str, position: &Position) -> String {
+        if position.character < 2 {
+            return String::new();
+        }
+        if let Some(doc) = self.documents.get(uri) {
+            let lines: Vec<&str> = doc.text.lines().collect();
+            if let Some(line) = lines.get(position.line as usize) {
+                // Walk backwards from the character before the dot
+                let dot_col = (position.character - 1) as usize;
+                if dot_col >= line.len() {
+                    return String::new();
+                }
+                let mut end = dot_col;
+                let bytes = line.as_bytes();
+                // Skip any whitespace between the dot and the identifier
+                while end > 0 && bytes[end - 1] == b' ' {
+                    end -= 1;
+                }
+                let ident_end = end;
+                // Walk backwards to find the start of the identifier
+                while end > 0 && (bytes[end - 1].is_ascii_alphanumeric() || bytes[end - 1] == b'_') {
+                    end -= 1;
+                }
+                return line[end..ident_end].to_string();
+            }
+        }
+        String::new()
+    }
+
+    /// Attempt to resolve the type of an identifier in the current scope.
+    /// Looks at let bindings, function parameters, and struct definitions.
+    fn resolve_identifier_type(
+        &self,
+        ident: &str,
+        program: &Program,
+        _position: &Position,
+    ) -> Option<String> {
+        // "self" in a component resolves to that component's type
+        if ident == "self" {
+            return Some("self".to_string());
+        }
+
+        // Check for let bindings with explicit type annotations in the AST.
+        // This is a simplified heuristic: look for struct names that match
+        // the declared type of variables.
+        for item in &program.items {
+            match item {
+                Item::Function(f) => {
+                    // Check parameters
+                    for param in &f.params {
+                        if param.name == ident {
+                            return Some(self.type_name_from_ast(&param.ty));
+                        }
+                    }
+                }
+                Item::Component(c) => {
+                    // Check props
+                    for prop in &c.props {
+                        if prop.name == ident {
+                            return Some(self.type_name_from_ast(&prop.ty));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Extract a simple type name from an AST Type node.
+    fn type_name_from_ast(&self, ty: &crate::ast::Type) -> String {
+        match ty {
+            crate::ast::Type::Named(name) => name.clone(),
+            crate::ast::Type::Reference { inner, .. } => {
+                self.type_name_from_ast(inner)
+            }
+            crate::ast::Type::Option(inner) => self.type_name_from_ast(inner),
+            crate::ast::Type::Array(inner) => self.type_name_from_ast(inner),
+            _ => String::new(),
+        }
     }
 
     // -- Hover --------------------------------------------------------------
@@ -1139,6 +1341,33 @@ mod tests {
         assert!(labels.contains(&"origin"), "should include method 'origin'");
     }
 
+    // --- Dot-completion filters to struct fields ---
+
+    #[test]
+    fn test_dot_completion_filters_struct_fields() {
+        let mut server = LspServer::new();
+        // "p." at position (1, 2) — character before cursor (position.character - 1 = 1) is '.'
+        let source = "struct Point { x: i32, y: i32 }\nfn test(p: Point) { p. }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 1, character: 22 }, // after the dot in "p."
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        // Dot completion should return struct fields (from type resolution of param `p: Point`)
+        assert!(labels.contains(&"x"), "dot completion on Point should include field 'x', got: {:?}", labels);
+        assert!(labels.contains(&"y"), "dot completion on Point should include field 'y'");
+        // Should NOT include keywords in dot-completion context
+        assert!(!labels.contains(&"let"), "dot completion should not include keywords");
+    }
+
     // --- Hover on struct ---
 
     #[test]
@@ -1395,5 +1624,53 @@ mod tests {
             server.identifier_at_position(text, 1, 1),
             Some("_".to_string())
         );
+    }
+
+    #[test]
+    fn test_completion_after_dot_returns_members() {
+        let mut server = LspServer::new();
+        // Line 0: "x."  -- dot at position 2, cursor at position 2 (right after dot)
+        let source = "x.\nfn f() { }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            // Position right after the dot: line 0, char 2
+            position: Position { line: 0, character: 2 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        // Should have built-in methods, but NOT keywords
+        assert!(labels.contains(&"len") || labels.contains(&"push"),
+            "After dot, should include built-in methods, got: {:?}", labels);
+        assert!(!labels.contains(&"fn"), "After dot, should NOT include keyword 'fn'");
+    }
+
+    #[test]
+    fn test_completion_not_after_dot_includes_keywords() {
+        let mut server = LspServer::new();
+        let source = "fn f() { }";
+        let program = server.parse_document(source);
+        server.documents.insert(
+            "file:///test.nectar".to_string(),
+            DocumentState { text: source.to_string(), program },
+        );
+
+        let params = CompletionParams {
+            text_document: TextDocumentIdentifier {
+                uri: "file:///test.nectar".to_string(),
+            },
+            position: Position { line: 0, character: 5 },
+        };
+        let items = server.on_completion(params);
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"fn"), "Should include keywords when not after dot");
+        assert!(labels.contains(&"component"), "Should include component keyword");
     }
 }

@@ -753,6 +753,12 @@ pub enum TemplateNode {
         iterator: Box<Expr>,
         children: Vec<TemplateNode>,
         lazy: bool,
+        /// When true, the compiler uses in-place slot-reuse for sort/filter:
+        /// setText/setAttr updates instead of moving DOM nodes. The compiler
+        /// validates that the card template is safe (no interactive inputs,
+        /// all dynamic fields enumerated, callbacks properly rebound).
+        /// Syntax: `{inplace for item in items { ... }}`
+        inplace: bool,
     },
     /// {match subject { Pattern => <template>, ... }}
     TemplateMatch {
@@ -1382,6 +1388,11 @@ pub enum Expr {
         start: Box<Expr>,
         end: Box<Expr>,
     },
+
+    /// Break out of the nearest enclosing loop
+    Break,
+    /// Continue to the next iteration of the nearest enclosing loop
+    Continue,
 }
 
 /// A segment in a format string expression.

@@ -30,6 +30,8 @@ pub struct WasmCodegen {
     target: CompilationTarget,
     output: String,
     indent: usize,
+    /// Source map for debug mapping from WAT back to .nectar source.
+    pub source_map: crate::sourcemap::SourceMap,
     /// Track local variables in current function scope
     locals: Vec<(String, WasmType)>,
     /// Counter for generating unique labels
@@ -61,6 +63,8 @@ pub struct WasmCodegen {
     component_fields: Vec<String>,
     /// Current component name (for global signal variable naming)
     component_name: String,
+    /// Name of the first component encountered — used for auto-mount in __init_all.
+    first_component_name: Option<String>,
     /// Deferred signal→DOM updater functions.
     /// When expr is Some, the updater re-evaluates the full expression (e.g. format("...", self.field)).
     /// When None, the updater reads the signal directly and converts via string_fromI32.
@@ -88,6 +92,9 @@ pub struct WasmCodegen {
     /// Tracks (component_name, base_index, method_count) for each component
     /// to emit the global __callback dispatcher at the end.
     callback_registry: Vec<(String, u32, u32)>,
+    /// Stack of (break_label, continue_label) for nested loops.
+    /// Used by Expr::Break and Expr::Continue to emit `br` to the right target.
+    loop_label_stack: Vec<(String, String)>,
     /// Active for-loop binding variable names (stack for nested loops).
     /// When generating child templates inside a `{for item in expr { ... }}`,
     /// `item` is pushed here so that `Expr::Ident("item")` resolves to
@@ -124,6 +131,19 @@ pub struct WasmCodegen {
     /// Widget tags found in templates — drives Prune registration in Honeycomb.
     /// Only widgets that appear in templates get registered → WASM linker strips the rest.
     used_widget_tags: HashSet<String>,
+    /// Deferred filter functions for in-place DOM filter toggling.
+    /// When a for-loop contains a TemplateIf matching a filter pattern,
+    /// the compiler emits all elements at mount time and toggles display:none.
+    deferred_filters: Vec<DeferredFilter>,
+    /// Deferred sort reorder functions for DOM sort via appendChild.
+    deferred_sorts: Vec<DeferredSort>,
+    /// When inside a for-loop body, tracks the WAT local variable name of the
+    /// first element created via dom_createElement. Used by sort element tracking.
+    sort_track_first_el: Option<String>,
+    /// Tracks the last element variable created by generate_template (Element node).
+    /// Set after every dom_createElement + local.set sequence. Used by the filter
+    /// optimization to capture the element ID for the filter table registration.
+    last_created_element_var: Option<String>,
     /// Import namespace usage flags — set during AST pre-scan to determine which
     /// browser API import blocks to emit. Only used namespaces get imports.
     needs_http: bool,
@@ -173,6 +193,17 @@ pub struct WasmCodegen {
     /// Collected during generation rather than panicking, so the compiler can
     /// report all missing codegen at once.
     pub codegen_errors: Vec<String>,
+    /// Codegen warnings — non-fatal issues detected during generation, such as
+    /// calls to unimplemented stdlib functions that will produce link errors.
+    pub codegen_warnings: Vec<String>,
+    /// Trait impl map — maps (type_name, method_name) to the generated WASM function name.
+    /// Built during pre-scan from impl blocks that implement traits. Used to resolve
+    /// method calls on concrete types to their trait impl functions.
+    trait_impl_methods: HashMap<String, Vec<(String, String)>>,
+    /// Current source file name for source map mappings.
+    source_file: String,
+    /// Current WAT output line number (0-based), tracked for source map emission.
+    wat_line: u32,
 }
 
 /// Describes a reactive conditional block updater.
@@ -206,6 +237,47 @@ struct SignalUpdater {
     /// If Some, this is an attribute updater (calls dom_setAttr with this attr name).
     /// If None, this is a text updater (calls dom_setText).
     attr_name: Option<String>,
+}
+
+/// Describes a detected filter pattern for in-place DOM filter toggling.
+/// When a for-loop contains a TemplateIf that matches the pattern
+/// `self.state_field == "All" || binding.item_field == self.state_field`,
+/// the compiler can optimize by creating ALL elements during mount and
+/// toggling `display:none` instead of rebuilding the entire tree.
+#[derive(Clone, Debug)]
+struct FilterPattern {
+    /// The state field that controls filtering (e.g. "active_cat")
+    state_field: String,
+    /// The item struct field used as the filter key (e.g. "category")
+    item_field: String,
+}
+
+/// Describes a deferred filter function to be emitted after mount.
+/// Records everything needed to emit a `$__apply_filter_<comp>` function
+/// that iterates a WASM-side filter table and toggles display:none via dom_setStyle.
+#[derive(Clone, Debug)]
+struct DeferredFilter {
+    /// Unique label id for naming globals/functions
+    uid: u32,
+    /// Component name (for function/global naming)
+    comp: String,
+    /// The state field signal name (e.g. "active_cat")
+    state_field: String,
+    /// The item struct field used as the filter key (e.g. "category")
+    item_field: String,
+}
+
+/// Describes a deferred DOM sort reorder function.
+/// When a for-loop emits DOM elements, a `DeferredSort` is recorded so that
+/// `$__apply_sort_<comp>_<uid>` can be emitted after the mount function.
+/// The sort function iterates the (now-sorted) data array, looks up each item's
+/// element ID via the stored (data_ptr, element_id) mapping, and calls
+/// dom_appendChild(parent, element_id) to reorder the DOM.
+#[derive(Clone)]
+struct DeferredSort {
+    uid: u32,
+    comp: String,
+    iterator_expr: Expr,
 }
 
 /// Describes a deferred lazy for-loop batch function.
@@ -256,11 +328,17 @@ impl WasmCodegen {
         Self::with_target(CompilationTarget::Browser)
     }
 
+    /// Set the source file name for source map generation.
+    pub fn set_source_file(&mut self, path: &str) {
+        self.source_file = path.to_string();
+    }
+
     pub fn with_target(target: CompilationTarget) -> Self {
         Self {
             target,
             output: String::new(),
             indent: 0,
+            source_map: crate::sourcemap::SourceMap::new(),
             locals: Vec::new(),
             label_counter: 0,
             strings: Vec::new(),
@@ -275,6 +353,7 @@ impl WasmCodegen {
             in_handler_body: false,
             component_fields: Vec::new(),
             component_name: String::new(),
+            first_component_name: None,
             signal_updaters: Vec::<SignalUpdater>::new(),
             known_components: Vec::new(),
             component_props: Vec::new(),
@@ -284,12 +363,17 @@ impl WasmCodegen {
             component_method_names: Vec::new(),
             global_handler_base: 0,
             callback_registry: Vec::new(),
+            loop_label_stack: Vec::new(),
             for_loop_bindings: Vec::new(),
             string_state_fields: Vec::new(),
             struct_layouts: HashMap::new(),
             handler_param_bindings: Vec::new(),
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
+            deferred_filters: Vec::new(),
+            deferred_sorts: Vec::new(),
+            sort_track_first_el: None,
+            last_created_element_var: None,
             used_runtime_categories: HashSet::new(),
             used_widget_tags: HashSet::new(),
             needs_http: false,
@@ -317,6 +401,10 @@ impl WasmCodegen {
             bloom_class_styles: HashMap::new(),
             breakpoint_defs: Vec::new(),
             codegen_errors: Vec::new(),
+            codegen_warnings: Vec::new(),
+            trait_impl_methods: HashMap::new(),
+            source_file: String::new(),
+            wat_line: 0,
         }
     }
 
@@ -1066,6 +1154,23 @@ impl WasmCodegen {
         // are actually used. This enables tree-shaking unused helpers.
         self.scan_program_for_runtime_deps(program);
 
+        // Build trait impl method map — maps target type names to their
+        // impl method names so method calls can be resolved to the correct
+        // prefixed function (e.g. point.display() -> call $Point_display).
+        for item in &program.items {
+            if let Item::Impl(imp) = item {
+                let methods: Vec<(String, String)> = imp.methods.iter()
+                    .map(|m| (m.name.clone(), format!("{}_{}", imp.target, m.name)))
+                    .collect();
+                if !methods.is_empty() {
+                    self.trait_impl_methods
+                        .entry(imp.target.clone())
+                        .or_default()
+                        .extend(methods);
+                }
+            }
+        }
+
         self.emit("(module");
         self.indent += 1;
 
@@ -1706,6 +1811,14 @@ impl WasmCodegen {
                 for call in &init_calls {
                     self.line(call);
                 }
+
+                // Auto-mount the first component: call dom_getRoot() → ComponentName_mount(root_id)
+                if let Some(comp_name) = self.first_component_name.clone() {
+                    self.line(&format!("  ;; auto-mount {} into #app", comp_name));
+                    self.line("  call $dom_getRoot");
+                    self.line(&format!("  call ${}_mount", comp_name));
+                }
+
                 self.line(")");
             }
         }
@@ -1852,7 +1965,12 @@ impl WasmCodegen {
     fn generate_item(&mut self, item: &Item) {
         match item {
             Item::Function(f) => self.generate_function(f),
-            Item::Component(c) => self.generate_component(c),
+            Item::Component(c) => {
+                if self.first_component_name.is_none() {
+                    self.first_component_name = Some(c.name.clone());
+                }
+                self.generate_component(c);
+            }
             Item::Struct(s) => self.generate_struct_layout(s),
             Item::Store(s) => self.generate_store(s),
             Item::Agent(a) => self.generate_agent(a),
@@ -1868,15 +1986,18 @@ impl WasmCodegen {
                 self.line(&format!(";; trait {} (erased)", t.name));
             }
             Item::Impl(imp) => {
-                // Impl methods are compiled like regular functions.
-                // Trait impls get a comment showing which traits are implemented.
+                // Impl methods are compiled with a {Type}_{method} prefix so that
+                // trait method calls on concrete types resolve correctly.
                 if !imp.trait_impls.is_empty() {
                     self.line(&format!(";; impl {} for {}", imp.trait_impls.join(" + "), imp.target));
                 } else {
                     self.line(&format!(";; impl {}", imp.target));
                 }
                 for method in &imp.methods {
-                    self.generate_function(method);
+                    // Generate with prefixed name: Point_display instead of display
+                    let mut prefixed = method.clone();
+                    prefixed.name = format!("{}_{}", imp.target, method.name);
+                    self.generate_function(&prefixed);
                 }
             }
             Item::App(app) => self.generate_app(app),
@@ -2748,6 +2869,17 @@ impl WasmCodegen {
             String::new()
         };
 
+        // Record source map mapping: WAT function start -> Nectar source span
+        if !self.source_file.is_empty() && func.span.line > 0 {
+            self.source_map.add_mapping_with_name(
+                self.wat_line,
+                0,
+                func.span.line - 1, // source map lines are 0-based
+                func.span.col.saturating_sub(1),
+                &self.source_file.clone(),
+                &func.name,
+            );
+        }
         self.emit(&format!("(func ${}{} {}{}",
             func.name, export, params.join(" "), ret));
         self.indent += 1;
@@ -3190,6 +3322,9 @@ impl WasmCodegen {
         // 2. Signal-backed state (each mutable field becomes a signal)
         // 3. Effect functions for reactive DOM updates
         // 4. Event handler trampolines
+
+        // Record source map mapping for the component
+        self.map_span(&comp.span);
 
         let comp_name = &comp.name;
 
@@ -3731,12 +3866,24 @@ impl WasmCodegen {
                     self.line("local.set $ptr");
                 }
             } else {
-                // Direct signal read: get signal value, convert to string
+                // Direct signal read: get signal value
+                let comp_prefix = format!("$__sig_{}_", self.component_name);
+                let sig_field = updater.sig_global
+                    .strip_prefix(&comp_prefix)
+                    .unwrap_or(&updater.sig_global)
+                    .to_string();
+                let is_string_sig = self.string_state_fields.contains(&sig_field);
                 self.line(&format!("global.get {}", updater.sig_global));
                 self.line("call $signal_get");
-                self.line("call $string_fromI32");
-                self.line("local.set $len");
-                self.line("local.set $ptr");
+                if is_string_sig {
+                    self.line("call $str_len ;; string signal: get (ptr, len) from pointer");
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                } else {
+                    self.line("call $string_fromI32");
+                    self.line("local.set $len");
+                    self.line("local.set $ptr");
+                }
             }
 
             if let Some(ref attr) = updater.attr_name {
@@ -3947,6 +4094,139 @@ impl WasmCodegen {
             self.line(")");
         }
 
+        // Emit in-place filter globals and apply_filter functions
+        for filter in &self.deferred_filters.clone() {
+            self.line(&format!("(global $__filter_table_base_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
+            self.line(&format!("(global $__filter_table_count_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
+            self.line(&format!("(global $__filter_parent_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
+        }
+
+        for filter in &self.deferred_filters.clone() {
+            let func_name = format!("$__apply_filter_{}_{}", filter.comp, filter.uid);
+            let all_str_offset = self.store_string("All");
+            let display_offset = self.store_string("display");
+            let none_offset = self.store_string("none");
+            let empty_offset = self.store_string("");
+
+            self.line("");
+            self.emit(&format!("(func {} ;; in-place filter updater", func_name));
+            self.indent += 1;
+            self.line("(local $i i32)");
+            self.line("(local $count i32)");
+            self.line("(local $entry_addr i32)");
+            self.line("(local $el_id i32)");
+            self.line("(local $str_ptr i32)");
+            self.line("(local $filter_val i32)");
+            self.line("(local $is_all i32)");
+
+            // Read current filter signal value
+            self.line(&format!(";; read current filter value for {}", filter.state_field));
+            self.line(&format!("global.get $__sig_{}_{}", filter.comp, filter.state_field));
+            self.line("call $signal_get");
+            self.line("local.set $filter_val");
+
+            // Check if filter is "All"
+            self.line("local.get $filter_val");
+            self.line(&format!("i32.const {} ;; ptr to \"All\"", all_str_offset));
+            self.line("call $str_eq");
+            self.line("local.set $is_all");
+
+            // Load count
+            self.line(&format!("global.get $__filter_table_count_{}_{}", filter.comp, filter.uid));
+            self.line("local.set $count");
+
+            // Loop: i = 0; i < count; i++
+            self.line("i32.const 0");
+            self.line("local.set $i");
+
+            self.line("block $filter_break");
+            self.indent += 1;
+            self.line("loop $filter_cont");
+            self.indent += 1;
+
+            // br_if $filter_break (i >= count)
+            self.line("local.get $i");
+            self.line("local.get $count");
+            self.line("i32.ge_u");
+            self.line("br_if $filter_break");
+
+            // Compute entry address: base + i * 12
+            self.line(&format!("global.get $__filter_table_base_{}_{}", filter.comp, filter.uid));
+            self.line("local.get $i");
+            self.line("i32.const 12");
+            self.line("i32.mul");
+            self.line("i32.add");
+            self.line("local.set $entry_addr");
+
+            // Load element_id from offset 0
+            self.line("local.get $entry_addr");
+            self.line("i32.load ;; element_id");
+            self.line("local.set $el_id");
+
+            // Load str_ptr from offset 4
+            self.line("local.get $entry_addr");
+            self.line("i32.load offset=4 ;; str_ptr (category)");
+            self.line("local.set $str_ptr");
+
+            // If is_all OR str_ptr matches filter_val → show (display:""), else hide (display:"none")
+            self.line("local.get $is_all");
+            self.line("if ;; filter is \"All\" — show card");
+            self.indent += 1;
+            // Show: set display to ""
+            self.line("local.get $el_id");
+            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
+            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+            self.line(&format!("i32.const {} ;; \"\" ptr", empty_offset));
+            self.line("i32.const 0 ;; \"\" len");
+            self.line("call $dom_setStyle");
+            self.indent -= 1;
+            self.line("else");
+            self.indent += 1;
+            // Compare card's category to filter value
+            self.line("local.get $str_ptr");
+            self.line("local.get $filter_val");
+            self.line("call $str_eq");
+            self.line("if ;; card matches filter");
+            self.indent += 1;
+            // Show: set display to ""
+            self.line("local.get $el_id");
+            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
+            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+            self.line(&format!("i32.const {} ;; \"\" ptr", empty_offset));
+            self.line("i32.const 0 ;; \"\" len");
+            self.line("call $dom_setStyle");
+            self.indent -= 1;
+            self.line("else");
+            self.indent += 1;
+            // Hide: set display to "none"
+            self.line("local.get $el_id");
+            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
+            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+            self.line(&format!("i32.const {} ;; \"none\" ptr", none_offset));
+            self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
+            self.line("call $dom_setStyle");
+            self.indent -= 1;
+            self.line("end ;; card match");
+            self.indent -= 1;
+            self.line("end ;; is_all check");
+
+            // Increment i
+            self.line("local.get $i");
+            self.line("i32.const 1");
+            self.line("i32.add");
+            self.line("local.set $i");
+
+            self.line("br $filter_cont");
+
+            self.indent -= 1;
+            self.line("end ;; filter_cont");
+            self.indent -= 1;
+            self.line("end ;; filter_break");
+
+            self.indent -= 1;
+            self.line(")");
+        }
+
         // Emit lazy for-loop batch globals and functions
         for batch in &self.lazy_batches.clone() {
             self.line(&format!("(global $__lazy_parent_{} (mut i32) (i32.const 0))", batch.uid));
@@ -4104,6 +4384,107 @@ impl WasmCodegen {
                 batch.callback_idx,
                 1,
             ));
+        }
+
+        // Emit sort tracking globals and $__apply_sort functions
+        let deferred_sorts = std::mem::take(&mut self.deferred_sorts);
+        for ds in &deferred_sorts {
+            let comp = &ds.comp;
+            let uid = ds.uid;
+
+            self.line(&format!("(global $__sort_els_base_{}_{} (mut i32) (i32.const 0))", comp, uid));
+            self.line(&format!("(global $__sort_data_base_{}_{} (mut i32) (i32.const 0))", comp, uid));
+            self.line(&format!("(global $__sort_els_count_{}_{} (mut i32) (i32.const 0))", comp, uid));
+            self.line(&format!("(global $__sort_parent_{}_{} (mut i32) (i32.const 0))", comp, uid));
+            self.line(&format!("(global $__sort_arr_data_{}_{} (mut i32) (i32.const 0))", comp, uid));
+
+            let func_name = format!("$__apply_sort_{}_{}", comp, uid);
+            self.line("");
+            self.emit(&format!("(func {} (export \"{}\") ;; DOM sort reorder via appendChild",
+                func_name, &func_name[1..]));
+            self.indent += 1;
+            self.line("(local $i i32)");
+            self.line("(local $j i32)");
+            self.line("(local $count i32)");
+            self.line("(local $cur_ptr i32)");
+
+            self.line(&format!("global.get $__sort_els_count_{}_{}", comp, uid));
+            self.line("local.set $count");
+
+            self.line("i32.const 0");
+            self.line("local.set $i");
+            let outer_brk = uid + 5000;
+            let outer_lp = uid + 6000;
+            self.line(&format!("(block $__as_brk_{outer_brk} (loop $__as_lp_{outer_lp}"));
+            self.indent += 1;
+
+            self.line("local.get $i");
+            self.line("local.get $count");
+            self.line("i32.ge_u");
+            self.line(&format!("br_if $__as_brk_{outer_brk}"));
+
+            self.line(&format!("global.get $__sort_arr_data_{}_{}", comp, uid));
+            self.line("local.get $i");
+            self.line("i32.const 4");
+            self.line("i32.mul");
+            self.line("i32.add");
+            self.line("i32.load ;; data_ptr at sorted position i");
+            self.line("local.set $cur_ptr");
+
+            self.line("i32.const 0");
+            self.line("local.set $j");
+            let inner_brk = uid + 7000;
+            let inner_lp = uid + 8000;
+            self.line(&format!("(block $__as_find_brk_{inner_brk} (loop $__as_find_lp_{inner_lp}"));
+            self.indent += 1;
+
+            self.line("local.get $j");
+            self.line("local.get $count");
+            self.line("i32.ge_u");
+            self.line(&format!("br_if $__as_find_brk_{inner_brk}"));
+
+            self.line(&format!("global.get $__sort_data_base_{}_{}", comp, uid));
+            self.line("local.get $j");
+            self.line("i32.const 4");
+            self.line("i32.mul");
+            self.line("i32.add");
+            self.line("i32.load");
+            self.line("local.get $cur_ptr");
+            self.line("i32.eq");
+            self.line("if");
+            self.indent += 1;
+            self.line(&format!("global.get $__sort_parent_{}_{}", comp, uid));
+            self.line(&format!("global.get $__sort_els_base_{}_{}", comp, uid));
+            self.line("local.get $j");
+            self.line("i32.const 4");
+            self.line("i32.mul");
+            self.line("i32.add");
+            self.line("i32.load ;; element_id at j");
+            self.line("call $dom_appendChild");
+            self.line(&format!("br $__as_find_brk_{inner_brk} ;; found, exit inner loop"));
+            self.indent -= 1;
+            self.line("end");
+
+            self.line("local.get $j");
+            self.line("i32.const 1");
+            self.line("i32.add");
+            self.line("local.set $j");
+            self.line(&format!("br $__as_find_lp_{inner_lp}"));
+
+            self.indent -= 1;
+            self.line("))");
+
+            self.line("local.get $i");
+            self.line("i32.const 1");
+            self.line("i32.add");
+            self.line("local.set $i");
+            self.line(&format!("br $__as_lp_{outer_lp}"));
+
+            self.indent -= 1;
+            self.line("))");
+
+            self.indent -= 1;
+            self.line(")");
         }
 
         // Reset component context
@@ -7392,6 +7773,106 @@ impl WasmCodegen {
         }
     }
 
+    /// Detect a filter pattern in the children of a for-loop.
+    /// Looks for a single TemplateIf child whose condition matches:
+    ///   self.state_field == "All" || binding.item_field == self.state_field
+    /// Returns Some(FilterPattern) if found, None otherwise.
+    fn detect_filter_pattern(&self, children: &[TemplateNode], binding: &str) -> Option<FilterPattern> {
+        // Look for a TemplateIf as a direct child
+        for child in children {
+            if let TemplateNode::TemplateIf { condition, .. } = child {
+                if let Some(pattern) = self.extract_filter_from_condition(condition, binding) {
+                    return Some(pattern);
+                }
+            }
+        }
+        None
+    }
+
+    /// Extract filter pattern from a condition expression.
+    /// Matches: self.X == "All" || binding.Y == self.X  (or reversed sides)
+    fn extract_filter_from_condition(&self, expr: &Expr, binding: &str) -> Option<FilterPattern> {
+        // Pattern 1: self.field == "All" || binding.field == self.field
+        if let Expr::Binary { op: BinOp::Or, left, right } = expr {
+            // Try: left is "All" check, right is field equality
+            if let Some(state_field) = self.find_self_eq_all(left) {
+                if let Some(item_field) = self.find_binding_field_eq_self(right, binding) {
+                    return Some(FilterPattern { state_field, item_field });
+                }
+            }
+            // Try reversed: right is "All" check, left is field equality
+            if let Some(state_field) = self.find_self_eq_all(right) {
+                if let Some(item_field) = self.find_binding_field_eq_self(left, binding) {
+                    return Some(FilterPattern { state_field, item_field });
+                }
+            }
+        }
+        // Pattern 2: just binding.field == self.field (no "All" check)
+        if let Expr::Binary { op: BinOp::Eq, .. } = expr {
+            if let (Some(item_field), Some(state_field)) = (
+                self.find_binding_field_eq_self(expr, binding),
+                self.find_self_field_in_eq(expr),
+            ) {
+                return Some(FilterPattern { state_field, item_field });
+            }
+        }
+        None
+    }
+
+    /// Check if an expression is `self.X == "All"` (or `"All" == self.X`).
+    /// Returns the self field name if matched.
+    fn find_self_eq_all(&self, expr: &Expr) -> Option<String> {
+        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+            // self.X == "All"
+            if let Expr::FieldAccess { object, field } = left.as_ref() {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    if matches!(right.as_ref(), Expr::StringLit(s) if s == "All") {
+                        return Some(field.clone());
+                    }
+                }
+            }
+            // "All" == self.X
+            if let Expr::FieldAccess { object, field } = right.as_ref() {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    if matches!(left.as_ref(), Expr::StringLit(s) if s == "All") {
+                        return Some(field.clone());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Find self.X in an equality expression (either side).
+    fn find_self_field_in_eq(&self, expr: &Expr) -> Option<String> {
+        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+            if let Expr::FieldAccess { object, field } = left.as_ref() {
+                if matches!(object.as_ref(), Expr::SelfExpr) { return Some(field.clone()); }
+            }
+            if let Expr::FieldAccess { object, field } = right.as_ref() {
+                if matches!(object.as_ref(), Expr::SelfExpr) { return Some(field.clone()); }
+            }
+        }
+        None
+    }
+
+    /// Find binding.Y in an equality expression where the other side is self.X.
+    fn find_binding_field_eq_self(&self, expr: &Expr, binding: &str) -> Option<String> {
+        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+            if let Expr::FieldAccess { object, field } = left.as_ref() {
+                if let Expr::Ident(name) = object.as_ref() {
+                    if name == binding { return Some(field.clone()); }
+                }
+            }
+            if let Expr::FieldAccess { object, field } = right.as_ref() {
+                if let Expr::Ident(name) = object.as_ref() {
+                    if name == binding { return Some(field.clone()); }
+                }
+            }
+        }
+        None
+    }
+
     fn generate_template(&mut self, node: &TemplateNode, parent: &str) {
         match node {
             TemplateNode::Element(el) => {
@@ -7456,6 +7937,14 @@ impl WasmCodegen {
                 self.line(&format!("i32.const {}", el.tag.len()));
                 self.line("call $dom_createElement");
                 self.line(&format!("local.set {}", var));
+
+                // Track last created element for filter pattern optimization
+                self.last_created_element_var = Some(var.clone());
+
+                // Sort tracking: capture the first element created in a for-loop iteration
+                if self.sort_track_first_el.is_some() && self.sort_track_first_el.as_deref() == Some("") {
+                    self.sort_track_first_el = Some(var.clone());
+                }
 
                 // Honeycomb widget: apply default styles if user didn't provide a style attr
                 let has_style_attr = el.attributes.iter().any(|a| matches!(a, Attribute::Static { name, .. } if name == "style"));
@@ -8200,7 +8689,7 @@ impl WasmCodegen {
                     });
                 }
             }
-            TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
+            TemplateNode::TemplateFor { binding, iterator, children, lazy, inplace } => {
                 // Check if iterator is a Range expression (start..end)
                 let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
 
@@ -8425,6 +8914,45 @@ impl WasmCodegen {
                     let block_label = format!("$for_break_{}", loop_id);
                     let loop_label = format!("$for_cont_{}", loop_id);
 
+                    // Detect filter pattern before generating the loop body
+                    let filter_pattern = if self.in_component_mount {
+                        self.detect_filter_pattern(children, binding)
+                    } else {
+                        None
+                    };
+
+                    // Extract then_children from the TemplateIf if a filter pattern was detected
+                    let (effective_children, filter_if_node): (Vec<&TemplateNode>, Option<&TemplateNode>) =
+                        if filter_pattern.is_some() {
+                            // Find the TemplateIf child that matched the pattern and use its then_children
+                            let mut if_node = None;
+                            let mut other_children: Vec<&TemplateNode> = Vec::new();
+                            for child in children {
+                                if if_node.is_none() {
+                                    if let TemplateNode::TemplateIf { condition, .. } = child {
+                                        if self.extract_filter_from_condition(condition, binding).is_some() {
+                                            if_node = Some(child);
+                                            continue;
+                                        }
+                                    }
+                                }
+                                other_children.push(child);
+                            }
+                            (other_children, if_node)
+                        } else {
+                            (children.iter().collect(), None)
+                        };
+
+                    // Set up filter table locals and globals
+                    let filter_uid = if filter_pattern.is_some() { Some(self.next_label()) } else { None };
+                    let filter_card_var = if filter_pattern.is_some() {
+                        let v = format!("$__filter_card_{}", filter_uid.unwrap());
+                        self.emit_template_local(&v);
+                        Some(v)
+                    } else {
+                        None
+                    };
+
                     self.emit_template_local(&arr_var);
                     self.emit_template_local(&idx_var);
                     self.emit_template_local(&len_var);
@@ -8446,6 +8974,50 @@ impl WasmCodegen {
                     self.line(&format!("local.get {}", arr_var));
                     self.line("i32.load offset=8 ;; data_ptr");
                     self.line(&format!("local.set {}", data_var));
+
+                    // Filter optimization: allocate filter table and store parent element ID
+                    if let (Some(fp), Some(f_uid)) = (filter_pattern.as_ref(), filter_uid) {
+                        let comp = self.component_name.clone();
+                        self.line(&format!(";; filter optimization: allocate filter table for {}", fp.state_field));
+                        // Allocate table: array_length * 12 bytes (element_id:i32 + str_ptr:i32 + str_len:i32)
+                        self.line(&format!("local.get {}", len_var));
+                        self.line("i32.const 12");
+                        self.line("i32.mul");
+                        self.line("call $alloc");
+                        self.line(&format!("global.set $__filter_table_base_{}_{}", comp, f_uid));
+                        self.line("i32.const 0");
+                        self.line(&format!("global.set $__filter_table_count_{}_{}", comp, f_uid));
+                        // Store parent element ID for potential sort reordering
+                        self.line(&format!("local.get {}", parent));
+                        self.line(&format!("global.set $__filter_parent_{}_{}", comp, f_uid));
+                    }
+
+                    // Sort element tracking: allocate arrays for (data_ptr, element_id)
+                    let sort_uid = loop_id;
+                    let comp_for_sort = self.component_name.clone();
+                    let in_mount = self.in_component_mount && !comp_for_sort.is_empty();
+                    if in_mount {
+                        self.line(&format!(";; sort tracking: allocate els/data arrays for {} items", binding));
+                        // Allocate sort_els array: len * 4 bytes via $alloc
+                        self.line(&format!("local.get {}", len_var));
+                        self.line("i32.const 4");
+                        self.line("i32.mul");
+                        self.line("call $alloc");
+                        self.line(&format!("global.set $__sort_els_base_{}_{}", comp_for_sort, sort_uid));
+                        // Allocate sort_data array: len * 4 bytes via $alloc
+                        self.line(&format!("local.get {}", len_var));
+                        self.line("i32.const 4");
+                        self.line("i32.mul");
+                        self.line("call $alloc");
+                        self.line(&format!("global.set $__sort_data_base_{}_{}", comp_for_sort, sort_uid));
+                        // Store count, parent, and data_ptr
+                        self.line(&format!("local.get {}", len_var));
+                        self.line(&format!("global.set $__sort_els_count_{}_{}", comp_for_sort, sort_uid));
+                        self.line(&format!("local.get {}", parent));
+                        self.line(&format!("global.set $__sort_parent_{}_{}", comp_for_sort, sort_uid));
+                        self.line(&format!("local.get {}", data_var));
+                        self.line(&format!("global.set $__sort_arr_data_{}_{}", comp_for_sort, sort_uid));
+                    }
 
                     // Initialize index to 0
                     self.line("i32.const 0");
@@ -8472,13 +9044,168 @@ impl WasmCodegen {
                     self.line("i32.load");
                     self.line(&format!("local.set {}", binding_var));
 
+                    // Enable sort element tracking for child generation
+                    let saved_sort_track = self.sort_track_first_el.take();
+                    if in_mount {
+                        self.sort_track_first_el = Some(String::new());
+                    }
+
                     // Push binding name so child expression resolution works
                     self.for_loop_bindings.push(binding.clone());
 
-                    // Generate child template nodes
-                    for child in children {
-                        self.generate_template(child, parent);
+                    if let (Some(fp), Some(f_uid), Some(if_node)) = (filter_pattern.as_ref(), filter_uid, filter_if_node) {
+                        // ── Filter-optimized path ──
+                        // Generate then_children directly (skip the if condition).
+                        // All cards are always created; non-matching ones get display:none.
+                        let comp = self.component_name.clone();
+                        let item_field = fp.item_field.clone();
+
+                        // Clear last_created_element_var so we can capture the first element
+                        self.last_created_element_var = None;
+
+                        // Extract then_children from the TemplateIf node
+                        if let TemplateNode::TemplateIf { then_children, .. } = if_node {
+                            for child in then_children {
+                                self.generate_template(child, parent);
+                            }
+                        }
+
+                        // Also generate any non-filter children
+                        for child in &effective_children {
+                            self.generate_template(child, parent);
+                        }
+
+                        // Capture the element ID of the first created element (the card)
+                        if let Some(ref card_el) = self.last_created_element_var.clone() {
+                            let card_var = filter_card_var.as_ref().unwrap();
+                            self.line(&format!("local.get {}", card_el));
+                            self.line(&format!("local.set {} ;; capture card element for filter table", card_var));
+
+                            // Register card in filter table: [element_id, str_ptr, str_len]
+                            // Compute table entry address: base + count * 12
+                            self.line(&format!(";; filter table registration: {}.{}", binding, item_field));
+                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
+                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
+                            self.line("i32.const 12");
+                            self.line("i32.mul");
+                            self.line("i32.add");
+                            // Store element_id at offset 0
+                            self.line(&format!("local.get {}", card_var));
+                            self.line("i32.store ;; filter table: element_id");
+
+                            // Store filter field string pointer at offset 4
+                            // Load the item's field value (string ptr from struct)
+                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
+                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
+                            self.line("i32.const 12");
+                            self.line("i32.mul");
+                            self.line("i32.add");
+                            self.line("i32.const 4");
+                            self.line("i32.add");
+                            // Load the string pointer for binding.item_field
+                            self.line(&format!("local.get ${}", binding));
+                            // Look up the field offset from struct layouts
+                            let field_offset = self.struct_layouts.values()
+                                .find_map(|layout| layout.iter()
+                                    .find(|(name, _)| name == &item_field)
+                                    .map(|(_, off)| *off))
+                                .unwrap_or(0);
+                            if field_offset == 0 {
+                                self.line(&format!("i32.load ;; {}.{} ptr", binding, item_field));
+                            } else {
+                                self.line(&format!("i32.load offset={} ;; {}.{} ptr", field_offset, binding, item_field));
+                            }
+                            self.line("i32.store ;; filter table: str_ptr");
+
+                            // Store 0 at offset 8 (reserved slot — str comparison uses $str_eq on null-terminated ptrs)
+                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
+                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
+                            self.line("i32.const 12");
+                            self.line("i32.mul");
+                            self.line("i32.add");
+                            self.line("i32.const 8");
+                            self.line("i32.add");
+                            self.line("i32.const 0");
+                            self.line("i32.store ;; filter table: reserved (str comparison uses $str_eq)");
+
+                            // Increment filter table count
+                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
+                            self.line("i32.const 1");
+                            self.line("i32.add");
+                            self.line(&format!("global.set $__filter_table_count_{}_{}", comp, f_uid));
+
+                            // Check initial filter value — hide card if it doesn't match
+                            // Read current filter signal value (self.state_field)
+                            let state_field = fp.state_field.clone();
+                            let all_str_offset = self.store_string("All");
+                            let display_offset = self.store_string("display");
+                            let none_offset = self.store_string("none");
+                            let empty_offset = self.store_string("");
+
+                            self.line(&format!(";; initial filter check: hide if {}.{} != self.{}", binding, item_field, state_field));
+                            // Check if filter is "All" — if so, show everything
+                            self.line(&format!("global.get $__sig_{}_{}", comp, state_field));
+                            self.line("call $signal_get");
+                            self.line(&format!("i32.const {} ;; ptr to \"All\"", all_str_offset));
+                            self.line("call $str_eq");
+                            self.line("i32.eqz ;; if NOT \"All\", check field match");
+                            self.line("if ;; filter is not \"All\"");
+                            self.indent += 1;
+                            // Compare card's category to current filter value
+                            self.line(&format!("local.get ${}", binding));
+                            if field_offset == 0 {
+                                self.line(&format!("i32.load ;; {}.{}", binding, item_field));
+                            } else {
+                                self.line(&format!("i32.load offset={} ;; {}.{}", field_offset, binding, item_field));
+                            }
+                            self.line(&format!("global.get $__sig_{}_{}", comp, state_field));
+                            self.line("call $signal_get");
+                            self.line("call $str_eq");
+                            self.line("i32.eqz ;; if no match, hide");
+                            self.line("if ;; card does not match filter");
+                            self.indent += 1;
+                            // Set display:none on the card element
+                            self.line(&format!("local.get {}", card_var));
+                            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
+                            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
+                            self.line(&format!("i32.const {} ;; \"none\" ptr", none_offset));
+                            self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
+                            self.line("call $dom_setStyle");
+                            self.indent -= 1;
+                            self.line("end ;; card match check");
+                            self.indent -= 1;
+                            self.line("end ;; filter All check");
+                        }
+                    } else {
+                        // ── Standard path (no filter optimization) ──
+                        for child in children {
+                            self.generate_template(child, parent);
+                        }
                     }
+
+                    // Store sort tracking data: sort_els[idx] = element_id, sort_data[idx] = data_ptr
+                    if in_mount {
+                        if let Some(ref el_var) = self.sort_track_first_el.clone() {
+                            if !el_var.is_empty() {
+                                self.line(";; sort tracking: store el_id and data_ptr at index");
+                                self.line(&format!("global.get $__sort_els_base_{}_{}", comp_for_sort, sort_uid));
+                                self.line(&format!("local.get {}", idx_var));
+                                self.line("i32.const 4");
+                                self.line("i32.mul");
+                                self.line("i32.add");
+                                self.line(&format!("local.get {}", el_var));
+                                self.line("i32.store");
+                                self.line(&format!("global.get $__sort_data_base_{}_{}", comp_for_sort, sort_uid));
+                                self.line(&format!("local.get {}", idx_var));
+                                self.line("i32.const 4");
+                                self.line("i32.mul");
+                                self.line("i32.add");
+                                self.line(&format!("local.get {}", binding_var));
+                                self.line("i32.store");
+                            }
+                        }
+                    }
+                    self.sort_track_first_el = saved_sort_track;
 
                     // Pop binding
                     self.for_loop_bindings.pop();
@@ -8496,6 +9223,38 @@ impl WasmCodegen {
                     self.line("end ;; for continue");
                     self.indent -= 1;
                     self.line("end ;; for break");
+
+                    // Register deferred sort function for emission after mount
+                    if in_mount {
+                        self.deferred_sorts.push(DeferredSort {
+                            uid: sort_uid,
+                            comp: comp_for_sort.clone(),
+                            iterator_expr: iterator.as_ref().clone(),
+                        });
+                    }
+
+                    // Register deferred filter function for emission after mount
+                    if let (Some(fp), Some(f_uid)) = (filter_pattern.as_ref(), filter_uid) {
+                        let comp = self.component_name.clone();
+
+                        // Subscribe apply_filter function to the state field signal
+                        let filter_func_name = format!("$__apply_filter_{}_{}", comp, f_uid);
+                        let table_idx = self.closure_func_names.len();
+                        self.closure_func_names.push(filter_func_name.clone());
+                        self.needs_func_table = true;
+
+                        self.line(&format!(";; subscribe filter function to signal {}", fp.state_field));
+                        self.line(&format!("global.get $__sig_{}_{}", comp, fp.state_field));
+                        self.line(&format!("i32.const {}", table_idx));
+                        self.line("call $signal_subscribe");
+
+                        self.deferred_filters.push(DeferredFilter {
+                            uid: f_uid,
+                            comp: comp.clone(),
+                            state_field: fp.state_field.clone(),
+                            item_field: fp.item_field.clone(),
+                        });
+                    }
                 }
             }
             TemplateNode::TemplateMatch { subject, arms } => {
@@ -9213,6 +9972,7 @@ impl WasmCodegen {
                                     self.line(&format!("call {}", wasm_fn));
                                 } else {
                                     // Route through stdlib resolver
+                                    self.warn_if_unimplemented_stdlib(name);
                                     let wasm_fn = self.resolve_stdlib_fn(name);
                                     self.line(&format!(";; stdlib: {}", name));
                                     self.line(&format!("call {}", wasm_fn));
@@ -10028,10 +10788,15 @@ impl WasmCodegen {
                 self.line("i32.eqz");
                 self.line(&format!("br_if {}", block_label));
 
+                // Push loop labels for break/continue
+                self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
+
                 // Body
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
+
+                self.loop_label_stack.pop();
 
                 // Branch back to loop start
                 self.line(&format!("br {}", loop_label));
@@ -10099,11 +10864,13 @@ impl WasmCodegen {
                 self.line(&format!("local.set {}", binding_var));
 
                 // Body
+                self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
                 self.for_loop_bindings.push(binding.clone());
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
                 self.for_loop_bindings.pop();
+                self.loop_label_stack.pop();
 
                 // Increment index
                 self.line(&format!("local.get {}", idx_var));
@@ -10117,6 +10884,20 @@ impl WasmCodegen {
                 self.line("end ;; for continue");
                 self.indent -= 1;
                 self.line("end ;; for break");
+            }
+            Expr::Break => {
+                if let Some((break_label, _)) = self.loop_label_stack.last() {
+                    self.line(&format!("br {} ;; break", break_label));
+                } else {
+                    self.line(";; ERROR: break outside of loop");
+                }
+            }
+            Expr::Continue => {
+                if let Some((_, continue_label)) = self.loop_label_stack.last() {
+                    self.line(&format!("br {} ;; continue", continue_label));
+                } else {
+                    self.line(";; ERROR: continue outside of loop");
+                }
             }
             Expr::Block(block) => {
                 for stmt in &block.stmts {
@@ -13731,6 +14512,153 @@ impl WasmCodegen {
                 self.generate_expr(object);
                 self.line("call $string_parse_int");
             }
+            "sort_asc" | "sort_desc" => {
+                // In-place insertion sort on an array of struct pointers by a named field.
+                // After sorting, call $__apply_sort_<comp>_<uid> to reorder DOM nodes.
+                let ascending = method == "sort_asc";
+                let field_name = if let Some(Expr::StringLit(f)) = args.first() {
+                    f.clone()
+                } else {
+                    "id".to_string()
+                };
+                let field_offset = self.resolve_field_offset(&field_name);
+                let lbl = self.next_label();
+                let brk = lbl + 1000;
+
+                self.line(&format!(";; .{}(\"{}\") — in-place insertion sort by field offset {}",
+                    method, field_name, field_offset));
+
+                self.emit_template_local(&format!("$__sort_arr_{lbl}"));
+                self.emit_template_local(&format!("$__sort_len_{lbl}"));
+                self.emit_template_local(&format!("$__sort_data_{lbl}"));
+                self.emit_template_local(&format!("$__sort_i_{lbl}"));
+                self.emit_template_local(&format!("$__sort_j_{lbl}"));
+                self.emit_template_local(&format!("$__sort_key_{lbl}"));
+                self.emit_template_local(&format!("$__sort_tmp_{lbl}"));
+
+                self.generate_expr(object);
+                self.line(&format!("local.set $__sort_arr_{lbl}"));
+
+                self.line(&format!("local.get $__sort_arr_{lbl}"));
+                self.line("i32.load ;; array length");
+                self.line(&format!("local.set $__sort_len_{lbl}"));
+                self.line(&format!("local.get $__sort_arr_{lbl}"));
+                self.line("i32.load offset=8 ;; data_ptr");
+                self.line(&format!("local.set $__sort_data_{lbl}"));
+
+                // Insertion sort: for i = 1 to len-1
+                self.line("i32.const 1");
+                self.line(&format!("local.set $__sort_i_{lbl}"));
+                self.line(&format!("(block $__sort_brk_{brk} (loop $__sort_lp_{lbl}"));
+                self.indent += 1;
+
+                self.line(&format!("local.get $__sort_i_{lbl}"));
+                self.line(&format!("local.get $__sort_len_{lbl}"));
+                self.line("i32.ge_u");
+                self.line(&format!("br_if $__sort_brk_{brk}"));
+
+                // Save data[i] into tmp
+                self.line(&format!("local.get $__sort_data_{lbl}"));
+                self.line(&format!("local.get $__sort_i_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load ;; struct ptr at i");
+                self.line(&format!("local.set $__sort_tmp_{lbl}"));
+
+                // key = tmp.field
+                self.line(&format!("local.get $__sort_tmp_{lbl}"));
+                self.line(&format!("i32.load offset={} ;; field value at i", field_offset));
+                self.line(&format!("local.set $__sort_key_{lbl}"));
+
+                // j = i
+                self.line(&format!("local.get $__sort_i_{lbl}"));
+                self.line(&format!("local.set $__sort_j_{lbl}"));
+
+                // Inner loop: shift elements
+                let inner_brk = lbl + 2000;
+                let inner_lp = lbl + 3000;
+                self.line(&format!("(block $__sort_inner_brk_{inner_brk} (loop $__sort_inner_lp_{inner_lp}"));
+                self.indent += 1;
+
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.eqz");
+                self.line(&format!("br_if $__sort_inner_brk_{inner_brk}"));
+
+                // Load data[j-1].field
+                self.line(&format!("local.get $__sort_data_{lbl}"));
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.sub");
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load ;; struct ptr at j-1");
+                self.line(&format!("i32.load offset={} ;; field value at j-1", field_offset));
+
+                // Compare
+                self.line(&format!("local.get $__sort_key_{lbl}"));
+                if ascending {
+                    self.line("i32.le_s ;; asc: break if prev <= key");
+                } else {
+                    self.line("i32.ge_s ;; desc: break if prev >= key");
+                }
+                self.line(&format!("br_if $__sort_inner_brk_{inner_brk}"));
+
+                // Shift: data[j] = data[j-1]
+                self.line(&format!("local.get $__sort_data_{lbl}"));
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line(&format!("local.get $__sort_data_{lbl}"));
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.sub");
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line("i32.load");
+                self.line("i32.store ;; data[j] = data[j-1]");
+
+                // j--
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.sub");
+                self.line(&format!("local.set $__sort_j_{lbl}"));
+
+                self.line(&format!("br $__sort_inner_lp_{inner_lp}"));
+                self.indent -= 1;
+                self.line("))");
+
+                // Place saved element: data[j] = tmp
+                self.line(&format!("local.get $__sort_data_{lbl}"));
+                self.line(&format!("local.get $__sort_j_{lbl}"));
+                self.line("i32.const 4");
+                self.line("i32.mul");
+                self.line("i32.add");
+                self.line(&format!("local.get $__sort_tmp_{lbl}"));
+                self.line("i32.store ;; data[j] = saved element");
+
+                // i++
+                self.line(&format!("local.get $__sort_i_{lbl}"));
+                self.line("i32.const 1");
+                self.line("i32.add");
+                self.line(&format!("local.set $__sort_i_{lbl}"));
+                self.line(&format!("br $__sort_lp_{lbl}"));
+
+                self.indent -= 1;
+                self.line("))");
+
+                // After sort: call apply_sort to reorder DOM
+                let comp = self.component_name.clone();
+                if !comp.is_empty() {
+                    if let Some(ds) = self.deferred_sorts.iter().find(|d| d.comp == comp) {
+                        let sort_uid = ds.uid;
+                        self.line(&format!("call $__apply_sort_{}_{}", comp, sort_uid));
+                    }
+                }
+            }
             _ => {
                 // Self method calls — self.method_b() inside a component handler
                 // dispatches to the corresponding handler function.
@@ -13780,6 +14708,7 @@ impl WasmCodegen {
                     if let Expr::Ident(obj_name) = object {
                         // Resolve namespace::method to the correct WASM function name
                         let qualified = format!("{}::{}", obj_name, method);
+                        self.warn_if_unimplemented_stdlib(&qualified);
                         let wasm_fn = self.resolve_stdlib_fn(&qualified);
                         for arg in args {
                             self.generate_expr(arg);
@@ -13802,6 +14731,7 @@ impl WasmCodegen {
                         KeywordDefKind::Theme      => "theme",
                     };
                     let qualified = format!("{}::{}", ns, method);
+                    self.warn_if_unimplemented_stdlib(&qualified);
                     let wasm_fn = self.resolve_stdlib_fn(&qualified);
                     self.line(&format!(";; keyword def method: {}.{}()", ns, method));
                     for arg in args {
@@ -13831,7 +14761,11 @@ impl WasmCodegen {
                     if !wasm_method.is_empty() {
                         self.line(&format!("call {}", wasm_method));
                     } else {
-                        self.line(&format!("call ${method}"));
+                        // Check if this method call can be resolved via trait impl map.
+                        // For variables whose type is known from struct layouts or for-loop
+                        // bindings, look up {Type}_{method} in the trait_impl_methods map.
+                        let resolved_fn = self.resolve_trait_impl_call(object, method);
+                        self.line(&format!("call ${}", resolved_fn));
                     }
                 }
             }
@@ -13979,9 +14913,11 @@ impl WasmCodegen {
                         );
                     }
                 }
-                // Method calls on self fields (e.g. self.items.push(...)) are void
+                // Method calls on self fields that are void (no return value)
                 if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
-                    if matches!(inner.as_ref(), Expr::SelfExpr) && method == "push" {
+                    if matches!(inner.as_ref(), Expr::SelfExpr) && matches!(method.as_str(),
+                        "push" | "sort_asc" | "sort_desc" | "sort_str_asc" | "sort_str_desc" | "reverse"
+                    ) {
                         return true;
                     }
                 }
@@ -14195,6 +15131,75 @@ impl WasmCodegen {
                 let wasm_name = qualified.replace("::", "_");
                 format!("${}", wasm_name)
             }
+        }
+    }
+
+    /// Check if a qualified stdlib function name is explicitly mapped (not a fallback).
+    fn is_known_stdlib_fn(qualified: &str) -> bool {
+        // Known namespace prefixes that have catch-all handlers or explicit mappings.
+        // These namespaces are expected to have functions — don't warn about them.
+        let known_namespace_prefixes = [
+            "crypto::", "clipboard::", "time::", "DateTime::", "Duration::",
+            "auth::", "db::", "upload::", "payment::", "banking::", "map::",
+            "channel::", "ws::", "pwa::", "console::", "theme::", "cache::",
+            "http::", "debounce::", "streaming::", "rtc::", "router::", "pdf::",
+        ];
+        // If the function is in a known namespace, consider it implemented
+        // (the namespace itself provides a catch-all or explicit mappings).
+        for prefix in &known_namespace_prefixes {
+            if qualified.starts_with(prefix) {
+                return true;
+            }
+        }
+        // For other namespaces, check if the naive replacement matches the resolved name.
+        // If they differ, the function has an explicit mapping.
+        let naive = format!("${}", qualified.replace("::", "_"));
+        let codegen = WasmCodegen::new();
+        let resolved = codegen.resolve_stdlib_fn(qualified);
+        resolved != naive
+    }
+
+    /// Resolve a method call on a concrete object to a trait impl function name.
+    /// Returns `{Type}_{method}` if the object's type has an impl with this method,
+    /// otherwise returns just `{method}` (the bare function name).
+    fn resolve_trait_impl_call(&self, object: &Expr, method: &str) -> String {
+        // Try to determine the type of the object expression.
+        // For identifiers, check if they are for-loop bindings or handler params
+        // whose struct type can be resolved via struct layouts.
+        // For any type in trait_impl_methods, check if method is defined there.
+        if let Expr::Ident(obj_name) = object {
+            // If the identifier itself IS a type name in trait_impl_methods
+            // (e.g., static method call like Point.display())
+            if let Some(methods) = self.trait_impl_methods.get(obj_name) {
+                if let Some((_, wasm_name)) = methods.iter().find(|(m, _)| m == method) {
+                    return wasm_name.clone();
+                }
+            }
+        }
+        // Search all types' impl methods for this method name.
+        // If only one type defines this method, use it (unambiguous).
+        let mut candidates: Vec<&str> = Vec::new();
+        for (_type_name, methods) in &self.trait_impl_methods {
+            for (m, wasm_name) in methods {
+                if m == method {
+                    candidates.push(wasm_name);
+                }
+            }
+        }
+        if candidates.len() == 1 {
+            return candidates[0].to_string();
+        }
+        // Ambiguous or no match — fall back to bare method name
+        method.to_string()
+    }
+
+    /// Called at sites where we generate code for stdlib calls and have `&mut self`.
+    fn warn_if_unimplemented_stdlib(&mut self, qualified: &str) {
+        if !Self::is_known_stdlib_fn(qualified) {
+            self.codegen_warnings.push(format!(
+                "unimplemented stdlib function: {} (will produce link error at runtime)",
+                qualified
+            ));
         }
     }
 
@@ -16657,14 +17662,30 @@ impl WasmCodegen {
         h
     }
 
+    /// Record a source map mapping from the current WAT position to a Nectar source span.
+    fn map_span(&mut self, span: &crate::token::Span) {
+        if !self.source_file.is_empty() && span.line > 0 {
+            let sf = self.source_file.clone();
+            self.source_map.add_mapping(
+                self.wat_line,
+                0,
+                span.line - 1,
+                span.col.saturating_sub(1),
+                &sf,
+            );
+        }
+    }
+
     fn emit(&mut self, s: &str) {
         let indent = "  ".repeat(self.indent);
         self.output.push_str(&format!("\n{}{}", indent, s));
+        self.wat_line += 1;
     }
 
     fn line(&mut self, s: &str) {
         let indent = "  ".repeat(self.indent);
         self.output.push_str(&format!("\n{}{}", indent, s));
+        self.wat_line += 1;
     }
 
     fn emit_bigdecimal_runtime(&mut self) {
@@ -23050,8 +24071,83 @@ mod comprehensive_codegen_tests {
         };
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
-        assert!(wat.contains("func $show"), "should generate trait impl method as function");
+        assert!(wat.contains("func $Point_show"), "should generate trait impl method with type prefix");
         assert!(wat.contains("impl Display for Point"), "should have impl comment");
+    }
+
+    #[test]
+    fn trait_impl_method_call_resolves_to_prefixed_name() {
+        // When a method call matches a trait impl method, codegen should
+        // emit `call $Point_show` instead of `call $show`.
+        use crate::token::Span;
+        let span = Span::new(0, 0, 1, 1);
+        let program = Program {
+            items: vec![
+                Item::Struct(StructDef {
+                    name: "Point".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    fields: vec![],
+                    trait_bounds: vec![],
+                    is_pub: false,
+                    span,
+                }),
+                Item::Trait(TraitDef {
+                    name: "Display".into(),
+                    type_params: vec![],
+                    methods: vec![],
+                    span,
+                }),
+                Item::Impl(ImplBlock {
+                    target: "Point".into(),
+                    trait_impls: vec!["Display".into()],
+                    methods: vec![Function {
+                        name: "show".into(),
+                        lifetimes: vec![],
+                        type_params: vec![],
+                        params: vec![Param {
+                            name: "self".into(),
+                            ty: Type::Named("Point".into()),
+                            ownership: Ownership::Owned,
+                            secret: false,
+                        }],
+                        return_type: Some(Type::Named("i32".into())),
+                        trait_bounds: vec![],
+                        body: Block { stmts: vec![Stmt::Return(Some(Expr::Integer(42)))], span },
+                        is_pub: false,
+                        is_async: false,
+                        must_use: false,
+                        span,
+                    }],
+                    span,
+                }),
+                // A function that calls point.show()
+                Item::Function(Function {
+                    name: "test_dispatch".into(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: None,
+                    trait_bounds: vec![],
+                    body: Block {
+                        stmts: vec![Stmt::Expr(Expr::MethodCall {
+                            object: Box::new(Expr::Ident("point".into())),
+                            method: "show".into(),
+                            args: vec![],
+                        })],
+                        span,
+                    },
+                    is_pub: false,
+                    is_async: false,
+                    must_use: false,
+                    span,
+                }),
+            ],
+        };
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        // The method call should resolve to the prefixed name
+        assert!(wat.contains("call $Point_show"), "method call should resolve to $Point_show, got:\n{}", wat);
     }
 
     // -----------------------------------------------------------------------
@@ -28097,6 +29193,20 @@ mod coverage_codegen_tests {
         assert_eq!(codegen.resolve_stdlib_fn("theme::set"), "$theme_set");
     }
 
+    /// Unimplemented stdlib functions produce codegen warnings
+    #[test]
+    fn test_unimplemented_stdlib_warning() {
+        let mut codegen = WasmCodegen::new();
+        codegen.warn_if_unimplemented_stdlib("frobnicate::nonexistent");
+        assert_eq!(codegen.codegen_warnings.len(), 1);
+        assert!(codegen.codegen_warnings[0].contains("unimplemented stdlib function"));
+        assert!(codegen.codegen_warnings[0].contains("frobnicate::nonexistent"));
+
+        // Known functions should NOT produce warnings
+        codegen.warn_if_unimplemented_stdlib("crypto::sha256");
+        assert_eq!(codegen.codegen_warnings.len(), 1, "known stdlib fn should not add a warning");
+    }
+
     /// known_keyword_defs is populated from auth/cache/db/payment/upload/pdf/theme items
     #[test]
     fn test_known_keyword_defs_populated_from_program() {
@@ -28345,6 +29455,7 @@ mod template_for_tests {
             iterator: Box::new(iterator),
             children,
             lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         // Combine deferred locals + body
@@ -28445,6 +29556,7 @@ mod template_for_tests {
                 }),
             ],
             lazy: false,
+            inplace: false,
         };
 
         let wat = generate_template_for(
@@ -28523,6 +29635,7 @@ mod template_for_tests {
                 }),
             ],
             lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -28610,6 +29723,7 @@ mod template_for_tests {
                 }),
             ],
             lazy: false,
+            inplace: false,
         };
 
         let node = TemplateNode::TemplateFor {
@@ -28617,6 +29731,7 @@ mod template_for_tests {
             iterator: Box::new(Expr::Ident("categories".to_string())),
             children: vec![inner_for],
             lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let out = codegen.output;
@@ -30339,6 +31454,7 @@ mod reactive_cond_tests {
                 TemplateNode::TextLiteral("item".to_string()),
             ],
             lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -30714,6 +31830,7 @@ component ItemList {
                 TemplateNode::TextLiteral("hello".to_string()),
             ],
             lazy: true,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -30753,6 +31870,7 @@ component ItemList {
                 TemplateNode::TextLiteral("num".to_string()),
             ],
             lazy: true,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -32906,5 +34024,375 @@ mod payhive_feature_tests {
             args: vec![Expr::StringLit("{}".to_string()), Expr::Integer(1)],
         };
         assert!(WasmCodegen::expr_returns_ptr_len(&format_expr), "format() returns (ptr,len)");
+    }
+
+    // ── Filter pattern detection tests ──
+
+    #[test]
+    fn test_filter_pattern_detection_basic() {
+        // Pattern: {for product in self.products { {if self.active_cat == "All" || product.category == self.active_cat { <div/> }} }}
+        let mut codegen = WasmCodegen::new();
+        let children = vec![
+            TemplateNode::TemplateIf {
+                condition: Box::new(Expr::Binary {
+                    op: BinOp::Or,
+                    left: Box::new(Expr::Binary {
+                        op: BinOp::Eq,
+                        left: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "active_cat".to_string(),
+                        }),
+                        right: Box::new(Expr::StringLit("All".to_string())),
+                    }),
+                    right: Box::new(Expr::Binary {
+                        op: BinOp::Eq,
+                        left: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::Ident("product".to_string())),
+                            field: "category".to_string(),
+                        }),
+                        right: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "active_cat".to_string(),
+                        }),
+                    }),
+                }),
+                then_children: vec![],
+                else_children: None,
+            },
+        ];
+        let result = codegen.detect_filter_pattern(&children, "product");
+        assert!(result.is_some(), "Should detect filter pattern");
+        let fp = result.unwrap();
+        assert_eq!(fp.state_field, "active_cat");
+        assert_eq!(fp.item_field, "category");
+    }
+
+    #[test]
+    fn test_filter_pattern_detection_reversed_order() {
+        // Pattern: product.category == self.active_cat || self.active_cat == "All"
+        let mut codegen = WasmCodegen::new();
+        let children = vec![
+            TemplateNode::TemplateIf {
+                condition: Box::new(Expr::Binary {
+                    op: BinOp::Or,
+                    left: Box::new(Expr::Binary {
+                        op: BinOp::Eq,
+                        left: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::Ident("product".to_string())),
+                            field: "category".to_string(),
+                        }),
+                        right: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "active_cat".to_string(),
+                        }),
+                    }),
+                    right: Box::new(Expr::Binary {
+                        op: BinOp::Eq,
+                        left: Box::new(Expr::FieldAccess {
+                            object: Box::new(Expr::SelfExpr),
+                            field: "active_cat".to_string(),
+                        }),
+                        right: Box::new(Expr::StringLit("All".to_string())),
+                    }),
+                }),
+                then_children: vec![],
+                else_children: None,
+            },
+        ];
+        let result = codegen.detect_filter_pattern(&children, "product");
+        assert!(result.is_some(), "Should detect reversed filter pattern");
+        let fp = result.unwrap();
+        assert_eq!(fp.state_field, "active_cat");
+        assert_eq!(fp.item_field, "category");
+    }
+
+    #[test]
+    fn test_filter_pattern_without_all_check_still_matches() {
+        // Just: product.category == self.active_cat (no "All" check)
+        // This is still a valid filter pattern — the apply_filter function
+        // handles the "All" check separately.
+        let mut codegen = WasmCodegen::new();
+        let children = vec![
+            TemplateNode::TemplateIf {
+                condition: Box::new(Expr::Binary {
+                    op: BinOp::Eq,
+                    left: Box::new(Expr::FieldAccess {
+                        object: Box::new(Expr::Ident("product".to_string())),
+                        field: "category".to_string(),
+                    }),
+                    right: Box::new(Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "active_cat".to_string(),
+                    }),
+                }),
+                then_children: vec![],
+                else_children: None,
+            },
+        ];
+        let result = codegen.detect_filter_pattern(&children, "product");
+        // The detector recognizes simple equality filter patterns too
+        assert!(result.is_some(), "Should detect simple equality filter pattern");
+    }
+
+    #[test]
+    fn test_filter_pattern_no_match_no_template_if() {
+        // Just a plain element, no TemplateIf
+        let mut codegen = WasmCodegen::new();
+        let children = vec![
+            TemplateNode::Element(Element {
+                tag: "div".to_string(),
+                attributes: vec![],
+                children: vec![],
+                span: Span { start: 0, end: 0, line: 1, col: 1 },
+            }),
+        ];
+        let result = codegen.detect_filter_pattern(&children, "product");
+        assert!(result.is_none(), "Should NOT detect filter in plain elements");
+    }
+
+    // ── Sort codegen tests ──
+
+    #[test]
+    fn test_sort_asc_codegen_emits_insertion_sort() {
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop() {
+                let mut products: [Product] = [];
+                fn sort_by_price(&mut self) {
+                    self.products.sort_asc("price");
+                }
+                render {
+                    <div>
+                        {for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("sort_asc"), "should contain sort_asc comment: {}",
+            wat.lines().filter(|l| l.contains("sort")).take(5).collect::<Vec<_>>().join("\n"));
+        assert!(wat.contains("i32.le_s"), "ascending sort should use i32.le_s comparison");
+    }
+
+    #[test]
+    fn test_sort_desc_codegen_emits_descending() {
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop() {
+                let mut products: [Product] = [];
+                fn sort_by_price_desc(&mut self) {
+                    self.products.sort_desc("price");
+                }
+                render {
+                    <div>
+                        {for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("i32.ge_s"), "descending sort should use i32.ge_s comparison");
+    }
+
+    #[test]
+    fn test_sort_tracking_globals_emitted() {
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop() {
+                let mut products: [Product] = [];
+                fn sort_price(&mut self) {
+                    self.products.sort_asc("price");
+                }
+                render {
+                    <div>
+                        {for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("__sort_els_base_Shop_"), "should emit sort_els_base global");
+        assert!(wat.contains("__sort_data_base_Shop_"), "should emit sort_data_base global");
+        assert!(wat.contains("__sort_parent_Shop_"), "should emit sort_parent global");
+    }
+
+    #[test]
+    fn test_apply_sort_function_calls_appendchild() {
+        let src = r#"
+            struct Product { name: String, price: i32 }
+            component Shop() {
+                let mut products: [Product] = [];
+                fn sort_price(&mut self) {
+                    self.products.sort_asc("price");
+                }
+                render {
+                    <div>
+                        {for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("__apply_sort_Shop_"), "should emit apply_sort function");
+        assert!(wat.contains("dom_appendChild"), "apply_sort should call dom_appendChild");
+    }
+
+    #[test]
+    fn test_closure_capture_codegen() {
+        let src = r#"
+            fn process() -> i32 {
+                let x = 10;
+                let items = [1, 2, 3];
+                let result = items.map(|n: i32| { n + x });
+                return 0;
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        // Closure should be generated as a function
+        assert!(wat.contains("__closure_"), "should emit closure function");
+    }
+
+    #[test]
+    fn test_closure_in_filter() {
+        let src = r#"
+            fn process() -> i32 {
+                let threshold = 5;
+                let items = [1, 2, 3, 10, 20];
+                let filtered = items.filter(|n: i32| { n > threshold });
+                return 0;
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("__closure_"), "should emit closure function for filter");
+    }
+
+    #[test]
+    fn test_closure_no_capture() {
+        let src = r#"
+            fn process() -> i32 {
+                let items = [1, 2, 3];
+                let doubled = items.map(|n: i32| { n * 2 });
+                return 0;
+            }
+        "#;
+        let mut lexer = crate::lexer::Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        let wat = codegen.generate(&program);
+        assert!(wat.contains("__closure_"), "should emit closure function for no-capture case");
+    }
+
+    // -----------------------------------------------------------------------
+    // Source map: codegen populates source_map when source_file is set
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_source_map_populated_for_functions() {
+        use crate::token::Span;
+        let span = Span::new(0, 50, 3, 5); // line 3, col 5
+        let program = Program {
+            items: vec![Item::Function(Function {
+                name: "my_func".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Integer(42)))],
+                    span,
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span,
+            })],
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.set_source_file("test.nectar");
+        let _wat = codegen.generate(&program);
+        assert!(
+            !codegen.source_map.mappings.is_empty(),
+            "source map should have at least one mapping after generating a function"
+        );
+        // Check that the source file was registered
+        assert!(
+            codegen.source_map.sources.contains(&"test.nectar".to_string()),
+            "source map should contain the source file name"
+        );
+        // Check that the function name was registered
+        assert!(
+            codegen.source_map.names.contains(&"my_func".to_string()),
+            "source map should contain the function name"
+        );
+    }
+
+    #[test]
+    fn test_source_map_empty_without_source_file() {
+        let program = Program {
+            items: vec![Item::Function(Function {
+                name: "f".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Integer(0)))],
+                    span: crate::token::Span::new(0, 0, 1, 1),
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: crate::token::Span::new(0, 0, 1, 1),
+            })],
+        };
+        let mut codegen = WasmCodegen::new();
+        // Do NOT set source_file — mappings should remain empty
+        let _wat = codegen.generate(&program);
+        assert!(
+            codegen.source_map.mappings.is_empty(),
+            "source map should be empty when no source file is set"
+        );
     }
 }

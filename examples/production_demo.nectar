@@ -1,0 +1,201 @@
+// Production demo: exercises all implemented language features.
+// Compile: nectar build examples/production_demo.nectar --emit-wasm
+
+// -- Structs --
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+struct Product {
+    name: String,
+    price: i32,
+    category: String,
+    in_stock: bool,
+}
+
+// -- Enums --
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+
+// -- Impl blocks --
+impl Point {
+    fn distance_squared(self) -> i32 {
+        return self.x * self.x + self.y * self.y;
+    }
+}
+
+// -- Generic function (monomorphized) --
+fn identity<T>(x: T) -> T {
+    return x;
+}
+
+// -- Regular functions --
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fn fibonacci(n: i32) -> i32 {
+    if n <= 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+    let mut a = 0;
+    let mut b = 1;
+    let mut i = 2;
+    while i <= n {
+        let temp = a + b;
+        a = b;
+        b = temp;
+        i += 1;
+    }
+    return b;
+}
+
+// -- Function with break/continue --
+fn find_first_even(items: [i32]) -> i32 {
+    for item in items {
+        if item <= 0 {
+            continue;
+        }
+        if item > 100 {
+            break;
+        }
+    }
+    return 0;
+}
+
+// -- Compound assignment --
+fn compound_ops() -> i32 {
+    let mut x = 100;
+    x += 10;
+    x -= 5;
+    x *= 2;
+    x /= 3;
+    return x;
+}
+
+// -- Range expressions --
+fn sum_range() -> i32 {
+    let mut total = 0;
+    for i in 0..10 {
+        total += i;
+    }
+    return total;
+}
+
+// -- Closures --
+fn apply_transform() -> i32 {
+    let offset = 10;
+    let items = [1, 2, 3, 4, 5];
+    let mapped = items.map(|x: i32| { x + offset });
+    return mapped.len();
+}
+
+// -- Match expressions --
+fn process_result(ok: bool) -> i32 {
+    if ok {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+// -- String operations --
+fn string_demo() -> String {
+    let greeting = "Hello, Nectar!";
+    let upper = greeting.to_upper();
+    return upper;
+}
+
+// -- Component with signals and reactive rendering --
+component Counter() {
+    signal count: i32 = 0;
+
+    fn increment(self) {
+        self.count = self.count + 1;
+    }
+
+    fn decrement(self) {
+        self.count = self.count - 1;
+    }
+
+    fn reset(self) {
+        self.count = 0;
+    }
+
+    render {
+        <div>
+            <h1>"Counter"</h1>
+            <p>{self.count}</p>
+            <button on:click={self.increment}>"+"</button>
+            <button on:click={self.decrement}>"-"</button>
+            <button on:click={self.reset}>"Reset"</button>
+        </div>
+    }
+}
+
+// -- Store with reactive state --
+store AppStore {
+    signal items: [Product] = [];
+    signal filter: String = "All";
+
+    action add_item(name: String, price: i32, category: String) {
+        self.items.push(Product {
+            name: name,
+            price: price,
+            category: category,
+            in_stock: true,
+        });
+    }
+
+    action set_filter(cat: String) {
+        self.filter = cat;
+    }
+}
+
+// -- Router --
+router AppRouter {
+    route "/" => Counter
+    fallback => Counter
+}
+
+// -- Contract for API --
+contract UserResponse {
+    id: i32,
+    name: String,
+    email: String,
+}
+
+// -- Tests --
+test "addition works" {
+    let result = add(2, 3);
+}
+
+test "factorial of 5" {
+    let result = factorial(5);
+}
+
+test "fibonacci sequence" {
+    let fib = fibonacci(10);
+}
+
+test "compound assignment" {
+    let result = compound_ops();
+}
+
+test "sum range" {
+    let total = sum_range();
+}

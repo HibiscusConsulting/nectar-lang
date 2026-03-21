@@ -23,6 +23,7 @@ pub struct RustCodegen {
     current_comp: String,
     handler_indices: std::collections::HashMap<String, usize>,
     filter_patterns: Vec<FilterPattern>, // detected from template analysis
+    has_inplace_for: bool, // true if any for-loop in the component uses `inplace`
     last_element_var: String, // last element variable created by emit_template_node
     in_for_loop: bool, // true when emitting inside a {for} loop — enables prototype optimization
     proto_counter: u32, // counter for prototype variable names
@@ -39,6 +40,7 @@ impl RustCodegen {
             current_comp: String::new(),
             handler_indices: std::collections::HashMap::new(),
             filter_patterns: Vec::new(),
+            has_inplace_for: false,
             last_element_var: String::new(),
             in_for_loop: false,
             proto_counter: 0,
@@ -194,6 +196,23 @@ impl RustCodegen {
         self.line("    if c < 10 { format!(\"{}ms\", d) } else { format!(\"{}.{}ms\", d, c) }");
         self.line("}");
         self.line("");
+    }
+
+    /// Check if any for-loop in the template tree uses the `inplace` keyword.
+    fn template_has_inplace(&self, node: &TemplateNode) -> bool {
+        match node {
+            TemplateNode::TemplateFor { inplace, children, .. } => {
+                if *inplace { return true; }
+                children.iter().any(|c| self.template_has_inplace(c))
+            }
+            TemplateNode::Element(el) => el.children.iter().any(|c| self.template_has_inplace(c)),
+            TemplateNode::TemplateIf { then_children, else_children, .. } => {
+                then_children.iter().any(|c| self.template_has_inplace(c))
+                    || else_children.as_ref().map_or(false, |ec| ec.iter().any(|c| self.template_has_inplace(c)))
+            }
+            TemplateNode::Fragment(children) => children.iter().any(|c| self.template_has_inplace(c)),
+            _ => false,
+        }
     }
 
     /// Scan template tree for filter patterns: {for x in self.items { {if self.field == "All" || x.attr == self.field { ... }} }}
@@ -498,6 +517,9 @@ impl RustCodegen {
         // Detect filter patterns in template: {for x in items { {if self.field == ... { }} }}
         self.filter_patterns.clear();
         self.detect_filter_patterns(&comp.render.body, None);
+
+        // Detect inplace for-loops in template
+        self.has_inplace_for = self.template_has_inplace(&comp.render.body);
 
         // Build handler index map: non-init methods → callback indices
         self.handler_indices.clear();
@@ -840,6 +862,17 @@ impl RustCodegen {
             } else if is_sort {
                 // Sort already called apply_sort_permutation inline via .sort_asc/.sort_desc
                 // No tree rebuild needed — just update metrics
+            } else if self.has_inplace_for {
+                // Inplace mode: skip full tree rebuild. Apply filter + reflow instead.
+                // The for-loop elements persist — only visibility/order changes.
+                self.line("// inplace: skip tree rebuild, apply filter + repaint");
+                if let Some(ref fp) = self.filter_patterns.first().cloned() {
+                    self.line(&format!("let _fv = {}_STATE.with(|s| s.borrow().{}.clone());", comp_name.to_uppercase(), fp.state_field));
+                    self.line("honeycomb::canvas_app::apply_filter(&_fv);");
+                } else {
+                    // No filter pattern — just repaint with existing tree state
+                    self.line("render();");
+                }
             } else {
                 self.line("// Re-render after state change");
                 self.line("let _t_rebuild = perf_now();");
@@ -1063,6 +1096,8 @@ impl RustCodegen {
                     format!("{}.{}({})", obj, method, a.join(", "))
                 }
             }
+            Expr::Break => "break".to_string(),
+            Expr::Continue => "continue".to_string(),
             Expr::Range { start, end } => {
                 let s = self.expr_to_rust(start, comp_name);
                 let e = self.expr_to_rust(end, comp_name);
