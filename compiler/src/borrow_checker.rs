@@ -334,6 +334,9 @@ impl Checker {
         // Validate lifetime elision rules.
         self.check_lifetime_elision(func);
 
+        // Validate lifetime consistency for explicit annotations.
+        self.check_lifetime_consistency(func);
+
         // Collect parameter names for return-reference validation.
         let param_names: Vec<String> = func.params.iter().map(|p| p.name.clone()).collect();
 
@@ -395,6 +398,75 @@ impl Checker {
                     func.name
                 ),
             );
+        }
+    }
+
+    /// Validate that explicit lifetime annotations are consistent.
+    ///
+    /// Checks:
+    /// 1. Return type lifetimes must reference a declared lifetime parameter.
+    /// 2. All parameter lifetimes must reference a declared lifetime parameter.
+    /// 3. If the return type has a lifetime, at least one parameter must share
+    ///    that same lifetime (so the returned reference has a valid source).
+    fn check_lifetime_consistency(&mut self, func: &Function) {
+        if func.lifetimes.is_empty() {
+            return;
+        }
+
+        // Collect all lifetime names used in parameter types
+        let mut param_lifetimes: Vec<String> = Vec::new();
+        for param in &func.params {
+            collect_lifetimes_from_type(&param.ty, &mut param_lifetimes);
+        }
+
+        // Collect all lifetime names used in the return type
+        let mut return_lifetimes: Vec<String> = Vec::new();
+        if let Some(ret_ty) = &func.return_type {
+            collect_lifetimes_from_type(ret_ty, &mut return_lifetimes);
+        }
+
+        // Check 1: All lifetimes used in parameters must be declared
+        for lt in &param_lifetimes {
+            if !func.lifetimes.contains(lt) {
+                self.error(
+                    BorrowErrorKind::LifetimeViolation,
+                    func.span,
+                    format!(
+                        "function `{}` uses undeclared lifetime `'{}` in parameter type",
+                        func.name, lt
+                    ),
+                );
+            }
+        }
+
+        // Check 2: All lifetimes used in return type must be declared
+        for lt in &return_lifetimes {
+            if !func.lifetimes.contains(lt) {
+                self.error(
+                    BorrowErrorKind::LifetimeViolation,
+                    func.span,
+                    format!(
+                        "function `{}` uses undeclared lifetime `'{}` in return type",
+                        func.name, lt
+                    ),
+                );
+            }
+        }
+
+        // Check 3: Each return-type lifetime must appear on at least one parameter.
+        // This ensures the returned reference has a valid source with matching lifetime.
+        for ret_lt in &return_lifetimes {
+            if !param_lifetimes.contains(ret_lt) {
+                self.error(
+                    BorrowErrorKind::LifetimeViolation,
+                    func.span,
+                    format!(
+                        "function `{}` returns a reference with lifetime `'{}` but no parameter \
+                         has that lifetime; the returned reference must borrow from a parameter",
+                        func.name, ret_lt
+                    ),
+                );
+            }
         }
     }
 
@@ -845,6 +917,11 @@ impl Checker {
                     self.check_expr(value, span);
                 }
             }
+            Expr::TupleLit(elements) => {
+                for elem in elements {
+                    self.check_expr(elem, span);
+                }
+            }
         }
     }
 
@@ -1180,6 +1257,40 @@ fn type_has_reference(ty: &Type) -> bool {
             params.iter().any(type_has_reference) || type_has_reference(ret)
         }
         _ => false,
+    }
+}
+
+/// Collect all named lifetime strings from a type into the `out` vector.
+fn collect_lifetimes_from_type(ty: &Type, out: &mut Vec<String>) {
+    match ty {
+        Type::Reference { lifetime, inner, .. } => {
+            if let Some(lt) = lifetime {
+                if !out.contains(lt) {
+                    out.push(lt.clone());
+                }
+            }
+            collect_lifetimes_from_type(inner, out);
+        }
+        Type::Array(inner) | Type::Option(inner) => collect_lifetimes_from_type(inner, out),
+        Type::Generic { args, .. } => {
+            for arg in args {
+                collect_lifetimes_from_type(arg, out);
+            }
+        }
+        Type::Tuple(elems) => {
+            for elem in elems {
+                collect_lifetimes_from_type(elem, out);
+            }
+        }
+        Type::Function { params, ret } => {
+            for p in params { collect_lifetimes_from_type(p, out); }
+            collect_lifetimes_from_type(ret, out);
+        }
+        Type::Result { ok, err } => {
+            collect_lifetimes_from_type(ok, out);
+            collect_lifetimes_from_type(err, out);
+        }
+        _ => {}
     }
 }
 
@@ -4774,5 +4885,366 @@ mod coverage_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "NLL should allow move after last use of borrow: {:?}", result.err());
+    }
+
+    // =====================================================================
+    // Feature 1: Tuple literal borrow checking
+    // =====================================================================
+
+    #[test]
+    fn tuple_literal_borrow_check_ok() {
+        let prog = program_with_stmts(vec![
+            Stmt::Expr(Expr::TupleLit(vec![
+                Expr::Integer(1),
+                Expr::Integer(2),
+                Expr::Integer(3),
+            ])),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Tuple literal should pass borrow check: {:?}", result);
+    }
+
+    #[test]
+    fn tuple_literal_with_moved_var() {
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(42),
+                ownership: Ownership::Owned,
+            },
+            // Move x
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Ident("x".into()),
+                ownership: Ownership::Owned,
+            },
+            // Use x in tuple — should fail
+            Stmt::Expr(Expr::TupleLit(vec![
+                Expr::Ident("x".into()),
+                Expr::Integer(2),
+            ])),
+        ]);
+        let result = check(&prog);
+        assert!(result.is_err(), "Using moved variable in tuple should fail");
+    }
+
+    // =====================================================================
+    // Feature 10: Full Lifetime Annotations
+    // =====================================================================
+
+    #[test]
+    fn lifetime_consistency_valid() {
+        // fn longest<'a>(a: &'a str, b: &'a str) -> &'a str
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "longest".into(),
+                lifetimes: vec!["a".into()],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("str".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                    Param {
+                        name: "y".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("str".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Reference {
+                    mutable: false,
+                    lifetime: Some("a".into()),
+                    inner: Box::new(Type::Named("str".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_ok(), "Valid lifetime annotations should compile: {:?}", result);
+    }
+
+    #[test]
+    fn lifetime_undeclared_in_param() {
+        // fn bad<'a>(x: &'b str) -> &'a str — 'b is not declared
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "bad".into(),
+                lifetimes: vec!["a".into()],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("b".into()),
+                            inner: Box::new(Type::Named("str".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Reference {
+                    mutable: false,
+                    lifetime: Some("a".into()),
+                    inner: Box::new(Type::Named("str".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_err(), "Undeclared lifetime in param should fail");
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
+            "Error should mention undeclared lifetime 'b: {:?}", errs);
+    }
+
+    #[test]
+    fn lifetime_undeclared_in_return() {
+        // fn bad<'a>(x: &'a str) -> &'b str — 'b is not declared
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "bad".into(),
+                lifetimes: vec!["a".into()],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("str".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Reference {
+                    mutable: false,
+                    lifetime: Some("b".into()),
+                    inner: Box::new(Type::Named("str".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_err(), "Undeclared lifetime in return should fail");
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
+            "Error should mention undeclared lifetime 'b: {:?}", errs);
+    }
+
+    #[test]
+    fn lifetime_return_not_on_any_param() {
+        // fn bad<'a, 'b>(x: &'a str) -> &'b str — 'b not on any param
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "bad".into(),
+                lifetimes: vec!["a".into(), "b".into()],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("str".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Reference {
+                    mutable: false,
+                    lifetime: Some("b".into()),
+                    inner: Box::new(Type::Named("str".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_err(), "Return lifetime not matching any param should fail");
+        let errs = result.unwrap_err();
+        assert!(errs.iter().any(|e| e.message.contains("no parameter has that lifetime")),
+            "Error should mention no param has the return lifetime: {:?}", errs);
+    }
+
+    #[test]
+    fn lifetime_two_params_same_lifetime_valid() {
+        // fn pick<'a>(x: &'a i32, y: &'a i32) -> &'a i32
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "pick".into(),
+                lifetimes: vec!["a".into()],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("i32".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                    Param {
+                        name: "y".into(),
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: Some("a".into()),
+                            inner: Box::new(Type::Named("i32".into())),
+                        },
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Reference {
+                    mutable: false,
+                    lifetime: Some("a".into()),
+                    inner: Box::new(Type::Named("i32".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_ok(), "Valid matching lifetimes should compile: {:?}", result);
+    }
+
+    #[test]
+    fn lifetime_no_annotations_no_error() {
+        // fn simple(x: i32) -> i32 — no lifetimes at all
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "simple".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![
+                    Param {
+                        name: "x".into(),
+                        ty: Type::Named("i32".into()),
+                        ownership: Ownership::Owned,
+                        secret: false,
+                    },
+                ],
+                return_type: Some(Type::Named("i32".into())),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::Ident("x".into())))],
+                    span: span(),
+                },
+                is_pub: true,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_ok(), "Function without lifetimes should compile: {:?}", result);
+    }
+
+    #[test]
+    fn collect_lifetimes_from_type_works() {
+        let mut lifetimes = Vec::new();
+        let ty = Type::Reference {
+            mutable: false,
+            lifetime: Some("a".into()),
+            inner: Box::new(Type::Named("str".into())),
+        };
+        collect_lifetimes_from_type(&ty, &mut lifetimes);
+        assert_eq!(lifetimes, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn collect_lifetimes_nested() {
+        let mut lifetimes = Vec::new();
+        let ty = Type::Tuple(vec![
+            Type::Reference {
+                mutable: false,
+                lifetime: Some("a".into()),
+                inner: Box::new(Type::Named("i32".into())),
+            },
+            Type::Reference {
+                mutable: false,
+                lifetime: Some("b".into()),
+                inner: Box::new(Type::Named("str".into())),
+            },
+        ]);
+        collect_lifetimes_from_type(&ty, &mut lifetimes);
+        assert!(lifetimes.contains(&"a".to_string()));
+        assert!(lifetimes.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn collect_lifetimes_deduplication() {
+        let mut lifetimes = Vec::new();
+        let ty = Type::Reference {
+            mutable: false,
+            lifetime: Some("a".into()),
+            inner: Box::new(Type::Reference {
+                mutable: false,
+                lifetime: Some("a".into()),
+                inner: Box::new(Type::Named("i32".into())),
+            }),
+        };
+        collect_lifetimes_from_type(&ty, &mut lifetimes);
+        assert_eq!(lifetimes.len(), 1, "Should deduplicate same lifetime");
+        assert_eq!(lifetimes[0], "a");
     }
 }

@@ -3437,6 +3437,10 @@ impl TypeChecker {
             Expr::Break | Expr::Continue => {
                 Ty::Unit
             }
+            Expr::TupleLit(elements) => {
+                let tys: Vec<Ty> = elements.iter().map(|e| self.infer_expr(e, env)).collect();
+                Ty::Tuple(tys)
+            }
             Expr::VirtualList { items, item_height, template, .. } => {
                 self.infer_expr(items, env);
                 self.infer_expr(item_height, env);

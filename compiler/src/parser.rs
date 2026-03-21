@@ -2883,8 +2883,19 @@ impl Parser {
             TokenKind::LeftParen => {
                 self.advance();
                 let expr = self.parse_expr()?;
-                self.expect(&TokenKind::RightParen)?;
-                Ok(expr)
+                // Check for tuple: (expr, expr, ...)
+                if self.check(&TokenKind::Comma) {
+                    let mut elements = vec![expr];
+                    while self.match_token(&TokenKind::Comma) {
+                        if self.check(&TokenKind::RightParen) { break; }
+                        elements.push(self.parse_expr()?);
+                    }
+                    self.expect(&TokenKind::RightParen)?;
+                    Ok(Expr::TupleLit(elements))
+                } else {
+                    self.expect(&TokenKind::RightParen)?;
+                    Ok(expr)
+                }
             }
             TokenKind::LeftBrace => {
                 if self.is_object_literal_brace() {
