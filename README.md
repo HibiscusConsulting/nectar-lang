@@ -2,7 +2,7 @@
 
 **A programming language that compiles to WebAssembly, built for the next era of web development.**
 
-![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![WASM](https://img.shields.io/badge/target-WebAssembly-654ff0.svg)
 
@@ -201,6 +201,6 @@ See [Render Modes](docs/render-modes.md) for details.
 
 ## License
 
-Business Source License 1.1 — see [LICENSE](LICENSE).
+MIT License — see [LICENSE](LICENSE).
 
-You can use Nectar for any purpose, including production apps. The BSL restriction only prevents offering Nectar itself as a hosted compiler service or selling it as a standalone product. On the Change Date (2030-03-12), the license converts to Apache 2.0.
+Nectar is free and open source. You can use, modify, and distribute it for any purpose.

@@ -458,7 +458,7 @@ JavaScript was the right answer in 2010 when it was the only language that ran i
 - **Live demo**: https://buildnectar.com/app/
 - **React benchmark**: https://buildnectar.com/app/react.html
 - **Svelte benchmark**: https://buildnectar.com/app/svelte.html
-- **License**: BSL 1.1 (converts to Apache 2.0 on 2030-03-12)
+- **License**: MIT
 
 ---
 
