@@ -2481,7 +2481,14 @@ impl Parser {
 
         loop {
             if self.match_token(&TokenKind::Dot) {
-                let field = self.expect_ident()?;
+                // Support tuple field access: t.0, t.1, etc.
+                let field = if let TokenKind::Integer(n) = self.peek_kind() {
+                    let s = format!("{}", n);
+                    self.advance();
+                    s
+                } else {
+                    self.expect_ident()?
+                };
                 if field == "send" && self.check(&TokenKind::LeftParen) {
                     // ch.send(value) -> Expr::Send
                     self.expect(&TokenKind::LeftParen)?;

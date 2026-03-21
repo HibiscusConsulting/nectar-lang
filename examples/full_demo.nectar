@@ -1,0 +1,772 @@
+// full_demo.nectar — Comprehensive language feature demo
+// Exercises every Nectar feature with working codegen
+
+// ============================================================
+// 1. Struct definitions with multiple fields
+// ============================================================
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+struct User {
+    name: String,
+    email: String,
+    age: i32,
+    active: bool,
+}
+
+struct Product {
+    id: i32,
+    title: String,
+    price: i32,
+    in_stock: bool,
+}
+
+// ============================================================
+// 2. Enum definitions with variants
+// ============================================================
+
+enum Color { Red, Green, Blue }
+
+enum Direction { Up, Down, Left, Right }
+
+// ============================================================
+// 3-4. Functions with parameters and return values
+// ============================================================
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+fn multiply(a: i32, b: i32) -> i32 {
+    return a * b;
+}
+
+fn is_positive(n: i32) -> bool {
+    return n > 0;
+}
+
+fn clamp(val: i32, low: i32, high: i32) -> i32 {
+    if val < low {
+        return low;
+    }
+    if val > high {
+        return high;
+    }
+    return val;
+}
+
+fn greet(name: String) -> String {
+    return format("Hello, {}!", name);
+}
+
+// ============================================================
+// 5. Recursive function
+// ============================================================
+
+fn factorial(n: i32) -> i32 {
+    if n <= 1 {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fn fibonacci(n: i32) -> i32 {
+    if n <= 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+// ============================================================
+// 6-7. Let/let mut bindings, if/else expressions
+// ============================================================
+
+fn classify_number(n: i32) -> String {
+    let is_neg: bool = n < 0;
+    let mut label: String = "zero";
+    if is_neg {
+        label = "negative";
+    }
+    if n > 0 {
+        label = "positive";
+    }
+    return label;
+}
+
+fn abs_value(n: i32) -> i32 {
+    if n < 0 {
+        return 0 - n;
+    }
+    return n;
+}
+
+// ============================================================
+// 8. While loops
+// ============================================================
+
+fn sum_to(n: i32) -> i32 {
+    let mut total: i32 = 0;
+    let mut i: i32 = 1;
+    while i <= n {
+        total = total + i;
+        i = i + 1;
+    }
+    return total;
+}
+
+fn count_digits(n: i32) -> i32 {
+    let mut val: i32 = n;
+    if val < 0 {
+        val = 0 - val;
+    }
+    if val == 0 {
+        return 1;
+    }
+    let mut digits: i32 = 0;
+    while val > 0 {
+        val = val / 10;
+        digits = digits + 1;
+    }
+    return digits;
+}
+
+// ============================================================
+// 9-10. For-in loops over arrays and ranges
+// ============================================================
+
+fn sum_array(nums: [i32]) -> i32 {
+    let mut total: i32 = 0;
+    for n in nums {
+        total = total + n;
+    }
+    return total;
+}
+
+fn sum_range() -> i32 {
+    let mut total: i32 = 0;
+    for i in 0..10 {
+        total = total + i;
+    }
+    return total;
+}
+
+fn range_squares() -> i32 {
+    let mut sum: i32 = 0;
+    for i in 1..6 {
+        sum = sum + i * i;
+    }
+    return sum;
+}
+
+// ============================================================
+// 11-13. Break, continue, nested loops
+// ============================================================
+
+fn find_first_big(items: [i32], threshold: i32) -> i32 {
+    let mut result: i32 = 0;
+    for item in items {
+        if item < 0 {
+            continue;
+        }
+        if item > threshold {
+            result = item;
+            break;
+        }
+    }
+    return result;
+}
+
+fn count_odd_until(limit: i32) -> i32 {
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+    while i < 1000 {
+        i += 1;
+        if i > limit {
+            break;
+        }
+        if i - (i / 2) * 2 == 0 {
+            continue;
+        }
+        count += 1;
+    }
+    return count;
+}
+
+fn nested_break_test() -> i32 {
+    let mut total: i32 = 0;
+    for i in 0..5 {
+        let mut j: i32 = 0;
+        while j < 10 {
+            j += 1;
+            if j > 3 {
+                break;
+            }
+            total += 1;
+        }
+    }
+    return total;
+}
+
+// ============================================================
+// 14. Compound assignment: +=, -=, *=, /=
+// ============================================================
+
+fn compound_ops() -> i32 {
+    let mut x: i32 = 100;
+    x += 50;
+    x -= 25;
+    x *= 2;
+    x /= 5;
+    return x;
+}
+
+// ============================================================
+// 15-16. Tuple construction and field access
+// ============================================================
+
+fn tuple_demo() -> i32 {
+    let t = (10, 20, 30);
+    let first: i32 = t.0;
+    let second: i32 = t.1;
+    let third: i32 = t.2;
+    return first + second + third;
+}
+
+fn swap_pair() -> i32 {
+    let pair = (42, 99);
+    return pair.0 + pair.1;
+}
+
+// ============================================================
+// 18. Match expressions with literal patterns
+// ============================================================
+
+fn match_number(n: i32) -> String {
+    match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        _ => "other",
+    }
+}
+
+fn match_bool(b: bool) -> i32 {
+    match b {
+        true => 1,
+        false => 0,
+    }
+}
+
+// ============================================================
+// 19. Array literals and operations
+// ============================================================
+
+fn array_operations() -> i32 {
+    let mut nums: [i32] = [1, 2, 3, 4, 5];
+    nums.push(6);
+    let count: i32 = nums.len();
+    let has_three: bool = nums.contains(3);
+    return count;
+}
+
+// ============================================================
+// 19b. Array map, filter, reduce
+// ============================================================
+
+fn double_all() -> [i32] {
+    let nums: [i32] = [1, 2, 3, 4, 5];
+    let doubled: [i32] = nums.map(|x: i32| { x * 2 });
+    return doubled;
+}
+
+fn get_positives() -> [i32] {
+    let nums: [i32] = [3, -1, 4, -2, 5];
+    let pos: [i32] = nums.filter(|x: i32| { x > 0 });
+    return pos;
+}
+
+fn sum_with_reduce() -> i32 {
+    let nums: [i32] = [1, 2, 3, 4, 5];
+    let total: i32 = nums.reduce(0, |acc: i32, x: i32| { acc + x });
+    return total;
+}
+
+// ============================================================
+// 20. String operations
+// ============================================================
+
+fn string_operations() -> String {
+    let s: String = "  Hello, World!  ";
+    let trimmed: String = s.trim();
+    let upper: String = s.to_upper();
+    let lower: String = s.to_lower();
+    let length: i32 = s.len();
+    let has_hello: bool = s.contains("Hello");
+    return trimmed;
+}
+
+// ============================================================
+// 21. Format strings
+// ============================================================
+
+fn format_demo(name: String, age: i32) -> String {
+    let f_str: String = f"Welcome {name}, you are {age} years old";
+    return f_str;
+}
+
+fn format_basic(x: i32, y: i32) -> String {
+    return format("x={}, y={}", x, y);
+}
+
+// ============================================================
+// 22. Struct construction and field access
+// ============================================================
+
+fn make_point(x: i32, y: i32) -> i32 {
+    let p: Point = Point { x: x, y: y };
+    return p.x + p.y;
+}
+
+fn make_user() -> String {
+    let u: User = User {
+        name: "Alice",
+        email: "alice@example.com",
+        age: 30,
+        active: true,
+    };
+    return u.name;
+}
+
+// ============================================================
+// 3 (continued). Impl blocks with methods
+// ============================================================
+
+impl Point {
+    fn new(x: i32, y: i32) -> Point {
+        return Point { x: x, y: y };
+    }
+
+    fn manhattan(&self) -> i32 {
+        let ax: i32 = abs_value(self.x);
+        let ay: i32 = abs_value(self.y);
+        return ax + ay;
+    }
+
+    fn translate(&self, dx: i32, dy: i32) -> Point {
+        return Point { x: self.x + dx, y: self.y + dy };
+    }
+}
+
+// ============================================================
+// 23. Method calls on structs
+// ============================================================
+
+fn test_methods() -> i32 {
+    let p: Point = Point { x: 3, y: 4 };
+    let dist: i32 = p.manhattan();
+    let moved: Point = p.translate(1, 2);
+    return dist;
+}
+
+// ============================================================
+// 27. try/catch blocks
+// ============================================================
+
+fn safe_divide(a: i32, b: i32) -> i32 {
+    try {
+        return a / b;
+    } catch err {
+        return 0;
+    }
+}
+
+// ============================================================
+// 28. Contract definition
+// ============================================================
+
+contract CustomerResponse {
+    id: i32,
+    name: String,
+    email: String,
+    balance: i32,
+}
+
+contract OrderResponse {
+    id: i32,
+    customer_id: i32,
+    total: i32,
+}
+
+// ============================================================
+// 30-32. Component with signals, methods, render block
+// ============================================================
+
+component DemoApp() {
+    let mut count: i32 = 0;
+    let mut label: String = "Demo";
+    let mut items: [i32] = [];
+    let mut show_detail: bool = false;
+    let mut filter_text: String = "All";
+
+    fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+
+    fn decrement(&mut self) {
+        self.count = self.count - 1;
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
+        self.label = "Reset";
+    }
+
+    fn toggle_detail(&mut self) {
+        self.show_detail = !self.show_detail;
+    }
+
+    fn add_item(&mut self) {
+        self.items.push(self.count);
+        self.count = self.count + 1;
+    }
+
+    fn set_filter_all(&mut self) {
+        self.filter_text = "All";
+    }
+
+    fn set_filter_even(&mut self) {
+        self.filter_text = "Even";
+    }
+
+    render {
+        <div>
+            <h1>"Nectar Full Demo"</h1>
+
+            // Display count with format
+            <p>{format("Count: {}", self.count)}</p>
+            <p>{format("Label: {}", self.label)}</p>
+
+            // Buttons with on:click handlers
+            <button on:click={self.increment}>"+"</button>
+            <button on:click={self.decrement}>"-"</button>
+            <button on:click={self.reset}>"Reset"</button>
+            <button on:click={self.toggle_detail}>"Toggle Detail"</button>
+            <button on:click={self.add_item}>"Add Item"</button>
+
+            // 34. Template conditionals
+            {if self.show_detail {
+                <div>
+                    <p>"Detail is visible"</p>
+                    <p>{format("Factorial of count: {}", factorial(self.count))}</p>
+                </div>
+            }}
+
+            {if !self.show_detail {
+                <p>"Detail is hidden"</p>
+            }}
+
+            // Filter buttons
+            <div>
+                <button on:click={self.set_filter_all}>"All"</button>
+                <button on:click={self.set_filter_even}>"Even"</button>
+                <p>{format("Filter: {}", self.filter_text)}</p>
+            </div>
+
+            // 33. Template for-loops
+            <div>
+                <h2>"Items"</h2>
+                {for item in self.items {
+                    <div>
+                        <span>{format("Item: {}", item)}</span>
+                    </div>
+                }}
+            </div>
+
+            // Summary
+            <p>{format("Total items: {}", self.items.len())}</p>
+        </div>
+    }
+}
+
+// ============================================================
+// Component with props
+// ============================================================
+
+component Greeting(name: String) {
+    render {
+        <div>
+            <h2>{format("Hello, {}!", name)}</h2>
+        </div>
+    }
+}
+
+// ============================================================
+// Component with scoped styles
+// ============================================================
+
+component StyledCard() {
+    let mut expanded: bool = false;
+
+    fn toggle(&mut self) {
+        self.expanded = !self.expanded;
+    }
+
+    style {
+        .card {
+            background: "#1a1a2e";
+            padding: "16px";
+            border-radius: "8px";
+        }
+        .title {
+            font-size: "18px";
+            color: "#e0e0e0";
+        }
+    }
+
+    render {
+        <div class="card">
+            <div class="title">"Styled Card"</div>
+            <button on:click={self.toggle}>"Toggle"</button>
+            {if self.expanded {
+                <p>"Card content is expanded"</p>
+            }}
+        </div>
+    }
+}
+
+// ============================================================
+// 35. Store with signals, actions
+// ============================================================
+
+store AppStore {
+    signal count: i32 = 0;
+    signal name: String = "default";
+    action increment(&mut self) {
+        self.count = self.count + 1;
+    }
+    action reset(&mut self) {
+        self.count = 0;
+    }
+    computed double(&self) -> i32 {
+        return self.count * 2;
+    }
+    effect log_count(&self) {
+        return;
+    }
+}
+
+// ============================================================
+// 36. Router with routes and fallback
+// ============================================================
+
+router AppRouter {
+    route "/" => DemoApp,
+    route "/about" => AboutPage,
+    fallback => NotFoundPage,
+}
+
+component AboutPage() {
+    render {
+        <div>
+            <h1>"About"</h1>
+            <p>"This is the about page."</p>
+        </div>
+    }
+}
+
+component NotFoundPage() {
+    render {
+        <div>
+            <h1>"404 — Not Found"</h1>
+        </div>
+    }
+}
+
+// ============================================================
+// 38. Page with meta
+// ============================================================
+
+page HomePage() {
+    meta {
+        title: "Full Demo — Nectar Language",
+        description: "Comprehensive demo of every Nectar feature.",
+        canonical: "/",
+    }
+
+    render {
+        <main>
+            <h1>"Welcome to Nectar"</h1>
+            <p>"A compiled-to-WASM language for the web."</p>
+        </main>
+    }
+}
+
+// ============================================================
+// 39. Form with field validation
+// ============================================================
+
+form ContactForm {
+    field name: String {
+        label: "Full Name",
+        placeholder: "Jane Doe",
+        required,
+        min_length: 2,
+        max_length: 100,
+    }
+
+    field email: String {
+        label: "Email",
+        placeholder: "jane@example.com",
+        required,
+        email,
+    }
+
+    field message: String {
+        label: "Message",
+        placeholder: "Your message here",
+        required,
+        min_length: 10,
+    }
+
+    fn on_submit(&self) {
+        let response = fetch("/api/contact");
+    }
+}
+
+// ============================================================
+// 40. Test blocks
+// ============================================================
+
+test "addition" {
+    assert_eq(add(2, 3), 5);
+}
+
+test "multiplication" {
+    assert_eq(multiply(4, 5), 20);
+}
+
+test "factorial base case" {
+    assert_eq(factorial(1), 1);
+}
+
+test "factorial recursive" {
+    assert_eq(factorial(5), 120);
+}
+
+test "fibonacci" {
+    assert_eq(fibonacci(6), 8);
+}
+
+test "absolute value" {
+    assert_eq(abs_value(-5), 5);
+    assert_eq(abs_value(3), 3);
+}
+
+test "sum to n" {
+    assert_eq(sum_to(10), 55);
+}
+
+test "compound assignments" {
+    assert_eq(compound_ops(), 50);
+}
+
+test "break finds first big" {
+    let nums: [i32] = [1, 5, 3, 15, 8];
+    let big: i32 = find_first_big(nums, 10);
+    assert_eq(big, 15);
+}
+
+test "continue skips evens" {
+    assert_eq(count_odd_until(10), 5);
+}
+
+test "nested break" {
+    assert_eq(nested_break_test(), 15);
+}
+
+test "tuple construction and access" {
+    assert_eq(tuple_demo(), 60);
+}
+
+test "swap pair" {
+    assert_eq(swap_pair(), 141);
+}
+
+test "clamp" {
+    assert_eq(clamp(5, 0, 10), 5);
+    assert_eq(clamp(-3, 0, 10), 0);
+    assert_eq(clamp(15, 0, 10), 10);
+}
+
+test "format strings" {
+    let result: String = greet("World");
+}
+
+test "struct and methods" {
+    let dist: i32 = test_methods();
+    assert_eq(dist, 7);
+}
+
+test "string ops" {
+    let s: String = string_operations();
+}
+
+test "array ops" {
+    let count: i32 = array_operations();
+    assert_eq(count, 6);
+}
+
+test "make point" {
+    let sum: i32 = make_point(3, 4);
+    assert_eq(sum, 7);
+}
+
+test "classify number" {
+    let pos: String = classify_number(5);
+    let neg: String = classify_number(-3);
+    let zero: String = classify_number(0);
+}
+
+test "safe divide" {
+    let result: i32 = safe_divide(10, 2);
+    assert_eq(result, 5);
+}
+
+test "count digits" {
+    assert_eq(count_digits(0), 1);
+    assert_eq(count_digits(123), 3);
+}
+
+test "sum range" {
+    assert_eq(sum_range(), 45);
+}
+
+test "range squares" {
+    assert_eq(range_squares(), 55);
+}
+
+test "reduce sum" {
+    assert_eq(sum_with_reduce(), 15);
+}
+
+test "match number" {
+    let z: String = match_number(0);
+    let o: String = match_number(1);
+    let t: String = match_number(99);
+}
+
+test "match bool" {
+    assert_eq(match_bool(true), 1);
+    assert_eq(match_bool(false), 0);
+}
+
+test "is positive" {
+    assert_eq(is_positive(5), true);
+    assert_eq(is_positive(-3), false);
+}
