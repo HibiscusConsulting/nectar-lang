@@ -20,7 +20,7 @@ This is not a guideline. This is the entire point of the language.
 - Built-in language keywords for common web patterns: `component`, `store`, `router`, `page`, `form`, `channel`, `auth`, `payment`, `upload`, `db`, `cache`, `agent`, `theme`, `app`
 - Standard library auto-included (no imports needed): `crypto`, `format`, `collections`, `BigDecimal`, `url`, `search`, `debounce`, `throttle`, `pagination`, `toast`, `skeleton`, `mask`, `chart`, `csv`, `datepicker`
 - **Repo**: `git@github.com:HibiscusConsulting/nectar-lang.git`
-- **License**: BSL 1.1 — free for all use except reselling the compiler or hosting it as a service. Converts to Apache 2.0 on 2030-03-12.
+- **License**: MIT
 - **Owner**: Blake Burnette (jbburnette2@gmail.com) / Hibiscus Consulting
 
 ## Build & Test
@@ -252,6 +252,8 @@ cargo tarpaulin --out json           # Coverage report
 | `contract_verify.rs` | Compile-time contract validation, type mismatches |
 | `codegen.rs` (JSON) | WASM JSON parser output ($json_parse, $json_get_field), contract parse codegen |
 | `codegen.rs` (lazy for) | Lazy for-loop batching, sentinel/observer setup, batch function emission |
+| `codegen.rs` (filter) | FilterPattern detection, filter table allocation, $__apply_filter function, display:none toggling |
+| `codegen.rs` (inplace) | In-place slot-reuse sort/filter when `inplace` keyword used, safety validation |
 | `codegen.rs` (reactive) | Reactive conditional updaters, signal subscription, function table entries |
 | `codegen.rs` (callbacks) | Parameterized callback codegen, call_indirect with captured args |
 | `package.rs` | Manifest parsing, validation |
@@ -271,6 +273,8 @@ Features are parsed and have codegen at different levels of maturity. This is th
 - Signals with DOM subscriptions (signal_subscribe + function table updaters)
 - Reactive conditionals ({if signal ...} in templates with live DOM updates)
 - Lazy for-loops (initial batch of 20, IntersectionObserver-driven pagination)
+- In-place filter optimization (display:none toggle, O(n) for 10K items, ~0.4ms)
+- `inplace` for-loops (compiler-validated slot-reuse for sort/filter, ~5ms for 10K sort)
 - For/while loops, if/else, match (Ok/Err/Some/None + custom enum variants with limitations)
 - String operations: len, push, contains, trim, to_upper, to_lower, split
 - Array operations: len, push, contains, map, filter, reduce
