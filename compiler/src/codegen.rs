@@ -204,6 +204,8 @@ pub struct WasmCodegen {
     source_file: String,
     /// Current WAT output line number (0-based), tracked for source map emission.
     wat_line: u32,
+    /// Whether $auth_validate_email has already been emitted (shared by auth and form codegen).
+    emitted_email_validator: bool,
 }
 
 /// Describes a reactive conditional block updater.
@@ -416,6 +418,7 @@ impl WasmCodegen {
             trait_impl_methods: HashMap::new(),
             source_file: String::new(),
             wat_line: 0,
+            emitted_email_validator: false,
         }
     }
 
@@ -1843,6 +1846,11 @@ impl WasmCodegen {
             self.line(";; Closure functions");
             let closures = std::mem::take(&mut self.closure_functions);
             for closure_fn in &closures {
+                // Ensure closure function starts on a new line so it doesn't
+                // get appended to the ";; Closure functions" comment line.
+                if !closure_fn.starts_with('\n') {
+                    self.output.push('\n');
+                }
                 self.output.push_str(closure_fn);
             }
             self.closure_functions = closures;
@@ -4834,7 +4842,7 @@ impl WasmCodegen {
                         self.line(&format!("  ;; validate {}: email", field.name));
                         self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
                         self.line("  call $signal_get");
-                        self.line("  call $string_len");
+                        self.line("  call $str_len");
                         self.line("  call $auth_validate_email");
                         self.line("  i32.eqz");
                         self.line("  if");
@@ -4923,6 +4931,14 @@ impl WasmCodegen {
             signal_names,
         ));
 
+        // Emit email validator if any field uses email validation
+        let has_email_validator = form.fields.iter().any(|f| {
+            f.validators.iter().any(|v| matches!(&v.kind, ValidatorKind::Email))
+        });
+        if has_email_validator {
+            self.emit_email_validator();
+        }
+
         // Generate methods, namespaced by form name to avoid redefinition
         // when multiple forms share method names like `on_submit`.
         let form_name = form.name.clone();
@@ -4931,6 +4947,87 @@ impl WasmCodegen {
             namespaced.name = format!("{form_name}_{}", method.name);
             self.generate_function(&namespaced);
         }
+    }
+
+    /// Emit the $auth_validate_email function (pure WASM string ops).
+    /// Guarded by a flag to prevent duplicate emission when both auth and form use it.
+    fn emit_email_validator(&mut self) {
+        if self.emitted_email_validator {
+            return;
+        }
+        self.emitted_email_validator = true;
+
+        // ── Validation: email (pure WASM string ops) ──
+        // Check: length > 0, contains '@', has '.' after '@'
+        self.line("(func $auth_validate_email (export \"auth_validate_email\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  (local $i i32)");
+        self.line("  (local $ch i32)");
+        self.line("  (local $at_pos i32)");
+        self.line("  (local $has_dot_after_at i32)");
+        // Empty check
+        self.line("  local.get $len");
+        self.line("  i32.eqz");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    i32.const -1  ;; at_pos = -1 (not found)");
+        self.line("    local.set $at_pos");
+        self.line("    i32.const 0");
+        self.line("    local.set $has_dot_after_at");
+        self.line("    i32.const 0");
+        self.line("    local.set $i");
+        self.line("    block $done");
+        self.line("      loop $loop");
+        self.line("        local.get $i");
+        self.line("        local.get $len");
+        self.line("        i32.ge_u");
+        self.line("        br_if $done");
+        self.line("        local.get $ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.set $ch");
+        // Check for '@' (0x40)
+        self.line("        local.get $ch");
+        self.line("        i32.const 64  ;; '@'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $i");
+        self.line("          local.set $at_pos");
+        self.line("        end");
+        // Check for '.' (0x2E) after '@'
+        self.line("        local.get $ch");
+        self.line("        i32.const 46  ;; '.'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $at_pos");
+        self.line("          i32.const -1");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            local.get $i");
+        self.line("            local.get $at_pos");
+        self.line("            i32.gt_u");
+        self.line("            if");
+        self.line("              i32.const 1");
+        self.line("              local.set $has_dot_after_at");
+        self.line("            end");
+        self.line("          end");
+        self.line("        end");
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $i");
+        self.line("        br $loop");
+        self.line("      end");
+        self.line("    end");
+        // Valid if at_pos != -1 && has_dot_after_at
+        self.line("    local.get $at_pos");
+        self.line("    i32.const -1");
+        self.line("    i32.ne");
+        self.line("    local.get $has_dot_after_at");
+        self.line("    i32.and");
+        self.line("  end");
+        self.line(")");
     }
 
     fn generate_channel(&mut self, ch: &ChannelDef) {
@@ -6122,77 +6219,7 @@ impl WasmCodegen {
         self.line("  call $http_fetchWithCallback");
         self.line(")");
 
-        // ── Validation: email (pure WASM string ops) ──
-        // Check: length > 0, contains '@', has '.' after '@'
-        self.line("(func $auth_validate_email (export \"auth_validate_email\") (param $ptr i32) (param $len i32) (result i32)");
-        self.line("  (local $i i32)");
-        self.line("  (local $ch i32)");
-        self.line("  (local $at_pos i32)");
-        self.line("  (local $has_dot_after_at i32)");
-        // Empty check
-        self.line("  local.get $len");
-        self.line("  i32.eqz");
-        self.line("  if (result i32)");
-        self.line("    i32.const 0");
-        self.line("  else");
-        self.line("    i32.const -1  ;; at_pos = -1 (not found)");
-        self.line("    local.set $at_pos");
-        self.line("    i32.const 0");
-        self.line("    local.set $has_dot_after_at");
-        self.line("    i32.const 0");
-        self.line("    local.set $i");
-        self.line("    block $done");
-        self.line("      loop $loop");
-        self.line("        local.get $i");
-        self.line("        local.get $len");
-        self.line("        i32.ge_u");
-        self.line("        br_if $done");
-        self.line("        local.get $ptr");
-        self.line("        local.get $i");
-        self.line("        i32.add");
-        self.line("        i32.load8_u");
-        self.line("        local.set $ch");
-        // Check for '@' (0x40)
-        self.line("        local.get $ch");
-        self.line("        i32.const 64  ;; '@'");
-        self.line("        i32.eq");
-        self.line("        if");
-        self.line("          local.get $i");
-        self.line("          local.set $at_pos");
-        self.line("        end");
-        // Check for '.' (0x2E) after '@'
-        self.line("        local.get $ch");
-        self.line("        i32.const 46  ;; '.'");
-        self.line("        i32.eq");
-        self.line("        if");
-        self.line("          local.get $at_pos");
-        self.line("          i32.const -1");
-        self.line("          i32.ne");
-        self.line("          if");
-        self.line("            local.get $i");
-        self.line("            local.get $at_pos");
-        self.line("            i32.gt_u");
-        self.line("            if");
-        self.line("              i32.const 1");
-        self.line("              local.set $has_dot_after_at");
-        self.line("            end");
-        self.line("          end");
-        self.line("        end");
-        self.line("        local.get $i");
-        self.line("        i32.const 1");
-        self.line("        i32.add");
-        self.line("        local.set $i");
-        self.line("        br $loop");
-        self.line("      end");
-        self.line("    end");
-        // Valid if at_pos != -1 && has_dot_after_at
-        self.line("    local.get $at_pos");
-        self.line("    i32.const -1");
-        self.line("    i32.ne");
-        self.line("    local.get $has_dot_after_at");
-        self.line("    i32.and");
-        self.line("  end");
-        self.line(")");
+        self.emit_email_validator();
 
         // ── Validation: password (min 8 chars) ──
         self.line("(func $auth_validate_password (export \"auth_validate_password\") (param $ptr i32) (param $len i32) (result i32)");
@@ -9877,8 +9904,26 @@ impl WasmCodegen {
                         _ => {}
                     }
                 }
+                // Determine if this is a user-defined function call where
+                // String args are single pointers (not (ptr, len) pairs).
+                let is_user_fn = if let Expr::Ident(name) = callee.as_ref() {
+                    !matches!(name.as_str(),
+                        "format" | "assert_eq" | "assert_ne" | "string_concat" |
+                        "string_trim" | "string_to_upper" | "string_to_lower" |
+                        "string_index_of" | "string_starts_with" | "string_ends_with" |
+                        "string_replace" | "string_contains" |
+                        "Ok" | "Some" | "Err"
+                    )
+                } else {
+                    false
+                };
                 for arg in args {
                     self.generate_expr(arg);
+                    // User functions take String as a single i32 pointer.
+                    // StringLit pushes (ptr, len) — drop the len.
+                    if is_user_fn && matches!(arg, Expr::StringLit(_)) {
+                        self.line("drop ;; drop str len for user fn call");
+                    }
                 }
                 if let Expr::Ident(name) = callee.as_ref() {
                     // Map well-known web API function names to their WASM imports
@@ -10569,6 +10614,10 @@ impl WasmCodegen {
                 self.generate_expr(catch_body);
                 self.indent -= 1;
                 self.line(") ;; end $try_ok");
+                // If both try and catch contain explicit returns, control never
+                // reaches here.  Emit unreachable to satisfy the WASM validator
+                // which requires the stack to match the function return type.
+                self.line("unreachable ;; control never reaches here (try/catch both return)");
             }
             Expr::Animate { target, animation } => {
                 self.line(";; animate — play a named animation on target");
@@ -10676,7 +10725,27 @@ impl WasmCodegen {
                 let saved_locals = std::mem::take(&mut self.locals);
                 self.indent = 2;
 
-                self.generate_expr(body);
+                // For closures, the last expression in a Block body is the
+                // return value.  Generate all statements except the last
+                // normally, then generate the last expression without drop
+                // so its value remains on the stack as the closure result.
+                if let Expr::Block(block) = body.as_ref() {
+                    let stmt_count = block.stmts.len();
+                    for (i, stmt) in block.stmts.iter().enumerate() {
+                        let is_last = i == stmt_count - 1;
+                        if is_last {
+                            if let Stmt::Expr(expr) = stmt {
+                                self.generate_expr(expr);
+                            } else {
+                                self.generate_stmt(stmt);
+                            }
+                        } else {
+                            self.generate_stmt(stmt);
+                        }
+                    }
+                } else {
+                    self.generate_expr(body);
+                }
 
                 let body_code = std::mem::replace(&mut self.output, saved_output);
                 self.indent = saved_indent;
@@ -10817,8 +10886,13 @@ impl WasmCodegen {
                 self.generate_expr(subject);
                 let subj_label = self.next_label();
                 let subject_local = format!("$__match_subj_{}", subj_label);
-                self.locals.push((format!("__match_subj_{}", subj_label), WasmType::I32));
+                self.emit_template_local(&subject_local);
                 self.line(&format!("local.set {}", subject_local));
+
+                // Detect if any arm body is a string literal — if so, the
+                // match produces (ptr, len) from StringLit.  We need to drop
+                // the len so the match result is a single i32 (pointer).
+                let arms_are_string = arms.iter().any(|a| matches!(&a.body, Expr::StringLit(_)));
 
                 // Each arm becomes an if/else chain.
                 // Track how many nested if/else blocks we open so we can close them.
@@ -10834,6 +10908,9 @@ impl WasmCodegen {
                                 self.emit("(then");
                                 self.indent += 1;
                                 self.generate_expr(&arm.body);
+                                if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
+                                    self.line("drop ;; drop str len, keep ptr");
+                                }
                                 self.indent -= 1;
                                 self.line(")");
                                 self.emit("(else");
@@ -10845,6 +10922,9 @@ impl WasmCodegen {
                                 self.line(")");
                             } else {
                                 self.generate_expr(&arm.body);
+                                if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
+                                    self.line("drop ;; drop str len, keep ptr");
+                                }
                             }
                         }
                         Pattern::Literal(lit_expr) => {
@@ -10868,6 +10948,9 @@ impl WasmCodegen {
                             self.emit("(then");
                             self.indent += 1;
                             self.generate_expr(&arm.body);
+                            if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
+                                self.line("drop ;; drop str len, keep ptr");
+                            }
                             self.indent -= 1;
                             self.line(")");
                             self.emit("(else");
@@ -10912,7 +10995,7 @@ impl WasmCodegen {
                                     } else {
                                         self.line(&format!("i32.load offset={} ;; field: {}", offset, field_name));
                                     }
-                                    self.locals.push((binding_name.clone(), WasmType::I32));
+                                    self.emit_template_local(&format!("${}", binding_name));
                                     self.line(&format!("local.set ${}", binding_name));
                                 }
                             }
@@ -10949,7 +11032,7 @@ impl WasmCodegen {
                                     } else {
                                         self.line(&format!("i32.load offset={} ;; tuple.{}", offset, i));
                                     }
-                                    self.locals.push((binding_name.clone(), WasmType::I32));
+                                    self.emit_template_local(&format!("${}", binding_name));
                                     self.line(&format!("local.set ${}", binding_name));
                                 }
                             }
@@ -11000,9 +11083,14 @@ impl WasmCodegen {
                         }
                     }
                 }
-                // Close all open else branches with a default value
-                for _ in 0..open_ifs {
-                    self.line("i32.const 0 ;; match fallthrough");
+                // Close all open else branches.  Only the innermost else
+                // needs a fallthrough value — the outer ones already have
+                // a result from the nested (if (result i32)) expression.
+                let has_wildcard = arms.iter().any(|a| matches!(&a.pattern, Pattern::Wildcard | Pattern::Ident(_)));
+                for i in 0..open_ifs {
+                    if i == 0 && !has_wildcard {
+                        self.line("i32.const 0 ;; match fallthrough");
+                    }
                     self.indent -= 1;
                     self.line(")");
                     self.indent -= 1;
@@ -12723,6 +12811,25 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
 
+        // string_len: compute length of null-terminated string, return just the length (i32)
+        // Used by form validators that need only the string length
+        self.emit("(func $string_len (param $ptr i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $len i32)");
+        self.line("i32.const 0  local.set $len");
+        self.line("block $done");
+        self.line("  loop $scan");
+        self.line("    local.get $ptr  local.get $len  i32.add  i32.load8_u");
+        self.line("    i32.eqz  br_if $done");
+        self.line("    local.get $len  i32.const 1  i32.add  local.set $len");
+        self.line("    local.get $len  i32.const 4096  i32.ge_u  br_if $done");
+        self.line("    br $scan");
+        self.line("  end");
+        self.line("end");
+        self.line("local.get $len");
+        self.indent -= 1;
+        self.line(")");
+
         // ── Router query param functions (WASM-internal) ──────────
         self.line("");
         self.line(";; Router query string parsing — pure WASM, no JS logic");
@@ -13940,16 +14047,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__map_src_{lbl}"));
                 self.line("i32.load ;; array length");
                 self.line(&format!("local.set $__map_len_{lbl}"));
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line(&format!("local.set $__map_dst_{lbl}"));
                 self.line(&format!("local.get $__map_len_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4 ;; header");
                 self.line("i32.add");
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $__heap_ptr");
+                self.line("global.set $heap_ptr");
                 self.line(&format!("local.get $__map_dst_{lbl}"));
                 self.line(&format!("local.get $__map_len_{lbl}"));
                 self.line("i32.store");
@@ -14012,16 +14119,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__flt_src_{lbl}"));
                 self.line("i32.load");
                 self.line(&format!("local.set $__flt_len_{lbl}"));
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line(&format!("local.set $__flt_dst_{lbl}"));
                 self.line(&format!("local.get $__flt_len_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $__heap_ptr");
+                self.line("global.set $heap_ptr");
                 self.line("i32.const 0");
                 self.line(&format!("local.set $__flt_out_{lbl}"));
                 self.line("i32.const 0");
@@ -14281,16 +14388,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__en_src_{lbl}"));
                 self.line("i32.load");
                 self.line(&format!("local.set $__en_len_{lbl}"));
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line(&format!("local.set $__en_dst_{lbl}"));
                 self.line(&format!("local.get $__en_len_{lbl}"));
                 self.line("i32.const 8");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $__heap_ptr");
+                self.line("global.set $heap_ptr");
                 self.line(&format!("local.get $__en_dst_{lbl}"));
                 self.line(&format!("local.get $__en_len_{lbl}"));
                 self.line("i32.store");
@@ -14364,16 +14471,16 @@ impl WasmCodegen {
                 self.line("i32.lt_u");
                 self.line("select ;; min(a.len, b.len)");
                 self.line(&format!("local.set $__zip_len_{lbl}"));
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line(&format!("local.set $__zip_dst_{lbl}"));
                 self.line(&format!("local.get $__zip_len_{lbl}"));
                 self.line("i32.const 8");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $__heap_ptr");
+                self.line("global.set $heap_ptr");
                 self.line(&format!("local.get $__zip_dst_{lbl}"));
                 self.line(&format!("local.get $__zip_len_{lbl}"));
                 self.line("i32.store");
@@ -14754,16 +14861,16 @@ impl WasmCodegen {
                     self.line("select");
                 }
                 self.line(&format!("local.set $__{tag}_out_{lbl}"));
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line(&format!("local.set $__{tag}_dst_{lbl}"));
                 self.line(&format!("local.get $__{tag}_out_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $__heap_ptr");
+                self.line("global.get $heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $__heap_ptr");
+                self.line("global.set $heap_ptr");
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
                 self.line(&format!("local.get $__{tag}_out_{lbl}"));
                 self.line("i32.store");
@@ -14786,19 +14893,30 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
             }
             // ── String instance methods ──────────────────────────────────────
+            // String methods expect (ptr, len) but local variables only store
+            // the pointer.  Use $str_len to recover (ptr, len) from a bare ptr.
             "trim" => {
                 self.line(";; .trim() — remove leading/trailing whitespace");
                 self.generate_expr(object);
+                if !matches!(object, Expr::StringLit(_)) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len)");
+                }
                 self.line("call $string_trim");
             }
             "to_upper" => {
                 self.line(";; .to_upper() — ASCII uppercase");
                 self.generate_expr(object);
+                if !matches!(object, Expr::StringLit(_)) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len)");
+                }
                 self.line("call $string_to_upper");
             }
             "to_lower" => {
                 self.line(";; .to_lower() — ASCII lowercase");
                 self.generate_expr(object);
+                if !matches!(object, Expr::StringLit(_)) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len)");
+                }
                 self.line("call $string_to_lower");
             }
             "split" => {
@@ -15281,13 +15399,12 @@ impl WasmCodegen {
                         );
                     }
                 }
-                // Method calls on self fields that are void (no return value)
-                if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
-                    if matches!(inner.as_ref(), Expr::SelfExpr) && matches!(method.as_str(),
-                        "push" | "sort_asc" | "sort_desc" | "sort_str_asc" | "sort_str_desc" | "reverse"
-                    ) {
-                        return true;
-                    }
+                // Array mutation methods are always void — they modify in place
+                // and don't leave a value on the WASM stack.
+                if matches!(method.as_str(),
+                    "push" | "sort_asc" | "sort_desc" | "sort_str_asc" | "sort_str_desc" | "reverse"
+                ) {
+                    return true;
                 }
                 // self.method() calls within a component are void — handlers don't return values
                 if matches!(object.as_ref(), Expr::SelfExpr) {
@@ -15330,6 +15447,9 @@ impl WasmCodegen {
             }
             // While/For loops and blocks are void — no stack value
             Expr::While { .. } | Expr::For { .. } | Expr::Block(_) => true,
+            // assert_eq is void — it emits an if/else that calls test_fail but
+            // does not leave a value on the stack.
+            Expr::AssertEq { .. } => true,
             _ => false,
         }
     }
