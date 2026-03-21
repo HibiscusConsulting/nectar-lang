@@ -55,6 +55,10 @@ pub enum TokenKind {
     OnConnect,
     OnDisconnect,
     Lazy,
+    /// `inplace` keyword — opt-in for in-place slot-reuse updates on for-loops.
+    /// `{inplace for item in items { ... }}` — compiler validates card safety,
+    /// then uses setText/setAttr updates instead of node moves on sort.
+    Inplace,
     Suspend,
     Yield,
     Agent,
@@ -139,6 +143,8 @@ pub enum TokenKind {
     Keyframes,
     Shortcut,
     Virtual,
+    Break,
+    Continue,
 
     // Types
     I32,
@@ -253,7 +259,8 @@ impl TokenKind {
             TokenKind::Pdf => "pdf".into(), TokenKind::Db => "db".into(),
             TokenKind::Cache => "cache".into(), TokenKind::Contract => "contract".into(),
             TokenKind::Async => "async".into(), TokenKind::Await => "await".into(),
-            TokenKind::Lazy => "lazy".into(), TokenKind::Spring => "spring".into(),
+            TokenKind::Lazy => "lazy".into(), TokenKind::Inplace => "inplace".into(),
+            TokenKind::Spring => "spring".into(),
             TokenKind::Keyframes => "keyframes".into(), TokenKind::Stagger => "stagger".into(),
             TokenKind::Shortcut => "shortcut".into(), TokenKind::Secret => "secret".into(),
             TokenKind::Atomic => "atomic".into(), TokenKind::Select => "select".into(),

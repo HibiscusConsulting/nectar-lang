@@ -482,8 +482,16 @@ impl DevServer {
             .iter()
             .map(|p| p.to_string_lossy().to_string())
             .collect();
+        // Send HMR message with WASM URL for hot module replacement.
+        // The dev client re-fetches the WASM module and re-instantiates.
+        // Falls back to full reload if the module shape changed.
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
         let message = serde_json::json!({
-            "type": "reload",
+            "type": "hmr",
+            "wasm_url": format!("/app.wasm?t={}", timestamp),
             "files": paths,
         })
         .to_string();

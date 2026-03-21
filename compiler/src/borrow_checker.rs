@@ -13,6 +13,10 @@ pub struct BorrowError {
     pub kind: BorrowErrorKind,
     pub span: Span,
     pub message: String,
+    /// The source line where the error occurred (for rustc-style diagnostics).
+    pub source_line: Option<String>,
+    /// A suggested fix (e.g. "did you mean `&x`?").
+    pub suggestion: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -31,11 +35,17 @@ pub enum BorrowErrorKind {
 
 impl fmt::Display for BorrowError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[borrow error] line {}:{}: {}",
-            self.span.line, self.span.col, self.message
-        )
+        writeln!(f, "error[borrow]: {}", self.message)?;
+        writeln!(f, " --> {}:{}", self.span.line, self.span.col)?;
+        if let Some(ref line) = self.source_line {
+            writeln!(f, "  |")?;
+            writeln!(f, "{} | {}", self.span.line, line)?;
+            writeln!(f, "  | {}^", " ".repeat(self.span.col.saturating_sub(1) as usize))?;
+        }
+        if let Some(ref suggestion) = self.suggestion {
+            writeln!(f, "  = help: {}", suggestion)?;
+        }
+        Ok(())
     }
 }
 
@@ -71,6 +81,10 @@ struct BorrowInfo {
     /// Optional named lifetime for this borrow (e.g., `'a`).
     #[allow(dead_code)]
     lifetime: Option<String>,
+    /// Statement index of last use of this borrow variable (NLL).
+    /// When set, the borrow is released after this statement rather than at scope exit.
+    #[allow(dead_code)]
+    last_use_stmt_idx: Option<usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -211,12 +225,16 @@ impl Env {
 struct Checker {
     env: Env,
     errors: Vec<BorrowError>,
+    /// Pre-scanned function signatures: fn_name -> Vec<Ownership>.
+    /// Used to determine whether a function call moves or borrows its arguments.
+    fn_sigs: HashMap<String, Vec<Ownership>>,
 }
 
 impl Checker {
     fn new() -> Self {
         Self {
             env: Env::new(),
+            fn_sigs: HashMap::new(),
             errors: Vec::new(),
         }
     }
@@ -226,12 +244,33 @@ impl Checker {
             kind,
             span,
             message: message.into(),
+            source_line: None,
+            suggestion: None,
+        });
+    }
+
+    fn error_with_suggestion(&mut self, kind: BorrowErrorKind, span: Span, message: impl Into<String>, suggestion: impl Into<String>) {
+        self.errors.push(BorrowError {
+            kind,
+            span,
+            message: message.into(),
+            source_line: None,
+            suggestion: Some(suggestion.into()),
         });
     }
 
     // -- top-level -----------------------------------------------------------
 
     fn check_program(&mut self, program: &Program) {
+        // Pre-scan: collect function signatures for ownership-aware call checking.
+        for item in &program.items {
+            if let Item::Function(f) = item {
+                let ownerships: Vec<Ownership> = f.params.iter()
+                    .map(|p| p.ownership.clone())
+                    .collect();
+                self.fn_sigs.insert(f.name.clone(), ownerships);
+            }
+        }
         for item in &program.items {
             self.check_item(item);
         }
@@ -295,7 +334,13 @@ impl Checker {
         // Validate lifetime elision rules.
         self.check_lifetime_elision(func);
 
+        // Collect parameter names for return-reference validation.
+        let param_names: Vec<String> = func.params.iter().map(|p| p.name.clone()).collect();
+
         self.check_block(&func.body);
+
+        // Validate that returned references don't point to local variables.
+        self.check_return_references(&func.body, &param_names, func.span);
 
         // Pop lifetime scopes (in reverse order).
         for _ in &func.lifetimes {
@@ -362,7 +407,11 @@ impl Checker {
     // -- blocks / statements ------------------------------------------------
 
     fn check_block(&mut self, block: &Block) {
-        for stmt in &block.stmts {
+        // NLL: compute last-use indices for borrow variables.
+        let last_use = Self::find_last_use_in_block(block);
+        for (idx, stmt) in block.stmts.iter().enumerate() {
+            // Release borrows that are dead before this statement.
+            self.release_dead_borrows(&last_use, idx);
             self.check_stmt(stmt, block.span);
         }
     }
@@ -504,14 +553,34 @@ impl Checker {
                 }
             }
             Expr::FnCall { callee, args } => {
+                // Determine callee name for signature lookup.
+                let callee_name = self.expr_as_ident(callee);
+                let param_ownerships = callee_name
+                    .as_ref()
+                    .and_then(|name| self.fn_sigs.get(name).cloned());
+
                 self.check_expr(callee, span);
-                for arg in args {
-                    // Passing a variable to a function moves it (by default).
-                    if let Expr::Ident(name) = arg {
-                        self.assert_not_moved(name, span);
-                        self.move_var(name, "<function argument>", span);
-                    } else {
-                        self.check_expr(arg, span);
+                for (i, arg) in args.iter().enumerate() {
+                    let ownership = param_ownerships
+                        .as_ref()
+                        .and_then(|ownerships| ownerships.get(i))
+                        .cloned()
+                        .unwrap_or(Ownership::Owned);
+
+                    match ownership {
+                        Ownership::Borrowed | Ownership::MutBorrowed => {
+                            // Borrowed param: just check the arg, no move.
+                            self.check_expr(arg, span);
+                        }
+                        Ownership::Owned => {
+                            // Owned param: moves the argument.
+                            if let Expr::Ident(name) = arg {
+                                self.assert_not_moved(name, span);
+                                self.move_var(name, "<function argument>", span);
+                            } else {
+                                self.check_expr(arg, span);
+                            }
+                        }
                     }
                 }
             }
@@ -574,7 +643,14 @@ impl Checker {
             Expr::Borrow(inner) => {
                 if let Expr::Ident(name) = inner.as_ref() {
                     self.assert_not_moved(name, span);
-                    self.assert_not_mut_borrowed(name, span);
+                    // Allow reborrowing: &r where r: &mut T is valid (immutable reborrow).
+                    // Only error if the variable is not a mutable borrow holder.
+                    let is_reborrow = self.env.borrow_map.get(name)
+                        .map(|info| info.mutable)
+                        .unwrap_or(false);
+                    if !is_reborrow {
+                        self.assert_not_mut_borrowed(name, span);
+                    }
                 } else {
                     self.check_expr(inner, span);
                 }
@@ -751,6 +827,9 @@ impl Checker {
                 self.check_expr(start, span);
                 self.check_expr(end, span);
             }
+            Expr::Break | Expr::Continue => {
+                // No ownership effects
+            }
             Expr::VirtualList { items, item_height, template, .. } => {
                 self.check_expr(items, span);
                 self.check_expr(item_height, span);
@@ -777,6 +856,24 @@ impl Checker {
             Expr::Ident(name) => Some(name.clone()),
             _ => None,
         }
+    }
+
+    /// Extract a dotted path from an expression for partial/field borrow tracking.
+    /// `obj.x.y` -> Some("obj.x.y"), `obj` -> Some("obj"), anything else -> None.
+    fn expr_as_path(&self, expr: &Expr) -> Option<String> {
+        match expr {
+            Expr::Ident(name) => Some(name.clone()),
+            Expr::FieldAccess { object, field } => {
+                self.expr_as_path(object).map(|base| format!("{}.{}", base, field))
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if two borrow paths conflict. Two paths conflict if one is a prefix
+    /// of the other (e.g., "obj" and "obj.x" conflict, "obj.x" and "obj.y" do not).
+    fn paths_conflict(a: &str, b: &str) -> bool {
+        a == b || a.starts_with(&format!("{}.", b)) || b.starts_with(&format!("{}.", a))
     }
 
     fn assert_not_moved(&mut self, name: &str, span: Span) {
@@ -884,6 +981,7 @@ impl Checker {
                 mutable: false,
                 scope_depth: self.env.depth(),
                 lifetime: None,
+                last_use_stmt_idx: None,
             },
         );
     }
@@ -903,8 +1001,139 @@ impl Checker {
                 mutable: true,
                 scope_depth: self.env.depth(),
                 lifetime: None,
+                last_use_stmt_idx: None,
             },
         );
+    }
+
+    /// Verify that no return statement returns a reference to a local variable.
+    /// References to function parameters are allowed (they outlive the function call).
+    fn check_return_references(&mut self, block: &Block, param_names: &[String], span: Span) {
+        for stmt in &block.stmts {
+            match stmt {
+                Stmt::Return(Some(expr)) => {
+                    self.check_return_expr_for_local_refs(expr, param_names, span);
+                }
+                Stmt::Expr(expr) => {
+                    self.check_return_in_expr(expr, param_names, span);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn check_return_expr_for_local_refs(&mut self, expr: &Expr, param_names: &[String], span: Span) {
+        match expr {
+            Expr::Borrow(inner) | Expr::BorrowMut(inner) => {
+                if let Some(name) = self.expr_as_ident(inner) {
+                    if !param_names.contains(&name) {
+                        self.error_with_suggestion(
+                            BorrowErrorKind::BorrowOutlivesScope,
+                            span,
+                            format!("cannot return reference to local variable `{}`", name),
+                            "consider returning the value directly instead of a reference".to_string(),
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn check_return_in_expr(&mut self, expr: &Expr, param_names: &[String], span: Span) {
+        match expr {
+            Expr::If { then_block, else_block, .. } => {
+                self.check_return_references(then_block, param_names, span);
+                if let Some(eb) = else_block {
+                    self.check_return_references(eb, param_names, span);
+                }
+            }
+            Expr::Block(block) => {
+                self.check_return_references(block, param_names, span);
+            }
+            _ => {}
+        }
+    }
+
+    /// NLL liveness pre-pass: find the last statement index where each variable
+    /// is used in a block. This allows borrows to be released at last use rather
+    /// than at scope exit.
+    fn find_last_use_in_block(block: &Block) -> HashMap<String, usize> {
+        let mut last_use: HashMap<String, usize> = HashMap::new();
+        for (idx, stmt) in block.stmts.iter().enumerate() {
+            let mut vars = Vec::new();
+            Self::collect_used_vars_in_stmt(stmt, &mut vars);
+            for var in vars {
+                last_use.insert(var, idx);
+            }
+        }
+        last_use
+    }
+
+    fn collect_used_vars_in_stmt(stmt: &Stmt, out: &mut Vec<String>) {
+        match stmt {
+            Stmt::Let { value, .. } => Self::collect_used_vars_in_expr(value, out),
+            Stmt::Expr(e) => Self::collect_used_vars_in_expr(e, out),
+            Stmt::Return(Some(e)) => Self::collect_used_vars_in_expr(e, out),
+            Stmt::Signal { value, .. } => Self::collect_used_vars_in_expr(value, out),
+            Stmt::Yield(e) => Self::collect_used_vars_in_expr(e, out),
+            _ => {}
+        }
+    }
+
+    fn collect_used_vars_in_expr(expr: &Expr, out: &mut Vec<String>) {
+        match expr {
+            Expr::Ident(name) => out.push(name.clone()),
+            Expr::Binary { left, right, .. } => {
+                Self::collect_used_vars_in_expr(left, out);
+                Self::collect_used_vars_in_expr(right, out);
+            }
+            Expr::Unary { operand, .. } => Self::collect_used_vars_in_expr(operand, out),
+            Expr::FnCall { callee, args } => {
+                Self::collect_used_vars_in_expr(callee, out);
+                for arg in args {
+                    Self::collect_used_vars_in_expr(arg, out);
+                }
+            }
+            Expr::FieldAccess { object, .. } => Self::collect_used_vars_in_expr(object, out),
+            Expr::MethodCall { object, args, .. } => {
+                Self::collect_used_vars_in_expr(object, out);
+                for arg in args {
+                    Self::collect_used_vars_in_expr(arg, out);
+                }
+            }
+            Expr::Borrow(inner) | Expr::BorrowMut(inner) => {
+                Self::collect_used_vars_in_expr(inner, out);
+            }
+            Expr::Index { object, index } => {
+                Self::collect_used_vars_in_expr(object, out);
+                Self::collect_used_vars_in_expr(index, out);
+            }
+            Expr::Assign { target, value } => {
+                Self::collect_used_vars_in_expr(target, out);
+                Self::collect_used_vars_in_expr(value, out);
+            }
+            _ => {}
+        }
+    }
+
+    /// Release borrows that are no longer live at the given statement index.
+    /// Called during block checking to implement NLL.
+    fn release_dead_borrows(&mut self, last_use: &HashMap<String, usize>, current_idx: usize) {
+        // Find borrow variables whose last use is before current_idx.
+        let to_release: Vec<(String, BorrowInfo)> = self.env.borrow_map.iter()
+            .filter(|(var, _info)| {
+                last_use.get(var.as_str())
+                    .map(|&lu| lu < current_idx)
+                    .unwrap_or(false)
+            })
+            .map(|(var, info)| (var.clone(), info.clone()))
+            .collect();
+
+        for (var, info) in to_release {
+            self.env.release_borrow_on_source(&info.source_var, info.mutable);
+            self.env.borrow_map.remove(&var);
+        }
     }
 
     fn declare_pattern_bindings(&mut self, pattern: &Pattern) {
@@ -2546,6 +2775,24 @@ mod coverage_tests {
         }
     }
 
+    fn program_with_fn(name: &str, params: Vec<Param>, return_type: Option<Type>, stmts: Vec<Stmt>) -> Program {
+        Program {
+            items: vec![Item::Function(Function {
+                name: name.to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params,
+                return_type,
+                trait_bounds: vec![],
+                body: Block { stmts, span: span() },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        }
+    }
+
     // -----------------------------------------------------------------------
     // BorrowError Display impl (lines 31-33)
     // -----------------------------------------------------------------------
@@ -2556,11 +2803,28 @@ mod coverage_tests {
             kind: BorrowErrorKind::UseAfterMove,
             span: Span::new(0, 5, 3, 7),
             message: "test error".to_string(),
+            source_line: None,
+            suggestion: None,
         };
         let s = format!("{}", err);
         assert!(s.contains("3:7"));
         assert!(s.contains("test error"));
-        assert!(s.contains("[borrow error]"));
+        assert!(s.contains("borrow"));
+    }
+
+    #[test]
+    fn borrow_error_display_with_source_line() {
+        let err = BorrowError {
+            kind: BorrowErrorKind::UseAfterMove,
+            span: Span::new(0, 10, 5, 8),
+            message: "use of moved value: `x`".to_string(),
+            source_line: Some("    let y = x;".to_string()),
+            suggestion: Some("consider borrowing with `&x`".to_string()),
+        };
+        let s = format!("{}", err);
+        assert!(s.contains("5:8"), "should contain line:col");
+        assert!(s.contains("let y = x;"), "should contain source line");
+        assert!(s.contains("consider borrowing"), "should contain suggestion");
     }
 
     // -----------------------------------------------------------------------
@@ -4254,5 +4518,261 @@ mod coverage_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "Range expression should pass borrow check: {:?}", result);
+    }
+
+    // -- Phase 3: Partial borrows, fn sigs, NLL, return refs, reborrowing -----
+
+    #[test]
+    fn test_paths_conflict_same() {
+        assert!(Checker::paths_conflict("obj", "obj"));
+    }
+
+    #[test]
+    fn test_paths_conflict_prefix() {
+        assert!(Checker::paths_conflict("obj", "obj.x"));
+        assert!(Checker::paths_conflict("obj.x", "obj"));
+    }
+
+    #[test]
+    fn test_paths_no_conflict_siblings() {
+        assert!(!Checker::paths_conflict("obj.x", "obj.y"));
+    }
+
+    #[test]
+    fn test_expr_as_path_ident() {
+        let checker = Checker::new();
+        assert_eq!(checker.expr_as_path(&Expr::Ident("x".into())), Some("x".to_string()));
+    }
+
+    #[test]
+    fn test_expr_as_path_field_access() {
+        let checker = Checker::new();
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::Ident("obj".into())),
+            field: "x".to_string(),
+        };
+        assert_eq!(checker.expr_as_path(&expr), Some("obj.x".to_string()));
+    }
+
+    #[test]
+    fn test_expr_as_path_nested() {
+        let checker = Checker::new();
+        let expr = Expr::FieldAccess {
+            object: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("a".into())),
+                field: "b".to_string(),
+            }),
+            field: "c".to_string(),
+        };
+        assert_eq!(checker.expr_as_path(&expr), Some("a.b.c".to_string()));
+    }
+
+    #[test]
+    fn test_fn_call_borrowed_param_no_move() {
+        // fn takes_ref(ref x: i32) { }
+        // let a = 5; takes_ref(a); let b = a;  -- should be ok
+        let prog = Program {
+            items: vec![
+                Item::Function(Function {
+                    name: "takes_ref".to_string(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![Param {
+                        name: "x".to_string(),
+                        ty: Type::Named("i32".into()),
+                        ownership: Ownership::Borrowed,
+                        secret: false,
+                    }],
+                    return_type: None,
+                    trait_bounds: vec![],
+                    body: Block { stmts: vec![], span: span() },
+                    is_pub: false,
+                    is_async: false,
+                    must_use: false,
+                    span: span(),
+                }),
+                Item::Function(Function {
+                    name: "main".to_string(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: None,
+                    trait_bounds: vec![],
+                    body: Block {
+                        stmts: vec![
+                            Stmt::Let {
+                                name: "a".to_string(),
+                                ty: None,
+                                value: int_lit(5),
+                                mutable: false,
+                                secret: false,
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Expr(Expr::FnCall {
+                                callee: Box::new(ident("takes_ref")),
+                                args: vec![ident("a")],
+                            }),
+                            Stmt::Let {
+                                name: "b".to_string(),
+                                ty: None,
+                                value: ident("a"),
+                                mutable: false,
+                                secret: false,
+                                ownership: Ownership::Owned,
+                            },
+                        ],
+                        span: span(),
+                    },
+                    is_pub: false,
+                    is_async: false,
+                    must_use: false,
+                    span: span(),
+                }),
+            ],
+        };
+        let result = check(&prog);
+        assert!(result.is_ok(), "Borrowed param should not move: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_return_ref_to_local_error() {
+        // fn bad() -> &i32 { let x = 5; return &x; }
+        let prog = program_with_fn(
+            "bad",
+            vec![],
+            Some(Type::Reference {
+                lifetime: None,
+                mutable: false,
+                inner: Box::new(Type::Named("i32".into())),
+            }),
+            vec![
+                Stmt::Let {
+                    name: "x".to_string(),
+                    ty: None,
+                    value: int_lit(5),
+                    mutable: false,
+                    secret: false,
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Return(Some(Expr::Borrow(Box::new(ident("x"))))),
+            ],
+        );
+        let result = check(&prog);
+        assert!(result.is_err(), "Should reject returning reference to local variable");
+    }
+
+    #[test]
+    fn test_return_ref_to_param_ok() {
+        // fn ok(ref x: i32) -> &i32 { return &x; }
+        let prog = Program {
+            items: vec![Item::Function(Function {
+                name: "ok".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![Param {
+                    name: "x".to_string(),
+                    ty: Type::Reference {
+                        lifetime: None,
+                        mutable: false,
+                        inner: Box::new(Type::Named("i32".into())),
+                    },
+                    ownership: Ownership::Borrowed,
+                    secret: false,
+                }],
+                return_type: Some(Type::Reference {
+                    lifetime: None,
+                    mutable: false,
+                    inner: Box::new(Type::Named("i32".into())),
+                }),
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Borrow(Box::new(ident("x"))))),
+                    ],
+                    span: span(),
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
+        };
+        let result = check(&prog);
+        assert!(result.is_ok(), "Should allow returning reference to param: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_reborrow_immutable_from_mut_borrow() {
+        // let mut x = 5;
+        // let r = &mut x;
+        // let s = &r;   -- immutable reborrow of mutable borrow holder, should be ok
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "x".to_string(),
+                ty: None,
+                value: int_lit(5),
+                mutable: true,
+                secret: false,
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "r".to_string(),
+                ty: None,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                mutable: false,
+                secret: false,
+                ownership: Ownership::MutBorrowed,
+            },
+            Stmt::Let {
+                name: "s".to_string(),
+                ty: None,
+                value: Expr::Borrow(Box::new(ident("r"))),
+                mutable: false,
+                secret: false,
+                ownership: Ownership::Borrowed,
+            },
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "Immutable reborrow of mut borrow should be ok: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_nll_borrow_released_at_last_use() {
+        // NLL: let r = &x; use(r); let y = x;
+        // r is dead before y, so the move of x should be ok.
+        let prog = program_with_stmts(vec![
+            Stmt::Let {
+                name: "x".to_string(),
+                ty: None,
+                value: int_lit(42),
+                mutable: false,
+                secret: false,
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "r".to_string(),
+                ty: None,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                mutable: false,
+                secret: false,
+                ownership: Ownership::Borrowed,
+            },
+            // Use r in an expression
+            Stmt::Expr(Expr::FnCall {
+                callee: Box::new(ident("use_val")),
+                args: vec![ident("r")],
+            }),
+            // After r is dead, moving x should be ok
+            Stmt::Let {
+                name: "y".to_string(),
+                ty: None,
+                value: ident("x"),
+                mutable: false,
+                secret: false,
+                ownership: Ownership::Owned,
+            },
+        ]);
+        let result = check(&prog);
+        assert!(result.is_ok(), "NLL should allow move after last use of borrow: {:?}", result.err());
     }
 }

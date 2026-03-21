@@ -271,8 +271,14 @@ impl Parser {
         loop {
             let type_param = self.expect_ident()?;
             self.expect(&TokenKind::Colon)?;
+            // Parse first trait bound
             let trait_name = self.expect_ident()?;
-            bounds.push(TraitBound { type_param, trait_name });
+            bounds.push(TraitBound { type_param: type_param.clone(), trait_name });
+            // Parse additional `+ TraitName` bounds for the same type param
+            while self.match_token(&TokenKind::Plus) {
+                let extra_trait = self.expect_ident()?;
+                bounds.push(TraitBound { type_param: type_param.clone(), trait_name: extra_trait });
+            }
             if !self.match_token(&TokenKind::Comma) {
                 break;
             }
@@ -488,6 +494,8 @@ impl Parser {
         let render = render.ok_or_else(|| ParseError {
             message: format!("Component '{name}' missing render block"),
             span,
+            source_line: None,
+            suggestion: Some("Add a `render { ... }` block inside the component".to_string()),
         })?;
 
         Ok(Component { name, type_params, props, state, methods, styles, transitions, trait_bounds, render, gestures, permissions, skeleton, error_boundary, chunk, on_destroy, a11y, shortcuts, span })
@@ -559,6 +567,8 @@ impl Parser {
         let render = render.ok_or_else(|| ParseError {
             message: format!("Page '{name}' missing render block"),
             span,
+            source_line: None,
+            suggestion: Some("Add a `render { ... }` block inside the page".to_string()),
         })?;
 
         Ok(PageDef {
@@ -993,11 +1003,15 @@ impl Parser {
                         then_children,
                         else_children,
                     })
-                } else if self.check(&TokenKind::Lazy) || self.check(&TokenKind::For) {
-                    // {lazy for x in expr { ... }} or {for x in expr { ... }}
+                } else if self.check(&TokenKind::Lazy) || self.check(&TokenKind::Inplace) || self.check(&TokenKind::For) {
+                    // {lazy for x in expr { ... }} or {inplace for x in expr { ... }} or {for x in expr { ... }}
                     let lazy = self.check(&TokenKind::Lazy);
                     if lazy {
                         self.advance(); // consume `lazy`
+                    }
+                    let inplace = self.check(&TokenKind::Inplace);
+                    if inplace {
+                        self.advance(); // consume `inplace`
                     }
                     self.expect(&TokenKind::For)?;
                     let binding = self.expect_ident()?;
@@ -1015,6 +1029,7 @@ impl Parser {
                         iterator: Box::new(iterator),
                         children,
                         lazy,
+                        inplace,
                     })
                 } else if self.check(&TokenKind::Match) {
                     // {match subject { Pattern => <template>, ... }}
@@ -2311,12 +2326,24 @@ impl Parser {
         }
 
         // Compound assignment operators
-        if self.match_token(&TokenKind::PlusEquals) {
+        let compound_op = if self.match_token(&TokenKind::PlusEquals) {
+            Some(BinOp::Add)
+        } else if self.match_token(&TokenKind::MinusEquals) {
+            Some(BinOp::Sub)
+        } else if self.match_token(&TokenKind::StarEquals) {
+            Some(BinOp::Mul)
+        } else if self.match_token(&TokenKind::SlashEquals) {
+            Some(BinOp::Div)
+        } else {
+            None
+        };
+
+        if let Some(op) = compound_op {
             let value = self.parse_assignment()?;
             return Ok(Expr::Assign {
                 target: Box::new(expr.clone()),
                 value: Box::new(Expr::Binary {
-                    op: BinOp::Add,
+                    op,
                     left: Box::new(expr),
                     right: Box::new(value),
                 }),
@@ -2576,6 +2603,8 @@ impl Parser {
             TokenKind::True => { self.advance(); Ok(Expr::Bool(true)) }
             TokenKind::False => { self.advance(); Ok(Expr::Bool(false)) }
             TokenKind::SelfKw => { self.advance(); Ok(Expr::SelfExpr) }
+            TokenKind::Break => { self.advance(); Ok(Expr::Break) }
+            TokenKind::Continue => { self.advance(); Ok(Expr::Continue) }
             TokenKind::LeftBracket => {
                 self.advance();
                 let mut elements = Vec::new();
@@ -3361,6 +3390,8 @@ impl Parser {
                                 e.message
                             ),
                             span: token.span,
+                            source_line: None,
+                            suggestion: None,
                         }
                     })?;
                     let mut inner_parser = Parser::new(inner_tokens);
@@ -3371,6 +3402,8 @@ impl Parser {
                                 e.message
                             ),
                             span: token.span,
+                            source_line: None,
+                            suggestion: None,
                         }
                     })?;
                     ast_parts.push(FormatPart::Expression(Box::new(expr)));
@@ -3882,6 +3915,8 @@ impl Parser {
                             self.errors.push(ParseError {
                                 message: format!("unknown channel property: {}", key),
                                 span,
+                                source_line: None,
+                                suggestion: None,
                             });
                             self.advance();
                         }
@@ -3972,6 +4007,8 @@ impl Parser {
                     self.errors.push(ParseError {
                         message: format!("unknown embed property: {}", key),
                         span,
+                        source_line: None,
+                        suggestion: None,
                     });
                     self.advance();
                 }
@@ -4023,6 +4060,8 @@ impl Parser {
                             self.errors.push(ParseError {
                                 message: format!("unknown pdf property: {}", key),
                                 span,
+                                source_line: None,
+                                suggestion: None,
                             });
                             self.advance();
                         }
@@ -4992,6 +5031,8 @@ impl Parser {
             Err(ParseError {
                 message: format!("Expected {:?}, found {:?}", kind, self.peek_kind()),
                 span: self.current_span(),
+                source_line: None,
+                suggestion: None,
             })
         }
     }
@@ -5058,6 +5099,8 @@ impl Parser {
                     Err(ParseError {
                         message: format!("Expected identifier, found {:?}", tok),
                         span: self.current_span(),
+                        source_line: None,
+                        suggestion: None,
                     })
                 }
             }
@@ -5093,6 +5136,8 @@ impl Parser {
         ParseError {
             message: msg.to_string(),
             span: self.current_span(),
+            source_line: None,
+            suggestion: None,
         }
     }
 
@@ -5176,11 +5221,27 @@ pub fn parse(tokens: Vec<Token>) -> (Program, Vec<ParseError>) {
 pub struct ParseError {
     pub message: String,
     pub span: Span,
+    /// The source line where the error occurred (for rustc-style diagnostics).
+    pub source_line: Option<String>,
+    /// A suggested fix (e.g. "did you mean `fn`?").
+    pub suggestion: Option<String>,
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}:{}] {}", self.span.line, self.span.col, self.message)
+        writeln!(f, "error: {}", self.message)?;
+        writeln!(f, " --> {}:{}", self.span.line, self.span.col)?;
+        if let Some(ref line) = self.source_line {
+            writeln!(f, "  |")?;
+            writeln!(f, "{} | {}", self.span.line, line)?;
+            // Caret pointer
+            let _padding = format!("{}", self.span.line).len() + 3 + self.span.col.saturating_sub(1) as usize;
+            writeln!(f, "  | {}^", " ".repeat(self.span.col.saturating_sub(1) as usize))?;
+        }
+        if let Some(ref suggestion) = self.suggestion {
+            writeln!(f, "  = help: {}", suggestion)?;
+        }
+        Ok(())
     }
 }
 
@@ -9372,6 +9433,84 @@ mod tests {
         assert!(matches!(prog.items[0], Item::Component(_)));
     }
 
+    #[test]
+    fn test_parse_template_inplace_for() {
+        let prog = parse(r#"
+            component Store() {
+                render {
+                    <div>
+                        {inplace for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                if let TemplateNode::TemplateFor { inplace, lazy, .. } = &el.children[0] {
+                    assert!(*inplace, "inplace should be true");
+                    assert!(!*lazy, "lazy should be false");
+                } else {
+                    panic!("Expected TemplateFor");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_template_for_default_not_inplace() {
+        let prog = parse(r#"
+            component Store() {
+                render {
+                    <div>
+                        {for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                if let TemplateNode::TemplateFor { inplace, lazy, .. } = &el.children[0] {
+                    assert!(!*inplace, "inplace should be false for default for-loop");
+                    assert!(!*lazy, "lazy should be false");
+                } else {
+                    panic!("Expected TemplateFor");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_template_lazy_for_not_inplace() {
+        let prog = parse(r#"
+            component Store() {
+                render {
+                    <div>
+                        {lazy for product in self.products {
+                            <div>{product.name}</div>
+                        }}
+                    </div>
+                }
+            }
+        "#);
+        assert_eq!(prog.items.len(), 1);
+        if let Item::Component(c) = &prog.items[0] {
+            if let TemplateNode::Element(el) = &c.render.body {
+                if let TemplateNode::TemplateFor { inplace, lazy, .. } = &el.children[0] {
+                    assert!(!*inplace, "inplace should be false for lazy for-loop");
+                    assert!(*lazy, "lazy should be true");
+                } else {
+                    panic!("Expected TemplateFor");
+                }
+            }
+        }
+    }
+
     // ========================================================================
     // TESTS FOR NEW PARSER FIXES
     // ========================================================================
@@ -10566,5 +10705,150 @@ component PostList() {
         } else {
             panic!("Expected Component");
         }
+    }
+
+    #[test]
+    fn test_parse_break() {
+        let prog = parse("fn f() { while true { break; } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::While { body, .. }) = &f.body.stmts[0] {
+                assert!(matches!(&body.stmts[0], Stmt::Expr(Expr::Break)));
+            } else {
+                panic!("Expected While");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_continue() {
+        let prog = parse("fn f() { while true { continue; } }");
+        if let Item::Function(f) = &prog.items[0] {
+            if let Stmt::Expr(Expr::While { body, .. }) = &f.body.stmts[0] {
+                assert!(matches!(&body.stmts[0], Stmt::Expr(Expr::Continue)));
+            } else {
+                panic!("Expected While");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_break_in_for() {
+        let prog = parse("fn f() { for i in 0..10 { if i > 5 { break; } } }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert!(matches!(&f.body.stmts[0], Stmt::Expr(Expr::For { .. })));
+        }
+    }
+
+    #[test]
+    fn test_parse_compound_minus_equals() {
+        let e = parse_expr("x -= 1");
+        if let Expr::Assign { value, .. } = &e {
+            if let Expr::Binary { op, .. } = value.as_ref() {
+                assert_eq!(*op, BinOp::Sub);
+            } else {
+                panic!("Expected Binary Sub");
+            }
+        } else {
+            panic!("Expected Assign");
+        }
+    }
+
+    #[test]
+    fn test_parse_compound_star_equals() {
+        let e = parse_expr("x *= 2");
+        if let Expr::Assign { value, .. } = &e {
+            if let Expr::Binary { op, .. } = value.as_ref() {
+                assert_eq!(*op, BinOp::Mul);
+            } else {
+                panic!("Expected Binary Mul");
+            }
+        } else {
+            panic!("Expected Assign");
+        }
+    }
+
+    #[test]
+    fn test_parse_compound_slash_equals() {
+        let e = parse_expr("x /= 3");
+        if let Expr::Assign { value, .. } = &e {
+            if let Expr::Binary { op, .. } = value.as_ref() {
+                assert_eq!(*op, BinOp::Div);
+            } else {
+                panic!("Expected Binary Div");
+            }
+        } else {
+            panic!("Expected Assign");
+        }
+    }
+
+    #[test]
+    fn test_parse_where_clause_plus_bounds() {
+        let prog = parse("fn process<T>(x: T) -> T where T: Display + Clone { return x; }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.trait_bounds.len(), 2);
+            assert_eq!(f.trait_bounds[0].type_param, "T");
+            assert_eq!(f.trait_bounds[0].trait_name, "Display");
+            assert_eq!(f.trait_bounds[1].type_param, "T");
+            assert_eq!(f.trait_bounds[1].trait_name, "Clone");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_where_clause_multi_param_plus_bounds() {
+        let prog = parse("fn combine<T, U>(a: T, b: U) where T: Display + Clone, U: Debug { }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.trait_bounds.len(), 3);
+            assert_eq!(f.trait_bounds[0].type_param, "T");
+            assert_eq!(f.trait_bounds[0].trait_name, "Display");
+            assert_eq!(f.trait_bounds[1].type_param, "T");
+            assert_eq!(f.trait_bounds[1].trait_name, "Clone");
+            assert_eq!(f.trait_bounds[2].type_param, "U");
+            assert_eq!(f.trait_bounds[2].trait_name, "Debug");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_where_clause_triple_bounds() {
+        let prog = parse("fn f<T>(x: T) where T: A + B + C { }");
+        if let Item::Function(f) = &prog.items[0] {
+            assert_eq!(f.trait_bounds.len(), 3);
+            assert_eq!(f.trait_bounds[0].trait_name, "A");
+            assert_eq!(f.trait_bounds[1].trait_name, "B");
+            assert_eq!(f.trait_bounds[2].trait_name, "C");
+        } else {
+            panic!("Expected Function");
+        }
+    }
+
+    #[test]
+    fn test_parse_error_display_rich_diagnostics() {
+        let err = ParseError {
+            message: "unexpected token".to_string(),
+            span: Span::new(10, 15, 3, 5),
+            source_line: Some("  let x = ;".to_string()),
+            suggestion: Some("expected an expression after `=`".to_string()),
+        };
+        let s = format!("{}", err);
+        assert!(s.contains("3:5"), "should contain line:col, got: {}", s);
+        assert!(s.contains("unexpected token"), "should contain error message");
+        assert!(s.contains("let x = ;"), "should contain source line");
+        assert!(s.contains("expected an expression"), "should contain suggestion");
+    }
+
+    #[test]
+    fn test_parse_error_display_minimal() {
+        let err = ParseError {
+            message: "test".to_string(),
+            span: Span::new(0, 1, 1, 1),
+            source_line: None,
+            suggestion: None,
+        };
+        let s = format!("{}", err);
+        assert!(s.contains("1:1"));
+        assert!(s.contains("test"));
     }
 }
