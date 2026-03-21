@@ -323,6 +323,17 @@ enum WasmType {
     F64,
 }
 
+impl std::fmt::Display for WasmType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WasmType::I32 => write!(f, "i32"),
+            WasmType::I64 => write!(f, "i64"),
+            WasmType::F32 => write!(f, "f32"),
+            WasmType::F64 => write!(f, "f64"),
+        }
+    }
+}
+
 impl WasmCodegen {
     pub fn new() -> Self {
         Self::with_target(CompilationTarget::Browser)
@@ -1006,6 +1017,9 @@ impl WasmCodegen {
             Expr::Range { start, end } => {
                 self.scan_expr_for_runtime_deps(start);
                 self.scan_expr_for_runtime_deps(end);
+            }
+            Expr::TupleLit(elems) => {
+                for e in elems { self.scan_expr_for_runtime_deps(e); }
             }
             _ => {}
         }
@@ -8360,7 +8374,16 @@ impl WasmCodegen {
                             } else {
                                 self.line("call $signal_get");
                             }
-                            self.line("call $string_fromI32");
+                            // String signals: signal_get returns a string pointer, use str_len.
+                            // Numeric signals: convert i32 to decimal string via string_fromI32.
+                            let is_string_field = signal_field.as_ref()
+                                .map(|f| self.string_state_fields.contains(f))
+                                .unwrap_or(false);
+                            if is_string_field {
+                                self.line("call $str_len ;; string signal: ptr → (ptr, len)");
+                            } else {
+                                self.line("call $string_fromI32");
+                            }
                             let ptr_var = format!("$dyn_ptr_{}", self.next_label());
                             let len_var = format!("$dyn_len_{}", self.next_label());
                             self.emit_template_local(&ptr_var);
@@ -9640,9 +9663,26 @@ impl WasmCodegen {
                 }
             }
             Stmt::Yield(expr) => {
-                self.line(";; yield — emit value from stream");
+                self.line(";; yield — emit value from stream/generator");
+                // For string expressions, the value is already (ptr, len) on stack.
+                // For integer expressions, we need to serialize to (ptr, len).
+                let is_string = matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. })
+                    || matches!(expr, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(name) if name == "format"));
                 self.generate_expr(expr);
-                // The streaming runtime handles delivery to the consumer.
+                if !is_string {
+                    // Integer/other value — store it in linear memory and push (ptr, len)
+                    let label = self.next_label();
+                    let tmp_var = format!("$__yield_tmp_{}", label);
+                    self.emit_template_local(&tmp_var);
+                    self.line(";; serialize yield value to memory");
+                    self.line(&format!("local.set {}", tmp_var));
+                    self.line("i32.const 4 ;; allocate 4 bytes for i32 value");
+                    self.line("call $alloc");
+                    self.line(&format!("local.get {}", tmp_var));
+                    self.line("i32.store ;; store value at allocated ptr");
+                    // Push (ptr, len=4) for streaming_yield
+                    self.line("i32.const 4 ;; len = 4 bytes");
+                }
                 // The yielded value (ptr, len) is on the stack; call into the
                 // stream chunk callback registered by the runtime.
                 self.line("call $streaming_yield");
@@ -9988,7 +10028,17 @@ impl WasmCodegen {
                 }
             }
             Expr::FieldAccess { object, field } => {
-                if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                // Tuple index access: t.0, t.1, t.2, ...
+                if let Ok(idx) = field.parse::<u32>() {
+                    let offset = idx * 4;
+                    self.line(&format!(";; tuple index access: .{}", idx));
+                    self.generate_expr(object);
+                    if offset == 0 {
+                        self.line("i32.load ;; tuple.0");
+                    } else {
+                        self.line(&format!("i32.load offset={} ;; tuple.{}", offset, idx));
+                    }
+                } else if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
                     && self.component_fields.contains(field) {
                     // In component context, self.field reads the signal value
                     self.line(&format!(";; self.{} (signal)", field));
@@ -10197,10 +10247,39 @@ impl WasmCodegen {
             }
             Expr::Spawn { body, .. } => {
                 self.line(";; spawn — launch task on Web Worker");
-                // Generate block statements; the last expression provides a function index
+                // Emit the body as a deferred closure function with a function table index.
+                // The function is added to the function table so worker_spawn can reference it.
+                let closure_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let func_name = format!("$__spawn_fn_{}", closure_idx);
+                let mut closure_body = String::new();
+                closure_body.push_str(&format!("(func {} (result i32)\n", func_name));
+                // Save/restore codegen state for nested generation
+                let saved_output = std::mem::take(&mut self.output);
+                let saved_locals = std::mem::take(&mut self.locals);
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
+                // If body didn't push a value, push 0
+                if body.stmts.is_empty() || matches!(body.stmts.last(), Some(Stmt::Return(None))) {
+                    self.line("i32.const 0");
+                }
+                let body_code = std::mem::take(&mut self.output);
+                self.output = saved_output;
+                // Emit locals
+                for (name, wasm_ty) in &self.locals {
+                    closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
+                }
+                self.locals = saved_locals;
+                closure_body.push_str(&body_code);
+                closure_body.push_str(")\n");
+                self.closure_functions.push(closure_body);
+                self.closure_func_names.push(func_name.clone());
+                self.needs_func_table = true;
+                // Push the function table index and body length onto the stack
+                let table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!("i32.const {} ;; spawn function table index ({})", table_idx, func_name));
+                self.line("i32.const 0 ;; reserved (body length)");
                 self.line("call $worker_spawn");
             }
             Expr::Channel { ty } => {
@@ -10220,26 +10299,75 @@ impl WasmCodegen {
             Expr::Receive { channel } => {
                 self.line(";; channel receive (async callback)");
                 self.generate_expr(channel);
-                self.line("i32.const 0 ;; callback index (default handler)");
+                // Allocate a callback index for the receive handler.
+                // When data arrives, the runtime calls back via call_indirect.
+                let cb_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let func_name = format!("$__recv_cb_{}", cb_idx);
+                // Emit a trivial callback function that returns the received value
+                let closure_body = format!(
+                    "(func {} (param $data i32) (result i32)\n  local.get $data\n)\n",
+                    func_name
+                );
+                self.closure_functions.push(closure_body);
+                self.closure_func_names.push(func_name.clone());
+                self.needs_func_table = true;
+                let table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!("i32.const {} ;; receive callback index ({})", table_idx, func_name));
                 self.line("call $worker_channelRecv");
             }
             Expr::Parallel { tasks, .. } => {
                 self.line(";; parallel — run expressions concurrently");
-                // Store function indices in linear memory for the runtime
+                // Each task becomes a deferred function. Store their table indices
+                // in linear memory so worker_parallel can spawn them all.
                 let count = tasks.len() as u32;
                 let array_label = self.next_label();
                 self.emit_template_local(&format!("$parallel_arr_{}", array_label));
-                self.line(&format!("i32.const {}", count * 4));
+                self.line(&format!("i32.const {} ;; {} tasks * 4 bytes", count * 4, count));
                 self.line("call $alloc");
                 self.line(&format!("local.set $parallel_arr_{}", array_label));
                 for (i, expr) in tasks.iter().enumerate() {
                     self.line(&format!("local.get $parallel_arr_{}", array_label));
+                    // Generate each task as a closure function with a table index
+                    let cb_idx = self.closure_counter;
+                    self.closure_counter += 1;
+                    let func_name = format!("$__parallel_task_{}_{}", array_label, i);
+                    let saved_output = std::mem::take(&mut self.output);
+                    let saved_locals = std::mem::take(&mut self.locals);
                     self.generate_expr(expr);
+                    let body_code = std::mem::take(&mut self.output);
+                    self.output = saved_output;
+                    let mut closure_body = format!("(func {} (result i32)\n", func_name);
+                    for (name, wasm_ty) in &self.locals {
+                        closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
+                    }
+                    self.locals = saved_locals;
+                    closure_body.push_str(&body_code);
+                    if body_code.trim().is_empty() {
+                        closure_body.push_str("  i32.const 0\n");
+                    }
+                    closure_body.push_str(")\n");
+                    self.closure_functions.push(closure_body);
+                    self.closure_func_names.push(func_name.clone());
+                    self.needs_func_table = true;
+                    let table_idx = self.closure_func_names.len() as u32 - 1;
+                    self.line(&format!("i32.const {} ;; task {} table index ({})", table_idx, i, func_name));
                     self.line(&format!("i32.store offset={}", i * 4));
                 }
                 self.line(&format!("local.get $parallel_arr_{}", array_label));
                 self.line(&format!("i32.const {}", count));
-                self.line("i32.const 0 ;; callback index (default handler)");
+                // Allocate a completion callback
+                let comp_cb_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let comp_func_name = format!("$__parallel_done_{}", array_label);
+                let comp_closure = format!(
+                    "(func {} (param $results i32) (result i32)\n  local.get $results\n)\n",
+                    comp_func_name
+                );
+                self.closure_functions.push(comp_closure);
+                self.closure_func_names.push(comp_func_name.clone());
+                let comp_table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!("i32.const {} ;; completion callback ({})", comp_table_idx, comp_func_name));
                 self.line("call $worker_parallel");
             }
             Expr::Navigate { path } => {
@@ -10249,19 +10377,74 @@ impl WasmCodegen {
                 self.line("call $router_navigate");
             }
             Expr::PromptTemplate { template, interpolations } => {
-                self.line(";; prompt template — compile interpolation to string building");
-                // Split the template at {var} boundaries and concatenate
-                // For each segment, store the static part, then evaluate the variable
-                let template_offset = self.store_string(template);
-                self.line(&format!("i32.const {} ;; template ptr", template_offset));
-                self.line(&format!("i32.const {} ;; template len", template.len()));
-                // Push interpolation values onto the stack
-                for (name, expr) in interpolations {
-                    self.line(&format!(";; interpolation: {{{}}}", name));
-                    self.generate_expr(expr);
+                self.line(";; prompt template — build prompt string and POST to AI endpoint");
+
+                // Step 1: Build the interpolated prompt string.
+                // Split at {var} boundaries and concatenate segments using $str_concat.
+                let interp_map: Vec<(String, &Expr)> = interpolations.iter()
+                    .map(|(name, expr)| (name.clone(), expr))
+                    .collect();
+
+                // Parse the template into literal + interpolation segments
+                let mut rest = template.as_str();
+                let mut parts: Vec<(bool, String)> = Vec::new(); // (is_interp, content)
+                while let Some(start) = rest.find('{') {
+                    if start > 0 {
+                        parts.push((false, rest[..start].to_string()));
+                    }
+                    if let Some(end) = rest[start..].find('}') {
+                        let var_name = rest[start + 1..start + end].to_string();
+                        parts.push((true, var_name));
+                        rest = &rest[start + end + 1..];
+                    } else {
+                        break;
+                    }
                 }
-                // The runtime will handle string interpolation
-                self.line(&format!("i32.const {} ;; interpolation count", interpolations.len()));
+                if !rest.is_empty() {
+                    parts.push((false, rest.to_string()));
+                }
+
+                // Emit string building: concatenate all parts
+                let mut first = true;
+                for (is_interp, content) in &parts {
+                    if *is_interp {
+                        // Find the interpolation expression
+                        if let Some((_name, expr)) = interp_map.iter().find(|(n, _)| n == content) {
+                            self.generate_expr(expr);
+                        } else {
+                            // Unknown interpolation — emit as literal
+                            let offset = self.store_string(content);
+                            self.line(&format!("i32.const {} ;; interpolation \"{}\" ptr", offset, content));
+                            self.line(&format!("i32.const {} ;; len", content.len()));
+                        }
+                    } else {
+                        let offset = self.store_string(content);
+                        self.line(&format!("i32.const {} ;; literal segment ptr", offset));
+                        self.line(&format!("i32.const {} ;; len", content.len()));
+                    }
+                    if !first {
+                        self.line("call $str_concat ;; concatenate prompt segments");
+                    }
+                    first = false;
+                }
+
+                // Step 2: The built prompt string (ptr, len) is on the stack.
+                // POST it to the AI endpoint via $http_fetch.
+                self.needs_http = true;
+                self.line(";; POST prompt to AI endpoint");
+                // Set method to POST
+                let post_offset = self.store_string("POST");
+                self.line(&format!("i32.const {} ;; method ptr", post_offset));
+                self.line(&format!("i32.const {} ;; method len", 4));
+                self.line("call $http_setMethod");
+                // Set body to the prompt string (already on stack as ptr, len)
+                self.line("call $http_setBody");
+                // Set the AI endpoint URL
+                let endpoint = "/api/ai/prompt";
+                let url_offset = self.store_string(endpoint);
+                self.line(&format!("i32.const {} ;; AI endpoint URL ptr", url_offset));
+                self.line(&format!("i32.const {} ;; URL len", endpoint.len()));
+                self.line("call $http_fetch");
             }
             Expr::Stream { source } => {
                 self.line(";; stream — create streaming data source");
@@ -10269,19 +10452,57 @@ impl WasmCodegen {
                 // puts (url_ptr, url_len) on the stack, then register a
                 // stream callback with the runtime.
                 self.generate_expr(source);
-                let callback_label = self.next_label();
-                self.line(&format!("i32.const {} ;; stream callback index", callback_label));
+                // Create a callback function for receiving stream chunks.
+                // Each chunk arrives as (ptr, len) and the callback processes it.
+                let cb_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let func_name = format!("$__stream_cb_{}", cb_idx);
+                let closure_body = format!(
+                    "(func {} (param $chunk_ptr i32) (param $chunk_len i32)\n  ;; Stream chunk callback — process incoming data\n  ;; chunk_ptr and chunk_len describe the received data in linear memory\n  nop  ;; chunk processing handled by for-loop body\n)\n",
+                    func_name
+                );
+                self.closure_functions.push(closure_body);
+                self.closure_func_names.push(func_name.clone());
+                self.needs_func_table = true;
+                let table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!("i32.const {} ;; stream callback index ({})", table_idx, func_name));
                 self.line("call $streaming_streamFetch");
             }
             Expr::Suspend { fallback, body } => {
                 self.line(";; suspend — show fallback while body loads");
+
                 // 1. Evaluate and render the fallback immediately
-                self.line(";; evaluate fallback");
+                self.line(";; step 1: mount fallback");
                 self.generate_expr(fallback);
-                // 2. Kick off async load of the body; runtime swaps fallback
-                //    for the real content when ready
-                self.line(";; evaluate body (async)");
+
+                // 2. Create a deferred function for the body.
+                // The body runs after a requestAnimationFrame to allow the
+                // fallback to paint first. When done, the runtime swaps.
+                let cb_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let func_name = format!("$__suspend_body_{}", cb_idx);
+
+                // Generate the body in a deferred closure function
+                let saved_output = std::mem::take(&mut self.output);
+                let saved_locals = std::mem::take(&mut self.locals);
                 self.generate_expr(body);
+                let body_code = std::mem::take(&mut self.output);
+                self.output = saved_output;
+                let mut closure_body = format!("(func {} (result i32)\n", func_name);
+                for (name, wasm_ty) in &self.locals {
+                    closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
+                }
+                self.locals = saved_locals;
+                closure_body.push_str(&body_code);
+                closure_body.push_str(")\n");
+                self.closure_functions.push(closure_body);
+                self.closure_func_names.push(func_name.clone());
+                self.needs_func_table = true;
+
+                let table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!(";; step 2: schedule deferred body mount (table idx {})", table_idx));
+                self.line(&format!("i32.const {} ;; body function table index", table_idx));
+
                 // The runtime manages the swap from fallback -> body
                 self.line("call $dom_lazyMount");
             }
@@ -10533,7 +10754,21 @@ impl WasmCodegen {
             Expr::DynamicImport { path, .. } => {
                 self.line(";; dynamic import — triggers code split and async chunk loading");
                 self.generate_expr(path);
-                self.line("call $load_chunk");
+                // Register a callback for when the module finishes loading.
+                // The callback receives the loaded module handle as i32.
+                let cb_idx = self.closure_counter;
+                self.closure_counter += 1;
+                let func_name = format!("$__import_cb_{}", cb_idx);
+                let closure_body = format!(
+                    "(func {} (param $module_handle i32) (result i32)\n  ;; Dynamic import callback — module loaded\n  local.get $module_handle\n)\n",
+                    func_name
+                );
+                self.closure_functions.push(closure_body);
+                self.closure_func_names.push(func_name.clone());
+                self.needs_func_table = true;
+                let table_idx = self.closure_func_names.len() as u32 - 1;
+                self.line(&format!("i32.const {} ;; import callback index ({})", table_idx, func_name));
+                self.line("call $dom_loadChunk");
             }
             Expr::Download { data, filename, .. } => {
                 self.line(";; download — trigger file download");
@@ -10662,8 +10897,105 @@ impl WasmCodegen {
                             self.indent += 1;
                             open_ifs += 1;
                         }
-                        _ => {
-                            // Tuple, Struct, Array patterns — fallthrough for now
+                        Pattern::Struct { name, fields, .. } => {
+                            // Struct destructuring in match arm.
+                            // The subject is a struct pointer. Bind each field
+                            // as a local by loading from the appropriate offset.
+                            self.line(&format!(";; match arm: struct {} destructure", name));
+                            for (i, (field_name, sub_pattern)) in fields.iter().enumerate() {
+                                if let Pattern::Ident(binding_name) = sub_pattern {
+                                    let offset = self.get_struct_field_offset(name, field_name)
+                                        .unwrap_or((i as u32) * 4);
+                                    self.line(&format!("local.get {}", subject_local));
+                                    if offset == 0 {
+                                        self.line(&format!("i32.load ;; field: {}", field_name));
+                                    } else {
+                                        self.line(&format!("i32.load offset={} ;; field: {}", offset, field_name));
+                                    }
+                                    self.locals.push((binding_name.clone(), WasmType::I32));
+                                    self.line(&format!("local.set ${}", binding_name));
+                                }
+                            }
+                            if let Some(guard) = &arm.guard {
+                                self.generate_expr(guard);
+                                self.emit("(if (result i32)");
+                                self.indent += 1;
+                                self.emit("(then");
+                                self.indent += 1;
+                                self.generate_expr(&arm.body);
+                                self.indent -= 1;
+                                self.line(")");
+                                self.emit("(else");
+                                self.indent += 1;
+                                self.line("i32.const 0 ;; match fallthrough");
+                                self.indent -= 1;
+                                self.line(")");
+                                self.indent -= 1;
+                                self.line(")");
+                            } else {
+                                self.generate_expr(&arm.body);
+                            }
+                        }
+                        Pattern::Tuple(pats) => {
+                            // Tuple destructuring in match arm.
+                            // Subject is a tuple pointer. Load each element at 4-byte offsets.
+                            self.line(";; match arm: tuple destructure");
+                            for (i, sub_pattern) in pats.iter().enumerate() {
+                                if let Pattern::Ident(binding_name) = sub_pattern {
+                                    let offset = (i as u32) * 4;
+                                    self.line(&format!("local.get {}", subject_local));
+                                    if offset == 0 {
+                                        self.line(&format!("i32.load ;; tuple.{}", i));
+                                    } else {
+                                        self.line(&format!("i32.load offset={} ;; tuple.{}", offset, i));
+                                    }
+                                    self.locals.push((binding_name.clone(), WasmType::I32));
+                                    self.line(&format!("local.set ${}", binding_name));
+                                }
+                            }
+                            if let Some(guard) = &arm.guard {
+                                self.generate_expr(guard);
+                                self.emit("(if (result i32)");
+                                self.indent += 1;
+                                self.emit("(then");
+                                self.indent += 1;
+                                self.generate_expr(&arm.body);
+                                self.indent -= 1;
+                                self.line(")");
+                                self.emit("(else");
+                                self.indent += 1;
+                                self.line("i32.const 0 ;; match fallthrough");
+                                self.indent -= 1;
+                                self.line(")");
+                                self.indent -= 1;
+                                self.line(")");
+                            } else {
+                                self.generate_expr(&arm.body);
+                            }
+                        }
+                        Pattern::Array(pats) => {
+                            // Array destructuring in match arm.
+                            // Subject is an array header pointer. Load data_ptr, then index.
+                            self.line(";; match arm: array destructure");
+                            let arr_data_label = self.next_label();
+                            let arr_data_var = format!("$__match_arr_data_{}", arr_data_label);
+                            self.locals.push((format!("__match_arr_data_{}", arr_data_label), WasmType::I32));
+                            self.line(&format!("local.get {}", subject_local));
+                            self.line("i32.load offset=8 ;; data_ptr");
+                            self.line(&format!("local.set {}", arr_data_var));
+                            for (i, sub_pattern) in pats.iter().enumerate() {
+                                if let Pattern::Ident(binding_name) = sub_pattern {
+                                    let offset = (i as u32) * 4;
+                                    self.line(&format!("local.get {}", arr_data_var));
+                                    if offset == 0 {
+                                        self.line(&format!("i32.load ;; elem[{}]", i));
+                                    } else {
+                                        self.line(&format!("i32.load offset={} ;; elem[{}]", offset, i));
+                                    }
+                                    self.locals.push((binding_name.clone(), WasmType::I32));
+                                    self.line(&format!("local.set ${}", binding_name));
+                                }
+                            }
                             self.generate_expr(&arm.body);
                         }
                     }
@@ -10771,6 +11103,39 @@ impl WasmCodegen {
 
                 // Leave header pointer on the stack
                 self.line(&format!("local.get {}", hdr_var));
+            }
+            Expr::TupleLit(elements) => {
+                // Tuple layout: struct-like memory with each element at 4-byte offsets.
+                // Allocate (n * 4) bytes, store each element, leave pointer on stack.
+                let count = elements.len() as u32;
+                let size = count * 4;
+                let lbl = self.next_label();
+                let ptr_var = format!("$__tuple_ptr_{}", lbl);
+                self.emit_template_local(&ptr_var);
+
+                self.line(&format!(";; tuple literal ({} elements, {} bytes)", count, size));
+                self.line(&format!("i32.const {}", size));
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", ptr_var));
+
+                // Store each element at its offset
+                for (i, elem) in elements.iter().enumerate() {
+                    let offset = (i as u32) * 4;
+                    self.line(&format!("local.get {}", ptr_var));
+                    self.generate_expr(elem);
+                    // String elements push (ptr, len) — drop len, store only ptr
+                    if matches!(elem, Expr::StringLit(_)) {
+                        self.line("drop ;; discard str len for tuple elem");
+                    }
+                    if offset == 0 {
+                        self.line(&format!("i32.store ;; tuple.{}", i));
+                    } else {
+                        self.line(&format!("i32.store offset={} ;; tuple.{}", offset, i));
+                    }
+                }
+
+                // Leave tuple pointer on the stack
+                self.line(&format!("local.get {}", ptr_var));
             }
             Expr::While { condition, body } => {
                 let lbl = self.next_label();
@@ -14814,6 +15179,9 @@ impl WasmCodegen {
                 for s in &block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
             }
             Expr::ArrayLit(elems) => {
+                for e in elems { Self::collect_free_vars(e, bound, out); }
+            }
+            Expr::TupleLit(elems) => {
                 for e in elems { Self::collect_free_vars(e, bound, out); }
             }
             Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
@@ -27312,7 +27680,7 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("prompt template"), "should have prompt template comment");
-        assert!(output.contains("interpolation count"), "should push interpolation count");
+        assert!(output.contains("http_fetch"), "should call http_fetch for AI endpoint");
     }
 
     #[test]
@@ -27356,7 +27724,7 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("dynamic import"), "should have dynamic import comment");
-        assert!(output.contains("load_chunk"), "should call load_chunk");
+        assert!(output.contains("loadChunk"), "should call dom_loadChunk");
     }
 
     #[test]
@@ -34394,5 +34762,493 @@ mod payhive_feature_tests {
             codegen.source_map.mappings.is_empty(),
             "source map should be empty when no source file is set"
         );
+    }
+
+    // =====================================================================
+    // Feature 1: Tuple Types and Destructuring
+    // =====================================================================
+
+    #[test]
+    fn tuple_literal_construction() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::TupleLit(vec![
+            Expr::Integer(1),
+            Expr::Integer(2),
+            Expr::Integer(3),
+        ]));
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple literal (3 elements, 12 bytes)"), "should have tuple comment");
+        assert!(output.contains("call $alloc"), "should allocate memory for tuple");
+        assert!(output.contains("i32.store ;; tuple.0"), "should store first element");
+        assert!(output.contains("i32.store offset=4 ;; tuple.1"), "should store second element at offset 4");
+        assert!(output.contains("i32.store offset=8 ;; tuple.2"), "should store third element at offset 8");
+    }
+
+    #[test]
+    fn tuple_literal_empty() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::TupleLit(vec![]));
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple literal (0 elements, 0 bytes)"), "should handle empty tuple");
+    }
+
+    #[test]
+    fn tuple_literal_with_string() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::TupleLit(vec![
+            Expr::Integer(42),
+            Expr::StringLit("hello".into()),
+        ]));
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple literal (2 elements, 8 bytes)"), "should have tuple comment");
+        assert!(output.contains("drop ;; discard str len for tuple elem"), "should drop string len");
+    }
+
+    #[test]
+    fn tuple_field_access() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FieldAccess {
+            object: Box::new(Expr::Ident("t".into())),
+            field: "0".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple index access: .0"), "should have tuple access comment");
+        assert!(output.contains("i32.load ;; tuple.0"), "should load from offset 0");
+    }
+
+    #[test]
+    fn tuple_field_access_offset() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::FieldAccess {
+            object: Box::new(Expr::Ident("t".into())),
+            field: "2".into(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple index access: .2"), "should have tuple access comment for .2");
+        assert!(output.contains("i32.load offset=8 ;; tuple.2"), "should load from offset 8");
+    }
+
+    #[test]
+    fn tuple_destructure_in_let() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::LetDestructure {
+            pattern: Pattern::Tuple(vec![
+                Pattern::Ident("a".into()),
+                Pattern::Ident("b".into()),
+                Pattern::Ident("c".into()),
+            ]),
+            value: Expr::TupleLit(vec![
+                Expr::Integer(1),
+                Expr::Integer(2),
+                Expr::Integer(3),
+            ]),
+            ty: None,
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("let destructure"), "should have destructure comment");
+        assert!(output.contains("tuple literal"), "should construct tuple");
+    }
+
+    #[test]
+    fn tuple_as_function_return() {
+        let mut codegen = WasmCodegen::new();
+        // Simulate returning a tuple from a function
+        codegen.generate_expr(&Expr::TupleLit(vec![
+            Expr::Integer(10),
+            Expr::Integer(20),
+        ]));
+        let output = codegen.output.clone();
+        assert!(output.contains("call $alloc"), "should allocate tuple memory");
+        assert!(output.contains("tuple.0"), "should store first element");
+        assert!(output.contains("tuple.1"), "should store second element");
+    }
+
+    // =====================================================================
+    // Feature 2: Struct Destructuring in Match
+    // =====================================================================
+
+    #[test]
+    fn match_struct_destructure() {
+        let mut codegen = WasmCodegen::new();
+        codegen.struct_layouts.insert("Point".into(), vec![
+            ("x".into(), 0),
+            ("y".into(), 4),
+        ]);
+        codegen.generate_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("p".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Struct {
+                        name: "Point".into(),
+                        fields: vec![
+                            ("x".into(), Pattern::Ident("px".into())),
+                            ("y".into(), Pattern::Ident("py".into())),
+                        ],
+                        rest: false,
+                    },
+                    guard: None,
+                    body: Expr::Ident("px".into()),
+                },
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("struct Point destructure"), "should have struct destructure comment");
+        assert!(output.contains("i32.load ;; field: x"), "should load field x at offset 0");
+        assert!(output.contains("i32.load offset=4 ;; field: y"), "should load field y at offset 4");
+        assert!(output.contains("local.set $px"), "should bind px");
+        assert!(output.contains("local.set $py"), "should bind py");
+    }
+
+    #[test]
+    fn match_struct_destructure_with_guard() {
+        let mut codegen = WasmCodegen::new();
+        codegen.struct_layouts.insert("User".into(), vec![
+            ("name".into(), 0),
+            ("age".into(), 4),
+        ]);
+        codegen.generate_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("user".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Struct {
+                        name: "User".into(),
+                        fields: vec![
+                            ("age".into(), Pattern::Ident("a".into())),
+                        ],
+                        rest: true,
+                    },
+                    guard: Some(Expr::Binary {
+                        op: BinOp::Gte,
+                        left: Box::new(Expr::Ident("a".into())),
+                        right: Box::new(Expr::Integer(18)),
+                    }),
+                    body: Expr::Integer(1),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                },
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("struct User destructure"), "should destructure User");
+        assert!(output.contains("local.set $a"), "should bind age to a");
+    }
+
+    #[test]
+    fn match_tuple_destructure() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("pair".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Tuple(vec![
+                        Pattern::Ident("x".into()),
+                        Pattern::Ident("y".into()),
+                    ]),
+                    guard: None,
+                    body: Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("x".into())),
+                        right: Box::new(Expr::Ident("y".into())),
+                    },
+                },
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("tuple destructure"), "should have tuple destructure comment");
+        assert!(output.contains("local.set $x"), "should bind x");
+        assert!(output.contains("local.set $y"), "should bind y");
+    }
+
+    #[test]
+    fn match_array_destructure() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Match {
+            subject: Box::new(Expr::Ident("arr".into())),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Array(vec![
+                        Pattern::Ident("first".into()),
+                        Pattern::Ident("second".into()),
+                    ]),
+                    guard: None,
+                    body: Expr::Ident("first".into()),
+                },
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("array destructure"), "should have array destructure comment");
+        assert!(output.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from array header");
+        assert!(output.contains("local.set $first"), "should bind first");
+        assert!(output.contains("local.set $second"), "should bind second");
+    }
+
+    // =====================================================================
+    // Feature 3: spawn/parallel — Web Worker Runtime
+    // =====================================================================
+
+    #[test]
+    fn spawn_creates_closure_function() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Spawn {
+            body: Block { stmts: vec![
+                Stmt::Expr(Expr::Integer(42)),
+            ], span: span() },
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("spawn"), "should have spawn comment");
+        assert!(output.contains("worker_spawn"), "should call worker_spawn");
+        assert!(output.contains("spawn function table index"), "should reference function table");
+        assert!(!codegen.closure_functions.is_empty(), "should create a closure function");
+        assert!(codegen.needs_func_table, "should need function table");
+    }
+
+    #[test]
+    fn parallel_creates_task_functions() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Parallel {
+            tasks: vec![
+                Expr::Integer(1),
+                Expr::Integer(2),
+                Expr::Integer(3),
+            ],
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("parallel"), "should have parallel comment");
+        assert!(output.contains("worker_parallel"), "should call worker_parallel");
+        // Should create 3 task functions + 1 completion callback = 4 closure functions
+        assert!(codegen.closure_functions.len() >= 3, "should create at least 3 closure functions for tasks");
+        assert!(codegen.needs_func_table, "should need function table");
+    }
+
+    // =====================================================================
+    // Feature 4: channel<T>() Concurrency
+    // =====================================================================
+
+    #[test]
+    fn channel_receive_creates_callback() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Receive {
+            channel: Box::new(Expr::Ident("ch".into())),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("channel receive"), "should have receive comment");
+        assert!(output.contains("worker_channelRecv"), "should call channelRecv");
+        assert!(output.contains("receive callback index"), "should use callback from function table");
+        assert!(!codegen.closure_functions.is_empty(), "should create callback function");
+    }
+
+    // =====================================================================
+    // Feature 5: yield/generators
+    // =====================================================================
+
+    #[test]
+    fn yield_string_value() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Yield(Expr::StringLit("hello".into())));
+        let output = codegen.output.clone();
+        assert!(output.contains("yield"), "should have yield comment");
+        assert!(output.contains("streaming_yield"), "should call streaming_yield");
+        // String values should pass through directly (ptr, len already on stack)
+        assert!(!output.contains("serialize yield value"), "strings should not need serialization");
+    }
+
+    #[test]
+    fn yield_integer_value_serializes() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Yield(Expr::Integer(42)));
+        let output = codegen.output.clone();
+        assert!(output.contains("yield"), "should have yield comment");
+        assert!(output.contains("streaming_yield"), "should call streaming_yield");
+        assert!(output.contains("serialize yield value"), "integers should be serialized to memory");
+        assert!(output.contains("call $alloc"), "should allocate memory for serialized value");
+    }
+
+    #[test]
+    fn yield_format_string_not_serialized() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_stmt(&Stmt::Yield(Expr::FormatString {
+            parts: vec![FormatPart::Literal("test".into())],
+        }));
+        let output = codegen.output.clone();
+        assert!(output.contains("yield"), "should have yield comment");
+        assert!(output.contains("streaming_yield"), "should call streaming_yield");
+    }
+
+    // =====================================================================
+    // Feature 6: Streaming Fetch
+    // =====================================================================
+
+    #[test]
+    fn stream_fetch_creates_callback() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Stream {
+            source: Box::new(Expr::StringLit("https://api.example.com/stream".into())),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("stream"), "should have stream comment");
+        assert!(output.contains("streaming_streamFetch"), "should call streaming_streamFetch");
+        assert!(output.contains("stream callback index"), "should use callback from function table");
+        assert!(!codegen.closure_functions.is_empty(), "should create stream callback function");
+        assert!(codegen.needs_func_table, "should need function table");
+    }
+
+    // =====================================================================
+    // Feature 7: suspend/fallback
+    // =====================================================================
+
+    #[test]
+    fn suspend_defers_body() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::Suspend {
+            fallback: Box::new(Expr::Integer(0)),
+            body: Box::new(Expr::Integer(1)),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("suspend"), "should have suspend comment");
+        assert!(output.contains("mount fallback"), "should mount fallback first");
+        assert!(output.contains("schedule deferred body mount"), "should defer body");
+        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
+        assert!(!codegen.closure_functions.is_empty(), "should create deferred body function");
+    }
+
+    // =====================================================================
+    // Feature 8: Dynamic Imports / Code Splitting
+    // =====================================================================
+
+    #[test]
+    fn dynamic_import_creates_callback() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::DynamicImport {
+            path: Box::new(Expr::StringLit("./heavy_module.wasm".into())),
+            span: span(),
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("dynamic import"), "should have dynamic import comment");
+        assert!(output.contains("dom_loadChunk"), "should call dom_loadChunk");
+        assert!(output.contains("import callback index"), "should use callback from function table");
+        assert!(!codegen.closure_functions.is_empty(), "should create import callback function");
+    }
+
+    // =====================================================================
+    // Feature 9: Prompt Templates — AI Runtime
+    // =====================================================================
+
+    #[test]
+    fn prompt_template_builds_string_and_fetches() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::PromptTemplate {
+            template: "Summarize: {document}".into(),
+            interpolations: vec![
+                ("document".into(), Expr::StringLit("some text".into())),
+            ],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("prompt template"), "should have prompt template comment");
+        assert!(output.contains("POST prompt to AI endpoint"), "should POST to AI");
+        assert!(output.contains("http_fetch"), "should call http_fetch");
+        assert!(output.contains("http_setMethod"), "should set HTTP method to POST");
+        assert!(output.contains("http_setBody"), "should set request body");
+        assert!(output.contains("AI endpoint URL"), "should reference AI endpoint URL");
+    }
+
+    #[test]
+    fn prompt_template_no_interpolation() {
+        let mut codegen = WasmCodegen::new();
+        codegen.generate_expr(&Expr::PromptTemplate {
+            template: "Tell me a joke".into(),
+            interpolations: vec![],
+        });
+        let output = codegen.output.clone();
+        assert!(output.contains("prompt template"), "should have prompt template comment");
+        assert!(output.contains("http_fetch"), "should call http_fetch");
+    }
+
+    // =====================================================================
+    // Feature 10: Full Lifetime Annotations (codegen-side tests)
+    // =====================================================================
+
+    #[test]
+    fn wasm_type_display() {
+        assert_eq!(format!("{}", WasmType::I32), "i32");
+        assert_eq!(format!("{}", WasmType::I64), "i64");
+        assert_eq!(format!("{}", WasmType::F32), "f32");
+        assert_eq!(format!("{}", WasmType::F64), "f64");
+    }
+
+    // =====================================================================
+    // Parser: Tuple literal parsing
+    // =====================================================================
+
+    #[test]
+    fn parse_tuple_literal() {
+        use crate::lexer::Lexer;
+        use crate::parser::Parser;
+        let src = "pub fn main() -> i32 { let t = (1, 2, 3); return 0; }";
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Function(f) = &program.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                assert!(matches!(value, Expr::TupleLit(elems) if elems.len() == 3),
+                    "should parse (1, 2, 3) as TupleLit with 3 elements");
+            } else {
+                panic!("Expected let statement");
+            }
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn parse_parenthesized_not_tuple() {
+        use crate::lexer::Lexer;
+        use crate::parser::Parser;
+        let src = "pub fn main() -> i32 { let x = (42); return 0; }";
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Function(f) = &program.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                assert!(matches!(value, Expr::Integer(42)),
+                    "should parse (42) as just Integer(42), not TupleLit");
+            } else {
+                panic!("Expected let statement");
+            }
+        } else {
+            panic!("Expected function");
+        }
+    }
+
+    #[test]
+    fn parse_two_element_tuple() {
+        use crate::lexer::Lexer;
+        use crate::parser::Parser;
+        let src = r#"pub fn main() -> i32 { let pair = (1, "hello"); return 0; }"#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        if let Item::Function(f) = &program.items[0] {
+            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
+                if let Expr::TupleLit(elems) = value {
+                    assert_eq!(elems.len(), 2);
+                    assert!(matches!(elems[0], Expr::Integer(1)));
+                    assert!(matches!(&elems[1], Expr::StringLit(s) if s == "hello"));
+                } else {
+                    panic!("Expected TupleLit, got {:?}", value);
+                }
+            } else {
+                panic!("Expected let statement");
+            }
+        } else {
+            panic!("Expected function");
+        }
     }
 }

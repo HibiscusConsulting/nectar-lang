@@ -1109,6 +1109,12 @@ impl Formatter {
             }
             Expr::Break => "break".to_string(),
             Expr::Continue => "continue".to_string(),
+            Expr::TupleLit(elements) => {
+                let elem_strs: Vec<String> = elements.iter()
+                    .map(|e| self.format_expr_inner(e, depth + 1))
+                    .collect();
+                format!("({})", elem_strs.join(", "))
+            }
             Expr::Range { start, end } => {
                 format!("{}..{}", self.format_expr_inner(start, depth), self.format_expr_inner(end, depth))
             }
@@ -4412,5 +4418,33 @@ mod tests {
     #[test]
     fn roundtrip_empty_function() {
         assert_roundtrip("fn noop() { }");
+    }
+
+    #[test]
+    fn test_format_tuple_literal() {
+        let formatter = Formatter::new(FormatterOptions::default());
+        let result = formatter.format_expr_inner(&Expr::TupleLit(vec![
+            Expr::Integer(1),
+            Expr::StringLit("hello".into()),
+            Expr::Bool(true),
+        ]), 0);
+        assert_eq!(result, r#"(1, "hello", true)"#);
+    }
+
+    #[test]
+    fn test_format_tuple_literal_two_elements() {
+        let formatter = Formatter::new(FormatterOptions::default());
+        let result = formatter.format_expr_inner(&Expr::TupleLit(vec![
+            Expr::Integer(1),
+            Expr::Integer(2),
+        ]), 0);
+        assert_eq!(result, "(1, 2)");
+    }
+
+    #[test]
+    fn test_format_empty_tuple() {
+        let formatter = Formatter::new(FormatterOptions::default());
+        let result = formatter.format_expr_inner(&Expr::TupleLit(vec![]), 0);
+        assert_eq!(result, "()");
     }
 }

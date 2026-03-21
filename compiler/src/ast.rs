@@ -1393,6 +1393,10 @@ pub enum Expr {
     Break,
     /// Continue to the next iteration of the nearest enclosing loop
     Continue,
+
+    /// Tuple literal — `(a, b, c)`
+    /// Allocates a struct-like memory region with each element at 4-byte offsets.
+    TupleLit(Vec<Expr>),
 }
 
 /// A segment in a format string expression.
