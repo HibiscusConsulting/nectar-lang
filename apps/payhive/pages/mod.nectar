@@ -1,0 +1,21 @@
+// PayHive pages module — re-exports all page components
+mod dashboard;
+mod login;
+mod customers;
+mod invoices;
+mod payments;
+mod schedule;
+mod services;
+mod crew;
+mod reports;
+mod settings;
+mod insights;
+mod signup;
+mod auth_callback;
+mod not_found;
+mod forgot_password;
+mod reset_password;
+mod account;
+mod crm;
+mod acct;
+mod public;

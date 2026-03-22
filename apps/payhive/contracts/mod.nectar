@@ -1,0 +1,4 @@
+// PayHive contracts module
+mod api;
+mod crm;
+mod accounting;

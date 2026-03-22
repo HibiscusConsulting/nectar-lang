@@ -1,0 +1,6 @@
+mod landing;
+mod magic_approval;
+mod magic_quote;
+mod privacy;
+mod terms;
+mod security;
