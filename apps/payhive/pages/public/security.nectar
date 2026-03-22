@@ -1,45 +1,361 @@
-// Security page — describes PayHive's security practices
+// PayHive security information page
+// Matching React SecurityPage.jsx — features grid, compliance, data protection, incident response
 
 component SecurityPage() {
+    let mut loading: bool = false;
+
+    fn go_home(&mut self) {
+        self.loading = false;
+    }
+
+    fn contact_security(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .security-page {
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+        }
+        .hero {
+            background-color: "#2E2E2E";
+            color: "#FFFFFF";
+            padding: "64px 24px";
+        }
+        .hero-inner {
+            max-width: "768px";
+            margin: "0 auto";
+        }
+        .back-link {
+            display: "inline-flex";
+            align-items: "center";
+            gap: "8px";
+            color: "#9CA3AF";
+            font-size: "14px";
+            text-decoration: "none";
+            margin-bottom: "32px";
+        }
+        .hero-title-row {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+            margin-bottom: "16px";
+        }
+        .hero-shield {
+            font-size: "48px";
+            color: "#F59E0B";
+        }
+        .hero-title {
+            font-size: "36px";
+            font-weight: "700";
+        }
+        .hero-desc {
+            font-size: "20px";
+            color: "#D1D5DB";
+            line-height: "1.5";
+        }
+        .content {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "64px 24px";
+        }
+        .section {
+            margin-bottom: "64px";
+        }
+        .section-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+            margin-bottom: "24px";
+        }
+        .section-text {
+            font-size: "15px";
+            color: "#525252";
+            line-height: "1.7";
+            margin-bottom: "16px";
+        }
+        .features-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+        }
+        .feature-card {
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "24px";
+        }
+        .feature-icon {
+            font-size: "32px";
+            color: "#F59E0B";
+            margin-bottom: "16px";
+        }
+        .feature-name {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "8px";
+        }
+        .feature-desc {
+            font-size: "14px";
+            color: "#525252";
+            line-height: "1.6";
+        }
+        .compliance-bg {
+            background-color: "#FAFAFA";
+            border-radius: "12px";
+            padding: "32px";
+        }
+        .compliance-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+        }
+        .compliance-item {
+            display: "flex";
+            align-items: "flex-start";
+            gap: "12px";
+        }
+        .compliance-check {
+            color: "#F59E0B";
+            font-size: "20px";
+            margin-top: "2px";
+            flex-shrink: "0";
+        }
+        .compliance-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .compliance-desc {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .protection-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .protection-item {
+            display: "flex";
+            align-items: "flex-start";
+            gap: "16px";
+            padding: "16px";
+            background-color: "#FAFAFA";
+            border-radius: "8px";
+        }
+        .protection-check {
+            color: "#F59E0B";
+            font-size: "20px";
+            margin-top: "2px";
+            flex-shrink: "0";
+        }
+        .protection-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .protection-desc {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .contact-card {
+            background-color: "#FFFBEB";
+            border-radius: "12px";
+            padding: "32px";
+        }
+        .contact-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+            margin-bottom: "16px";
+        }
+        .contact-text {
+            font-size: "15px";
+            color: "#525252";
+            margin-bottom: "24px";
+        }
+        .contact-btn {
+            display: "inline-flex";
+            align-items: "center";
+            gap: "8px";
+            padding: "12px 24px";
+            border-radius: "8px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            font-size: "15px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+        }
+        .footer {
+            background-color: "#F5F5F5";
+            padding: "32px 24px";
+            text-align: "center";
+        }
+        .footer-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .footer-links {
+            display: "flex";
+            justify-content: "center";
+            gap: "24px";
+            margin-top: "16px";
+            font-size: "14px";
+        }
+        .footer-link {
+            color: "#525252";
+            text-decoration: "none";
+        }
+    }
+
     render {
-        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
-                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Security"</h1>
-                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"How PayHive protects your data"</p>
+        <div class="security-page">
+            <header class="hero">
+                <div class="hero-inner">
+                    <a class="back-link" href="/">"Back to Home"</a>
+                    <div class="hero-title-row">
+                        <span class="hero-shield">"shield"</span>
+                        <h1 class="hero-title">"Security at PayHive"</h1>
+                    </div>
+                    <p class="hero-desc">"Your security is our top priority. Learn about the measures we take to protect your data."</p>
+                </div>
+            </header>
 
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Authentication"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Passkey/WebAuthn support for phishing-resistant login"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Ed25519 session tokens with 24-hour expiry"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Account lockout after 5 failed attempts (30-minute cooldown)"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• OAuth2 with PKCE for third-party integrations"</p>
-                    <p style="color: #374151; line-height: 1.7;">"• Magic link login with 15-minute expiry"</p>
+            <main class="content">
+                <div class="section">
+                    <h2 class="section-title">"Our Security Commitment"</h2>
+                    <p class="section-text">"PayHive is built with security at its core. We employ industry-leading practices and technologies to ensure your business and customer data remains protected at all times."</p>
+                    <p class="section-text">"We continuously monitor, test, and improve our security posture to stay ahead of emerging threats and maintain the trust you place in us."</p>
                 </div>
 
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Data Protection"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• All data encrypted in transit (TLS 1.3)"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Passwords hashed with Argon2id"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Payment data handled by Stripe (PCI DSS Level 1)"</p>
-                    <p style="color: #374151; line-height: 1.7;">"• Comprehensive audit logging of all security events"</p>
+                <div class="section">
+                    <h2 class="section-title">"Security Features"</h2>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-icon">"lock"</div>
+                            <h3 class="feature-name">"End-to-End Encryption"</h3>
+                            <p class="feature-desc">"All data is encrypted in transit using TLS 1.3 and at rest using AES-256 encryption. Payment data is tokenized and never stored in plain text."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">"shield"</div>
+                            <h3 class="feature-name">"FIDO2 Passwordless Auth"</h3>
+                            <p class="feature-desc">"Support for modern passwordless authentication using hardware security keys and biometrics, eliminating password-based vulnerabilities."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">"eye"</div>
+                            <h3 class="feature-name">"24/7 Security Monitoring"</h3>
+                            <p class="feature-desc">"Automated threat detection and monitoring systems watch for suspicious activity around the clock, with immediate alerting for any anomalies."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">"server"</div>
+                            <h3 class="feature-name">"Secure Infrastructure"</h3>
+                            <p class="feature-desc">"Hosted on SOC 2 compliant infrastructure with redundant systems, automatic failover, and geographic distribution for high availability."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">"clock"</div>
+                            <h3 class="feature-name">"Regular Security Audits"</h3>
+                            <p class="feature-desc">"Weekly automated security testing and periodic third-party penetration tests ensure our defenses remain strong against evolving threats."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-icon">"users"</div>
+                            <h3 class="feature-name">"Role-Based Access Control"</h3>
+                            <p class="feature-desc">"Granular permissions system ensures users only access the data and features they need, following the principle of least privilege."</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Infrastructure"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Hosted on Google Cloud Platform"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Cloud Run with automatic scaling and isolation"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Secrets managed via GCP Secret Manager"</p>
-                    <p style="color: #374151; line-height: 1.7;">"• Rate limiting on all API endpoints"</p>
+                <div class="section">
+                    <h2 class="section-title">"Compliance & Standards"</h2>
+                    <div class="compliance-bg">
+                        <div class="compliance-grid">
+                            <div class="compliance-item">
+                                <span class="compliance-check">"check"</span>
+                                <div>
+                                    <div class="compliance-name">"PCI DSS Compliant"</div>
+                                    <div class="compliance-desc">"Payment processing meets Payment Card Industry Data Security Standards"</div>
+                                </div>
+                            </div>
+                            <div class="compliance-item">
+                                <span class="compliance-check">"check"</span>
+                                <div>
+                                    <div class="compliance-name">"SOC 2 Type II"</div>
+                                    <div class="compliance-desc">"Infrastructure adheres to SOC 2 security and availability principles"</div>
+                                </div>
+                            </div>
+                            <div class="compliance-item">
+                                <span class="compliance-check">"check"</span>
+                                <div>
+                                    <div class="compliance-name">"GDPR Ready"</div>
+                                    <div class="compliance-desc">"Data handling practices comply with European privacy regulations"</div>
+                                </div>
+                            </div>
+                            <div class="compliance-item">
+                                <span class="compliance-check">"check"</span>
+                                <div>
+                                    <div class="compliance-name">"99.9% Uptime SLA"</div>
+                                    <div class="compliance-desc">"Service level agreement with guaranteed availability"</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Reporting Vulnerabilities"</h2>
-                    <p style="color: #374151; line-height: 1.7;">
-                        "If you discover a security vulnerability, please report it to security@payhiveapp.com. We take all reports seriously and will respond within 24 hours."
-                    </p>
+                <div class="section">
+                    <h2 class="section-title">"Data Protection"</h2>
+                    <div class="protection-list">
+                        <div class="protection-item">
+                            <span class="protection-check">"check"</span>
+                            <div>
+                                <div class="protection-name">"Daily Backups"</div>
+                                <div class="protection-desc">"Automated daily backups with 30-day retention and point-in-time recovery capabilities."</div>
+                            </div>
+                        </div>
+                        <div class="protection-item">
+                            <span class="protection-check">"check"</span>
+                            <div>
+                                <div class="protection-name">"7-Year Audit Logs"</div>
+                                <div class="protection-desc">"Comprehensive audit trail of all system access and changes retained for compliance and forensics."</div>
+                            </div>
+                        </div>
+                        <div class="protection-item">
+                            <span class="protection-check">"check"</span>
+                            <div>
+                                <div class="protection-name">"Data Isolation"</div>
+                                <div class="protection-desc">"Multi-tenant architecture with strict data isolation ensures your data is never accessible to other customers."</div>
+                            </div>
+                        </div>
+                        <div class="protection-item">
+                            <span class="protection-check">"check"</span>
+                            <div>
+                                <div class="protection-name">"Secure Data Centers"</div>
+                                <div class="protection-desc">"Physical security including biometric access, 24/7 surveillance, and environmental controls."</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+
+                <div class="section">
+                    <h2 class="section-title">"Incident Response"</h2>
+                    <p class="section-text">"In the unlikely event of a security incident, our dedicated security team follows a well-defined incident response plan to quickly contain, investigate, and remediate any issues."</p>
+                    <p class="section-text">"We commit to transparent communication with affected customers and regulatory bodies as required, with timely notifications and detailed post-incident reports."</p>
+                </div>
+
+                <div class="contact-card">
+                    <h2 class="contact-title">"Security Questions?"</h2>
+                    <p class="contact-text">"If you have questions about our security practices or want to report a security concern, please reach out to our security team."</p>
+                    <button class="contact-btn" on:click={self.contact_security}>"Contact Security Team"</button>
+                </div>
+            </main>
+
+            <footer class="footer">
+                <div class="footer-text">"2026 PayHive. All rights reserved."</div>
+                <div class="footer-links">
+                    <a class="footer-link" href="/terms">"Terms of Service"</a>
+                    <a class="footer-link" href="/privacy">"Privacy Policy"</a>
+                    <a class="footer-link" href="/">"Home"</a>
+                </div>
+            </footer>
         </div>
     }
 }

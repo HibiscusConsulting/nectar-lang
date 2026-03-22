@@ -1,54 +1,187 @@
-// Privacy Policy page — legal content rendered in clean layout
+// PayHive privacy policy page
+// Full legal content matching React LegalPrivacy.jsx
 
-component PrivacyPage() {
+component PrivacyPolicy() {
+    let mut loading: bool = false;
+
+    fn go_home(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .legal-page {
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+        }
+        .legal-header {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "48px 24px 24px";
+        }
+        .back-link {
+            font-size: "14px";
+            color: "#525252";
+            text-decoration: "none";
+            margin-bottom: "16px";
+            display: "inline-block";
+        }
+        .legal-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .legal-body {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "0 24px 64px";
+            font-size: "15px";
+            line-height: "1.7";
+            color: "#374151";
+        }
+        .section-title {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#111827";
+            margin-top: "32px";
+            margin-bottom: "12px";
+        }
+        .subsection-title {
+            font-size: "17px";
+            font-weight: "600";
+            color: "#111827";
+            margin-top: "24px";
+            margin-bottom: "8px";
+        }
+        .paragraph {
+            margin-bottom: "16px";
+        }
+        .list {
+            margin-bottom: "16px";
+            padding-left: "24px";
+        }
+        .list-item {
+            margin-bottom: "8px";
+        }
+        .bold {
+            font-weight: "600";
+        }
+        .link {
+            color: "#112D4E";
+            text-decoration: "underline";
+        }
+        .footer {
+            background-color: "#F5F5F5";
+            padding: "32px 24px";
+            text-align: "center";
+        }
+        .footer-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .footer-links {
+            display: "flex";
+            justify-content: "center";
+            gap: "24px";
+            margin-top: "16px";
+            font-size: "14px";
+        }
+        .footer-link {
+            color: "#525252";
+            text-decoration: "none";
+        }
+    }
+
     render {
-        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
-                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Privacy Policy"</h1>
-                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"Last updated: March 2026"</p>
-
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "This Privacy Policy explains how PayHive (\"we,\" \"our,\" or \"us\") collects, uses, discloses, and safeguards information in connection with our website and services, including customer onboarding, scheduling and crew management, invoicing, and payment processing integrations."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Scope & Roles"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "We act as a controller for the data we collect about you when you visit our sites, sign up for a trial, or otherwise interact with us directly. When business customers use PayHive to process their own customers' data, we generally act as a processor/service provider on their behalf."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Information We Collect"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"We collect the following categories of information:"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Account & lead data: name, email, company, phone, and preferences submitted via our forms."</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Business & customer content: customers, property addresses, services, schedules, crew assignments."</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Payment-related info: we integrate with Stripe. We do not store full card numbers."</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Device & usage data: IP address, browser, pages viewed, timestamps, performance logs."</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">"• Cookies & similar tech: to keep you logged in, remember preferences, and measure usage."</p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"How We Use Information"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Provide and improve our services"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Process payments and manage billing"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Communicate with you about your account"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Detect and prevent fraud or abuse"</p>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">"• Comply with legal obligations"</p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Data Retention"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "We retain personal data for as long as your account is active or as needed to provide services. We may retain certain data longer for legal, tax, or compliance purposes."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Your Rights"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "You may request access to, correction of, or deletion of your personal data by contacting us at privacy@payhiveapp.com."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Contact Us"</h2>
-                    <p style="color: #374151; line-height: 1.7;">
-                        "If you have questions about this Privacy Policy, contact us at privacy@payhiveapp.com."
-                    </p>
-                </div>
+        <div class="legal-page">
+            <div class="legal-header">
+                <a class="back-link" href="/">"Back to Home"</a>
+                <h1 class="legal-title">"Privacy Policy"</h1>
             </div>
+
+            <div class="legal-body">
+                <p class="paragraph">"This Privacy Policy explains how PayHive (we, our, or us) collects, uses, discloses, and safeguards information in connection with our website and services, including customer onboarding (QR/email/SMS invites), scheduling and crew management, invoicing, and payment processing integrations."</p>
+
+                <h2 class="section-title">"Scope & Roles"</h2>
+                <p class="paragraph">"We act as a controller for the data we collect about you when you visit our sites, sign up for a trial, or otherwise interact with us directly. When business customers use PayHive to process their own customers' data (e.g., property addresses, job details, invoices), we generally act as a processor/service provider on their behalf. If you are a customer of a business that uses PayHive, please contact that business to exercise your privacy rights; we will assist them as required."</p>
+
+                <h2 class="section-title">"Information We Collect"</h2>
+                <ul class="list">
+                    <li class="list-item">"Account & lead data: name, email, company, phone, and preferences you submit via our forms (e.g., demo or trial requests). Authentication is provided via our login provider; we receive your basic profile and identifiers."</li>
+                    <li class="list-item">"Business & customer content: customers you import, invited recipients, property addresses, services, schedules, crew assignments, notes, and attachments."</li>
+                    <li class="list-item">"Payment-related info: we integrate with Stripe to process payments. We do not store full card numbers. We may receive limited payment metadata (e.g., last4, brand, status, amounts) necessary for invoices, reconciliation, and support."</li>
+                    <li class="list-item">"Device & usage data: IP address, browser/user-agent, pages viewed, referring URLs, approximate location (derived from IP), timestamps, error and performance logs, and product interaction events."</li>
+                    <li class="list-item">"Cookies & similar tech: to keep you logged in, remember preferences, measure usage, and improve features. You can control cookies through your browser settings."</li>
+                    <li class="list-item">"From service providers: identity assertions from our authentication provider, payment and risk signals from Stripe, and operational data from hosting, email/SMS, logging, and analytics providers."</li>
+                </ul>
+
+                <h2 class="section-title">"How We Use Information"</h2>
+                <ul class="list">
+                    <li class="list-item">"Provide, secure, and maintain the service (authentication, sessions, access control)."</li>
+                    <li class="list-item">"Operate core workflows: onboarding (QR/email/SMS invites), customer management, scheduling/crew assignment, invoicing, and payment status reconciliation."</li>
+                    <li class="list-item">"Communicate with you about the service (support, updates, billing, and security notices)."</li>
+                    <li class="list-item">"Improve and develop features, including troubleshooting, analytics, and research."</li>
+                    <li class="list-item">"Send marketing communications with your consent or as otherwise permitted (you may opt out at any time). Transactional emails (e.g., receipts, alerts) are required to provide the service."</li>
+                    <li class="list-item">"Comply with legal obligations and enforce our Terms."</li>
+                </ul>
+
+                <h2 class="section-title">"Disclosure of Information"</h2>
+                <p class="paragraph">"We disclose information as follows:"</p>
+                <ul class="list">
+                    <li class="list-item">"Service providers: hosting, authentication provider, payments (Stripe), email/SMS delivery, customer support, analytics, logging/monitoring, and security vendors."</li>
+                    <li class="list-item">"Third-party integrations: if you connect PayHive to third-party services such as QuickBooks, Outlook, or other accounting or productivity tools, we will share data necessary to enable the integration."</li>
+                    <li class="list-item">"Within your organization: data visible to your team depends on roles/permissions you configure."</li>
+                    <li class="list-item">"Legal and safety: to comply with law, enforce agreements, or protect rights, safety, and the integrity of the service."</li>
+                    <li class="list-item">"Business transfers: in connection with a merger, acquisition, financing, or sale of assets."</li>
+                    <li class="list-item">"With your direction or consent."</li>
+                </ul>
+
+                <h2 class="section-title">"Security"</h2>
+                <ul class="list">
+                    <li class="list-item">"TLS for data in transit and encryption at rest where applicable."</li>
+                    <li class="list-item">"Role-based access controls, audit logging, and least-privilege practices."</li>
+                    <li class="list-item">"Vulnerability management, dependency updates, and security monitoring."</li>
+                </ul>
+                <p class="paragraph">"No method of transmission or storage is 100% secure. We maintain safeguards appropriate to the nature of the data and the risks of our service."</p>
+
+                <h2 class="section-title">"Retention"</h2>
+                <p class="paragraph">"We retain information while your account is active or as needed to provide the service, resolve disputes, and comply with legal obligations (for example, certain invoice/transaction records may be retained for up to seven years)."</p>
+
+                <h2 class="section-title">"Your Choices & Rights"</h2>
+                <ul class="list">
+                    <li class="list-item">"Access, correct, or delete account information via in-product settings or by contacting us."</li>
+                    <li class="list-item">"Export certain data where technically feasible."</li>
+                    <li class="list-item">"Opt out of marketing emails using the unsubscribe link."</li>
+                    <li class="list-item">"Control cookies via browser settings."</li>
+                </ul>
+
+                <h3 class="subsection-title">"EEA/UK Visitors"</h3>
+                <p class="paragraph">"If you are in the EEA/UK, our legal bases include contract performance, legitimate interests, consent (where applicable), and compliance with legal obligations. You may have rights to access, correct, delete, restrict, or object to processing, and to portability."</p>
+
+                <h3 class="subsection-title">"California Residents"</h3>
+                <p class="paragraph">"We process personal information as defined by the CPRA. We do not sell or share personal information (as those terms are defined by CPRA). You may request access, deletion, and correction, and you have a right to non-discrimination."</p>
+
+                <h2 class="section-title">"Children"</h2>
+                <p class="paragraph">"Our service is for businesses and is not directed to children under 16. We do not knowingly collect personal information from children under 16."</p>
+
+                <h2 class="section-title">"International Transfers"</h2>
+                <p class="paragraph">"We are a U.S.-based service and may transfer information to the United States and other countries where our service providers operate. When required, we use appropriate safeguards such as Standard Contractual Clauses."</p>
+
+                <h2 class="section-title">"Changes"</h2>
+                <p class="paragraph">"We may update this Privacy Policy from time to time. If changes are material, we will provide appropriate notice."</p>
+
+                <h2 class="section-title">"Contact"</h2>
+                <p class="paragraph">"Questions or requests? Email support@thepayhive.com."</p>
+                <p class="paragraph">"See our Terms of Service for more on your responsibilities and acceptable use."</p>
+            </div>
+
+            <footer class="footer">
+                <div class="footer-text">"2026 PayHive. All rights reserved."</div>
+                <div class="footer-links">
+                    <a class="footer-link" href="/terms">"Terms of Service"</a>
+                    <a class="footer-link" href="/security">"Security"</a>
+                    <a class="footer-link" href="/">"Home"</a>
+                </div>
+            </footer>
         </div>
     }
 }
