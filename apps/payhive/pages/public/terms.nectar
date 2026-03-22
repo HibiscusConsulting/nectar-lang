@@ -1,55 +1,184 @@
-// Terms of Service page
+// PayHive terms of service page
+// Full legal content matching React LegalTerms.jsx
 
-component TermsPage() {
+component TermsOfService() {
+    let mut loading: bool = false;
+
+    fn go_home(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .legal-page {
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+        }
+        .legal-header {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "48px 24px 24px";
+        }
+        .back-link {
+            font-size: "14px";
+            color: "#525252";
+            text-decoration: "none";
+            margin-bottom: "16px";
+            display: "inline-block";
+        }
+        .legal-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .legal-body {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "0 24px 64px";
+            font-size: "15px";
+            line-height: "1.7";
+            color: "#374151";
+        }
+        .section-title {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#111827";
+            margin-top: "32px";
+            margin-bottom: "12px";
+        }
+        .paragraph {
+            margin-bottom: "16px";
+        }
+        .list {
+            margin-bottom: "16px";
+            padding-left: "24px";
+        }
+        .list-item {
+            margin-bottom: "8px";
+        }
+        .bold {
+            font-weight: "600";
+        }
+        .caps-text {
+            text-transform: "uppercase";
+        }
+        .link {
+            color: "#112D4E";
+            text-decoration: "underline";
+        }
+        .footer {
+            background-color: "#F5F5F5";
+            padding: "32px 24px";
+            text-align: "center";
+        }
+        .footer-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .footer-links {
+            display: "flex";
+            justify-content: "center";
+            gap: "24px";
+            margin-top: "16px";
+            font-size: "14px";
+        }
+        .footer-link {
+            color: "#525252";
+            text-decoration: "none";
+        }
+    }
+
     render {
-        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
-                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Terms of Service"</h1>
-                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"Last updated: March 2026"</p>
-
-                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"1. Acceptance of Terms"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "By accessing or using PayHive's services, you agree to be bound by these Terms of Service. If you do not agree, you may not use our services."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"2. Description of Service"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "PayHive provides field service management software including scheduling, invoicing, payment processing, customer management, and crew coordination tools."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"3. Account Registration"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account credentials."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"4. Payment Terms"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "Payment processing is handled through Stripe. You agree to pay all fees associated with your use of the service. PayHive is not responsible for payment disputes between you and your customers."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"5. Data Ownership"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "You retain ownership of all data you submit to PayHive. We will not sell your data to third parties. You may export or delete your data at any time."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"6. Limitation of Liability"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "PayHive shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"7. Termination"</h2>
-                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
-                        "Either party may terminate this agreement at any time. Upon termination, you may export your data within 30 days."
-                    </p>
-
-                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"8. Contact"</h2>
-                    <p style="color: #374151; line-height: 1.7;">
-                        "Questions about these Terms? Contact us at legal@payhiveapp.com."
-                    </p>
-                </div>
+        <div class="legal-page">
+            <div class="legal-header">
+                <a class="back-link" href="/">"Back to Home"</a>
+                <h1 class="legal-title">"Terms of Service"</h1>
             </div>
+
+            <div class="legal-body">
+                <p class="paragraph">"These Terms of Service (Terms) govern your access to and use of PayHive's website and services. By accessing or using the service, you agree to these Terms. If you use the service on behalf of a company, you represent that you are authorized to bind that company, and you refers to that company."</p>
+
+                <h2 class="section-title">"1. Eligibility & Accounts"</h2>
+                <ul class="list">
+                    <li class="list-item">"You must be at least 18 and able to form a binding contract."</li>
+                    <li class="list-item">"Registration and login are handled by our authentication provider. Keep your credentials secure and notify us immediately of any unauthorized use. You are responsible for activities under your account, including actions by users you invite."</li>
+                    <li class="list-item">"You must provide accurate, current information and keep it updated (e.g., company name, billing contact)."</li>
+                </ul>
+
+                <h2 class="section-title">"2. Your Data & Content"</h2>
+                <p class="paragraph">"As between you and us, you own all data and content you submit to the service (e.g., customers, properties, schedules, invoices, attachments, messages). You grant us a worldwide, non-exclusive, royalty-free license to host, process, transmit, display, and create limited backups of your content as reasonably necessary to provide and support the service, and to create aggregated or de-identified data that does not identify you or your users, which we may use to improve and operate the service."</p>
+                <p class="paragraph">"You are responsible for your content, including ensuring that you have all rights and lawful bases required to store, use, and share it through the service."</p>
+
+                <h2 class="section-title">"3. Acceptable Use"</h2>
+                <ul class="list">
+                    <li class="list-item">"Comply with all laws, including anti-spam/telemarketing rules (CAN-SPAM, CASL, TCPA)."</li>
+                    <li class="list-item">"No unlawful, infringing, deceptive, harassing, or harmful content or activity."</li>
+                    <li class="list-item">"No reverse engineering, scraping, rate-limiting evasion, or unauthorized access."</li>
+                    <li class="list-item">"No uploading payment card primary account numbers (PANs) or bank account numbers outside Stripe."</li>
+                    <li class="list-item">"No storing or processing protected health information (PHI) or other highly sensitive data."</li>
+                    <li class="list-item">"No attempts to interfere with or disrupt the service or its security."</li>
+                </ul>
+                <p class="paragraph">"Invites and messaging: If you import contacts or send QR/email/SMS invites through PayHive, you must have a lawful basis to contact recipients and must comply with applicable consent and content rules. You are solely responsible for the messages you send."</p>
+
+                <h2 class="section-title">"4. Roles, Permissions & Visibility"</h2>
+                <p class="paragraph">"You control roles (Owner/Admin/Manager/Crew) and visibility settings in your organization. You are responsible for granting and revoking access appropriately and reviewing activity. We are not responsible for misconfigurations or unauthorized disclosures caused by your settings."</p>
+
+                <h2 class="section-title">"5. Payments, Fees & Taxes"</h2>
+                <p class="paragraph">"Platform fees: We may offer free trials. After a trial, paid plans, usage charges, and add-on fees (if any) will be billed as described at sign-up or in your order. Fees are due upon invoice and are non-refundable unless required by law. You are responsible for all applicable taxes."</p>
+                <p class="paragraph">"Stripe processing: Customer payments are processed by Stripe. Your use of payment features is subject to Stripe's terms, and you may be required to complete KYC or other verification. Chargebacks, disputes, and risk decisions are between you, your customers, and Stripe."</p>
+
+                <h2 class="section-title">"6. Third-Party Services"</h2>
+                <p class="paragraph">"The service integrates with third parties (e.g., authentication provider, Stripe, email/SMS providers). You may also optionally connect PayHive to accounting software (such as QuickBooks), productivity tools (such as Outlook), or other third-party services. Their terms and privacy policies govern your use of those services."</p>
+
+                <h2 class="section-title">"7. Confidentiality"</h2>
+                <p class="paragraph">"Each party may receive confidential information of the other. The receiving party will use the same degree of care it uses to protect its own similar information (but no less than reasonable care) and will use it only to perform under these Terms."</p>
+
+                <h2 class="section-title">"8. Security & Data Protection"</h2>
+                <p class="paragraph">"We implement safeguards appropriate to the nature of the data and our service (see our Privacy Policy). When we process personal data on your behalf, our role is processor/service provider. A data processing addendum (DPA) is available upon request."</p>
+
+                <h2 class="section-title">"9. Service Changes; Beta"</h2>
+                <p class="paragraph">"We may modify or discontinue features with reasonable notice where practicable. From time to time, we may offer beta or preview features; they are provided as is, may be withdrawn, and may be subject to additional terms."</p>
+
+                <h2 class="section-title">"10. Term; Suspension; Termination"</h2>
+                <ul class="list">
+                    <li class="list-item">"These Terms begin when you first use the service and continue until terminated."</li>
+                    <li class="list-item">"We may suspend or terminate access for violation of these Terms, legal requirements, risk, or harm to the service."</li>
+                    <li class="list-item">"Upon termination, your access ends. We may retain limited data as required by law or for legitimate business purposes."</li>
+                </ul>
+
+                <h2 class="section-title">"11. Disclaimers"</h2>
+                <p class="paragraph">"THE SERVICE IS PROVIDED AS IS AND AS AVAILABLE. TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT."</p>
+
+                <h2 class="section-title">"12. Limitation of Liability"</h2>
+                <p class="paragraph">"TO THE MAXIMUM EXTENT PERMITTED BY LAW, NEITHER PARTY WILL BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, REVENUE, GOODWILL, OR DATA. EACH PARTY'S TOTAL LIABILITY UNDER THESE TERMS IS LIMITED TO THE AMOUNTS PAID OR PAYABLE BY YOU TO US FOR THE SERVICE IN THE TWELVE (12) MONTHS BEFORE THE EVENT GIVING RISE TO LIABILITY."</p>
+
+                <h2 class="section-title">"13. Indemnification"</h2>
+                <p class="paragraph">"You will defend, indemnify, and hold us harmless from claims, damages, liabilities, costs, and expenses arising out of: (a) your content or use of the service in violation of law or these Terms; (b) communications you send without proper consent; or (c) your violation of third-party rights."</p>
+
+                <h2 class="section-title">"14. Governing Law; Venue"</h2>
+                <p class="paragraph">"These Terms are governed by the laws of the State of Delaware and applicable U.S. federal law, without regard to conflict-of-laws rules. The exclusive forum for disputes will be the state and federal courts located in Wilmington, Delaware."</p>
+
+                <h2 class="section-title">"15. Changes to Terms"</h2>
+                <p class="paragraph">"We may update these Terms from time to time. If changes are material, we will provide reasonable notice. Your continued use after the effective date constitutes acceptance of the updated Terms."</p>
+
+                <h2 class="section-title">"16. Miscellaneous"</h2>
+                <ul class="list">
+                    <li class="list-item">"Entire Agreement. These Terms (and any applicable order) are the entire agreement between you and us regarding the service."</li>
+                    <li class="list-item">"Assignment. You may not assign these Terms without our prior written consent."</li>
+                    <li class="list-item">"Severability; Waiver. If any provision is unenforceable, the remainder remains in effect."</li>
+                    <li class="list-item">"Notices. We may send notices to your account email; you may send notices to support@thepayhive.com."</li>
+                </ul>
+
+                <p class="paragraph">"See our Privacy Policy for how we handle personal information."</p>
+            </div>
+
+            <footer class="footer">
+                <div class="footer-text">"2026 PayHive. All rights reserved."</div>
+                <div class="footer-links">
+                    <a class="footer-link" href="/privacy">"Privacy Policy"</a>
+                    <a class="footer-link" href="/security">"Security"</a>
+                    <a class="footer-link" href="/">"Home"</a>
+                </div>
+            </footer>
         </div>
     }
 }
