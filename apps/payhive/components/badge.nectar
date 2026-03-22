@@ -1,0 +1,43 @@
+// Status badge component
+// Displays colored badges for status indicators
+
+component Badge() {
+    let mut text: String = "";
+    let mut variant: String = "default";
+
+    style {
+        .badge {
+            display: "inline-flex";
+            align-items: "center";
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            line-height: "20px";
+        }
+        .badge-success {
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .badge-warning {
+            background-color: "#FFFBEB";
+            color: "#D97706";
+        }
+        .badge-danger {
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+        }
+        .badge-info {
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+        }
+        .badge-default {
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+    }
+
+    render {
+        <span class="badge">{format("{}", self.text)}</span>
+    }
+}

@@ -1,0 +1,206 @@
+// PayHive customer management page
+// Search, filter pills, customer cards with status badges
+
+component CustomersPage() {
+    let mut search_query: String = "";
+    let mut active_filter: String = "all";
+    let mut customer_count: i32 = 24;
+    let mut loading: bool = false;
+
+    fn filter_all(&mut self) {
+        self.active_filter = "all";
+    }
+
+    fn filter_active(&mut self) {
+        self.active_filter = "active";
+    }
+
+    fn filter_leads(&mut self) {
+        self.active_filter = "leads";
+    }
+
+    fn filter_archived(&mut self) {
+        self.active_filter = "archived";
+    }
+
+    fn add_customer(&mut self) {
+        self.loading = true;
+    }
+
+    fn load_customers(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/customers");
+        self.loading = false;
+    }
+
+    style {
+        .customers-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "20px";
+        }
+        .customers-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .customers-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .add-btn {
+            padding: "10px 20px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "600";
+            cursor: "pointer";
+        }
+        .filters-row {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .search-input {
+            padding: "10px 16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#303234";
+            min-width: "280px";
+        }
+        .filter-pill {
+            padding: "6px 14px";
+            border-radius: "9999px";
+            font-size: "13px";
+            font-weight: "500";
+            border: "1px solid #E5E7EB";
+            background-color: "#FFFFFF";
+            color: "#6B7280";
+            cursor: "pointer";
+        }
+        .filter-pill-active {
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border-color: "#303234";
+        }
+        .customer-grid {
+            display: "grid";
+            grid-template-columns: "repeat(auto-fill, minmax(320px, 1fr))";
+            gap: "16px";
+        }
+        .customer-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .customer-name {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#303234";
+            margin-bottom: "4px";
+        }
+        .customer-email {
+            font-size: "13px";
+            color: "#6B7280";
+            margin-bottom: "8px";
+        }
+        .customer-meta {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .customer-balance {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .status-active {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .status-lead {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+        }
+        .status-archived {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+        .count-label {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+    }
+
+    render {
+        <div class="customers-page">
+            <div class="customers-header">
+                <div>
+                    <h1 class="customers-title">"Customers"</h1>
+                    <span class="count-label">{format("{} total", self.customer_count)}</span>
+                </div>
+                <button class="add-btn" on:click={self.add_customer}>"+ Add Customer"</button>
+            </div>
+
+            <div class="filters-row">
+                <input class="search-input" placeholder="Search customers..." />
+                <button class="filter-pill filter-pill-active" on:click={self.filter_all}>"All"</button>
+                <button class="filter-pill" on:click={self.filter_active}>"Active"</button>
+                <button class="filter-pill" on:click={self.filter_leads}>"Leads"</button>
+                <button class="filter-pill" on:click={self.filter_archived}>"Archived"</button>
+            </div>
+
+            <div class="customer-grid">
+                <div class="customer-card">
+                    <div class="customer-name">"Johnson Landscaping"</div>
+                    <div class="customer-email">"mike@johnsonlandscaping.com"</div>
+                    <div class="customer-meta">
+                        <span class="customer-balance">"$2,450.00"</span>
+                        <span class="status-active">"Active"</span>
+                    </div>
+                </div>
+                <div class="customer-card">
+                    <div class="customer-name">"Smith Electrical"</div>
+                    <div class="customer-email">"dave@smithelectric.com"</div>
+                    <div class="customer-meta">
+                        <span class="customer-balance">"$1,200.00"</span>
+                        <span class="status-active">"Active"</span>
+                    </div>
+                </div>
+                <div class="customer-card">
+                    <div class="customer-name">"Garcia Plumbing"</div>
+                    <div class="customer-email">"maria@garciaplumbing.com"</div>
+                    <div class="customer-meta">
+                        <span class="customer-balance">"$890.00"</span>
+                        <span class="status-lead">"Lead"</span>
+                    </div>
+                </div>
+                <div class="customer-card">
+                    <div class="customer-name">"Wilson HVAC"</div>
+                    <div class="customer-email">"james@wilsonhvac.com"</div>
+                    <div class="customer-meta">
+                        <span class="customer-balance">"$0.00"</span>
+                        <span class="status-archived">"Archived"</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

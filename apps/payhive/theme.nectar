@@ -1,0 +1,42 @@
+// PayHive design system — exact brand colors
+// Charcoal + honey orange palette
+
+theme PayHiveTheme {
+    light {
+        brand: "#303234",
+        brand_hover: "#242628",
+        brand_accent: "#FFB547",
+        brand_honey: "#FFD36E",
+        brand_orange: "#F68F1E",
+        bg_page: "#F9FAFB",
+        bg_card: "#FFFFFF",
+        text_primary: "#303234",
+        text_secondary: "#6B7280",
+        text_muted: "#9CA3AF",
+        border: "#E5E7EB",
+        success: "#10B981",
+        warning: "#F59E0B",
+        danger: "#EF4444",
+        info: "#3B82F6",
+    }
+
+    dark {
+        brand: "#E5E7EB",
+        brand_hover: "#D1D5DB",
+        brand_accent: "#FFB547",
+        brand_honey: "#FFD36E",
+        brand_orange: "#F68F1E",
+        bg_page: "#111827",
+        bg_card: "#1F2937",
+        text_primary: "#F9FAFB",
+        text_secondary: "#9CA3AF",
+        text_muted: "#6B7280",
+        border: "#374151",
+        success: "#34D399",
+        warning: "#FBBF24",
+        danger: "#F87171",
+        info: "#60A5FA",
+    }
+
+    default: "light",
+}

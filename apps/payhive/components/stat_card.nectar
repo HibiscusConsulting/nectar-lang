@@ -1,0 +1,54 @@
+// Reusable stat card for dashboard metrics
+
+component StatCard() {
+    let mut label: String = "";
+    let mut value: String = "$0.00";
+    let mut change: String = "+0%";
+    let mut trend_up: bool = true;
+
+    style {
+        .stat-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "20px";
+            min-width: "200px";
+            flex: "1";
+        }
+        .stat-label {
+            font-size: "13px";
+            font-weight: "500";
+            color: "#6B7280";
+            margin-bottom: "4px";
+        }
+        .stat-value {
+            font-size: "28px";
+            font-weight: "700";
+            color: "#303234";
+            margin-bottom: "4px";
+        }
+        .stat-change {
+            font-size: "13px";
+            font-weight: "500";
+        }
+        .stat-change-up {
+            color: "#10B981";
+        }
+        .stat-change-down {
+            color: "#EF4444";
+        }
+    }
+
+    render {
+        <div class="stat-card">
+            <div class="stat-label">{format("{}", self.label)}</div>
+            <div class="stat-value">{format("{}", self.value)}</div>
+            {if self.trend_up {
+                <div class="stat-change stat-change-up">{format("{}", self.change)}</div>
+            }}
+            {if !self.trend_up {
+                <div class="stat-change stat-change-down">{format("{}", self.change)}</div>
+            }}
+        </div>
+    }
+}

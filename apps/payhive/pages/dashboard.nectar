@@ -1,0 +1,203 @@
+// PayHive main dashboard
+// Financial summary cards, quick stats, recent activity
+
+component Dashboard() {
+    let mut available_balance: String = "$12,450.00";
+    let mut pending_amount: String = "$3,280.00";
+    let mut outstanding_amount: String = "$8,120.00";
+    let mut revenue_month: String = "$24,680.00";
+    let mut active_jobs: i32 = 12;
+    let mut new_customers: i32 = 5;
+    let mut invoices_due: i32 = 8;
+    let mut crew_active: i32 = 6;
+    let mut loading: bool = false;
+
+    fn refresh_data(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/dashboard/summary");
+        self.loading = false;
+    }
+
+    style {
+        .dashboard {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .dashboard-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .dashboard-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .dashboard-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-top: "4px";
+        }
+        .refresh-btn {
+            padding: "8px 16px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .summary-cards {
+            display: "grid";
+            grid-template-columns: "repeat(auto-fit, minmax(240px, 1fr))";
+            gap: "16px";
+        }
+        .summary-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "20px";
+        }
+        .summary-card-label {
+            font-size: "13px";
+            font-weight: "500";
+            color: "#6B7280";
+            margin-bottom: "4px";
+        }
+        .summary-card-value {
+            font-size: "28px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .summary-card-accent {
+            border-left: "4px solid #FFB547";
+        }
+        .quick-stats {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .quick-stat {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+            text-align: "center";
+        }
+        .quick-stat-value {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .quick-stat-label {
+            font-size: "13px";
+            color: "#6B7280";
+            margin-top: "4px";
+        }
+        .section-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#303234";
+            margin-bottom: "12px";
+        }
+        .activity-list {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .activity-item {
+            padding: "14px 20px";
+            border-bottom: "1px solid #F3F4F6";
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .activity-text {
+            font-size: "14px";
+            color: "#303234";
+        }
+        .activity-time {
+            font-size: "12px";
+            color: "#9CA3AF";
+        }
+    }
+
+    render {
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="dashboard-title">"Dashboard"</h1>
+                    <p class="dashboard-subtitle">"Welcome back. Here is your business overview."</p>
+                </div>
+                <button class="refresh-btn" on:click={self.refresh_data}>"Refresh"</button>
+            </div>
+
+            <div class="summary-cards">
+                <div class="summary-card summary-card-accent">
+                    <div class="summary-card-label">"Available Balance"</div>
+                    <div class="summary-card-value">{format("{}", self.available_balance)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Pending"</div>
+                    <div class="summary-card-value">{format("{}", self.pending_amount)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Outstanding"</div>
+                    <div class="summary-card-value">{format("{}", self.outstanding_amount)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Revenue This Month"</div>
+                    <div class="summary-card-value">{format("{}", self.revenue_month)}</div>
+                </div>
+            </div>
+
+            <div class="quick-stats">
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{format("{}", self.active_jobs)}</div>
+                    <div class="quick-stat-label">"Active Jobs"</div>
+                </div>
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{format("{}", self.new_customers)}</div>
+                    <div class="quick-stat-label">"New Customers"</div>
+                </div>
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{format("{}", self.invoices_due)}</div>
+                    <div class="quick-stat-label">"Invoices Due"</div>
+                </div>
+                <div class="quick-stat">
+                    <div class="quick-stat-value">{format("{}", self.crew_active)}</div>
+                    <div class="quick-stat-label">"Crew Active"</div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="section-title">"Recent Activity"</h2>
+                <div class="activity-list">
+                    <div class="activity-item">
+                        <span class="activity-text">"Invoice #1042 paid by Johnson Landscaping"</span>
+                        <span class="activity-time">"2 hours ago"</span>
+                    </div>
+                    <div class="activity-item">
+                        <span class="activity-text">"New customer: Smith Electrical"</span>
+                        <span class="activity-time">"5 hours ago"</span>
+                    </div>
+                    <div class="activity-item">
+                        <span class="activity-text">"Payment of $850.00 processed"</span>
+                        <span class="activity-time">"Yesterday"</span>
+                    </div>
+                    <div class="activity-item">
+                        <span class="activity-text">"Invoice #1041 sent to Garcia Plumbing"</span>
+                        <span class="activity-time">"Yesterday"</span>
+                    </div>
+                    <div class="activity-item">
+                        <span class="activity-text">"Crew member Mike assigned to Job #287"</span>
+                        <span class="activity-time">"2 days ago"</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

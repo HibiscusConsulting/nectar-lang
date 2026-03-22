@@ -1,0 +1,43 @@
+// PayHive dashboard layout wrapper
+// Sidebar (240px) + Header (64px) + Content area
+
+component DashboardLayout() {
+    let mut sidebar_visible: bool = true;
+
+    fn toggle_sidebar(&mut self) {
+        self.sidebar_visible = !self.sidebar_visible;
+    }
+
+    style {
+        .layout {
+            display: "flex";
+            min-height: "100vh";
+            background-color: "#F9FAFB";
+        }
+        .layout-main {
+            flex: "1";
+            display: "flex";
+            flex-direction: "column";
+            min-width: "0";
+        }
+        .layout-content {
+            flex: "1";
+            padding: "24px";
+            overflow-y: "auto";
+        }
+    }
+
+    render {
+        <div class="layout">
+            {if self.sidebar_visible {
+                <div>"sidebar placeholder"</div>
+            }}
+            <div class="layout-main">
+                <div>"header placeholder"</div>
+                <main class="layout-content">
+                    <div>"content placeholder"</div>
+                </main>
+            </div>
+        </div>
+    }
+}
