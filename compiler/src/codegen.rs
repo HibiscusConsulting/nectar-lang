@@ -881,6 +881,18 @@ impl WasmCodegen {
             Item::Contract(_) => { self.needs_http = true; }
             Item::Embed(_) => {}
             Item::Router(_) => {}
+            Item::Mod(m) => {
+                if let Some(ref items) = m.items {
+                    for item in items {
+                        self.scan_item_for_runtime_deps(item);
+                    }
+                }
+            }
+            Item::Form(f) => {
+                for method in &f.methods {
+                    self.scan_block_for_runtime_deps(&method.body);
+                }
+            }
             _ => {}
         }
     }
@@ -977,6 +989,7 @@ impl WasmCodegen {
                 self.scan_expr_for_runtime_deps(e);
             }
             Expr::Fetch { url, options, .. } => {
+                self.needs_http = true;
                 self.scan_expr_for_runtime_deps(url);
                 if let Some(opts) = options { self.scan_expr_for_runtime_deps(opts); }
             }
@@ -2044,8 +2057,15 @@ impl WasmCodegen {
             }
             // Import statements — resolved before codegen, no output needed
             Item::Use(_) => {}
-            // Module declarations — contents already flattened into the program
-            Item::Mod(_) => {}
+            // Module declarations — recurse into contained items
+            Item::Mod(m) => {
+                if let Some(ref items) = m.items {
+                    self.line(&format!(";; module {}", m.name));
+                    for item in items {
+                        self.generate_item(item);
+                    }
+                }
+            }
         }
     }
 
@@ -15450,6 +15470,8 @@ impl WasmCodegen {
             // assert_eq is void — it emits an if/else that calls test_fail but
             // does not leave a value on the stack.
             Expr::AssertEq { .. } => true,
+            // Navigate, Spawn, Parallel, Send are void — they call functions with no return value
+            Expr::Navigate { .. } | Expr::Spawn { .. } | Expr::Parallel { .. } | Expr::Send { .. } => true,
             _ => false,
         }
     }
