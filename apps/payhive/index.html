@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PayHive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; width: 100%; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    #app { min-height: 100vh; width: 100%; background: #F9FAFB; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { instantiate } from './core.js';
+    try {
+      document.getElementById('app').innerHTML = '';
+      const instance = await instantiate('./app.wasm', {
+        test: { pass: () => {}, fail: () => {}, summary: () => {} }
+      });
+      if (instance.exports.__init_all) {
+        instance.exports.__init_all();
+      }
+    } catch (e) {
+      document.getElementById('app').innerHTML =
+        '<div style="padding:48px;max-width:600px;margin:0 auto;font-family:Inter,sans-serif">' +
+        '<h1 style="color:#303234;margin-bottom:16px">PayHive</h1>' +
+        '<p style="color:#EF4444;margin-bottom:8px">WASM init error:</p>' +
+        '<pre style="color:#6B7280;font-size:13px;white-space:pre-wrap">' + e.message + '</pre></div>';
+      console.error(e);
+    }
+  </script>
+</body>
+</html>
