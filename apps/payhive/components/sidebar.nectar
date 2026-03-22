@@ -1,0 +1,130 @@
+// PayHive navigation sidebar
+// 240px width, white bg, right border, nav links with active state
+
+component Sidebar() {
+    let mut active_item: String = "dashboard";
+
+    fn nav_dashboard(&mut self) {
+        self.active_item = "dashboard";
+        navigate("/app");
+    }
+
+    fn nav_schedule(&mut self) {
+        self.active_item = "schedule";
+        navigate("/app/schedule");
+    }
+
+    fn nav_customers(&mut self) {
+        self.active_item = "customers";
+        navigate("/app/customers");
+    }
+
+    fn nav_invoices(&mut self) {
+        self.active_item = "invoices";
+        navigate("/app/invoices");
+    }
+
+    fn nav_payments(&mut self) {
+        self.active_item = "payments";
+        navigate("/app/payments");
+    }
+
+    fn nav_services(&mut self) {
+        self.active_item = "services";
+        navigate("/app/services");
+    }
+
+    fn nav_crew(&mut self) {
+        self.active_item = "crew";
+        navigate("/app/crew");
+    }
+
+    fn nav_reports(&mut self) {
+        self.active_item = "reports";
+        navigate("/app/reports");
+    }
+
+    fn nav_settings(&mut self) {
+        self.active_item = "settings";
+        navigate("/app/settings");
+    }
+
+    style {
+        .sidebar {
+            width: "240px";
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+            border-right: "1px solid #E5E7EB";
+            padding: "16px 0";
+            display: "flex";
+            flex-direction: "column";
+        }
+        .sidebar-brand {
+            padding: "0 20px 24px 20px";
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .sidebar-brand-text {
+            font-size: "22px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .sidebar-brand-accent {
+            color: "#FFB547";
+        }
+        .sidebar-nav {
+            display: "flex";
+            flex-direction: "column";
+            gap: "2px";
+            padding: "0 8px";
+        }
+        .nav-item {
+            padding: "10px 12px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#6B7280";
+            cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            gap: "10px";
+        }
+        .nav-item-active {
+            background-color: "#FFF7ED";
+            color: "#303234";
+            font-weight: "600";
+        }
+        .nav-section-label {
+            padding: "16px 12px 6px 12px";
+            font-size: "11px";
+            font-weight: "600";
+            color: "#9CA3AF";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+        }
+    }
+
+    render {
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <span class="sidebar-brand-text">"Pay"</span>
+                <span class="sidebar-brand-text sidebar-brand-accent">"Hive"</span>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">"Main"</div>
+                <div class="nav-item" on:click={self.nav_dashboard}>"Dashboard"</div>
+                <div class="nav-item" on:click={self.nav_schedule}>"Schedule"</div>
+                <div class="nav-item" on:click={self.nav_customers}>"Customers"</div>
+                <div class="nav-item" on:click={self.nav_invoices}>"Invoices"</div>
+                <div class="nav-item" on:click={self.nav_payments}>"Payments"</div>
+                <div class="nav-section-label">"Business"</div>
+                <div class="nav-item" on:click={self.nav_services}>"Services"</div>
+                <div class="nav-item" on:click={self.nav_crew}>"Crew"</div>
+                <div class="nav-item" on:click={self.nav_reports}>"Reports"</div>
+                <div class="nav-section-label">"System"</div>
+                <div class="nav-item" on:click={self.nav_settings}>"Settings"</div>
+            </nav>
+        </aside>
+    }
+}

@@ -1,0 +1,30 @@
+// App-wide state management for PayHive
+
+component AppStore() {
+    let mut page_title: String = "Dashboard";
+    let mut sidebar_open: bool = true;
+    let mut toast_message: String = "";
+    let mut toast_visible: bool = false;
+
+    fn set_title(&mut self) {
+        self.page_title = "Dashboard";
+    }
+
+    fn toggle_sidebar(&mut self) {
+        self.sidebar_open = !self.sidebar_open;
+    }
+
+    fn show_toast(&mut self) {
+        self.toast_visible = true;
+    }
+
+    fn hide_toast(&mut self) {
+        self.toast_visible = false;
+        self.toast_message = "";
+    }
+
+    render {
+        <div>
+        </div>
+    }
+}

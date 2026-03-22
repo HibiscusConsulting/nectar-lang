@@ -1,0 +1,37 @@
+// Auth state management for PayHive
+// Handles SSO session with hive-identity
+
+component AuthStore() {
+    let mut authenticated: bool = false;
+    let mut loading: bool = true;
+    let mut user_name: String = "";
+    let mut user_email: String = "";
+    let mut user_role: String = "";
+    let mut user_avatar: String = "";
+
+    fn check_session(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/auth/session");
+        self.loading = false;
+    }
+
+    fn login(&mut self) {
+        self.loading = true;
+        navigate("/login");
+    }
+
+    fn logout(&mut self) {
+        self.authenticated = false;
+        self.user_name = "";
+        self.user_email = "";
+        self.user_role = "";
+        self.user_avatar = "";
+        let response = fetch("/api/auth/logout");
+        navigate("/login");
+    }
+
+    render {
+        <div>
+        </div>
+    }
+}

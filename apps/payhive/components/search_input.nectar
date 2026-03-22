@@ -1,0 +1,63 @@
+// Search input with debounce
+// Calls search callback after user stops typing
+
+component SearchInput() {
+    let mut query: String = "";
+    let mut searching: bool = false;
+
+    fn on_search(&mut self) {
+        self.searching = true;
+    }
+
+    fn clear_search(&mut self) {
+        self.query = "";
+        self.searching = false;
+    }
+
+    style {
+        .search-wrapper {
+            position: "relative";
+            width: "100%";
+            max-width: "400px";
+        }
+        .search-input {
+            width: "100%";
+            padding: "10px 16px 10px 40px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#303234";
+            background-color: "#FFFFFF";
+            outline: "none";
+        }
+        .search-icon {
+            position: "absolute";
+            left: "12px";
+            top: "50%";
+            transform: "translateY(-50%)";
+            color: "#9CA3AF";
+            font-size: "16px";
+        }
+        .search-clear {
+            position: "absolute";
+            right: "12px";
+            top: "50%";
+            transform: "translateY(-50%)";
+            background: "none";
+            border: "none";
+            color: "#9CA3AF";
+            cursor: "pointer";
+            font-size: "16px";
+        }
+    }
+
+    render {
+        <div class="search-wrapper">
+            <span class="search-icon">"S"</span>
+            <input class="search-input" placeholder="Search..." value={format("{}", self.query)} />
+            {if self.searching {
+                <button class="search-clear" on:click={self.clear_search}>"x"</button>
+            }}
+        </div>
+    }
+}

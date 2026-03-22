@@ -1,0 +1,223 @@
+// PayHive invoice management page
+// Status filter tabs, date range, invoice list with amounts and status badges
+
+component InvoicesPage() {
+    let mut active_tab: String = "all";
+    let mut invoice_count: i32 = 42;
+    let mut loading: bool = false;
+
+    fn tab_all(&mut self) {
+        self.active_tab = "all";
+    }
+
+    fn tab_draft(&mut self) {
+        self.active_tab = "draft";
+    }
+
+    fn tab_sent(&mut self) {
+        self.active_tab = "sent";
+    }
+
+    fn tab_paid(&mut self) {
+        self.active_tab = "paid";
+    }
+
+    fn tab_overdue(&mut self) {
+        self.active_tab = "overdue";
+    }
+
+    fn create_invoice(&mut self) {
+        self.loading = true;
+    }
+
+    fn load_invoices(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/invoices");
+        self.loading = false;
+    }
+
+    style {
+        .invoices-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "20px";
+        }
+        .invoices-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .invoices-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .create-btn {
+            padding: "10px 20px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "600";
+            cursor: "pointer";
+        }
+        .tab-row {
+            display: "flex";
+            gap: "0";
+            border-bottom: "2px solid #E5E7EB";
+        }
+        .tab {
+            padding: "10px 20px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#6B7280";
+            border: "none";
+            background: "none";
+            cursor: "pointer";
+            border-bottom: "2px solid transparent";
+            margin-bottom: "-2px";
+        }
+        .tab-active {
+            color: "#303234";
+            font-weight: "600";
+            border-bottom-color: "#303234";
+        }
+        .invoice-list {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .invoice-header-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr 120px 120px 100px";
+            padding: "12px 20px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .invoice-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr 120px 120px 100px";
+            padding: "14px 20px";
+            border-bottom: "1px solid #F3F4F6";
+            align-items: "center";
+        }
+        .invoice-number {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .invoice-customer {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .invoice-amount {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .invoice-date {
+            font-size: "13px";
+            color: "#9CA3AF";
+        }
+        .badge-paid {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .badge-sent {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+        }
+        .badge-overdue {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+        }
+        .badge-draft {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+        .count-label {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+    }
+
+    render {
+        <div class="invoices-page">
+            <div class="invoices-header">
+                <div>
+                    <h1 class="invoices-title">"Invoices"</h1>
+                    <span class="count-label">{format("{} invoices", self.invoice_count)}</span>
+                </div>
+                <button class="create-btn" on:click={self.create_invoice}>"+ New Invoice"</button>
+            </div>
+
+            <div class="tab-row">
+                <button class="tab tab-active" on:click={self.tab_all}>"All"</button>
+                <button class="tab" on:click={self.tab_draft}>"Draft"</button>
+                <button class="tab" on:click={self.tab_sent}>"Sent"</button>
+                <button class="tab" on:click={self.tab_paid}>"Paid"</button>
+                <button class="tab" on:click={self.tab_overdue}>"Overdue"</button>
+            </div>
+
+            <div class="invoice-list">
+                <div class="invoice-header-row">
+                    <span>"Invoice"</span>
+                    <span>"Customer"</span>
+                    <span>"Amount"</span>
+                    <span>"Due Date"</span>
+                    <span>"Status"</span>
+                </div>
+                <div class="invoice-row">
+                    <span class="invoice-number">"INV-1042"</span>
+                    <span class="invoice-customer">"Johnson Landscaping"</span>
+                    <span class="invoice-amount">"$2,450.00"</span>
+                    <span class="invoice-date">"Mar 15, 2026"</span>
+                    <span class="badge-paid">"Paid"</span>
+                </div>
+                <div class="invoice-row">
+                    <span class="invoice-number">"INV-1041"</span>
+                    <span class="invoice-customer">"Garcia Plumbing"</span>
+                    <span class="invoice-amount">"$890.00"</span>
+                    <span class="invoice-date">"Mar 20, 2026"</span>
+                    <span class="badge-sent">"Sent"</span>
+                </div>
+                <div class="invoice-row">
+                    <span class="invoice-number">"INV-1040"</span>
+                    <span class="invoice-customer">"Smith Electrical"</span>
+                    <span class="invoice-amount">"$1,200.00"</span>
+                    <span class="invoice-date">"Mar 10, 2026"</span>
+                    <span class="badge-overdue">"Overdue"</span>
+                </div>
+                <div class="invoice-row">
+                    <span class="invoice-number">"INV-1039"</span>
+                    <span class="invoice-customer">"Wilson HVAC"</span>
+                    <span class="invoice-amount">"$3,100.00"</span>
+                    <span class="invoice-date">"Mar 25, 2026"</span>
+                    <span class="badge-draft">"Draft"</span>
+                </div>
+            </div>
+        </div>
+    }
+}

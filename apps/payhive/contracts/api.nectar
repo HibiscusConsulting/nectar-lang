@@ -1,0 +1,67 @@
+// PayHive API response contracts
+// Compile-time validated shapes for all API responses
+
+contract UserProfile {
+    id: i32,
+    email: String,
+    name: String,
+    role: String,
+    avatar_url: String,
+    company_id: i32,
+    company_name: String,
+}
+
+contract Customer {
+    id: i32,
+    name: String,
+    email: String,
+    phone: String,
+    status: String,
+    address: String,
+    balance_cents: i32,
+    created_at: String,
+}
+
+contract Invoice {
+    id: i32,
+    number: String,
+    customer_id: i32,
+    customer_name: String,
+    amount_cents: i32,
+    tax_cents: i32,
+    total_cents: i32,
+    status: String,
+    due_date: String,
+    created_at: String,
+}
+
+contract Payment {
+    id: i32,
+    invoice_id: i32,
+    customer_name: String,
+    amount_cents: i32,
+    method: String,
+    status: String,
+    processed_at: String,
+}
+
+contract FinancialSummary {
+    available_balance_cents: i32,
+    pending_cents: i32,
+    outstanding_cents: i32,
+    revenue_this_month_cents: i32,
+}
+
+contract QuickStat {
+    label: String,
+    value: String,
+    change_pct: i32,
+    trend: String,
+}
+
+contract ActivityItem {
+    id: i32,
+    description: String,
+    timestamp: String,
+    activity_type: String,
+}

@@ -1,0 +1,294 @@
+// PayHive payment history page
+// Status filter, payment list with amounts, refund capability
+
+component PaymentsPage() {
+    let mut active_filter: String = "all";
+    let mut payment_count: i32 = 156;
+    let mut loading: bool = false;
+    let mut refund_modal: bool = false;
+
+    fn filter_all(&mut self) {
+        self.active_filter = "all";
+    }
+
+    fn filter_completed(&mut self) {
+        self.active_filter = "completed";
+    }
+
+    fn filter_pending(&mut self) {
+        self.active_filter = "pending";
+    }
+
+    fn filter_refunded(&mut self) {
+        self.active_filter = "refunded";
+    }
+
+    fn filter_failed(&mut self) {
+        self.active_filter = "failed";
+    }
+
+    fn open_refund(&mut self) {
+        self.refund_modal = true;
+    }
+
+    fn close_refund(&mut self) {
+        self.refund_modal = false;
+    }
+
+    fn load_payments(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/payments");
+        self.loading = false;
+    }
+
+    style {
+        .payments-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "20px";
+        }
+        .payments-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .payments-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .filter-row {
+            display: "flex";
+            gap: "8px";
+        }
+        .filter-btn {
+            padding: "6px 14px";
+            border-radius: "9999px";
+            font-size: "13px";
+            font-weight: "500";
+            border: "1px solid #E5E7EB";
+            background-color: "#FFFFFF";
+            color: "#6B7280";
+            cursor: "pointer";
+        }
+        .filter-btn-active {
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border-color: "#303234";
+        }
+        .payment-list {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .payment-header-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr 120px 120px 100px 80px";
+            padding: "12px 20px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .payment-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr 120px 120px 100px 80px";
+            padding: "14px 20px";
+            border-bottom: "1px solid #F3F4F6";
+            align-items: "center";
+        }
+        .payment-id {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .payment-customer {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .payment-amount {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .payment-method {
+            font-size: "13px";
+            color: "#9CA3AF";
+        }
+        .badge-completed {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .badge-pending {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FFFBEB";
+            color: "#D97706";
+        }
+        .badge-refunded {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+        .badge-failed {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+        }
+        .refund-btn {
+            padding: "4px 10px";
+            font-size: "12px";
+            color: "#6B7280";
+            background: "none";
+            border: "1px solid #E5E7EB";
+            border-radius: "6px";
+            cursor: "pointer";
+        }
+        .count-label {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .refund-modal-bg {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            width: "100%";
+            height: "100%";
+            background-color: "rgba(0,0,0,0.5)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "500";
+        }
+        .refund-modal {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            min-width: "400px";
+        }
+        .refund-modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#303234";
+            margin-bottom: "16px";
+        }
+        .refund-modal-text {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "20px";
+        }
+        .refund-modal-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "8px";
+        }
+        .refund-cancel-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            background-color: "#F3F4F6";
+            color: "#303234";
+            border: "none";
+            cursor: "pointer";
+        }
+        .refund-confirm-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            background-color: "#EF4444";
+            color: "#FFFFFF";
+            border: "none";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="payments-page">
+            <div class="payments-header">
+                <div>
+                    <h1 class="payments-title">"Payments"</h1>
+                    <span class="count-label">{format("{} payments", self.payment_count)}</span>
+                </div>
+            </div>
+
+            <div class="filter-row">
+                <button class="filter-btn filter-btn-active" on:click={self.filter_all}>"All"</button>
+                <button class="filter-btn" on:click={self.filter_completed}>"Completed"</button>
+                <button class="filter-btn" on:click={self.filter_pending}>"Pending"</button>
+                <button class="filter-btn" on:click={self.filter_refunded}>"Refunded"</button>
+                <button class="filter-btn" on:click={self.filter_failed}>"Failed"</button>
+            </div>
+
+            <div class="payment-list">
+                <div class="payment-header-row">
+                    <span>"Payment"</span>
+                    <span>"Customer"</span>
+                    <span>"Amount"</span>
+                    <span>"Method"</span>
+                    <span>"Status"</span>
+                    <span>"Action"</span>
+                </div>
+                <div class="payment-row">
+                    <span class="payment-id">"PAY-3021"</span>
+                    <span class="payment-customer">"Johnson Landscaping"</span>
+                    <span class="payment-amount">"$2,450.00"</span>
+                    <span class="payment-method">"ACH"</span>
+                    <span class="badge-completed">"Completed"</span>
+                    <button class="refund-btn" on:click={self.open_refund}>"Refund"</button>
+                </div>
+                <div class="payment-row">
+                    <span class="payment-id">"PAY-3020"</span>
+                    <span class="payment-customer">"Smith Electrical"</span>
+                    <span class="payment-amount">"$1,200.00"</span>
+                    <span class="payment-method">"Card"</span>
+                    <span class="badge-completed">"Completed"</span>
+                    <button class="refund-btn" on:click={self.open_refund}>"Refund"</button>
+                </div>
+                <div class="payment-row">
+                    <span class="payment-id">"PAY-3019"</span>
+                    <span class="payment-customer">"Garcia Plumbing"</span>
+                    <span class="payment-amount">"$890.00"</span>
+                    <span class="payment-method">"ACH"</span>
+                    <span class="badge-pending">"Pending"</span>
+                    <span>""</span>
+                </div>
+                <div class="payment-row">
+                    <span class="payment-id">"PAY-3018"</span>
+                    <span class="payment-customer">"Wilson HVAC"</span>
+                    <span class="payment-amount">"$450.00"</span>
+                    <span class="payment-method">"Card"</span>
+                    <span class="badge-failed">"Failed"</span>
+                    <span>""</span>
+                </div>
+            </div>
+
+            {if self.refund_modal {
+                <div class="refund-modal-bg">
+                    <div class="refund-modal">
+                        <h2 class="refund-modal-title">"Confirm Refund"</h2>
+                        <p class="refund-modal-text">"Are you sure you want to refund this payment? This action cannot be undone."</p>
+                        <div class="refund-modal-actions">
+                            <button class="refund-cancel-btn" on:click={self.close_refund}>"Cancel"</button>
+                            <button class="refund-confirm-btn">"Refund Payment"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

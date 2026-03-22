@@ -1,0 +1,103 @@
+// PayHive SSO Login page
+// Orange gradient backdrop with centered white card
+
+component LoginPage() {
+    let mut logging_in: bool = false;
+
+    fn login_sso(&mut self) {
+        self.logging_in = true;
+        let response = fetch("/api/auth/sso/redirect");
+    }
+
+    style {
+        .login-page {
+            min-height: "100vh";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            background: "linear-gradient(135deg, #FFD36E 0%, #F68F1E 100%)";
+            position: "relative";
+            overflow: "hidden";
+        }
+        .login-backdrop {
+            position: "absolute";
+            top: "-50%";
+            left: "-25%";
+            width: "150%";
+            height: "200%";
+            background: "radial-gradient(ellipse at center, rgba(255,211,110,0.4) 0%, transparent 70%)";
+        }
+        .login-card {
+            background-color: "#FFFFFF";
+            border-radius: "16px";
+            padding: "48px 40px";
+            width: "100%";
+            max-width: "420px";
+            box-shadow: "0 20px 60px rgba(0,0,0,0.15)";
+            text-align: "center";
+            position: "relative";
+            z-index: "1";
+        }
+        .login-logo {
+            font-size: "32px";
+            font-weight: "800";
+            color: "#303234";
+            margin-bottom: "8px";
+        }
+        .login-logo-accent {
+            color: "#FFB547";
+        }
+        .login-heading {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#303234";
+            margin-bottom: "8px";
+        }
+        .login-subtext {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "32px";
+        }
+        .login-btn {
+            width: "100%";
+            padding: "14px 24px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "10px";
+            font-size: "16px";
+            font-weight: "600";
+            cursor: "pointer";
+        }
+        .login-btn-loading {
+            opacity: "0.7";
+            cursor: "not-allowed";
+        }
+        .login-footer {
+            margin-top: "24px";
+            font-size: "12px";
+            color: "#9CA3AF";
+        }
+    }
+
+    render {
+        <div class="login-page">
+            <div class="login-backdrop"></div>
+            <div class="login-card">
+                <div class="login-logo">
+                    <span>"Pay"</span>
+                    <span class="login-logo-accent">"Hive"</span>
+                </div>
+                <h1 class="login-heading">"Welcome to the Hive!"</h1>
+                <p class="login-subtext">"Sign in to manage your business, crew, and payments."</p>
+                {if self.logging_in {
+                    <button class="login-btn login-btn-loading">"Signing in..."</button>
+                }}
+                {if !self.logging_in {
+                    <button class="login-btn" on:click={self.login_sso}>"Sign in with PayHive SSO"</button>
+                }}
+                <p class="login-footer">"Powered by Hive Identity"</p>
+            </div>
+        </div>
+    }
+}

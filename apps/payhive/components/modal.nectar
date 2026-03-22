@@ -1,0 +1,105 @@
+// Modal dialog component
+// Centered overlay with backdrop
+
+component Modal() {
+    let mut visible: bool = false;
+    let mut title: String = "";
+
+    fn open(&mut self) {
+        self.visible = true;
+    }
+
+    fn close(&mut self) {
+        self.visible = false;
+    }
+
+    style {
+        .modal-backdrop {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            width: "100%";
+            height: "100%";
+            background-color: "rgba(0,0,0,0.5)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "500";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            min-width: "400px";
+            max-width: "600px";
+            box-shadow: "0 20px 60px rgba(0,0,0,0.2)";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .modal-close {
+            background: "none";
+            border: "none";
+            font-size: "20px";
+            color: "#9CA3AF";
+            cursor: "pointer";
+        }
+        .modal-body {
+            font-size: "14px";
+            color: "#6B7280";
+            line-height: "1.6";
+        }
+        .modal-footer {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "8px";
+            margin-top: "24px";
+        }
+        .modal-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+            border: "none";
+        }
+        .modal-btn-primary {
+            background-color: "#303234";
+            color: "#FFFFFF";
+        }
+        .modal-btn-secondary {
+            background-color: "#F3F4F6";
+            color: "#303234";
+        }
+    }
+
+    render {
+        <div>
+            {if self.visible {
+                <div class="modal-backdrop">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">{format("{}", self.title)}</h2>
+                            <button class="modal-close" on:click={self.close}>"x"</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>"Modal content goes here."</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="modal-btn modal-btn-secondary" on:click={self.close}>"Cancel"</button>
+                            <button class="modal-btn modal-btn-primary">"Confirm"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}
