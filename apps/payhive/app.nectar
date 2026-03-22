@@ -1,7 +1,6 @@
 // PayHive — Full-stack field service management platform
 // Built with Nectar: compiled to WASM, zero JavaScript dependencies
 //
-// Routes match the React original at ~/repos/payhive/payhive/src/
 // Colors: #303234 (dark), #FFB547 (gold), #F68F1E (amber), #F9FAFB (bg)
 
 // Load all modules
@@ -12,18 +11,54 @@ mod contracts;
 mod theme;
 
 router AppRouter {
+    // Core app pages
     route "/" => Dashboard,
     route "/app" => Dashboard,
     route "/app/schedule" => Schedule,
-    route "/app/customers" => Customers,
+    route "/app/customers" => CustomersPage,
+    route "/app/invoices" => InvoicesPage,
+    route "/app/payments" => PaymentsPage,
     route "/app/services" => Services,
     route "/app/crew" => Crew,
     route "/app/reports" => Reports,
     route "/app/settings" => Settings,
     route "/app/insights" => Insights,
-    route "/signup/:code" => Signup,
+
+    // Auth pages
+    route "/login" => LoginPage,
+    route "/signup" => Signup,
     route "/auth/callback" => AuthCallback,
     route "/forgot-password" => ForgotPassword,
     route "/reset-password" => ResetPassword,
+
+    // Account portal
+    route "/account" => AccountDashboard,
+    route "/account/payments" => AccountPayments,
+    route "/account/invoices" => AccountInvoices,
+    route "/account/properties" => AccountProperties,
+    route "/account/approvals" => AccountApprovals,
+    route "/account/passkeys" => AccountPasskeys,
+
+    // CRM
+    route "/crm" => CrmDashboard,
+    route "/crm/pipeline" => Pipeline,
+    route "/crm/contacts" => CrmContacts,
+    route "/crm/organizations" => CrmOrganizations,
+    route "/crm/tasks" => CrmTasks,
+    route "/crm/feedback" => FeedbackDashboard,
+
+    // Accounting
+    route "/acct" => AcctDashboard,
+    route "/acct/transactions" => AcctTransactions,
+    route "/acct/exceptions" => AcctExceptions,
+    route "/acct/integrations" => AcctIntegrations,
+    route "/acct/dcf" => AcctDCF,
+
+    // Public pages
+    route "/landing" => LandingPage,
+    route "/legal/privacy" => PrivacyPolicy,
+    route "/legal/terms" => TermsOfService,
+    route "/security" => SecurityPage,
+
     fallback => NotFound,
 }

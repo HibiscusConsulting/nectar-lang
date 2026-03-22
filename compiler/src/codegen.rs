@@ -817,6 +817,31 @@ impl WasmCodegen {
     }
 
     /// Pre-scan the AST to determine which runtime categories are actually
+    /// Recursively collect component/page names from all items, including nested modules.
+    fn collect_component_names(&mut self, items: &[Item]) {
+        for item in items {
+            match item {
+                Item::Component(c) => {
+                    self.known_components.push(c.name.clone());
+                    let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((c.name.clone(), prop_names));
+                }
+                Item::LazyComponent(lc) => {
+                    self.known_components.push(lc.component.name.clone());
+                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
+                }
+                Item::Page(p) => self.known_components.push(p.name.clone()),
+                Item::Mod(m) => {
+                    if let Some(ref items) = m.items {
+                        self.collect_component_names(items);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// used by the program. This enables tree-shaking of unused runtime
     /// helpers (crypto, chart, datepicker, etc.) from the WASM output.
     fn scan_program_for_runtime_deps(&mut self, program: &Program) {
@@ -1648,20 +1673,13 @@ impl WasmCodegen {
             }
         }
 
-        // Pre-collect component names so template codegen can detect component instantiation
+        // Pre-collect component names so template codegen can detect component instantiation.
+        // Recursively walks into Item::Mod to find components in nested modules.
+        self.collect_component_names(&program.items);
+
+        // (continued below — keyword defs are collected in the same loop)
         for item in &program.items {
             match item {
-                Item::Component(c) => {
-                    self.known_components.push(c.name.clone());
-                    let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
-                    self.component_prop_defs.push((c.name.clone(), prop_names));
-                },
-                Item::LazyComponent(lc) => {
-                    self.known_components.push(lc.component.name.clone());
-                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
-                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
-                },
-                Item::Page(p) => self.known_components.push(p.name.clone()),
                 // Collect keyword definition names so bare references to them
                 // (e.g. `AppAuth` in `AppAuth.login(...)`) are treated as
                 // namespace handles rather than local variable references.
