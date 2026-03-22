@@ -1,0 +1,53 @@
+// Accounting API response contracts
+// Compile-time validated shapes for accounting module responses
+
+contract Transaction {
+    id: i32,
+    date: String,
+    description: String,
+    amount_cents: i32,
+    state: String,
+    account_name: String,
+    account_code: String,
+    created_at: String,
+}
+
+contract Exception {
+    id: i32,
+    transaction_id: i32,
+    exception_type: String,
+    priority: String,
+    description: String,
+    amount_cents: i32,
+    date: String,
+    assigned_to: String,
+    status: String,
+    created_at: String,
+}
+
+contract Integration {
+    id: i32,
+    provider: String,
+    institution_name: String,
+    account_name: String,
+    account_mask: String,
+    account_type: String,
+    status: String,
+    last_synced: String,
+    connected_at: String,
+}
+
+contract DCFProjection {
+    id: i32,
+    model_name: String,
+    year: i32,
+    revenue_cents: i32,
+    operating_expenses_cents: i32,
+    ebitda_cents: i32,
+    free_cash_flow_cents: i32,
+    discount_rate_bps: i32,
+    terminal_growth_bps: i32,
+    enterprise_value_cents: i32,
+    source: String,
+    status: String,
+}

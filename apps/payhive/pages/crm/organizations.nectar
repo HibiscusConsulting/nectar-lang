@@ -1,0 +1,380 @@
+// CRM Organizations
+// Company records with search, stage management, table view
+
+component CrmOrganizations() {
+    let mut search_query: String = "";
+    let mut loading: bool = false;
+    let mut show_form: bool = false;
+    let mut org_count: i32 = 5;
+
+    fn search_orgs(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/organizations");
+        self.loading = false;
+    }
+
+    fn add_org(&mut self) {
+        self.show_form = true;
+    }
+
+    fn close_form(&mut self) {
+        self.show_form = false;
+    }
+
+    fn save_org(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/organizations");
+        self.show_form = false;
+        self.loading = false;
+    }
+
+    style {
+        .orgs-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .orgs-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .add-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .search-row {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            flex-wrap: "wrap";
+        }
+        .search-input {
+            padding: "8px 16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+            flex: "1";
+            max-width: "400px";
+        }
+        .search-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .orgs-table {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .table-header {
+            display: "grid";
+            grid-template-columns: "2fr 1fr 1fr 1fr 1fr 80px";
+            padding: "12px 16px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .th {
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .table-row {
+            display: "grid";
+            grid-template-columns: "2fr 1fr 1fr 1fr 1fr 80px";
+            padding: "12px 16px";
+            border-bottom: "1px solid #F3F4F6";
+            align-items: "center";
+            cursor: "pointer";
+        }
+        .org-name {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .org-industry {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .org-phone {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .org-contacts {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .stage-prospect {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#374151";
+        }
+        .stage-qualified {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DBEAFE";
+            color: "#1D4ED8";
+        }
+        .stage-proposal {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#EDE9FE";
+            color: "#6D28D9";
+        }
+        .stage-customer {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .stage-negotiation {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .delete-btn {
+            padding: "4px 8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#9CA3AF";
+            cursor: "pointer";
+            font-size: "14px";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0, 0, 0, 0.3)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            width: "100%";
+            max-width: "512px";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .close-btn {
+            padding: "8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            cursor: "pointer";
+            font-size: "18px";
+        }
+        .form-group {
+            margin-bottom: "16px";
+        }
+        .form-label {
+            display: "block";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#374151";
+            margin-bottom: "4px";
+        }
+        .form-input {
+            width: "100%";
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .form-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "12px";
+        }
+        .form-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "8px";
+            padding-top: "8px";
+        }
+        .cancel-btn {
+            padding: "8px 16px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .submit-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="orgs-page">
+            <div class="orgs-header">
+                <h1 class="page-title">"Organizations"</h1>
+                <button class="add-btn" on:click={self.add_org}>"+ Add Organization"</button>
+            </div>
+
+            <div class="search-row">
+                <input class="search-input" placeholder="Search organizations..." />
+                <button class="search-btn" on:click={self.search_orgs}>"Search"</button>
+            </div>
+
+            <div class="orgs-table">
+                <div class="table-header">
+                    <span class="th">"Organization"</span>
+                    <span class="th">"Industry"</span>
+                    <span class="th">"Phone"</span>
+                    <span class="th">"Stage"</span>
+                    <span class="th">"Contacts"</span>
+                    <span class="th">""</span>
+                </div>
+                <div class="table-row">
+                    <span class="org-name">"Acme Corp"</span>
+                    <span class="org-industry">"Technology"</span>
+                    <span class="org-phone">"(555) 100-2000"</span>
+                    <span><span class="stage-negotiation">"Negotiation"</span></span>
+                    <span class="org-contacts">"3"</span>
+                    <button class="delete-btn">"x"</button>
+                </div>
+                <div class="table-row">
+                    <span class="org-name">"TechStart LLC"</span>
+                    <span class="org-industry">"Software"</span>
+                    <span class="org-phone">"(555) 200-3000"</span>
+                    <span><span class="stage-qualified">"Qualified"</span></span>
+                    <span class="org-contacts">"2"</span>
+                    <button class="delete-btn">"x"</button>
+                </div>
+                <div class="table-row">
+                    <span class="org-name">"Green Valley Services"</span>
+                    <span class="org-industry">"Landscaping"</span>
+                    <span class="org-phone">"(555) 300-4000"</span>
+                    <span><span class="stage-prospect">"Prospect"</span></span>
+                    <span class="org-contacts">"1"</span>
+                    <button class="delete-btn">"x"</button>
+                </div>
+                <div class="table-row">
+                    <span class="org-name">"Johnson Landscaping"</span>
+                    <span class="org-industry">"Landscaping"</span>
+                    <span class="org-phone">"(555) 400-5000"</span>
+                    <span><span class="stage-customer">"Customer"</span></span>
+                    <span class="org-contacts">"2"</span>
+                    <button class="delete-btn">"x"</button>
+                </div>
+                <div class="table-row">
+                    <span class="org-name">"Wilson HVAC"</span>
+                    <span class="org-industry">"HVAC"</span>
+                    <span class="org-phone">"(555) 500-6000"</span>
+                    <span><span class="stage-proposal">"Proposal"</span></span>
+                    <span class="org-contacts">"1"</span>
+                    <button class="delete-btn">"x"</button>
+                </div>
+            </div>
+
+            {if self.show_form {
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">"New Organization"</h2>
+                            <button class="close-btn" on:click={self.close_form}>"X"</button>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Organization Name"</label>
+                            <input class="form-input" placeholder="Acme Inc." />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">"Phone"</label>
+                                <input class="form-input" placeholder="(555) 000-0000" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">"Industry"</label>
+                                <input class="form-input" placeholder="e.g. Landscaping" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Website"</label>
+                            <input class="form-input" placeholder="https://example.com" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Address"</label>
+                            <input class="form-input" placeholder="123 Main St" />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">"City"</label>
+                                <input class="form-input" placeholder="Springfield" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">"State"</label>
+                                <input class="form-input" placeholder="IL" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Stage"</label>
+                            <select class="form-input">
+                                <option>"Prospect"</option>
+                                <option>"Qualified"</option>
+                                <option>"Proposal"</option>
+                                <option>"Negotiation"</option>
+                                <option>"Customer"</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button class="cancel-btn" on:click={self.close_form}>"Cancel"</button>
+                            <button class="submit-btn" on:click={self.save_org}>"Create"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

@@ -1,0 +1,28 @@
+// PayHive 404 page
+// Matches NotFound.jsx: centered message with navigation links
+
+component NotFound() {
+    fn go_dashboard(&mut self) {
+        navigate("/app");
+    }
+
+    fn go_customers(&mut self) {
+        navigate("/app/customers");
+    }
+
+    fn go_settings(&mut self) {
+        navigate("/app/settings");
+    }
+
+    render {
+        <div style="max-width: 560px; margin: 0 auto; text-align: center; padding: 64px 24px;">
+            <h2 style="font-size: 24px; font-weight: 600; color: #111827; margin-bottom: 8px;">"Page not found"</h2>
+            <p style="font-size: 14px; color: #6B7280; margin-bottom: 24px;">"We couldn't find the page you're looking for."</p>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                <button on:click={self.go_dashboard} style="padding: 10px 16px; background: #303234; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px;">"Go to Dashboard"</button>
+                <button on:click={self.go_customers} style="padding: 10px 16px; background: #FFFFFF; color: #374151; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;">"Customers"</button>
+                <button on:click={self.go_settings} style="padding: 10px 16px; background: #FFFFFF; color: #374151; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;">"Settings"</button>
+            </div>
+        </div>
+    }
+}

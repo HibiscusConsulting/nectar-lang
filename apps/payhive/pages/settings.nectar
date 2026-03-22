@@ -1,0 +1,285 @@
+// PayHive Settings page
+// Matches Settings.jsx: tabbed settings for Organization, Billing, Messaging,
+// Checklists, Settlement, Quotes, and User profile
+
+component Settings() {
+    let mut active_tab: String = "organization";
+    let mut loading: bool = false;
+    let mut toast_msg: String = "";
+    let mut toast_visible: bool = false;
+
+    // Organization fields
+    let mut org_name: String = "Green Lawn Pros";
+    let mut org_industry: String = "Lawn Care";
+    let mut org_website: String = "";
+    let mut org_phone: String = "(555) 111-2222";
+    let mut org_email: String = "info@greenlawnpros.com";
+    let mut has_org_edits: bool = false;
+
+    // Stripe status
+    let mut stripe_onboarded: bool = true;
+    let mut charges_enabled: bool = true;
+    let mut payouts_enabled: bool = true;
+
+    // User profile fields
+    let mut user_name: String = "Blake Burnette";
+    let mut user_email: String = "blake@greenlawnpros.com";
+    let mut user_phone: String = "(555) 333-4444";
+    let mut user_timezone: String = "America/New_York";
+    let mut user_theme: String = "system";
+    let mut notify_email: bool = true;
+    let mut notify_sms: bool = false;
+    let mut notify_billing: bool = true;
+
+    // Settlement fields
+    let mut net_terms_enabled: bool = false;
+    let mut net_term_days: i32 = 30;
+    let mut down_payment_enabled: bool = false;
+    let mut down_payment_percent: i32 = 30;
+    let mut multi_payment_enabled: bool = false;
+
+    fn set_tab_organization(&mut self) {
+        self.active_tab = "organization";
+    }
+
+    fn set_tab_billing(&mut self) {
+        self.active_tab = "billing";
+    }
+
+    fn set_tab_messaging(&mut self) {
+        self.active_tab = "messaging";
+    }
+
+    fn set_tab_settlement(&mut self) {
+        self.active_tab = "settlement";
+    }
+
+    fn set_tab_user(&mut self) {
+        self.active_tab = "user";
+    }
+
+    fn save_org(&mut self) {
+        self.has_org_edits = false;
+        self.toast_msg = "Organization saved";
+        self.toast_visible = true;
+    }
+
+    fn reset_org(&mut self) {
+        self.has_org_edits = false;
+    }
+
+    fn save_user(&mut self) {
+        self.toast_msg = "Profile updated";
+        self.toast_visible = true;
+    }
+
+    fn save_settlement(&mut self) {
+        self.toast_msg = "Settlement settings saved";
+        self.toast_visible = true;
+    }
+
+    fn open_stripe_dashboard(&mut self) {
+        // fetch POST /api/owner/platform-billing/dashboard-link -> redirect
+    }
+
+    fn continue_onboarding(&mut self) {
+        // fetch POST /api/owner/platform-billing/start-onboarding -> redirect
+    }
+
+    fn change_password(&mut self) {
+        navigate("/change-password");
+    }
+
+    fn dismiss_toast(&mut self) {
+        self.toast_visible = false;
+    }
+
+    render {
+        <div style="padding: 24px; background-color: #F9FAFB; min-height: 100vh;">
+            <div style="max-width: 1200px; margin: 0 auto;">
+                // Header
+                <div style="margin-bottom: 24px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #111827;">"Settings"</h1>
+                </div>
+
+                // Tabs
+                <div style="display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #E5E7EB;">
+                    <button on:click={self.set_tab_organization} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #374151; border: none; background: transparent; border-bottom: 2px solid #FFB547;">"Organization"</button>
+                    <button on:click={self.set_tab_billing} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"Billing"</button>
+                    <button on:click={self.set_tab_messaging} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"Messaging"</button>
+                    <button on:click={self.set_tab_settlement} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"Settlement"</button>
+                    <button on:click={self.set_tab_user} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"User"</button>
+                </div>
+
+                // Organization card
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #E5E7EB;">
+                        <h3 style="font-size: 16px; font-weight: 600; color: #111827;">{format("Organization - {}", self.org_name)}</h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        // Payments & Payouts status
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                            <div style="font-size: 14px; font-weight: 600; color: #111827;">"Payments & Payouts"</div>
+                            {if self.charges_enabled {
+                                <span style="font-size: 12px; padding: 4px 12px; background: #D1FAE5; color: #065F46; border-radius: 9999px; border: 1px solid #A7F3D0;">"All set"</span>
+                            }}
+                        </div>
+
+                        <div style="font-size: 11px; color: #9CA3AF; margin-bottom: 20px;">{format("payments: {} / payouts: {} / details_submitted: true", self.charges_enabled, self.payouts_enabled)}</div>
+
+                        // Org form fields
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Industry"</label>
+                                <select style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;">
+                                    <option value="lawn_care">"Lawn Care"</option>
+                                    <option value="cleaning">"Cleaning"</option>
+                                    <option value="plumbing">"Plumbing"</option>
+                                    <option value="hvac">"HVAC"</option>
+                                    <option value="pest_control">"Pest Control"</option>
+                                    <option value="landscaping">"Landscaping"</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Website"</label>
+                                <input type="text" placeholder="https://example.com" value={format("{}", self.org_website)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Phone"</label>
+                                <input type="text" placeholder="(555) 123-4567" value={format("{}", self.org_phone)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Email"</label>
+                                <input type="text" placeholder="info@company.com" value={format("{}", self.org_email)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                        </div>
+                    </div>
+                    // Actions footer
+                    <div style="padding: 16px 20px; border-top: 1px solid #E5E7EB; display: flex; gap: 8px; justify-content: flex-end;">
+                        <button on:click={self.continue_onboarding} style="padding: 8px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; color: #374151; font-size: 14px;">"Start/Continue Onboarding"</button>
+                        <button on:click={self.open_stripe_dashboard} style="padding: 8px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; color: #374151; font-size: 14px;">"Open Stripe Dashboard"</button>
+                        <button on:click={self.save_org} style="padding: 8px 16px; background: #303234; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px;">"Save Changes"</button>
+                        <button on:click={self.reset_org} style="padding: 8px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; color: #374151; font-size: 14px;">"Reset"</button>
+                    </div>
+                </div>
+
+                // Settlement card
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; margin-top: 16px;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #E5E7EB;">
+                        <h3 style="font-size: 16px; font-weight: 600; color: #111827;">"Payment & Settlement"</h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        // Auto-charge
+                        <div style="padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; background: #F9FAFB; margin-bottom: 12px;">
+                            <div style="font-size: 14px; font-weight: 600; color: #111827;">"Auto-charge on completion"</div>
+                            <div style="font-size: 13px; color: #6B7280; margin-top: 4px;">"Default path: automatically charge the saved payment method when a service is marked complete."</div>
+                        </div>
+
+                        // Net terms
+                        <div style="padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #111827;">"Enable Net Terms (Net-X)"</div>
+                                    <div style="font-size: 12px; color: #6B7280;">"Allow invoices to be due after completion."</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        // Down payment
+                        <div style="padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #111827;">"Enable Down Payments"</div>
+                                    <div style="font-size: 12px; color: #6B7280;">"Collect a percentage before work begins."</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        // Multi-payment
+                        <div style="padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #111827;">"Enable Multi-Payment Plans"</div>
+                                    <div style="font-size: 12px; color: #6B7280;">"Split the remaining balance into installments."</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        // Late fee policy
+                        <div style="padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; background: #F9FAFB;">
+                            <div style="font-size: 14px; font-weight: 600; color: #111827;">"Late fee policy"</div>
+                            <div style="font-size: 13px; color: #374151; margin-top: 4px;">"$0.00 late fee after 0 days past due."</div>
+                            <div style="font-size: 13px; color: #374151;">"0% per month after 0 days past due."</div>
+                            <div style="font-size: 11px; color: #9CA3AF; margin-top: 4px;">"Late fees are read-only for now."</div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+                            <button on:click={self.save_settlement} style="padding: 8px 16px; background: #303234; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px;">"Save Settlement Settings"</button>
+                        </div>
+                    </div>
+                </div>
+
+                // User profile card
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; margin-top: 16px;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #E5E7EB;">
+                        <h3 style="font-size: 16px; font-weight: 600; color: #111827;">"User Profile"</h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Name"</label>
+                                <input type="text" value={format("{}", self.user_name)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Email"</label>
+                                <input type="email" value={format("{}", self.user_email)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Phone"</label>
+                                <input type="text" value={format("{}", self.user_phone)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 4px;">"Timezone"</label>
+                                <input type="text" value={format("{}", self.user_timezone)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                        </div>
+
+                        // Notification preferences
+                        <div style="margin-top: 20px;">
+                            <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 12px;">"Notification Preferences"</div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" checked="true" />
+                                    <span style="font-size: 14px; color: #374151;">"Email notifications"</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" />
+                                    <span style="font-size: 14px; color: #374151;">"SMS notifications"</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="checkbox" checked="true" />
+                                    <span style="font-size: 14px; color: #374151;">"Billing alerts"</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 20px;">
+                            <button on:click={self.save_user} style="padding: 8px 16px; background: #303234; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px;">"Save Profile"</button>
+                            <button on:click={self.change_password} style="padding: 8px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; color: #374151; font-size: 14px;">"Change Password"</button>
+                        </div>
+                    </div>
+                </div>
+
+                // Toast
+                {if self.toast_visible {
+                    <div style="position: fixed; bottom: 24px; right: 24px; background: #303234; color: #F9FAFB; padding: 12px 20px; border-radius: 8px; font-size: 14px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span>{format("{}", self.toast_msg)}</span>
+                            <button on:click={self.dismiss_toast} style="background: transparent; border: none; color: #9CA3AF;">"x"</button>
+                        </div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}

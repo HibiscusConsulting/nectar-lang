@@ -1,0 +1,55 @@
+// Terms of Service page
+
+component TermsPage() {
+    render {
+        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
+            <div style="max-width: 800px; margin: 0 auto;">
+                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
+                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Terms of Service"</h1>
+                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"Last updated: March 2026"</p>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"1. Acceptance of Terms"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "By accessing or using PayHive's services, you agree to be bound by these Terms of Service. If you do not agree, you may not use our services."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"2. Description of Service"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "PayHive provides field service management software including scheduling, invoicing, payment processing, customer management, and crew coordination tools."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"3. Account Registration"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account credentials."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"4. Payment Terms"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "Payment processing is handled through Stripe. You agree to pay all fees associated with your use of the service. PayHive is not responsible for payment disputes between you and your customers."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"5. Data Ownership"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "You retain ownership of all data you submit to PayHive. We will not sell your data to third parties. You may export or delete your data at any time."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"6. Limitation of Liability"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "PayHive shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"7. Termination"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "Either party may terminate this agreement at any time. Upon termination, you may export your data within 30 days."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"8. Contact"</h2>
+                    <p style="color: #374151; line-height: 1.7;">
+                        "Questions about these Terms? Contact us at legal@payhiveapp.com."
+                    </p>
+                </div>
+            </div>
+        </div>
+    }
+}

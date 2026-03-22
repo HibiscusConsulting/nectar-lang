@@ -1,134 +1,22 @@
-// PayHive — Field service management and payment platform
-// Compiled to WASM with Nectar. Zero JavaScript.
-
-auth AppAuth {
-    providers: [hive_identity],
-    session_duration: "24h",
-}
+// PayHive — Full-stack field service management platform
+// Built with Nectar: compiled to WASM, zero JavaScript dependencies
+//
+// Routes match the React original at ~/repos/payhive/payhive/src/
+// Colors: #303234 (dark), #FFB547 (gold), #F68F1E (amber), #F9FAFB (bg)
 
 router AppRouter {
-    route "/login" => LoginPage,
-    route "/auth/callback" => AuthCallback,
-    route "/signup" => SignupPage,
+    route "/" => Dashboard,
     route "/app" => Dashboard,
-    route "/app/schedule" => SchedulePage,
-    route "/app/customers" => CustomersPage,
-    route "/app/invoices" => InvoicesPage,
-    route "/app/payments" => PaymentsPage,
-    route "/app/services" => ServicesPage,
-    route "/app/crew" => CrewPage,
-    route "/app/reports" => ReportsPage,
-    route "/app/settings" => SettingsPage,
-    route "/app/insights" => InsightsPage,
-    route "/account" => AccountDashboard,
-    route "/account/payments" => AccountPayments,
-    route "/account/invoices" => AccountInvoices,
-    fallback => NotFoundPage,
-}
-
-component NotFoundPage() {
-    render {
-        <div class="not-found">
-            <h1>"404"</h1>
-            <p>"Page not found."</p>
-        </div>
-    }
-}
-
-component AuthCallback() {
-    render {
-        <div class="auth-callback">
-            <p>"Authenticating..."</p>
-        </div>
-    }
-}
-
-component SignupPage() {
-    render {
-        <div class="signup">
-            <h1>"Create Account"</h1>
-            <p>"Sign up for PayHive."</p>
-        </div>
-    }
-}
-
-component SchedulePage() {
-    render {
-        <div class="schedule">
-            <h1>"Schedule"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component ServicesPage() {
-    render {
-        <div class="services">
-            <h1>"Services"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component CrewPage() {
-    render {
-        <div class="crew">
-            <h1>"Crew"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component ReportsPage() {
-    render {
-        <div class="reports">
-            <h1>"Reports"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component SettingsPage() {
-    render {
-        <div class="settings">
-            <h1>"Settings"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component InsightsPage() {
-    render {
-        <div class="insights">
-            <h1>"Insights"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component AccountDashboard() {
-    render {
-        <div class="account">
-            <h1>"Account"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component AccountPayments() {
-    render {
-        <div class="account-payments">
-            <h1>"Account Payments"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
-}
-
-component AccountInvoices() {
-    render {
-        <div class="account-invoices">
-            <h1>"Account Invoices"</h1>
-            <p>"Coming soon."</p>
-        </div>
-    }
+    route "/app/schedule" => Schedule,
+    route "/app/customers" => Customers,
+    route "/app/services" => Services,
+    route "/app/crew" => Crew,
+    route "/app/reports" => Reports,
+    route "/app/settings" => Settings,
+    route "/app/insights" => Insights,
+    route "/signup/:code" => Signup,
+    route "/auth/callback" => AuthCallback,
+    route "/forgot-password" => ForgotPassword,
+    route "/reset-password" => ResetPassword,
+    fallback => NotFound,
 }

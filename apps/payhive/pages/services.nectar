@@ -1,0 +1,244 @@
+// PayHive Services page
+// Matches Services.jsx: service catalog editor, pricing calculator,
+// service records list with responsive tabs
+
+struct Service {
+    id: i32,
+    name: String,
+    description: String,
+    price_cents: i32,
+    estimated_minutes: i32,
+    crew_members_needed: i32,
+    active: bool,
+}
+
+component Services() {
+    let mut active_section: String = "catalog";
+    let mut creating: bool = false;
+    let mut loading: bool = false;
+    let mut service_count: i32 = 6;
+    let mut toast_msg: String = "";
+    let mut toast_visible: bool = false;
+
+    // Create form state
+    let mut form_name: String = "";
+    let mut form_description: String = "";
+    let mut form_price: String = "";
+    let mut form_minutes: String = "45";
+    let mut form_crew: String = "2";
+    let mut form_equipment: String = "";
+    let mut form_notes: String = "";
+
+    // Pricing calculator state
+    let mut calc_rate: String = "";
+    let mut calc_units: String = "";
+    let mut calc_minimum: String = "";
+
+    fn set_section_catalog(&mut self) {
+        self.active_section = "catalog";
+    }
+
+    fn set_section_records(&mut self) {
+        self.active_section = "records";
+    }
+
+    fn toggle_create(&mut self) {
+        if self.creating {
+            self.creating = false;
+        } else {
+            self.creating = true;
+        }
+    }
+
+    fn save_service(&mut self) {
+        if self.form_name.len() < 1 {
+            self.toast_msg = "Service name is required";
+            self.toast_visible = true;
+        } else {
+            self.service_count = self.service_count + 1;
+            self.creating = false;
+            self.form_name = "";
+            self.form_description = "";
+            self.form_price = "";
+            self.toast_msg = "Service created successfully";
+            self.toast_visible = true;
+        }
+    }
+
+    fn dismiss_toast(&mut self) {
+        self.toast_visible = false;
+    }
+
+    render {
+        <div style="padding: 24px; background-color: #F9FAFB; min-height: 100vh;">
+            <div style="max-width: 1200px; margin: 0 auto;">
+                // Header
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                    <div>
+                        <h1 style="font-size: 24px; font-weight: 700; color: #111827;">"Services"</h1>
+                        <p style="font-size: 14px; color: #6B7280;">{format("{} services configured", self.service_count)}</p>
+                    </div>
+                    <button on:click={self.toggle_create} style="padding: 10px 20px; background-color: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;">"+ New Service"</button>
+                </div>
+
+                // Section tabs
+                <div style="display: flex; gap: 4px; margin-bottom: 16px;">
+                    <button on:click={self.set_section_catalog} style="padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; background: #FFB547; color: #303234; border: none;">"Service Catalog"</button>
+                    <button on:click={self.set_section_records} style="padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; background: #FFFFFF; color: #374151; border: 1px solid #D1D5DB;">"Service Records"</button>
+                </div>
+
+                // Create form (collapsible)
+                {if self.creating {
+                    <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 24px; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                            <h2 style="font-size: 18px; font-weight: 600; color: #111827;">"Create New Service"</h2>
+                            <button on:click={self.toggle_create} style="background: transparent; border: none; color: #6B7280; font-size: 20px;">"x"</button>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div>
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Service Name *"</label>
+                                <input type="text" placeholder="e.g. Lawn Mowing" value={format("{}", self.form_name)} style="width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Price (USD) *"</label>
+                                <div style="position: relative;">
+                                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6B7280;">"$"</span>
+                                    <input type="number" placeholder="0.00" value={format("{}", self.form_price)} style="width: 100%; padding: 10px 12px 10px 28px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                                </div>
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Estimated Minutes"</label>
+                                <input type="number" placeholder="45" value={format("{}", self.form_minutes)} style="width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Crew Members Needed"</label>
+                                <input type="number" placeholder="2" value={format("{}", self.form_crew)} style="width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Description"</label>
+                                <textarea placeholder="Describe the service..." value={format("{}", self.form_description)} style="width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; min-height: 80px;" />
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Equipment Needed"</label>
+                                <input type="text" placeholder="e.g. Mower, trimmer, blower" value={format("{}", self.form_equipment)} style="width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                        </div>
+
+                        // Pricing calculator section
+                        <div style="margin-top: 20px; padding: 16px; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;">
+                            <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 12px;">"Pricing Calculator"</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                                <div>
+                                    <label style="display: block; font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Rate per Unit ($)"</label>
+                                    <input type="number" placeholder="0.00" value={format("{}", self.calc_rate)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Default Units"</label>
+                                    <input type="number" placeholder="0" value={format("{}", self.calc_units)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Minimum Charge ($)"</label>
+                                    <input type="number" placeholder="0.00" value={format("{}", self.calc_minimum)} style="width: 100%; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px;" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                            <button on:click={self.toggle_create} style="padding: 10px 20px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Cancel"</button>
+                            <button on:click={self.save_service} style="padding: 10px 20px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;">"Save Service"</button>
+                        </div>
+                    </div>
+                }}
+
+                // Service catalog list
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+                    // Table header
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 12px 20px; background: #F9FAFB; border-bottom: 1px solid #E5E7EB; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">
+                        <div>"Service"</div>
+                        <div>"Price"</div>
+                        <div>"Duration"</div>
+                        <div>"Crew Size"</div>
+                        <div>"Status"</div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Lawn Mowing"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Standard residential lawn care"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$65.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"45 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"2"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Full Service"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Mowing, edging, trimming, blowing"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$120.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"90 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"3"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Hedge Trimming"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Trimming and shaping of hedges"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$85.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"60 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"2"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Leaf Removal"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Seasonal leaf cleanup and disposal"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$95.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"75 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"2"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Mulching"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Mulch installation and bed refresh"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$150.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"120 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"3"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #FEE2E2; color: #991B1B; border-radius: 9999px;">"Inactive"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px; padding: 16px 20px; align-items: center;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #111827;">"Aeration"</div>
+                            <div style="font-size: 12px; color: #6B7280;">"Core aeration for lawn health"</div>
+                        </div>
+                        <div style="font-size: 14px; color: #111827;">"$175.00"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"90 min"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"2"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+                </div>
+
+                // Toast
+                {if self.toast_visible {
+                    <div style="position: fixed; bottom: 24px; right: 24px; background: #303234; color: #F9FAFB; padding: 12px 20px; border-radius: 8px; font-size: 14px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span>{format("{}", self.toast_msg)}</span>
+                            <button on:click={self.dismiss_toast} style="background: transparent; border: none; color: #9CA3AF;">"x"</button>
+                        </div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}

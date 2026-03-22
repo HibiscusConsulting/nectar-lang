@@ -1,0 +1,1014 @@
+// PayHive marketing landing page
+// Hero, old way vs new, three revolutions, invoiceless architecture, metrics, security, FAQ, CTA
+// Brand: gold #FBAB2E, navy #112D4E, cream #FFFBF2
+
+component LandingPage() {
+    let mut email: String = "";
+    let mut hero_error: String = "";
+    let mut busy: bool = false;
+    let mut faq_open_1: bool = false;
+    let mut faq_open_2: bool = false;
+    let mut faq_open_3: bool = false;
+    let mut faq_open_4: bool = false;
+    let mut faq_open_5: bool = false;
+    let mut faq_open_6: bool = false;
+
+    fn start_demo(&mut self) {
+        self.busy = true;
+        self.hero_error = "";
+        let response = fetch("/api/public/leads");
+        self.busy = false;
+    }
+
+    fn on_login(&mut self) {
+        self.busy = false;
+    }
+
+    fn toggle_faq_1(&mut self) {
+        self.faq_open_1 = !self.faq_open_1;
+    }
+
+    fn toggle_faq_2(&mut self) {
+        self.faq_open_2 = !self.faq_open_2;
+    }
+
+    fn toggle_faq_3(&mut self) {
+        self.faq_open_3 = !self.faq_open_3;
+    }
+
+    fn toggle_faq_4(&mut self) {
+        self.faq_open_4 = !self.faq_open_4;
+    }
+
+    fn toggle_faq_5(&mut self) {
+        self.faq_open_5 = !self.faq_open_5;
+    }
+
+    fn toggle_faq_6(&mut self) {
+        self.faq_open_6 = !self.faq_open_6;
+    }
+
+    style {
+        .landing {
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+        }
+        .nav {
+            height: "64px";
+            border-bottom: "1px solid rgba(251,171,46,0.13)";
+            display: "flex";
+            align-items: "center";
+            padding: "0 24px";
+        }
+        .nav-brand {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#112D4E";
+        }
+        .nav-links {
+            display: "flex";
+            align-items: "center";
+            gap: "20px";
+            margin-left: "24px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#112D4E";
+        }
+        .nav-link {
+            opacity: "0.7";
+            text-decoration: "none";
+            color: "#112D4E";
+        }
+        .nav-right {
+            margin-left: "auto";
+        }
+        .login-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#112D4E";
+            background-color: "rgba(251,171,46,0.12)";
+            border: "none";
+            cursor: "pointer";
+        }
+        .hero {
+            background-color: "#FFFBF2";
+            padding: "64px 24px";
+            position: "relative";
+            overflow: "hidden";
+        }
+        .hero-inner {
+            max-width: "1280px";
+            margin: "0 auto";
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "48px";
+            align-items: "center";
+        }
+        .hero-content {
+            max-width: "560px";
+        }
+        .hero-h1 {
+            font-size: "48px";
+            font-weight: "700";
+            color: "#112D4E";
+            line-height: "1.0";
+        }
+        .hero-h1-gold {
+            font-size: "48px";
+            font-weight: "700";
+            color: "#E89A1C";
+            line-height: "1.0";
+        }
+        .hero-desc {
+            margin-top: "24px";
+            font-size: "18px";
+            line-height: "1.6";
+            color: "rgba(17,45,78,0.8)";
+        }
+        .hero-desc-auto {
+            color: "#E89A1C";
+            font-weight: "600";
+        }
+        .hero-sub {
+            margin-top: "12px";
+            font-size: "16px";
+            color: "rgba(17,45,78,0.6)";
+        }
+        .hero-form {
+            margin-top: "24px";
+            display: "flex";
+            gap: "8px";
+        }
+        .hero-input {
+            flex: "1";
+            padding: "12px 16px";
+            border-radius: "8px";
+            border: "1px solid #E5E7EB";
+            font-size: "15px";
+            background-color: "#FFFFFF";
+        }
+        .hero-cta {
+            padding: "12px 24px";
+            border-radius: "8px";
+            background-color: "#112D4E";
+            color: "#FFFFFF";
+            font-size: "15px";
+            font-weight: "600";
+            border: "none";
+            cursor: "pointer";
+        }
+        .hero-note {
+            margin-top: "12px";
+            font-size: "12px";
+            color: "rgba(17,45,78,0.5)";
+        }
+        .hero-error {
+            margin-top: "8px";
+            font-size: "14px";
+            color: "#DC2626";
+        }
+        .hero-phone {
+            display: "flex";
+            justify-content: "center";
+        }
+        .phone-frame {
+            border-radius: "32px";
+            background-color: "#FFFFFF";
+            padding: "12px";
+            width: "300px";
+            height: "620px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "14px";
+            color: "#737373";
+            border: "1px solid #E5E7EB";
+        }
+        .problem-section {
+            background-color: "#112D4E";
+            padding: "64px 24px";
+        }
+        .problem-inner {
+            max-width: "960px";
+            margin: "0 auto";
+        }
+        .problem-label {
+            font-size: "14px";
+            font-weight: "500";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+            color: "#FBAB2E";
+            text-align: "center";
+            margin-bottom: "12px";
+        }
+        .problem-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#FFFFFF";
+            text-align: "center";
+            margin-bottom: "32px";
+        }
+        .problem-card {
+            border-radius: "16px";
+            padding: "24px 32px";
+            border: "1px solid rgba(255,255,255,0.1)";
+            background-color: "#1A3D5C";
+        }
+        .problem-item {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+            color: "rgba(255,255,255,0.7)";
+            margin-bottom: "16px";
+        }
+        .problem-x {
+            width: "32px";
+            height: "32px";
+            border-radius: "50%";
+            background-color: "rgba(239,68,68,0.2)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            color: "#F87171";
+            font-size: "14px";
+            flex-shrink: "0";
+        }
+        .problem-pain {
+            font-weight: "500";
+            color: "#FFFFFF";
+        }
+        .problem-wait {
+            color: "rgba(255,255,255,0.5)";
+            margin-left: "12px";
+        }
+        .problem-stat {
+            margin-top: "32px";
+            padding-top: "24px";
+            border-top: "1px solid rgba(255,255,255,0.1)";
+            color: "rgba(255,255,255,0.6)";
+            font-size: "15px";
+        }
+        .problem-stat-bold {
+            color: "#FFFFFF";
+            font-weight: "600";
+        }
+        .problem-reveal {
+            margin-top: "40px";
+            text-align: "center";
+            font-size: "24px";
+            font-weight: "700";
+            color: "#FFFFFF";
+        }
+        .problem-reveal-gold {
+            color: "#FBAB2E";
+        }
+        .features-section {
+            background-color: "#FFFFFF";
+            padding: "64px 24px";
+        }
+        .features-inner {
+            max-width: "1120px";
+            margin: "0 auto";
+        }
+        .features-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#112D4E";
+            text-align: "center";
+            margin-bottom: "8px";
+        }
+        .features-subtitle {
+            font-size: "18px";
+            color: "#525252";
+            text-align: "center";
+            margin-bottom: "48px";
+        }
+        .features-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "32px";
+        }
+        .feature-card {
+            border-radius: "16px";
+            border: "2px solid #E5E7EB";
+            padding: "24px";
+            position: "relative";
+        }
+        .feature-number {
+            font-size: "72px";
+            font-weight: "700";
+            color: "#F5F5F5";
+            position: "absolute";
+            top: "-16px";
+            left: "-8px";
+        }
+        .feature-icon {
+            width: "48px";
+            height: "48px";
+            border-radius: "12px";
+            background-color: "#112D4E";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            color: "#FFFFFF";
+            margin-bottom: "16px";
+            font-size: "20px";
+        }
+        .feature-name {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#112D4E";
+        }
+        .feature-sub {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#FBAB2E";
+            margin-top: "4px";
+        }
+        .feature-desc {
+            font-size: "15px";
+            color: "#525252";
+            margin-top: "12px";
+            line-height: "1.5";
+        }
+        .value-section {
+            background-color: "#112D4E";
+            padding: "64px 24px";
+        }
+        .value-inner {
+            max-width: "960px";
+            margin: "0 auto";
+        }
+        .value-label {
+            font-size: "14px";
+            font-weight: "500";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+            color: "#FBAB2E";
+            text-align: "center";
+            margin-bottom: "12px";
+        }
+        .value-title {
+            font-size: "40px";
+            font-weight: "700";
+            color: "#FFFFFF";
+            text-align: "center";
+            line-height: "1.2";
+        }
+        .value-subtitle {
+            font-size: "18px";
+            color: "rgba(255,255,255,0.7)";
+            text-align: "center";
+            margin-top: "16px";
+            max-width: "640px";
+            margin-left: "auto";
+            margin-right: "auto";
+            margin-bottom: "48px";
+        }
+        .compare-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+            margin-bottom: "48px";
+        }
+        .compare-old {
+            border-radius: "16px";
+            background-color: "rgba(255,255,255,0.05)";
+            border: "1px solid rgba(255,255,255,0.1)";
+            padding: "24px";
+        }
+        .compare-old-header {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            margin-bottom: "16px";
+            color: "rgba(255,255,255,0.6)";
+        }
+        .compare-old-title {
+            font-weight: "600";
+        }
+        .compare-step {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            color: "rgba(255,255,255,0.5)";
+            margin-bottom: "12px";
+            font-size: "14px";
+        }
+        .step-num {
+            width: "24px";
+            height: "24px";
+            border-radius: "50%";
+            background-color: "rgba(255,255,255,0.1)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "12px";
+            flex-shrink: "0";
+        }
+        .compare-old-result {
+            margin-top: "16px";
+            padding-top: "16px";
+            border-top: "1px solid rgba(255,255,255,0.1)";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#F87171";
+        }
+        .compare-new {
+            border-radius: "16px";
+            background-color: "#1A3D5C";
+            border: "2px solid #FBAB2E";
+            padding: "24px";
+        }
+        .compare-new-header {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            margin-bottom: "16px";
+            color: "#FFFFFF";
+        }
+        .compare-new-title {
+            font-weight: "600";
+        }
+        .compare-new-icon {
+            color: "#FBAB2E";
+        }
+        .new-step {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            color: "#FFFFFF";
+            margin-bottom: "12px";
+            font-size: "14px";
+        }
+        .new-step-num {
+            width: "24px";
+            height: "24px";
+            border-radius: "50%";
+            background-color: "#FBAB2E";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "12px";
+            font-weight: "700";
+            flex-shrink: "0";
+        }
+        .crossed-step {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            color: "rgba(255,255,255,0.4)";
+            margin-bottom: "12px";
+            font-size: "14px";
+            text-decoration: "line-through";
+        }
+        .compare-new-result {
+            margin-top: "16px";
+            padding-top: "16px";
+            border-top: "1px solid rgba(251,171,46,0.4)";
+            font-size: "14px";
+            font-weight: "700";
+            color: "#FBAB2E";
+        }
+        .how-card {
+            border-radius: "16px";
+            background-color: "rgba(255,255,255,0.05)";
+            border: "1px solid rgba(255,255,255,0.1)";
+            padding: "24px 32px";
+        }
+        .how-title {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#FFFFFF";
+            margin-bottom: "16px";
+        }
+        .how-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "24px";
+        }
+        .how-item-icon {
+            width: "40px";
+            height: "40px";
+            border-radius: "12px";
+            background-color: "#1A3D5C";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            color: "#FBAB2E";
+            margin-bottom: "12px";
+            font-size: "16px";
+        }
+        .how-item-title {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#FFFFFF";
+            margin-bottom: "8px";
+        }
+        .how-item-desc {
+            font-size: "14px";
+            color: "rgba(255,255,255,0.6)";
+            line-height: "1.5";
+        }
+        .metrics-section {
+            background-color: "#FAFAFA";
+            padding: "64px 24px";
+        }
+        .metrics-inner {
+            max-width: "960px";
+            margin: "0 auto";
+        }
+        .metrics-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#112D4E";
+            text-align: "center";
+            margin-bottom: "48px";
+        }
+        .metrics-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "32px";
+            margin-bottom: "48px";
+        }
+        .metric-item {
+            text-align: "center";
+        }
+        .metric-numbers {
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            gap: "12px";
+        }
+        .metric-big {
+            font-size: "48px";
+            font-weight: "700";
+            color: "#112D4E";
+        }
+        .metric-arrow {
+            font-size: "48px";
+            font-weight: "700";
+            color: "#FBAB2E";
+        }
+        .metric-gold {
+            font-size: "48px";
+            font-weight: "700";
+            color: "#FBAB2E";
+        }
+        .metric-label-sm {
+            font-size: "14px";
+            color: "#737373";
+            margin-top: "4px";
+        }
+        .metric-desc {
+            margin-top: "8px";
+            font-size: "15px";
+            color: "#525252";
+        }
+        .metrics-callout {
+            border-radius: "16px";
+            border: "2px solid rgba(251,171,46,0.4)";
+            background-color: "#FFFFFF";
+            padding: "24px 32px";
+            text-align: "center";
+        }
+        .callout-bold {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#112D4E";
+        }
+        .callout-sub {
+            font-size: "15px";
+            color: "#525252";
+            margin-top: "8px";
+        }
+        .security-section {
+            background-color: "#FFFFFF";
+            padding: "48px 24px";
+            border-top: "1px solid #E5E7EB";
+        }
+        .security-inner {
+            max-width: "1120px";
+            margin: "0 auto";
+        }
+        .security-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#112D4E";
+            text-align: "center";
+            margin-bottom: "8px";
+        }
+        .security-subtitle {
+            font-size: "15px";
+            color: "#525252";
+            text-align: "center";
+            max-width: "640px";
+            margin: "0 auto 32px";
+        }
+        .security-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "16px";
+        }
+        .sec-card {
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "20px";
+        }
+        .sec-icon {
+            font-size: "20px";
+            color: "#FBAB2E";
+            margin-bottom: "8px";
+        }
+        .sec-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#112D4E";
+        }
+        .sec-desc {
+            font-size: "13px";
+            color: "#525252";
+            margin-top: "4px";
+            line-height: "1.5";
+        }
+        .faq-section {
+            background-color: "#FAFAFA";
+            padding: "64px 24px";
+        }
+        .faq-inner {
+            max-width: "768px";
+            margin: "0 auto";
+        }
+        .faq-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#112D4E";
+            text-align: "center";
+            margin-bottom: "32px";
+        }
+        .faq-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+        .faq-item {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .faq-question {
+            padding: "16px 20px";
+            font-size: "15px";
+            font-weight: "600";
+            color: "#112D4E";
+            cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            border: "none";
+            background: "none";
+            width: "100%";
+            text-align: "left";
+        }
+        .faq-answer {
+            padding: "0 20px 16px";
+            font-size: "14px";
+            color: "#525252";
+            line-height: "1.6";
+        }
+        .cta-section {
+            background-color: "#112D4E";
+            padding: "64px 24px";
+            text-align: "center";
+        }
+        .cta-title {
+            font-size: "32px";
+            font-weight: "700";
+            color: "#FFFFFF";
+            margin-bottom: "16px";
+        }
+        .cta-subtitle {
+            font-size: "18px";
+            color: "rgba(255,255,255,0.7)";
+            margin-bottom: "32px";
+        }
+        .cta-btn {
+            padding: "16px 32px";
+            border-radius: "8px";
+            background-color: "#FBAB2E";
+            color: "#112D4E";
+            font-size: "16px";
+            font-weight: "700";
+            border: "none";
+            cursor: "pointer";
+        }
+        .footer {
+            background-color: "#F5F5F5";
+            padding: "32px 24px";
+            text-align: "center";
+        }
+        .footer-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .footer-links {
+            display: "flex";
+            justify-content: "center";
+            gap: "24px";
+            margin-top: "16px";
+            font-size: "14px";
+        }
+        .footer-link {
+            color: "#525252";
+            text-decoration: "none";
+        }
+    }
+
+    render {
+        <div class="landing">
+            <header class="nav">
+                <div class="nav-brand">"PayHive"</div>
+                <nav class="nav-links">
+                    <a class="nav-link" href="#features">"Features"</a>
+                    <a class="nav-link" href="#value">"Value"</a>
+                    <a class="nav-link" href="#security">"Security"</a>
+                    <a class="nav-link" href="#faq">"FAQ"</a>
+                </nav>
+                <div class="nav-right">
+                    <button class="login-btn" on:click={self.on_login}>"Log in"</button>
+                </div>
+            </header>
+
+            <section class="hero">
+                <div class="hero-inner">
+                    <div class="hero-content">
+                        <h1 class="hero-h1">"We killed"</h1>
+                        <h1 class="hero-h1-gold">"invoicing."</h1>
+                        <p class="hero-desc">
+                            "Your technician finishes the job. Payment happens. "
+                            <span class="hero-desc-auto">"Automatically."</span>
+                        </p>
+                        <p class="hero-sub">"No invoice to send. No email to chase. No 30-day wait. The entire billing cycle? Gone."</p>
+                        <div class="hero-form">
+                            <button class="hero-cta" on:click={self.start_demo}>"Book a Demo"</button>
+                        </div>
+                        <div class="hero-note">"Join the contractors who stopped chasing payments."</div>
+                    </div>
+                    <div class="hero-phone">
+                        <div class="phone-frame">"[PayHive App Preview]"</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="problem-section">
+                <div class="problem-inner">
+                    <div class="problem-label">"The way it has always been done"</div>
+                    <h2 class="problem-title">"This is how most contractors get paid."</h2>
+                    <div class="problem-card">
+                        <div class="problem-item">
+                            <div class="problem-x">"X"</div>
+                            <span class="problem-pain">"Send invoice"</span>
+                            <span class="problem-wait">"Wait 3 days for them to open it"</span>
+                        </div>
+                        <div class="problem-item">
+                            <div class="problem-x">"X"</div>
+                            <span class="problem-pain">"Send reminder"</span>
+                            <span class="problem-wait">"Wait another week"</span>
+                        </div>
+                        <div class="problem-item">
+                            <div class="problem-x">"X"</div>
+                            <span class="problem-pain">"Make phone call"</span>
+                            <span class="problem-wait">"Check is in the mail"</span>
+                        </div>
+                        <div class="problem-item">
+                            <div class="problem-x">"X"</div>
+                            <span class="problem-pain">"Send to collections"</span>
+                            <span class="problem-wait">"Get 50 cents on the dollar"</span>
+                        </div>
+                        <div class="problem-stat">
+                            <span class="problem-stat-bold">"Average time to get paid: 45 days."</span>
+                            " That is cash you earned, sitting in someone else is pocket."
+                        </div>
+                    </div>
+                    <div class="problem-reveal">
+                        "What if the invoice... "
+                        <span class="problem-reveal-gold">"never existed?"</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="features-section" id="features">
+                <div class="features-inner">
+                    <h2 class="features-title">"Three things that change everything."</h2>
+                    <p class="features-subtitle">"Not features. Revolutions."</p>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-number">"1"</div>
+                            <div class="feature-icon">"$"</div>
+                            <h3 class="feature-name">"Automatic Payment"</h3>
+                            <p class="feature-sub">"Job done. Paid. Done."</p>
+                            <p class="feature-desc">"The moment your tech marks complete, money moves. No invoice. No email. No waiting."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">"2"</div>
+                            <div class="feature-icon">"#"</div>
+                            <h3 class="feature-name">"Cryptographic Proof"</h3>
+                            <p class="feature-sub">"Undeniable evidence."</p>
+                            <p class="feature-desc">"Photos, timestamps, GPS -- cryptographically sealed. Disputes become impossible."</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-number">"3"</div>
+                            <div class="feature-icon">"@"</div>
+                            <h3 class="feature-name">"Command Center"</h3>
+                            <p class="feature-sub">"Your entire operation."</p>
+                            <p class="feature-desc">"Crews. Schedules. Payroll. Customers. One system. Zero friction."</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="value-section" id="value">
+                <div class="value-inner">
+                    <div class="value-label">"The breakthrough"</div>
+                    <h2 class="value-title">"Invoiceless Architecture"</h2>
+                    <p class="value-subtitle">"We did not build faster invoicing. We removed the invoice entirely."</p>
+                    <div class="compare-grid">
+                        <div class="compare-old">
+                            <div class="compare-old-header">
+                                <span class="compare-old-title">"The Old Way"</span>
+                            </div>
+                            <div class="compare-step"><span class="step-num">"1"</span><span>"Work completed"</span></div>
+                            <div class="compare-step"><span class="step-num">"2"</span><span>"Generate invoice"</span></div>
+                            <div class="compare-step"><span class="step-num">"3"</span><span>"Send invoice"</span></div>
+                            <div class="compare-step"><span class="step-num">"4"</span><span>"Wait..."</span></div>
+                            <div class="compare-step"><span class="step-num">"5"</span><span>"Chase payment"</span></div>
+                            <div class="compare-step"><span class="step-num">"6"</span><span>"Maybe get paid"</span></div>
+                            <div class="compare-old-result">"Average: 45 days"</div>
+                        </div>
+                        <div class="compare-new">
+                            <div class="compare-new-header">
+                                <span class="compare-new-icon">"$"</span>
+                                <span class="compare-new-title">"PayHive"</span>
+                            </div>
+                            <div class="new-step"><span class="new-step-num">"1"</span><span>"Work completed + photo proof"</span></div>
+                            <div class="new-step"><span class="new-step-num">"2"</span><span>"Payment captured"</span></div>
+                            <div class="crossed-step"><span class="step-num">"-"</span><span>"Invoice? What invoice?"</span></div>
+                            <div class="compare-new-result">"Average: Instant"</div>
+                        </div>
+                    </div>
+                    <div class="how-card">
+                        <h3 class="how-title">"How it actually works:"</h3>
+                        <div class="how-grid">
+                            <div>
+                                <div class="how-item-icon">"$"</div>
+                                <h4 class="how-item-title">"Pre-Authorization"</h4>
+                                <p class="how-item-desc">"Customer authorizes payment when they book. ACH or card. The money is committed before you dispatch."</p>
+                            </div>
+                            <div>
+                                <div class="how-item-icon">"C"</div>
+                                <h4 class="how-item-title">"Verified Completion"</h4>
+                                <p class="how-item-desc">"Tech captures photos. System hashes everything -- SHA-256, timestamped, immutable. Proof that cannot be disputed."</p>
+                            </div>
+                            <div>
+                                <div class="how-item-icon">"Z"</div>
+                                <h4 class="how-item-title">"Atomic Settlement"</h4>
+                                <p class="how-item-desc">"Verification triggers payment. One moment: work done, money moved. The billing cycle collapses to zero."</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="metrics-section">
+                <div class="metrics-inner">
+                    <h2 class="metrics-title">"The numbers do not lie."</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-item">
+                            <div class="metric-numbers">
+                                <span class="metric-big">"45"</span>
+                                <span class="metric-arrow">">"</span>
+                                <span class="metric-gold">"0"</span>
+                            </div>
+                            <p class="metric-desc">"Days to get paid with invoicing vs. PayHive"</p>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-big">"100%"</div>
+                            <div class="metric-label-sm">"collection rate"</div>
+                            <p class="metric-desc">"Pre-authorized payments do not bounce"</p>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-big">"Zero"</div>
+                            <div class="metric-label-sm">"disputes"</div>
+                            <p class="metric-desc">"Cryptographic proof ends he said, she said"</p>
+                        </div>
+                    </div>
+                    <div class="metrics-callout">
+                        <p class="callout-bold">"The average contractor loses $50,000/year to slow payments, disputes, and write-offs."</p>
+                        <p class="callout-sub">"That is not a billing problem. That is a broken system problem. We fixed the system."</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="security-section" id="security">
+                <div class="security-inner">
+                    <h2 class="security-title">"Enterprise-grade security"</h2>
+                    <p class="security-subtitle">"Your data is protected by the same standards used by major financial institutions."</p>
+                    <div class="security-grid">
+                        <div class="sec-card">
+                            <div class="sec-icon">"lock"</div>
+                            <div class="sec-name">"End-to-End Encryption"</div>
+                            <div class="sec-desc">"TLS 1.3 in transit, AES-256 at rest. Payment data tokenized."</div>
+                        </div>
+                        <div class="sec-card">
+                            <div class="sec-icon">"shield"</div>
+                            <div class="sec-name">"FIDO2 Passwordless Auth"</div>
+                            <div class="sec-desc">"Hardware security keys and biometrics. No passwords."</div>
+                        </div>
+                        <div class="sec-card">
+                            <div class="sec-icon">"eye"</div>
+                            <div class="sec-name">"24/7 Monitoring"</div>
+                            <div class="sec-desc">"Automated threat detection with immediate alerting."</div>
+                        </div>
+                        <div class="sec-card">
+                            <div class="sec-icon">"server"</div>
+                            <div class="sec-name">"SOC 2 Infrastructure"</div>
+                            <div class="sec-desc">"Redundant systems, auto failover, geographic distribution."</div>
+                        </div>
+                        <div class="sec-card">
+                            <div class="sec-icon">"check"</div>
+                            <div class="sec-name">"PCI DSS Compliant"</div>
+                            <div class="sec-desc">"Full payment card industry security standards."</div>
+                        </div>
+                        <div class="sec-card">
+                            <div class="sec-icon">"users"</div>
+                            <div class="sec-name">"Role-Based Access"</div>
+                            <div class="sec-desc">"Granular permissions, least-privilege principle."</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="faq-section" id="faq">
+                <div class="faq-inner">
+                    <h2 class="faq-title">"Frequently Asked Questions"</h2>
+                    <div class="faq-list">
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_1}>"What types of businesses is PayHive designed for?"</button>
+                            {if self.faq_open_1 {
+                                <div class="faq-answer">"PayHive is built for field service contractors including HVAC, plumbing, electrical, lawn care, cleaning services, pest control, pool maintenance, pressure washing, roofing, and other service businesses that want to eliminate invoicing friction and get paid faster."</div>
+                            }}
+                        </div>
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_2}>"How does instant payment work?"</button>
+                            {if self.faq_open_2 {
+                                <div class="faq-answer">"When your technician completes a job and captures photos, payment is automatically triggered based on your settlement rules. No invoices to send, no 30-day wait. Customers pre-authorize payment, so funds move the moment the work is verified."</div>
+                            }}
+                        </div>
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_3}>"What makes service records cryptographically verified?"</button>
+                            {if self.faq_open_3 {
+                                <div class="faq-answer">"Every service record -- including photos, timestamps, and job details -- is hashed using SHA-256 and stored in a tamper-evident chain. This creates undeniable proof of what was done, when, and by whom."</div>
+                            }}
+                        </div>
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_4}>"What is Invoiceless Architecture?"</button>
+                            {if self.faq_open_4 {
+                                <div class="faq-answer">"Invoiceless Architecture is our breakthrough approach that eliminates the entire invoice-payment cycle. Instead of work, invoice, wait, chase, payment, we use pre-authorization and verified completion to trigger instant settlement."</div>
+                            }}
+                        </div>
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_5}>"What payment methods does PayHive accept?"</button>
+                            {if self.faq_open_5 {
+                                <div class="faq-answer">"PayHive accepts credit/debit card payments and ACH (bank transfers) via Stripe. Customers pre-authorize payments so you get paid automatically when jobs complete."</div>
+                            }}
+                        </div>
+                        <div class="faq-item">
+                            <button class="faq-question" on:click={self.toggle_faq_6}>"Can I manage multiple crews and track time?"</button>
+                            {if self.faq_open_6 {
+                                <div class="faq-answer">"Yes. PayHive includes crew management, time tracking, and direct integration with Gusto for payroll. Assign jobs, track hours, and sync timecards automatically."</div>
+                            }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cta-section">
+                <h2 class="cta-title">"Ready to stop chasing payments?"</h2>
+                <p class="cta-subtitle">"Join the contractors who get paid the moment the job is done."</p>
+                <button class="cta-btn" on:click={self.start_demo}>"Book a Demo"</button>
+            </section>
+
+            <footer class="footer">
+                <div class="footer-text">"2026 PayHive. All rights reserved."</div>
+                <div class="footer-links">
+                    <a class="footer-link" href="/terms">"Terms of Service"</a>
+                    <a class="footer-link" href="/privacy">"Privacy Policy"</a>
+                    <a class="footer-link" href="/security">"Security"</a>
+                </div>
+            </footer>
+        </div>
+    }
+}

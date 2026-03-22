@@ -1,0 +1,157 @@
+// PayHive Crew page
+// Matches Crews.jsx: crew member list, shifts, day summary, history, team management
+// with responsive tabs for Shifts, Day Summary, History, Teams
+
+component Crew() {
+    let mut active_tab: String = "shifts";
+    let mut role: String = "owner";
+    let mut crew_count: i32 = 8;
+    let mut loading: bool = false;
+
+    fn set_tab_shifts(&mut self) {
+        self.active_tab = "shifts";
+    }
+
+    fn set_tab_summary(&mut self) {
+        self.active_tab = "summary";
+    }
+
+    fn set_tab_history(&mut self) {
+        self.active_tab = "history";
+    }
+
+    fn set_tab_teams(&mut self) {
+        self.active_tab = "teams";
+    }
+
+    fn add_team_member(&mut self) {
+        self.crew_count = self.crew_count + 1;
+    }
+
+    render {
+        <div style="padding: 24px; background-color: #F9FAFB; min-height: 100vh;">
+            <div style="max-width: 1200px; margin: 0 auto;">
+                // Header
+                <div style="margin-bottom: 24px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #111827;">"Crews"</h1>
+                    <p style="font-size: 14px; color: #6B7280;">"Owner/Admin can view all crew timecards, shift events, and team summaries."</p>
+                </div>
+
+                // Tab bar
+                <div style="display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #E5E7EB;">
+                    <button on:click={self.set_tab_shifts} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #374151; border: none; background: transparent; border-bottom: 2px solid #FFB547;">"Shifts"</button>
+                    <button on:click={self.set_tab_summary} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"Day Summary"</button>
+                    <button on:click={self.set_tab_history} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"History"</button>
+                    <button on:click={self.set_tab_teams} style="padding: 10px 20px; font-size: 14px; font-weight: 500; color: #6B7280; border: none; background: transparent;">"Teams"</button>
+                </div>
+
+                // Shifts tab content
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: space-between;">
+                        <h2 style="font-size: 16px; font-weight: 600; color: #111827;">"Active Shifts"</h2>
+                        <div style="font-size: 13px; color: #6B7280;">"Today - March 22, 2026"</div>
+                    </div>
+
+                    // Crew member shift rows
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr; padding: 12px 20px; background: #F9FAFB; border-bottom: 1px solid #E5E7EB; font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase;">
+                        <div>"Crew Member"</div>
+                        <div>"Team"</div>
+                        <div>"Clock In"</div>
+                        <div>"Clock Out"</div>
+                        <div>"Status"</div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 9999px; background: #EFF6FF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #3B82F6;">"JD"</div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500; color: #111827;">"James Davis"</div>
+                                <div style="font-size: 12px; color: #6B7280;">"Crew Leader"</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 14px; color: #374151;">"Team Alpha"</div>
+                        <div style="font-size: 14px; color: #374151;">"7:00 AM"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"-"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 9999px; background: #FEF3C7; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #D97706;">"ML"</div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500; color: #111827;">"Maria Lopez"</div>
+                                <div style="font-size: 12px; color: #6B7280;">"Technician"</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 14px; color: #374151;">"Team Alpha"</div>
+                        <div style="font-size: 14px; color: #374151;">"7:15 AM"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"-"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr; padding: 16px 20px; border-bottom: 1px solid #F3F4F6; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 9999px; background: #F3E8FF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #7C3AED;">"RW"</div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500; color: #111827;">"Robert Williams"</div>
+                                <div style="font-size: 12px; color: #6B7280;">"Crew Leader"</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 14px; color: #374151;">"Team Beta"</div>
+                        <div style="font-size: 14px; color: #374151;">"7:30 AM"</div>
+                        <div style="font-size: 14px; color: #6B7280;">"-"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #D1FAE5; color: #065F46; border-radius: 9999px;">"Active"</span></div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr; padding: 16px 20px; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 9999px; background: #FEE2E2; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #DC2626;">"TJ"</div>
+                            <div>
+                                <div style="font-size: 14px; font-weight: 500; color: #111827;">"Tyler Johnson"</div>
+                                <div style="font-size: 12px; color: #6B7280;">"Technician"</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 14px; color: #374151;">"Team Beta"</div>
+                        <div style="font-size: 14px; color: #374151;">"8:00 AM"</div>
+                        <div style="font-size: 14px; color: #374151;">"12:30 PM"</div>
+                        <div><span style="font-size: 12px; padding: 2px 8px; background: #F3F4F6; color: #6B7280; border-radius: 9999px;">"Clocked Out"</span></div>
+                    </div>
+                </div>
+
+                // Teams card (shown below shifts for owner/admin)
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; overflow: hidden; margin-top: 16px;">
+                    <div style="padding: 16px 20px; border-bottom: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: space-between;">
+                        <h2 style="font-size: 16px; font-weight: 600; color: #111827;">"Teams"</h2>
+                        <button on:click={self.add_team_member} style="padding: 6px 16px; background: #FFB547; color: #303234; border: none; border-radius: 6px; font-size: 13px; font-weight: 600;">"+ Add Member"</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            // Team Alpha
+                            <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px;">
+                                <div style="font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 8px;">"Team Alpha"</div>
+                                <div style="font-size: 13px; color: #6B7280;">"4 members - Residential"</div>
+                                <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="font-size: 13px; color: #374151;">"James Davis (Leader)"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Maria Lopez"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Chris Martin"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Sarah Kim"</div>
+                                </div>
+                            </div>
+                            // Team Beta
+                            <div style="border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px;">
+                                <div style="font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 8px;">"Team Beta"</div>
+                                <div style="font-size: 13px; color: #6B7280;">"4 members - Commercial"</div>
+                                <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="font-size: 13px; color: #374151;">"Robert Williams (Leader)"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Tyler Johnson"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Alex Rivera"</div>
+                                    <div style="font-size: 13px; color: #374151;">"Jordan Lee"</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

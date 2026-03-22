@@ -1,0 +1,70 @@
+// PayHive Auth Callback page
+// Matches AuthCallback.jsx: OAuth2 authorization code callback handler
+// Exchanges authorization code + PKCE verifier for session tokens
+
+component AuthCallback() {
+    let mut status: String = "loading";
+    let mut message: String = "";
+    let mut exchange_attempted: bool = false;
+
+    fn exchange_code(&mut self) {
+        if self.exchange_attempted {
+            // Prevent double-exchange
+        } else {
+            self.exchange_attempted = true;
+            self.status = "loading";
+            // In real app:
+            // 1. Read ?code= and ?state= from URL query params
+            // 2. Validate state matches sessionStorage oauth_state
+            // 3. Read PKCE code_verifier from sessionStorage
+            // 4. POST to /api/auth/oauth/callback with { code, code_verifier, redirect_uri }
+            // 5. On success: clear PKCE data, refresh auth context, navigate to /app
+            // 6. On error: show error message
+
+            // Simulated success:
+            self.status = "success";
+            navigate("/app");
+        }
+    }
+
+    fn go_login(&mut self) {
+        navigate("/login");
+    }
+
+    render {
+        <div style="min-height: 100vh; background-color: #F9FAFB; display: flex; align-items: center; justify-content: center;">
+            <div style="max-width: 400px; width: 100%; padding: 24px;">
+                <div style="background: #FFFFFF; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); text-align: center;">
+                    // Logo
+                    <div style="font-size: 24px; font-weight: 700; color: #FFB547; margin-bottom: 24px;">"PayHive"</div>
+
+                    {if self.status == "loading" {
+                        <div>
+                            <div style="font-size: 16px; font-weight: 500; color: #111827; margin-bottom: 8px;">"Signing you in..."</div>
+                            <div style="font-size: 14px; color: #6B7280;">"Completing authentication. Please wait."</div>
+                            <div style="margin-top: 20px;">
+                                <div style="width: 40px; height: 40px; border: 3px solid #E5E7EB; border-top: 3px solid #FFB547; border-radius: 9999px; margin: 0 auto;"></div>
+                            </div>
+                        </div>
+                    }}
+
+                    {if self.status == "success" {
+                        <div>
+                            <div style="font-size: 16px; font-weight: 500; color: #10B981; margin-bottom: 8px;">"Authentication successful"</div>
+                            <div style="font-size: 14px; color: #6B7280;">"Redirecting to dashboard..."</div>
+                        </div>
+                    }}
+
+                    {if self.status == "error" {
+                        <div>
+                            <div style="padding: 12px; background: #FEE2E2; border-radius: 8px; margin-bottom: 16px;">
+                                <div style="font-size: 14px; color: #991B1B;">{format("{}", self.message)}</div>
+                            </div>
+                            <button on:click={self.go_login} style="padding: 10px 20px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;">"Back to Sign In"</button>
+                        </div>
+                    }}
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,482 @@
+// CRM Tasks
+// Task board with filters, priority badges, due dates, grouped by date
+
+component CrmTasks() {
+    let mut active_filter: String = "pending";
+    let mut sort_by: String = "due_at:asc";
+    let mut loading: bool = false;
+    let mut show_form: bool = false;
+
+    fn filter_pending(&mut self) {
+        self.active_filter = "pending";
+    }
+
+    fn filter_completed(&mut self) {
+        self.active_filter = "completed";
+    }
+
+    fn filter_all(&mut self) {
+        self.active_filter = "all";
+    }
+
+    fn add_task(&mut self) {
+        self.show_form = true;
+    }
+
+    fn close_form(&mut self) {
+        self.show_form = false;
+    }
+
+    fn save_task(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/tasks");
+        self.show_form = false;
+        self.loading = false;
+    }
+
+    fn refresh_tasks(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/tasks");
+        self.loading = false;
+    }
+
+    style {
+        .tasks-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .tasks-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .add-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .filters-bar {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            flex-wrap: "wrap";
+            gap: "8px";
+        }
+        .filter-group {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .filter-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            border: "1px solid #E5E7EB";
+            background-color: "#FFFFFF";
+            color: "#6B7280";
+            cursor: "pointer";
+        }
+        .filter-btn-active {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            cursor: "pointer";
+        }
+        .sort-select {
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .date-group {
+            margin-bottom: "24px";
+        }
+        .date-label {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#6B7280";
+            margin-bottom: "8px";
+        }
+        .task-list {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .task-row {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+            padding: "16px";
+            border-bottom: "1px solid #F3F4F6";
+        }
+        .task-row-completed {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+            padding: "16px";
+            border-bottom: "1px solid #F3F4F6";
+            background-color: "#F9FAFB";
+        }
+        .check-btn {
+            width: "24px";
+            height: "24px";
+            border-radius: "50%";
+            border: "2px solid #D1D5DB";
+            background-color: "transparent";
+            cursor: "pointer";
+            flex-shrink: "0";
+        }
+        .check-btn-done {
+            width: "24px";
+            height: "24px";
+            border-radius: "50%";
+            border: "2px solid #22C55E";
+            background-color: "#22C55E";
+            color: "#FFFFFF";
+            cursor: "pointer";
+            flex-shrink: "0";
+            font-size: "12px";
+        }
+        .task-content {
+            flex: "1";
+            min-width: "0";
+        }
+        .task-title {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+            cursor: "pointer";
+        }
+        .task-title-done {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#9CA3AF";
+            text-decoration: "line-through";
+            cursor: "pointer";
+        }
+        .task-meta {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            margin-top: "4px";
+        }
+        .task-type {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .task-due {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .task-due-overdue {
+            font-size: "13px";
+            color: "#EF4444";
+        }
+        .task-lead {
+            font-size: "13px";
+            color: "#2563EB";
+        }
+        .priority-low {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#4B5563";
+        }
+        .priority-normal {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DBEAFE";
+            color: "#2563EB";
+        }
+        .priority-high {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FFEDD5";
+            color: "#EA580C";
+        }
+        .priority-urgent {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEE2E2";
+            color: "#DC2626";
+        }
+        .action-btn {
+            padding: "8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#9CA3AF";
+            cursor: "pointer";
+            font-size: "14px";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0, 0, 0, 0.3)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            width: "100%";
+            max-width: "448px";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .close-btn {
+            padding: "8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            cursor: "pointer";
+            font-size: "18px";
+        }
+        .form-group {
+            margin-bottom: "16px";
+        }
+        .form-label {
+            display: "block";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#374151";
+            margin-bottom: "4px";
+        }
+        .form-input {
+            width: "100%";
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .form-row {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "12px";
+        }
+        .form-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "8px";
+            padding-top: "8px";
+        }
+        .cancel-btn {
+            padding: "8px 16px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .submit-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="tasks-page">
+            <div class="tasks-header">
+                <h1 class="page-title">"Tasks"</h1>
+                <button class="add-btn" on:click={self.add_task}>"+ Add Task"</button>
+            </div>
+
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <button class="filter-btn-active" on:click={self.filter_pending}>"Pending"</button>
+                    <button class="filter-btn" on:click={self.filter_completed}>"Completed"</button>
+                    <button class="filter-btn" on:click={self.filter_all}>"All"</button>
+                </div>
+                <select class="sort-select">
+                    <option>"Due Date (earliest first)"</option>
+                    <option>"Due Date (latest first)"</option>
+                    <option>"Newest First"</option>
+                    <option>"Oldest First"</option>
+                    <option>"Priority (urgent first)"</option>
+                </select>
+            </div>
+
+            <div class="date-group">
+                <div class="date-label">"Overdue"</div>
+                <div class="task-list">
+                    <div class="task-row">
+                        <button class="check-btn"></button>
+                        <div class="task-content">
+                            <div class="task-title">"Review contract terms"</div>
+                            <div class="task-meta">
+                                <span class="task-type">"todo"</span>
+                                <span class="task-due-overdue">"Overdue"</span>
+                                <span class="task-lead">"Acme Corp"</span>
+                            </div>
+                        </div>
+                        <span class="priority-urgent">"urgent"</span>
+                        <button class="action-btn">"x"</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="date-group">
+                <div class="date-label">"Today"</div>
+                <div class="task-list">
+                    <div class="task-row">
+                        <button class="check-btn"></button>
+                        <div class="task-content">
+                            <div class="task-title">"Follow up with Sarah Johnson"</div>
+                            <div class="task-meta">
+                                <span class="task-type">"call"</span>
+                                <span class="task-due">"Today"</span>
+                                <span class="task-lead">"Acme Corp"</span>
+                            </div>
+                        </div>
+                        <span class="priority-high">"high"</span>
+                        <button class="action-btn">"x"</button>
+                    </div>
+                    <div class="task-row">
+                        <button class="check-btn"></button>
+                        <div class="task-content">
+                            <div class="task-title">"Email proposal to Wilson HVAC"</div>
+                            <div class="task-meta">
+                                <span class="task-type">"email"</span>
+                                <span class="task-due">"Today"</span>
+                                <span class="task-lead">"Wilson HVAC"</span>
+                            </div>
+                        </div>
+                        <span class="priority-normal">"normal"</span>
+                        <button class="action-btn">"x"</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="date-group">
+                <div class="date-label">"Tomorrow"</div>
+                <div class="task-list">
+                    <div class="task-row">
+                        <button class="check-btn"></button>
+                        <div class="task-content">
+                            <div class="task-title">"Schedule demo for TechStart"</div>
+                            <div class="task-meta">
+                                <span class="task-type">"meeting"</span>
+                                <span class="task-due">"Tomorrow"</span>
+                                <span class="task-lead">"TechStart LLC"</span>
+                            </div>
+                        </div>
+                        <span class="priority-normal">"normal"</span>
+                        <button class="action-btn">"x"</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="date-group">
+                <div class="date-label">"This Week"</div>
+                <div class="task-list">
+                    <div class="task-row">
+                        <button class="check-btn"></button>
+                        <div class="task-content">
+                            <div class="task-title">"Prepare quote for Green Valley"</div>
+                            <div class="task-meta">
+                                <span class="task-type">"todo"</span>
+                                <span class="task-due">"Friday"</span>
+                                <span class="task-lead">"Green Valley Services"</span>
+                            </div>
+                        </div>
+                        <span class="priority-low">"low"</span>
+                        <button class="action-btn">"x"</button>
+                    </div>
+                </div>
+            </div>
+
+            {if self.show_form {
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">"New Task"</h2>
+                            <button class="close-btn" on:click={self.close_form}>"X"</button>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Title"</label>
+                            <input class="form-input" placeholder="Task title" />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">"Type"</label>
+                                <select class="form-input">
+                                    <option>"todo"</option>
+                                    <option>"call"</option>
+                                    <option>"email"</option>
+                                    <option>"meeting"</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">"Priority"</label>
+                                <select class="form-input">
+                                    <option>"normal"</option>
+                                    <option>"low"</option>
+                                    <option>"high"</option>
+                                    <option>"urgent"</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Due Date"</label>
+                            <input class="form-input" type="datetime-local" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Notes"</label>
+                            <input class="form-input" placeholder="Optional notes..." />
+                        </div>
+                        <div class="form-actions">
+                            <button class="cancel-btn" on:click={self.close_form}>"Cancel"</button>
+                            <button class="submit-btn" on:click={self.save_task}>"Create"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

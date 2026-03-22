@@ -1,0 +1,423 @@
+// Accounting DCF Valuations
+// DCF valuation model list with projections, create modal
+
+component AcctDCF() {
+    let mut loading: bool = false;
+    let mut show_create: bool = false;
+    let mut active_models: i32 = 1;
+    let mut highest_valuation: String = "$2,500,000";
+    let mut ai_analyzed: String = "1 / 2";
+
+    fn open_create(&mut self) {
+        self.show_create = true;
+    }
+
+    fn close_create(&mut self) {
+        self.show_create = false;
+    }
+
+    fn create_model(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/dcf/models");
+        self.show_create = false;
+        self.loading = false;
+    }
+
+    fn view_model(&mut self) {
+        self.loading = false;
+    }
+
+    fn delete_model(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/dcf/models/delete");
+        self.loading = false;
+    }
+
+    style {
+        .dcf-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .dcf-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .create-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .quick-stats {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "16px";
+        }
+        .quick-stat-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .quick-stat-inner {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .qs-icon-amber {
+            padding: "8px";
+            background-color: "#FEF3C7";
+            border-radius: "8px";
+            color: "#D97706";
+            font-size: "16px";
+        }
+        .qs-icon-green {
+            padding: "8px";
+            background-color: "#DCFCE7";
+            border-radius: "8px";
+            color: "#059669";
+            font-size: "16px";
+        }
+        .qs-icon-blue {
+            padding: "8px";
+            background-color: "#DBEAFE";
+            border-radius: "8px";
+            color: "#2563EB";
+            font-size: "16px";
+        }
+        .qs-label {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .qs-value {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .models-table {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .table-header {
+            display: "grid";
+            grid-template-columns: "2fr 100px 160px 100px 100px 100px 120px 60px";
+            padding: "12px 16px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .th {
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .table-row {
+            display: "grid";
+            grid-template-columns: "2fr 100px 160px 100px 100px 100px 120px 60px";
+            padding: "12px 16px";
+            border-bottom: "1px solid #F3F4F6";
+            align-items: "center";
+        }
+        .model-name {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#D97706";
+            cursor: "pointer";
+        }
+        .status-active {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .status-draft {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .ev-value {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#059669";
+            font-family: "monospace";
+        }
+        .ev-none {
+            font-size: "14px";
+            color: "#9CA3AF";
+        }
+        .cell-text {
+            font-size: "14px";
+            color: "#374151";
+        }
+        .ai-complete {
+            font-size: "14px";
+            color: "#059669";
+        }
+        .ai-pending {
+            font-size: "14px";
+            color: "#9CA3AF";
+        }
+        .delete-btn {
+            padding: "4px 8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#9CA3AF";
+            cursor: "pointer";
+            font-size: "14px";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0, 0, 0, 0.5)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            width: "100%";
+            max-width: "512px";
+            overflow: "hidden";
+        }
+        .modal-header {
+            padding: "24px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .modal-title {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .modal-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-top: "4px";
+        }
+        .modal-body {
+            padding: "24px";
+        }
+        .form-group {
+            margin-bottom: "16px";
+        }
+        .form-label {
+            display: "block";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#374151";
+            margin-bottom: "4px";
+        }
+        .form-input {
+            width: "100%";
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .form-row-2 {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "16px";
+        }
+        .form-row-3 {
+            display: "grid";
+            grid-template-columns: "1fr 1fr 1fr";
+            gap: "16px";
+        }
+        .form-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "12px";
+            padding: "16px 24px";
+            border-top: "1px solid #E5E7EB";
+        }
+        .cancel-btn {
+            padding: "8px 16px";
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#374151";
+            cursor: "pointer";
+        }
+        .submit-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="dcf-page">
+            <div class="dcf-header">
+                <div>
+                    <h1 class="page-title">"DCF Valuations"</h1>
+                    <p class="page-subtitle">"Discounted Cash Flow analysis with AI-powered projections"</p>
+                </div>
+                <button class="create-btn" on:click={self.open_create}>"+ New Valuation"</button>
+            </div>
+
+            <div class="quick-stats">
+                <div class="quick-stat-card">
+                    <div class="quick-stat-inner">
+                        <div class="qs-icon-amber">"T"</div>
+                        <div>
+                            <div class="qs-label">"Active Models"</div>
+                            <div class="qs-value">{format("{}", self.active_models)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="quick-stat-card">
+                    <div class="quick-stat-inner">
+                        <div class="qs-icon-green">"$"</div>
+                        <div>
+                            <div class="qs-label">"Highest Valuation"</div>
+                            <div class="qs-value">{format("{}", self.highest_valuation)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="quick-stat-card">
+                    <div class="quick-stat-inner">
+                        <div class="qs-icon-blue">"A"</div>
+                        <div>
+                            <div class="qs-label">"AI Analyzed"</div>
+                            <div class="qs-value">{format("{}", self.ai_analyzed)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="models-table">
+                <div class="table-header">
+                    <span class="th">"Model Name"</span>
+                    <span class="th">"Status"</span>
+                    <span class="th">"Enterprise Value"</span>
+                    <span class="th">"Projection"</span>
+                    <span class="th">"Discount"</span>
+                    <span class="th">"AI"</span>
+                    <span class="th">"Updated"</span>
+                    <span class="th">""</span>
+                </div>
+                <div class="table-row">
+                    <span class="model-name" on:click={self.view_model}>"2024 Valuation"</span>
+                    <span><span class="status-active">"Active"</span></span>
+                    <span class="ev-value">"$2,500,000"</span>
+                    <span class="cell-text">"5 years"</span>
+                    <span class="cell-text">"12.0%"</span>
+                    <span class="ai-complete">"Complete"</span>
+                    <span class="cell-text">"Jan 20"</span>
+                    <button class="delete-btn" on:click={self.delete_model}>"x"</button>
+                </div>
+                <div class="table-row">
+                    <span class="model-name" on:click={self.view_model}>"Q1 Projection Review"</span>
+                    <span><span class="status-draft">"Draft"</span></span>
+                    <span class="ev-none">"Not calculated"</span>
+                    <span class="cell-text">"5 years"</span>
+                    <span class="cell-text">"10.0%"</span>
+                    <span class="ai-pending">"Pending"</span>
+                    <span class="cell-text">"Jan 18"</span>
+                    <button class="delete-btn" on:click={self.delete_model}>"x"</button>
+                </div>
+            </div>
+
+            {if self.show_create {
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">"New DCF Valuation"</h2>
+                            <p class="modal-subtitle">"Create a new valuation model to analyze your business"</p>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label class="form-label">"Model Name"</label>
+                                <input class="form-input" placeholder="e.g., 2024 Annual Valuation" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">"Description (optional)"</label>
+                                <input class="form-input" placeholder="Notes about this valuation..." />
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label class="form-label">"Historical Start"</label>
+                                    <input class="form-input" type="date" />
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">"Historical End"</label>
+                                    <input class="form-input" type="date" />
+                                </div>
+                            </div>
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label class="form-label">"Projection Years"</label>
+                                    <select class="form-input">
+                                        <option>"3 years"</option>
+                                        <option>"5 years"</option>
+                                        <option>"7 years"</option>
+                                        <option>"10 years"</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">"Discount Rate"</label>
+                                    <select class="form-input">
+                                        <option>"8%"</option>
+                                        <option>"10%"</option>
+                                        <option>"12%"</option>
+                                        <option>"15%"</option>
+                                        <option>"18%"</option>
+                                        <option>"20%"</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">"Terminal Growth"</label>
+                                    <select class="form-input">
+                                        <option>"1%"</option>
+                                        <option>"2%"</option>
+                                        <option>"3%"</option>
+                                        <option>"4%"</option>
+                                        <option>"5%"</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="cancel-btn" on:click={self.close_create}>"Cancel"</button>
+                            <button class="submit-btn" on:click={self.create_model}>"Create Model"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

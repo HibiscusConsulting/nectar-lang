@@ -1,0 +1,361 @@
+// PayHive public magic link — quote review page
+// Token-based, no auth. Tiered pricing, accept/decline/request changes
+
+component MagicQuote() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut has_quote: bool = true;
+    let mut org_name: String = "ABC Landscaping";
+    let mut customer_name: String = "John Smith";
+    let mut service_name: String = "Full Yard Maintenance";
+    let mut quote_status: String = "pending";
+    let mut created_at: String = "Mar 18, 2026";
+    let mut selected_tier: String = "";
+    let mut show_change_form: bool = false;
+    let mut change_message: String = "";
+    let mut action_loading: bool = false;
+    let mut action_error: String = "";
+    let mut success_msg: String = "";
+    let mut good_price: String = "$75.00/visit";
+    let mut good_desc: String = "Basic mowing and edging";
+    let mut better_price: String = "$120.00/visit";
+    let mut better_desc: String = "Mowing, edging, and trimming";
+    let mut best_price: String = "$175.00/visit";
+    let mut best_desc: String = "Full service: mowing, edging, trimming, blowing, and weed control";
+
+    fn select_good(&mut self) {
+        self.selected_tier = "good";
+        let response = fetch("/api/portal/quotes/magic/select-tier");
+    }
+
+    fn select_better(&mut self) {
+        self.selected_tier = "better";
+        let response = fetch("/api/portal/quotes/magic/select-tier");
+    }
+
+    fn select_best(&mut self) {
+        self.selected_tier = "best";
+        let response = fetch("/api/portal/quotes/magic/select-tier");
+    }
+
+    fn accept_quote(&mut self) {
+        self.action_loading = true;
+        self.action_error = "";
+        self.success_msg = "";
+        let response = fetch("/api/portal/quotes/magic/accept");
+        self.success_msg = "Quote accepted! Your service will be scheduled.";
+        self.action_loading = false;
+    }
+
+    fn decline_quote(&mut self) {
+        self.action_loading = true;
+        self.action_error = "";
+        self.success_msg = "";
+        let response = fetch("/api/portal/quotes/magic/decline");
+        self.success_msg = "Quote declined.";
+        self.action_loading = false;
+    }
+
+    fn toggle_change_form(&mut self) {
+        self.show_change_form = !self.show_change_form;
+    }
+
+    fn submit_change(&mut self) {
+        self.action_loading = true;
+        self.action_error = "";
+        self.success_msg = "";
+        let response = fetch("/api/portal/quotes/magic/request-change");
+        self.success_msg = "Change request sent. You will hear back soon.";
+        self.action_loading = false;
+        self.show_change_form = false;
+    }
+
+    style {
+        .quote-page {
+            min-height: "100vh";
+            background-color: "#F5F5F5";
+        }
+        .quote-header {
+            background: "linear-gradient(to bottom, #FFBF47, #FFA11E)";
+            padding: "32px 24px";
+            text-align: "center";
+        }
+        .header-brand {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#2E2E2E";
+            margin-bottom: "8px";
+        }
+        .header-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#2E2E2E";
+        }
+        .header-subtitle {
+            font-size: "14px";
+            color: "rgba(46,46,46,0.7)";
+            margin-top: "4px";
+        }
+        .quote-body {
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "24px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .quote-info {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .info-label {
+            font-size: "12px";
+            color: "#737373";
+            text-transform: "uppercase";
+            margin-bottom: "4px";
+        }
+        .info-org {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .info-service {
+            font-size: "14px";
+            color: "#525252";
+            margin-top: "4px";
+        }
+        .info-date {
+            font-size: "12px";
+            color: "#737373";
+            margin-top: "4px";
+        }
+        .tiers-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "12px";
+        }
+        .tier-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "12px";
+        }
+        .tier-card {
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+            background-color: "#FAFAFA";
+            cursor: "pointer";
+        }
+        .tier-card-best {
+            border: "2px solid #F59E0B";
+            border-radius: "12px";
+            padding: "16px";
+            background-color: "#FFFBEB";
+            cursor: "pointer";
+        }
+        .tier-card-selected {
+            border: "2px solid #059669";
+            border-radius: "12px";
+            padding: "16px";
+            background-color: "#F0FDF4";
+            cursor: "pointer";
+        }
+        .tier-label {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "4px";
+        }
+        .tier-price {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#111827";
+            margin-bottom: "8px";
+        }
+        .tier-desc {
+            font-size: "13px";
+            color: "#525252";
+            line-height: "1.5";
+        }
+        .tier-recommended {
+            font-size: "11px";
+            font-weight: "600";
+            color: "#D97706";
+            text-transform: "uppercase";
+            margin-bottom: "4px";
+        }
+        .action-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .action-buttons {
+            display: "flex";
+            gap: "8px";
+            margin-bottom: "12px";
+        }
+        .accept-btn {
+            padding: "10px 20px";
+            border-radius: "8px";
+            background-color: "#FFA11E";
+            color: "#2E2E2E";
+            font-size: "14px";
+            font-weight: "600";
+            border: "none";
+            cursor: "pointer";
+        }
+        .decline-btn {
+            padding: "10px 20px";
+            border-radius: "8px";
+            background-color: "#FFFFFF";
+            color: "#DC2626";
+            font-size: "14px";
+            border: "1px solid #E5E7EB";
+            cursor: "pointer";
+        }
+        .change-btn {
+            padding: "10px 20px";
+            border-radius: "8px";
+            background-color: "#FFFFFF";
+            color: "#525252";
+            font-size: "14px";
+            border: "1px solid #E5E7EB";
+            cursor: "pointer";
+        }
+        .change-form {
+            margin-top: "12px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+        .change-label {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .change-textarea {
+            width: "100%";
+            min-height: "80px";
+            border: "1px solid #D1D5DB";
+            border-radius: "8px";
+            padding: "8px";
+            font-size: "14px";
+        }
+        .send-change-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            background-color: "#112D4E";
+            color: "#FFFFFF";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+            align-self: "flex-start";
+        }
+        .action-error {
+            font-size: "14px";
+            color: "#DC2626";
+            margin-top: "8px";
+        }
+        .action-success {
+            font-size: "14px";
+            color: "#059669";
+            margin-top: "8px";
+        }
+        .loading-text {
+            font-size: "14px";
+            color: "#404040";
+            padding: "32px";
+            text-align: "center";
+        }
+        .error-box {
+            background-color: "#FEF2F2";
+            border: "1px solid #FECACA";
+            border-radius: "6px";
+            padding: "12px";
+            font-size: "14px";
+            color: "#B91C1C";
+        }
+        .legal-note {
+            font-size: "11px";
+            color: "#737373";
+            text-align: "center";
+        }
+    }
+
+    render {
+        <div class="quote-page">
+            <div class="quote-header">
+                <div class="header-brand">"PayHive"</div>
+                <h1 class="header-title">"Your Quote"</h1>
+                <p class="header-subtitle">{format("From {}", self.org_name)}</p>
+            </div>
+
+            <div class="quote-body">
+                {if self.error_msg != "" {
+                    <div class="error-box">{format("{}", self.error_msg)}</div>
+                }}
+
+                {if self.has_quote {
+                    <div class="quote-info">
+                        <div class="info-label">"Quote for"</div>
+                        <div class="info-org">{format("{}", self.customer_name)}</div>
+                        <div class="info-service">{format("{}", self.service_name)}</div>
+                        <div class="info-date">{format("Sent {}", self.created_at)}</div>
+                    </div>
+
+                    <div>
+                        <div class="tiers-title">"Choose your plan"</div>
+                        <div class="tier-grid">
+                            <div class="tier-card" on:click={self.select_good}>
+                                <div class="tier-label">"Good"</div>
+                                <div class="tier-price">{format("{}", self.good_price)}</div>
+                                <div class="tier-desc">{format("{}", self.good_desc)}</div>
+                            </div>
+                            <div class="tier-card" on:click={self.select_better}>
+                                <div class="tier-label">"Better"</div>
+                                <div class="tier-price">{format("{}", self.better_price)}</div>
+                                <div class="tier-desc">{format("{}", self.better_desc)}</div>
+                            </div>
+                            <div class="tier-card-best" on:click={self.select_best}>
+                                <div class="tier-recommended">"Recommended"</div>
+                                <div class="tier-label">"Best"</div>
+                                <div class="tier-price">{format("{}", self.best_price)}</div>
+                                <div class="tier-desc">{format("{}", self.best_desc)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-buttons">
+                            <button class="accept-btn" on:click={self.accept_quote}>"Accept Quote"</button>
+                            <button class="decline-btn" on:click={self.decline_quote}>"Decline"</button>
+                            <button class="change-btn" on:click={self.toggle_change_form}>"Request Changes"</button>
+                        </div>
+
+                        {if self.show_change_form {
+                            <div class="change-form">
+                                <div class="change-label">"Describe the changes you need:"</div>
+                                <button class="send-change-btn" on:click={self.submit_change}>"Send Change Request"</button>
+                            </div>
+                        }}
+
+                        {if self.action_error != "" {
+                            <div class="action-error">{format("{}", self.action_error)}</div>
+                        }}
+
+                        {if self.success_msg != "" {
+                            <div class="action-success">{format("{}", self.success_msg)}</div>
+                        }}
+                    </div>
+
+                    <div class="legal-note">"We may record device/IP and approximate location for fraud prevention."</div>
+                }}
+            </div>
+        </div>
+    }
+}

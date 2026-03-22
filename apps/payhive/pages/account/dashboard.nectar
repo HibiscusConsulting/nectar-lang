@@ -1,0 +1,530 @@
+// PayHive account portal — customer self-service dashboard
+// Upcoming services, pending approvals, reschedule requests, referral sharing
+
+component AccountDashboard() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut service_label: String = "Scheduled Service";
+    let mut service_date: String = "Mar 28 @ 10:00 AM";
+    let mut service_address: String = "123 Main St, Austin, TX";
+    let mut reschedule_requested: bool = false;
+    let mut cancelled: bool = false;
+    let mut show_reschedule: bool = false;
+    let mut reschedule_reason: String = "";
+    let mut reschedule_submitting: bool = false;
+    let mut reschedule_success: bool = false;
+    let mut reschedule_error: String = "";
+    let mut pending_count: i32 = 0;
+    let mut has_pending: bool = true;
+    let mut approval_summary: String = "Service Authorization";
+    let mut approval_amount: String = "$150.00";
+    let mut approval_date: String = "Apr 2, 2026";
+    let mut referral_url: String = "https://thepayhive.com/r";
+    let mut has_more: bool = true;
+    let mut more_service_1: String = "Lawn Maintenance";
+    let mut more_date_1: String = "Apr 5 @ 9:00 AM";
+    let mut more_service_2: String = "Pest Control";
+    let mut more_date_2: String = "Apr 12 @ 2:00 PM";
+
+    fn refresh_data(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/users/upcoming-services");
+        self.loading = false;
+    }
+
+    fn open_reschedule(&mut self) {
+        self.show_reschedule = true;
+        self.reschedule_error = "";
+        self.reschedule_success = false;
+    }
+
+    fn close_reschedule(&mut self) {
+        self.show_reschedule = false;
+    }
+
+    fn submit_reschedule(&mut self) {
+        self.reschedule_submitting = true;
+        self.reschedule_error = "";
+        let response = fetch("/api/users/request-reschedule");
+        self.reschedule_success = true;
+        self.reschedule_submitting = false;
+    }
+
+    fn cancel_service(&mut self) {
+        let response = fetch("/api/users/cancel-service");
+        self.cancelled = true;
+    }
+
+    fn approve_request(&mut self) {
+        let response = fetch("/api/portal/approvals/approve");
+        self.has_pending = false;
+    }
+
+    fn decline_request(&mut self) {
+        let response = fetch("/api/portal/approvals/decline");
+        self.has_pending = false;
+    }
+
+    fn share_referral(&mut self) {
+        self.loading = false;
+    }
+
+    fn navigate_approvals(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .portal {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .approval-banner {
+            background-color: "#FFFBEB";
+            border-radius: "16px";
+            border: "1px solid #FDE68A";
+            overflow: "hidden";
+        }
+        .approval-banner-header {
+            padding: "16px 20px";
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .approval-bell {
+            font-size: "16px";
+            color: "#D97706";
+        }
+        .approval-banner-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#78350F";
+        }
+        .approval-divider {
+            height: "1px";
+            background-color: "#FDE68A";
+        }
+        .approval-body {
+            padding: "20px";
+        }
+        .approval-card {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            border: "1px solid #FDE68A";
+            padding: "16px";
+        }
+        .approval-label {
+            font-size: "11px";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+            color: "#B45309";
+            margin-bottom: "4px";
+        }
+        .approval-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .approval-detail {
+            font-size: "14px";
+            color: "#4B5563";
+            margin-top: "4px";
+        }
+        .approval-actions {
+            display: "flex";
+            gap: "8px";
+            margin-top: "12px";
+        }
+        .approve-btn {
+            padding: "8px 16px";
+            border-radius: "6px";
+            background-color: "#059669";
+            color: "#FFFFFF";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+        }
+        .decline-btn {
+            padding: "8px 16px";
+            border-radius: "6px";
+            background-color: "#FFFFFF";
+            color: "#111827";
+            font-size: "14px";
+            font-weight: "500";
+            border: "1px solid #D1D5DB";
+            cursor: "pointer";
+        }
+        .view-all-link {
+            font-size: "14px";
+            color: "#B45309";
+            text-decoration: "underline";
+            margin-top: "12px";
+            cursor: "pointer";
+            background: "none";
+            border: "none";
+        }
+        .card-shell {
+            background-color: "#FFFFFF";
+            border-radius: "16px";
+            border: "1px solid #E5E7EB";
+            overflow: "hidden";
+        }
+        .card-header {
+            padding: "16px 20px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .card-title {
+            font-size: "20px";
+            font-weight: "800";
+            color: "#111827";
+        }
+        .card-header-actions {
+            display: "flex";
+            gap: "8px";
+        }
+        .refresh-btn {
+            padding: "8px 12px";
+            border-radius: "6px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#92400E";
+            border: "1px solid rgba(251,171,46,0.4)";
+            background: "none";
+            cursor: "pointer";
+        }
+        .card-divider {
+            height: "1px";
+            background-color: "#E5E7EB";
+        }
+        .card-body {
+            padding: "20px";
+        }
+        .upcoming-block {
+            border-radius: "12px";
+            border: "1px solid #E5E7EB";
+            padding: "16px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "12px";
+        }
+        .upcoming-label {
+            font-size: "11px";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+            color: "#525252";
+        }
+        .upcoming-name {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+            margin-top: "4px";
+        }
+        .upcoming-detail {
+            font-size: "14px";
+            color: "#404040";
+            display: "flex";
+            align-items: "center";
+            gap: "4px";
+        }
+        .upcoming-actions {
+            display: "flex";
+            gap: "8px";
+            margin-top: "4px";
+        }
+        .reschedule-btn {
+            padding: "8px 12px";
+            border-radius: "6px";
+            font-size: "14px";
+            color: "#111827";
+            border: "1px solid #D1D5DB";
+            background: "none";
+            cursor: "pointer";
+        }
+        .cancel-btn {
+            padding: "8px 12px";
+            border-radius: "6px";
+            font-size: "14px";
+            color: "#DC2626";
+            border: "1px solid #D1D5DB";
+            background: "none";
+            cursor: "pointer";
+        }
+        .more-section {
+            background-color: "#FFFFFF";
+            border-radius: "16px";
+            border: "1px solid #E5E7EB";
+            overflow: "hidden";
+        }
+        .more-header {
+            padding: "16px 20px";
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            color: "#262626";
+        }
+        .more-title {
+            font-size: "16px";
+            font-weight: "600";
+        }
+        .more-grid {
+            padding: "20px";
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "16px";
+        }
+        .pill-reschedule {
+            display: "inline-flex";
+            align-items: "center";
+            gap: "4px";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "11px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#78350F";
+            border: "1px solid #FDE68A";
+        }
+        .pill-cancelled {
+            display: "inline-flex";
+            align-items: "center";
+            gap: "4px";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "11px";
+            font-weight: "500";
+            background-color: "#FFE4E6";
+            color: "#881337";
+            border: "1px solid #FECDD3";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            z-index: "50";
+        }
+        .modal-backdrop {
+            position: "absolute";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0,0,0,0.4)";
+        }
+        .modal-sheet {
+            position: "absolute";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "#FFFFFF";
+            border-top-left-radius: "16px";
+            border-top-right-radius: "16px";
+            border-top: "1px solid #E5E7EB";
+        }
+        .modal-content {
+            max-width: "672px";
+            margin: "0 auto";
+            padding: "16px";
+        }
+        .modal-handle {
+            width: "56px";
+            height: "6px";
+            border-radius: "9999px";
+            background-color: "#D4D4D4";
+            margin: "0 auto 8px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            margin-bottom: "8px";
+        }
+        .modal-service-info {
+            background-color: "#FAFAFA";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "12px";
+            font-size: "14px";
+            color: "#262626";
+            margin-bottom: "16px";
+        }
+        .modal-service-name {
+            font-weight: "500";
+        }
+        .modal-service-date {
+            color: "#404040";
+            margin-top: "4px";
+        }
+        .modal-label {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#262626";
+            margin-bottom: "4px";
+        }
+        .modal-textarea {
+            width: "100%";
+            border: "1px solid #D1D5DB";
+            border-radius: "8px";
+            padding: "8px";
+            font-size: "14px";
+            min-height: "72px";
+        }
+        .modal-hint {
+            font-size: "12px";
+            color: "#737373";
+            margin-top: "4px";
+        }
+        .modal-error {
+            font-size: "14px";
+            color: "#DC2626";
+            margin-top: "8px";
+        }
+        .modal-success {
+            font-size: "14px";
+            color: "#15803D";
+            margin-top: "8px";
+        }
+        .modal-buttons {
+            display: "flex";
+            gap: "8px";
+            margin-top: "16px";
+        }
+        .send-btn {
+            padding: "8px 16px";
+            border-radius: "6px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+        }
+        .close-btn {
+            padding: "8px 16px";
+            border-radius: "6px";
+            font-size: "14px";
+            color: "#111827";
+            border: "1px solid #D1D5DB";
+            background: "none";
+            cursor: "pointer";
+        }
+        .loading-text {
+            color: "#737373";
+        }
+        .error-text {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            color: "#DC2626";
+        }
+        .empty-text {
+            color: "#404040";
+        }
+    }
+
+    render {
+        <div class="portal">
+            {if self.has_pending {
+                <div class="approval-banner">
+                    <div class="approval-banner-header">
+                        <span class="approval-bell">"bell"</span>
+                        <h2 class="approval-banner-title">{format("Action Required ({})", self.pending_count)}</h2>
+                    </div>
+                    <div class="approval-divider"></div>
+                    <div class="approval-body">
+                        <div class="approval-card">
+                            <div class="approval-label">"Approval Needed"</div>
+                            <div class="approval-name">{format("{}", self.approval_summary)}</div>
+                            <div class="approval-detail">{format("Amount: {}", self.approval_amount)}</div>
+                            <div class="approval-detail">{format("Scheduled: {}", self.approval_date)}</div>
+                            <div class="approval-actions">
+                                <button class="approve-btn" on:click={self.approve_request}>"Approve"</button>
+                                <button class="decline-btn" on:click={self.decline_request}>"Decline"</button>
+                            </div>
+                        </div>
+                        <button class="view-all-link" on:click={self.navigate_approvals}>"View all approvals"</button>
+                    </div>
+                </div>
+            }}
+
+            <div class="card-shell">
+                <div class="card-header">
+                    <h1 class="card-title">"Customer Self-Service Portal"</h1>
+                    <div class="card-header-actions">
+                        <button class="refresh-btn" on:click={self.refresh_data}>"Refresh"</button>
+                    </div>
+                </div>
+                <div class="card-divider"></div>
+                <div class="card-body">
+                    <div class="upcoming-block">
+                        <div>
+                            <div class="upcoming-label">"Upcoming Service"</div>
+                            {if self.reschedule_requested {
+                                <span class="pill-reschedule">"Reschedule requested"</span>
+                            }}
+                            {if self.cancelled {
+                                <span class="pill-cancelled">"Cancelled"</span>
+                            }}
+                            <div class="upcoming-name">{format("{}", self.service_label)}</div>
+                            <div class="upcoming-detail">{format("{}", self.service_date)}</div>
+                            <div class="upcoming-detail">{format("{}", self.service_address)}</div>
+                        </div>
+                        <div class="upcoming-actions">
+                            <button class="reschedule-btn" on:click={self.open_reschedule}>"Request Reschedule"</button>
+                            <button class="cancel-btn" on:click={self.cancel_service}>"Cancel"</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {if self.has_more {
+                <div class="more-section">
+                    <div class="more-header">
+                        <span class="more-title">"More Upcoming"</span>
+                    </div>
+                    <div class="card-divider"></div>
+                    <div class="more-grid">
+                        <div class="upcoming-block">
+                            <div class="upcoming-label">"Upcoming Service"</div>
+                            <div class="upcoming-name">{format("{}", self.more_service_1)}</div>
+                            <div class="upcoming-detail">{format("{}", self.more_date_1)}</div>
+                        </div>
+                        <div class="upcoming-block">
+                            <div class="upcoming-label">"Upcoming Service"</div>
+                            <div class="upcoming-name">{format("{}", self.more_service_2)}</div>
+                            <div class="upcoming-detail">{format("{}", self.more_date_2)}</div>
+                        </div>
+                    </div>
+                </div>
+            }}
+
+            {if self.show_reschedule {
+                <div class="modal-overlay">
+                    <div class="modal-backdrop" on:click={self.close_reschedule}></div>
+                    <div class="modal-sheet">
+                        <div class="modal-content">
+                            <div class="modal-handle"></div>
+                            <h3 class="modal-title">"Request a Reschedule"</h3>
+                            <div class="modal-service-info">
+                                <div class="modal-service-name">{format("{}", self.service_label)}</div>
+                                <div class="modal-service-date">{format("{}", self.service_date)}</div>
+                            </div>
+                            <div class="modal-label">"Optional note"</div>
+                            <div class="modal-hint">"This sends a request to your provider. They will pick a new time."</div>
+                            {if self.reschedule_success {
+                                <div class="modal-success">"Request sent. We will notify you when it is rescheduled."</div>
+                            }}
+                            <div class="modal-buttons">
+                                <button class="send-btn" on:click={self.submit_reschedule}>"Send Request"</button>
+                                <button class="close-btn" on:click={self.close_reschedule}>"Close"</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

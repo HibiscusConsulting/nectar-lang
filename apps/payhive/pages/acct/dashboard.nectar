@@ -1,0 +1,308 @@
+// Accounting Dashboard
+// Financial overview with stats, quick actions, weekly activity
+
+component AcctDashboard() {
+    let mut pending_exceptions: i32 = 12;
+    let mut total_transactions: i32 = 1847;
+    let mut active_patterns: i32 = 24;
+    let mut auto_coded_rate: String = "87.5%";
+    let mut transactions_this_month: i32 = 342;
+    let mut resolved_this_week: i32 = 45;
+    let mut auto_coded_count: i32 = 299;
+    let mut loading: bool = false;
+
+    fn refresh_stats(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/dashboard/stats");
+        self.loading = false;
+    }
+
+    fn nav_exceptions(&mut self) {
+        self.loading = false;
+    }
+
+    fn nav_patterns(&mut self) {
+        self.loading = false;
+    }
+
+    fn nav_integrations(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .acct-dashboard {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .stats-grid {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .stat-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .stat-card-alert {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .stat-label {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "4px";
+        }
+        .stat-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .stat-trend {
+            font-size: "13px";
+            color: "#10B981";
+            margin-top: "4px";
+        }
+        .stat-trend-warn {
+            font-size: "13px";
+            color: "#F59E0B";
+            margin-top: "4px";
+        }
+        .two-col-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+        }
+        .section-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "24px";
+        }
+        .section-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "16px";
+        }
+        .action-item {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "16px";
+            border-radius: "8px";
+            margin-bottom: "12px";
+            cursor: "pointer";
+        }
+        .action-item-red {
+            background-color: "#FEF2F2";
+        }
+        .action-item-amber {
+            background-color: "#FFFBEB";
+        }
+        .action-item-blue {
+            background-color: "#EFF6FF";
+        }
+        .action-left {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .action-icon-red {
+            padding: "8px";
+            background-color: "#FEE2E2";
+            border-radius: "8px";
+            color: "#DC2626";
+            font-size: "16px";
+        }
+        .action-icon-amber {
+            padding: "8px";
+            background-color: "#FEF3C7";
+            border-radius: "8px";
+            color: "#D97706";
+            font-size: "16px";
+        }
+        .action-icon-blue {
+            padding: "8px";
+            background-color: "#DBEAFE";
+            border-radius: "8px";
+            color: "#2563EB";
+            font-size: "16px";
+        }
+        .action-title-red {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#7F1D1D";
+        }
+        .action-subtitle-red {
+            font-size: "13px";
+            color: "#DC2626";
+        }
+        .action-title-amber {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#78350F";
+        }
+        .action-subtitle-amber {
+            font-size: "13px";
+            color: "#D97706";
+        }
+        .action-title-blue {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#1E3A8A";
+        }
+        .action-subtitle-blue {
+            font-size: "13px";
+            color: "#2563EB";
+        }
+        .action-arrow {
+            font-size: "16px";
+            color: "#9CA3AF";
+        }
+        .activity-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "12px 0";
+            border-bottom: "1px solid #F3F4F6";
+        }
+        .activity-left {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .activity-icon-gray {
+            color: "#9CA3AF";
+            font-size: "16px";
+        }
+        .activity-icon-green {
+            color: "#22C55E";
+            font-size: "16px";
+        }
+        .activity-icon-amber {
+            color: "#F59E0B";
+            font-size: "16px";
+        }
+        .activity-label {
+            font-size: "14px";
+            color: "#4B5563";
+        }
+        .activity-value {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+        }
+    }
+
+    render {
+        <div class="acct-dashboard">
+            <div>
+                <h1 class="page-title">"Dashboard"</h1>
+                <p class="page-subtitle">"Overview of your accounting operations"</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card-alert">
+                    <div class="stat-label">"Pending Exceptions"</div>
+                    <div class="stat-value">{format("{}", self.pending_exceptions)}</div>
+                    <div class="stat-trend-warn">"Needs attention"</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">"Total Transactions"</div>
+                    <div class="stat-value">{format("{}", self.total_transactions)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">"Active Patterns"</div>
+                    <div class="stat-value">{format("{}", self.active_patterns)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">"Auto-Coded Rate"</div>
+                    <div class="stat-value">{format("{}", self.auto_coded_rate)}</div>
+                    <div class="stat-trend">"+2.3% from last month"</div>
+                </div>
+            </div>
+
+            <div class="two-col-grid">
+                <div class="section-card">
+                    <h2 class="section-title">"Quick Actions"</h2>
+                    <div class="action-item action-item-red" on:click={self.nav_exceptions}>
+                        <div class="action-left">
+                            <div class="action-icon-red">"!"</div>
+                            <div>
+                                <div class="action-title-red">"Review Exceptions"</div>
+                                <div class="action-subtitle-red">{format("{} items need attention", self.pending_exceptions)}</div>
+                            </div>
+                        </div>
+                        <span class="action-arrow">">"</span>
+                    </div>
+                    <div class="action-item action-item-amber" on:click={self.nav_patterns}>
+                        <div class="action-left">
+                            <div class="action-icon-amber">"*"</div>
+                            <div>
+                                <div class="action-title-amber">"Create Pattern"</div>
+                                <div class="action-subtitle-amber">"Automate transaction coding"</div>
+                            </div>
+                        </div>
+                        <span class="action-arrow">">"</span>
+                    </div>
+                    <div class="action-item action-item-blue" on:click={self.nav_integrations}>
+                        <div class="action-left">
+                            <div class="action-icon-blue">"S"</div>
+                            <div>
+                                <div class="action-title-blue">"Sync Transactions"</div>
+                                <div class="action-subtitle-blue">"Pull latest from bank accounts"</div>
+                            </div>
+                        </div>
+                        <span class="action-arrow">">"</span>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <h2 class="section-title">"This Week"</h2>
+                    <div class="activity-row">
+                        <div class="activity-left">
+                            <span class="activity-icon-gray">"R"</span>
+                            <span class="activity-label">"Transactions processed"</span>
+                        </div>
+                        <span class="activity-value">{format("{}", self.transactions_this_month)}</span>
+                    </div>
+                    <div class="activity-row">
+                        <div class="activity-left">
+                            <span class="activity-icon-green">"V"</span>
+                            <span class="activity-label">"Exceptions resolved"</span>
+                        </div>
+                        <span class="activity-value">{format("{}", self.resolved_this_week)}</span>
+                    </div>
+                    <div class="activity-row">
+                        <div class="activity-left">
+                            <span class="activity-icon-amber">"*"</span>
+                            <span class="activity-label">"Auto-coded transactions"</span>
+                        </div>
+                        <span class="activity-value">{format("{}", self.auto_coded_count)}</span>
+                    </div>
+                    <div class="activity-row">
+                        <div class="activity-left">
+                            <span class="activity-icon-gray">"C"</span>
+                            <span class="activity-label">"Avg. resolution time"</span>
+                        </div>
+                        <span class="activity-value">"2.4 hours"</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

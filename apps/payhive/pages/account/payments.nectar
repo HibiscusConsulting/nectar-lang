@@ -1,0 +1,407 @@
+// PayHive account portal — user payment methods management
+// Default payment method, saved methods list, add new method flow
+
+component AccountPayments() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut has_default: bool = true;
+    let mut default_label: String = "VISA **** 4242 - exp 03/28";
+    let mut pm_count: i32 = 2;
+    let mut pm1_label: String = "VISA **** 4242 - exp 03/28";
+    let mut pm1_is_default: bool = true;
+    let mut pm1_type_label: String = "VISA";
+    let mut pm2_label: String = "ACH **** 6789";
+    let mut pm2_is_default: bool = false;
+    let mut pm2_type_label: String = "ACH";
+    let mut busy: bool = false;
+    let mut show_add_modal: bool = false;
+    let mut confirm_modal: bool = false;
+    let mut confirm_title: String = "";
+    let mut confirm_message: String = "";
+    let mut toast_show: bool = false;
+    let mut toast_message: String = "";
+
+    fn refresh_status(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/users/billing/status");
+        self.loading = false;
+    }
+
+    fn start_add(&mut self) {
+        self.busy = true;
+        let response = fetch("/api/users/billing/setup-intent");
+        self.show_add_modal = true;
+        self.busy = false;
+    }
+
+    fn close_add_modal(&mut self) {
+        self.show_add_modal = false;
+    }
+
+    fn set_default_pm1(&mut self) {
+        self.confirm_title = "Set as default payment method?";
+        self.confirm_message = "This payment method will be used for all future payments to your organization.";
+        self.confirm_modal = true;
+    }
+
+    fn set_default_pm2(&mut self) {
+        self.confirm_title = "Set as default payment method?";
+        self.confirm_message = "This payment method will be used for all future payments to your organization.";
+        self.confirm_modal = true;
+    }
+
+    fn remove_pm2(&mut self) {
+        self.confirm_title = "Remove payment method?";
+        self.confirm_message = "Are you sure you want to remove this payment method? This action cannot be undone.";
+        self.confirm_modal = true;
+    }
+
+    fn close_confirm(&mut self) {
+        self.confirm_modal = false;
+    }
+
+    fn confirm_action(&mut self) {
+        self.busy = true;
+        let response = fetch("/api/users/billing/set-default");
+        self.confirm_modal = false;
+        self.toast_show = true;
+        self.toast_message = "Payment method updated!";
+        self.busy = false;
+    }
+
+    fn close_toast(&mut self) {
+        self.toast_show = false;
+    }
+
+    style {
+        .payments-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+            max-width: "768px";
+            margin: "0 auto";
+            padding: "16px 24px";
+        }
+        .breadcrumbs {
+            font-size: "14px";
+            color: "#525252";
+            margin-bottom: "8px";
+        }
+        .breadcrumb-sep {
+            margin: "0 8px";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+            margin-bottom: "24px";
+        }
+        .section-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            margin-bottom: "24px";
+        }
+        .section-header {
+            padding: "16px 20px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .section-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .section-body {
+            padding: "20px";
+        }
+        .pm-default-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .pm-default-label {
+            font-size: "14px";
+            color: "#262626";
+        }
+        .pm-update-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            border: "1px solid #D1D5DB";
+            background-color: "#FFFFFF";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .pm-note {
+            font-size: "12px";
+            color: "#737373";
+            margin-top: "12px";
+        }
+        .pm-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "12px";
+        }
+        .pm-item {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "12px";
+        }
+        .pm-item-left {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .pm-type-badge {
+            width: "40px";
+            height: "28px";
+            background-color: "#F5F5F5";
+            border: "1px solid #D1D5DB";
+            border-radius: "4px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "10px";
+            font-weight: "500";
+            color: "#525252";
+        }
+        .pm-item-label {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .pm-default-badge {
+            display: "inline-flex";
+            align-items: "center";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            background-color: "#DCFCE7";
+            color: "#166534";
+            border: "1px solid #BBF7D0";
+            margin-left: "8px";
+        }
+        .pm-item-actions {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .pm-action-btn {
+            padding: "6px 12px";
+            border-radius: "8px";
+            border: "1px solid #D1D5DB";
+            font-size: "14px";
+            background-color: "#FFFFFF";
+            cursor: "pointer";
+        }
+        .pm-list-note {
+            font-size: "12px";
+            color: "#737373";
+            margin-top: "16px";
+        }
+        .add-section-desc {
+            font-size: "14px";
+            color: "#525252";
+            margin-bottom: "16px";
+        }
+        .add-section-hint {
+            font-size: "12px";
+            color: "#737373";
+            margin-bottom: "16px";
+        }
+        .add-pm-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+        }
+        .footer-note {
+            font-size: "14px";
+            color: "#525252";
+            text-align: "center";
+            margin-top: "24px";
+        }
+        .modal-bg {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            width: "100%";
+            height: "100%";
+            background-color: "rgba(0,0,0,0.4)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+            padding: "16px";
+        }
+        .modal-card {
+            background-color: "#FFFFFF";
+            border-radius: "16px";
+            padding: "24px";
+            max-width: "448px";
+            width: "100%";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "flex-start";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .modal-close-btn {
+            padding: "4px";
+            border-radius: "8px";
+            border: "none";
+            background: "none";
+            cursor: "pointer";
+            color: "#737373";
+            font-size: "16px";
+        }
+        .modal-message {
+            font-size: "14px";
+            color: "#525252";
+            margin-bottom: "24px";
+        }
+        .modal-actions {
+            display: "flex";
+            gap: "12px";
+            justify-content: "flex-end";
+        }
+        .modal-cancel-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            border: "1px solid #D1D5DB";
+            background-color: "#FFFFFF";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .modal-confirm-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            font-size: "14px";
+            border: "none";
+            cursor: "pointer";
+        }
+        .toast {
+            position: "fixed";
+            bottom: "24px";
+            left: "50%";
+            transform: "translateX(-50%)";
+            z-index: "60";
+        }
+        .toast-inner {
+            background-color: "#F0FDF4";
+            color: "#166534";
+            border: "1px solid #BBF7D0";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            font-weight: "500";
+        }
+    }
+
+    render {
+        <div class="payments-page">
+            <div class="breadcrumbs">
+                <span>"Home"</span>
+                <span class="breadcrumb-sep">"/"</span>
+                <span>"Payments"</span>
+            </div>
+
+            <h1 class="page-title">"My Payments"</h1>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">"Payment Method"</h3>
+                </div>
+                <div class="section-body">
+                    {if self.has_default {
+                        <div class="pm-default-row">
+                            <div class="pm-default-label">{format("{}", self.default_label)}</div>
+                            <button class="pm-update-btn" on:click={self.start_add}>"Update"</button>
+                        </div>
+                    }}
+                    <p class="pm-note">"Your card/bank is stored and processed securely by our payment processor."</p>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">"Saved payment methods"</h3>
+                </div>
+                <div class="section-body">
+                    <div class="pm-list">
+                        <div class="pm-item">
+                            <div class="pm-item-left">
+                                <div class="pm-type-badge">{format("{}", self.pm1_type_label)}</div>
+                                <span class="pm-item-label">{format("{}", self.pm1_label)}</span>
+                                <span class="pm-default-badge">"Default"</span>
+                            </div>
+                            <div class="pm-item-actions">
+                                <button class="pm-action-btn" on:click={self.remove_pm2}>"Remove"</button>
+                            </div>
+                        </div>
+                        <div class="pm-item">
+                            <div class="pm-item-left">
+                                <div class="pm-type-badge">{format("{}", self.pm2_type_label)}</div>
+                                <span class="pm-item-label">{format("{}", self.pm2_label)}</span>
+                            </div>
+                            <div class="pm-item-actions">
+                                <button class="pm-action-btn" on:click={self.set_default_pm2}>"Make default"</button>
+                                <button class="pm-action-btn" on:click={self.remove_pm2}>"Remove"</button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="pm-list-note">"You can store multiple cards/bank accounts. Choose one as your default for payments."</p>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-header">
+                    <h3 class="section-title">"Add a payment method (ACH or card)"</h3>
+                </div>
+                <div class="section-body">
+                    <p class="add-section-desc">"Bank (ACH) is preferred to reduce fees. Your details are handled by Stripe; we never store full account numbers."</p>
+                    <p class="add-section-hint">"Choose bank account (ACH) or card. ACH helps keep costs low."</p>
+                    <button class="add-pm-btn" on:click={self.start_add}>"Add New Payment Method"</button>
+                </div>
+            </div>
+
+            <div class="footer-note">"Your default method will be used for payments to your organization. You can update it at any time."</div>
+
+            {if self.confirm_modal {
+                <div class="modal-bg">
+                    <div class="modal-card">
+                        <div class="modal-header">
+                            <h3 class="modal-title">{format("{}", self.confirm_title)}</h3>
+                            <button class="modal-close-btn" on:click={self.close_confirm}>"X"</button>
+                        </div>
+                        <p class="modal-message">{format("{}", self.confirm_message)}</p>
+                        <div class="modal-actions">
+                            <button class="modal-cancel-btn" on:click={self.close_confirm}>"Cancel"</button>
+                            <button class="modal-confirm-btn" on:click={self.confirm_action}>"Confirm"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+
+            {if self.toast_show {
+                <div class="toast">
+                    <div class="toast-inner">{format("{}", self.toast_message)}</div>
+                </div>
+            }}
+        </div>
+    }
+}

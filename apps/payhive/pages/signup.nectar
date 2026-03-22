@@ -1,0 +1,292 @@
+// PayHive Signup page
+// Matches Signup.jsx: multi-step registration wizard
+// Steps: email -> password -> address -> availability -> services -> frequency -> disclosures -> phone
+
+component Signup() {
+    let mut step: i32 = 0;
+    let mut loading: bool = false;
+    let mut submitting: bool = false;
+    let mut toast_msg: String = "";
+    let mut toast_visible: bool = false;
+
+    // Lead fields
+    let mut email: String = "";
+    let mut password: String = "";
+    let mut password_confirm: String = "";
+    let mut name: String = "";
+    let mut phone: String = "";
+
+    // Address fields
+    let mut street: String = "";
+    let mut city: String = "";
+    let mut state: String = "";
+    let mut zip: String = "";
+
+    // Selections
+    let mut freq: String = "weekly";
+    let mut sms_consent: bool = false;
+
+    // Org info (loaded from invite code)
+    let mut org_name: String = "Green Lawn Pros";
+
+    fn next_step(&mut self) {
+        self.step = self.step + 1;
+    }
+
+    fn prev_step(&mut self) {
+        if self.step > 0 {
+            self.step = self.step - 1;
+        }
+    }
+
+    fn save_email(&mut self) {
+        if self.name.len() < 1 {
+            self.toast_msg = "Enter your name";
+            self.toast_visible = true;
+        } else {
+            self.step = self.step + 1;
+        }
+    }
+
+    fn save_password(&mut self) {
+        if self.password.len() < 12 {
+            self.toast_msg = "Use 12+ chars with upper, lower, number, symbol";
+            self.toast_visible = true;
+        } else {
+            self.step = self.step + 1;
+        }
+    }
+
+    fn save_address(&mut self) {
+        if self.street.len() < 1 {
+            self.toast_msg = "Enter your street address";
+            self.toast_visible = true;
+        } else {
+            self.step = self.step + 1;
+        }
+    }
+
+    fn save_availability(&mut self) {
+        self.step = self.step + 1;
+    }
+
+    fn save_services(&mut self) {
+        self.step = self.step + 1;
+    }
+
+    fn save_frequency(&mut self) {
+        self.step = self.step + 1;
+    }
+
+    fn finalize(&mut self) {
+        self.submitting = true;
+        // Would POST to /api/public/signup/:code
+        self.step = self.step + 1;
+        self.submitting = false;
+    }
+
+    fn dismiss_toast(&mut self) {
+        self.toast_visible = false;
+    }
+
+    render {
+        <div style="min-height: 100vh; background: linear-gradient(180deg, #FFB547 0%, #F68F1E 100%);">
+            <div style="max-width: 480px; margin: 0 auto; padding: 40px 24px;">
+                // Logo
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div style="font-size: 28px; font-weight: 700; color: #303234;">"PayHive"</div>
+                    <div style="font-size: 14px; color: #303234; opacity: 0.7; margin-top: 4px;">{format("Sign up with {}", self.org_name)}</div>
+                </div>
+
+                // Progress bar
+                <div style="display: flex; gap: 4px; margin-bottom: 24px;">
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: #303234;"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                    <div style="flex: 1; height: 4px; border-radius: 2px; background: rgba(48, 50, 52, 0.3);"></div>
+                </div>
+
+                // Card
+                <div style="background: #FFFFFF; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+                    // Step 0: Email
+                    {if self.step == 0 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 20px;">"Get Started"</h2>
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Full Name"</label>
+                                <input type="text" placeholder="Jane Doe" value={format("{}", self.name)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Email Address"</label>
+                                <input type="email" placeholder="jane@example.com" value={format("{}", self.email)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <button on:click={self.save_email} style="width: 100%; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                        </div>
+                    }}
+
+                    // Step 1: Password
+                    {if self.step == 1 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 20px;">"Create Password"</h2>
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Password"</label>
+                                <input type="password" placeholder="Min 12 chars, mixed case + number + symbol" value={format("{}", self.password)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Confirm Password"</label>
+                                <input type="password" placeholder="Confirm your password" value={format("{}", self.password_confirm)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.save_password} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 2: Address
+                    {if self.step == 2 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 20px;">"Service Address"</h2>
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Street Address"</label>
+                                <input type="text" placeholder="123 Main St" value={format("{}", self.street)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                                <div>
+                                    <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"City"</label>
+                                    <input type="text" placeholder="City" value={format("{}", self.city)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"State"</label>
+                                    <input type="text" placeholder="NC" value={format("{}", self.state)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                                </div>
+                                <div>
+                                    <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"ZIP"</label>
+                                    <input type="text" placeholder="28202" value={format("{}", self.zip)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.save_address} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 3: Availability
+                    {if self.step == 3 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 8px;">"Availability"</h2>
+                            <p style="font-size: 14px; color: #6B7280; margin-bottom: 20px;">"Select the days you are available for service."</p>
+                            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Monday"</button>
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Tuesday"</button>
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Wednesday"</button>
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Thursday"</button>
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Friday"</button>
+                                <button style="padding: 10px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151;">"Saturday"</button>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.save_availability} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 4: Services
+                    {if self.step == 4 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 8px;">"Select Services"</h2>
+                            <p style="font-size: 14px; color: #6B7280; margin-bottom: 20px;">"Choose which services you would like."</p>
+                            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                                <div style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <div style="font-size: 14px; font-weight: 500; color: #111827;">"Lawn Mowing"</div>
+                                        <div style="font-size: 12px; color: #6B7280;">"$65.00"</div>
+                                    </div>
+                                    <input type="checkbox" />
+                                </div>
+                                <div style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <div style="font-size: 14px; font-weight: 500; color: #111827;">"Full Service"</div>
+                                        <div style="font-size: 12px; color: #6B7280;">"$120.00"</div>
+                                    </div>
+                                    <input type="checkbox" />
+                                </div>
+                                <div style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                                    <div>
+                                        <div style="font-size: 14px; font-weight: 500; color: #111827;">"Hedge Trimming"</div>
+                                        <div style="font-size: 12px; color: #6B7280;">"$85.00"</div>
+                                    </div>
+                                    <input type="checkbox" />
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.save_services} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 5: Frequency
+                    {if self.step == 5 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 8px;">"Service Frequency"</h2>
+                            <p style="font-size: 14px; color: #6B7280; margin-bottom: 20px;">"How often would you like service?"</p>
+                            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                                <button style="padding: 12px 16px; border: 2px solid #FFB547; border-radius: 8px; background: #FEF3C7; font-size: 14px; font-weight: 500; color: #303234; text-align: left;">"Weekly"</button>
+                                <button style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151; text-align: left;">"Every 2 Weeks"</button>
+                                <button style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151; text-align: left;">"Monthly"</button>
+                                <button style="padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 14px; color: #374151; text-align: left;">"One-Time"</button>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.save_frequency} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Continue"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 6: Disclosures
+                    {if self.step == 6 {
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 8px;">"Almost Done"</h2>
+                            <p style="font-size: 14px; color: #6B7280; margin-bottom: 20px;">"Review and confirm to complete signup."</p>
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; font-size: 14px; color: #374151; margin-bottom: 4px;">"Phone Number"</label>
+                                <input type="tel" placeholder="(555) 123-4567" value={format("{}", self.phone)} style="width: 100%; padding: 12px 16px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px;" />
+                            </div>
+                            <div style="margin-bottom: 20px; padding: 12px; background: #F9FAFB; border-radius: 8px; font-size: 13px; color: #6B7280;">
+                                "By completing signup, you authorize this provider to save your payment method and charge it after each visit you request and receive. You can turn off auto-charge anytime in your account settings."
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button on:click={self.prev_step} style="flex: 1; padding: 12px; background: #FFFFFF; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; color: #374151;">"Back"</button>
+                                <button on:click={self.finalize} style="flex: 2; padding: 12px; background: #FFB547; color: #303234; border: none; border-radius: 8px; font-size: 16px; font-weight: 600;">"Complete Signup"</button>
+                            </div>
+                        </div>
+                    }}
+
+                    // Step 7: Success
+                    {if self.step == 7 {
+                        <div style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">"🎉"</div>
+                            <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 8px;">"Welcome!"</h2>
+                            <p style="font-size: 14px; color: #6B7280; margin-bottom: 20px;">"Your account has been created successfully. You can now log in to manage your services."</p>
+                        </div>
+                    }}
+                </div>
+            </div>
+
+            // Toast
+            {if self.toast_visible {
+                <div style="position: fixed; bottom: 24px; right: 24px; background: #303234; color: #F9FAFB; padding: 12px 20px; border-radius: 8px; font-size: 14px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span>{format("{}", self.toast_msg)}</span>
+                        <button on:click={self.dismiss_toast} style="background: transparent; border: none; color: #9CA3AF;">"x"</button>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}
