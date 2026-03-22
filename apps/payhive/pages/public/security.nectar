@@ -1,0 +1,45 @@
+// Security page — describes PayHive's security practices
+
+component SecurityPage() {
+    render {
+        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
+            <div style="max-width: 800px; margin: 0 auto;">
+                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
+                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Security"</h1>
+                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"How PayHive protects your data"</p>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Authentication"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Passkey/WebAuthn support for phishing-resistant login"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Ed25519 session tokens with 24-hour expiry"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Account lockout after 5 failed attempts (30-minute cooldown)"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• OAuth2 with PKCE for third-party integrations"</p>
+                    <p style="color: #374151; line-height: 1.7;">"• Magic link login with 15-minute expiry"</p>
+                </div>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Data Protection"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• All data encrypted in transit (TLS 1.3)"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Passwords hashed with Argon2id"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Payment data handled by Stripe (PCI DSS Level 1)"</p>
+                    <p style="color: #374151; line-height: 1.7;">"• Comprehensive audit logging of all security events"</p>
+                </div>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px; margin-bottom: 16px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Infrastructure"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Hosted on Google Cloud Platform"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Cloud Run with automatic scaling and isolation"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Secrets managed via GCP Secret Manager"</p>
+                    <p style="color: #374151; line-height: 1.7;">"• Rate limiting on all API endpoints"</p>
+                </div>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Reporting Vulnerabilities"</h2>
+                    <p style="color: #374151; line-height: 1.7;">
+                        "If you discover a security vulnerability, please report it to security@payhiveapp.com. We take all reports seriously and will respond within 24 hours."
+                    </p>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,296 @@
+// Accounting Transactions
+// Transaction ledger with search, filters, status badges, pagination
+
+component AcctTransactions() {
+    let mut search_query: String = "";
+    let mut state_filter: String = "";
+    let mut loading: bool = false;
+    let mut current_page: i32 = 1;
+    let mut total_count: i32 = 1847;
+
+    fn search_transactions(&mut self) {
+        self.loading = true;
+        self.current_page = 1;
+        let response = fetch("/api/accounting/transactions");
+        self.loading = false;
+    }
+
+    fn export_csv(&mut self) {
+        self.loading = false;
+    }
+
+    fn next_page(&mut self) {
+        self.current_page = self.current_page + 1;
+        self.loading = true;
+        let response = fetch("/api/accounting/transactions");
+        self.loading = false;
+    }
+
+    fn prev_page(&mut self) {
+        self.current_page = self.current_page - 1;
+        self.loading = true;
+        let response = fetch("/api/accounting/transactions");
+        self.loading = false;
+    }
+
+    style {
+        .txn-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .txn-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .export-btn {
+            padding: "8px 16px";
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#374151";
+            cursor: "pointer";
+        }
+        .filters-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .filters-row {
+            display: "flex";
+            gap: "16px";
+            align-items: "center";
+            flex-wrap: "wrap";
+        }
+        .search-input {
+            flex: "1";
+            padding: "8px 16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .filter-select {
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+            min-width: "140px";
+        }
+        .date-input {
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+            min-width: "140px";
+        }
+        .apply-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .txn-table {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .table-header {
+            display: "grid";
+            grid-template-columns: "120px 2fr 120px 100px 1fr";
+            padding: "12px 16px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .th {
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .table-row {
+            display: "grid";
+            grid-template-columns: "120px 2fr 120px 100px 1fr";
+            padding: "12px 16px";
+            border-bottom: "1px solid #F3F4F6";
+            align-items: "center";
+        }
+        .txn-date {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .txn-desc {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#D97706";
+            cursor: "pointer";
+        }
+        .txn-amount-pos {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#059669";
+        }
+        .txn-amount-neg {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#DC2626";
+        }
+        .status-coded {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .status-verified {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DBEAFE";
+            color: "#1D4ED8";
+        }
+        .status-exception {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEE2E2";
+            color: "#DC2626";
+        }
+        .status-pending {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .txn-account {
+            font-size: "14px";
+            color: "#374151";
+        }
+        .txn-account-none {
+            font-size: "14px";
+            color: "#9CA3AF";
+        }
+        .pagination-bar {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "12px 16px";
+            background-color: "#F9FAFB";
+        }
+        .pagination-info {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .pagination-btns {
+            display: "flex";
+            gap: "8px";
+        }
+        .page-btn {
+            padding: "6px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "6px";
+            font-size: "14px";
+            background-color: "#FFFFFF";
+            color: "#374151";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="txn-page">
+            <div class="txn-header">
+                <div>
+                    <h1 class="page-title">"Transactions"</h1>
+                    <p class="page-subtitle">"View and manage bank transactions"</p>
+                </div>
+                <button class="export-btn" on:click={self.export_csv}>"Export"</button>
+            </div>
+
+            <div class="filters-card">
+                <div class="filters-row">
+                    <input class="search-input" placeholder="Search transactions..." />
+                    <select class="filter-select">
+                        <option>"All States"</option>
+                        <option>"Pending"</option>
+                        <option>"Coded"</option>
+                        <option>"Exception"</option>
+                        <option>"Synced"</option>
+                        <option>"Verified"</option>
+                    </select>
+                    <input class="date-input" type="date" placeholder="From" />
+                    <input class="date-input" type="date" placeholder="To" />
+                    <button class="apply-btn" on:click={self.search_transactions}>"Apply"</button>
+                </div>
+            </div>
+
+            <div class="txn-table">
+                <div class="table-header">
+                    <span class="th">"Date"</span>
+                    <span class="th">"Description"</span>
+                    <span class="th">"Amount"</span>
+                    <span class="th">"Status"</span>
+                    <span class="th">"Account"</span>
+                </div>
+                <div class="table-row">
+                    <span class="txn-date">"Jan 15, 2024"</span>
+                    <span class="txn-desc">"AMAZON WEB SERVICES"</span>
+                    <span class="txn-amount-neg">"-$1,250.00"</span>
+                    <span><span class="status-coded">"Coded"</span></span>
+                    <span class="txn-account">"Software Expense"</span>
+                </div>
+                <div class="table-row">
+                    <span class="txn-date">"Jan 14, 2024"</span>
+                    <span class="txn-desc">"STRIPE PAYMENT"</span>
+                    <span class="txn-amount-pos">"+$5,840.00"</span>
+                    <span><span class="status-verified">"Verified"</span></span>
+                    <span class="txn-account">"Revenue"</span>
+                </div>
+                <div class="table-row">
+                    <span class="txn-date">"Jan 14, 2024"</span>
+                    <span class="txn-desc">"UNKNOWN VENDOR #4521"</span>
+                    <span class="txn-amount-neg">"-$342.50"</span>
+                    <span><span class="status-exception">"Exception"</span></span>
+                    <span class="txn-account-none">"Uncoded"</span>
+                </div>
+                <div class="table-row">
+                    <span class="txn-date">"Jan 13, 2024"</span>
+                    <span class="txn-desc">"GOOGLE CLOUD"</span>
+                    <span class="txn-amount-neg">"-$892.00"</span>
+                    <span><span class="status-pending">"Pending"</span></span>
+                    <span class="txn-account-none">"Uncoded"</span>
+                </div>
+                <div class="pagination-bar">
+                    <span class="pagination-info">{format("Showing 1-4 of {}", self.total_count)}</span>
+                    <div class="pagination-btns">
+                        <button class="page-btn" on:click={self.prev_page}>"Previous"</button>
+                        <button class="page-btn" on:click={self.next_page}>"Next"</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

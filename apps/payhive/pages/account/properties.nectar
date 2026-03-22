@@ -1,0 +1,324 @@
+// PayHive account portal — property service history
+// Property details, service records table with trust hashes
+
+component AccountProperties() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut property_address: String = "123 Main St, Austin, TX 78701";
+    let mut property_id: String = "prop_abc123";
+    let mut record_count: i32 = 4;
+    let mut toast_show: bool = false;
+    let mut toast_msg: String = "";
+
+    fn refresh_history(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/properties/history");
+        self.loading = false;
+    }
+
+    fn copy_hash(&mut self) {
+        self.toast_show = true;
+        self.toast_msg = "Hash copied";
+    }
+
+    fn close_toast(&mut self) {
+        self.toast_show = false;
+    }
+
+    fn view_record(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .properties-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .header-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "20px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .refresh-btn {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            padding: "8px 12px";
+            border-radius: "8px";
+            border: "1px solid #E5E7EB";
+            background-color: "#FFFFFF";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .property-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .property-label {
+            font-size: "14px";
+            color: "#525252";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+        }
+        .property-address {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+            margin-top: "8px";
+        }
+        .property-id {
+            font-size: "12px";
+            color: "#737373";
+            margin-top: "4px";
+        }
+        .records-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .records-header {
+            padding: "12px 16px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .records-title {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#262626";
+        }
+        .records-table {
+            width: "100%";
+        }
+        .table-head {
+            background-color: "#FAFAFA";
+        }
+        .table-th {
+            padding: "8px 12px";
+            text-align: "left";
+            font-size: "12px";
+            font-weight: "500";
+            color: "#525252";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+        }
+        .table-row {
+            border-bottom: "1px solid #F5F5F5";
+        }
+        .table-td {
+            padding: "8px 12px";
+            font-size: "14px";
+            color: "#262626";
+        }
+        .table-td-muted {
+            padding: "8px 12px";
+            font-size: "14px";
+            color: "#525252";
+        }
+        .table-td-capitalize {
+            padding: "8px 12px";
+            font-size: "14px";
+            color: "#525252";
+            text-transform: "capitalize";
+        }
+        .trust-cell {
+            padding: "8px 12px";
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            font-size: "14px";
+        }
+        .trust-icon {
+            color: "#059669";
+            font-size: "14px";
+        }
+        .trust-hash {
+            font-family: "monospace";
+            font-size: "12px";
+            color: "#525252";
+        }
+        .copy-btn {
+            font-size: "12px";
+            color: "#737373";
+            text-decoration: "underline";
+            background: "none";
+            border: "none";
+            cursor: "pointer";
+        }
+        .view-btn {
+            font-size: "14px";
+            color: "#059669";
+            background: "none";
+            border: "none";
+            cursor: "pointer";
+            text-decoration: "none";
+        }
+        .badge-completed {
+            display: "inline-flex";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .badge-pending {
+            display: "inline-flex";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            background-color: "#FFFBEB";
+            color: "#D97706";
+        }
+        .badge-unpaid {
+            display: "inline-flex";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+        }
+        .history-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .history-title {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#262626";
+            margin-bottom: "8px";
+        }
+        .history-empty {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .loading-text {
+            font-size: "14px";
+            color: "#525252";
+            padding: "12px";
+        }
+        .error-text {
+            font-size: "14px";
+            color: "#DC2626";
+            padding: "12px";
+        }
+        .toast {
+            position: "fixed";
+            bottom: "24px";
+            left: "50%";
+            transform: "translateX(-50%)";
+            z-index: "60";
+        }
+        .toast-inner {
+            background-color: "#F0FDF4";
+            color: "#166534";
+            border: "1px solid #BBF7D0";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            font-weight: "500";
+        }
+    }
+
+    render {
+        <div class="properties-page">
+            <div class="header-row">
+                <h1 class="page-title">"Property History"</h1>
+                <button class="refresh-btn" on:click={self.refresh_history}>"Refresh"</button>
+            </div>
+
+            <div class="property-card">
+                <div class="property-label">"Property"</div>
+                <div class="property-address">{format("{}", self.property_address)}</div>
+                <div class="property-id">{format("Property ID: {}", self.property_id)}</div>
+            </div>
+
+            <div class="records-card">
+                <div class="records-header">
+                    <div class="records-title">"Service records"</div>
+                </div>
+                <table class="records-table">
+                    <thead class="table-head">
+                        <tr>
+                            <th class="table-th">"Date"</th>
+                            <th class="table-th">"Service"</th>
+                            <th class="table-th">"Status"</th>
+                            <th class="table-th">"Payment"</th>
+                            <th class="table-th">"Trust"</th>
+                            <th class="table-th">"Action"</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row">
+                            <td class="table-td">"2026-03-15"</td>
+                            <td class="table-td-muted">"Lawn Mowing"</td>
+                            <td class="table-td-capitalize">"completed"</td>
+                            <td class="table-td"><span class="badge-completed">"Paid"</span></td>
+                            <td class="trust-cell">
+                                <span class="trust-icon">"shield"</span>
+                                <span class="trust-hash">"a3f8c1d2..."</span>
+                                <button class="copy-btn" on:click={self.copy_hash}>"Copy"</button>
+                            </td>
+                            <td class="table-td"><button class="view-btn" on:click={self.view_record}>"View record"</button></td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="table-td">"2026-03-01"</td>
+                            <td class="table-td-muted">"Lawn Mowing"</td>
+                            <td class="table-td-capitalize">"completed"</td>
+                            <td class="table-td"><span class="badge-completed">"Paid"</span></td>
+                            <td class="trust-cell">
+                                <span class="trust-icon">"shield"</span>
+                                <span class="trust-hash">"b7e2a9f1..."</span>
+                                <button class="copy-btn" on:click={self.copy_hash}>"Copy"</button>
+                            </td>
+                            <td class="table-td"><button class="view-btn" on:click={self.view_record}>"View record"</button></td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="table-td">"2026-02-15"</td>
+                            <td class="table-td-muted">"Pest Control"</td>
+                            <td class="table-td-capitalize">"completed"</td>
+                            <td class="table-td"><span class="badge-pending">"Pending"</span></td>
+                            <td class="trust-cell">
+                                <span class="trust-icon">"shield"</span>
+                                <span class="trust-hash">"c4d5e6f7..."</span>
+                                <button class="copy-btn" on:click={self.copy_hash}>"Copy"</button>
+                            </td>
+                            <td class="table-td"><button class="view-btn" on:click={self.view_record}>"View record"</button></td>
+                        </tr>
+                        <tr class="table-row">
+                            <td class="table-td">"2026-02-01"</td>
+                            <td class="table-td-muted">"Lawn Mowing"</td>
+                            <td class="table-td-capitalize">"completed"</td>
+                            <td class="table-td"><span class="badge-completed">"Paid"</span></td>
+                            <td class="trust-cell">
+                                <span class="trust-icon">"shield"</span>
+                                <span class="trust-hash">"d8e9f0a1..."</span>
+                                <button class="copy-btn" on:click={self.copy_hash}>"Copy"</button>
+                            </td>
+                            <td class="table-td"><button class="view-btn" on:click={self.view_record}>"View record"</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="history-card">
+                <div class="history-title">"History"</div>
+                <div class="history-empty">"No additional history entries."</div>
+            </div>
+
+            {if self.toast_show {
+                <div class="toast">
+                    <div class="toast-inner">{format("{}", self.toast_msg)}</div>
+                </div>
+            }}
+        </div>
+    }
+}

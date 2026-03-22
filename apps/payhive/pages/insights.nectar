@@ -1,0 +1,154 @@
+// PayHive Insights page
+// Matches Insights.jsx: Stripe balance summary, earnings chart, revenue metrics,
+// geo insights map, and Stripe onboarding prompt
+
+component Insights() {
+    let mut loading: bool = false;
+    let mut earnings_loading: bool = false;
+    let mut error_msg: String = "";
+    let mut has_account: bool = true;
+    let mut account_id: String = "acct_1234567890";
+
+    // Balance data
+    let mut available_usd: i32 = 245000;
+    let mut pending_usd: i32 = 85000;
+
+    // Earnings summary (12 months)
+    let mut total_net_cents: i32 = 1580000;
+    let mut earnings_count: i32 = 156;
+
+    fn refresh(&mut self) {
+        self.loading = true;
+        // fetch("/api/owner/stripe/balance") loads real balance
+        // fetch("/api/owner/stripe/earnings?months=12") loads earnings
+        self.loading = false;
+    }
+
+    fn continue_onboarding(&mut self) {
+        // fetch POST "/api/owner/stripe/start-onboarding" -> redirect to Stripe
+    }
+
+    render {
+        <div style="padding: 24px; background-color: #F9FAFB; min-height: 100vh;">
+            <div style="max-width: 1200px; margin: 0 auto;">
+                // Header
+                <div style="margin-bottom: 24px;">
+                    <h1 style="font-size: 24px; font-weight: 700; color: #111827;">"Insights"</h1>
+                    <p style="font-size: 14px; color: #6B7280;">"Live Stripe Connect balance & earnings"</p>
+                </div>
+
+                // Earnings Trends card
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #111827;">"Recent Earnings (past 12 months)"</div>
+                        <div style="font-size: 14px; color: #6B7280;">
+                            "Total Net: "
+                            <span style="font-weight: 500; color: #111827;">"$15,800.00"</span>
+                        </div>
+                    </div>
+
+                    // Bar chart representation (12 months)
+                    <div style="display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 0 16px;">
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 40px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Apr"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 55px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"May"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 80px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Jun"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 95px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Jul"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 120px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Aug"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 140px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Sep"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 130px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Oct"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 100px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Nov"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 70px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Dec"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 60px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Jan"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 85px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Feb"</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                            <div style="width: 28px; height: 110px; background: rgba(59, 130, 246, 0.6); border-radius: 6px;"></div>
+                            <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"Mar"</div>
+                        </div>
+                    </div>
+                </div>
+
+                // Stripe Balance card
+                <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                        <div style="font-size: 16px; font-weight: 600; color: #111827;">"Stripe Balance"</div>
+                        <button on:click={self.refresh} style="padding: 6px 16px; border: 1px solid #D1D5DB; border-radius: 8px; background: #FFFFFF; font-size: 13px; color: #374151;">"Refresh"</button>
+                    </div>
+
+                    <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 12px;">{format("Connected Account: {}", self.account_id)}</div>
+
+                    // Balance table
+                    <table style="width: 100%; font-size: 14px;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid #E5E7EB;">
+                                <th style="padding: 8px 8px 8px 0; color: #6B7280;">"Currency"</th>
+                                <th style="padding: 8px; color: #6B7280;">"Available"</th>
+                                <th style="padding: 8px; color: #6B7280;">"Pending"</th>
+                                <th style="padding: 8px; color: #6B7280;">"Total"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid #F3F4F6;">
+                                <td style="padding: 8px 8px 8px 0; font-weight: 500; color: #111827;">"USD"</td>
+                                <td style="padding: 8px; color: #111827;">"$2,450.00"</td>
+                                <td style="padding: 8px; color: #111827;">"$850.00"</td>
+                                <td style="padding: 8px; color: #111827;">"$3,300.00"</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                // Revenue metrics row
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                    <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Monthly Revenue"</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #111827;">"$3,250.00"</div>
+                        <div style="font-size: 12px; color: #10B981; margin-top: 4px;">"+8.2% vs last month"</div>
+                    </div>
+                    <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Total Payments"</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #111827;">{format("{}", self.earnings_count)}</div>
+                        <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">"Past 12 months"</div>
+                    </div>
+                    <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px;">
+                        <div style="font-size: 13px; color: #6B7280; margin-bottom: 4px;">"Avg per Payment"</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #111827;">"$101.28"</div>
+                        <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">"Across all services"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

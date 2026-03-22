@@ -1,0 +1,371 @@
+// CRM Contacts
+// Contact database with search, grid cards, add/edit modal
+
+component CrmContacts() {
+    let mut search_query: String = "";
+    let mut loading: bool = false;
+    let mut show_form: bool = false;
+    let mut contact_count: i32 = 6;
+
+    fn search_contacts(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/contacts");
+        self.loading = false;
+    }
+
+    fn add_contact(&mut self) {
+        self.show_form = true;
+    }
+
+    fn close_form(&mut self) {
+        self.show_form = false;
+    }
+
+    fn save_contact(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/contacts");
+        self.show_form = false;
+        self.loading = false;
+    }
+
+    style {
+        .contacts-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .contacts-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .add-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .search-row {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .search-input {
+            padding: "8px 16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+            flex: "1";
+            max-width: "400px";
+        }
+        .search-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .contacts-grid {
+            display: "grid";
+            grid-template-columns: "repeat(auto-fill, minmax(300px, 1fr))";
+            gap: "16px";
+        }
+        .contact-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+            cursor: "pointer";
+        }
+        .contact-top {
+            display: "flex";
+            align-items: "flex-start";
+            justify-content: "space-between";
+            margin-bottom: "12px";
+        }
+        .contact-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .contact-title {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .delete-btn {
+            padding: "4px";
+            background-color: "transparent";
+            border: "none";
+            color: "#9CA3AF";
+            cursor: "pointer";
+            font-size: "14px";
+        }
+        .contact-info {
+            display: "flex";
+            flex-direction: "column";
+            gap: "6px";
+        }
+        .contact-detail {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            font-size: "13px";
+            color: "#2563EB";
+        }
+        .contact-org {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            font-size: "13px";
+            color: "#4B5563";
+        }
+        .detail-icon {
+            color: "#9CA3AF";
+            font-size: "12px";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0, 0, 0, 0.3)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            width: "100%";
+            max-width: "512px";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .close-btn {
+            padding: "8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            cursor: "pointer";
+            font-size: "18px";
+        }
+        .form-group {
+            margin-bottom: "16px";
+        }
+        .form-label {
+            display: "block";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#374151";
+            margin-bottom: "4px";
+        }
+        .form-input {
+            width: "100%";
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .form-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "8px";
+            padding-top: "8px";
+        }
+        .cancel-btn {
+            padding: "8px 16px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+        .submit-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="contacts-page">
+            <div class="contacts-header">
+                <h1 class="page-title">"Contacts"</h1>
+                <button class="add-btn" on:click={self.add_contact}>"+ Add Contact"</button>
+            </div>
+
+            <div class="search-row">
+                <input class="search-input" placeholder="Search contacts..." />
+                <button class="search-btn" on:click={self.search_contacts}>"Search"</button>
+            </div>
+
+            <div class="contacts-grid">
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"Sarah Johnson"</div>
+                            <div class="contact-title">"CEO"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"sarah@acmecorp.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 123-4567"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"Acme Corp"</div>
+                    </div>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"Mike Chen"</div>
+                            <div class="contact-title">"Operations Manager"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"mike@techstart.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 234-5678"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"TechStart LLC"</div>
+                    </div>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"Lisa Park"</div>
+                            <div class="contact-title">"Owner"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"lisa@greenvalley.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 345-6789"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"Green Valley Services"</div>
+                    </div>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"James Wilson"</div>
+                            <div class="contact-title">"President"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"james@wilsonhvac.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 456-7890"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"Wilson HVAC"</div>
+                    </div>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"Dan Rogers"</div>
+                            <div class="contact-title">"Manager"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"dan@metroplumbing.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 567-8901"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"Metro Plumbing"</div>
+                    </div>
+                </div>
+
+                <div class="contact-card">
+                    <div class="contact-top">
+                        <div>
+                            <div class="contact-name">"Amy Tran"</div>
+                            <div class="contact-title">"Director"</div>
+                        </div>
+                        <button class="delete-btn">"x"</button>
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-detail"><span class="detail-icon">"@"</span>"amy@sunriseelectric.com"</div>
+                        <div class="contact-detail"><span class="detail-icon">"#"</span>"(555) 678-9012"</div>
+                        <div class="contact-org"><span class="detail-icon">"B"</span>"Sunrise Electric"</div>
+                    </div>
+                </div>
+            </div>
+
+            {if self.show_form {
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">"New Contact"</h2>
+                            <button class="close-btn" on:click={self.close_form}>"X"</button>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Name"</label>
+                            <input class="form-input" placeholder="John Doe" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Email"</label>
+                            <input class="form-input" placeholder="john@example.com" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Phone"</label>
+                            <input class="form-input" placeholder="(555) 000-0000" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Title"</label>
+                            <input class="form-input" placeholder="e.g. CEO, Manager" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Company"</label>
+                            <select class="form-input">
+                                <option>"Select a company..."</option>
+                                <option>"Acme Corp"</option>
+                                <option>"TechStart LLC"</option>
+                                <option>"Green Valley Services"</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Notes"</label>
+                            <input class="form-input" placeholder="Optional notes..." />
+                        </div>
+                        <div class="form-actions">
+                            <button class="cancel-btn" on:click={self.close_form}>"Cancel"</button>
+                            <button class="submit-btn" on:click={self.save_contact}>"Create"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

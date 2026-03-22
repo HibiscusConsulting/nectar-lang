@@ -1,0 +1,510 @@
+// Accounting Exceptions
+// Anomaly detection, exception queue with AI suggestions, resolve modal
+
+component AcctExceptions() {
+    let mut total_open: i32 = 12;
+    let mut high_priority: i32 = 3;
+    let mut resolved_today: i32 = 5;
+    let mut avg_resolution: String = "2.4h";
+    let mut loading: bool = false;
+    let mut show_resolve: bool = false;
+    let mut selected_desc: String = "";
+    let mut selected_amount: String = "";
+    let mut show_suggestion: bool = false;
+
+    fn open_resolve_1(&mut self) {
+        self.selected_desc = "UNKNOWN VENDOR #4521";
+        self.selected_amount = "-$342.50";
+        self.show_resolve = true;
+    }
+
+    fn open_resolve_2(&mut self) {
+        self.selected_desc = "AWS Large Transaction";
+        self.selected_amount = "-$15,420.00";
+        self.show_resolve = true;
+    }
+
+    fn open_resolve_3(&mut self) {
+        self.selected_desc = "STRIPE PAYMENT";
+        self.selected_amount = "+$2,500.00";
+        self.show_resolve = true;
+    }
+
+    fn close_resolve(&mut self) {
+        self.show_resolve = false;
+        self.show_suggestion = false;
+    }
+
+    fn get_suggestion(&mut self) {
+        self.show_suggestion = true;
+    }
+
+    fn resolve_exception(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/exceptions/resolve");
+        self.show_resolve = false;
+        self.show_suggestion = false;
+        self.loading = false;
+    }
+
+    style {
+        .exceptions-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .stats-grid {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .stat-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .stat-card-red {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-left: "4px solid #EF4444";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .stat-label {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "4px";
+        }
+        .stat-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .queue-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .queue-header {
+            padding: "16px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .queue-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .exception-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "16px";
+            border-bottom: "1px solid #F3F4F6";
+            cursor: "pointer";
+        }
+        .exception-left {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+        }
+        .icon-high {
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#FEE2E2";
+            color: "#DC2626";
+            font-size: "16px";
+        }
+        .icon-medium {
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#FEF3C7";
+            color: "#D97706";
+            font-size: "16px";
+        }
+        .icon-low {
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+            font-size: "16px";
+        }
+        .exception-desc {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .exception-meta {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            margin-top: "4px";
+        }
+        .badge-high {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEE2E2";
+            color: "#DC2626";
+        }
+        .badge-medium {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .badge-low {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+        .exception-type {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .exception-date {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .exception-right {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+        }
+        .exception-amount-neg {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#DC2626";
+        }
+        .exception-amount-pos {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#059669";
+        }
+        .assigned-to {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .chevron {
+            color: "#9CA3AF";
+            font-size: "16px";
+        }
+        .modal-overlay {
+            position: "fixed";
+            top: "0";
+            left: "0";
+            right: "0";
+            bottom: "0";
+            background-color: "rgba(0, 0, 0, 0.3)";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            z-index: "50";
+        }
+        .modal-content {
+            background-color: "#FFFFFF";
+            border-radius: "12px";
+            padding: "24px";
+            width: "100%";
+            max-width: "600px";
+        }
+        .modal-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "24px";
+        }
+        .modal-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .close-btn {
+            padding: "8px";
+            background-color: "transparent";
+            border: "none";
+            color: "#6B7280";
+            cursor: "pointer";
+            font-size: "18px";
+        }
+        .detail-box {
+            padding: "16px";
+            background-color: "#F9FAFB";
+            border-radius: "8px";
+            margin-bottom: "16px";
+        }
+        .detail-row {
+            display: "flex";
+            justify-content: "space-between";
+            align-items: "flex-start";
+            margin-bottom: "8px";
+        }
+        .detail-desc {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .detail-sub {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .detail-amount {
+            font-size: "14px";
+            font-weight: "700";
+        }
+        .ai-box {
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "16px";
+            margin-bottom: "16px";
+        }
+        .ai-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "12px";
+        }
+        .ai-title {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .ai-btn {
+            font-size: "14px";
+            color: "#D97706";
+            background-color: "transparent";
+            border: "none";
+            cursor: "pointer";
+        }
+        .ai-suggestion {
+            font-size: "14px";
+            color: "#111827";
+            margin-bottom: "4px";
+        }
+        .ai-confidence {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .ai-reason {
+            font-size: "13px";
+            color: "#6B7280";
+            margin-top: "8px";
+        }
+        .ai-apply {
+            font-size: "14px";
+            color: "#D97706";
+            font-weight: "500";
+            background-color: "transparent";
+            border: "none";
+            cursor: "pointer";
+            margin-top: "8px";
+        }
+        .ai-placeholder {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .form-group {
+            margin-bottom: "16px";
+        }
+        .form-label {
+            display: "block";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#374151";
+            margin-bottom: "4px";
+        }
+        .form-input {
+            width: "100%";
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .form-actions {
+            display: "flex";
+            justify-content: "flex-end";
+            gap: "12px";
+            padding-top: "16px";
+            border-top: "1px solid #F3F4F6";
+        }
+        .cancel-btn {
+            padding: "8px 16px";
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#374151";
+            cursor: "pointer";
+        }
+        .resolve-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+    }
+
+    render {
+        <div class="exceptions-page">
+            <div>
+                <h1 class="page-title">"Exceptions"</h1>
+                <p class="page-subtitle">"Review and resolve transaction exceptions"</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">"Open Exceptions"</div>
+                    <div class="stat-value">{format("{}", self.total_open)}</div>
+                </div>
+                <div class="stat-card-red">
+                    <div class="stat-label">"High Priority"</div>
+                    <div class="stat-value">{format("{}", self.high_priority)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">"Resolved Today"</div>
+                    <div class="stat-value">{format("{}", self.resolved_today)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">"Avg. Resolution"</div>
+                    <div class="stat-value">{format("{}", self.avg_resolution)}</div>
+                </div>
+            </div>
+
+            <div class="queue-card">
+                <div class="queue-header">
+                    <h2 class="queue-title">"Exception Queue"</h2>
+                </div>
+                <div class="exception-row" on:click={self.open_resolve_1}>
+                    <div class="exception-left">
+                        <div class="icon-high">"!"</div>
+                        <div>
+                            <div class="exception-desc">"UNKNOWN VENDOR #4521"</div>
+                            <div class="exception-meta">
+                                <span class="badge-high">"high"</span>
+                                <span class="exception-type">"Unmatched Vendor"</span>
+                                <span class="exception-date">"Jan 14, 2024"</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exception-right">
+                        <span class="exception-amount-neg">"-$342.50"</span>
+                        <span class="chevron">">"</span>
+                    </div>
+                </div>
+                <div class="exception-row" on:click={self.open_resolve_2}>
+                    <div class="exception-left">
+                        <div class="icon-medium">"!"</div>
+                        <div>
+                            <div class="exception-desc">"AWS Large Transaction"</div>
+                            <div class="exception-meta">
+                                <span class="badge-medium">"medium"</span>
+                                <span class="exception-type">"Amount Threshold"</span>
+                                <span class="exception-date">"Jan 13, 2024"</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exception-right">
+                        <span class="exception-amount-neg">"-$15,420.00"</span>
+                        <span class="assigned-to">"john"</span>
+                        <span class="chevron">">"</span>
+                    </div>
+                </div>
+                <div class="exception-row" on:click={self.open_resolve_3}>
+                    <div class="exception-left">
+                        <div class="icon-low">"!"</div>
+                        <div>
+                            <div class="exception-desc">"STRIPE PAYMENT"</div>
+                            <div class="exception-meta">
+                                <span class="badge-low">"low"</span>
+                                <span class="exception-type">"Duplicate Suspected"</span>
+                                <span class="exception-date">"Jan 12, 2024"</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="exception-right">
+                        <span class="exception-amount-pos">"+$2,500.00"</span>
+                        <span class="chevron">">"</span>
+                    </div>
+                </div>
+            </div>
+
+            {if self.show_resolve {
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">"Resolve Exception"</h2>
+                            <button class="close-btn" on:click={self.close_resolve}>"X"</button>
+                        </div>
+                        <div class="detail-box">
+                            <div class="detail-row">
+                                <div>
+                                    <div class="detail-desc">{format("{}", self.selected_desc)}</div>
+                                    <div class="detail-sub">"Unmatched Vendor"</div>
+                                </div>
+                                <span class="detail-amount">{format("{}", self.selected_amount)}</span>
+                            </div>
+                        </div>
+                        <div class="ai-box">
+                            <div class="ai-header">
+                                <span class="ai-title">"AI Suggestion"</span>
+                                <button class="ai-btn" on:click={self.get_suggestion}>"Get Suggestion"</button>
+                            </div>
+                            {if self.show_suggestion {
+                                <div>
+                                    <div class="ai-suggestion">"Software Expense"<span class="ai-confidence">"87% confidence"</span></div>
+                                    <div class="ai-reason">"Based on similar transactions from this vendor pattern"</div>
+                                    <button class="ai-apply">"Apply suggestion"</button>
+                                </div>
+                            }}
+                            {if !self.show_suggestion {
+                                <p class="ai-placeholder">"Click Get Suggestion for AI-powered account recommendation"</p>
+                            }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Account"</label>
+                            <select class="form-input">
+                                <option>"Select an account"</option>
+                                <option>"6100 - Software Expense"</option>
+                                <option>"6200 - Office Supplies"</option>
+                                <option>"4000 - Revenue"</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">"Memo"</label>
+                            <input class="form-input" placeholder="Optional memo for this transaction" />
+                        </div>
+                        <div class="form-actions">
+                            <button class="cancel-btn" on:click={self.close_resolve}>"Cancel"</button>
+                            <button class="resolve-btn" on:click={self.resolve_exception}>"Resolve Exception"</button>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

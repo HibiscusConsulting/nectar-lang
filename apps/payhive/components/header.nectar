@@ -1,113 +1,69 @@
-// PayHive top navigation bar
-// Sticky, 64px, white bg, bottom border
+// PayHive header component — shared navigation bar
 
 component Header() {
-    let mut dropdown_open: bool = false;
-    let mut menu_open: bool = false;
+    let mut active_link: String = "dashboard";
 
-    fn toggle_dropdown(&mut self) {
-        self.dropdown_open = !self.dropdown_open;
+    fn go_dashboard(&mut self) {
+        self.active_link = "dashboard";
+        navigate("/app");
     }
 
-    fn toggle_menu(&mut self) {
-        self.menu_open = !self.menu_open;
+    fn go_schedule(&mut self) {
+        self.active_link = "schedule";
+        navigate("/app/schedule");
+    }
+
+    fn go_customers(&mut self) {
+        self.active_link = "customers";
+        navigate("/app/customers");
+    }
+
+    fn go_services(&mut self) {
+        self.active_link = "services";
+        navigate("/app/services");
+    }
+
+    fn go_crew(&mut self) {
+        self.active_link = "crew";
+        navigate("/app/crew");
+    }
+
+    fn go_reports(&mut self) {
+        self.active_link = "reports";
+        navigate("/app/reports");
+    }
+
+    fn go_insights(&mut self) {
+        self.active_link = "insights";
+        navigate("/app/insights");
+    }
+
+    fn go_settings(&mut self) {
+        self.active_link = "settings";
+        navigate("/app/settings");
+    }
+
+    render {
+        <header class="header" style="background-color: #303234; color: #FFFFFF; padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="logo" style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 20px; font-weight: 700; color: #FFB547;">"PayHive"</span>
+            </div>
+            <nav style="display: flex; gap: 4px; align-items: center;">
+                <button on:click={self.go_dashboard} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Dashboard"</button>
+                <button on:click={self.go_schedule} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Schedule"</button>
+                <button on:click={self.go_customers} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Customers"</button>
+                <button on:click={self.go_services} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Services"</button>
+                <button on:click={self.go_crew} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Crew"</button>
+                <button on:click={self.go_reports} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Reports"</button>
+                <button on:click={self.go_insights} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Insights"</button>
+                <button on:click={self.go_settings} style="padding: 8px 16px; border-radius: 6px; font-size: 14px; color: #F9FAFB; background: transparent; border: none;">"Settings"</button>
+            </nav>
+        </header>
     }
 
     style {
         .header {
-            position: "sticky";
-            top: "0";
-            height: "64px";
-            background-color: "#FFFFFF";
-            border-bottom: "1px solid #E5E7EB";
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-            padding: "0 24px";
-            z-index: "100";
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
         }
-        .header-logo {
-            display: "flex";
-            align-items: "center";
-            gap: "8px";
-        }
-        .header-logo-text {
-            font-size: "20px";
-            font-weight: "700";
-            color: "#303234";
-        }
-        .header-logo-accent {
-            color: "#FFB547";
-        }
-        .header-title {
-            font-size: "16px";
-            font-weight: "600";
-            color: "#303234";
-        }
-        .header-right {
-            display: "flex";
-            align-items: "center";
-            gap: "12px";
-        }
-        .header-avatar {
-            width: "36px";
-            height: "36px";
-            border-radius: "50%";
-            background-color: "#303234";
-            color: "#FFFFFF";
-            display: "flex";
-            align-items: "center";
-            justify-content: "center";
-            font-size: "14px";
-            font-weight: "600";
-            cursor: "pointer";
-        }
-        .menu-toggle {
-            display: "none";
-            background: "none";
-            border: "none";
-            font-size: "24px";
-            color: "#303234";
-            cursor: "pointer";
-        }
-        .dropdown {
-            position: "absolute";
-            top: "56px";
-            right: "24px";
-            background-color: "#FFFFFF";
-            border: "1px solid #E5E7EB";
-            border-radius: "8px";
-            padding: "8px 0";
-            min-width: "180px";
-            box-shadow: "0 4px 12px rgba(0,0,0,0.1)";
-            z-index: "200";
-        }
-        .dropdown-item {
-            padding: "8px 16px";
-            font-size: "14px";
-            color: "#303234";
-            cursor: "pointer";
-        }
-    }
-
-    render {
-        <header class="header">
-            <div class="header-logo">
-                <span class="header-logo-text">"Pay"</span>
-                <span class="header-logo-text header-logo-accent">"Hive"</span>
-            </div>
-            <div class="header-title">"Dashboard"</div>
-            <div class="header-right">
-                <button class="menu-toggle" on:click={self.toggle_menu}>"Menu"</button>
-                <div class="header-avatar" on:click={self.toggle_dropdown}>"BB"</div>
-                {if self.dropdown_open {
-                    <div class="dropdown">
-                        <div class="dropdown-item">"Profile"</div>
-                        <div class="dropdown-item">"Settings"</div>
-                        <div class="dropdown-item">"Sign Out"</div>
-                    </div>
-                }}
-            </div>
-        </header>
     }
 }

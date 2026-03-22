@@ -1,0 +1,384 @@
+// CRM Pipeline
+// Kanban-style deal pipeline with stages: Prospect, Qualified, Proposal, Negotiation, Customer, Churned
+
+component Pipeline() {
+    let mut view_mode: String = "kanban";
+    let mut search_query: String = "";
+    let mut stage_filter: String = "";
+    let mut total_items: i32 = 0;
+    let mut loading: bool = false;
+    let mut prospect_count: i32 = 3;
+    let mut qualified_count: i32 = 2;
+    let mut proposal_count: i32 = 2;
+    let mut negotiation_count: i32 = 1;
+    let mut customer_count: i32 = 4;
+    let mut churned_count: i32 = 1;
+
+    fn set_view_kanban(&mut self) {
+        self.view_mode = "kanban";
+    }
+
+    fn set_view_list(&mut self) {
+        self.view_mode = "list";
+    }
+
+    fn search_items(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/pipeline");
+        self.loading = false;
+    }
+
+    fn refresh(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/crm/pipeline");
+        self.loading = false;
+    }
+
+    style {
+        .pipeline-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .pipeline-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .view-toggle {
+            display: "flex";
+            align-items: "center";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            overflow: "hidden";
+            background-color: "#FFFFFF";
+        }
+        .view-btn {
+            padding: "8px 16px";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            background-color: "#FFFFFF";
+            color: "#6B7280";
+            cursor: "pointer";
+        }
+        .view-btn-active {
+            padding: "8px 16px";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            cursor: "pointer";
+        }
+        .filters-row {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            flex-wrap: "wrap";
+        }
+        .search-input {
+            padding: "8px 16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+            min-width: "256px";
+        }
+        .filter-select {
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .search-btn {
+            padding: "8px 16px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .kanban-board {
+            display: "grid";
+            grid-template-columns: "repeat(6, 1fr)";
+            gap: "12px";
+            overflow-x: "auto";
+        }
+        .kanban-column {
+            background-color: "#F9FAFB";
+            border-radius: "12px";
+            padding: "12px";
+            min-width: "220px";
+        }
+        .column-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "12px";
+        }
+        .column-title {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .column-count {
+            font-size: "12px";
+            font-weight: "500";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            background-color: "#E5E7EB";
+            color: "#374151";
+        }
+        .deal-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "12px";
+            margin-bottom: "8px";
+            cursor: "pointer";
+        }
+        .deal-name {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "4px";
+        }
+        .deal-company {
+            font-size: "12px";
+            color: "#6B7280";
+            margin-bottom: "8px";
+        }
+        .deal-meta {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .deal-amount {
+            font-size: "13px";
+            font-weight: "600";
+            color: "#059669";
+        }
+        .deal-date {
+            font-size: "11px";
+            color: "#9CA3AF";
+        }
+        .stage-dot-prospect {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#9CA3AF";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+        .stage-dot-qualified {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#2563EB";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+        .stage-dot-proposal {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#7C3AED";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+        .stage-dot-negotiation {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#D97706";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+        .stage-dot-customer {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#059669";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+        .stage-dot-churned {
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#DC2626";
+            display: "inline-block";
+            margin-right: "6px";
+        }
+    }
+
+    render {
+        <div class="pipeline-page">
+            <div class="pipeline-header">
+                <h1 class="page-title">"Pipeline"</h1>
+            </div>
+
+            <div class="filters-row">
+                <div class="view-toggle">
+                    <button class="view-btn-active" on:click={self.set_view_kanban}>"Kanban"</button>
+                    <button class="view-btn" on:click={self.set_view_list}>"List"</button>
+                </div>
+            </div>
+
+            <div class="filters-row">
+                <input class="search-input" placeholder="Search..." />
+                <select class="filter-select">
+                    <option>"All Stages"</option>
+                    <option>"Prospect"</option>
+                    <option>"Qualified"</option>
+                    <option>"Proposal"</option>
+                    <option>"Negotiation"</option>
+                    <option>"Customer"</option>
+                    <option>"Churned"</option>
+                </select>
+                <button class="search-btn" on:click={self.search_items}>"Search"</button>
+            </div>
+
+            <div class="kanban-board">
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-prospect"></span>"Prospect"</span>
+                        <span class="column-count">{format("{}", self.prospect_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Green Valley Services"</div>
+                        <div class="deal-company">"Lisa Park"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$8,500"</span>
+                            <span class="deal-date">"Jan 20"</span>
+                        </div>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Metro Plumbing"</div>
+                        <div class="deal-company">"Dan Rogers"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$3,200"</span>
+                            <span class="deal-date">"Jan 18"</span>
+                        </div>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Sunrise Electric"</div>
+                        <div class="deal-company">"Amy Tran"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$5,000"</span>
+                            <span class="deal-date">"Jan 15"</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-qualified"></span>"Qualified"</span>
+                        <span class="column-count">{format("{}", self.qualified_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"TechStart LLC"</div>
+                        <div class="deal-company">"Mike Chen"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$12,000"</span>
+                            <span class="deal-date">"Feb 1"</span>
+                        </div>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Blue Ridge Roofing"</div>
+                        <div class="deal-company">"Tom Harris"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$7,500"</span>
+                            <span class="deal-date">"Jan 28"</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-proposal"></span>"Proposal"</span>
+                        <span class="column-count">{format("{}", self.proposal_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Wilson HVAC"</div>
+                        <div class="deal-company">"James Wilson"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$15,000"</span>
+                            <span class="deal-date">"Feb 5"</span>
+                        </div>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Pacific Landscaping"</div>
+                        <div class="deal-company">"Maria Santos"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$9,800"</span>
+                            <span class="deal-date">"Feb 3"</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-negotiation"></span>"Negotiation"</span>
+                        <span class="column-count">{format("{}", self.negotiation_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Acme Corp"</div>
+                        <div class="deal-company">"Sarah Johnson"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$22,000"</span>
+                            <span class="deal-date">"Feb 10"</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-customer"></span>"Customer"</span>
+                        <span class="column-count">{format("{}", self.customer_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Johnson Landscaping"</div>
+                        <div class="deal-company">"Mike Johnson"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$18,000"</span>
+                            <span class="deal-date">"Dec 15"</span>
+                        </div>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Smith Electrical"</div>
+                        <div class="deal-company">"Dave Smith"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$11,500"</span>
+                            <span class="deal-date">"Nov 20"</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <span class="column-title"><span class="stage-dot-churned"></span>"Churned"</span>
+                        <span class="column-count">{format("{}", self.churned_count)}</span>
+                    </div>
+                    <div class="deal-card">
+                        <div class="deal-name">"Old Town Repairs"</div>
+                        <div class="deal-company">"Bob Miller"</div>
+                        <div class="deal-meta">
+                            <span class="deal-amount">"$4,200"</span>
+                            <span class="deal-date">"Oct 5"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,54 @@
+// Privacy Policy page — legal content rendered in clean layout
+
+component PrivacyPage() {
+    render {
+        <div style="background-color: #F9FAFB; min-height: 100vh; padding: 48px 24px;">
+            <div style="max-width: 800px; margin: 0 auto;">
+                <a href="/" style="color: #FFB547; font-size: 14px; text-decoration: none;">"← Back to Home"</a>
+                <h1 style="font-size: 32px; font-weight: 700; color: #303234; margin-top: 16px; margin-bottom: 8px;">"Privacy Policy"</h1>
+                <p style="color: #9CA3AF; font-size: 14px; margin-bottom: 32px;">"Last updated: March 2026"</p>
+
+                <div style="background-color: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 32px;">
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "This Privacy Policy explains how PayHive (\"we,\" \"our,\" or \"us\") collects, uses, discloses, and safeguards information in connection with our website and services, including customer onboarding, scheduling and crew management, invoicing, and payment processing integrations."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Scope & Roles"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "We act as a controller for the data we collect about you when you visit our sites, sign up for a trial, or otherwise interact with us directly. When business customers use PayHive to process their own customers' data, we generally act as a processor/service provider on their behalf."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Information We Collect"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"We collect the following categories of information:"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Account & lead data: name, email, company, phone, and preferences submitted via our forms."</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Business & customer content: customers, property addresses, services, schedules, crew assignments."</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Payment-related info: we integrate with Stripe. We do not store full card numbers."</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Device & usage data: IP address, browser, pages viewed, timestamps, performance logs."</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">"• Cookies & similar tech: to keep you logged in, remember preferences, and measure usage."</p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"How We Use Information"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Provide and improve our services"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Process payments and manage billing"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Communicate with you about your account"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 8px;">"• Detect and prevent fraud or abuse"</p>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">"• Comply with legal obligations"</p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Data Retention"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "We retain personal data for as long as your account is active or as needed to provide services. We may retain certain data longer for legal, tax, or compliance purposes."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Your Rights"</h2>
+                    <p style="color: #374151; line-height: 1.7; margin-bottom: 24px;">
+                        "You may request access to, correction of, or deletion of your personal data by contacting us at privacy@payhiveapp.com."
+                    </p>
+
+                    <h2 style="font-size: 20px; font-weight: 600; color: #303234; margin-bottom: 12px;">"Contact Us"</h2>
+                    <p style="color: #374151; line-height: 1.7;">
+                        "If you have questions about this Privacy Policy, contact us at privacy@payhiveapp.com."
+                    </p>
+                </div>
+            </div>
+        </div>
+    }
+}

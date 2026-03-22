@@ -1,0 +1,389 @@
+// Accounting Integrations
+// Bank connections (Plaid) and QuickBooks integration management
+
+component AcctIntegrations() {
+    let mut loading: bool = false;
+    let mut bank_count: i32 = 1;
+    let mut qbo_connected: bool = true;
+    let mut qbo_company: String = "Acme Inc.";
+    let mut syncing: bool = false;
+
+    fn connect_bank(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/integrations/plaid/link-token");
+        self.loading = false;
+    }
+
+    fn sync_bank(&mut self) {
+        self.syncing = true;
+        let response = fetch("/api/accounting/integrations/bank/sync");
+        self.syncing = false;
+    }
+
+    fn disconnect_bank(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/integrations/bank/disconnect");
+        self.loading = false;
+    }
+
+    fn connect_qbo(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/accounting/integrations/qbo/auth");
+        self.loading = false;
+    }
+
+    fn sync_accounts(&mut self) {
+        self.syncing = true;
+        let response = fetch("/api/accounting/integrations/qbo/sync-accounts");
+        self.syncing = false;
+    }
+
+    fn disconnect_qbo(&mut self) {
+        self.qbo_connected = false;
+    }
+
+    style {
+        .integrations-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .two-col-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+        }
+        .section-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .card-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "16px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .card-header-left {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .card-icon {
+            color: "#9CA3AF";
+            font-size: "16px";
+        }
+        .card-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .connect-btn {
+            padding: "6px 12px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "6px";
+            font-size: "13px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .bank-item {
+            padding: "16px";
+        }
+        .bank-header {
+            display: "flex";
+            align-items: "flex-start";
+            justify-content: "space-between";
+            margin-bottom: "12px";
+        }
+        .bank-name {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .bank-synced {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .status-connected {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .status-active {
+            padding: "2px 10px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .account-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+            margin-bottom: "12px";
+        }
+        .account-item {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "8px 12px";
+            background-color: "#F9FAFB";
+            border-radius: "6px";
+        }
+        .account-name {
+            font-size: "13px";
+            color: "#111827";
+        }
+        .account-mask {
+            font-size: "12px";
+            color: "#6B7280";
+        }
+        .account-type {
+            font-size: "12px";
+            color: "#9CA3AF";
+        }
+        .bank-actions {
+            display: "flex";
+            gap: "8px";
+        }
+        .sync-btn {
+            padding: "6px 12px";
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "6px";
+            font-size: "13px";
+            color: "#374151";
+            cursor: "pointer";
+        }
+        .disconnect-btn {
+            padding: "6px 12px";
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "6px";
+            font-size: "13px";
+            color: "#DC2626";
+            cursor: "pointer";
+        }
+        .qbo-content {
+            padding: "16px";
+        }
+        .qbo-info {
+            margin-bottom: "12px";
+        }
+        .qbo-company {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .qbo-date {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .qbo-actions {
+            display: "flex";
+            gap: "8px";
+        }
+        .accounts-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            overflow: "hidden";
+        }
+        .accounts-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "16px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .accounts-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .accounts-count {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .coa-table-header {
+            display: "grid";
+            grid-template-columns: "80px 2fr 1fr";
+            padding: "8px 16px";
+            background-color: "#F9FAFB";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .coa-th {
+            font-size: "12px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+        }
+        .coa-row {
+            display: "grid";
+            grid-template-columns: "80px 2fr 1fr";
+            padding: "8px 16px";
+            border-bottom: "1px solid #F3F4F6";
+        }
+        .coa-code {
+            font-size: "13px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .coa-name {
+            font-size: "13px";
+            color: "#374151";
+        }
+        .coa-type {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+        .empty-state {
+            padding: "32px";
+            text-align: "center";
+        }
+        .empty-icon {
+            font-size: "48px";
+            color: "#D1D5DB";
+            margin-bottom: "12px";
+        }
+        .empty-text {
+            font-size: "14px";
+            color: "#4B5563";
+        }
+        .empty-hint {
+            font-size: "13px";
+            color: "#6B7280";
+        }
+    }
+
+    render {
+        <div class="integrations-page">
+            <div>
+                <h1 class="page-title">"Integrations"</h1>
+                <p class="page-subtitle">"Connect your bank accounts and accounting software"</p>
+            </div>
+
+            <div class="two-col-grid">
+                <div class="section-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <span class="card-icon">"B"</span>
+                            <h2 class="card-title">"Bank Accounts"</h2>
+                        </div>
+                        <button class="connect-btn" on:click={self.connect_bank}>"Connect Bank"</button>
+                    </div>
+                    <div class="bank-item">
+                        <div class="bank-header">
+                            <div>
+                                <div class="bank-name">"Chase"</div>
+                                <div class="bank-synced">"Last synced: Jan 15, 2024 10:30 AM"</div>
+                            </div>
+                            <span class="status-connected">"connected"</span>
+                        </div>
+                        <div class="account-list">
+                            <div class="account-item">
+                                <div>
+                                    <span class="account-name">"Business Checking"</span>
+                                    <span class="account-mask">" ...4521"</span>
+                                </div>
+                                <span class="account-type">"depository"</span>
+                            </div>
+                            <div class="account-item">
+                                <div>
+                                    <span class="account-name">"Business Savings"</span>
+                                    <span class="account-mask">" ...7832"</span>
+                                </div>
+                                <span class="account-type">"depository"</span>
+                            </div>
+                        </div>
+                        <div class="bank-actions">
+                            <button class="sync-btn" on:click={self.sync_bank}>"Sync"</button>
+                            <button class="disconnect-btn" on:click={self.disconnect_bank}>"Disconnect"</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <span class="card-icon">"Q"</span>
+                            <h2 class="card-title">"QuickBooks Online"</h2>
+                        </div>
+                    </div>
+                    {if self.qbo_connected {
+                        <div class="qbo-content">
+                            <div class="bank-header">
+                                <div class="qbo-info">
+                                    <div class="qbo-company">{format("{}", self.qbo_company)}</div>
+                                    <div class="qbo-date">"Connected: Jan 10, 2024"</div>
+                                </div>
+                                <span class="status-active">"active"</span>
+                            </div>
+                            <div class="qbo-actions">
+                                <button class="sync-btn" on:click={self.sync_accounts}>"Sync Accounts"</button>
+                                <button class="disconnect-btn" on:click={self.disconnect_qbo}>"Disconnect"</button>
+                            </div>
+                        </div>
+                    }}
+                    {if !self.qbo_connected {
+                        <div class="empty-state">
+                            <div class="empty-icon">"Q"</div>
+                            <div class="empty-text">"QuickBooks not connected"</div>
+                            <div class="empty-hint">"Connect to sync your chart of accounts"</div>
+                            <button class="connect-btn" on:click={self.connect_qbo}>"Connect QuickBooks"</button>
+                        </div>
+                    }}
+                </div>
+            </div>
+
+            <div class="accounts-card">
+                <div class="accounts-header">
+                    <h2 class="accounts-title">"Chart of Accounts"</h2>
+                    <span class="accounts-count">"4 accounts"</span>
+                </div>
+                <div class="coa-table-header">
+                    <span class="coa-th">"Code"</span>
+                    <span class="coa-th">"Name"</span>
+                    <span class="coa-th">"Type"</span>
+                </div>
+                <div class="coa-row">
+                    <span class="coa-code">"1000"</span>
+                    <span class="coa-name">"Bank Account"</span>
+                    <span class="coa-type">"Asset"</span>
+                </div>
+                <div class="coa-row">
+                    <span class="coa-code">"4000"</span>
+                    <span class="coa-name">"Revenue"</span>
+                    <span class="coa-type">"Income"</span>
+                </div>
+                <div class="coa-row">
+                    <span class="coa-code">"6100"</span>
+                    <span class="coa-name">"Software Expense"</span>
+                    <span class="coa-type">"Expense"</span>
+                </div>
+                <div class="coa-row">
+                    <span class="coa-code">"6200"</span>
+                    <span class="coa-name">"Office Supplies"</span>
+                    <span class="coa-type">"Expense"</span>
+                </div>
+            </div>
+        </div>
+    }
+}

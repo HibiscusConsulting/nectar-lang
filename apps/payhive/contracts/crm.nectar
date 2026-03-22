@@ -1,0 +1,69 @@
+// CRM API response contracts
+// Compile-time validated shapes for CRM module responses
+
+contract Contact {
+    id: i32,
+    first_name: String,
+    last_name: String,
+    email: String,
+    phone: String,
+    job_title: String,
+    organization_id: i32,
+    organization_name: String,
+    stage: String,
+    notes: String,
+    created_at: String,
+}
+
+contract Deal {
+    id: i32,
+    name: String,
+    stage: String,
+    amount_cents: i32,
+    contact_id: i32,
+    contact_name: String,
+    organization_name: String,
+    expected_close_date: String,
+    source: String,
+    created_at: String,
+}
+
+contract Organization {
+    id: i32,
+    name: String,
+    phone: String,
+    website: String,
+    industry: String,
+    address: String,
+    city: String,
+    state: String,
+    zip: String,
+    stage: String,
+    owner_name: String,
+    contact_count: i32,
+    created_at: String,
+}
+
+contract Task {
+    id: i32,
+    title: String,
+    task_type: String,
+    priority: String,
+    due_at: String,
+    completed_at: String,
+    assigned_to: String,
+    lead_name: String,
+    notes: String,
+    created_at: String,
+}
+
+contract FeedbackItem {
+    id: i32,
+    category: String,
+    notes: String,
+    org_name: String,
+    contact_name: String,
+    logged_by: String,
+    occurred_at: String,
+    sentiment: String,
+}

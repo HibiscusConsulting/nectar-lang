@@ -1,0 +1,420 @@
+// PayHive account portal — pending approvals management
+// Customer authorization flow, send reminders, urgency indicators
+
+component AccountApprovals() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut item_count: i32 = 3;
+    let mut toast_show: bool = false;
+    let mut toast_msg: String = "";
+    let mut sending_id: String = "";
+    let mut all_clear: bool = false;
+
+    fn refresh_approvals(&mut self) {
+        self.loading = true;
+        let response = fetch("/api/approvals");
+        self.loading = false;
+    }
+
+    fn send_reminder_1(&mut self) {
+        self.sending_id = "1";
+        let response = fetch("/api/approvals/1/remind");
+        self.toast_show = true;
+        self.toast_msg = "Reminder sent to customer";
+        self.sending_id = "";
+    }
+
+    fn send_reminder_2(&mut self) {
+        self.sending_id = "2";
+        let response = fetch("/api/approvals/2/remind");
+        self.toast_show = true;
+        self.toast_msg = "Reminder sent to customer";
+        self.sending_id = "";
+    }
+
+    fn send_reminder_3(&mut self) {
+        self.sending_id = "3";
+        let response = fetch("/api/approvals/3/remind");
+        self.toast_show = true;
+        self.toast_msg = "Reminder sent to customer";
+        self.sending_id = "";
+    }
+
+    fn view_customer(&mut self) {
+        self.loading = false;
+    }
+
+    fn close_toast(&mut self) {
+        self.toast_show = false;
+    }
+
+    style {
+        .approvals-page {
+            padding: "16px 24px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .main-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px 24px";
+        }
+        .card-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            margin-bottom: "16px";
+        }
+        .header-left {
+            display: "flex";
+            flex-direction: "column";
+        }
+        .header-label {
+            font-size: "12px";
+            color: "#737373";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#525252";
+            margin-top: "4px";
+        }
+        .refresh-btn {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            padding: "8px 16px";
+            font-size: "14px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            background-color: "#FFFFFF";
+            cursor: "pointer";
+        }
+        .approval-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "12px";
+        }
+        .approval-item {
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "16px";
+            background-color: "#FAFAFA";
+        }
+        .approval-item-urgent {
+            border: "1px solid #FCA5A5";
+            border-radius: "8px";
+            padding: "16px";
+            background-color: "#FEF2F2";
+        }
+        .approval-top {
+            display: "flex";
+            align-items: "flex-start";
+            justify-content: "space-between";
+            gap: "16px";
+        }
+        .approval-content {
+            flex: "1";
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+        .customer-row {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .customer-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .urgent-badge {
+            display: "inline-flex";
+            align-items: "center";
+            gap: "4px";
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DC2626";
+            color: "#FFFFFF";
+        }
+        .contact-row {
+            font-size: "14px";
+            color: "#525252";
+            display: "flex";
+            gap: "12px";
+        }
+        .service-row {
+            display: "flex";
+            align-items: "center";
+            gap: "16px";
+            font-size: "14px";
+        }
+        .service-name {
+            font-weight: "500";
+            color: "#111827";
+        }
+        .service-date {
+            color: "#525252";
+        }
+        .service-urgency {
+            color: "#737373";
+        }
+        .service-amount {
+            font-weight: "500";
+            color: "#111827";
+        }
+        .reminder-row {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+            font-size: "12px";
+            color: "#525252";
+        }
+        .reminder-count {
+            color: "#B45309";
+        }
+        .reminder-scheduled {
+            color: "#059669";
+        }
+        .approval-summary {
+            font-size: "14px";
+            color: "#404040";
+            font-style: "italic";
+        }
+        .action-buttons {
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+        .send-btn {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            padding: "8px 16px";
+            font-size: "14px";
+            border-radius: "8px";
+            background-color: "#059669";
+            color: "#FFFFFF";
+            border: "none";
+            cursor: "pointer";
+            white-space: "nowrap";
+        }
+        .view-customer-btn {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            padding: "8px 16px";
+            font-size: "14px";
+            border-radius: "8px";
+            border: "1px solid #E5E7EB";
+            background-color: "#FFFFFF";
+            cursor: "pointer";
+            white-space: "nowrap";
+        }
+        .empty-state {
+            text-align: "center";
+            padding: "48px 0";
+        }
+        .empty-icon {
+            font-size: "48px";
+            color: "#16A34A";
+            margin-bottom: "12px";
+        }
+        .empty-title {
+            font-size: "18px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .empty-subtitle {
+            font-size: "14px";
+            color: "#525252";
+            margin-top: "4px";
+        }
+        .info-panel {
+            background-color: "#EFF6FF";
+            border: "1px solid #BFDBFE";
+            border-radius: "8px";
+            padding: "16px";
+            font-size: "14px";
+            color: "#1E3A5F";
+        }
+        .info-title {
+            font-weight: "600";
+            margin-bottom: "8px";
+        }
+        .info-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "4px";
+            color: "#1E40AF";
+        }
+        .loading-text {
+            font-size: "14px";
+            color: "#525252";
+            text-align: "center";
+            padding: "32px 0";
+        }
+        .error-text {
+            font-size: "14px";
+            color: "#DC2626";
+            text-align: "center";
+            padding: "32px 0";
+        }
+        .toast {
+            position: "fixed";
+            bottom: "24px";
+            left: "50%";
+            transform: "translateX(-50%)";
+            z-index: "60";
+        }
+        .toast-inner {
+            background-color: "#F0FDF4";
+            color: "#166534";
+            border: "1px solid #BBF7D0";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            font-weight: "500";
+        }
+    }
+
+    render {
+        <div class="approvals-page">
+            <div class="main-card">
+                <div class="card-header">
+                    <div class="header-left">
+                        <div class="header-label">"Customer Authorizations"</div>
+                        <h1 class="page-title">"Pending Approvals"</h1>
+                        <div class="page-subtitle">"Services awaiting customer authorization before completion"</div>
+                    </div>
+                    <button class="refresh-btn" on:click={self.refresh_approvals}>"Refresh"</button>
+                </div>
+
+                {if self.all_clear {
+                    <div class="empty-state">
+                        <div class="empty-icon">"check"</div>
+                        <div class="empty-title">"All caught up!"</div>
+                        <div class="empty-subtitle">"No pending approvals at this time."</div>
+                    </div>
+                }}
+
+                {if !self.all_clear {
+                    <div class="approval-list">
+                        <div class="approval-item-urgent">
+                            <div class="approval-top">
+                                <div class="approval-content">
+                                    <div class="customer-row">
+                                        <span class="customer-name">"Sarah Johnson"</span>
+                                        <span class="urgent-badge">"Tomorrow"</span>
+                                    </div>
+                                    <div class="contact-row">
+                                        <span>"sarah@example.com"</span>
+                                        <span>"(512) 555-0142"</span>
+                                    </div>
+                                    <div class="service-row">
+                                        <span class="service-name">"Lawn Mowing"</span>
+                                        <span class="service-date">"Mar 23, 2026"</span>
+                                        <span class="service-urgency">"(Tomorrow)"</span>
+                                        <span class="service-amount">"$75.00"</span>
+                                    </div>
+                                    <div class="reminder-row">
+                                        <span>"Requested Mar 18, 2026"</span>
+                                        <span class="reminder-count">"2 reminders sent"</span>
+                                    </div>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="send-btn" on:click={self.send_reminder_1}>"Send Reminder"</button>
+                                    <button class="view-customer-btn" on:click={self.view_customer}>"View Customer"</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="approval-item">
+                            <div class="approval-top">
+                                <div class="approval-content">
+                                    <div class="customer-row">
+                                        <span class="customer-name">"Mike Thompson"</span>
+                                    </div>
+                                    <div class="contact-row">
+                                        <span>"mike.t@example.com"</span>
+                                        <span>"(512) 555-0198"</span>
+                                    </div>
+                                    <div class="service-row">
+                                        <span class="service-name">"HVAC Maintenance"</span>
+                                        <span class="service-date">"Mar 28, 2026"</span>
+                                        <span class="service-urgency">"(6 days)"</span>
+                                        <span class="service-amount">"$250.00"</span>
+                                    </div>
+                                    <div class="reminder-row">
+                                        <span>"Requested Mar 20, 2026"</span>
+                                        <span class="reminder-count">"1 reminder sent"</span>
+                                    </div>
+                                    <div class="approval-summary">"Annual HVAC system checkup and filter replacement"</div>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="send-btn" on:click={self.send_reminder_2}>"Send Reminder"</button>
+                                    <button class="view-customer-btn" on:click={self.view_customer}>"View Customer"</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="approval-item">
+                            <div class="approval-top">
+                                <div class="approval-content">
+                                    <div class="customer-row">
+                                        <span class="customer-name">"Lisa Chen"</span>
+                                    </div>
+                                    <div class="contact-row">
+                                        <span>"lisa.chen@example.com"</span>
+                                    </div>
+                                    <div class="service-row">
+                                        <span class="service-name">"Pest Control"</span>
+                                        <span class="service-date">"Apr 5, 2026"</span>
+                                        <span class="service-urgency">"(2 weeks)"</span>
+                                        <span class="service-amount">"$120.00"</span>
+                                    </div>
+                                    <div class="reminder-row">
+                                        <span>"Requested Mar 21, 2026"</span>
+                                        <span class="reminder-scheduled">"Next scheduled: Mar 24, 2026"</span>
+                                    </div>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="send-btn" on:click={self.send_reminder_3}>"Send Reminder"</button>
+                                    <button class="view-customer-btn" on:click={self.view_customer}>"View Customer"</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }}
+            </div>
+
+            <div class="info-panel">
+                <div class="info-title">"About Automated Reminders"</div>
+                <div class="info-list">
+                    <span>"Reminders are sent automatically based on service date"</span>
+                    <span>"Services today: Single immediate reminder"</span>
+                    <span>"Services within 7 days: Daily reminders until day of service"</span>
+                    <span>"Services 1+ month out: Today, tomorrow, weekly, then daily near service date"</span>
+                    <span>"Reminders stop automatically when customer approves"</span>
+                </div>
+            </div>
+
+            {if self.toast_show {
+                <div class="toast">
+                    <div class="toast-inner">{format("{}", self.toast_msg)}</div>
+                </div>
+            }}
+        </div>
+    }
+}

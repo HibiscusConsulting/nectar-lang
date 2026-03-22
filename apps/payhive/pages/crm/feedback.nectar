@@ -1,0 +1,499 @@
+// CRM Feedback Dashboard
+// Customer feedback and objection tracking with category distribution
+
+component FeedbackDashboard() {
+    let mut total_feedback: i32 = 24;
+    let mut org_count: i32 = 8;
+    let mut top_objection: String = "Pricing";
+    let mut pending_analysis: i32 = 3;
+    let mut days_filter: i32 = 30;
+    let mut loading: bool = false;
+
+    let mut pricing_count: i32 = 8;
+    let mut timing_count: i32 = 5;
+    let mut features_count: i32 = 4;
+    let mut competition_count: i32 = 3;
+    let mut budget_count: i32 = 2;
+    let mut other_count: i32 = 2;
+
+    fn set_days_7(&mut self) {
+        self.days_filter = 7;
+        self.loading = true;
+        let response = fetch("/api/crm/feedback/dashboard");
+        self.loading = false;
+    }
+
+    fn set_days_30(&mut self) {
+        self.days_filter = 30;
+        self.loading = true;
+        let response = fetch("/api/crm/feedback/dashboard");
+        self.loading = false;
+    }
+
+    fn set_days_90(&mut self) {
+        self.days_filter = 90;
+        self.loading = true;
+        let response = fetch("/api/crm/feedback/dashboard");
+        self.loading = false;
+    }
+
+    style {
+        .feedback-page {
+            display: "flex";
+            flex-direction: "column";
+            gap: "24px";
+        }
+        .feedback-header {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-top: "4px";
+        }
+        .days-select {
+            padding: "8px 12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            font-size: "14px";
+            color: "#111827";
+        }
+        .summary-grid {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .summary-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .summary-card-label {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "4px";
+        }
+        .summary-card-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .summary-card-value-amber {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#D97706";
+        }
+        .summary-card-value-text {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .alert-bar {
+            background-color: "#FFFBEB";
+            border: "1px solid #FDE68A";
+            border-radius: "8px";
+            padding: "16px";
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .alert-icon {
+            color: "#D97706";
+            font-size: "16px";
+        }
+        .alert-text {
+            font-size: "14px";
+            color: "#92400E";
+        }
+        .categories-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "24px";
+        }
+        .section-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+            margin-bottom: "16px";
+        }
+        .categories-grid {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .category-card {
+            padding: "16px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+        }
+        .cat-icon-red {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-icon-yellow {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#FFFBEB";
+            color: "#D97706";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-icon-blue {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-icon-purple {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#F5F3FF";
+            color: "#7C3AED";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-icon-orange {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#FFF7ED";
+            color: "#EA580C";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-icon-gray {
+            display: "inline-flex";
+            padding: "8px";
+            border-radius: "8px";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+            margin-bottom: "8px";
+            font-size: "16px";
+        }
+        .cat-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .cat-label {
+            font-size: "14px";
+            color: "#6B7280";
+        }
+        .cat-bar {
+            margin-top: "8px";
+            height: "6px";
+            background-color: "#F3F4F6";
+            border-radius: "9999px";
+            overflow: "hidden";
+        }
+        .cat-bar-fill-red {
+            height: "100%";
+            background-color: "#EF4444";
+        }
+        .cat-bar-fill-yellow {
+            height: "100%";
+            background-color: "#F59E0B";
+        }
+        .cat-bar-fill-blue {
+            height: "100%";
+            background-color: "#3B82F6";
+        }
+        .cat-bar-fill-purple {
+            height: "100%";
+            background-color: "#8B5CF6";
+        }
+        .cat-bar-fill-orange {
+            height: "100%";
+            background-color: "#F97316";
+        }
+        .cat-bar-fill-gray {
+            height: "100%";
+            background-color: "#9CA3AF";
+        }
+        .cat-pct {
+            font-size: "12px";
+            color: "#9CA3AF";
+            margin-top: "4px";
+        }
+        .two-col-grid {
+            display: "grid";
+            grid-template-columns: "1fr 1fr";
+            gap: "24px";
+        }
+        .list-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "24px";
+        }
+        .org-item {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            margin-bottom: "8px";
+            cursor: "pointer";
+        }
+        .org-name {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#111827";
+        }
+        .sentiment-hot {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DCFCE7";
+            color: "#15803D";
+        }
+        .sentiment-warm {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .sentiment-cold {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#F3F4F6";
+            color: "#374151";
+        }
+        .feedback-count {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#4B5563";
+        }
+        .feedback-entry {
+            padding: "12px";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            margin-bottom: "8px";
+        }
+        .feedback-entry-header {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+            margin-bottom: "4px";
+        }
+        .feedback-badge-pricing {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEE2E2";
+            color: "#991B1B";
+        }
+        .feedback-badge-timing {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#FEF3C7";
+            color: "#92400E";
+        }
+        .feedback-badge-features {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#DBEAFE";
+            color: "#1D4ED8";
+        }
+        .feedback-badge-competition {
+            padding: "2px 8px";
+            border-radius: "9999px";
+            font-size: "12px";
+            font-weight: "500";
+            background-color: "#EDE9FE";
+            color: "#6D28D9";
+        }
+        .feedback-date {
+            font-size: "12px";
+            color: "#9CA3AF";
+        }
+        .feedback-note {
+            font-size: "14px";
+            color: "#111827";
+        }
+        .feedback-source {
+            font-size: "12px";
+            color: "#6B7280";
+            margin-top: "4px";
+        }
+    }
+
+    render {
+        <div class="feedback-page">
+            <div class="feedback-header">
+                <div>
+                    <h1 class="page-title">"Feedback & Objections"</h1>
+                    <p class="page-subtitle">"AI-powered insights from sales interactions"</p>
+                </div>
+                <select class="days-select">
+                    <option>"Last 7 days"</option>
+                    <option>"Last 30 days"</option>
+                    <option>"Last 90 days"</option>
+                </select>
+            </div>
+
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-card-label">"Total Feedback"</div>
+                    <div class="summary-card-value">{format("{}", self.total_feedback)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Organizations"</div>
+                    <div class="summary-card-value">{format("{}", self.org_count)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Top Objection"</div>
+                    <div class="summary-card-value-text">{format("{}", self.top_objection)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">"Pending Analysis"</div>
+                    <div class="summary-card-value-amber">{format("{}", self.pending_analysis)}</div>
+                </div>
+            </div>
+
+            {if self.pending_analysis > 0 {
+                <div class="alert-bar">
+                    <span class="alert-icon">"!"</span>
+                    <span class="alert-text">{format("{} organizations have new feedback pending AI analysis. Analysis runs every 30 minutes.", self.pending_analysis)}</span>
+                </div>
+            }}
+
+            <div class="categories-card">
+                <h2 class="section-title">"Objection Categories"</h2>
+                <div class="categories-grid">
+                    <div class="category-card">
+                        <div class="cat-icon-red">"$"</div>
+                        <div class="cat-value">{format("{}", self.pricing_count)}</div>
+                        <div class="cat-label">"Pricing"</div>
+                        <div class="cat-bar"><div class="cat-bar-fill-red" style="width: 33%"></div></div>
+                        <div class="cat-pct">"33%"</div>
+                    </div>
+                    <div class="category-card">
+                        <div class="cat-icon-yellow">"T"</div>
+                        <div class="cat-value">{format("{}", self.timing_count)}</div>
+                        <div class="cat-label">"Timing"</div>
+                        <div class="cat-bar"><div class="cat-bar-fill-yellow" style="width: 21%"></div></div>
+                        <div class="cat-pct">"21%"</div>
+                    </div>
+                    <div class="category-card">
+                        <div class="cat-icon-blue">"F"</div>
+                        <div class="cat-value">{format("{}", self.features_count)}</div>
+                        <div class="cat-label">"Features"</div>
+                        <div class="cat-bar"><div class="cat-bar-fill-blue" style="width: 17%"></div></div>
+                        <div class="cat-pct">"17%"</div>
+                    </div>
+                    <div class="category-card">
+                        <div class="cat-icon-purple">"C"</div>
+                        <div class="cat-value">{format("{}", self.competition_count)}</div>
+                        <div class="cat-label">"Competition"</div>
+                        <div class="cat-bar"><div class="cat-bar-fill-purple" style="width: 13%"></div></div>
+                        <div class="cat-pct">"13%"</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="two-col-grid">
+                <div class="list-card">
+                    <h2 class="section-title">"Organizations with Most Feedback"</h2>
+                    <div class="org-item">
+                        <div>
+                            <div class="org-name">"Acme Corp"</div>
+                            <span class="sentiment-hot">"hot"</span>
+                        </div>
+                        <span class="feedback-count">"5 entries"</span>
+                    </div>
+                    <div class="org-item">
+                        <div>
+                            <div class="org-name">"TechStart LLC"</div>
+                            <span class="sentiment-warm">"warm"</span>
+                        </div>
+                        <span class="feedback-count">"4 entries"</span>
+                    </div>
+                    <div class="org-item">
+                        <div>
+                            <div class="org-name">"Wilson HVAC"</div>
+                            <span class="sentiment-warm">"warm"</span>
+                        </div>
+                        <span class="feedback-count">"3 entries"</span>
+                    </div>
+                    <div class="org-item">
+                        <div>
+                            <div class="org-name">"Green Valley Services"</div>
+                            <span class="sentiment-cold">"cold"</span>
+                        </div>
+                        <span class="feedback-count">"2 entries"</span>
+                    </div>
+                </div>
+
+                <div class="list-card">
+                    <h2 class="section-title">"Recent Feedback"</h2>
+                    <div class="feedback-entry">
+                        <div class="feedback-entry-header">
+                            <span class="feedback-badge-pricing">"Pricing"</span>
+                            <span class="feedback-date">"Jan 20, 2024"</span>
+                        </div>
+                        <div class="feedback-note">"Too expensive compared to Square for payment processing"</div>
+                        <div class="feedback-source">"Acme Corp - Sarah Johnson"</div>
+                    </div>
+                    <div class="feedback-entry">
+                        <div class="feedback-entry-header">
+                            <span class="feedback-badge-timing">"Timing"</span>
+                            <span class="feedback-date">"Jan 19, 2024"</span>
+                        </div>
+                        <div class="feedback-note">"Not ready to switch until Q2, current contract runs through March"</div>
+                        <div class="feedback-source">"TechStart LLC - Mike Chen"</div>
+                    </div>
+                    <div class="feedback-entry">
+                        <div class="feedback-entry-header">
+                            <span class="feedback-badge-features">"Features"</span>
+                            <span class="feedback-date">"Jan 18, 2024"</span>
+                        </div>
+                        <div class="feedback-note">"Needs QuickBooks integration before they can switch"</div>
+                        <div class="feedback-source">"Wilson HVAC - James Wilson"</div>
+                    </div>
+                    <div class="feedback-entry">
+                        <div class="feedback-entry-header">
+                            <span class="feedback-badge-competition">"Competition"</span>
+                            <span class="feedback-date">"Jan 17, 2024"</span>
+                        </div>
+                        <div class="feedback-note">"Currently using Jobber, happy with it but open to alternatives"</div>
+                        <div class="feedback-source">"Green Valley Services - Lisa Park"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,257 @@
+// PayHive public magic link — approval page
+// No auth required, token-based access for service approval/decline
+
+component MagicApproval() {
+    let mut loading: bool = true;
+    let mut error_msg: String = "";
+    let mut has_approval: bool = true;
+    let mut title: String = "Approval request";
+    let mut summary: String = "Service Authorization";
+    let mut created_at: String = "Mar 20, 2026 3:15 PM";
+    let mut amount: String = "$150.00";
+    let mut note: String = "";
+    let mut action_loading: bool = false;
+    let mut action_error: String = "";
+    let mut success_msg: String = "";
+    let mut has_items: bool = false;
+    let mut item_name: String = "Lawn Mowing";
+    let mut item_qty: String = "1";
+    let mut item_price: String = "$75.00";
+    let mut item_total: String = "$75.00";
+
+    fn approve(&mut self) {
+        self.action_loading = true;
+        self.action_error = "";
+        self.success_msg = "";
+        let response = fetch("/api/portal/approvals/magic/respond");
+        self.success_msg = "Approved. You can manage offer texts in settings.";
+        self.action_loading = false;
+    }
+
+    fn decline(&mut self) {
+        self.action_loading = true;
+        self.action_error = "";
+        self.success_msg = "";
+        let response = fetch("/api/portal/approvals/magic/respond");
+        self.success_msg = "Declined.";
+        self.action_loading = false;
+    }
+
+    fn open_portal(&mut self) {
+        self.loading = false;
+    }
+
+    style {
+        .magic-page {
+            padding: "16px 24px";
+            max-width: "768px";
+            margin: "0 auto";
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .page-label {
+            font-size: "12px";
+            color: "#737373";
+            text-transform: "uppercase";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .loading-text {
+            font-size: "14px";
+            color: "#404040";
+        }
+        .error-box {
+            background-color: "#FEF2F2";
+            border: "1px solid #FECACA";
+            border-radius: "6px";
+            padding: "12px";
+            font-size: "14px";
+            color: "#B91C1C";
+        }
+        .expired-text {
+            font-size: "14px";
+            color: "#404040";
+        }
+        .approval-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "16px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "12px";
+        }
+        .approval-title {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .approval-summary {
+            font-size: "14px";
+            color: "#262626";
+        }
+        .approval-meta {
+            font-size: "12px";
+            color: "#525252";
+        }
+        .items-box {
+            background-color: "#FAFAFA";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "8px";
+            font-size: "14px";
+            color: "#262626";
+        }
+        .item-row {
+            display: "flex";
+            align-items: "flex-start";
+            justify-content: "space-between";
+            gap: "8px";
+        }
+        .item-name {
+            font-weight: "500";
+        }
+        .item-detail {
+            font-size: "12px";
+            color: "#525252";
+        }
+        .item-total {
+            font-size: "14px";
+            font-weight: "600";
+        }
+        .items-total-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            border-top: "1px solid #E5E7EB";
+            padding-top: "8px";
+            margin-top: "4px";
+            font-weight: "600";
+        }
+        .approval-note {
+            font-size: "12px";
+            color: "#404040";
+        }
+        .legal-hint {
+            font-size: "12px";
+            color: "#525252";
+        }
+        .action-error {
+            font-size: "14px";
+            color: "#DC2626";
+        }
+        .action-success {
+            font-size: "14px";
+            color: "#059669";
+        }
+        .action-row {
+            display: "flex";
+            align-items: "center";
+            gap: "8px";
+        }
+        .decline-btn {
+            display: "inline-flex";
+            align-items: "center";
+            padding: "8px 12px";
+            border-radius: "8px";
+            background-color: "#FFF1F2";
+            color: "#BE123C";
+            font-size: "14px";
+            border: "none";
+            cursor: "pointer";
+        }
+        .approve-btn {
+            display: "inline-flex";
+            align-items: "center";
+            padding: "8px 12px";
+            border-radius: "8px";
+            background-color: "#059669";
+            color: "#FFFFFF";
+            font-size: "14px";
+            border: "none";
+            cursor: "pointer";
+        }
+        .fraud-note {
+            font-size: "11px";
+            color: "#737373";
+        }
+        .portal-link {
+            font-size: "12px";
+            color: "#525252";
+        }
+        .portal-btn {
+            color: "#059669";
+            text-decoration: "underline";
+            background: "none";
+            border: "none";
+            cursor: "pointer";
+            font-size: "12px";
+        }
+    }
+
+    render {
+        <div class="magic-page">
+            <div class="page-label">"Magic approval"</div>
+            <h1 class="page-title">"Secure approval link"</h1>
+
+            {if self.loading {
+                <div class="loading-text">"Loading..."</div>
+            }}
+
+            {if self.error_msg != "" {
+                <div class="error-box">{format("{}", self.error_msg)}</div>
+            }}
+
+            {if self.has_approval {
+                <div class="approval-card">
+                    <div>
+                        <div class="approval-title">{format("{}", self.title)}</div>
+                        <div class="approval-summary">{format("{}", self.summary)}</div>
+                        <div class="approval-meta">{format("Created {}", self.created_at)}</div>
+                    </div>
+
+                    {if self.has_items {
+                        <div class="items-box">
+                            <div class="item-row">
+                                <div>
+                                    <div class="item-name">{format("{}", self.item_name)}</div>
+                                    <div class="item-detail">{format("Qty {} @ {}", self.item_qty, self.item_price)}</div>
+                                </div>
+                                <div class="item-total">{format("{}", self.item_total)}</div>
+                            </div>
+                            <div class="items-total-row">
+                                <span>"Total"</span>
+                                <span>{format("{}", self.amount)}</span>
+                            </div>
+                        </div>
+                    }}
+
+                    <div class="legal-hint">"No charge unless you approve."</div>
+
+                    {if self.action_error != "" {
+                        <div class="action-error">{format("{}", self.action_error)}</div>
+                    }}
+
+                    {if self.success_msg != "" {
+                        <div class="action-success">{format("{}", self.success_msg)}</div>
+                    }}
+
+                    <div class="action-row">
+                        <button class="decline-btn" on:click={self.decline}>"Decline"</button>
+                        <button class="approve-btn" on:click={self.approve}>"Approve"</button>
+                        <div class="fraud-note">"We may record device/IP and approximate location for fraud prevention."</div>
+                    </div>
+
+                    <div class="portal-link">
+                        <span>"You can manage offer texts in settings. Need the app? "</span>
+                        <button class="portal-btn" on:click={self.open_portal}>"Open portal"</button>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}

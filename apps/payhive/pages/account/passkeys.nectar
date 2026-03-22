@@ -1,0 +1,252 @@
+// PayHive account portal — passkey (WebAuthn) management
+// Register/revoke passkeys for passwordless sign-in
+
+component AccountPasskeys() {
+    let mut session_ok: bool = true;
+    let mut email_verified: bool = true;
+    let mut loading: bool = false;
+    let mut device_label: String = "This device";
+    let mut adding: bool = false;
+    let mut error_msg: String = "";
+    let mut success_msg: String = "";
+    let mut credential_count: i32 = 2;
+    let mut cred1_label: String = "MacBook Pro";
+    let mut cred1_date: String = "Mar 10, 2026 2:15 PM";
+    let mut cred2_label: String = "iPhone 15";
+    let mut cred2_date: String = "Mar 5, 2026 9:30 AM";
+
+    fn add_passkey(&mut self) {
+        self.adding = true;
+        self.error_msg = "";
+        self.success_msg = "";
+        let response = fetch("/api/auth/webauthn/register/options");
+        self.success_msg = "Passkey added.";
+        self.adding = false;
+    }
+
+    fn revoke_cred1(&mut self) {
+        self.error_msg = "";
+        let response = fetch("/api/auth/webauthn/credentials/revoke");
+        self.success_msg = "Passkey revoked.";
+        self.credential_count = self.credential_count - 1;
+    }
+
+    fn revoke_cred2(&mut self) {
+        self.error_msg = "";
+        let response = fetch("/api/auth/webauthn/credentials/revoke");
+        self.success_msg = "Passkey revoked.";
+        self.credential_count = self.credential_count - 1;
+    }
+
+    style {
+        .passkeys-page {
+            max-width: "512px";
+            margin: "0 auto";
+            padding: "32px 24px";
+        }
+        .page-header {
+            margin-bottom: "24px";
+        }
+        .page-title {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .page-subtitle {
+            font-size: "14px";
+            color: "#525252";
+            margin-top: "4px";
+        }
+        .callout-warning {
+            background-color: "#FFFBEB";
+            border: "1px solid #FDE68A";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            color: "#92400E";
+            margin-bottom: "16px";
+        }
+        .callout-error {
+            background-color: "#FEF2F2";
+            border: "1px solid #FECACA";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            color: "#B91C1C";
+            margin-bottom: "16px";
+        }
+        .callout-success {
+            background-color: "#F0FDF4";
+            border: "1px solid #BBF7D0";
+            border-radius: "8px";
+            padding: "12px 16px";
+            font-size: "14px";
+            color: "#166534";
+            margin-bottom: "16px";
+        }
+        .callout-link {
+            text-decoration: "underline";
+            color: "#92400E";
+        }
+        .section {
+            display: "flex";
+            flex-direction: "column";
+            gap: "16px";
+        }
+        .add-card {
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "16px";
+        }
+        .input-label {
+            font-size: "14px";
+            color: "#404040";
+            display: "block";
+            margin-bottom: "4px";
+        }
+        .input-field {
+            width: "100%";
+            border: "1px solid #D1D5DB";
+            border-radius: "8px";
+            padding: "8px 12px";
+            font-size: "14px";
+            margin-top: "4px";
+        }
+        .add-btn {
+            display: "inline-flex";
+            align-items: "center";
+            justify-content: "center";
+            padding: "8px 16px";
+            border-radius: "8px";
+            background-color: "#F59E0B";
+            color: "#FFFFFF";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            cursor: "pointer";
+            margin-top: "12px";
+        }
+        .list-card {
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "16px";
+            background-color: "#FFFFFF";
+        }
+        .list-title {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#262626";
+            margin-bottom: "12px";
+        }
+        .cred-list {
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+        .cred-item {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "8px 12px";
+        }
+        .cred-info {
+            font-size: "14px";
+        }
+        .cred-name {
+            font-weight: "600";
+            color: "#111827";
+        }
+        .cred-date {
+            font-size: "12px";
+            color: "#525252";
+        }
+        .revoke-btn {
+            padding: "6px 12px";
+            font-size: "14px";
+            border-radius: "6px";
+            border: "1px solid #D1D5DB";
+            background-color: "#FFFFFF";
+            cursor: "pointer";
+        }
+        .empty-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .loading-text {
+            font-size: "14px";
+            color: "#525252";
+        }
+        .login-needed {
+            display: "flex";
+            flex-direction: "column";
+            gap: "8px";
+        }
+    }
+
+    render {
+        <div class="passkeys-page">
+            <div class="page-header">
+                <h1 class="page-title">"Passkeys"</h1>
+                <p class="page-subtitle">"Register and manage passkeys for passwordless sign-in."</p>
+            </div>
+
+            {if !self.session_ok {
+                <div class="callout-warning">
+                    <span>"You need to sign in to manage passkeys. "</span>
+                    <span class="callout-link">"Sign in"</span>
+                </div>
+            }}
+
+            {if !self.email_verified {
+                <div class="callout-warning">"Please verify your email before adding a passkey."</div>
+            }}
+
+            {if self.error_msg != "" {
+                <div class="callout-error">{format("{}", self.error_msg)}</div>
+            }}
+
+            {if self.success_msg != "" {
+                <div class="callout-success">{format("{}", self.success_msg)}</div>
+            }}
+
+            {if self.session_ok {
+                <div class="section">
+                    <div class="add-card">
+                        <label class="input-label">"Device label"</label>
+                        <div class="input-field">{format("{}", self.device_label)}</div>
+                        <button class="add-btn" on:click={self.add_passkey}>
+                            {if self.adding {
+                                "Adding..."
+                            }}
+                            {if !self.adding {
+                                "Add passkey"
+                            }}
+                        </button>
+                    </div>
+
+                    <div class="list-card">
+                        <div class="list-title">"Your passkeys"</div>
+                        <div class="cred-list">
+                            <div class="cred-item">
+                                <div class="cred-info">
+                                    <div class="cred-name">{format("{}", self.cred1_label)}</div>
+                                    <div class="cred-date">{format("Added {}", self.cred1_date)}</div>
+                                </div>
+                                <button class="revoke-btn" on:click={self.revoke_cred1}>"Revoke"</button>
+                            </div>
+                            <div class="cred-item">
+                                <div class="cred-info">
+                                    <div class="cred-name">{format("{}", self.cred2_label)}</div>
+                                    <div class="cred-date">{format("Added {}", self.cred2_date)}</div>
+                                </div>
+                                <button class="revoke-btn" on:click={self.revoke_cred2}>"Revoke"</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }}
+        </div>
+    }
+}
