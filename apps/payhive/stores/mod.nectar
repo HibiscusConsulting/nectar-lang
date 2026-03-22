@@ -1,0 +1,3 @@
+// PayHive stores module
+mod auth_store;
+mod app_store;

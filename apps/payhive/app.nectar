@@ -4,6 +4,13 @@
 // Routes match the React original at ~/repos/payhive/payhive/src/
 // Colors: #303234 (dark), #FFB547 (gold), #F68F1E (amber), #F9FAFB (bg)
 
+// Load all modules
+mod components;
+mod pages;
+mod stores;
+mod contracts;
+mod theme;
+
 router AppRouter {
     route "/" => Dashboard,
     route "/app" => Dashboard,
