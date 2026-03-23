@@ -527,7 +527,7 @@ component Dashboard() {
                     // Schedule header card
                     <div class="schedule-card">
                         <div class="schedule-owner-label">"Owner"</div>
-                        <div class="schedule-title">"Today \xB7 All Teams"</div>
+                        <div class="schedule-title">"Today . All Teams"</div>
                         <div class="schedule-date">"Monday, Mar 23"</div>
                     </div>
 
@@ -580,22 +580,22 @@ component Dashboard() {
 
                     // Footer
                     <div class="footer">
-                        <div class="footer-brand">"PayHive \xB7 \xA9 2026"</div>
+                        <div class="footer-brand">"PayHive . (c) 2026"</div>
                         <div class="footer-links">
                             <span class="footer-link">"DNA"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Terms"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Privacy"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Security"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Careers"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Blog"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"White Paper"</span>
-                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-dot">"."</span>
                             <span class="footer-link">"Support"</span>
                         </div>
                     </div>
