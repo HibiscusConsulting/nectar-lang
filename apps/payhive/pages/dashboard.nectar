@@ -577,7 +577,7 @@ component Dashboard() {
                                     <div class="card-label">"AVAILABLE BALANCE"</div>
                                     <div class="card-value">"$0.00"</div>
                                 </div>
-                                <div class="card-icon-badge card-icon-green">"$"</div>
+                                
                             </div>
                         </div>
 
@@ -588,7 +588,7 @@ component Dashboard() {
                                     <div class="card-label">"PENDING PAYOUT"</div>
                                     <div class="card-value">"$0.00"</div>
                                 </div>
-                                <div class="card-icon-badge card-icon-blue">"📈"</div>
+                                
                             </div>
                             <div class="card-sub-text">"Processing to your bank"</div>
                         </div>
@@ -600,7 +600,7 @@ component Dashboard() {
                                     <div class="card-label">"OUTSTANDING A/R"</div>
                                     <div class="card-value">"$0.00"</div>
                                 </div>
-                                <div class="card-icon-badge card-icon-gray">"!"</div>
+                                
                             </div>
                             <div class="card-sub-text-green">"All caught up!"</div>
                         </div>
