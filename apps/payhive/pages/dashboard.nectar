@@ -1,5 +1,5 @@
 // PayHive main dashboard
-// Financial summary cards, quick stats, recent activity
+// Full layout: sidebar + header + content area with financial cards
 
 component Dashboard() {
     let mut available_balance: String = "$12,450.00";
@@ -11,6 +11,7 @@ component Dashboard() {
     let mut invoices_due: i32 = 8;
     let mut crew_active: i32 = 6;
     let mut loading: bool = false;
+    let mut active_nav: String = "dashboard";
 
     fn refresh_data(&mut self) {
         self.loading = true;
@@ -18,7 +19,190 @@ component Dashboard() {
         self.loading = false;
     }
 
+    fn nav_dashboard(&mut self) {
+        self.active_nav = "dashboard";
+        navigate("/app");
+    }
+
+    fn nav_schedule(&mut self) {
+        self.active_nav = "schedule";
+        navigate("/app/schedule");
+    }
+
+    fn nav_pipeline(&mut self) {
+        self.active_nav = "pipeline";
+        navigate("/crm/pipeline");
+    }
+
+    fn nav_storm_leads(&mut self) {
+        self.active_nav = "storm_leads";
+        navigate("/app/storm-leads");
+    }
+
+    fn nav_quotes(&mut self) {
+        self.active_nav = "quotes";
+        navigate("/app/quotes");
+    }
+
+    fn nav_crews(&mut self) {
+        self.active_nav = "crews";
+        navigate("/app/crew");
+    }
+
+    fn nav_payments(&mut self) {
+        self.active_nav = "payments";
+        navigate("/app/payments");
+    }
+
+    fn nav_settings(&mut self) {
+        self.active_nav = "settings";
+        navigate("/app/settings");
+    }
+
+    fn nav_more(&mut self) {
+        self.active_nav = "more";
+    }
+
+    fn nav_integrations(&mut self) {
+        self.active_nav = "integrations";
+        navigate("/acct/integrations");
+    }
+
+    fn nav_crm_settings(&mut self) {
+        self.active_nav = "crm_settings";
+        navigate("/app/settings");
+    }
+
     style {
+        .layout {
+            display: "flex";
+            min-height: "100vh";
+            background-color: "#F9FAFB";
+        }
+        .sidebar {
+            width: "240px";
+            min-height: "100vh";
+            background-color: "#FFFFFF";
+            border-right: "1px solid #E5E7EB";
+            padding: "16px 0";
+            display: "flex";
+            flex-direction: "column";
+            flex-shrink: "0";
+        }
+        .sidebar-brand {
+            padding: "0 20px 24px 20px";
+            display: "flex";
+            align-items: "center";
+            gap: "4px";
+        }
+        .sidebar-brand-dark {
+            font-size: "22px";
+            font-weight: "700";
+            color: "#303234";
+        }
+        .sidebar-brand-gold {
+            font-size: "22px";
+            font-weight: "700";
+            color: "#FFB547";
+        }
+        .sidebar-nav {
+            display: "flex";
+            flex-direction: "column";
+            gap: "2px";
+            padding: "0 8px";
+        }
+        .nav-section-label {
+            padding: "16px 12px 6px 12px";
+            font-size: "11px";
+            font-weight: "600";
+            color: "#9CA3AF";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+        }
+        .nav-item {
+            padding: "10px 12px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "500";
+            color: "#6B7280";
+            cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            gap: "10px";
+        }
+        .nav-item-active {
+            padding: "10px 12px";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+            background-color: "#FFF7ED";
+            cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            gap: "10px";
+        }
+        .nav-icon {
+            width: "18px";
+            height: "18px";
+            display: "inline-flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "14px";
+        }
+        .layout-main {
+            flex: "1";
+            display: "flex";
+            flex-direction: "column";
+            min-width: "0";
+        }
+        .header {
+            height: "64px";
+            background-color: "#FFFFFF";
+            border-bottom: "1px solid #E5E7EB";
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "0 24px";
+            flex-shrink: "0";
+        }
+        .header-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .header-actions {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .quick-actions-btn {
+            padding: "8px 16px";
+            background-color: "#303234";
+            color: "#FFFFFF";
+            border: "none";
+            border-radius: "8px";
+            font-size: "13px";
+            font-weight: "500";
+            cursor: "pointer";
+        }
+        .user-avatar {
+            width: "32px";
+            height: "32px";
+            border-radius: "50%";
+            background-color: "#FFB547";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "14px";
+            font-weight: "600";
+            color: "#303234";
+        }
+        .content {
+            flex: "1";
+            padding: "24px";
+            overflow-y: "auto";
+        }
         .dashboard {
             display: "flex";
             flex-direction: "column";
@@ -60,6 +244,39 @@ component Dashboard() {
             border-radius: "12px";
             padding: "20px";
         }
+        .summary-card-accent {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-left: "4px solid #FFB547";
+            border-radius: "12px";
+            padding: "20px";
+        }
+        .card-icon-badge {
+            width: "36px";
+            height: "36px";
+            border-radius: "8px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "16px";
+            margin-bottom: "12px";
+        }
+        .card-icon-green {
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .card-icon-yellow {
+            background-color: "#FFF7ED";
+            color: "#D97706";
+        }
+        .card-icon-red {
+            background-color: "#FEF2F2";
+            color: "#DC2626";
+        }
+        .card-icon-blue {
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+        }
         .summary-card-label {
             font-size: "13px";
             font-weight: "500";
@@ -70,9 +287,6 @@ component Dashboard() {
             font-size: "28px";
             font-weight: "700";
             color: "#303234";
-        }
-        .summary-card-accent {
-            border-left: "4px solid #FFB547";
         }
         .quick-stats {
             display: "grid";
@@ -126,77 +340,150 @@ component Dashboard() {
     }
 
     render {
-        <div class="dashboard">
-            <div class="dashboard-header">
-                <div>
-                    <h1 class="dashboard-title">"Dashboard"</h1>
-                    <p class="dashboard-subtitle">"Welcome back. Here is your business overview."</p>
+        <div class="layout">
+            <aside class="sidebar">
+                <div class="sidebar-brand">
+                    <span class="sidebar-brand-dark">"Pay"</span>
+                    <span class="sidebar-brand-gold">"Hive"</span>
                 </div>
-                <button class="refresh-btn" on:click={self.refresh_data}>"Refresh"</button>
-            </div>
+                <nav class="sidebar-nav">
+                    <div class="nav-section-label">"MAIN"</div>
+                    <div class="nav-item-active" on:click={self.nav_dashboard}>
+                        <span class="nav-icon">"📊"</span>
+                        <span>"Dashboard"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_schedule}>
+                        <span class="nav-icon">"📅"</span>
+                        <span>"Schedule"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_pipeline}>
+                        <span class="nav-icon">"📈"</span>
+                        <span>"Pipeline"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_storm_leads}>
+                        <span class="nav-icon">"⛈"</span>
+                        <span>"Storm Leads"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_quotes}>
+                        <span class="nav-icon">"📝"</span>
+                        <span>"Quotes"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_crews}>
+                        <span class="nav-icon">"👷"</span>
+                        <span>"Crews"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_payments}>
+                        <span class="nav-icon">"💳"</span>
+                        <span>"Payments"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_settings}>
+                        <span class="nav-icon">"⚙"</span>
+                        <span>"Settings"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_more}>
+                        <span class="nav-icon">"•••"</span>
+                        <span>"More"</span>
+                    </div>
+                    <div class="nav-section-label">"ADMIN"</div>
+                    <div class="nav-item" on:click={self.nav_integrations}>
+                        <span class="nav-icon">"🔌"</span>
+                        <span>"Integrations"</span>
+                    </div>
+                    <div class="nav-item" on:click={self.nav_crm_settings}>
+                        <span class="nav-icon">"🔧"</span>
+                        <span>"CRM Settings"</span>
+                    </div>
+                </nav>
+            </aside>
 
-            <div class="summary-cards">
-                <div class="summary-card summary-card-accent">
-                    <div class="summary-card-label">"Available Balance"</div>
-                    <div class="summary-card-value">{format("{}", self.available_balance)}</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-card-label">"Pending"</div>
-                    <div class="summary-card-value">{format("{}", self.pending_amount)}</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-card-label">"Outstanding"</div>
-                    <div class="summary-card-value">{format("{}", self.outstanding_amount)}</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-card-label">"Revenue This Month"</div>
-                    <div class="summary-card-value">{format("{}", self.revenue_month)}</div>
-                </div>
-            </div>
+            <div class="layout-main">
+                <header class="header">
+                    <span class="header-title">"PayHive Dashboard"</span>
+                    <div class="header-actions">
+                        <button class="quick-actions-btn">"Quick Actions"</button>
+                        <div class="user-avatar">"BB"</div>
+                    </div>
+                </header>
 
-            <div class="quick-stats">
-                <div class="quick-stat">
-                    <div class="quick-stat-value">{format("{}", self.active_jobs)}</div>
-                    <div class="quick-stat-label">"Active Jobs"</div>
-                </div>
-                <div class="quick-stat">
-                    <div class="quick-stat-value">{format("{}", self.new_customers)}</div>
-                    <div class="quick-stat-label">"New Customers"</div>
-                </div>
-                <div class="quick-stat">
-                    <div class="quick-stat-value">{format("{}", self.invoices_due)}</div>
-                    <div class="quick-stat-label">"Invoices Due"</div>
-                </div>
-                <div class="quick-stat">
-                    <div class="quick-stat-value">{format("{}", self.crew_active)}</div>
-                    <div class="quick-stat-label">"Crew Active"</div>
-                </div>
-            </div>
+                <main class="content">
+                    <div class="dashboard">
+                        <div class="dashboard-header">
+                            <div>
+                                <h1 class="dashboard-title">"Dashboard"</h1>
+                                <p class="dashboard-subtitle">"Welcome back. Here is your business overview."</p>
+                            </div>
+                            <button class="refresh-btn" on:click={self.refresh_data}>"Refresh"</button>
+                        </div>
 
-            <div>
-                <h2 class="section-title">"Recent Activity"</h2>
-                <div class="activity-list">
-                    <div class="activity-item">
-                        <span class="activity-text">"Invoice #1042 paid by Johnson Landscaping"</span>
-                        <span class="activity-time">"2 hours ago"</span>
+                        <div class="summary-cards">
+                            <div class="summary-card-accent">
+                                <div class="card-icon-badge card-icon-green">"$"</div>
+                                <div class="summary-card-label">"Available Balance"</div>
+                                <div class="summary-card-value">{self.available_balance}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon-badge card-icon-yellow">"⏳"</div>
+                                <div class="summary-card-label">"Pending"</div>
+                                <div class="summary-card-value">{self.pending_amount}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon-badge card-icon-red">"!"</div>
+                                <div class="summary-card-label">"Outstanding"</div>
+                                <div class="summary-card-value">{self.outstanding_amount}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon-badge card-icon-blue">"↑"</div>
+                                <div class="summary-card-label">"Revenue This Month"</div>
+                                <div class="summary-card-value">{self.revenue_month}</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-stats">
+                            <div class="quick-stat">
+                                <div class="quick-stat-value">{self.active_jobs}</div>
+                                <div class="quick-stat-label">"Active Jobs"</div>
+                            </div>
+                            <div class="quick-stat">
+                                <div class="quick-stat-value">{self.new_customers}</div>
+                                <div class="quick-stat-label">"New Customers"</div>
+                            </div>
+                            <div class="quick-stat">
+                                <div class="quick-stat-value">{self.invoices_due}</div>
+                                <div class="quick-stat-label">"Invoices Due"</div>
+                            </div>
+                            <div class="quick-stat">
+                                <div class="quick-stat-value">{self.crew_active}</div>
+                                <div class="quick-stat-label">"Crew Active"</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h2 class="section-title">"Recent Activity"</h2>
+                            <div class="activity-list">
+                                <div class="activity-item">
+                                    <span class="activity-text">"Invoice #1042 paid by Johnson Landscaping"</span>
+                                    <span class="activity-time">"2 hours ago"</span>
+                                </div>
+                                <div class="activity-item">
+                                    <span class="activity-text">"New customer: Smith Electrical"</span>
+                                    <span class="activity-time">"5 hours ago"</span>
+                                </div>
+                                <div class="activity-item">
+                                    <span class="activity-text">"Payment of $850.00 processed"</span>
+                                    <span class="activity-time">"Yesterday"</span>
+                                </div>
+                                <div class="activity-item">
+                                    <span class="activity-text">"Invoice #1041 sent to Garcia Plumbing"</span>
+                                    <span class="activity-time">"Yesterday"</span>
+                                </div>
+                                <div class="activity-item">
+                                    <span class="activity-text">"Crew member Mike assigned to Job #287"</span>
+                                    <span class="activity-time">"2 days ago"</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="activity-item">
-                        <span class="activity-text">"New customer: Smith Electrical"</span>
-                        <span class="activity-time">"5 hours ago"</span>
-                    </div>
-                    <div class="activity-item">
-                        <span class="activity-text">"Payment of $850.00 processed"</span>
-                        <span class="activity-time">"Yesterday"</span>
-                    </div>
-                    <div class="activity-item">
-                        <span class="activity-text">"Invoice #1041 sent to Garcia Plumbing"</span>
-                        <span class="activity-time">"Yesterday"</span>
-                    </div>
-                    <div class="activity-item">
-                        <span class="activity-text">"Crew member Mike assigned to Job #287"</span>
-                        <span class="activity-time">"2 days ago"</span>
-                    </div>
-                </div>
+                </main>
             </div>
         </div>
     }
