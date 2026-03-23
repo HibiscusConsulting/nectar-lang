@@ -330,6 +330,9 @@ impl DevServer {
 
         let response = if let Some((body, ct)) = serve_file(&file_path) {
             http_response(200, ct, &body)
+        } else if let Some((body, _)) = serve_file(&build_dir.join("index.html")) {
+            // SPA fallback: serve index.html for unmatched routes
+            http_response(200, "text/html", &body)
         } else {
             http_response(404, "text/plain", b"Not Found")
         };
