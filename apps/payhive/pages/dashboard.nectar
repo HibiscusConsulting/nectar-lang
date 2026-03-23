@@ -69,14 +69,12 @@ component Dashboard() {
     }
 
     style {
-        /* ===== ROOT LAYOUT ===== */
         .layout {
             display: "flex";
             min-height: "100vh";
             background-color: "#F9FAFB";
         }
 
-        /* ===== SIDEBAR ===== */
         .sidebar {
             width: "240px";
             min-height: "100vh";
@@ -147,7 +145,6 @@ component Dashboard() {
             color: "#9CA3AF";
         }
 
-        /* ===== MAIN CONTENT COLUMN ===== */
         .layout-main {
             flex: "1";
             display: "flex";
@@ -155,7 +152,6 @@ component Dashboard() {
             min-width: "0";
         }
 
-        /* ===== HEADER ===== */
         .header {
             height: "56px";
             background-color: "#FFFFFF";
@@ -222,7 +218,6 @@ component Dashboard() {
             color: "#FFFFFF";
         }
 
-        /* ===== ONBOARDING BANNER ===== */
         .onboarding-banner {
             background-color: "#F68F1E";
             padding: "14px 24px";
@@ -286,7 +281,6 @@ component Dashboard() {
             opacity: "0.8";
         }
 
-        /* ===== CONTENT AREA ===== */
         .content {
             flex: "1";
             padding: "24px";
@@ -295,13 +289,11 @@ component Dashboard() {
             gap: "20px";
         }
 
-        /* Breadcrumb */
         .breadcrumb {
             font-size: "13px";
             color: "#9CA3AF";
         }
 
-        /* Schedule Card */
         .schedule-card {
             background-color: "#FFFFFF";
             border: "1px solid #E5E7EB";
@@ -324,7 +316,6 @@ component Dashboard() {
             margin-top: "2px";
         }
 
-        /* Schedule Day Section */
         .schedule-day-card {
             background-color: "#FFFFFF";
             border: "1px solid #E5E7EB";
@@ -354,7 +345,6 @@ component Dashboard() {
             text-align: "center";
         }
 
-        /* ===== FINANCIAL CARDS ===== */
         .financial-cards {
             display: "grid";
             grid-template-columns: "repeat(3, 1fr)";
@@ -418,7 +408,6 @@ component Dashboard() {
             color: "#6B7280";
         }
 
-        /* ===== FOOTER ===== */
         .footer {
             padding: "24px";
             text-align: "center";
