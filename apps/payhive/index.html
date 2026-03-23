@@ -196,6 +196,22 @@
       cursor: pointer;
     }
 
+    input, select, textarea {
+      background-color: #FFFFFF;
+      color: #111827;
+      border: 1px solid #D1D5DB;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #F68F1E;
+      box-shadow: 0 0 0 2px rgba(246, 143, 30, 0.15);
+    }
+    button { font-family: inherit; }
+
     /* Content area where WASM mounts */
     #app {
       flex: 1;
