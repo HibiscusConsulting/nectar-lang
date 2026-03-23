@@ -12,6 +12,23 @@
     html, body { height: 100%; width: 100%; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
     #app { min-height: 100vh; width: 100%; background: #F9FAFB; }
+    @media (max-width: 768px) {
+      [class*="Dashboard__sidebar"] { display: none !important; }
+      [class*="Dashboard__header"] { display: none !important; }
+      [class*="Dashboard__mobile-header"] {
+        display: flex !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #E5E7EB;
+      }
+      [class*="Dashboard__financial-cards"] { grid-template-columns: 1fr !important; }
+      [class*="Dashboard__onboarding-banner"] { flex-wrap: wrap !important; gap: 12px; padding: 12px 16px !important; }
+      [class*="Dashboard__content"] { padding: 16px !important; }
+      [class*="Dashboard__footer-items"] { flex-direction: column !important; gap: 4px !important; }
+      [class*="Dashboard__card-value"] { font-size: 20px !important; }
+    }
   </style>
 </head>
 <body>
