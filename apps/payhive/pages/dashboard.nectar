@@ -261,7 +261,7 @@ component Dashboard() {
             align-items: "center";
             gap: "12px";
         }
-        .banner-continue-btn {
+        .banner-setup-btn {
             padding: "8px 20px";
             background-color: "#FFFFFF";
             color: "#F68F1E";
@@ -420,14 +420,14 @@ component Dashboard() {
             color: "#6B7280";
             margin-bottom: "8px";
         }
-        .footer-links {
+        .footer-items {
             display: "flex";
             align-items: "center";
             justify-content: "center";
             gap: "16px";
             flex-wrap: "wrap";
         }
-        .footer-link {
+        .footer-item {
             font-size: "13px";
             color: "#9CA3AF";
             text-decoration: "none";
@@ -513,7 +513,7 @@ component Dashboard() {
                             </div>
                         </div>
                         <div class="banner-right">
-                            <button class="banner-continue-btn" on:click={self.continue_setup}>"Continue Setup"</button>
+                            <button class="banner-setup-btn" on:click={self.continue_setup}>"Continue Setup"</button>
                             <button class="banner-close-btn" on:click={self.close_banner}>"x"</button>
                         </div>
                     </div>
@@ -581,22 +581,22 @@ component Dashboard() {
                     // Footer
                     <div class="footer">
                         <div class="footer-brand">"PayHive . (c) 2026"</div>
-                        <div class="footer-links">
-                            <span class="footer-link">"DNA"</span>
+                        <div class="footer-items">
+                            <span class="footer-item">"DNA"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Terms"</span>
+                            <span class="footer-item">"Terms"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Privacy"</span>
+                            <span class="footer-item">"Privacy"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Security"</span>
+                            <span class="footer-item">"Security"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Careers"</span>
+                            <span class="footer-item">"Careers"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Blog"</span>
+                            <span class="footer-item">"Blog"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"White Paper"</span>
+                            <span class="footer-item">"White Paper"</span>
                             <span class="footer-dot">"."</span>
-                            <span class="footer-link">"Support"</span>
+                            <span class="footer-item">"Support"</span>
                         </div>
                     </div>
                 </main>
