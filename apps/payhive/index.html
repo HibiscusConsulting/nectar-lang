@@ -316,7 +316,7 @@
 
   <!-- Quick Actions Drawer -->
   <div id="ph-qa-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:200"></div>
-  <div id="ph-qa-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:380px;background:#FFFFFF;box-shadow:-4px 0 20px rgba(0,0,0,0.1);z-index:201;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease">
+  <div id="ph-qa-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:380px;background:#FFFFFF;box-shadow:-4px 0 20px rgba(0,0,0,0.1);z-index:201;overflow-y:auto;transform:translateX(100%);transition:transform 0.1s cubic-bezier(0.2,0,0,1)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #E5E7EB">
       <span style="font-size:18px;font-weight:600;color:#111827">Quick Actions</span>
       <span id="ph-qa-close" style="cursor:pointer;font-size:22px;color:#9CA3AF;padding:4px">&times;</span>
@@ -394,7 +394,7 @@
       const qaOverlay = document.getElementById('ph-qa-overlay');
       const qaClose = document.getElementById('ph-qa-close');
       function openQA() { qaPanel.style.display='block'; qaOverlay.style.display='block'; setTimeout(()=>{qaPanel.style.transform='translateX(0)';},10); }
-      function closeQA() { qaPanel.style.transform='translateX(100%)'; setTimeout(()=>{qaPanel.style.display='none'; qaOverlay.style.display='none';},250); }
+      function closeQA() { qaPanel.style.transform='translateX(100%)'; setTimeout(()=>{qaPanel.style.display='none'; qaOverlay.style.display='none';},100); }
       if (qaBtn && qaPanel) {
         qaBtn.addEventListener('click', () => { openQA(); });
         qaClose.addEventListener('click', () => { closeQA(); });
