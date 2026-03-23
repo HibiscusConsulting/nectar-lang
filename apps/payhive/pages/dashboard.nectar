@@ -1,64 +1,9 @@
-// PayHive Dashboard — matches React DashboardHome layout exactly
-// Sidebar + Header + Onboarding Banner + Schedule Card + Financial Summary + Footer
+// PayHive Dashboard — content area only
+// Layout (sidebar + header) is in index.html
 
 component Dashboard() {
-    let mut active_nav: String = "dashboard";
     let mut show_banner: bool = true;
     let mut loading: bool = false;
-
-    fn nav_dashboard(&mut self) {
-        self.active_nav = "dashboard";
-        navigate("/app");
-    }
-
-    fn nav_schedule(&mut self) {
-        self.active_nav = "schedule";
-        navigate("/app/schedule");
-    }
-
-    fn nav_pipeline(&mut self) {
-        self.active_nav = "pipeline";
-        navigate("/app/crm/pipeline");
-    }
-
-    fn nav_storm_leads(&mut self) {
-        self.active_nav = "storm_leads";
-        navigate("/app/crm/b2c-leads");
-    }
-
-    fn nav_quotes(&mut self) {
-        self.active_nav = "quotes";
-        navigate("/app/quotes");
-    }
-
-    fn nav_crews(&mut self) {
-        self.active_nav = "crews";
-        navigate("/app/crews");
-    }
-
-    fn nav_payments(&mut self) {
-        self.active_nav = "payments";
-        navigate("/app/payments");
-    }
-
-    fn nav_settings(&mut self) {
-        self.active_nav = "settings";
-        navigate("/app/settings");
-    }
-
-    fn nav_more(&mut self) {
-        self.active_nav = "more";
-    }
-
-    fn nav_integrations(&mut self) {
-        self.active_nav = "integrations";
-        navigate("/app/admin/integrations/gusto");
-    }
-
-    fn nav_crm_settings(&mut self) {
-        self.active_nav = "crm_settings";
-        navigate("/app/crm/settings");
-    }
 
     fn close_banner(&mut self) {
         self.show_banner = false;
@@ -69,155 +14,6 @@ component Dashboard() {
     }
 
     style {
-        .layout {
-            display: "flex";
-            min-height: "100vh";
-            background-color: "#F9FAFB";
-        }
-
-        .sidebar {
-            width: "240px";
-            min-height: "100vh";
-            background-color: "#FFFFFF";
-            border-right: "1px solid #E5E7EB";
-            padding: "16px 0";
-            display: "flex";
-            flex-direction: "column";
-            flex-shrink: "0";
-        }
-        .sidebar-menu-row {
-            padding: "0 16px 20px 16px";
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-        }
-        .sidebar-menu-text {
-            font-size: "16px";
-            font-weight: "600";
-            color: "#111827";
-        }
-        .sidebar-collapse-btn {
-            font-size: "14px";
-            color: "#9CA3AF";
-            cursor: "pointer";
-            background: "none";
-            border: "none";
-            padding: "4px 8px";
-        }
-        .sidebar-nav {
-            display: "flex";
-            flex-direction: "column";
-            gap: "2px";
-            padding: "0 8px";
-        }
-        .nav-section-label {
-            padding: "16px 12px 6px 12px";
-            font-size: "11px";
-            font-weight: "600";
-            color: "#9CA3AF";
-            text-transform: "uppercase";
-            letter-spacing: "0.05em";
-        }
-        .nav-item {
-            padding: "10px 12px";
-            border-radius: "8px";
-            font-size: "14px";
-            font-weight: "500";
-            color: "#374151";
-            cursor: "pointer";
-            display: "flex";
-            align-items: "center";
-        }
-        .nav-item-active {
-            padding: "10px 12px";
-            border-radius: "8px";
-            font-size: "14px";
-            font-weight: "600";
-            color: "#FFFFFF";
-            background-color: "#F68F1E";
-            cursor: "pointer";
-            display: "flex";
-            align-items: "center";
-        }
-        .nav-chevron {
-            margin-left: "auto";
-            font-size: "12px";
-            color: "#9CA3AF";
-        }
-
-        .layout-main {
-            flex: "1";
-            display: "flex";
-            flex-direction: "column";
-            min-width: "0";
-        }
-
-        .header {
-            height: "56px";
-            background-color: "#FFFFFF";
-            border-bottom: "1px solid #E5E7EB";
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-            padding: "0 24px";
-            flex-shrink: "0";
-        }
-        .header-left {
-            display: "flex";
-            align-items: "center";
-            gap: "12px";
-        }
-        .header-logo {
-            font-size: "18px";
-            font-weight: "700";
-            color: "#111827";
-        }
-        .header-logo-accent {
-            font-size: "18px";
-            font-weight: "700";
-            color: "#111827";
-        }
-        .header-divider {
-            width: "1px";
-            height: "20px";
-            background-color: "#E5E7EB";
-        }
-        .header-title {
-            font-size: "18px";
-            font-weight: "600";
-            color: "#111827";
-        }
-        .header-actions {
-            display: "flex";
-            align-items: "center";
-            gap: "12px";
-        }
-        .quick-actions-btn {
-            padding: "6px 16px";
-            background-color: "#FFFFFF";
-            color: "#374151";
-            border: "1px solid #D1D5DB";
-            border-radius: "9999px";
-            font-size: "14px";
-            font-weight: "500";
-            cursor: "pointer";
-            display: "flex";
-            align-items: "center";
-            gap: "6px";
-        }
-        .user-avatar {
-            width: "32px";
-            height: "32px";
-            border-radius: "50%";
-            background-color: "#F68F1E";
-            display: "flex";
-            align-items: "center";
-            justify-content: "center";
-            font-size: "13px";
-            font-weight: "600";
-            color: "#FFFFFF";
-        }
-
         .onboarding-banner {
             background-color: "#F68F1E";
             padding: "14px 24px";
@@ -282,8 +78,6 @@ component Dashboard() {
         }
 
         .content {
-            flex: "1";
-            padding: "24px";
             display: "flex";
             flex-direction: "column";
             gap: "20px";
@@ -385,28 +179,6 @@ component Dashboard() {
             color: "#10B981";
             margin-top: "8px";
         }
-        .card-icon-badge {
-            width: "40px";
-            height: "40px";
-            border-radius: "10px";
-            display: "flex";
-            align-items: "center";
-            justify-content: "center";
-            font-size: "16px";
-            font-weight: "700";
-        }
-        .card-icon-green {
-            background-color: "#ECFDF5";
-            color: "#059669";
-        }
-        .card-icon-blue {
-            background-color: "#EFF6FF";
-            color: "#2563EB";
-        }
-        .card-icon-gray {
-            background-color: "#F3F4F6";
-            color: "#6B7280";
-        }
 
         .footer {
             padding: "24px";
@@ -437,197 +209,104 @@ component Dashboard() {
             font-size: "13px";
             color: "#D1D5DB";
         }
-        .mobile-header {
-            display: "none";
-        }
-        .hamburger-btn {
-            background: "none";
-            border: "none";
-            font-size: "24px";
-            color: "#111827";
-            cursor: "pointer";
-            padding: "4px";
-        }
-        .mobile-header-title {
-            font-size: "18px";
-            font-weight: "600";
-            color: "#111827";
-        }
-        .mobile-user-icon {
-            font-size: "24px";
-            color: "#374151";
-            cursor: "pointer";
-        }
     }
 
     render {
-        <div class="layout">
-            // ===== SIDEBAR =====
-            <aside class="sidebar">
-                <div class="sidebar-menu-row">
-                    <span class="sidebar-menu-text">"Menu"</span>
-                    <button class="sidebar-collapse-btn">"<<"</button>
+        <div class="content">
+            // Onboarding Banner
+            {if self.show_banner {
+                <div class="onboarding-banner">
+                    <div class="banner-left">
+                        <div class="banner-badge">"0/3"</div>
+                        <div class="banner-text-group">
+                            <span class="banner-title">"Finish setting up your business"</span>
+                            <span class="banner-subtitle">"Complete Stripe verification"</span>
+                        </div>
+                    </div>
+                    <div class="banner-right">
+                        <button class="banner-setup-btn" on:click={self.continue_setup}>"Continue Setup"</button>
+                        <button class="banner-close-btn" on:click={self.close_banner}>"x"</button>
+                    </div>
                 </div>
-                <nav class="sidebar-nav">
-                    <div class="nav-section-label">"NAVIGATION"</div>
-                    <div class="nav-item-active" on:click={self.nav_dashboard}>
-                        <span>"Dashboard"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_schedule}>
-                        <span>"Schedule"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_pipeline}>
-                        <span>"Pipeline"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_storm_leads}>
-                        <span>"Storm Leads"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_quotes}>
-                        <span>"Quotes"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_crews}>
-                        <span>"Crews"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_payments}>
-                        <span>"Payments"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_settings}>
-                        <span>"Settings"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_more}>
-                        <span>"More"</span>
-                        <span class="nav-chevron">">"</span>
-                    </div>
-                    <div class="nav-section-label">"ADMIN"</div>
-                    <div class="nav-item" on:click={self.nav_integrations}>
-                        <span>"Integrations"</span>
-                    </div>
-                    <div class="nav-item" on:click={self.nav_crm_settings}>
-                        <span>"CRM Settings"</span>
-                    </div>
-                </nav>
-            </aside>
+            }}
 
-            // ===== MAIN CONTENT =====
-            <div class="layout-main">
-                // Desktop Header
-                <header class="header">
-                    <div class="header-left">
-                        <span class="header-logo">"PayHive"</span>
-                        <div class="header-divider"></div>
-                        <span class="header-title">"Dashboard"</span>
-                    </div>
-                    <div class="header-actions">
-                        <button class="quick-actions-btn">"Quick Actions"</button>
-                        <div class="user-avatar">"BB"</div>
-                    </div>
-                </header>
+            // Breadcrumb
+            <div class="breadcrumb">"Home"</div>
 
-                // Mobile Header (hidden on desktop via CSS)
-                <div class="mobile-header">
-                    <button class="hamburger-btn">"="</button>
-                    <span class="mobile-header-title">"Dashboard"</span>
-                    <span class="mobile-user-icon">"B"</span>
+            // Schedule header card
+            <div class="schedule-card">
+                <div class="schedule-owner-label">"Owner"</div>
+                <div class="schedule-title">"Today . All Teams"</div>
+                <div class="schedule-date">"Monday, Mar 23"</div>
+            </div>
+
+            // Schedule day section
+            <div class="schedule-day-card">
+                <div class="schedule-day-header">
+                    <span class="schedule-day-text">"Mon, Mar 23"</span>
+                    <span class="schedule-day-count">"(0)"</span>
+                </div>
+                <div class="schedule-empty">"No items"</div>
+            </div>
+
+            // Financial Summary - 3 cards
+            <div class="financial-cards">
+                // Available Balance
+                <div class="financial-card">
+                    <div class="card-header-row">
+                        <div>
+                            <div class="card-label">"AVAILABLE BALANCE"</div>
+                            <div class="card-value">"$0.00"</div>
+                        </div>
+
+                    </div>
                 </div>
 
-                // Onboarding Banner
-                {if self.show_banner {
-                    <div class="onboarding-banner">
-                        <div class="banner-left">
-                            <div class="banner-badge">"0/3"</div>
-                            <div class="banner-text-group">
-                                <span class="banner-title">"Finish setting up your business"</span>
-                                <span class="banner-subtitle">"Complete Stripe verification"</span>
-                            </div>
+                // Pending Payout
+                <div class="financial-card">
+                    <div class="card-header-row">
+                        <div>
+                            <div class="card-label">"PENDING PAYOUT"</div>
+                            <div class="card-value">"$0.00"</div>
                         </div>
-                        <div class="banner-right">
-                            <button class="banner-setup-btn" on:click={self.continue_setup}>"Continue Setup"</button>
-                            <button class="banner-close-btn" on:click={self.close_banner}>"x"</button>
-                        </div>
+
                     </div>
-                }}
+                    <div class="card-sub-text">"Processing to your bank"</div>
+                </div>
 
-                // Content Area
-                <main class="content">
-                    // Breadcrumb
-                    <div class="breadcrumb">"Home"</div>
+                // Outstanding A/R
+                <div class="financial-card">
+                    <div class="card-header-row">
+                        <div>
+                            <div class="card-label">"OUTSTANDING A/R"</div>
+                            <div class="card-value">"$0.00"</div>
+                        </div>
 
-                    // Schedule header card
-                    <div class="schedule-card">
-                        <div class="schedule-owner-label">"Owner"</div>
-                        <div class="schedule-title">"Today . All Teams"</div>
-                        <div class="schedule-date">"Monday, Mar 23"</div>
                     </div>
+                    <div class="card-sub-text-green">"All caught up!"</div>
+                </div>
+            </div>
 
-                    // Schedule day section
-                    <div class="schedule-day-card">
-                        <div class="schedule-day-header">
-                            <span class="schedule-day-text">"Mon, Mar 23"</span>
-                            <span class="schedule-day-count">"(0)"</span>
-                        </div>
-                        <div class="schedule-empty">"No items"</div>
-                    </div>
-
-                    // Financial Summary - 3 cards
-                    <div class="financial-cards">
-                        // Available Balance
-                        <div class="financial-card">
-                            <div class="card-header-row">
-                                <div>
-                                    <div class="card-label">"AVAILABLE BALANCE"</div>
-                                    <div class="card-value">"$0.00"</div>
-                                </div>
-                                
-                            </div>
-                        </div>
-
-                        // Pending Payout
-                        <div class="financial-card">
-                            <div class="card-header-row">
-                                <div>
-                                    <div class="card-label">"PENDING PAYOUT"</div>
-                                    <div class="card-value">"$0.00"</div>
-                                </div>
-                                
-                            </div>
-                            <div class="card-sub-text">"Processing to your bank"</div>
-                        </div>
-
-                        // Outstanding A/R
-                        <div class="financial-card">
-                            <div class="card-header-row">
-                                <div>
-                                    <div class="card-label">"OUTSTANDING A/R"</div>
-                                    <div class="card-value">"$0.00"</div>
-                                </div>
-                                
-                            </div>
-                            <div class="card-sub-text-green">"All caught up!"</div>
-                        </div>
-                    </div>
-
-                    // Footer
-                    <div class="footer">
-                        <div class="footer-brand">"PayHive . (c) 2026"</div>
-                        <div class="footer-items">
-                            <span class="footer-item">"DNA"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Terms"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Privacy"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Security"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Careers"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Blog"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"White Paper"</span>
-                            <span class="footer-dot">"."</span>
-                            <span class="footer-item">"Support"</span>
-                        </div>
-                    </div>
-                </main>
+            // Footer
+            <div class="footer">
+                <div class="footer-brand">"PayHive . (c) 2026"</div>
+                <div class="footer-items">
+                    <span class="footer-item">"DNA"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Terms"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Privacy"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Security"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Careers"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Blog"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"White Paper"</span>
+                    <span class="footer-dot">"."</span>
+                    <span class="footer-item">"Support"</span>
+                </div>
             </div>
         </div>
     }

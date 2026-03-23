@@ -11,11 +11,201 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; width: 100%; }
     body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    #app { min-height: 100vh; width: 100%; background: #F9FAFB; }
+
+    /* ===== Shared Layout ===== */
+    .ph-layout {
+      display: flex;
+      min-height: 100vh;
+      background-color: #F9FAFB;
+    }
+
+    /* Sidebar */
+    .ph-sidebar {
+      width: 240px;
+      min-height: 100vh;
+      background-color: #FFFFFF;
+      border-right: 1px solid #E5E7EB;
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .ph-sidebar-menu-row {
+      padding: 0 16px 20px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ph-sidebar-menu-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .ph-sidebar-collapse-btn {
+      font-size: 14px;
+      color: #9CA3AF;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 4px 8px;
+    }
+    .ph-sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0 8px;
+    }
+    .ph-nav-section-label {
+      padding: 16px 12px 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9CA3AF;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ph-nav-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+    }
+    .ph-nav-item:hover {
+      background-color: #F3F4F6;
+    }
+    .ph-nav-item-active {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #F68F1E;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+    }
+    .ph-nav-chevron {
+      margin-left: auto;
+      font-size: 12px;
+      color: #9CA3AF;
+    }
+
+    /* Header */
+    .ph-layout-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .ph-header {
+      height: 56px;
+      background-color: #FFFFFF;
+      border-bottom: 1px solid #E5E7EB;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+    .ph-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ph-header-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .ph-header-divider {
+      width: 1px;
+      height: 20px;
+      background-color: #E5E7EB;
+    }
+    .ph-header-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .ph-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ph-quick-actions-btn {
+      padding: 6px 16px;
+      background-color: #FFFFFF;
+      color: #374151;
+      border: 1px solid #D1D5DB;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ph-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: #F68F1E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #FFFFFF;
+    }
+
+    /* Mobile header */
+    .ph-mobile-header {
+      display: none;
+    }
+    .ph-hamburger-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #111827;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .ph-mobile-header-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .ph-mobile-user-icon {
+      font-size: 24px;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    /* Content area where WASM mounts */
+    #app {
+      flex: 1;
+      padding: 24px;
+      background: #F9FAFB;
+      min-height: 0;
+    }
+
+    /* Active nav highlight via hash */
+    .ph-nav-item[data-active="true"] {
+      font-weight: 600;
+      color: #FFFFFF;
+      background-color: #F68F1E;
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-      [class*="Dashboard__sidebar"] { display: none !important; }
-      [class*="Dashboard__header"] { display: none !important; }
-      [class*="Dashboard__mobile-header"] {
+      .ph-sidebar { display: none !important; }
+      .ph-header { display: none !important; }
+      .ph-mobile-header {
         display: flex !important;
         align-items: center;
         justify-content: space-between;
@@ -23,16 +213,61 @@
         background-color: #FFFFFF;
         border-bottom: 1px solid #E5E7EB;
       }
-      [class*="Dashboard__financial-cards"] { grid-template-columns: 1fr !important; }
-      [class*="Dashboard__onboarding-banner"] { flex-wrap: wrap !important; gap: 12px; padding: 12px 16px !important; }
-      [class*="Dashboard__content"] { padding: 16px !important; }
-      [class*="Dashboard__footer-items"] { flex-direction: column !important; gap: 4px !important; }
-      [class*="Dashboard__card-value"] { font-size: 20px !important; }
+      #app { padding: 16px !important; }
     }
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div class="ph-layout">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="ph-sidebar">
+      <div class="ph-sidebar-menu-row">
+        <span class="ph-sidebar-menu-text">Menu</span>
+        <button class="ph-sidebar-collapse-btn">&laquo;</button>
+      </div>
+      <nav class="ph-sidebar-nav">
+        <div class="ph-nav-section-label">NAVIGATION</div>
+        <a class="ph-nav-item" href="#/" data-nav="dashboard">Dashboard</a>
+        <a class="ph-nav-item" href="#/app/schedule" data-nav="schedule">Schedule</a>
+        <a class="ph-nav-item" href="#/app/crm/pipeline" data-nav="pipeline">Pipeline</a>
+        <a class="ph-nav-item" href="#/app/customers" data-nav="customers">Customers</a>
+        <a class="ph-nav-item" href="#/app/invoices" data-nav="quotes">Quotes</a>
+        <a class="ph-nav-item" href="#/app/crew" data-nav="crews">Crews</a>
+        <a class="ph-nav-item" href="#/app/payments" data-nav="payments">Payments</a>
+        <a class="ph-nav-item" href="#/app/settings" data-nav="settings">Settings</a>
+        <div class="ph-nav-section-label">ADMIN</div>
+        <a class="ph-nav-item" href="#/app/admin/integrations/gusto" data-nav="integrations">Integrations</a>
+        <a class="ph-nav-item" href="#/app/crm/settings" data-nav="crm_settings">CRM Settings</a>
+      </nav>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <div class="ph-layout-main">
+      <!-- Desktop Header -->
+      <header class="ph-header">
+        <div class="ph-header-left">
+          <span class="ph-header-logo">PayHive</span>
+          <div class="ph-header-divider"></div>
+          <span class="ph-header-title" id="ph-page-title">Dashboard</span>
+        </div>
+        <div class="ph-header-actions">
+          <button class="ph-quick-actions-btn">Quick Actions</button>
+          <div class="ph-user-avatar">BB</div>
+        </div>
+      </header>
+
+      <!-- Mobile Header -->
+      <div class="ph-mobile-header">
+        <button class="ph-hamburger-btn">=</button>
+        <span class="ph-mobile-header-title">PayHive</span>
+        <span class="ph-mobile-user-icon">B</span>
+      </div>
+
+      <!-- WASM mounts page content here -->
+      <div id="app"></div>
+    </div>
+  </div>
+
   <script type="module">
     import { instantiate } from './core.js';
     try {
