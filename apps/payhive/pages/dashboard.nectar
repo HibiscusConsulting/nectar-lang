@@ -437,6 +437,55 @@ component Dashboard() {
             font-size: "13px";
             color: "#D1D5DB";
         }
+        .mobile-header {
+            display: "none";
+        }
+        .hamburger-btn {
+            background: "none";
+            border: "none";
+            font-size: "24px";
+            color: "#111827";
+            cursor: "pointer";
+            padding: "4px";
+        }
+        .mobile-header-title {
+            font-size: "18px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .mobile-user-icon {
+            font-size: "24px";
+            color: "#374151";
+            cursor: "pointer";
+        }
+    }
+
+    style {
+        @media (max-width: 768px) {
+            .Dashboard__sidebar { display: none; }
+            .Dashboard__header { display: none; }
+            .Dashboard__mobile-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 12px 16px;
+                background-color: #FFFFFF;
+                border-bottom: 1px solid #E5E7EB;
+                flex-shrink: 0;
+            }
+            .Dashboard__mobile-header-title { font-size: 18px; font-weight: 600; color: #111827; }
+            .Dashboard__hamburger-btn { background: none; border: none; font-size: 24px; color: #111827; cursor: pointer; padding: 4px; }
+            .Dashboard__mobile-user-icon { font-size: 24px; color: #374151; cursor: pointer; }
+            .Dashboard__financial-cards { grid-template-columns: 1fr; }
+            .Dashboard__onboarding-banner { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+            .Dashboard__banner-left { flex: 1; min-width: 0; }
+            .Dashboard__banner-title { font-size: 14px; }
+            .Dashboard__banner-subtitle { font-size: 12px; }
+            .Dashboard__content { padding: 16px; }
+            .Dashboard__footer-items { flex-direction: column; gap: 4px; }
+            .Dashboard__schedule-card { padding: 16px; }
+            .Dashboard__card-value { font-size: 20px; }
+        }
     }
 
     render {
@@ -489,7 +538,7 @@ component Dashboard() {
 
             // ===== MAIN CONTENT =====
             <div class="layout-main">
-                // Header
+                // Desktop Header
                 <header class="header">
                     <div class="header-left">
                         <span class="header-logo">"PayHive"</span>
@@ -501,6 +550,13 @@ component Dashboard() {
                         <div class="user-avatar">"BB"</div>
                     </div>
                 </header>
+
+                // Mobile Header (hidden on desktop via CSS)
+                <div class="mobile-header">
+                    <button class="hamburger-btn">"="</button>
+                    <span class="mobile-header-title">"Dashboard"</span>
+                    <span class="mobile-user-icon">"B"</span>
+                </div>
 
                 // Onboarding Banner
                 {if self.show_banner {
