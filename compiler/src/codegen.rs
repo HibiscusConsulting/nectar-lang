@@ -821,6 +821,23 @@ impl WasmCodegen {
     }
 
     /// Pre-scan the AST to determine which runtime categories are actually
+    /// Recursively collect router init calls from all items, including nested modules.
+    fn collect_router_init_calls(items: &[Item], init_calls: &mut Vec<String>) {
+        for item in items {
+            match item {
+                Item::Router(r) => {
+                    init_calls.push(format!("  call ${}_init", r.name));
+                }
+                Item::Mod(m) => {
+                    if let Some(ref inner) = m.items {
+                        Self::collect_router_init_calls(inner, init_calls);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// Recursively collect component/page names from all items, including nested modules.
     fn collect_component_names(&mut self, items: &[Item]) {
         for item in items {
@@ -1771,6 +1788,9 @@ impl WasmCodegen {
                     let _ = b;
                 }
             }
+
+            // Collect router init calls — must be called AFTER allocations
+            Self::collect_router_init_calls(&program.items, &mut init_calls);
 
             {
                 self.line("");
