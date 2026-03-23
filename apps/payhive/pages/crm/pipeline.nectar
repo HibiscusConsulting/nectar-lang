@@ -1,18 +1,15 @@
 // CRM Pipeline
-// Kanban-style deal pipeline with stages: Prospect, Qualified, Proposal, Negotiation, Customer, Churned
+// Kanban-style deal pipeline with stages: Lead, Inspection Set, Estimate Sent, Sold
 
 component Pipeline() {
     let mut view_mode: String = "kanban";
     let mut search_query: String = "";
-    let mut stage_filter: String = "";
-    let mut total_items: i32 = 0;
+    let mut stage_filter: String = "all";
     let mut loading: bool = false;
-    let mut prospect_count: i32 = 3;
-    let mut qualified_count: i32 = 2;
-    let mut proposal_count: i32 = 2;
-    let mut negotiation_count: i32 = 1;
-    let mut customer_count: i32 = 4;
-    let mut churned_count: i32 = 1;
+    let mut lead_count: i32 = 6;
+    let mut inspection_count: i32 = 19;
+    let mut estimate_count: i32 = 12;
+    let mut sold_count: i32 = 4;
 
     fn set_view_kanban(&mut self) {
         self.view_mode = "kanban";
@@ -22,13 +19,7 @@ component Pipeline() {
         self.view_mode = "list";
     }
 
-    fn search_items(&mut self) {
-        self.loading = true;
-        let response = fetch("/api/crm/pipeline");
-        self.loading = false;
-    }
-
-    fn refresh(&mut self) {
+    fn filter_items(&mut self) {
         self.loading = true;
         let response = fetch("/api/crm/pipeline");
         self.loading = false;
@@ -38,7 +29,10 @@ component Pipeline() {
         .pipeline-page {
             display: "flex";
             flex-direction: "column";
-            gap: "16px";
+            gap: "20px";
+            padding: "24px";
+            background-color: "#F9FAFB";
+            min-height: "100vh";
         }
         .pipeline-header {
             display: "flex";
@@ -50,36 +44,41 @@ component Pipeline() {
             font-weight: "700";
             color: "#111827";
         }
+        .toggle-row {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
         .view-toggle {
             display: "flex";
             align-items: "center";
-            border: "1px solid #E5E7EB";
             border-radius: "8px";
             overflow: "hidden";
-            background-color: "#FFFFFF";
         }
-        .view-btn {
+        .toggle-active {
             padding: "8px 16px";
             font-size: "14px";
             font-weight: "500";
             border: "none";
-            background-color: "#FFFFFF";
-            color: "#6B7280";
-            cursor: "pointer";
-        }
-        .view-btn-active {
-            padding: "8px 16px";
-            font-size: "14px";
-            font-weight: "500";
-            border: "none";
-            background-color: "#F59E0B";
+            background-color: "#303234";
             color: "#FFFFFF";
             cursor: "pointer";
+            border-radius: "6px 0 0 6px";
+        }
+        .toggle-inactive {
+            padding: "8px 16px";
+            font-size: "14px";
+            font-weight: "500";
+            border: "none";
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+            cursor: "pointer";
+            border-radius: "0 6px 6px 0";
         }
         .filters-row {
             display: "flex";
             align-items: "center";
-            gap: "8px";
+            gap: "12px";
             flex-wrap: "wrap";
         }
         .search-input {
@@ -88,7 +87,10 @@ component Pipeline() {
             border-radius: "8px";
             font-size: "14px";
             color: "#111827";
-            min-width: "256px";
+            background-color: "#FFFFFF";
+            min-width: "280px";
+            flex: "1";
+            max-width: "400px";
         }
         .filter-select {
             padding: "8px 12px";
@@ -96,10 +98,11 @@ component Pipeline() {
             border-radius: "8px";
             font-size: "14px";
             color: "#111827";
+            background-color: "#FFFFFF";
         }
-        .search-btn {
-            padding: "8px 16px";
-            background-color: "#F59E0B";
+        .filter-btn {
+            padding: "8px 20px";
+            background-color: "#F68F1E";
             color: "#FFFFFF";
             border: "none";
             border-radius: "8px";
@@ -107,17 +110,71 @@ component Pipeline() {
             font-weight: "500";
             cursor: "pointer";
         }
+        .stats-row {
+            display: "grid";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
+        }
+        .stat-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            padding: "16px";
+            text-align: "center";
+        }
+        .stat-number {
+            font-size: "28px";
+            font-weight: "700";
+            color: "#111827";
+            margin-bottom: "4px";
+        }
+        .stat-label-plain {
+            font-size: "13px";
+            font-weight: "500";
+            color: "#6B7280";
+        }
+        .stat-label-orange {
+            font-size: "13px";
+            font-weight: "500";
+            color: "#F68F1E";
+        }
         .kanban-board {
             display: "grid";
-            grid-template-columns: "repeat(6, 1fr)";
-            gap: "12px";
+            grid-template-columns: "repeat(4, 1fr)";
+            gap: "16px";
             overflow-x: "auto";
         }
-        .kanban-column {
-            background-color: "#F9FAFB";
-            border-radius: "12px";
-            padding: "12px";
-            min-width: "220px";
+        .col-prospect {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            border-top: "3px solid #3B82F6";
+            padding: "16px";
+            min-width: "240px";
+        }
+        .col-qualified {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            border-top: "3px solid #3B82F6";
+            padding: "16px";
+            min-width: "240px";
+        }
+        .col-proposal {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            border-top: "3px solid #F68F1E";
+            padding: "16px";
+            min-width: "240px";
+        }
+        .col-negotiation {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "8px";
+            border-top: "3px solid #F59E0B";
+            padding: "16px";
+            min-width: "240px";
         }
         .column-header {
             display: "flex";
@@ -138,86 +195,48 @@ component Pipeline() {
             background-color: "#E5E7EB";
             color: "#374151";
         }
-        .deal-card {
+        .contact-card {
             background-color: "#FFFFFF";
             border: "1px solid #E5E7EB";
             border-radius: "8px";
-            padding: "12px";
+            padding: "16px";
             margin-bottom: "8px";
             cursor: "pointer";
         }
-        .deal-name {
-            font-size: "14px";
-            font-weight: "600";
-            color: "#111827";
-            margin-bottom: "4px";
-        }
-        .deal-company {
-            font-size: "12px";
-            color: "#6B7280";
-            margin-bottom: "8px";
-        }
-        .deal-meta {
+        .contact-name-row {
             display: "flex";
             align-items: "center";
-            justify-content: "space-between";
+            gap: "8px";
+            margin-bottom: "10px";
         }
-        .deal-amount {
-            font-size: "13px";
+        .user-icon {
+            width: "32px";
+            height: "32px";
+            border-radius: "50%";
+            background-color: "#EFF6FF";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "14px";
+            color: "#3B82F6";
             font-weight: "600";
-            color: "#059669";
         }
-        .deal-date {
-            font-size: "11px";
+        .contact-name {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .contact-detail {
+            display: "flex";
+            align-items: "center";
+            gap: "6px";
+            font-size: "14px";
+            color: "#6B7280";
+            margin-bottom: "6px";
+        }
+        .detail-icon {
+            font-size: "13px";
             color: "#9CA3AF";
-        }
-        .stage-dot-prospect {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#9CA3AF";
-            display: "inline-block";
-            margin-right: "6px";
-        }
-        .stage-dot-qualified {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#2563EB";
-            display: "inline-block";
-            margin-right: "6px";
-        }
-        .stage-dot-proposal {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#7C3AED";
-            display: "inline-block";
-            margin-right: "6px";
-        }
-        .stage-dot-negotiation {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#D97706";
-            display: "inline-block";
-            margin-right: "6px";
-        }
-        .stage-dot-customer {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#059669";
-            display: "inline-block";
-            margin-right: "6px";
-        }
-        .stage-dot-churned {
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#DC2626";
-            display: "inline-block";
-            margin-right: "6px";
         }
     }
 
@@ -227,10 +246,10 @@ component Pipeline() {
                 <h1 class="page-title">"Pipeline"</h1>
             </div>
 
-            <div class="filters-row">
+            <div class="toggle-row">
                 <div class="view-toggle">
-                    <button class="view-btn-active" on:click={self.set_view_kanban}>"Kanban"</button>
-                    <button class="view-btn" on:click={self.set_view_list}>"List"</button>
+                    <button class="toggle-active" on:click={self.set_view_kanban}>"Kanban"</button>
+                    <button class="toggle-inactive" on:click={self.set_view_list}>"List"</button>
                 </div>
             </div>
 
@@ -238,143 +257,274 @@ component Pipeline() {
                 <input class="search-input" placeholder="Search..." />
                 <select class="filter-select">
                     <option>"All Stages"</option>
-                    <option>"Prospect"</option>
-                    <option>"Qualified"</option>
-                    <option>"Proposal"</option>
-                    <option>"Negotiation"</option>
-                    <option>"Customer"</option>
-                    <option>"Churned"</option>
+                    <option>"Lead"</option>
+                    <option>"Inspection Set"</option>
+                    <option>"Estimate Sent"</option>
+                    <option>"Sold"</option>
                 </select>
-                <button class="search-btn" on:click={self.search_items}>"Search"</button>
+                <button class="filter-btn" on:click={self.filter_items}>"Filter"</button>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-number">{format("{}", self.lead_count)}</div>
+                    <div class="stat-label-plain">"Lead"</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{format("{}", self.inspection_count)}</div>
+                    <div class="stat-label-orange">"Inspection Set"</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{format("{}", self.estimate_count)}</div>
+                    <div class="stat-label-orange">"Estimate Sent"</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{format("{}", self.sold_count)}</div>
+                    <div class="stat-label-orange">"Sold"</div>
+                </div>
             </div>
 
             <div class="kanban-board">
-                <div class="kanban-column">
+                <div class="col-prospect">
                     <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-prospect"></span>"Prospect"</span>
-                        <span class="column-count">{format("{}", self.prospect_count)}</span>
+                        <span class="column-title">"Prospect"</span>
+                        <span class="column-count">"6"</span>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Green Valley Services"</div>
-                        <div class="deal-company">"Lisa Park"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$8,500"</span>
-                            <span class="deal-date">"Jan 20"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"GH"</div>
+                            <span class="contact-name">"Greg Hernandez"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"greg.hernandez@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0142"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Metro Plumbing"</div>
-                        <div class="deal-company">"Dan Rogers"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$3,200"</span>
-                            <span class="deal-date">"Jan 18"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"SP"</div>
+                            <span class="contact-name">"Steve Patel"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"steve.patel@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0237"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Sunrise Electric"</div>
-                        <div class="deal-company">"Amy Tran"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$5,000"</span>
-                            <span class="deal-date">"Jan 15"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"SN"</div>
+                            <span class="contact-name">"Sandra Nguyen"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"sandra.nguyen@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0318"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="kanban-column">
+                <div class="col-qualified">
                     <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-qualified"></span>"Qualified"</span>
-                        <span class="column-count">{format("{}", self.qualified_count)}</span>
+                        <span class="column-title">"Qualified"</span>
+                        <span class="column-count">"19"</span>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"TechStart LLC"</div>
-                        <div class="deal-company">"Mike Chen"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$12,000"</span>
-                            <span class="deal-date">"Feb 1"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"TM"</div>
+                            <span class="contact-name">"Tony Morales"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"tony.morales@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0451"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Blue Ridge Roofing"</div>
-                        <div class="deal-company">"Tom Harris"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$7,500"</span>
-                            <span class="deal-date">"Jan 28"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"LW"</div>
+                            <span class="contact-name">"Lisa Washington"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"lisa.washington@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0589"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"PO"</div>
+                            <span class="contact-name">"Patricia O'Brien"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"patricia.obrien@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0673"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="kanban-column">
+                <div class="col-proposal">
                     <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-proposal"></span>"Proposal"</span>
-                        <span class="column-count">{format("{}", self.proposal_count)}</span>
+                        <span class="column-title">"Proposal"</span>
+                        <span class="column-count">"12"</span>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Wilson HVAC"</div>
-                        <div class="deal-company">"James Wilson"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$15,000"</span>
-                            <span class="deal-date">"Feb 5"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"CV"</div>
+                            <span class="contact-name">"Carlos Vega"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"carlos.vega@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0724"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Pacific Landscaping"</div>
-                        <div class="deal-company">"Maria Santos"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$9,800"</span>
-                            <span class="deal-date">"Feb 3"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"DK"</div>
+                            <span class="contact-name">"David Kim"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"david.kim@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0856"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"RT"</div>
+                            <span class="contact-name">"Rebecca Taylor"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"rebecca.taylor@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-0931"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="kanban-column">
+                <div class="col-negotiation">
                     <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-negotiation"></span>"Negotiation"</span>
-                        <span class="column-count">{format("{}", self.negotiation_count)}</span>
+                        <span class="column-title">"Negotiation"</span>
+                        <span class="column-count">"4"</span>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Acme Corp"</div>
-                        <div class="deal-company">"Sarah Johnson"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$22,000"</span>
-                            <span class="deal-date">"Feb 10"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"DR"</div>
+                            <span class="contact-name">"Diana Reyes"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"diana.reyes@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-1047"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                </div>
-
-                <div class="kanban-column">
-                    <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-customer"></span>"Customer"</span>
-                        <span class="column-count">{format("{}", self.customer_count)}</span>
-                    </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Johnson Landscaping"</div>
-                        <div class="deal-company">"Mike Johnson"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$18,000"</span>
-                            <span class="deal-date">"Dec 15"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"AF"</div>
+                            <span class="contact-name">"Angela Foster"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"angela.foster@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-1158"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Smith Electrical"</div>
-                        <div class="deal-company">"Dave Smith"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$11,500"</span>
-                            <span class="deal-date">"Nov 20"</span>
+                    <div class="contact-card">
+                        <div class="contact-name-row">
+                            <div class="user-icon">"JM"</div>
+                            <span class="contact-name">"Jennifer Martinez"</span>
                         </div>
-                    </div>
-                </div>
-
-                <div class="kanban-column">
-                    <div class="column-header">
-                        <span class="column-title"><span class="stage-dot-churned"></span>"Churned"</span>
-                        <span class="column-count">{format("{}", self.churned_count)}</span>
-                    </div>
-                    <div class="deal-card">
-                        <div class="deal-name">"Old Town Repairs"</div>
-                        <div class="deal-company">"Bob Miller"</div>
-                        <div class="deal-meta">
-                            <span class="deal-amount">"$4,200"</span>
-                            <span class="deal-date">"Oct 5"</span>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"@"</span>
+                            <span>"jennifer.martinez@email.com"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"P"</span>
+                            <span>"(210) 555-1263"</span>
+                        </div>
+                        <div class="contact-detail">
+                            <span class="detail-icon">"L"</span>
+                            <span>"San Antonio, TX"</span>
                         </div>
                     </div>
                 </div>
