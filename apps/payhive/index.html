@@ -283,7 +283,9 @@
     import { instantiate } from './core.js';
     try {
       document.getElementById('app').innerHTML = '';
+      const wasmMemory = new WebAssembly.Memory({ initial: 256, maximum: 1024 });
       const instance = await instantiate('./app.wasm', {
+        env: { memory: wasmMemory },
         test: { pass: () => {}, fail: () => {}, summary: () => {} }
       });
       if (instance.exports.__init_all) {
@@ -292,7 +294,7 @@
       // Wire sidebar nav to WASM router
       const nav = document.getElementById('ph-nav');
       if (nav && instance.exports.__router_navigate) {
-        const mem = instance.exports.memory;
+        const mem = wasmMemory;
         nav.addEventListener('click', (e) => {
           const link = e.target.closest('[data-path]');
           if (!link) return;
