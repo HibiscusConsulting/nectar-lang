@@ -267,8 +267,18 @@
           <div class="ph-header-divider"></div>
           <span class="ph-header-title" id="ph-page-title">Dashboard</span>
         </div>
-        <div class="ph-header-actions">
-          <button class="ph-quick-actions-btn">Quick Actions</button>
+        <div class="ph-header-actions" style="position:relative">
+          <button class="ph-quick-actions-btn" id="ph-qa-btn">Quick Actions</button>
+          <div id="ph-qa-panel" style="display:none;position:absolute;top:48px;right:0;width:320px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.1);z-index:100;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E5E7EB">
+              <span style="font-size:16px;font-weight:600;color:#111827">Quick Actions</span>
+              <span id="ph-qa-close" style="cursor:pointer;font-size:18px;color:#9CA3AF">&times;</span>
+            </div>
+            <a data-path="/app/customers" style="display:block;padding:14px 20px;font-size:15px;color:#111827;text-decoration:none;border-bottom:1px solid #F3F4F6;cursor:pointer">Onboard Customer</a>
+            <a data-path="/app/schedule" style="display:block;padding:14px 20px;font-size:15px;color:#111827;text-decoration:none;border-bottom:1px solid #F3F4F6;cursor:pointer">Schedule</a>
+            <a data-path="/app/invoices" style="display:block;padding:14px 20px;font-size:15px;color:#111827;text-decoration:none;border-bottom:1px solid #F3F4F6;cursor:pointer">Create Quote</a>
+            <a data-path="/app/invoices" style="display:block;padding:14px 20px;font-size:15px;color:#111827;text-decoration:none;cursor:pointer">Invoices</a>
+          </div>
           <div class="ph-user-avatar">BB</div>
         </div>
       </header>
@@ -317,6 +327,26 @@
             el.className = 'ph-nav-item';
           });
           link.className = 'ph-nav-item-active';
+        });
+      }
+      // Quick Actions toggle
+      const qaBtn = document.getElementById('ph-qa-btn');
+      const qaPanel = document.getElementById('ph-qa-panel');
+      const qaClose = document.getElementById('ph-qa-close');
+      if (qaBtn && qaPanel) {
+        qaBtn.addEventListener('click', () => {
+          qaPanel.style.display = qaPanel.style.display === 'none' ? 'block' : 'none';
+        });
+        qaClose.addEventListener('click', () => { qaPanel.style.display = 'none'; });
+        qaPanel.addEventListener('click', (e) => {
+          const link = e.target.closest('[data-path]');
+          if (!link) return;
+          qaPanel.style.display = 'none';
+          const path = link.dataset.path;
+          const bytes = new TextEncoder().encode(path);
+          const ptr = instance.exports.alloc(bytes.length);
+          new Uint8Array(wasmMemory.buffer, ptr, bytes.length).set(bytes);
+          try { instance.exports.__router_navigate(ptr, bytes.length); } catch(err) { console.error(err); }
         });
       }
       // More toggle
