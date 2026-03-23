@@ -1,23 +1,10 @@
-// PayHive main dashboard
-// Full layout: sidebar + header + content area with financial cards
+// PayHive Dashboard — matches React DashboardHome layout exactly
+// Sidebar + Header + Onboarding Banner + Schedule Card + Financial Summary + Footer
 
 component Dashboard() {
-    let mut available_balance: String = "$12,450.00";
-    let mut pending_amount: String = "$3,280.00";
-    let mut outstanding_amount: String = "$8,120.00";
-    let mut revenue_month: String = "$24,680.00";
-    let mut active_jobs: i32 = 12;
-    let mut new_customers: i32 = 5;
-    let mut invoices_due: i32 = 8;
-    let mut crew_active: i32 = 6;
-    let mut loading: bool = false;
     let mut active_nav: String = "dashboard";
-
-    fn refresh_data(&mut self) {
-        self.loading = true;
-        let response = fetch("/api/dashboard/summary");
-        self.loading = false;
-    }
+    let mut show_banner: bool = true;
+    let mut loading: bool = false;
 
     fn nav_dashboard(&mut self) {
         self.active_nav = "dashboard";
@@ -31,12 +18,12 @@ component Dashboard() {
 
     fn nav_pipeline(&mut self) {
         self.active_nav = "pipeline";
-        navigate("/crm/pipeline");
+        navigate("/app/crm/pipeline");
     }
 
     fn nav_storm_leads(&mut self) {
         self.active_nav = "storm_leads";
-        navigate("/app/storm-leads");
+        navigate("/app/crm/b2c-leads");
     }
 
     fn nav_quotes(&mut self) {
@@ -46,7 +33,7 @@ component Dashboard() {
 
     fn nav_crews(&mut self) {
         self.active_nav = "crews";
-        navigate("/app/crew");
+        navigate("/app/crews");
     }
 
     fn nav_payments(&mut self) {
@@ -65,20 +52,31 @@ component Dashboard() {
 
     fn nav_integrations(&mut self) {
         self.active_nav = "integrations";
-        navigate("/acct/integrations");
+        navigate("/app/admin/integrations/gusto");
     }
 
     fn nav_crm_settings(&mut self) {
         self.active_nav = "crm_settings";
+        navigate("/app/crm/settings");
+    }
+
+    fn close_banner(&mut self) {
+        self.show_banner = false;
+    }
+
+    fn continue_setup(&mut self) {
         navigate("/app/settings");
     }
 
     style {
+        /* ===== ROOT LAYOUT ===== */
         .layout {
             display: "flex";
             min-height: "100vh";
             background-color: "#F9FAFB";
         }
+
+        /* ===== SIDEBAR ===== */
         .sidebar {
             width: "240px";
             min-height: "100vh";
@@ -89,26 +87,24 @@ component Dashboard() {
             flex-direction: "column";
             flex-shrink: "0";
         }
-        .sidebar-brand {
-            padding: "0 20px 24px 20px";
+        .sidebar-menu-row {
+            padding: "0 16px 20px 16px";
             display: "flex";
             align-items: "center";
-            gap: "4px";
+            justify-content: "space-between";
         }
-        .sidebar-brand-text {
+        .sidebar-menu-text {
             font-size: "16px";
             font-weight: "600";
-            color: "#303234";
+            color: "#111827";
         }
-        .sidebar-collapse {
+        .sidebar-collapse-btn {
             font-size: "14px";
             color: "#9CA3AF";
             cursor: "pointer";
-        }
-        .nav-chevron {
-            margin-left: "auto";
-            font-size: "12px";
-            color: "#9CA3AF";
+            background: "none";
+            border: "none";
+            padding: "4px 8px";
         }
         .sidebar-nav {
             display: "flex";
@@ -129,40 +125,39 @@ component Dashboard() {
             border-radius: "8px";
             font-size: "14px";
             font-weight: "500";
-            color: "#6B7280";
+            color: "#374151";
             cursor: "pointer";
             display: "flex";
             align-items: "center";
-            gap: "10px";
         }
         .nav-item-active {
             padding: "10px 12px";
             border-radius: "8px";
             font-size: "14px";
             font-weight: "600";
-            color: "#F68F1E";
-            background-color: "#FFF7ED";
+            color: "#FFFFFF";
+            background-color: "#F68F1E";
             cursor: "pointer";
             display: "flex";
             align-items: "center";
-            gap: "10px";
         }
-        .nav-icon {
-            width: "18px";
-            height: "18px";
-            display: "inline-flex";
-            align-items: "center";
-            justify-content: "center";
-            font-size: "14px";
+        .nav-chevron {
+            margin-left: "auto";
+            font-size: "12px";
+            color: "#9CA3AF";
         }
+
+        /* ===== MAIN CONTENT COLUMN ===== */
         .layout-main {
             flex: "1";
             display: "flex";
             flex-direction: "column";
             min-width: "0";
         }
+
+        /* ===== HEADER ===== */
         .header {
-            height: "64px";
+            height: "56px";
             background-color: "#FFFFFF";
             border-bottom: "1px solid #E5E7EB";
             display: "flex";
@@ -171,10 +166,30 @@ component Dashboard() {
             padding: "0 24px";
             flex-shrink: "0";
         }
+        .header-left {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .header-logo {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .header-logo-accent {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .header-divider {
+            width: "1px";
+            height: "20px";
+            background-color: "#E5E7EB";
+        }
         .header-title {
             font-size: "18px";
             font-weight: "600";
-            color: "#303234";
+            color: "#111827";
         }
         .header-actions {
             display: "flex";
@@ -182,174 +197,266 @@ component Dashboard() {
             gap: "12px";
         }
         .quick-actions-btn {
-            padding: "8px 16px";
-            background-color: "#303234";
-            color: "#FFFFFF";
-            border: "none";
-            border-radius: "8px";
-            font-size: "13px";
+            padding: "6px 16px";
+            background-color: "#FFFFFF";
+            color: "#374151";
+            border: "1px solid #D1D5DB";
+            border-radius: "9999px";
+            font-size: "14px";
             font-weight: "500";
             cursor: "pointer";
+            display: "flex";
+            align-items: "center";
+            gap: "6px";
         }
         .user-avatar {
             width: "32px";
             height: "32px";
             border-radius: "50%";
-            background-color: "#FFB547";
+            background-color: "#F68F1E";
             display: "flex";
             align-items: "center";
             justify-content: "center";
-            font-size: "14px";
+            font-size: "13px";
             font-weight: "600";
-            color: "#303234";
+            color: "#FFFFFF";
         }
-        .content {
-            flex: "1";
-            padding: "24px";
-            overflow-y: "auto";
-        }
-        .dashboard {
-            display: "flex";
-            flex-direction: "column";
-            gap: "24px";
-        }
-        .dashboard-header {
+
+        /* ===== ONBOARDING BANNER ===== */
+        .onboarding-banner {
+            background-color: "#F68F1E";
+            padding: "14px 24px";
             display: "flex";
             align-items: "center";
             justify-content: "space-between";
         }
-        .dashboard-title {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#303234";
+        .banner-left {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
         }
-        .dashboard-subtitle {
-            font-size: "14px";
-            color: "#6B7280";
-            margin-top: "4px";
-        }
-        .refresh-btn {
-            padding: "8px 16px";
-            background-color: "#303234";
-            color: "#FFFFFF";
-            border: "none";
-            border-radius: "8px";
-            font-size: "14px";
-            font-weight: "500";
-            cursor: "pointer";
-        }
-        .summary-cards {
-            display: "grid";
-            grid-template-columns: "repeat(auto-fit, minmax(240px, 1fr))";
-            gap: "16px";
-        }
-        .summary-card {
-            background-color: "#FFFFFF";
-            border: "1px solid #E5E7EB";
-            border-radius: "12px";
-            padding: "20px";
-        }
-        .summary-card-accent {
-            background-color: "#FFFFFF";
-            border: "1px solid #E5E7EB";
-            border-left: "4px solid #FFB547";
-            border-radius: "12px";
-            padding: "20px";
-        }
-        .card-icon-badge {
-            width: "36px";
-            height: "36px";
-            border-radius: "8px";
+        .banner-badge {
+            width: "32px";
+            height: "32px";
+            border-radius: "50%";
+            background-color: "rgba(0, 0, 0, 0.3)";
             display: "flex";
             align-items: "center";
             justify-content: "center";
-            font-size: "16px";
-            margin-bottom: "12px";
-        }
-        .card-icon-green {
-            background-color: "#ECFDF5";
-            color: "#059669";
-        }
-        .card-icon-yellow {
-            background-color: "#FFF7ED";
-            color: "#D97706";
-        }
-        .card-icon-red {
-            background-color: "#FEF2F2";
-            color: "#DC2626";
-        }
-        .card-icon-blue {
-            background-color: "#EFF6FF";
-            color: "#2563EB";
-        }
-        .summary-card-label {
             font-size: "13px";
-            font-weight: "500";
-            color: "#6B7280";
-            margin-bottom: "4px";
-        }
-        .summary-card-value {
-            font-size: "28px";
             font-weight: "700";
-            color: "#303234";
+            color: "#FFFFFF";
         }
-        .quick-stats {
-            display: "grid";
-            grid-template-columns: "repeat(4, 1fr)";
-            gap: "16px";
+        .banner-text-group {
+            display: "flex";
+            flex-direction: "column";
+            gap: "2px";
         }
-        .quick-stat {
+        .banner-title {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#FFFFFF";
+        }
+        .banner-subtitle {
+            font-size: "13px";
+            color: "rgba(255, 255, 255, 0.85)";
+        }
+        .banner-right {
+            display: "flex";
+            align-items: "center";
+            gap: "12px";
+        }
+        .banner-continue-btn {
+            padding: "8px 20px";
+            background-color: "#FFFFFF";
+            color: "#F68F1E";
+            border: "none";
+            border-radius: "8px";
+            font-size: "14px";
+            font-weight: "600";
+            cursor: "pointer";
+        }
+        .banner-close-btn {
+            background: "none";
+            border: "none";
+            color: "#FFFFFF";
+            font-size: "18px";
+            cursor: "pointer";
+            padding: "4px 8px";
+            opacity: "0.8";
+        }
+
+        /* ===== CONTENT AREA ===== */
+        .content {
+            flex: "1";
+            padding: "24px";
+            display: "flex";
+            flex-direction: "column";
+            gap: "20px";
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            font-size: "13px";
+            color: "#9CA3AF";
+        }
+
+        /* Schedule Card */
+        .schedule-card {
             background-color: "#FFFFFF";
             border: "1px solid #E5E7EB";
             border-radius: "12px";
-            padding: "16px";
-            text-align: "center";
+            padding: "20px";
         }
-        .quick-stat-value {
-            font-size: "32px";
-            font-weight: "700";
-            color: "#303234";
-        }
-        .quick-stat-label {
+        .schedule-owner-label {
             font-size: "13px";
             color: "#6B7280";
-            margin-top: "4px";
+            margin-bottom: "4px";
         }
-        .section-title {
+        .schedule-title {
             font-size: "18px";
             font-weight: "600";
-            color: "#303234";
-            margin-bottom: "12px";
+            color: "#111827";
         }
-        .activity-list {
+        .schedule-date {
+            font-size: "14px";
+            color: "#6B7280";
+            margin-top: "2px";
+        }
+
+        /* Schedule Day Section */
+        .schedule-day-card {
             background-color: "#FFFFFF";
             border: "1px solid #E5E7EB";
             border-radius: "12px";
             overflow: "hidden";
         }
-        .activity-item {
+        .schedule-day-header {
             padding: "14px 20px";
-            border-bottom: "1px solid #F3F4F6";
             display: "flex";
             align-items: "center";
+            gap: "8px";
+            border-bottom: "1px solid #E5E7EB";
+        }
+        .schedule-day-text {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#111827";
+        }
+        .schedule-day-count {
+            font-size: "13px";
+            color: "#9CA3AF";
+        }
+        .schedule-empty {
+            padding: "20px";
+            font-size: "14px";
+            color: "#9CA3AF";
+            text-align: "center";
+        }
+
+        /* ===== FINANCIAL CARDS ===== */
+        .financial-cards {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "16px";
+        }
+        .financial-card {
+            background-color: "#FFFFFF";
+            border: "1px solid #E5E7EB";
+            border-radius: "12px";
+            padding: "20px";
+            position: "relative";
+        }
+        .card-header-row {
+            display: "flex";
+            align-items: "flex-start";
             justify-content: "space-between";
         }
-        .activity-text {
-            font-size: "14px";
-            color: "#303234";
+        .card-label {
+            font-size: "11px";
+            font-weight: "600";
+            color: "#6B7280";
+            text-transform: "uppercase";
+            letter-spacing: "0.05em";
+            margin-bottom: "8px";
         }
-        .activity-time {
-            font-size: "12px";
+        .card-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#111827";
+        }
+        .card-sub-text {
+            font-size: "13px";
+            color: "#6B7280";
+            margin-top: "8px";
+        }
+        .card-sub-text-green {
+            font-size: "13px";
+            color: "#10B981";
+            margin-top: "8px";
+        }
+        .card-icon-badge {
+            width: "40px";
+            height: "40px";
+            border-radius: "10px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "16px";
+            font-weight: "700";
+        }
+        .card-icon-green {
+            background-color: "#ECFDF5";
+            color: "#059669";
+        }
+        .card-icon-blue {
+            background-color: "#EFF6FF";
+            color: "#2563EB";
+        }
+        .card-icon-gray {
+            background-color: "#F3F4F6";
+            color: "#6B7280";
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            padding: "24px";
+            text-align: "center";
+            border-top: "1px solid #E5E7EB";
+            margin-top: "auto";
+        }
+        .footer-brand {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#6B7280";
+            margin-bottom: "8px";
+        }
+        .footer-links {
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            gap: "16px";
+            flex-wrap: "wrap";
+        }
+        .footer-link {
+            font-size: "13px";
             color: "#9CA3AF";
+            text-decoration: "none";
+            cursor: "pointer";
+        }
+        .footer-dot {
+            font-size: "13px";
+            color: "#D1D5DB";
         }
     }
 
     render {
         <div class="layout">
+            // ===== SIDEBAR =====
             <aside class="sidebar">
-                <div class="sidebar-brand">
-                    <span class="sidebar-brand-text">"Menu"</span>
-                    <span class="sidebar-collapse">"<<"</span>
+                <div class="sidebar-menu-row">
+                    <span class="sidebar-menu-text">"Menu"</span>
+                    <button class="sidebar-collapse-btn">"<<"</button>
                 </div>
                 <nav class="sidebar-nav">
                     <div class="nav-section-label">"NAVIGATION"</div>
@@ -391,91 +498,116 @@ component Dashboard() {
                 </nav>
             </aside>
 
+            // ===== MAIN CONTENT =====
             <div class="layout-main">
+                // Header
                 <header class="header">
-                    <span class="header-title">"PayHive Dashboard"</span>
+                    <div class="header-left">
+                        <span class="header-logo">"PayHive"</span>
+                        <div class="header-divider"></div>
+                        <span class="header-title">"Dashboard"</span>
+                    </div>
                     <div class="header-actions">
                         <button class="quick-actions-btn">"Quick Actions"</button>
                         <div class="user-avatar">"BB"</div>
                     </div>
                 </header>
 
+                // Onboarding Banner
+                {if self.show_banner {
+                    <div class="onboarding-banner">
+                        <div class="banner-left">
+                            <div class="banner-badge">"0/3"</div>
+                            <div class="banner-text-group">
+                                <span class="banner-title">"Finish setting up your business"</span>
+                                <span class="banner-subtitle">"Complete Stripe verification"</span>
+                            </div>
+                        </div>
+                        <div class="banner-right">
+                            <button class="banner-continue-btn" on:click={self.continue_setup}>"Continue Setup"</button>
+                            <button class="banner-close-btn" on:click={self.close_banner}>"x"</button>
+                        </div>
+                    </div>
+                }}
+
+                // Content Area
                 <main class="content">
-                    <div class="dashboard">
-                        <div class="dashboard-header">
-                            <div>
-                                <h1 class="dashboard-title">"Dashboard"</h1>
-                                <p class="dashboard-subtitle">"Welcome back. Here is your business overview."</p>
-                            </div>
-                            <button class="refresh-btn" on:click={self.refresh_data}>"Refresh"</button>
-                        </div>
+                    // Breadcrumb
+                    <div class="breadcrumb">"Home"</div>
 
-                        <div class="summary-cards">
-                            <div class="summary-card-accent">
+                    // Schedule header card
+                    <div class="schedule-card">
+                        <div class="schedule-owner-label">"Owner"</div>
+                        <div class="schedule-title">"Today \xB7 All Teams"</div>
+                        <div class="schedule-date">"Monday, Mar 23"</div>
+                    </div>
+
+                    // Schedule day section
+                    <div class="schedule-day-card">
+                        <div class="schedule-day-header">
+                            <span class="schedule-day-text">"Mon, Mar 23"</span>
+                            <span class="schedule-day-count">"(0)"</span>
+                        </div>
+                        <div class="schedule-empty">"No items"</div>
+                    </div>
+
+                    // Financial Summary - 3 cards
+                    <div class="financial-cards">
+                        // Available Balance
+                        <div class="financial-card">
+                            <div class="card-header-row">
+                                <div>
+                                    <div class="card-label">"AVAILABLE BALANCE"</div>
+                                    <div class="card-value">"$0.00"</div>
+                                </div>
                                 <div class="card-icon-badge card-icon-green">"$"</div>
-                                <div class="summary-card-label">"Available Balance"</div>
-                                <div class="summary-card-value">{self.available_balance}</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="card-icon-badge card-icon-yellow">"⏳"</div>
-                                <div class="summary-card-label">"Pending"</div>
-                                <div class="summary-card-value">{self.pending_amount}</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="card-icon-badge card-icon-red">"!"</div>
-                                <div class="summary-card-label">"Outstanding"</div>
-                                <div class="summary-card-value">{self.outstanding_amount}</div>
-                            </div>
-                            <div class="summary-card">
-                                <div class="card-icon-badge card-icon-blue">"↑"</div>
-                                <div class="summary-card-label">"Revenue This Month"</div>
-                                <div class="summary-card-value">{self.revenue_month}</div>
                             </div>
                         </div>
 
-                        <div class="quick-stats">
-                            <div class="quick-stat">
-                                <div class="quick-stat-value">{self.active_jobs}</div>
-                                <div class="quick-stat-label">"Active Jobs"</div>
+                        // Pending Payout
+                        <div class="financial-card">
+                            <div class="card-header-row">
+                                <div>
+                                    <div class="card-label">"PENDING PAYOUT"</div>
+                                    <div class="card-value">"$0.00"</div>
+                                </div>
+                                <div class="card-icon-badge card-icon-blue">"^"</div>
                             </div>
-                            <div class="quick-stat">
-                                <div class="quick-stat-value">{self.new_customers}</div>
-                                <div class="quick-stat-label">"New Customers"</div>
-                            </div>
-                            <div class="quick-stat">
-                                <div class="quick-stat-value">{self.invoices_due}</div>
-                                <div class="quick-stat-label">"Invoices Due"</div>
-                            </div>
-                            <div class="quick-stat">
-                                <div class="quick-stat-value">{self.crew_active}</div>
-                                <div class="quick-stat-label">"Crew Active"</div>
-                            </div>
+                            <div class="card-sub-text">"Processing to your bank"</div>
                         </div>
 
-                        <div>
-                            <h2 class="section-title">"Recent Activity"</h2>
-                            <div class="activity-list">
-                                <div class="activity-item">
-                                    <span class="activity-text">"Invoice #1042 paid by Johnson Landscaping"</span>
-                                    <span class="activity-time">"2 hours ago"</span>
+                        // Outstanding A/R
+                        <div class="financial-card">
+                            <div class="card-header-row">
+                                <div>
+                                    <div class="card-label">"OUTSTANDING A/R"</div>
+                                    <div class="card-value">"$0.00"</div>
                                 </div>
-                                <div class="activity-item">
-                                    <span class="activity-text">"New customer: Smith Electrical"</span>
-                                    <span class="activity-time">"5 hours ago"</span>
-                                </div>
-                                <div class="activity-item">
-                                    <span class="activity-text">"Payment of $850.00 processed"</span>
-                                    <span class="activity-time">"Yesterday"</span>
-                                </div>
-                                <div class="activity-item">
-                                    <span class="activity-text">"Invoice #1041 sent to Garcia Plumbing"</span>
-                                    <span class="activity-time">"Yesterday"</span>
-                                </div>
-                                <div class="activity-item">
-                                    <span class="activity-text">"Crew member Mike assigned to Job #287"</span>
-                                    <span class="activity-time">"2 days ago"</span>
-                                </div>
+                                <div class="card-icon-badge card-icon-gray">"!"</div>
                             </div>
+                            <div class="card-sub-text-green">"All caught up!"</div>
+                        </div>
+                    </div>
+
+                    // Footer
+                    <div class="footer">
+                        <div class="footer-brand">"PayHive \xB7 \xA9 2026"</div>
+                        <div class="footer-links">
+                            <span class="footer-link">"DNA"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Terms"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Privacy"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Security"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Careers"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Blog"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"White Paper"</span>
+                            <span class="footer-dot">"\xB7"</span>
+                            <span class="footer-link">"Support"</span>
                         </div>
                     </div>
                 </main>
