@@ -95,15 +95,20 @@ component Dashboard() {
             align-items: "center";
             gap: "4px";
         }
-        .sidebar-brand-dark {
-            font-size: "22px";
-            font-weight: "700";
+        .sidebar-brand-text {
+            font-size: "16px";
+            font-weight: "600";
             color: "#303234";
         }
-        .sidebar-brand-gold {
-            font-size: "22px";
-            font-weight: "700";
-            color: "#FFB547";
+        .sidebar-collapse {
+            font-size: "14px";
+            color: "#9CA3AF";
+            cursor: "pointer";
+        }
+        .nav-chevron {
+            margin-left: "auto";
+            font-size: "12px";
+            color: "#9CA3AF";
         }
         .sidebar-nav {
             display: "flex";
@@ -135,7 +140,7 @@ component Dashboard() {
             border-radius: "8px";
             font-size: "14px";
             font-weight: "600";
-            color: "#303234";
+            color: "#F68F1E";
             background-color: "#FFF7ED";
             cursor: "pointer";
             display: "flex";
@@ -343,54 +348,44 @@ component Dashboard() {
         <div class="layout">
             <aside class="sidebar">
                 <div class="sidebar-brand">
-                    <span class="sidebar-brand-dark">"Pay"</span>
-                    <span class="sidebar-brand-gold">"Hive"</span>
+                    <span class="sidebar-brand-text">"Menu"</span>
+                    <span class="sidebar-collapse">"<<"</span>
                 </div>
                 <nav class="sidebar-nav">
-                    <div class="nav-section-label">"MAIN"</div>
+                    <div class="nav-section-label">"NAVIGATION"</div>
                     <div class="nav-item-active" on:click={self.nav_dashboard}>
-                        <span class="nav-icon">"📊"</span>
                         <span>"Dashboard"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_schedule}>
-                        <span class="nav-icon">"📅"</span>
                         <span>"Schedule"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_pipeline}>
-                        <span class="nav-icon">"📈"</span>
                         <span>"Pipeline"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_storm_leads}>
-                        <span class="nav-icon">"⛈"</span>
                         <span>"Storm Leads"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_quotes}>
-                        <span class="nav-icon">"📝"</span>
                         <span>"Quotes"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_crews}>
-                        <span class="nav-icon">"👷"</span>
                         <span>"Crews"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_payments}>
-                        <span class="nav-icon">"💳"</span>
                         <span>"Payments"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_settings}>
-                        <span class="nav-icon">"⚙"</span>
                         <span>"Settings"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_more}>
-                        <span class="nav-icon">"•••"</span>
                         <span>"More"</span>
+                        <span class="nav-chevron">">"</span>
                     </div>
                     <div class="nav-section-label">"ADMIN"</div>
                     <div class="nav-item" on:click={self.nav_integrations}>
-                        <span class="nav-icon">"🔌"</span>
                         <span>"Integrations"</span>
                     </div>
                     <div class="nav-item" on:click={self.nav_crm_settings}>
-                        <span class="nav-icon">"🔧"</span>
                         <span>"CRM Settings"</span>
                     </div>
                 </nav>
