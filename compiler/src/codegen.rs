@@ -163,6 +163,9 @@ pub struct WasmCodegen {
     needs_rtc: bool,
     needs_gpu: bool,
     needs_test: bool,
+    /// Whether the program has a router — if so, skip auto-mounting the first component
+    /// because the router handles initial route mounting.
+    has_router: bool,
     /// Contract definitions in this program. Each entry is (contract_name, fields).
     /// Used to resolve `ContractName::call()`, `ContractName::parse()`,
     /// `ContractName::serialize()` to their generated WASM functions.
@@ -406,6 +409,7 @@ impl WasmCodegen {
             needs_rtc: false,
             needs_gpu: false,
             needs_test: false,
+            has_router: false,
             known_contracts: Vec::new(),
             required_providers: HashSet::new(),
             known_payment_signals: Vec::new(),
@@ -1860,11 +1864,14 @@ impl WasmCodegen {
                     self.line(call);
                 }
 
-                // Auto-mount the first component: call dom_getRoot() → ComponentName_mount(root_id)
-                if let Some(comp_name) = self.first_component_name.clone() {
-                    self.line(&format!("  ;; auto-mount {} into #app", comp_name));
-                    self.line("  call $dom_getRoot");
-                    self.line(&format!("  call ${}_mount", comp_name));
+                // Auto-mount the first component — but ONLY if there's no router.
+                // When a router exists, it handles initial route mounting via router_init.
+                if !self.has_router {
+                    if let Some(comp_name) = self.first_component_name.clone() {
+                        self.line(&format!("  ;; auto-mount {} into #app", comp_name));
+                        self.line("  call $dom_getRoot");
+                        self.line(&format!("  call ${}_mount", comp_name));
+                    }
                 }
 
                 self.line(")");
@@ -2027,7 +2034,10 @@ impl WasmCodegen {
             Item::Struct(s) => self.generate_struct_layout(s),
             Item::Store(s) => self.generate_store(s),
             Item::Agent(a) => self.generate_agent(a),
-            Item::Router(r) => self.generate_router(r),
+            Item::Router(r) => {
+                self.has_router = true;
+                self.generate_router(r);
+            }
             Item::LazyComponent(lc) => {
                 self.generate_lazy_component(lc);
             }
