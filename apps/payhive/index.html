@@ -297,11 +297,11 @@
   </div>
 
   <script type="module">
-    import { instantiate } from './core.js';
+    import { instantiate } from '/core.js';
     try {
       document.getElementById('app').innerHTML = '';
       const wasmMemory = new WebAssembly.Memory({ initial: 256, maximum: 1024 });
-      const instance = await instantiate('./app.wasm', {
+      const instance = await instantiate('/app.wasm', {
         env: { memory: wasmMemory },
         test: { pass: () => {}, fail: () => {}, summary: () => {} }
       });
