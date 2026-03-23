@@ -89,6 +89,12 @@
       align-items: center;
       text-decoration: none;
     }
+    .ph-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-right: 10px;
+    }
     .ph-nav-chevron {
       margin-left: auto;
       font-size: 12px;
@@ -227,19 +233,19 @@
       </div>
       <nav class="ph-sidebar-nav" id="ph-nav">
         <div class="ph-nav-section-label">NAVIGATION</div>
-        <a class="ph-nav-item-active" data-path="/" data-nav="dashboard">Dashboard</a>
-        <a class="ph-nav-item" data-path="/crm/pipeline" data-nav="pipeline">Pipeline</a>
-        <a class="ph-nav-item" data-path="/app/crm/b2c-leads" data-nav="storm_leads">Storm Leads</a>
-        <a class="ph-nav-item" data-path="/crm/contacts" data-nav="contacts">Contacts</a>
-        <a class="ph-nav-item" data-path="/crm/organizations" data-nav="organizations">Organizations</a>
-        <a class="ph-nav-item" data-path="/app/schedule" data-nav="schedule">Schedule</a>
-        <a class="ph-nav-item" data-path="/app/invoices" data-nav="quotes">Quotes</a>
-        <a class="ph-nav-item" data-path="/app/payments" data-nav="payments">Payments</a>
-        <a class="ph-nav-item" data-path="/app/settings" data-nav="settings">Settings</a>
-        <a class="ph-nav-item" data-nav="more">More <span class="ph-nav-chevron">&gt;</span></a>
+        <a class="ph-nav-item-active" data-path="/" data-nav="dashboard"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+        <a class="ph-nav-item" data-path="/crm/pipeline" data-nav="pipeline"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>Pipeline</a>
+        <a class="ph-nav-item" data-path="/app/crm/b2c-leads" data-nav="storm_leads"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></svg>Storm Leads</a>
+        <a class="ph-nav-item" data-path="/crm/contacts" data-nav="contacts"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contacts</a>
+        <a class="ph-nav-item" data-path="/crm/organizations" data-nav="organizations"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>Organizations</a>
+        <a class="ph-nav-item" data-path="/app/schedule" data-nav="schedule"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule</a>
+        <a class="ph-nav-item" data-path="/app/invoices" data-nav="quotes"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Quotes</a>
+        <a class="ph-nav-item" data-path="/app/payments" data-nav="payments"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Payments</a>
+        <a class="ph-nav-item" data-path="/app/settings" data-nav="settings"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+        <a class="ph-nav-item" data-nav="more"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>More <span class="ph-nav-chevron">&gt;</span></a>
         <div class="ph-nav-section-label">ADMIN</div>
-        <a class="ph-nav-item" data-path="/app/admin/integrations/gusto" data-nav="integrations">Integrations</a>
-        <a class="ph-nav-item" data-path="/app/crm/settings" data-nav="crm_settings">CRM Settings</a>
+        <a class="ph-nav-item" data-path="/app/admin/integrations/gusto" data-nav="integrations"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Integrations</a>
+        <a class="ph-nav-item" data-path="/app/crm/settings" data-nav="crm_settings"><svg class="ph-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>CRM Settings</a>
       </nav>
     </aside>
 
