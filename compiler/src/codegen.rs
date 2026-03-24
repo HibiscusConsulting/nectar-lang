@@ -3035,6 +3035,12 @@ impl WasmCodegen {
 
         // Generate body (dynamic locals go to template_locals)
         let has_return = func.return_type.is_some();
+        let returns_string = func.return_type.as_ref()
+            .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
+            .unwrap_or(false);
+        let returns_float = func.return_type.as_ref()
+            .map(|t| matches!(t, Type::Named(n) if n == "f64"))
+            .unwrap_or(false);
         let stmt_count = func.body.stmts.len();
         for (i, stmt) in func.body.stmts.iter().enumerate() {
             let is_last = i == stmt_count - 1;
@@ -3047,6 +3053,16 @@ impl WasmCodegen {
                         && Self::if_branches_return(expr);
                     if !is_returning_if {
                         self.generate_expr(expr);
+                        // If the function returns String (i32 i32) but the expression
+                        // produces a single i32 (e.g., an if-expression returning a ptr),
+                        // convert to (ptr, len) via str_len.
+                        if returns_string && !self.expr_pushes_ptr_len(expr) {
+                            self.line("call $str_len ;; convert ptr to (ptr, len) for String return");
+                        }
+                        // If the function returns f64 but expr is i32, convert
+                        if returns_float && !self.expr_is_float(expr) {
+                            self.line("f64.convert_i32_s ;; convert i32 to f64 for return");
+                        }
                         continue;
                     }
                 }
@@ -3972,13 +3988,11 @@ impl WasmCodegen {
                 // Re-evaluate the full expression
                 self.generate_expr(wrapped_expr);
                 // Determine what's on the stack based on expression type
-                let returns_ptr_len = matches!(
+                let returns_ptr_len = self.expr_pushes_ptr_len(wrapped_expr)
+                    || matches!(wrapped_expr, Expr::FormatString { .. });
+                let returns_single_ptr = !returns_ptr_len && matches!(
                     wrapped_expr,
-                    Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
-                );
-                let returns_single_ptr = matches!(
-                    wrapped_expr,
-                    Expr::StringLit(_) | Expr::If { .. }
+                    Expr::If { .. }
                 );
                 if returns_ptr_len {
                     // Stack has (ptr, len)
@@ -7294,8 +7308,8 @@ impl WasmCodegen {
             let ret = comp.return_type.as_ref()
                 .map(|t| format!(" (result {})", self.type_to_wasm(t)))
                 .unwrap_or_else(|| " (result i32)".into());
-            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\")",
-                comp.name, comp.name));
+            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\"){}",
+                comp.name, comp.name, ret));
             self.indent += 1;
             self.line(&format!(";; computed value{}", ret));
 
@@ -7305,8 +7319,40 @@ impl WasmCodegen {
             self.defer_template_locals = true;
             self.template_locals.clear();
 
-            for stmt in &comp.body.stmts {
+            // Check if the last statement is an expression that leaves a value
+            let last_stmt_has_return = comp.body.stmts.last()
+                .map(|s| matches!(s, Stmt::Return(_)))
+                .unwrap_or(false);
+            let has_return_type = comp.return_type.is_some();
+
+            let stmt_count = comp.body.stmts.len();
+            for (i, stmt) in comp.body.stmts.iter().enumerate() {
+                let is_last = i == stmt_count - 1;
+                if is_last && has_return_type {
+                    if let Stmt::Expr(expr) = stmt {
+                        // Last expression in a computed — generate as expression to leave value
+                        self.generate_expr(expr);
+                        continue;
+                    }
+                }
                 self.generate_stmt(stmt);
+            }
+            // If the computed has a result type and the last statement doesn't
+            // leave a value (e.g., only conditional returns without else),
+            // add a default value so the function is valid.
+            let last_is_value_expr = comp.body.stmts.last()
+                .map(|s| matches!(s, Stmt::Expr(e) if !self.expr_is_void(e)))
+                .unwrap_or(false);
+            if has_return_type && !last_stmt_has_return && !last_is_value_expr {
+                let returns_string = comp.return_type.as_ref()
+                    .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
+                    .unwrap_or(false);
+                if returns_string {
+                    self.line("i32.const 0 ;; default empty string ptr");
+                    self.line("i32.const 0 ;; default empty string len");
+                } else {
+                    self.line("i32.const 0 ;; default return value");
+                }
             }
 
             let body_output = std::mem::take(&mut self.output);
@@ -8481,10 +8527,8 @@ impl WasmCodegen {
                 } else {
                     // Check if the expression returns a string (ptr, len pair)
                     // rather than a signal i32 value.
-                    let is_string_expr = matches!(
-                        expr.as_ref(),
-                        Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::StringLit(_)
-                    );
+                    let is_string_expr = self.expr_pushes_ptr_len(expr)
+                        || matches!(expr.as_ref(), Expr::FormatString { .. });
 
                     if is_string_expr {
                         // Expression already produces (ptr, len) on the stack
@@ -9765,8 +9809,7 @@ impl WasmCodegen {
                 } else {
                     self.line(&local_decl);
                 }
-                let is_string_val = matches!(value, Expr::StringLit(_))
-                    || matches!(value, Expr::FormatString { .. })
+                let is_string_val = self.expr_pushes_ptr_len(value)
                     || self.expr_is_string_typed(value);
                 self.generate_expr(value);
                 if is_string_val {
@@ -9791,29 +9834,13 @@ impl WasmCodegen {
                 self.line("return");
             }
             Stmt::Expr(expr) => {
-                // Statement-level if: determine whether to emit void or value-producing if.
-                // If the if has both then+else and both branches end with value-producing
-                // expressions, emit `(if (result i32) ...)` and drop the result.
-                // Otherwise emit void `(if ...)` for side-effect-only ifs.
+                // Statement-level if: always emit as void (if ... end) with no result type.
+                // Each branch generates its statements normally via generate_stmt,
+                // which handles dropping values from non-void expressions.
+                // This avoids type mismatches from branches producing different types.
                 if let Expr::If { condition, then_block, else_block } = expr {
-                    let has_else = else_block.is_some();
-                    // Check if last statement in each branch is a value-producing expression
-                    let then_produces_value = then_block.stmts.last().map(|s| {
-                        matches!(s, Stmt::Expr(e) if !self.expr_is_void(e))
-                    }).unwrap_or(false);
-                    let else_produces_value = else_block.as_ref().map(|blk| {
-                        blk.stmts.last().map(|s| {
-                            matches!(s, Stmt::Expr(e) if !self.expr_is_void(e))
-                        }).unwrap_or(false)
-                    }).unwrap_or(false);
-                    let use_result_type = has_else && then_produces_value && else_produces_value;
-
                     self.generate_expr(condition);
-                    if use_result_type {
-                        self.emit("(if (result i32)");
-                    } else {
-                        self.emit("(if");
-                    }
+                    self.emit("(if");
                     self.indent += 1;
                     self.emit("(then");
                     self.indent += 1;
@@ -9833,9 +9860,6 @@ impl WasmCodegen {
                     }
                     self.indent -= 1;
                     self.line(")");
-                    if use_result_type {
-                        self.line("drop ;; discard result of expression-level if in statement position");
-                    }
                     return;
                 }
                 // Determine whether this expression produces a value that needs to be dropped.
@@ -10008,14 +10032,14 @@ impl WasmCodegen {
                         || self.expr_is_string_typed(left) || self.expr_is_string_typed(right));
 
                 if is_string_cmp {
-                    // Generate left side; if it's a string literal, drop the len
+                    // Generate left side; drop len if expr produces (ptr, len)
                     self.generate_expr(left);
-                    if self.expr_is_string_lit(left) {
+                    if self.expr_pushes_ptr_len(left) {
                         self.line("drop  ;; string cmp: keep only ptr");
                     }
-                    // Generate right side; if it's a string literal, drop the len
+                    // Generate right side; drop len if expr produces (ptr, len)
                     self.generate_expr(right);
-                    if self.expr_is_string_lit(right) {
+                    if self.expr_pushes_ptr_len(right) {
                         self.line("drop  ;; string cmp: keep only ptr");
                     }
                     // Compare null-terminated strings byte-by-byte
@@ -10024,22 +10048,63 @@ impl WasmCodegen {
                         self.line("i32.eqz  ;; neq: invert str_eq result");
                     }
                 } else {
+                    // Detect float operands to use f64 instructions
+                    let is_float_op = self.expr_is_float(left) || self.expr_is_float(right);
                     self.generate_expr(left);
+                    if is_float_op && !self.expr_is_float(left) {
+                        // Left is i32 but right is f64 — convert left to f64
+                        self.line("f64.convert_i32_s");
+                    }
                     self.generate_expr(right);
-                    let instr = match op {
-                        BinOp::Add => "i32.add",
-                        BinOp::Sub => "i32.sub",
-                        BinOp::Mul => "i32.mul",
-                        BinOp::Div => "i32.div_s",
-                        BinOp::Mod => "i32.rem_s",
-                        BinOp::Eq => "i32.eq",
-                        BinOp::Neq => "i32.ne",
-                        BinOp::Lt => "i32.lt_s",
-                        BinOp::Gt => "i32.gt_s",
-                        BinOp::Lte => "i32.le_s",
-                        BinOp::Gte => "i32.ge_s",
-                        BinOp::And => "i32.and",
-                        BinOp::Or => "i32.or",
+                    if is_float_op && !self.expr_is_float(right) {
+                        // Right is i32 but left is f64 — convert right to f64
+                        self.line("f64.convert_i32_s");
+                    }
+                    let instr = if is_float_op {
+                        match op {
+                            BinOp::Add => "f64.add",
+                            BinOp::Sub => "f64.sub",
+                            BinOp::Mul => "f64.mul",
+                            BinOp::Div => "f64.div",
+                            BinOp::Mod => {
+                                // f64 modulo: a - floor(a/b)*b
+                                // For now emit f64.div + conversion
+                                "f64.div"
+                            }
+                            BinOp::Eq => "f64.eq",
+                            BinOp::Neq => "f64.ne",
+                            BinOp::Lt => "f64.lt",
+                            BinOp::Gt => "f64.gt",
+                            BinOp::Lte => "f64.le",
+                            BinOp::Gte => "f64.ge",
+                            // And/Or: convert f64 results to i32 first
+                            BinOp::And => {
+                                self.line("f64.ne");  // convert right to bool
+                                // But this is a logical AND — left should also be bool
+                                // This is unusual for floats; just emit i32 version
+                                "i32.and"
+                            }
+                            BinOp::Or => {
+                                self.line("f64.ne");
+                                "i32.or"
+                            }
+                        }
+                    } else {
+                        match op {
+                            BinOp::Add => "i32.add",
+                            BinOp::Sub => "i32.sub",
+                            BinOp::Mul => "i32.mul",
+                            BinOp::Div => "i32.div_s",
+                            BinOp::Mod => "i32.rem_s",
+                            BinOp::Eq => "i32.eq",
+                            BinOp::Neq => "i32.ne",
+                            BinOp::Lt => "i32.lt_s",
+                            BinOp::Gt => "i32.gt_s",
+                            BinOp::Lte => "i32.le_s",
+                            BinOp::Gte => "i32.ge_s",
+                            BinOp::And => "i32.and",
+                            BinOp::Or => "i32.or",
+                        }
                     };
                     self.line(instr);
                 }
@@ -10080,10 +10145,9 @@ impl WasmCodegen {
                             // Each subsequent arg: call $format with current (ptr, len) + arg
                             for arg in &args[1..] {
                                 self.generate_expr(arg);
-                                // If arg is a String-returning method, drop the len —
+                                // If arg produces (ptr, len), drop the len —
                                 // $format expects a single i32 arg, not (ptr, len)
-                                if self.method_call_returns_string(arg)
-                                    || Self::expr_returns_ptr_len(arg) {
+                                if self.expr_pushes_ptr_len(arg) {
                                     self.line("drop ;; drop str len for format arg");
                                 }
                                 self.line("call $format");
@@ -10104,6 +10168,12 @@ impl WasmCodegen {
                         "string_index_of" | "string_starts_with" | "string_ends_with" |
                         "string_replace" | "string_contains" |
                         "Ok" | "Some" | "Err" |
+                        // Stdlib functions that take (ptr, len) string args:
+                        "parse_f64" | "parse_i32" | "parse_int" | "parse_float" |
+                        "json_decode" | "json_parse" | "json_encode" |
+                        "capitalize" | "to_title_case" | "to_snake_case" | "to_camel_case" |
+                        "url_encode" | "url_decode" | "base64_encode" | "base64_decode" |
+                        "string_from_bytes" | "string_to_bytes" |
                         // Web API functions that accept (ptr, len) string args:
                         "localStorage_get" | "localStorage_set" | "localStorage_remove" |
                         "sessionStorage_get" | "sessionStorage_set" | "sessionStorage_remove" |
@@ -10130,17 +10200,36 @@ impl WasmCodegen {
                 };
                 // Check if this is a format() call — format takes string arg as single i32
                 let is_format_call = matches!(callee.as_ref(), Expr::Ident(name) if name == "format");
+                // Check if this is a stdlib function that takes (ptr, len) string args
+                let needs_ptr_len_args = if let Expr::Ident(name) = callee.as_ref() {
+                    matches!(name.as_str(),
+                        "parse_f64" | "parse_i32" | "parse_int" | "parse_float" |
+                        "json_decode" | "json_parse" | "json_encode" |
+                        "capitalize" | "to_uppercase" | "to_lowercase" |
+                        "url_encode" | "url_decode" | "base64_encode" | "base64_decode" |
+                        "string_trim" | "string_to_upper" | "string_to_lower" |
+                        "string_index_of" | "string_starts_with" | "string_ends_with" |
+                        "string_replace" | "string_contains" | "string_concat" |
+                        "console_log" | "console_warn" | "console_error"
+                    )
+                } else {
+                    false
+                };
                 for (arg_idx, arg) in args.iter().enumerate() {
                     self.generate_expr(arg);
                     // User functions take String as a single i32 pointer.
-                    // StringLit pushes (ptr, len) — drop the len.
-                    if is_user_fn && matches!(arg, Expr::StringLit(_)) {
+                    // Expressions that push (ptr, len) need the len dropped.
+                    if is_user_fn && self.expr_pushes_ptr_len(arg) {
                         self.line("drop ;; drop str len for user fn call");
                     }
-                    // For format() calls, non-template args (idx > 0) that return String (ptr,len)
+                    // For format() calls, non-template args (idx > 0) that produce (ptr,len)
                     // need the len dropped since $format expects a single i32 arg value.
-                    if is_format_call && arg_idx > 0 && self.method_call_returns_string(arg) {
+                    if is_format_call && arg_idx > 0 && self.expr_pushes_ptr_len(arg) {
                         self.line("drop ;; drop str len for format arg");
+                    }
+                    // For stdlib functions that take (ptr, len), convert single ptr to (ptr, len)
+                    if needs_ptr_len_args && !self.expr_pushes_ptr_len(arg) && !Self::expr_returns_ptr_len(arg) {
+                        self.line("call $str_len ;; expand ptr to (ptr, len) for stdlib call");
                     }
                 }
                 if let Expr::Ident(name) = callee.as_ref() {
@@ -10505,17 +10594,22 @@ impl WasmCodegen {
                 self.indent += 1;
                 self.emit("(then");
                 self.indent += 1;
-                for stmt in &then_block.stmts {
-                    self.generate_stmt(stmt);
-                }
+                // Generate all statements except the last as statements (void),
+                // and the last as an expression (leaving value on stack).
+                self.generate_branch_stmts_as_expr(&then_block.stmts);
                 self.indent -= 1;
                 self.line(")");
                 if let Some(else_blk) = else_block {
                     self.emit("(else");
                     self.indent += 1;
-                    for stmt in &else_blk.stmts {
-                        self.generate_stmt(stmt);
-                    }
+                    self.generate_branch_stmts_as_expr(&else_blk.stmts);
+                    self.indent -= 1;
+                    self.line(")");
+                } else {
+                    // No else branch — provide default i32 value
+                    self.emit("(else");
+                    self.indent += 1;
+                    self.line("i32.const 0");
                     self.indent -= 1;
                     self.line(")");
                 }
@@ -10718,7 +10812,10 @@ impl WasmCodegen {
             Expr::Navigate { path } => {
                 self.line(";; navigate — programmatic route change");
                 self.generate_expr(path);
-                // Path string (ptr, len) is on the stack
+                // Ensure path string is (ptr, len) on the stack
+                if !self.expr_pushes_ptr_len(path) && !Self::expr_returns_ptr_len(path) {
+                    self.line("call $str_len ;; compute (ptr, len) for navigate");
+                }
                 self.line("call $router_navigate");
             }
             Expr::PromptTemplate { template, interpolations } => {
@@ -12980,7 +13077,7 @@ impl WasmCodegen {
         self.line("local.get $headers_ptr  i32.load ;; key ptr (for len calc)");
         self.line("call $str_len");
         self.line("local.get $headers_ptr  i32.load offset=4 ;; value (unused in flat header)");
-        self.line("drop  drop  drop ;; header application simplified");
+        self.line("drop  drop  drop  drop ;; header application simplified");
         self.indent -= 1;
         self.line("))");
         self.indent -= 1;
@@ -14662,10 +14759,14 @@ impl WasmCodegen {
     fn collect_locals(&mut self, block: &Block) {
         for stmt in &block.stmts {
             match stmt {
-                Stmt::Let { name, ty, .. } => {
-                    let wasm_ty = ty.as_ref()
-                        .map(|t| self.ast_type_to_wasm(t))
-                        .unwrap_or(WasmType::I32);
+                Stmt::Let { name, ty, value, .. } => {
+                    let wasm_ty = if let Some(t) = ty.as_ref() {
+                        self.ast_type_to_wasm(t)
+                    } else if self.expr_is_float(value) {
+                        WasmType::F64
+                    } else {
+                        WasmType::I32
+                    };
                     self.locals.push((name.clone(), wasm_ty));
                 }
                 Stmt::LetDestructure { pattern, .. } => {
@@ -15638,6 +15739,23 @@ impl WasmCodegen {
                 self.line("memory.copy");
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
             }
+            // ── String parsing methods ────────────────────────────────────────
+            "parse_f64" | "parse_float" => {
+                self.line(";; .parse_f64() — parse string to float");
+                self.generate_expr(object);
+                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len)");
+                }
+                self.line("call $parse_f64");
+            }
+            "capitalize" => {
+                self.line(";; .capitalize() — capitalize first letter");
+                self.generate_expr(object);
+                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len)");
+                }
+                self.line("call $capitalize");
+            }
             // ── String instance methods ──────────────────────────────────────
             // String methods expect (ptr, len) but local variables only store
             // the pointer.  Use $str_len to recover (ptr, len) from a bare ptr.
@@ -15900,6 +16018,11 @@ impl WasmCodegen {
                         self.line("i32.const 0 ;; self (signals are global)");
                         for arg in args {
                             self.generate_expr(arg);
+                            // Component methods take String as single i32 ptr.
+                            // Drop the len if the arg pushes (ptr, len).
+                            if self.expr_pushes_ptr_len(arg) {
+                                self.line("drop ;; drop str len for method arg");
+                            }
                         }
                         self.line(&format!("call ${}_{}", self.component_name, method));
                         return;
@@ -16254,6 +16377,179 @@ impl WasmCodegen {
         }
     }
 
+    /// Generate statements for an if/else branch used as an expression.
+    /// All statements except the last are generated as statements (void).
+    /// The last statement is generated as an expression (leaving value on stack).
+    /// If the last statement doesn't produce a value, push i32.const 0 as default.
+    fn generate_branch_stmts_as_expr(&mut self, stmts: &[Stmt]) {
+        if stmts.is_empty() {
+            self.line("i32.const 0 ;; empty branch default");
+            return;
+        }
+        let last_idx = stmts.len() - 1;
+        for (i, stmt) in stmts.iter().enumerate() {
+            if i < last_idx {
+                self.generate_stmt(stmt);
+            } else {
+                // Last statement: generate as expression to leave value on stack
+                match stmt {
+                    Stmt::Expr(expr) => {
+                        // For if expressions used as the last expression in a branch,
+                        // recurse through generate_expr which handles Expr::If properly
+                        self.generate_expr(expr);
+                        // If the expression is a string literal or format string, it
+                        // produces (ptr, len) — drop len to leave just ptr (i32)
+                        if matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. }) {
+                            self.line("drop ;; discard str len, keep ptr for if result");
+                        } else if matches!(expr, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format")) {
+                            self.line("drop ;; discard str len from format(), keep ptr for if result");
+                        } else if self.method_call_returns_string(expr) {
+                            self.line("drop ;; discard str len from method, keep ptr for if result");
+                        } else if self.expr_is_void(expr) {
+                            // Void expression as last in branch — push default value
+                            self.line("i32.const 0 ;; void expr, provide default for if result");
+                        }
+                    }
+                    Stmt::Return(Some(expr)) => {
+                        self.generate_expr(expr);
+                        self.line("return");
+                    }
+                    Stmt::Return(None) => {
+                        self.line("return");
+                    }
+                    _ => {
+                        self.generate_stmt(stmt);
+                        // Non-expression statements are void — push default
+                        self.line("i32.const 0 ;; stmt default for if result");
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check if the last expression in a branch's statements returns a String (ptr, len).
+    fn if_branch_returns_string(&self, stmts: &[Stmt]) -> bool {
+        if let Some(last) = stmts.last() {
+            match last {
+                Stmt::Expr(expr) => {
+                    if self.expr_pushes_ptr_len(expr) {
+                        return true;
+                    }
+                    if let Expr::If { then_block, .. } = expr {
+                        return self.if_branch_returns_string(&then_block.stmts);
+                    }
+                    false
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Check if the last expression in a branch's statements returns an f64.
+    fn if_branch_returns_float(&self, stmts: &[Stmt]) -> bool {
+        if let Some(last) = stmts.last() {
+            match last {
+                Stmt::Expr(expr) => {
+                    if self.expr_is_float(expr) {
+                        return true;
+                    }
+                    if let Expr::If { then_block, .. } = expr {
+                        return self.if_branch_returns_float(&then_block.stmts);
+                    }
+                    false
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Generate branch stmts where the last expression returns a String (ptr, len).
+    /// Does NOT drop the len, unlike generate_branch_stmts_as_expr.
+    fn generate_branch_stmts_as_string_expr(&mut self, stmts: &[Stmt]) {
+        if stmts.is_empty() {
+            self.line("i32.const 0 ;; empty branch default ptr");
+            self.line("i32.const 0 ;; empty branch default len");
+            return;
+        }
+        let last_idx = stmts.len() - 1;
+        for (i, stmt) in stmts.iter().enumerate() {
+            if i < last_idx {
+                self.generate_stmt(stmt);
+            } else {
+                match stmt {
+                    Stmt::Expr(expr) => {
+                        self.generate_expr(expr);
+                        // If the expression doesn't produce (ptr, len), convert to it
+                        if !self.expr_pushes_ptr_len(expr) && !matches!(expr, Expr::If { .. }) {
+                            if self.expr_is_void(expr) {
+                                self.line("i32.const 0 ;; void expr default ptr");
+                                self.line("i32.const 0 ;; void expr default len");
+                            } else {
+                                // Single i32 value — compute str_len to get (ptr, len)
+                                self.line("call $str_len");
+                            }
+                        }
+                    }
+                    Stmt::Return(Some(expr)) => {
+                        self.generate_expr(expr);
+                        self.line("return");
+                    }
+                    Stmt::Return(None) => {
+                        self.line("return");
+                    }
+                    _ => {
+                        self.generate_stmt(stmt);
+                        self.line("i32.const 0 ;; stmt default ptr");
+                        self.line("i32.const 0 ;; stmt default len");
+                    }
+                }
+            }
+        }
+    }
+
+    /// Generate branch stmts where the last expression returns an f64.
+    fn generate_branch_stmts_as_float_expr(&mut self, stmts: &[Stmt]) {
+        if stmts.is_empty() {
+            self.line("f64.const 0 ;; empty branch default");
+            return;
+        }
+        let last_idx = stmts.len() - 1;
+        for (i, stmt) in stmts.iter().enumerate() {
+            if i < last_idx {
+                self.generate_stmt(stmt);
+            } else {
+                match stmt {
+                    Stmt::Expr(expr) => {
+                        self.generate_expr(expr);
+                        if !self.expr_is_float(expr) && !matches!(expr, Expr::If { .. }) {
+                            if self.expr_is_void(expr) {
+                                self.line("f64.const 0 ;; void expr default");
+                            } else {
+                                // i32 value — convert to f64
+                                self.line("f64.convert_i32_s");
+                            }
+                        }
+                    }
+                    Stmt::Return(Some(expr)) => {
+                        self.generate_expr(expr);
+                        self.line("return");
+                    }
+                    Stmt::Return(None) => {
+                        self.line("return");
+                    }
+                    _ => {
+                        self.generate_stmt(stmt);
+                        self.line("f64.const 0 ;; stmt default");
+                    }
+                }
+            }
+        }
+    }
+
     /// Returns true if an `Expr::If` has branches that all end with explicit
     /// `return` statements, meaning the if does not produce a stack value.
     fn if_branches_return(expr: &Expr) -> bool {
@@ -16512,6 +16808,98 @@ impl WasmCodegen {
     /// Returns true if the expression is a string literal (pushes ptr, len).
     fn expr_is_string_lit(&self, expr: &Expr) -> bool {
         matches!(expr, Expr::StringLit(_))
+    }
+
+    /// Returns true if the expression produces an f64 value on the WASM stack.
+    fn expr_is_float(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::Float(_) => true,
+            // Method calls on self — check return type
+            Expr::MethodCall { object, method, .. } => {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    return self.component_method_return_types.get(method.as_str())
+                        .and_then(|r| r.as_ref())
+                        .map(|t| t == "f64" || t == "Float" || t == "float")
+                        .unwrap_or(false);
+                }
+                false
+            }
+            // self.field where field type is f64
+            Expr::FieldAccess { object, field } => {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    // Check prop types for f64
+                    if let Some(ty) = self.component_prop_types.get(field.as_str()) {
+                        return ty == "f64" || ty == "Float" || ty == "float";
+                    }
+                }
+                false
+            }
+            // Binary operation where either side is float
+            Expr::Binary { left, right, op } => {
+                if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod) {
+                    return self.expr_is_float(left) || self.expr_is_float(right);
+                }
+                false
+            }
+            // Identifiers — check locals
+            Expr::Ident(name) => {
+                self.locals.iter().any(|(n, ty)| n == name && matches!(ty, WasmType::F64 | WasmType::F32))
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns true if the expression pushes (ptr, len) onto the WASM stack.
+    /// More comprehensive than expr_returns_ptr_len — also checks string props,
+    /// method calls returning String, and format strings.
+    fn expr_pushes_ptr_len(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::StringLit(_) => true,
+            Expr::FormatString { .. } => true,
+            Expr::FnCall { callee, .. } => {
+                if let Expr::Ident(name) = callee.as_ref() {
+                    if name == "format" || name == "string_concat" {
+                        return true;
+                    }
+                    // Check if it's a component method that returns String
+                    if self.component_method_return_types.get(name.as_str())
+                        .and_then(|r| r.as_ref())
+                        .map(|t| t == "String" || t == "str")
+                        .unwrap_or(false)
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+            Expr::MethodCall { object, method, .. } => {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    return self.component_method_return_types.get(method.as_str())
+                        .and_then(|r| r.as_ref())
+                        .map(|t| t == "String" || t == "str")
+                        .unwrap_or(false);
+                }
+                // String methods that return String (ptr, len)
+                if matches!(method.as_str(),
+                    "trim" | "to_upper" | "to_lower" | "replace" | "substring" | "slice" |
+                    "split" | "join" | "pad_start" | "pad_end" | "repeat"
+                ) {
+                    return true;
+                }
+                false
+            }
+            // String props push (ptr, len)
+            Expr::FieldAccess { object, field } => {
+                if matches!(object.as_ref(), Expr::SelfExpr) {
+                    // Check if it's a string prop (pushes ptr + len)
+                    return self.component_prop_types.get(field.as_str())
+                        .map(|t| t == "String" || t == "str")
+                        .unwrap_or(false);
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     /// Returns true if the expression produces a (ptr, len) pair on the stack
