@@ -3661,6 +3661,11 @@ impl WasmCodegen {
         for prop in &comp.props {
             let ty_name = match &prop.ty {
                 Type::Named(n) => n.clone(),
+                Type::Array(_) => "Array".to_string(),
+                Type::Option(_) => "Option".to_string(),
+                Type::Result { .. } => "Result".to_string(),
+                Type::Tuple(_) => "Tuple".to_string(),
+                Type::Generic { name, .. } => name.clone(),
                 _ => "String".to_string(),
             };
             self.component_prop_types.insert(prop.name.clone(), ty_name);
@@ -7382,6 +7387,13 @@ impl WasmCodegen {
             self.defer_template_locals = true;
             self.template_locals.clear();
 
+            // Set current_fn_returns_string for return statement expansion
+            let saved_fn_returns_string = self.current_fn_returns_string;
+            let returns_string = comp.return_type.as_ref()
+                .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
+                .unwrap_or(false);
+            self.current_fn_returns_string = returns_string;
+
             // Check if the last statement is an expression that leaves a value
             let last_stmt_has_return = comp.body.stmts.last()
                 .map(|s| matches!(s, Stmt::Return(_)))
@@ -7395,6 +7407,13 @@ impl WasmCodegen {
                     if let Stmt::Expr(expr) = stmt {
                         // Last expression in a computed — generate as expression to leave value
                         self.generate_expr(expr);
+                        // For String-returning computeds, expand ptr to (ptr, len) if needed
+                        let returns_string = comp.return_type.as_ref()
+                            .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
+                            .unwrap_or(false);
+                        if returns_string && !self.expr_pushes_ptr_len(expr) && !Self::expr_returns_ptr_len(expr) {
+                            self.line("call $str_len ;; expand ptr to (ptr, len) for String return");
+                        }
                         continue;
                     }
                 }
@@ -7417,6 +7436,8 @@ impl WasmCodegen {
                     self.line("i32.const 0 ;; default return value");
                 }
             }
+
+            self.current_fn_returns_string = saved_fn_returns_string;
 
             let body_output = std::mem::take(&mut self.output);
             self.output = saved_output;
@@ -7712,6 +7733,15 @@ impl WasmCodegen {
                 self.line(")");
             } else {
                 self.line("local.get $root");
+                // Pass default (0, 0) for each prop the component expects
+                let prop_defs: Vec<String> = self.component_prop_defs.iter()
+                    .find(|(n, _)| n == &route.component)
+                    .map(|(_, props)| props.clone())
+                    .unwrap_or_default();
+                for _prop in &prop_defs {
+                    self.line("i32.const 0 ;; default prop ptr");
+                    self.line("i32.const 0 ;; default prop len");
+                }
                 self.line(&format!("call ${}_mount", route.component));
             }
 
@@ -9875,7 +9905,8 @@ impl WasmCodegen {
                     self.line(&local_decl);
                 }
                 let is_string_val = self.expr_pushes_ptr_len(value)
-                    || self.expr_is_string_typed(value);
+                    || self.expr_is_string_typed(value)
+                    || Self::expr_returns_ptr_len(value);
                 self.generate_expr(value);
                 if is_string_val {
                     // String expressions push (ptr, len); drop len (top), keep ptr
@@ -10217,7 +10248,7 @@ impl WasmCodegen {
                                 self.generate_expr(arg);
                                 // If arg produces (ptr, len), drop the len —
                                 // $format expects a single i32 arg, not (ptr, len)
-                                if self.expr_pushes_ptr_len(arg) {
+                                if self.expr_pushes_ptr_len(arg) || Self::expr_returns_ptr_len(arg) {
                                     self.line("drop ;; drop str len for format arg");
                                 } else if self.expr_is_float(arg) {
                                     self.line("i32.trunc_f64_s ;; convert f64 arg to i32 for format");
@@ -10276,9 +10307,10 @@ impl WasmCodegen {
                 let needs_ptr_len_args = if let Expr::Ident(name) = callee.as_ref() {
                     matches!(name.as_str(),
                         "parse_f64" | "parse_i32" | "parse_int" | "parse_float" |
-                        "json_decode" | "json_parse" | "json_encode" |
+                        "json_decode" | "json_parse" |
                         "capitalize" | "to_uppercase" | "to_lowercase" |
                         "url_encode" | "url_decode" | "base64_encode" | "base64_decode" |
+                        "base64url_sha256" |
                         "string_trim" | "string_to_upper" | "string_to_lower" |
                         "string_index_of" | "string_starts_with" | "string_ends_with" |
                         "string_replace" | "string_contains" | "string_concat" |
@@ -10304,7 +10336,7 @@ impl WasmCodegen {
                     }
                     // For format() calls, non-template args (idx > 0) that produce (ptr,len)
                     // need the len dropped since $format expects a single i32 arg value.
-                    if is_format_call && arg_idx > 0 && self.expr_pushes_ptr_len(arg) {
+                    if is_format_call && arg_idx > 0 && (self.expr_pushes_ptr_len(arg) || Self::expr_returns_ptr_len(arg)) {
                         self.line("drop ;; drop str len for format arg");
                     }
                     // For format() calls, non-template args that produce f64 need conversion
@@ -10723,7 +10755,7 @@ impl WasmCodegen {
                         self.line(&format!(";; self.{} = ... (signal set)", field));
                         self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
                         self.generate_expr(value);
-                        if Self::expr_returns_ptr_len(value) {
+                        if self.expr_pushes_ptr_len(value) || Self::expr_returns_ptr_len(value) {
                             self.line("drop  ;; discard str len for signal_set");
                         }
                         if self.expr_is_float(value) {
@@ -11804,6 +11836,97 @@ impl WasmCodegen {
                 self.line("end ;; while break");
             }
             Expr::For { binding, iterator, body } => {
+                // Check if iterator is a range expression (possibly reversed)
+                let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
+                let is_reversed_range = matches!(iterator.as_ref(),
+                    Expr::MethodCall { object, method, .. } if method == "rev" && matches!(object.as_ref(), Expr::Range { .. })
+                );
+
+                if is_range || is_reversed_range {
+                    // Range-based for loop: iterate start..end directly (no array)
+                    let lbl = self.next_label();
+                    let idx_var = format!("${}", binding);
+                    let end_var = format!("$for_end_{}", lbl);
+                    let block_label = format!("$for_break_{}", lbl);
+                    let loop_label = format!("$for_cont_{}", lbl);
+
+                    self.emit_template_local(&idx_var);
+                    self.emit_template_local(&end_var);
+
+                    self.line(&format!(";; for {} in range", binding));
+
+                    let (start_expr, end_expr) = if is_reversed_range {
+                        if let Expr::MethodCall { object, .. } = iterator.as_ref() {
+                            if let Expr::Range { start, end } = object.as_ref() {
+                                (end, start) // Reversed: start from end-1, go down to start
+                            } else { unreachable!() }
+                        } else { unreachable!() }
+                    } else if let Expr::Range { start, end } = iterator.as_ref() {
+                        (start, end)
+                    } else { unreachable!() };
+
+                    if is_reversed_range {
+                        // Reversed range: i = end - 1, loop while i >= start
+                        self.generate_expr(start_expr);
+                        self.line("i32.const 1");
+                        self.line("i32.sub");
+                        self.line(&format!("local.set {}", idx_var));
+                        self.generate_expr(end_expr);
+                        self.line("i32.const 1");
+                        self.line("i32.sub ;; end_var = start - 1 (stop before)");
+                        self.line(&format!("local.set {}", end_var));
+                    } else {
+                        self.generate_expr(start_expr);
+                        self.line(&format!("local.set {}", idx_var));
+                        self.generate_expr(end_expr);
+                        self.line(&format!("local.set {}", end_var));
+                    }
+
+                    self.line(&format!("block {} ;; for break", block_label));
+                    self.indent += 1;
+                    self.line(&format!("loop {} ;; for continue", loop_label));
+                    self.indent += 1;
+
+                    if is_reversed_range {
+                        // br_if break (idx <= end_var, i.e., idx < start)
+                        self.line(&format!("local.get {}", idx_var));
+                        self.line(&format!("local.get {}", end_var));
+                        self.line("i32.le_s");
+                        self.line(&format!("br_if {}", block_label));
+                    } else {
+                        self.line(&format!("local.get {}", idx_var));
+                        self.line(&format!("local.get {}", end_var));
+                        self.line("i32.ge_s");
+                        self.line(&format!("br_if {}", block_label));
+                    }
+
+                    // Body
+                    self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
+                    self.for_loop_bindings.push(binding.clone());
+                    for stmt in &body.stmts {
+                        self.generate_stmt(stmt);
+                    }
+                    self.for_loop_bindings.pop();
+                    self.loop_label_stack.pop();
+
+                    // Increment/decrement index
+                    self.line(&format!("local.get {}", idx_var));
+                    if is_reversed_range {
+                        self.line("i32.const 1");
+                        self.line("i32.sub");
+                    } else {
+                        self.line("i32.const 1");
+                        self.line("i32.add");
+                    }
+                    self.line(&format!("local.set {}", idx_var));
+
+                    self.line(&format!("br {}", loop_label));
+
+                    self.indent -= 1;
+                    self.line("end ;; for continue");
+                    self.indent -= 1;
+                    self.line("end ;; for break");
+                } else {
                 // Imperative for loop (non-template): iterate array
                 let lbl = self.next_label();
                 let arr_var = format!("$for_arr_{}", lbl);
@@ -11881,6 +12004,7 @@ impl WasmCodegen {
                 self.line("end ;; for continue");
                 self.indent -= 1;
                 self.line("end ;; for break");
+                } // end else (array-based for loop)
             }
             Expr::Break => {
                 if let Some((break_label, _)) = self.loop_label_stack.last() {
@@ -15921,6 +16045,10 @@ impl WasmCodegen {
             "slice" => {
                 self.line(";; .slice() — substring");
                 self.generate_expr(object);
+                // string_slice takes (ptr, len, start, end) — expand receiver if needed
+                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                    self.line("call $str_len ;; expand str ptr to (ptr, len) for slice");
+                }
                 if args.len() >= 2 {
                     self.generate_expr(&args[0]);
                     self.generate_expr(&args[1]);
@@ -16132,6 +16260,23 @@ impl WasmCodegen {
                     }
                 }
             }
+            "to_string" => {
+                // .to_string() — if receiver is already a string, no-op; else convert int to string
+                self.generate_expr(object);
+                if self.expr_pushes_ptr_len(object) || Self::expr_returns_ptr_len(object) || matches!(object, Expr::StringLit(_)) {
+                    // Already a string (ptr, len) — no conversion needed
+                } else {
+                    self.line("call $to_string");
+                }
+            }
+            "clone" => {
+                // .clone() — clone a value. For strings (ptr, len), drop len and clone the ptr.
+                self.generate_expr(object);
+                if self.expr_pushes_ptr_len(object) || Self::expr_returns_ptr_len(object) || matches!(object, Expr::StringLit(_)) {
+                    self.line("drop ;; drop str len for clone, keep ptr");
+                }
+                self.line("call $clone");
+            }
             _ => {
                 // Self method calls — self.method_b() inside a component/store handler
                 // dispatches to the corresponding handler function.
@@ -16261,7 +16406,7 @@ impl WasmCodegen {
                         self.generate_expr(object);
                         // String methods that take (ptr, len) as receiver need expansion
                         let needs_str_expand = matches!(method,
-                            "chars" | "char_at" | "to_uppercase" | "to_lowercase" |
+                            "chars" | "to_uppercase" | "to_lowercase" |
                             "capitalize" | "to_upper" | "to_lower"
                         );
                         if needs_str_expand && !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
@@ -16294,6 +16439,14 @@ impl WasmCodegen {
                         _ => "",
                     };
                     self.generate_expr(object);
+                    // String methods that take (ptr, len) as receiver need expansion
+                    let needs_str_expand = matches!(method,
+                        "chars" | "to_uppercase" | "to_lowercase" |
+                        "capitalize" | "to_upper" | "to_lower"
+                    );
+                    if needs_str_expand && !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                        self.line("call $str_len ;; expand str ptr to (ptr, len) for method receiver");
+                    }
                     for arg in args {
                         self.generate_expr(arg);
                     }
@@ -16548,14 +16701,9 @@ impl WasmCodegen {
                         // For if expressions used as the last expression in a branch,
                         // recurse through generate_expr which handles Expr::If properly
                         self.generate_expr(expr);
-                        // If the expression is a string literal or format string, it
-                        // produces (ptr, len) — drop len to leave just ptr (i32)
-                        if matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. }) {
+                        // If the expression pushes (ptr, len) — drop len to leave just ptr (i32)
+                        if self.expr_pushes_ptr_len(expr) || Self::expr_returns_ptr_len(expr) || matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. }) {
                             self.line("drop ;; discard str len, keep ptr for if result");
-                        } else if matches!(expr, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(n) if n == "format")) {
-                            self.line("drop ;; discard str len from format(), keep ptr for if result");
-                        } else if self.method_call_returns_string(expr) {
-                            self.line("drop ;; discard str len from method, keep ptr for if result");
                         } else if self.expr_is_void(expr) {
                             // Void expression as last in branch — push default value
                             self.line("i32.const 0 ;; void expr, provide default for if result");
@@ -17049,7 +17197,7 @@ impl WasmCodegen {
                 // String methods that return String (ptr, len)
                 if matches!(method.as_str(),
                     "trim" | "to_upper" | "to_lower" | "to_uppercase" | "to_lowercase" |
-                    "replace" | "substring" | "slice" |
+                    "replace" | "substring" | "slice" | "char_at" | "to_string" |
                     "split" | "join" | "pad_start" | "pad_end" | "repeat" |
                     "capitalize"
                 ) {
@@ -17065,6 +17213,16 @@ impl WasmCodegen {
                         .map(|t| t == "String" || t == "str")
                         .unwrap_or(false);
                 }
+                // Store field access: StoreName.field — check if field is a computed returning String
+                if let Expr::Ident(obj_name) = object.as_ref() {
+                    if self.known_stores.iter().any(|(sn, _)| sn == obj_name) {
+                        // Check if StoreName_field is in string_returning_fns
+                        let qualified = format!("{}_{}", obj_name, field);
+                        if self.string_returning_fns.iter().any(|f| f == &qualified) {
+                            return true;
+                        }
+                    }
+                }
                 false
             }
             _ => false,
@@ -17075,9 +17233,16 @@ impl WasmCodegen {
     /// rather than a single i32. Used to avoid spurious $str_len calls.
     fn expr_returns_ptr_len(expr: &Expr) -> bool {
         match expr {
-            // format() returns (ptr, len)
+            // Functions that return (ptr, len) string pairs
             Expr::FnCall { callee, .. } => {
-                matches!(callee.as_ref(), Expr::Ident(name) if name == "format")
+                matches!(callee.as_ref(), Expr::Ident(name) if matches!(name.as_str(),
+                    "format" | "string_concat" |
+                    "json_encode" | "url_encode" | "url_form_encode" |
+                    "capitalize" | "random_hex" | "base64url_sha256" |
+                    "to_string" |
+                    // WebAPI functions that return (ptr, len) strings:
+                    "location_hostname" | "location_protocol" | "origin"
+                ))
             }
             // FormatString (f"...") also returns (ptr, len)
             Expr::FormatString { .. } => true,
