@@ -121,6 +121,15 @@ pub struct WasmCodegen {
     /// pushed here so that `Expr::Ident("product")` resolves to `local.get $product`
     /// and `Expr::FieldAccess` on `product` emits a struct field load from the pointer.
     handler_param_bindings: Vec<String>,
+    /// Function parameter types — maps param name to WASM type.
+    /// Used by expr_is_float to detect f64 parameters.
+    fn_param_types: HashMap<String, WasmType>,
+    /// Whether the current function returns String (i32, i32).
+    /// Used by generate_stmt to fix early returns that need (ptr, len).
+    current_fn_returns_string: bool,
+    /// All function names that return String (i32, i32).
+    /// Used by expr_pushes_ptr_len to detect FnCalls that return String.
+    string_returning_fns: Vec<String>,
     /// Deferred conditional block updaters for reactive {if ...} template blocks.
     /// Each entry: (func_name, container_global, last_val_global, signal_globals, condition_expr, then_children, else_children)
     /// The updater re-evaluates the condition and mounts/clears the container.
@@ -394,6 +403,9 @@ impl WasmCodegen {
             string_state_fields: Vec::new(),
             struct_layouts: HashMap::new(),
             handler_param_bindings: Vec::new(),
+            fn_param_types: HashMap::new(),
+            current_fn_returns_string: false,
+            string_returning_fns: Vec::new(),
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
             deferred_filters: Vec::new(),
@@ -841,6 +853,39 @@ impl WasmCodegen {
                 Item::Mod(m) => {
                     if let Some(ref inner) = m.items {
                         Self::collect_router_init_calls(inner, init_calls);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Recursively collect function names that return String, from all items including modules.
+    fn collect_string_returning_fns(&mut self, items: &[Item]) {
+        for item in items {
+            match item {
+                Item::Function(f) => {
+                    if f.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
+                        self.string_returning_fns.push(f.name.clone());
+                    }
+                }
+                Item::Store(s) => {
+                    for computed in &s.computed {
+                        if computed.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
+                            self.string_returning_fns.push(format!("{}_{}", s.name, computed.name));
+                        }
+                    }
+                }
+                Item::Component(c) => {
+                    for method in &c.methods {
+                        if method.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
+                            self.string_returning_fns.push(format!("{}_{}", c.name, method.name));
+                        }
+                    }
+                }
+                Item::Mod(m) => {
+                    if let Some(ref inner) = m.items {
+                        self.collect_string_returning_fns(inner);
                     }
                 }
                 _ => {}
@@ -1300,6 +1345,9 @@ impl WasmCodegen {
                 }
             }
         }
+
+        // Pre-scan all functions, store computeds, and component methods for String return types
+        self.collect_string_returning_fns(&program.items);
 
         self.emit("(module");
         self.indent += 1;
@@ -3029,8 +3077,10 @@ impl WasmCodegen {
         // field access on them (e.g., product.name) resolves to struct
         // field loads from the parameter pointer.
         let saved_handler_params = std::mem::take(&mut self.handler_param_bindings);
+        let saved_fn_param_types = std::mem::take(&mut self.fn_param_types);
         for p in func.params.iter().filter(|p| p.name != "self") {
             self.handler_param_bindings.push(p.name.clone());
+            self.fn_param_types.insert(p.name.clone(), self.ast_type_to_wasm(&p.ty));
         }
 
         // Generate body (dynamic locals go to template_locals)
@@ -3038,6 +3088,8 @@ impl WasmCodegen {
         let returns_string = func.return_type.as_ref()
             .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
             .unwrap_or(false);
+        let saved_fn_returns_string = self.current_fn_returns_string;
+        self.current_fn_returns_string = returns_string;
         let returns_float = func.return_type.as_ref()
             .map(|t| matches!(t, Type::Named(n) if n == "f64"))
             .unwrap_or(false);
@@ -3070,8 +3122,10 @@ impl WasmCodegen {
             self.generate_stmt(stmt);
         }
 
-        // Restore handler param bindings
+        // Restore handler param bindings, fn param types, and fn return type
         self.handler_param_bindings = saved_handler_params;
+        self.fn_param_types = saved_fn_param_types;
+        self.current_fn_returns_string = saved_fn_returns_string;
 
         // Hoist deferred locals before the body
         let body_output = std::mem::take(&mut self.output);
@@ -3651,10 +3705,15 @@ impl WasmCodegen {
         // drop the len; for all other types a single i32 is already on the stack.
         for state in &comp.state {
             let is_string_init = matches!(&state.initializer, Expr::StringLit(_));
+            let is_float_init = self.expr_is_float(&state.initializer);
             self.generate_expr(&state.initializer);
             if is_string_init {
                 // String literal pushed (ptr, len); drop the len, keep the ptr.
                 self.line("drop  ;; discard str len — signal stores only the ptr");
+            }
+            if is_float_init {
+                // Float value on stack; signal_create expects i32
+                self.line("i32.trunc_f64_s ;; convert f64 to i32 for signal_create");
             }
             if state.atomic {
                 self.line(";; atomic signal — uses lock-free concurrent access");
@@ -3910,6 +3969,10 @@ impl WasmCodegen {
                 for p in _method.params.iter().filter(|p| p.name != "self") {
                     self.line(&format!(";; pass callback data as ${}", p.name));
                     self.line("global.get $__callback_data");
+                    // Convert i32 callback_data to f64 if handler param expects f64
+                    if matches!(&p.ty, Type::Named(n) if n == "f64" || n == "Float" || n == "float") {
+                        self.line("f64.convert_i32_s ;; convert i32 callback_data to f64 param");
+                    }
                 }
                 self.line(&format!("call ${handler_name}"));
                 // Record end time and compute delta for this handler
@@ -7306,7 +7369,7 @@ impl WasmCodegen {
         for comp in &store.computed {
             self.line("");
             let ret = comp.return_type.as_ref()
-                .map(|t| format!(" (result {})", self.type_to_wasm(t)))
+                .map(|t| format!(" (result {})", self.return_type_to_wasm(t)))
                 .unwrap_or_else(|| " (result i32)".into());
             self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\"){}",
                 comp.name, comp.name, ret));
@@ -8686,6 +8749,7 @@ impl WasmCodegen {
                 let href_offset = self.store_string("href");
                 self.line(&format!("i32.const {} ;; href attr name ptr", href_offset));
                 self.line("i32.const 4 ;; href attr name len");
+                self.line("call $dom_setAttr");
 
                 // Generate additional attributes (class, style, aria-*, etc.)
                 for attr in attributes {
@@ -8698,6 +8762,7 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", name.len()));
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
+                            self.line("call $dom_setAttr");
                         }
                         Attribute::EventHandler { event, handler } => {
                             let event_offset = self.store_string(event);
@@ -9828,6 +9893,11 @@ impl WasmCodegen {
             }
             Stmt::Return(Some(expr)) => {
                 self.generate_expr(expr);
+                // If the function returns String (i32, i32) but the expression
+                // produces a single i32, expand to (ptr, len) via str_len
+                if self.current_fn_returns_string && !self.expr_pushes_ptr_len(expr) && !Self::expr_returns_ptr_len(expr) {
+                    self.line("call $str_len ;; expand ptr to (ptr, len) for String return");
+                }
                 self.line("return");
             }
             Stmt::Return(None) => {
@@ -10149,6 +10219,8 @@ impl WasmCodegen {
                                 // $format expects a single i32 arg, not (ptr, len)
                                 if self.expr_pushes_ptr_len(arg) {
                                     self.line("drop ;; drop str len for format arg");
+                                } else if self.expr_is_float(arg) {
+                                    self.line("i32.trunc_f64_s ;; convert f64 arg to i32 for format");
                                 }
                                 self.line("call $format");
                             }
@@ -10210,7 +10282,15 @@ impl WasmCodegen {
                         "string_trim" | "string_to_upper" | "string_to_lower" |
                         "string_index_of" | "string_starts_with" | "string_ends_with" |
                         "string_replace" | "string_contains" | "string_concat" |
-                        "console_log" | "console_warn" | "console_error"
+                        "console_log" | "console_warn" | "console_error" |
+                        // Storage APIs that take (ptr, len) string args:
+                        "storage_set" | "localStorage_set" | "localStorage_remove" |
+                        "storage_remove" | "storage_get" | "localStorage_get" |
+                        "sessionStorage_set" | "sessionStorage_get" | "sessionStorage_remove" |
+                        "session_set" | "session_get" | "session_remove" |
+                        // Navigation
+                        "navigate" | "navigate_external" | "push_state" | "replace_state" |
+                        "set_title" | "download"
                     )
                 } else {
                     false
@@ -10226,6 +10306,10 @@ impl WasmCodegen {
                     // need the len dropped since $format expects a single i32 arg value.
                     if is_format_call && arg_idx > 0 && self.expr_pushes_ptr_len(arg) {
                         self.line("drop ;; drop str len for format arg");
+                    }
+                    // For format() calls, non-template args that produce f64 need conversion
+                    if is_format_call && arg_idx > 0 && self.expr_is_float(arg) {
+                        self.line("i32.trunc_f64_s ;; convert f64 arg to i32 for format");
                     }
                     // For stdlib functions that take (ptr, len), convert single ptr to (ptr, len)
                     if needs_ptr_len_args && !self.expr_pushes_ptr_len(arg) && !Self::expr_returns_ptr_len(arg) {
@@ -10590,7 +10674,16 @@ impl WasmCodegen {
             }
             Expr::If { condition, then_block, else_block } => {
                 self.generate_expr(condition);
-                self.emit("(if (result i32)");
+                // Determine result type — f64 if the then branch's last expr is float
+                let result_is_float = then_block.stmts.last()
+                    .and_then(|s| if let Stmt::Expr(e) = s { Some(e) } else { None })
+                    .map(|e| self.expr_is_float(e))
+                    .unwrap_or(false);
+                if result_is_float {
+                    self.emit("(if (result f64)");
+                } else {
+                    self.emit("(if (result i32)");
+                }
                 self.indent += 1;
                 self.emit("(then");
                 self.indent += 1;
@@ -10606,10 +10699,14 @@ impl WasmCodegen {
                     self.indent -= 1;
                     self.line(")");
                 } else {
-                    // No else branch — provide default i32 value
+                    // No else branch — provide default value
                     self.emit("(else");
                     self.indent += 1;
-                    self.line("i32.const 0");
+                    if result_is_float {
+                        self.line("f64.const 0");
+                    } else {
+                        self.line("i32.const 0");
+                    }
                     self.indent -= 1;
                     self.line(")");
                 }
@@ -10629,13 +10726,16 @@ impl WasmCodegen {
                         if Self::expr_returns_ptr_len(value) {
                             self.line("drop  ;; discard str len for signal_set");
                         }
+                        if self.expr_is_float(value) {
+                            self.line("i32.trunc_f64_s ;; convert f64 to i32 for signal_set");
+                        }
                         self.line("call $signal_set");
                     } else {
                         self.generate_expr(value);
                     }
                 } else {
                     self.generate_expr(value);
-                    if matches!(value.as_ref(), Expr::StringLit(_)) {
+                    if self.expr_pushes_ptr_len(value) || Self::expr_returns_ptr_len(value) {
                         self.line("drop  ;; discard str len for local assign");
                     }
                     if let Expr::Ident(name) = target.as_ref() {
@@ -11181,6 +11281,21 @@ impl WasmCodegen {
 
                 // 3. Emit body code
                 closure_body.push_str(&body_code);
+                // Determine if the closure body produces a value (i32) on the stack.
+                // If the last expression is void (method call, signal_set, console call, etc.),
+                // we need to add a default i32.const 0 since the closure type requires (result i32).
+                let body_produces_value = if let Expr::Block(block) = body.as_ref() {
+                    block.stmts.last().map(|s| match s {
+                        Stmt::Expr(e) => !self.expr_is_void(e),
+                        Stmt::Return(Some(_)) => true,
+                        _ => false,
+                    }).unwrap_or(false)
+                } else {
+                    !self.expr_is_void(body)
+                };
+                if !body_produces_value {
+                    closure_body.push_str("    i32.const 0 ;; default return for closure\n");
+                }
                 closure_body.push_str("  )\n");
 
                 self.closure_functions.push(closure_body);
@@ -11800,7 +11915,8 @@ impl WasmCodegen {
                 for (i, (_name, value)) in fields.iter().enumerate() {
                     self.line(&format!("local.get {}", ptr_var));
                     self.generate_expr(value);
-                    if matches!(value, Expr::StringLit(_)) {
+                    // For expressions that push (ptr, len), drop the len — store only the ptr
+                    if self.expr_pushes_ptr_len(value) {
                         self.line("drop ;; keep only str ptr for object field");
                     }
                     if i == 0 {
@@ -13015,7 +13131,7 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
 
-        self.emit("(func $Map_parse_from_obj (param $ptr i32) (param $len i32) (result i32)");
+        self.emit("(func $Map_parse_from_obj (param $ptr i32) (result i32)");
         self.indent += 1;
         self.line("local.get $ptr ;; return pointer to parsed object");
         self.indent -= 1;
@@ -14760,10 +14876,11 @@ impl WasmCodegen {
         for stmt in &block.stmts {
             match stmt {
                 Stmt::Let { name, ty, value, .. } => {
-                    let wasm_ty = if let Some(t) = ty.as_ref() {
-                        self.ast_type_to_wasm(t)
-                    } else if self.expr_is_float(value) {
+                    let wasm_ty = if self.expr_is_float(value) {
+                        // Float expressions always use f64 regardless of annotation
                         WasmType::F64
+                    } else if let Some(t) = ty.as_ref() {
+                        self.ast_type_to_wasm(t)
                     } else {
                         WasmType::I32
                     };
@@ -15620,6 +15737,10 @@ impl WasmCodegen {
                 self.line(&format!("local.set $__con_src_{lbl}"));
                 if let Some(val_arg) = args.first() {
                     self.generate_expr(val_arg);
+                    // If the search value is a string (pushes ptr, len), drop len — keep just ptr
+                    if self.expr_pushes_ptr_len(val_arg) || Self::expr_returns_ptr_len(val_arg) {
+                        self.line("drop ;; drop str len for contains comparison value");
+                    }
                 } else {
                     self.line("i32.const 0");
                 }
@@ -15747,6 +15868,7 @@ impl WasmCodegen {
                     self.line("call $str_len ;; expand ptr to (ptr, len)");
                 }
                 self.line("call $parse_f64");
+                self.line("f64.convert_i32_s ;; convert i32 result to f64");
             }
             "capitalize" => {
                 self.line(";; .capitalize() — capitalize first letter");
@@ -15815,6 +15937,10 @@ impl WasmCodegen {
             "replace" => {
                 self.line(";; .replace() — replace first occurrence");
                 self.generate_expr(object);
+                // Ensure object is (ptr, len) for string_replace
+                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                    self.line("call $str_len ;; expand str ptr to (ptr, len) for replace");
+                }
                 if args.len() >= 2 {
                     self.generate_expr(&args[0]);
                     self.generate_expr(&args[1]);
@@ -16015,7 +16141,12 @@ impl WasmCodegen {
                         // (both stores and components). The typed version has correct return types
                         // and signatures, unlike the void handler trampolines (__handler_N).
                         self.line(&format!(";; self.{}() — method call", method));
-                        self.line("i32.const 0 ;; self (signals are global)");
+                        // Only push self arg for component methods (which have $self param).
+                        // Store actions don't have a self parameter.
+                        let is_store = self.known_stores.iter().any(|(name, _)| name == &self.component_name);
+                        if !is_store {
+                            self.line("i32.const 0 ;; self (signals are global)");
+                        }
                         for arg in args {
                             self.generate_expr(arg);
                             // Component methods take String as single i32 ptr.
@@ -16128,6 +16259,14 @@ impl WasmCodegen {
                             _ => "",
                         };
                         self.generate_expr(object);
+                        // String methods that take (ptr, len) as receiver need expansion
+                        let needs_str_expand = matches!(method,
+                            "chars" | "char_at" | "to_uppercase" | "to_lowercase" |
+                            "capitalize" | "to_upper" | "to_lower"
+                        );
+                        if needs_str_expand && !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
+                            self.line("call $str_len ;; expand str ptr to (ptr, len) for method receiver");
+                        }
                         for arg in args {
                             self.generate_expr(arg);
                         }
@@ -16326,6 +16465,18 @@ impl WasmCodegen {
                 // self.method() calls within a component are void — handlers don't return values
                 if matches!(object.as_ref(), Expr::SelfExpr) {
                     if self.component_method_names.iter().any(|m| m == method) {
+                        return true;
+                    }
+                }
+                // Store method calls are void — store actions don't return values
+                if let Expr::Ident(obj_name) = object.as_ref() {
+                    if self.known_store_actions.iter().any(|(action, store)| {
+                        action == method && store == obj_name
+                    }) {
+                        return true;
+                    }
+                    // Also check if it's a known store name (any method call on a store is void)
+                    if self.known_stores.iter().any(|(name, _)| name == obj_name) {
                         return true;
                     }
                 }
@@ -16814,8 +16965,12 @@ impl WasmCodegen {
     fn expr_is_float(&self, expr: &Expr) -> bool {
         match expr {
             Expr::Float(_) => true,
-            // Method calls on self — check return type
+            // Method calls — check return type
             Expr::MethodCall { object, method, .. } => {
+                // parse_f64 / parse_float always return f64
+                if method == "parse_f64" || method == "parse_float" {
+                    return true;
+                }
                 if matches!(object.as_ref(), Expr::SelfExpr) {
                     return self.component_method_return_types.get(method.as_str())
                         .and_then(|r| r.as_ref())
@@ -16841,9 +16996,17 @@ impl WasmCodegen {
                 }
                 false
             }
-            // Identifiers — check locals
+            // Identifiers — check locals and function params
             Expr::Ident(name) => {
                 self.locals.iter().any(|(n, ty)| n == name && matches!(ty, WasmType::F64 | WasmType::F32))
+                || self.fn_param_types.get(name.as_str()).map(|ty| matches!(ty, WasmType::F64 | WasmType::F32)).unwrap_or(false)
+            }
+            // If expressions — check if the then branch produces f64
+            Expr::If { then_block, .. } => {
+                then_block.stmts.last()
+                    .and_then(|s| if let Stmt::Expr(e) = s { Some(e) } else { None })
+                    .map(|e| self.expr_is_float(e))
+                    .unwrap_or(false)
             }
             _ => false,
         }
@@ -16869,6 +17032,10 @@ impl WasmCodegen {
                     {
                         return true;
                     }
+                    // Check if it's a standalone function that returns String
+                    if self.string_returning_fns.iter().any(|f| f == name) {
+                        return true;
+                    }
                 }
                 false
             }
@@ -16881,8 +17048,10 @@ impl WasmCodegen {
                 }
                 // String methods that return String (ptr, len)
                 if matches!(method.as_str(),
-                    "trim" | "to_upper" | "to_lower" | "replace" | "substring" | "slice" |
-                    "split" | "join" | "pad_start" | "pad_end" | "repeat"
+                    "trim" | "to_upper" | "to_lower" | "to_uppercase" | "to_lowercase" |
+                    "replace" | "substring" | "slice" |
+                    "split" | "join" | "pad_start" | "pad_end" | "repeat" |
+                    "capitalize"
                 ) {
                     return true;
                 }
