@@ -57,6 +57,8 @@ page Catalog {
 
 The template syntax is identical across all three modes. The compiler generates different output based on the render mode.
 
+All render modes support component composition via router layout blocks with `<Outlet />`. The layout shell (navigation, footer) persists across page navigations while only the outlet content swaps.
+
 ## Mode Comparison
 
 | Feature | DOM | Canvas | Hybrid |

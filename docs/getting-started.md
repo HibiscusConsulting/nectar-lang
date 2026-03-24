@@ -385,6 +385,63 @@ nectar build src/main.nectar --emit-wasm -O2
 
 ---
 
+## Component Composition with Routers
+
+Nectar supports nested routing with layout components using `<Outlet />`:
+
+```nectar
+component NavBar() {
+    render {
+        <nav>
+            <a on:click={self.go_home}>"Home"</a>
+            <a on:click={self.go_about}>"About"</a>
+        </nav>
+    }
+
+    fn go_home(&mut self) {
+        navigate("/");
+    }
+
+    fn go_about(&mut self) {
+        navigate("/about");
+    }
+}
+
+router AppRouter {
+    layout {
+        <div>
+            <NavBar />
+            <Outlet />
+        </div>
+    }
+
+    route "/" => Home,
+    route "/about" => About,
+    fallback => NotFound,
+}
+```
+
+The `<Outlet />` element marks where the routed page content renders. The surrounding layout (NavBar) persists across navigations without re-rendering.
+
+---
+
+## Generics and Monomorphization
+
+Nectar supports generic functions that are specialized at compile time:
+
+```nectar
+fn max<T>(a: T, b: T) -> T where T: Ord {
+    if a > b { a } else { b }
+}
+
+let bigger = max(10, 20);          // generates max__i32
+let longer = max("abc", "xyz");    // generates max__String
+```
+
+The compiler creates a separate WASM function for each concrete type, eliminating runtime type dispatch.
+
+---
+
 ## Next Steps
 
 Now that you have the basics, explore these resources:

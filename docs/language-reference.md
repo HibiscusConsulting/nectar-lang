@@ -180,13 +180,20 @@ let names: [String] = ["Alice", "Bob"];
 let empty: [f64] = [];
 ```
 
-### Tuples **(PLANNED)**
+### Tuples
 
-Tuples combine a fixed number of values of potentially different types. Parsed but no codegen:
+Tuples combine a fixed number of values of potentially different types:
 
 ```nectar
 let pair: (i32, String) = (42, "hello");
 let triple: (bool, f64, String) = (true, 3.14, "pi");
+```
+
+Tuple elements are accessed by index using `.0`, `.1`, etc.:
+
+```nectar
+let x = pair.0;    // 42
+let s = pair.1;    // "hello"
 ```
 
 ### Option
@@ -300,20 +307,29 @@ The `own` keyword can explicitly mark owned transfer:
 let data = own create_data();
 ```
 
-### Destructuring **(PLANNED)**
+### Destructuring
 
-Variables can be destructured from tuples, arrays, and structs. Parsed but no codegen:
+Destructuring is supported in match arms for tuples, structs, and arrays:
 
 ```nectar
-// Tuple destructuring
-let (x, y) = get_point();
+// Tuple destructuring in match
+match get_point() {
+    (0, 0) => { /* origin */ },
+    (x, y) => { /* use x, y */ },
+}
 
-// Array destructuring
-let [first, second, ..] = items;
+// Struct destructuring in match
+match user {
+    User { name, age, .. } => { /* use name, age */ },
+}
 
-// Struct destructuring
-let User { name, age, .. } = user;
+// Array destructuring in match
+match items {
+    [first, second, ..] => { /* use first, second */ },
+}
 ```
+
+Note: `let`-binding destructuring (`let (x, y) = expr;`) is parsed but not yet in codegen. Use match arms for destructuring.
 
 ---
 
@@ -354,9 +370,9 @@ async fn fetch_data(url: String) -> String {
 }
 ```
 
-### Generic Functions **(PLANNED)**
+### Generic Functions
 
-Functions can have type parameters. Parsed but no monomorphization codegen exists yet:
+Functions can have type parameters. The compiler monomorphizes generic functions -- specializing them for each concrete type they are called with:
 
 ```nectar
 fn identity<T>(value: T) -> T {
@@ -368,9 +384,11 @@ fn first<'a, T>(items: &'a [T]) -> &'a T {
 }
 ```
 
-### Where Clauses (Trait Bounds) **(PLANNED)**
+When called with `identity(42)`, the compiler generates `identity__i32`. When called with `identity("hello")`, it generates `identity__String`.
 
-Constrain type parameters with `where`. Parsed but no codegen:
+### Where Clauses (Trait Bounds)
+
+Constrain type parameters with `where`:
 
 ```nectar
 fn print_all<T>(items: [T]) where T: Display {
@@ -510,6 +528,27 @@ component Card() {
 }
 ```
 
+### Canvas Mode Styles (Honeycomb)
+
+In canvas mode (`nectar build --canvas`), CSS is not used. Instead, Honeycomb's layout engine uses typed style properties set as inline attributes:
+
+```nectar
+<div style="direction: vertical; padding: 16px; gap: 12px; background-color: #18181b;">
+    <span style="font-size: 15px; font-weight: 600; color: #fafafa;">"Title"</span>
+    <button style="width: fill; height: 44px; background-color: #ffa11e; border-radius: 8px;">
+        "Click me"
+    </button>
+</div>
+```
+
+**Canvas layout properties:** `direction` (vertical/horizontal/layer), `width`, `height`, `padding`, `gap`, `align`, `justify`, `wrap`, `min-width`, `max-width`, `min-height`, `max-height`, `scroll`, `position`, `z-index`, `display`
+
+**Canvas visual properties:** `background-color`, `color`, `font-size`, `font-weight`, `line-height`, `border-radius`, `border-width`, `border-color`, `opacity`, `text-decoration`, `text-overflow`
+
+**Canvas sizing values:** `fill` (stretch to parent), `hug` (shrink to content), `Npx` (fixed pixels)
+
+Key differences from CSS: no `display: flex` (everything is flex by default), no `margin` (use `padding` + `gap`), no CSS grid (use `wrap: true`), no media queries, no pseudo-classes. See CLAUDE.md for the full comparison table.
+
 ### Critical Styles
 
 When building with `nectar build --ssr --critical-css`, the compiler automatically determines which component styles are critical (needed for the initial above-the-fold render) and which can be deferred.
@@ -612,9 +651,9 @@ component UserProfile(id: u32) {
 
 **Skeleton blocks are optional.** Components without a `skeleton` block render their `render` content immediately as before.
 
-### Generic Components **(PLANNED)**
+### Generic Components
 
-Components can accept type parameters with optional trait bounds. Parsed but no codegen:
+Components can accept type parameters with optional trait bounds. Generic monomorphization applies:
 
 ```nectar
 component List<T>(items: [T]) where T: Display {
@@ -927,9 +966,9 @@ trait Drawable {
 }
 ```
 
-### Generic Traits **(PLANNED)**
+### Generic Traits
 
-Traits can have type parameters. Parsed but no codegen:
+Traits can have type parameters:
 
 ```nectar
 trait Container<T> {
@@ -938,15 +977,17 @@ trait Container<T> {
 }
 ```
 
-### Trait Bounds **(PLANNED)**
+### Trait Bounds
 
-Use trait bounds to constrain generic type parameters. Parsed but no codegen:
+Use trait bounds to constrain generic type parameters:
 
 ```nectar
 fn print_item<T>(item: T) where T: Display {
     println(item.to_string());
 }
 ```
+
+Trait dispatch is static -- the compiler resolves the concrete implementation at compile time. There is no vtable or dynamic dispatch.
 
 ---
 
@@ -1081,6 +1122,24 @@ while count < 10 {
 }
 ```
 
+### Break and Continue
+
+`break` exits the current loop, `continue` skips to the next iteration:
+
+```nectar
+for item in items {
+    if item.skip {
+        continue;
+    }
+    if item.done {
+        break;
+    }
+    process(item);
+}
+```
+
+Both compile to WASM `br` instructions targeting the correct block/loop label.
+
 ### Closures
 
 Closures (lambdas) are used primarily as arguments to map/filter/reduce:
@@ -1105,7 +1164,7 @@ Closures can also be written with `fn` syntax in certain positions:
 items.filter(fn(t: &Todo) -> bool { !t.done })
 ```
 
-> **Note**: Environment capture in closures has limited codegen. Simple closures as callback arguments (map/filter/reduce) work. Complex closures capturing multiple outer variables are less reliable.
+> Closures with environment capture compile to WASM functions in the function table. They work for map/filter/reduce callbacks and event handlers.
 
 ### Await Expressions **(PLANNED)**
 
@@ -1132,9 +1191,9 @@ let response = fetch("https://api.example.com/posts", {
 });
 ```
 
-### Spawn and Channel Expressions **(PLANNED)**
+### Spawn and Channel Expressions
 
-Concurrency primitives. Parsed but no Web Worker runtime:
+Concurrency primitives backed by Web Workers and MessageChannel:
 
 ```nectar
 // Spawn work on a background thread
@@ -1150,9 +1209,9 @@ ch.send(42);
 let value = ch.recv();
 ```
 
-### Parallel Expressions **(PLANNED)**
+### Parallel Expressions
 
-Run multiple expressions concurrently. Parsed but no runtime:
+Run multiple expressions concurrently via Web Workers:
 
 ```nectar
 parallel {
@@ -1196,9 +1255,9 @@ navigate("/user/42");
 navigate(f"/posts/{post_id}");
 ```
 
-### Stream Expressions **(PLANNED)**
+### Stream Expressions
 
-Process async data as it arrives. Parsed but no streaming runtime:
+Process async data as it arrives via streaming fetch:
 
 ```nectar
 for chunk in stream fetch("https://api.example.com/stream") {
@@ -1206,9 +1265,9 @@ for chunk in stream fetch("https://api.example.com/stream") {
 }
 ```
 
-### Suspend Expressions **(PLANNED)**
+### Suspend Expressions
 
-Show fallback content while loading. Parsed, limited codegen:
+Show fallback content while loading:
 
 ```nectar
 suspend(<LoadingSpinner />) {
@@ -1233,9 +1292,9 @@ let msg = f"Hello {name}, you have {count} items";
 let url = f"https://api.example.com/users/{id}";
 ```
 
-### Prompt Templates **(PLANNED)**
+### Prompt Templates
 
-AI prompt templates with interpolation. Parsed but no AI runtime:
+AI prompt templates with interpolation. The codegen builds the interpolated string and triggers a fetch:
 
 ```nectar
 let p = prompt "Summarize the following document: {document}";
@@ -1567,31 +1626,38 @@ AuthStatus::LoggedIn(user) => show_user(user),
 None => show_empty(),
 ```
 
-### Tuple Pattern **(PLANNED)**
+### Tuple Pattern
 
-Destructure a tuple. Parsed but no codegen:
-
-```nectar
-let (x, y) = point;
-(0, 0) => handle_origin(),
-(x, _) => use_x_only(x),
-```
-
-### Struct Pattern **(PLANNED)**
-
-Destructure a struct, with an optional `..` to ignore remaining fields. Parsed but no codegen:
+Destructure a tuple in match arms:
 
 ```nectar
-let User { name, age, .. } = user;
+match point {
+    (0, 0) => handle_origin(),
+    (x, _) => use_x_only(x),
+}
 ```
 
-### Array Pattern **(PLANNED)**
+### Struct Pattern
 
-Destructure an array. Parsed but no codegen:
+Destructure a struct in match arms, with an optional `..` to ignore remaining fields:
 
 ```nectar
-let [first, second, ..] = items;
+match user {
+    User { name, age, .. } => greet(name, age),
+}
 ```
+
+### Array Pattern
+
+Destructure an array in match arms:
+
+```nectar
+match items {
+    [first, second, ..] => process(first, second),
+}
+```
+
+> **Note**: `let`-binding destructuring (`let (x, y) = expr;`, `let User { name, .. } = user;`) is parsed but not yet in codegen. Use match arms for destructuring.
 
 ---
 
