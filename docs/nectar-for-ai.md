@@ -31,12 +31,12 @@ i32  i64  u32  u64  f32  f64  bool  String
 [T]  Option<T>  Result<T, E>
 ```
 
-### Types that parse but DO NOT fully work in codegen:
+### Additional type notes:
 
-- `(T, U)` -- tuple types parse but tuple construction/destructuring has no codegen
-- `&T` / `&mut T` / `&'a T` -- borrow syntax is parsed and checked but does not affect WASM output (WASM has no references)
+- `(T, U)` -- tuple types work. Construction via `(a, b)` and access via `.0`, `.1` compile to WASM.
+- `&T` / `&mut T` / `&'a T` -- borrow syntax is parsed and checked by the borrow checker but does not affect WASM output (WASM has no references). The borrow checker enforces field-level borrows, NLL, return ref verification, and reborrowing.
 - `fn(T) -> U` -- function types parse but higher-order functions are limited
-- Generics like `Vec<T>` or `HashMap<K, V>` -- generic type parameters parse but monomorphization is not implemented; use concrete types
+- Generics like `fn first<T>(items: [T]) -> T` -- generic type parameters are monomorphized. The compiler specializes each generic function for every concrete type it is called with.
 
 ---
 
@@ -58,11 +58,12 @@ component Counter() {
 }
 ```
 
-### What does NOT work for variables:
+### Variable notes:
 
 - `signal name: String = "";` -- the `signal` keyword is parsed but in practice `let mut` inside components achieves the same thing and is the proven pattern
-- `let (a, b) = expr;` -- tuple destructuring parses but has no codegen
-- `let User { name, .. } = user;` -- struct destructuring parses but has no codegen
+- `let (a, b) = expr;` -- let-binding tuple destructuring parses but has no codegen. Use `match` for destructuring.
+- `let User { name, .. } = user;` -- let-binding struct destructuring parses but has no codegen. Use `match` for destructuring.
+- Tuple, struct, and array destructuring WORK in `match` arms
 
 ---
 
@@ -88,9 +89,13 @@ fn increment(&mut self) {
 
 - `async fn` -- parses but async/await has no runtime support
 - `f"Hello {name}"` -- format string interpolation (`f"..."`) parses into the AST but is NOT reliably generated in codegen. Use `format("{}", value)` instead.
-- Generic functions (`fn first<T>(items: [T]) -> T`) -- parses but no monomorphization
-- Lifetime annotations (`fn first<'a>(x: &'a str) -> &'a str`) -- parses but are no-ops
-- `where T: Display` bounds -- parses but no trait dispatch
+
+### What DOES work for functions:
+
+- Generic functions (`fn first<T>(items: [T]) -> T`) -- monomorphized at compile time for each concrete type
+- Lifetime annotations (`fn first<'a>(x: &'a str) -> &'a str`) -- validated by the borrow checker
+- `where T: Display` bounds -- static trait dispatch at compile time
+- Closures with environment capture -- compiled to function table entries
 
 ---
 
@@ -143,11 +148,12 @@ item.category         // field access from for-loop binding
 product.price         // field access from handler parameter
 ```
 
-### What does NOT work for structs:
+### What works for structs:
 
-- Generic structs (`struct Point<T> { x: T, y: T }`) -- parses but no monomorphization
-- `impl` blocks with methods -- parses but method dispatch is limited
-- Trait implementations (`impl Display for User`) -- parses but no vtable dispatch
+- Generic structs -- monomorphized at compile time
+- `impl` blocks with methods -- method calls compile to `call $Type_method`
+- Trait implementations (`impl Display for User`) -- static trait dispatch, no vtable needed
+- Struct destructuring in match arms
 
 ---
 
@@ -492,7 +498,7 @@ fn handle_add(&mut self) {
 
 `CartStore::add()` compiles to `call $CartStore_add`. Signal getters compile to `call $CartStore_get_count`.
 
-### What does NOT work for stores:
+### Store limitations:
 
 - `async action` -- parses but async runtime is not implemented
 
@@ -602,6 +608,26 @@ fn go_home(&mut self) {
 ```
 
 `navigate("/path")` compiles to WASM calls that update the URL via `history.pushState` and trigger route matching.
+
+### Component composition with layout blocks (WORKS):
+
+```nectar
+router AppRouter {
+    layout {
+        <div>
+            <NavBar />
+            <Outlet />
+            <Footer />
+        </div>
+    }
+
+    route "/" => Home,
+    route "/about" => About,
+    fallback => NotFound,
+}
+```
+
+`<Outlet />` marks where the routed page content renders. The surrounding layout persists across navigations. The codegen generates a container div with `id="__nectar_outlet"` for route content swapping.
 
 ---
 
@@ -767,11 +793,12 @@ for i in 0..10 {
 }
 ```
 
-### What does NOT work for control flow:
+### Additional control flow that works:
 
-- `break` -- not implemented in codegen
-- `continue` -- not implemented in codegen
-- `for chunk in stream fetch(url) { ... }` -- stream iteration parses but has no runtime
+- `break` -- compiles to WASM `br` targeting the correct block
+- `continue` -- compiles to WASM `br` targeting the loop header
+- Compound assignment: `-=`, `*=`, `/=` work alongside `+=`
+- `for chunk in stream fetch(url) { ... }` -- streaming fetch codegen exists
 
 ---
 
@@ -801,13 +828,17 @@ match x {
 }
 ```
 
-### What does NOT work for pattern matching:
+### What works for pattern matching:
 
-- Enum variant matching beyond Ok/Err/Some/None -- limited codegen
+- Struct destructuring in match arms -- `User { name, age, .. } => ...`
+- Tuple destructuring in match arms -- `(x, y) => ...`
+- Array destructuring in match arms -- `[first, ..] => ...`
+- Guards (`match x { n if n > 0 => ... }`) -- supported in codegen
+
+### What has limited support:
+
+- Enum variant matching beyond Ok/Err/Some/None -- basic codegen exists
 - Nested pattern matching -- parses but codegen coverage is incomplete
-- Guards (`match x { n if n > 0 => ... }`) -- parses but limited codegen
-- Struct destructuring in patterns -- parses but no codegen
-- Tuple destructuring in patterns -- parses but no codegen
 
 ---
 
@@ -1403,29 +1434,37 @@ router AppRouter {
 
 ---
 
-## What DOES NOT Work Yet (Aspirational Features)
+## Feature Status Summary
 
-These features are parsed by the compiler but either have no codegen or have incomplete runtime support. Do NOT use them in production code:
+### Features with working codegen (use these):
+
+| Feature | Status |
+|---|---|
+| Generic types / monomorphization | Working -- functions specialized per concrete type |
+| Trait / impl dispatch | Working -- static dispatch at compile time |
+| Tuple types `(T, U)` | Working -- literal construction and `.0`/`.1` access |
+| Tuple/struct/array destructuring in `match` | Working |
+| `break` / `continue` in loops | Working -- compiles to WASM `br` |
+| `spawn { }` / `parallel { }` | Working -- Web Worker codegen |
+| `channel<T>()` / `ch.send()` / `ch.recv()` | Working -- MessageChannel codegen |
+| `suspend(<Fallback />) { <Heavy /> }` | Working -- codegen for fallback rendering |
+| Dynamic imports `import("./module")` | Working -- codegen emits `dom_loadChunk` |
+| `prompt "..."` (AI prompt templates) | Working -- builds string and triggers fetch |
+| Streaming fetch `for chunk in stream fetch(url)` | Working -- codegen emits `streaming_streamFetch` |
+| Closures with environment capture | Working -- compiled to function table entries |
+| Component composition (`<Outlet />`) | Working -- router layout blocks |
+| Lifetime validation | Working -- NLL, field borrows, return ref verification, reborrowing |
+
+### Features with limited or no codegen (use with caution):
 
 | Feature | Status |
 |---|---|
 | `async fn` / `await` | Parsed, no async runtime |
 | `f"string {interpolation}"` | Parsed into AST as FormatString, codegen exists but less proven than `format()` |
-| Generic types / monomorphization | Parsed, no codegen |
-| Trait / impl dispatch | Parsed, no vtable |
-| Tuple types `(T, U)` | Parsed, no codegen |
-| Tuple destructuring `let (a, b) = expr` | Parsed, no codegen |
-| Struct destructuring `let Foo { x, .. } = expr` | Parsed, no codegen |
-| `break` / `continue` in loops | Not in codegen |
-| `spawn { }` / `parallel { }` | Parsed, no Web Worker runtime |
-| `channel<T>()` / `ch.send()` / `ch.recv()` | Parsed, no concurrency runtime |
+| `let (a, b) = expr;` destructuring | Parsed but no codegen -- use `match` instead |
 | `try { } catch e { }` | Parsed, limited codegen |
 | `yield` | Parsed, no generator runtime |
-| `for chunk in stream fetch(url)` | Parsed, no streaming runtime |
-| `suspend(<Fallback />) { <Heavy /> }` | Parsed, limited codegen |
 | `bind:value={signal}` | Parsed and codegen exists, but less battle-tested than on:click handlers |
-| Dynamic imports `import("./module")` | Parsed, limited codegen |
-| `prompt "..."` (AI prompt templates) | Parsed, no AI runtime |
 | Full enum variant matching | Limited -- Ok/Err/Some/None work, custom enum variants are incomplete |
 | WebRTC (`rtc::` namespace) | Parsed, runtime imports exist but end-to-end is untested |
 

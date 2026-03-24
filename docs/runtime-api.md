@@ -4,7 +4,7 @@ This document describes the complete runtime layer that bridges Nectar's WASM mo
 
 ## Architecture
 
-Nectar's runtime is a single JavaScript file (`runtime/modules/core.js`, ~660 lines) that provides browser API syscalls to WASM. **All logic runs in WASM.** JavaScript functions are 1-3 lines each — pure bridges with zero computation.
+Nectar's runtime is a single JavaScript file (`runtime/modules/core.js`, ~900 lines) that provides browser API syscalls to WASM. **All logic runs in WASM.** JavaScript functions are 1-3 lines each — pure bridges with zero computation.
 
 ### What Lives Where
 

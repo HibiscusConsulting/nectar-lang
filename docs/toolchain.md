@@ -161,8 +161,10 @@ When you run `nectar build`, the compiler performs these steps in order:
 5. **Borrow checking** -- validates ownership rules (unless `--no-check`)
 6. **Type checking** -- Hindley-Milner type inference (unless `--no-check`)
 7. **Exhaustiveness checking** -- warns about non-exhaustive match patterns
-8. **Optimization** -- runs enabled optimization passes
-9. **Code generation** -- emits WAT, WASM, SSR JS, or hydration bundle
+8. **Monomorphization** -- specializes generic functions for concrete types
+9. **Optimization** -- runs enabled optimization passes
+10. **Code generation** -- emits WAT, WASM, SSR JS, or hydration bundle
+11. **Source map emission** -- writes `.map` file if source mappings were recorded
 
 ---
 
@@ -264,9 +266,9 @@ nectar test <input> [OPTIONS]
 | `--filter <pattern>` | Only run tests whose name contains `<pattern>` |
 | `--watch` | Re-run tests automatically whenever the source file changes |
 
-### Test Discovery
+### Test Execution
 
-The test runner finds all top-level `test "name" { ... }` blocks in the specified file. Tests are validated through the full compilation pipeline (lex, parse, borrow check, type check, codegen).
+The test runner finds all top-level `test "name" { ... }` blocks in the specified file. Tests are validated through the full compilation pipeline (lex, parse, borrow check, type check, codegen). Test WASM modules are executed via **wasmtime** when possible. If wasmtime execution fails (e.g., the module uses browser APIs that wasmtime cannot provide), the test falls back to compilation-only validation.
 
 ### Test Output
 
@@ -592,14 +594,19 @@ The dev server:
 1. **Starts an HTTP server** on the specified port, serving the build directory
 2. **Watches `.nectar` files** in the source directory using filesystem polling
 3. **Recompiles on change** when a source file is modified
-4. **Notifies the browser** via WebSocket to hot-reload the updated WASM module
+4. **Notifies the browser** via WebSocket for hot module replacement (HMR)
+5. **SPA fallback** -- unmatched routes serve `index.html`, enabling client-side routing without 404s
 
 ### WebSocket Protocol
 
 The dev server communicates with the browser runtime using a simple WebSocket protocol:
 
-- **Server to Client**: `"reload"` -- signals that the WASM module has been recompiled and should be reloaded
+- **Server to Client**: `{"type": "hmr"}` -- signals that the WASM module has been recompiled and should be hot-reloaded
 - The client runtime reconnects automatically if the WebSocket connection drops
+
+### Source Map Emission
+
+When the compiler records source mappings during codegen, it automatically writes a `.map` file alongside the output. This enables browser DevTools to show Nectar source when debugging WASM.
 
 ### Examples
 
@@ -786,7 +793,7 @@ The Nectar language server provides:
 - **Diagnostics** -- real-time error and warning reporting as you type
 - **Go to Definition** -- jump to the definition of functions, types, and variables
 - **Hover Information** -- type information and documentation on hover
-- **Completion** -- context-aware code completion for keywords, types, and identifiers
+- **Completion** -- context-aware code completion for keywords, types, and identifiers, including **dot-completion** that resolves the type of the expression before the dot and suggests its fields and methods
 - **Formatting** -- document formatting using the built-in formatter
 
 ### VS Code Setup

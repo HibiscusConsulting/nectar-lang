@@ -408,14 +408,27 @@ One layout algorithm. Multiple renderers. Same `.nectar` source file.
 
 ## 7. Current Limitations
 
-Nectar is a working language with 2,421 compiler tests, but several features remain aspirational:
+Nectar is a working language with 2,547 compiler tests across 105K+ lines of Rust. Two production apps have been built: PayHive (62 .nectar files, 460 KB WASM) and Hive Listings (60 .nectar files, 899 KB WASM). The following features remain aspirational:
 
 - **Async/await**: Parsed but no async runtime in WASM. Async operations use callback patterns.
-- **Generic types**: Parsed but no monomorphization codegen.
-- **Trait dispatch**: Parsed but no vtable generation.
-- **Break/continue**: Not yet in codegen.
 - **Lazy for re-render**: Sorting/filtering mutates the array in WASM memory but the DOM does not re-render the product grid. The reactive system updates signal-bound attributes (pills, metrics) but not list content.
 - **String comparison in match**: Use `if/else` chains instead.
+- **Yield / generators**: Parsed but no generator runtime.
+
+The following features that were previously aspirational now have working codegen:
+
+- **Generic types / monomorphization**: The `monomorphize.rs` pass specializes generic functions for each concrete type.
+- **Static trait dispatch**: `impl Trait for Type` resolves at compile time.
+- **Break/continue**: Compile to WASM `br` instructions.
+- **Tuple types**: Literal construction and `.0`/`.1` access.
+- **Struct/tuple/array destructuring**: Works in match arms.
+- **Closures with environment capture**: Compiled to function table entries.
+- **Spawn/parallel/channel**: Web Worker codegen exists.
+- **Streaming fetch**: codegen emits `streaming_streamFetch`.
+- **Dynamic imports**: codegen emits `dom_loadChunk`.
+- **Prompt templates**: codegen builds interpolated string and triggers fetch.
+- **Lifetime validation**: Borrow checker enforces NLL, field borrows, return ref verification, reborrowing.
+- **Component composition**: Router layout blocks with `<Outlet />`.
 
 These are engineering work items, not architectural limitations. The core thesis — that all computation belongs in WASM — is validated by the benchmark results.
 
@@ -459,6 +472,8 @@ JavaScript was the right answer in 2010 when it was the only language that ran i
 - **React benchmark**: https://buildnectar.com/app/react.html
 - **Svelte benchmark**: https://buildnectar.com/app/svelte.html
 - **License**: MIT
+- **Compiler**: 105K+ lines of Rust, 2,547 tests, 34 source modules
+- **Production apps**: PayHive (62 files, 460 KB WASM), Hive Listings (60 files, 899 KB WASM)
 
 ---
 

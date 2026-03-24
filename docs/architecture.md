@@ -56,6 +56,11 @@ Nectar's compiler is a traditional multi-pass compiler written in Rust. Source c
                |   Check    |
                +-----+------+
                      |
+               +-----v---------+
+               | Monomorphize  |
+               | (generics)    |
+               +-----+---------+
+                     |
                +-----v------+
                | Optimizer   |
                | (O0/O1/O2) |
@@ -82,6 +87,7 @@ All compiler modules live in `compiler/src/`:
 | Borrow checker | `borrow_checker.rs` | Ownership and lifetime validation |
 | Type checker | `type_checker.rs` | Hindley-Milner type inference |
 | Exhaustiveness | `exhaustiveness.rs` | Match pattern coverage checking |
+| Monomorphization | `monomorphize.rs` | Generic function specialization |
 | Optimizer | `optimizer.rs` | Pass manager |
 | Constant folding | `const_fold.rs` | Compile-time expression evaluation |
 | Dead code elimination | `dce.rs` | Remove unreachable statements |
@@ -102,6 +108,7 @@ All compiler modules live in `compiler/src/`:
 | Dev server | `devserver.rs` | HTTP + WebSocket hot-reload server |
 | Source maps | `sourcemap.rs` | Debug mapping generation |
 | Standard library | `stdlib.rs` | Built-in types and functions |
+| Canvas codegen | `rust_codegen.rs` | .nectar → Rust source for Honeycomb canvas mode |
 | CLI entry point | `main.rs` | Command-line interface |
 
 ### Honeycomb (Canvas Rendering Engine)
