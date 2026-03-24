@@ -7160,7 +7160,14 @@ impl WasmCodegen {
         }
 
         // Setters for each signal (with reactive notification)
+        // Skip auto-setter if an explicit action with the same name exists
+        let action_names: Vec<&str> = store.actions.iter().map(|a| a.name.as_str()).collect();
         for sig in &store.signals {
+            let setter_name = format!("set_{}", sig.name);
+            if action_names.contains(&setter_name.as_str()) {
+                self.line(&format!(";; skipping auto-setter for {} — explicit action exists", sig.name));
+                continue;
+            }
             self.line("");
             let wasm_ty = sig.ty.as_ref()
                 .map(|t| self.type_to_wasm(t))
@@ -7801,22 +7808,16 @@ impl WasmCodegen {
     /// Emit a local declaration, or defer it if we're in deferred mode.
     fn emit_template_local(&mut self, var: &str) {
         let decl = format!("(local {} i32)", var);
-        if self.defer_template_locals {
-            self.template_locals.push(decl);
-        } else {
-            self.line(&decl);
-        }
+        // Always defer locals — WAT requires all locals at function preamble,
+        // before any instructions. Emitting inline causes wat2wasm errors.
+        self.template_locals.push(decl);
     }
 
     /// Like `emit_template_local` but with an explicit WASM type.
     /// Used when hoisting typed locals (i64, f32, f64) to a function's preamble.
     fn emit_template_local_typed(&mut self, var: &str, wasm_ty: &str) {
         let decl = format!("(local {} {})", var, wasm_ty);
-        if self.defer_template_locals {
-            self.template_locals.push(decl);
-        } else {
-            self.line(&decl);
-        }
+        self.template_locals.push(decl);
     }
 
     /// Walk an expression tree and collect all signal field names referenced
@@ -10132,7 +10133,14 @@ impl WasmCodegen {
                                 }
                             }
                         } else {
-                            self.line(&format!("call ${}", name));
+                            // If we're inside a component and the function name matches
+                            // one of the component's methods, use the namespaced name
+                            // (e.g., format_cents → CurrencyDisplay_format_cents)
+                            if self.in_component_mount && self.component_method_names.contains(name) {
+                                self.line(&format!("call ${}_{}", self.component_name, name));
+                            } else {
+                                self.line(&format!("call ${}", name));
+                            }
                         }
                     } else {
                         self.line(&format!(";; webapi: {}", name));
@@ -15215,13 +15223,12 @@ impl WasmCodegen {
                 // dispatches to the corresponding handler function.
                 if matches!(object, Expr::SelfExpr) && self.in_component_mount {
                     if let Some(idx) = self.component_method_names.iter().position(|m| m == method) {
-                        let handler_idx = self.global_handler_base + idx as u32;
                         self.line(&format!(";; self.{}() — component method call", method));
                         self.line("i32.const 0 ;; self (signals are global)");
                         for arg in args {
                             self.generate_expr(arg);
                         }
-                        self.line(&format!("call ${}__handler_{}", self.component_name, handler_idx));
+                        self.line(&format!("call ${}__handler_{}", self.component_name, idx));
                         return;
                     }
                 }
@@ -34447,8 +34454,8 @@ mod payhive_feature_tests {
             &[],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $AdminPanel__handler_6"),
-            "self.refresh() should emit call $AdminPanel__handler_6, got:\n{}", output);
+        assert!(output.contains("call $AdminPanel__handler_1"),
+            "self.refresh() should emit call $AdminPanel__handler_1 (local index), got:\n{}", output);
     }
 
     #[test]
