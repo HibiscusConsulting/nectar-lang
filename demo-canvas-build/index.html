@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>demo-canvas</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+*{margin:0;padding:0;overflow:hidden}body{background:#0b0e14}canvas{display:block}
+nav{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+nav .logo{color:#f97316;font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}
+nav .links{display:flex;gap:4px}
+nav .links a{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}
+nav .links a:hover{color:#e6edf3;background:rgba(255,255,255,0.06)}
+nav .links a.active{color:#e6edf3;background:rgba(249,115,22,0.12)}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Nectar</a>
+  <div class="links">
+    <a href="/nectar" class="active">Demo</a>
+    <a href="/trading">Trading</a>
+    <a href="/svelte">Svelte 5</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank">GitHub</a>
+    <a href="/">Home</a>
+  </div>
+</nav>
+<canvas id="c" style="margin-top:48px"></canvas>
+<script>
+(async () => {
+const cvs = document.getElementById('c');
+let dpr = window.devicePixelRatio || 1;
+const navH = 48;
+cvs.width = window.innerWidth * dpr;
+cvs.height = (window.innerHeight - navH) * dpr;
+cvs.style.width = window.innerWidth + 'px';
+cvs.style.height = (window.innerHeight - navH) + 'px';
+let ctx = cvs.getContext('2d');
+ctx.scale(dpr, dpr);
+const dec = new TextDecoder();
+
+// Single WASM binary — app + Honeycomb compiled together.
+// JS provides ONLY canvas syscalls (1-line bridges to Canvas 2D API).
+let W;
+const imports = { env: {
+  canvas_init: (w,h) => { cvs.width=w*dpr; cvs.height=h*dpr; cvs.style.width=w+'px'; cvs.style.height=h+'px'; ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr); return 1; },
+  canvas_clear: (id) => ctx.clearRect(0,0,window.innerWidth,window.innerHeight),
+  canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
+  canvas_fill_rect: (id,x,y,w,h,r,g,b,a) => { ctx.fillStyle=`rgba(${r},${g},${b},${a/255})`; ctx.fillRect(x,y,w,h); },
+  canvas_stroke_rect: (id,x,y,w,h,r,g,b,a,lw) => { ctx.strokeStyle=`rgba(${r},${g},${b},${a/255})`; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); },
+  canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => { ctx.fillStyle=`rgba(${r},${g},${b},${a/255})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); },
+  canvas_fill_text: (id,p,l,x,y,r,g,b,sz,bold) => { ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.font=`${bold?'bold ':''}${sz}px -apple-system,BlinkMacSystemFont,sans-serif`; ctx.fillText(dec.decode(new Uint8Array(W.memory.buffer,p,l)),x,y); },
+  canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {
+    const url = dec.decode(new Uint8Array(W.memory.buffer,sp,sl));
+    if (!_imgCache[url]) { const img = new Image(); img.crossOrigin='anonymous'; img.onload=()=>{ if(W.app_render) W.app_render(); }; img.src=url; _imgCache[url]=img; }
+    const img = _imgCache[url]; if (img && img.complete && img.naturalWidth > 0) { try { if(cr>0){ ctx.save(); ctx.beginPath(); ctx.roundRect(x,y,w,h,cr); ctx.clip(); ctx.drawImage(img,x,y,w,h); ctx.restore(); } else { ctx.drawImage(img,x,y,w,h); } } catch(e){} }
+  },
+  canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => { const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){ try{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}catch(e){} } },
+  canvas_measure_text: (id,p,l,sz) => { ctx.font=`${sz}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; },
+  canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight - 48,
+  clipboard_write: (p,l) => navigator.clipboard?.writeText(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
+  clipboard_read: () => 0,
+  input_overlay_show: () => {}, input_overlay_hide: () => {}, input_overlay_get_value: () => 0,
+  search_scroll_to: () => {},
+  navigate: (p,l) => { window.location.href=dec.decode(new Uint8Array(W.memory.buffer,p,l)); },
+  performance_now: () => performance.now(),
+  canvas_draw_line: (id,x1,y1,x2,y2,r,g,b,a,w) => { ctx.strokeStyle=`rgba(${r},${g},${b},${a/255})`; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); },
+  canvas_save: (id) => ctx.save(), canvas_restore: (id) => ctx.restore(),
+  canvas_clip_rect: (id,x,y,w,h) => { ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); },
+  canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => { ctx.fillStyle=`rgba(${cr},${cg},${cb},${ca/255})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); },
+  canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => { ctx.strokeStyle=`rgba(${r},${g},${b},${a/255})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); },
+  canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => { ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${r},${g},${b},${a/255})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; },
+  canvas_clear_shadow: (id) => { ctx.shadowBlur=0; ctx.shadowColor="transparent"; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; },
+  console_log: (p,l) => console.log(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
+  app_callback: (idx) => { if(W.__callback) W.__callback(idx); },
+  file_picker_open: () => 0,
+  media_create: () => 0, media_play: () => {}, media_pause: () => {}, media_destroy: () => {},
+  // HTTP fetch — 1-line bridges to browser fetch() API
+  fetch_request: (up,ul,method,bp,bl,cb) => {
+    const url = dec.decode(new Uint8Array(W.memory.buffer,up,ul));
+    const opts = { method: ['GET','POST','PUT','DELETE','PATCH'][method]||'GET', headers: {..._fh} };
+    if (bl > 0) opts.body = new Uint8Array(W.memory.buffer,bp,bl).slice();
+    _fh = {};
+    fetch(url,opts).then(async r => { _fs=r.status; _fb=new Uint8Array(await r.arrayBuffer()); if(W.__callback)W.__callback(cb); W.app_render(); }).catch(()=>{_fs=0;_fb=new Uint8Array(0);});
+  },
+  fetch_set_header: (kp,kl,vp,vl) => { _fh[dec.decode(new Uint8Array(W.memory.buffer,kp,kl))]=dec.decode(new Uint8Array(W.memory.buffer,vp,vl)); },
+  fetch_response_status: () => _fs,
+  fetch_response_body: (bp,bc) => { const n=Math.min(_fb.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(_fb.subarray(0,n)); return n; },
+  // Storage — 1-line bridges to browser localStorage
+  storage_get: (kp,kl,bp,bc) => { const v=localStorage.getItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))); if(!v)return 0; const b=new TextEncoder().encode(v); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; },
+  storage_set: (kp,kl,vp,vl) => localStorage.setItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl)),dec.decode(new Uint8Array(W.memory.buffer,vp,vl))),
+  storage_remove: (kp,kl) => localStorage.removeItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))),
+  // Routing — 1-line bridges to browser location.hash
+  get_location_hash: (bp,bc) => { const h=location.hash.slice(1); const b=new TextEncoder().encode(h); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; },
+  set_location_hash: (p,l) => { location.hash=dec.decode(new Uint8Array(W.memory.buffer,p,l)); },
+  on_hashchange: (cb) => window.addEventListener('hashchange',()=>{ if(W.__callback)W.__callback(cb); W.app_render(); }),
+  // Timers — 1-line bridges to browser setTimeout/setInterval
+  set_timeout: (cb,ms) => setTimeout(()=>{ if(W.__callback)W.__callback(cb); W.app_render(); },ms),
+  set_interval: (cb,ms) => setInterval(()=>{ if(W.__callback)W.__callback(cb); W.app_render(); },ms),
+  clear_interval: (id) => clearInterval(id),
+  clear_timeout: (id) => clearTimeout(id),
+}};
+let _fh={}, _fs=0, _fb=new Uint8Array(0), _imgCache={};
+
+try {
+const { instance } = await WebAssembly.instantiateStreaming(fetch('app.wasm?v='+Date.now()), imports);
+W = instance.exports;
+if (W.nectar_init) {
+  // .nectar app — build tree via nectar_init, then app_init picks it up from wasm_api::TREE
+  W.nectar_init(window.innerWidth, window.innerHeight - 48);
+}
+// app_init detects pre-built tree (compiler_tree) and uses it; otherwise builds demo
+W.app_init(window.innerWidth, window.innerHeight - 48, 0);
+W.app_render();
+} catch(e) { document.body.style.color='#f00'; document.body.style.padding='20px'; document.body.style.fontSize='14px'; document.body.style.fontFamily='monospace'; document.body.innerText='WASM Error: '+e.message+'\n\n'+e.stack; console.error(e); }
+
+// Full event wiring — all Honeycomb exports
+window.addEventListener('resize', () => {
+  dpr = window.devicePixelRatio || 1;
+  cvs.width = window.innerWidth * dpr; cvs.height = (window.innerHeight - navH) * dpr;
+  cvs.style.width = window.innerWidth + 'px'; cvs.style.height = (window.innerHeight - navH) + 'px';
+  ctx = cvs.getContext('2d'); ctx.scale(dpr, dpr);
+  if (W.app_resize) W.app_resize(window.innerWidth, window.innerHeight - navH);
+  if (W.app_render) W.app_render();
+});
+cvs.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);
+  if (W.app_scroll) W.app_scroll(e.deltaY);
+  if (W.app_render) W.app_render();
+}, { passive: false });
+cvs.addEventListener('click', e => {
+  if (W.app_click) W.app_click(e.offsetX, e.offsetY);
+  if (W.app_render) W.app_render();
+});
+cvs.addEventListener('mousedown', e => {
+  if (W.app_mousedown) W.app_mousedown(e.offsetX, e.offsetY, e.detail);
+  if (W.app_render) W.app_render();
+});
+cvs.addEventListener('mouseup', e => {
+  if (W.app_mouseup) W.app_mouseup(e.offsetX, e.offsetY);
+  if (W.app_render) W.app_render();
+});
+let _raf = 0;
+cvs.addEventListener('mousemove', e => {
+  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, e.buttons);
+  if (W.app_cursor) {
+    const c = W.app_cursor(e.offsetX, e.offsetY);
+    cvs.style.cursor = ['default','pointer','text','not-allowed'][c] || 'default';
+  }
+  if (!_raf) { _raf = requestAnimationFrame(() => { if (W.app_render) W.app_render(); _raf = 0; }); }
+});
+document.addEventListener('keydown', e => {
+  const mod = (e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0);
+  const ch = e.key.length === 1 ? new TextEncoder().encode(e.key) : new Uint8Array(0);
+  if (ch.length && 32*1024*1024 + ch.length <= W.memory.buffer.byteLength) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
+  if (W.app_keydown) W.app_keydown(e.keyCode, ch.length ? 32*1024*1024 : 0, ch.length, mod);
+  if (W.app_render) W.app_render();
+  // Allow ALL browser shortcuts through — only block bare keys with no modifier
+  if (e.metaKey||e.ctrlKey||e.altKey||e.key.length>1) return;
+});
+// Touch
+cvs.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }, { passive: false });
+cvs.addEventListener('touchmove', e => { e.preventDefault(); const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }, { passive: false });
+cvs.addEventListener('touchend', e => { if (W.app_touchend) W.app_touchend(0, 0); if (W.app_render) W.app_render(); });
+// Caret blink
+setInterval(() => { if (W.app_needs_animation && W.app_needs_animation() && W.app_render) W.app_render(); }, 500);
+
+console.log('%c[Nectar Canvas]%c .nectar + Honeycomb — single WASM binary', 'color:#f97316;font-weight:bold', 'color:inherit');
+})();
+</script>
+</body>
+</html>
