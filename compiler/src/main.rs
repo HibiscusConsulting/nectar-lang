@@ -1255,9 +1255,22 @@ fn build_canvas_app(
     let build_dir = std::env::temp_dir().join(format!("nectar-canvas-{}", std::process::id()));
     fs::create_dir_all(build_dir.join("src"))?;
 
-    // Resolve absolute path to honeycomb crate
-    let honeycomb_path = fs::canonicalize("../honeycomb")
+    // Resolve absolute path to honeycomb crate — check multiple locations:
+    // 1. Relative to the compiler binary (inside nectar-lang repo)
+    // 2. Relative to CWD
+    // 3. Sibling repo (~/repos/honeycomb)
+    // 4. Home directory
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_default();
+    let honeycomb_path = fs::canonicalize(exe_dir.join("../../../honeycomb"))
+        .or_else(|_| fs::canonicalize("../honeycomb"))
         .or_else(|_| fs::canonicalize("honeycomb"))
+        .or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_default();
+            fs::canonicalize(format!("{}/repos/honeycomb", home))
+        })
         .unwrap_or_else(|_| PathBuf::from("../honeycomb"));
 
     fs::write(build_dir.join("Cargo.toml"), format!(
@@ -1282,6 +1295,8 @@ lto = true
 "#, honeycomb_path.display(), if opt_level >= 2 { "s" } else { "2" }))?;
 
     fs::write(build_dir.join("src/lib.rs"), &rust_source)?;
+    // DEBUG: save generated source for inspection
+    let _ = fs::write(out_dir.join("generated.rs"), &rust_source);
 
     // Step 4: Compile to WASM
     println!("nectar: compiling canvas cell...");
@@ -1437,6 +1452,8 @@ const imports = {{ env: {{
   canvas_clip_rect: (id,x,y,w,h) => {{ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); }},
   canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => {{ ctx.fillStyle=`rgba(${{cr}},${{cg}},${{cb}},${{ca/255}})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }},
   canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); }},
+  canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => {{ ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; }},
+  canvas_clear_shadow: (id) => {{ ctx.shadowBlur=0; ctx.shadowColor='transparent'; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; }},
   console_log: (p,l) => console.log(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
   app_callback: (idx) => {{ if(W.__callback) W.__callback(idx); }},
   file_picker_open: () => 0,
