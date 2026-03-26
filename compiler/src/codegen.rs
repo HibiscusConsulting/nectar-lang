@@ -8374,7 +8374,7 @@ impl WasmCodegen {
                     });
                 }
             }
-            TemplateNode::TemplateFor { binding, iterator, children, lazy } => {
+            TemplateNode::TemplateFor { binding, iterator, children, lazy, .. } => {
                 // Check if iterator is a Range expression (start..end)
                 let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
 
@@ -10398,6 +10398,20 @@ impl WasmCodegen {
                 // Borrows are erased at codegen — just generate the inner expression.
                 // Borrow checking happens before codegen ensures safety.
                 self.generate_expr(inner);
+            }
+            Expr::Break => {
+                // Break out of the nearest loop
+                self.line("br $loop_break");
+            }
+            Expr::Continue => {
+                // Continue to next iteration of the nearest loop
+                self.line("br $loop_continue");
+            }
+            Expr::TupleLit(elements) => {
+                // Tuple literals — generate each element, leave on stack
+                for elem in elements {
+                    self.generate_expr(elem);
+                }
             }
         }
     }
