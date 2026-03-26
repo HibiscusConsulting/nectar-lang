@@ -25,6 +25,8 @@ pub struct RustCodegen {
     filter_patterns: Vec<FilterPattern>, // detected from template analysis
     has_inplace_for: bool, // true if any for-loop in the component uses `inplace`
     last_element_var: String, // last element variable created by emit_template_node
+    root_element_var: String, // root element var of the current emit_template_node call (set at creation, not overwritten by children)
+    pending_filter_reg: Option<(String, String)>, // (binding, field) — when set, the next Element created will be registered as a filter card
     in_for_loop: bool, // true when emitting inside a {for} loop — enables prototype optimization
     proto_counter: u32, // counter for prototype variable names
     proto_use_idx: u32, // which prototype to use next (reset per loop iteration)
@@ -42,6 +44,8 @@ impl RustCodegen {
             filter_patterns: Vec::new(),
             has_inplace_for: false,
             last_element_var: String::new(),
+            root_element_var: String::new(),
+            pending_filter_reg: None,
             in_for_loop: false,
             proto_counter: 0,
             proto_use_idx: 0,
@@ -562,6 +566,8 @@ impl RustCodegen {
             TemplateNode::Element(el) => {
                 let var = format!("el_{}", self.fresh_id());
                 self.last_element_var = var.clone();
+                self.root_element_var = var.clone();
+                let pending_reg = self.pending_filter_reg.take();
                 // Use prototype if inside a for-loop (zero string parsing per element)
                 let use_proto = self.in_for_loop;
                 if use_proto {
@@ -572,6 +578,14 @@ impl RustCodegen {
                     self.line(&format!("let {} = tree.create(\"{}\");", var, el.tag));
                 }
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
+
+                // Pending filter card registration — emit after create+append, before children
+                if let Some((binding, field)) = pending_reg {
+                    let filter_val = format!("{}.{}", binding, field);
+                    self.line(&format!("// Auto-detected filter pattern: register card container for O(n) filtering"));
+                    self.line(&format!("tree.set_attribute({}, \"{}\", &{});", var, field, filter_val));
+                    self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", var, filter_val, filter_val));
+                }
 
                 // Attributes
                 for attr in &el.attributes {
@@ -782,17 +796,13 @@ impl RustCodegen {
                 for child in children {
                     if let (Some(fp), TemplateNode::TemplateIf { then_children, .. }) = (&filter_for_this_loop, child) {
                         // Emit the then_children directly (skip the {if} — all items rendered)
-                        // Auto-register the first element for filtering
+                        // Set pending filter registration — the NEXT Element created will be the card container.
+                        self.pending_filter_reg = Some((binding.clone(), fp.item_field.clone()));
                         for (ci, tc) in then_children.iter().enumerate() {
                             self.emit_template_node(tc, parent_var, comp_name);
-                            // After the first element child, auto-register it for filtering
                             if ci == 0 {
                                 if let TemplateNode::Element(_) = tc {
-                                    let card_var = self.last_element_var.clone();
-                                    let filter_val = format!("{}.{}", binding, fp.item_field);
-                                    self.line(&format!("// Auto-detected filter pattern: register for O(n) filtering"));
-                                    self.line(&format!("tree.set_attribute({}, \"{}\", &{});", card_var, fp.item_field, filter_val));
-                                    self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", card_var, filter_val, filter_val));
+                                    // Registration was emitted inside emit_template_node via pending_filter_reg.
                                 }
                             }
                         }
@@ -891,6 +901,8 @@ impl RustCodegen {
             } else {
                 self.line("// Re-render after state change");
                 self.line("let _t_rebuild = perf_now();");
+                self.line("// Clear stale registrations before tree rebuild");
+                self.line("honeycomb::canvas_app::clear_registrations();");
                 self.line("with_tree(|tree| {");
                 self.indent += 1;
                 self.line("let root = tree.root_id();");

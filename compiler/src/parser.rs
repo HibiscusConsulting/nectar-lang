@@ -1015,6 +1015,7 @@ impl Parser {
                         iterator: Box::new(iterator),
                         children,
                         lazy,
+                        inplace: false,
                     })
                 } else if self.check(&TokenKind::Match) {
                     // {match subject { Pattern => <template>, ... }}
@@ -2212,6 +2213,16 @@ impl Parser {
                 let expr = self.parse_expr()?;
                 self.expect(&TokenKind::Semicolon)?;
                 Ok(Stmt::Yield(expr))
+            }
+            TokenKind::Break => {
+                self.advance();
+                self.expect(&TokenKind::Semicolon)?;
+                Ok(Stmt::Expr(Expr::Break))
+            }
+            TokenKind::Continue => {
+                self.advance();
+                self.expect(&TokenKind::Semicolon)?;
+                Ok(Stmt::Expr(Expr::Continue))
             }
             // `<element>` — a template node used as an expression-statement inside
             // a closure body (e.g., the virtual list row template).
