@@ -89,7 +89,7 @@ impl RustCodegen {
         self.line("#[allow(unused_imports)]");
         self.line("use honeycomb::element::ElementTree;");
         self.line("use honeycomb::layout;");
-        self.line("use honeycomb::measure::EstimateMeasurer;");
+        self.line("use honeycomb::canvas_app::CanvasTextMeasurer;");
         self.line("use honeycomb::canvas_syscalls::*;");
         self.line("use std::cell::RefCell;");
         self.line("use serde::Deserialize;");
@@ -459,6 +459,11 @@ impl RustCodegen {
         self.line("_element_ids: Vec<u32>,");
         // Card tracking for O(1) filter toggle (card_id, category_string)
         self.line("_card_cats: Vec<(u32, String)>,");
+        // Devtools metrics (only add if not already declared in component)
+        let field_names: Vec<&str> = comp.state.iter().map(|f| f.name.as_str()).collect();
+        if !field_names.contains(&"total_ms") { self.line("total_ms: String,"); }
+        if !field_names.contains(&"heap_ms") { self.line("heap_ms: String,"); }
+        if !field_names.contains(&"last_op_ms") { self.line("last_op_ms: String,"); }
         self.indent -= 1;
         self.line("}");
         self.line("");
@@ -480,6 +485,9 @@ impl RustCodegen {
         }
         self.line("_element_ids: Vec::new(),");
         self.line("_card_cats: Vec::new(),");
+        if !field_names.contains(&"total_ms") { self.line("total_ms: String::new(),"); }
+        if !field_names.contains(&"heap_ms") { self.line("heap_ms: String::new(),"); }
+        if !field_names.contains(&"last_op_ms") { self.line("last_op_ms: String::new(),"); }
         self.indent -= 2;
         self.line("    });");
         self.line("}");
@@ -820,6 +828,7 @@ impl RustCodegen {
 
     fn emit_handler(&mut self, comp_name: &str, method: &Function, _idx: usize) {
         let is_init = method.name.starts_with("init");
+        let is_data_callback = method.name.contains("loaded") || method.name.contains("response");
 
         self.line(&format!("fn {}_{}() {{", comp_name.to_lowercase(), method.name));
         self.indent += 1;
@@ -842,6 +851,12 @@ impl RustCodegen {
         self.in_handler = false;
         self.indent -= 1;
         self.line("});");
+
+        // For data-loaded callbacks, persist heap_ms into state BEFORE tree rebuild
+        if is_data_callback {
+            self.line(&format!("{}_STATE.with(|s| s.borrow_mut().heap_ms = honeycomb::canvas_app::get_heap_ms());",
+                comp_name.to_uppercase()));
+        }
 
         // Init methods don't re-render — they're called before first mount
         if !is_init {
@@ -894,14 +909,17 @@ impl RustCodegen {
                 self.line("}");
             }
             // Record total handler time + update text node
-            self.line("let _op_elapsed = to_ms_string(_op_t0, perf_now());");
-            self.line(&format!("{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
-                comp_name.to_uppercase()));
-            self.line("update_metric_text(\"last_op_ms\", &_op_elapsed);");
+            // Skip LAST OP for data callbacks (on_data_loaded, on_response) — they're init, not user interactions
+            if !is_data_callback {
+                self.line("let _op_elapsed = to_ms_string(_op_t0, perf_now());");
+                self.line(&format!("{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
+                    comp_name.to_uppercase()));
+                self.line("update_metric_text(\"last_op_ms\", &_op_elapsed);");
+            }
 
-            // For data-loaded callbacks, also update total_ms to show full pipeline time
+            // For data-loaded callbacks, update total_ms after rebuild
             if method.name.contains("loaded") || method.name.contains("response") {
-                self.line("// Full pipeline time: init → fetch → parse → render");
+                // Full pipeline time: init → fetch → parse → render
                 self.line("let _total = to_ms_string(unsafe { INIT_START }, perf_now());");
                 self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _total.clone());",
                     comp_name.to_uppercase()));
@@ -1084,12 +1102,13 @@ impl RustCodegen {
                     let field = a[0].trim_matches('"');
                     format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}", obj=obj, field=field)
                 } else if method == "sort_str_asc" && a.len() == 1 {
-                    // Argsort by string field — sort indices in-place, no string cloning
+                    // Argsort by string field — sort_by_cached_key caches cloned keys, avoids repeated field lookups
                     let field = a[0].trim_matches('"');
-                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_unstable_by(|&a, &b| {obj}[a as usize].{field}.cmp(&{obj}[b as usize].{field})); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.clone()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
                 } else if method == "sort_str_desc" && a.len() == 1 {
+                    // Descending string sort — cached key with Reverse wrapper avoids repeated lookups
                     let field = a[0].trim_matches('"');
-                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_unstable_by(|&a, &b| {obj}[b as usize].{field}.cmp(&{obj}[a as usize].{field})); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.clone())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
                 } else if method == "reverse" {
                     format!("{}.reverse()", obj)
                 } else {
@@ -1203,7 +1222,7 @@ impl RustCodegen {
         self.line("honeycomb::wasm_api::TREE.with(|t| {");
         self.indent += 1;
         self.line("let mut tree = t.borrow_mut();");
-        self.line("let mut measurer = EstimateMeasurer;");
+        self.line("let mut measurer = CanvasTextMeasurer { canvas_id: 0 };");
         self.line("let vw = unsafe { canvas_get_width() };");
         self.line("let vh = unsafe { canvas_get_height() };");
         self.line("layout::compute(&mut tree, vw, 999999.0, &mut measurer);");
@@ -1386,5 +1405,83 @@ impl RustCodegen {
         use std::sync::atomic::{AtomicU32, Ordering};
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: build a MethodCall expr for `obj.method("field")`
+    fn make_sort_call(obj_name: &str, method: &str, field: &str) -> Expr {
+        Expr::MethodCall {
+            object: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::Ident("self".to_string())),
+                field: obj_name.to_string(),
+            }),
+            method: method.to_string(),
+            args: vec![Expr::StringLit(field.to_string())],
+        }
+    }
+
+    #[test]
+    fn test_sort_asc_emits_i32_keys() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("products", "sort_asc", "price");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("Vec<i32>"), "sort_asc should use Vec<i32> keys, got: {}", out);
+        assert!(out.contains("apply_sort_by_i32(&_k, true)"), "sort_asc should call apply_sort_by_i32 ascending, got: {}", out);
+        assert!(out.contains("p.price as i32"), "sort_asc should cast field to i32, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_desc_emits_i32_keys() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("products", "sort_desc", "price");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("Vec<i32>"), "sort_desc should use Vec<i32> keys, got: {}", out);
+        assert!(out.contains("apply_sort_by_i32(&_k, false)"), "sort_desc should call apply_sort_by_i32 descending, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_str_asc_emits_cached_key() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("products", "sort_str_asc", "name");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("sort_by_cached_key"), "sort_str_asc should use sort_by_cached_key, got: {}", out);
+        assert!(out.contains(".name.clone()"), "sort_str_asc should clone the field, got: {}", out);
+        assert!(out.contains("apply_sort_by_indices"), "sort_str_asc should call apply_sort_by_indices, got: {}", out);
+        assert!(!out.contains("sort_unstable_by"), "sort_str_asc should NOT use sort_unstable_by, got: {}", out);
+        assert!(!out.contains("Reverse"), "sort_str_asc should NOT use Reverse, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_str_desc_emits_cached_key_with_reverse() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("products", "sort_str_desc", "name");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("sort_by_cached_key"), "sort_str_desc should use sort_by_cached_key, got: {}", out);
+        assert!(out.contains("std::cmp::Reverse"), "sort_str_desc should use std::cmp::Reverse, got: {}", out);
+        assert!(out.contains(".name.clone()"), "sort_str_desc should clone the field, got: {}", out);
+        assert!(out.contains("apply_sort_by_indices"), "sort_str_desc should call apply_sort_by_indices, got: {}", out);
+        assert!(!out.contains("sort_unstable_by"), "sort_str_desc should NOT use sort_unstable_by, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_asc_different_field() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("items", "sort_asc", "rating");
+        let out = cg.expr_to_rust(&expr, "Shop");
+        assert!(out.contains("p.rating as i32"), "should reference the correct field name, got: {}", out);
+        assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_str_asc_different_field() {
+        let cg = RustCodegen::new();
+        let expr = make_sort_call("items", "sort_str_asc", "category");
+        let out = cg.expr_to_rust(&expr, "Shop");
+        assert!(out.contains(".category.clone()"), "should reference the correct field, got: {}", out);
+        assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
     }
 }

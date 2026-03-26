@@ -55,10 +55,6 @@ pub enum TokenKind {
     OnConnect,
     OnDisconnect,
     Lazy,
-    /// `inplace` keyword — opt-in for in-place slot-reuse updates on for-loops.
-    /// `{inplace for item in items { ... }}` — compiler validates card safety,
-    /// then uses setText/setAttr updates instead of node moves on sort.
-    Inplace,
     Suspend,
     Yield,
     Agent,
@@ -145,6 +141,7 @@ pub enum TokenKind {
     Virtual,
     Break,
     Continue,
+    Inplace,
 
     // Types
     I32,
@@ -230,6 +227,67 @@ pub enum FormatStringPart {
 }
 
 impl TokenKind {
+    /// Returns the keyword text for contextual keywords that can be used as identifiers.
+    /// Excludes structural keywords (let, fn, if, else, for, while, return, struct, enum, etc.)
+    /// that would create ambiguity if used as identifiers.
+    pub fn as_contextual_ident(&self) -> Option<&'static str> {
+        match self {
+            TokenKind::True => Some("true"), TokenKind::False => Some("false"),
+            TokenKind::Component => Some("component"), TokenKind::Render => Some("render"),
+            TokenKind::Store => Some("store"), TokenKind::Signal => Some("signal"),
+            TokenKind::Action => Some("action"), TokenKind::Computed => Some("computed"),
+            TokenKind::Effect => Some("effect"), TokenKind::Selector => Some("selector"),
+            TokenKind::Router => Some("router"), TokenKind::Route => Some("route"),
+            TokenKind::Page => Some("page"), TokenKind::Form => Some("form"),
+            TokenKind::Channel => Some("channel"), TokenKind::Agent => Some("agent"),
+            TokenKind::App => Some("app"), TokenKind::Theme => Some("theme"),
+            TokenKind::Auth => Some("auth"), TokenKind::Payment => Some("payment"),
+            TokenKind::Upload => Some("upload"), TokenKind::Embed => Some("embed"),
+            TokenKind::Pdf => Some("pdf"), TokenKind::Db => Some("db"),
+            TokenKind::Cache => Some("cache"), TokenKind::Contract => Some("contract"),
+            TokenKind::Async => Some("async"), TokenKind::Await => Some("await"),
+            TokenKind::Lazy => Some("lazy"), TokenKind::Spring => Some("spring"),
+            TokenKind::Keyframes => Some("keyframes"), TokenKind::Stagger => Some("stagger"),
+            TokenKind::Shortcut => Some("shortcut"), TokenKind::Secret => Some("secret"),
+            TokenKind::Atomic => Some("atomic"), TokenKind::Select => Some("select"),
+            TokenKind::Test => Some("test"), TokenKind::Navigate => Some("navigate"),
+            TokenKind::Fallback => Some("fallback"), TokenKind::Guard => Some("guard"),
+            TokenKind::Layout => Some("layout"), TokenKind::Breakpoint => Some("breakpoint"),
+            TokenKind::Spawn => Some("spawn"), TokenKind::Suspend => Some("suspend"),
+            TokenKind::MustUse => Some("must_use"), TokenKind::Yield => Some("yield"),
+            TokenKind::Try => Some("try"), TokenKind::Catch => Some("catch"),
+            TokenKind::Banking => Some("banking"), TokenKind::MapKeyword => Some("map"),
+            TokenKind::A11y => Some("a11y"), TokenKind::Manual => Some("manual"),
+            TokenKind::Hybrid => Some("hybrid"), TokenKind::Outlet => Some("outlet"),
+            TokenKind::Crypto => Some("crypto"), TokenKind::Virtual => Some("virtual"),
+            TokenKind::Canonical => Some("canonical"), TokenKind::Sandbox => Some("sandbox"),
+            TokenKind::Loading => Some("loading"), TokenKind::Duration => Some("duration"),
+            TokenKind::Invalidate => Some("invalidate"), TokenKind::Optimistic => Some("optimistic"),
+            TokenKind::Validate => Some("validate"), TokenKind::Schema => Some("schema"),
+            TokenKind::Instant => Some("instant"), TokenKind::Fluid => Some("fluid"),
+            TokenKind::Clipboard => Some("clipboard"), TokenKind::Draggable => Some("draggable"),
+            TokenKind::Droppable => Some("droppable"), TokenKind::Download => Some("download"),
+            TokenKind::Haptic => Some("haptic"), TokenKind::Biometric => Some("biometric"),
+            TokenKind::Camera => Some("camera"), TokenKind::Geolocation => Some("geolocation"),
+            TokenKind::Flag => Some("flag"), TokenKind::Trace => Some("trace"),
+            TokenKind::Env => Some("env"), TokenKind::Style => Some("style"),
+            TokenKind::Push => Some("push"), TokenKind::Query => Some("query"),
+            TokenKind::OnMessage => Some("on_message"), TokenKind::Chunk => Some("chunk"),
+            TokenKind::Link => Some("link"), TokenKind::Fetch => Some("fetch"),
+            TokenKind::Stream => Some("stream"), TokenKind::Parallel => Some("parallel"),
+            TokenKind::OnConnect => Some("on_connect"), TokenKind::OnDisconnect => Some("on_disconnect"),
+            TokenKind::Prompt => Some("prompt"), TokenKind::Tool => Some("tool"),
+            TokenKind::Transition => Some("transition"), TokenKind::Animate => Some("animate"),
+            TokenKind::Manifest => Some("manifest"), TokenKind::Offline => Some("offline"),
+            TokenKind::Gesture => Some("gesture"), TokenKind::Permissions => Some("permissions"),
+            TokenKind::Meta => Some("meta"), TokenKind::Sitemap => Some("sitemap"),
+            TokenKind::Field => Some("field"), TokenKind::Mutation => Some("mutation"),
+            TokenKind::Assert => Some("assert"), TokenKind::Expect => Some("expect"),
+            TokenKind::AssertEq => Some("assert_eq"), TokenKind::Derive => Some("derive"),
+            _ => None,
+        }
+    }
+
     /// Text representation for CSS selector context.
     /// All keywords return their lowercase text so class names
     /// like .app-layout, .form-row, .page-header parse correctly.
@@ -259,8 +317,7 @@ impl TokenKind {
             TokenKind::Pdf => "pdf".into(), TokenKind::Db => "db".into(),
             TokenKind::Cache => "cache".into(), TokenKind::Contract => "contract".into(),
             TokenKind::Async => "async".into(), TokenKind::Await => "await".into(),
-            TokenKind::Lazy => "lazy".into(), TokenKind::Inplace => "inplace".into(),
-            TokenKind::Spring => "spring".into(),
+            TokenKind::Lazy => "lazy".into(), TokenKind::Spring => "spring".into(),
             TokenKind::Keyframes => "keyframes".into(), TokenKind::Stagger => "stagger".into(),
             TokenKind::Shortcut => "shortcut".into(), TokenKind::Secret => "secret".into(),
             TokenKind::Atomic => "atomic".into(), TokenKind::Select => "select".into(),
