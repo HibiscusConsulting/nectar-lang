@@ -30,8 +30,6 @@ pub struct WasmCodegen {
     target: CompilationTarget,
     output: String,
     indent: usize,
-    /// Source map for debug mapping from WAT back to .nectar source.
-    pub source_map: crate::sourcemap::SourceMap,
     /// Track local variables in current function scope
     locals: Vec<(String, WasmType)>,
     /// Counter for generating unique labels
@@ -63,8 +61,6 @@ pub struct WasmCodegen {
     component_fields: Vec<String>,
     /// Current component name (for global signal variable naming)
     component_name: String,
-    /// Name of the first component encountered — used for auto-mount in __init_all.
-    first_component_name: Option<String>,
     /// Deferred signal→DOM updater functions.
     /// When expr is Some, the updater re-evaluates the full expression (e.g. format("...", self.field)).
     /// When None, the updater reads the signal directly and converts via string_fromI32.
@@ -74,8 +70,6 @@ pub struct WasmCodegen {
     known_components: Vec<String>,
     /// Prop names for the current component being generated (String props passed as ptr+len pairs)
     component_props: Vec<String>,
-    /// Prop types for the current component (maps prop name -> WASM type string)
-    component_prop_types: std::collections::HashMap<String, String>,
     /// Map from component name to its prop list (for passing props at instantiation sites)
     component_prop_defs: Vec<(String, Vec<String>)>,
     /// Names of keyword definitions (auth, cache, db, payment, upload, pdf) in this program.
@@ -86,22 +80,14 @@ pub struct WasmCodegen {
     /// Names of stores defined in this program (for resolving StoreName::signal calls).
     /// Each entry is (store_name, signal_names).
     known_stores: Vec<(String, Vec<String>)>,
-    /// Store action names: (action_name, store_name) for resolving bare action calls.
-    /// e.g. ("logout", "AuthStore") so `logout()` → `call $AuthStore_logout`
-    known_store_actions: Vec<(String, String)>,
     /// Method names for the current component (for resolving handler indices)
     component_method_names: Vec<String>,
-    /// Method return types for the current component (method_name → return type string)
-    component_method_return_types: std::collections::HashMap<String, Option<String>>,
     /// Global handler index counter — each event handler across all components
     /// gets a globally unique index so `__callback(idx)` can dispatch correctly.
     global_handler_base: u32,
     /// Tracks (component_name, base_index, method_count) for each component
     /// to emit the global __callback dispatcher at the end.
     callback_registry: Vec<(String, u32, u32)>,
-    /// Stack of (break_label, continue_label) for nested loops.
-    /// Used by Expr::Break and Expr::Continue to emit `br` to the right target.
-    loop_label_stack: Vec<(String, String)>,
     /// Active for-loop binding variable names (stack for nested loops).
     /// When generating child templates inside a `{for item in expr { ... }}`,
     /// `item` is pushed here so that `Expr::Ident("item")` resolves to
@@ -121,15 +107,6 @@ pub struct WasmCodegen {
     /// pushed here so that `Expr::Ident("product")` resolves to `local.get $product`
     /// and `Expr::FieldAccess` on `product` emits a struct field load from the pointer.
     handler_param_bindings: Vec<String>,
-    /// Function parameter types — maps param name to WASM type.
-    /// Used by expr_is_float to detect f64 parameters.
-    fn_param_types: HashMap<String, WasmType>,
-    /// Whether the current function returns String (i32, i32).
-    /// Used by generate_stmt to fix early returns that need (ptr, len).
-    current_fn_returns_string: bool,
-    /// All function names that return String (i32, i32).
-    /// Used by expr_pushes_ptr_len to detect FnCalls that return String.
-    string_returning_fns: Vec<String>,
     /// Deferred conditional block updaters for reactive {if ...} template blocks.
     /// Each entry: (func_name, container_global, last_val_global, signal_globals, condition_expr, then_children, else_children)
     /// The updater re-evaluates the condition and mounts/clears the container.
@@ -147,19 +124,6 @@ pub struct WasmCodegen {
     /// Widget tags found in templates — drives Prune registration in Honeycomb.
     /// Only widgets that appear in templates get registered → WASM linker strips the rest.
     used_widget_tags: HashSet<String>,
-    /// Deferred filter functions for in-place DOM filter toggling.
-    /// When a for-loop contains a TemplateIf matching a filter pattern,
-    /// the compiler emits all elements at mount time and toggles display:none.
-    deferred_filters: Vec<DeferredFilter>,
-    /// Deferred sort reorder functions for DOM sort via appendChild.
-    deferred_sorts: Vec<DeferredSort>,
-    /// When inside a for-loop body, tracks the WAT local variable name of the
-    /// first element created via dom_createElement. Used by sort element tracking.
-    sort_track_first_el: Option<String>,
-    /// Tracks the last element variable created by generate_template (Element node).
-    /// Set after every dom_createElement + local.set sequence. Used by the filter
-    /// optimization to capture the element ID for the filter table registration.
-    last_created_element_var: Option<String>,
     /// Import namespace usage flags — set during AST pre-scan to determine which
     /// browser API import blocks to emit. Only used namespaces get imports.
     needs_http: bool,
@@ -179,9 +143,6 @@ pub struct WasmCodegen {
     needs_rtc: bool,
     needs_gpu: bool,
     needs_test: bool,
-    /// Whether the program has a router — if so, skip auto-mounting the first component
-    /// because the router handles initial route mounting.
-    has_router: bool,
     /// Contract definitions in this program. Each entry is (contract_name, fields).
     /// Used to resolve `ContractName::call()`, `ContractName::parse()`,
     /// `ContractName::serialize()` to their generated WASM functions.
@@ -212,19 +173,20 @@ pub struct WasmCodegen {
     /// Collected during generation rather than panicking, so the compiler can
     /// report all missing codegen at once.
     pub codegen_errors: Vec<String>,
-    /// Codegen warnings — non-fatal issues detected during generation, such as
-    /// calls to unimplemented stdlib functions that will produce link errors.
-    pub codegen_warnings: Vec<String>,
-    /// Trait impl map — maps (type_name, method_name) to the generated WASM function name.
-    /// Built during pre-scan from impl blocks that implement traits. Used to resolve
-    /// method calls on concrete types to their trait impl functions.
-    trait_impl_methods: HashMap<String, Vec<(String, String)>>,
-    /// Current source file name for source map mappings.
+    /// When true, we are generating code inside a store action body.
+    /// String allocations for signal_set values should use $alloc_store
+    /// so they persist across page-tier resets (navigation).
+    in_store_action: bool,
+    /// Stack of (break_label, continue_label) for nested loops.
+    loop_label_stack: Vec<(String, String)>,
+    /// Source map for debug mapping from WAT back to .nectar source.
+    pub source_map: crate::sourcemap::SourceMap,
+    /// Source file name for source map entries.
     source_file: String,
-    /// Current WAT output line number (0-based), tracked for source map emission.
+    /// Current WAT output line number (for source map mapping).
     wat_line: u32,
-    /// Whether $auth_validate_email has already been emitted (shared by auth and form codegen).
-    emitted_email_validator: bool,
+    /// Codegen warnings (e.g., unimplemented stdlib functions).
+    pub codegen_warnings: Vec<String>,
 }
 
 /// Describes a reactive conditional block updater.
@@ -258,47 +220,6 @@ struct SignalUpdater {
     /// If Some, this is an attribute updater (calls dom_setAttr with this attr name).
     /// If None, this is a text updater (calls dom_setText).
     attr_name: Option<String>,
-}
-
-/// Describes a detected filter pattern for in-place DOM filter toggling.
-/// When a for-loop contains a TemplateIf that matches the pattern
-/// `self.state_field == "All" || binding.item_field == self.state_field`,
-/// the compiler can optimize by creating ALL elements during mount and
-/// toggling `display:none` instead of rebuilding the entire tree.
-#[derive(Clone, Debug)]
-struct FilterPattern {
-    /// The state field that controls filtering (e.g. "active_cat")
-    state_field: String,
-    /// The item struct field used as the filter key (e.g. "category")
-    item_field: String,
-}
-
-/// Describes a deferred filter function to be emitted after mount.
-/// Records everything needed to emit a `$__apply_filter_<comp>` function
-/// that iterates a WASM-side filter table and toggles display:none via dom_setStyle.
-#[derive(Clone, Debug)]
-struct DeferredFilter {
-    /// Unique label id for naming globals/functions
-    uid: u32,
-    /// Component name (for function/global naming)
-    comp: String,
-    /// The state field signal name (e.g. "active_cat")
-    state_field: String,
-    /// The item struct field used as the filter key (e.g. "category")
-    item_field: String,
-}
-
-/// Describes a deferred DOM sort reorder function.
-/// When a for-loop emits DOM elements, a `DeferredSort` is recorded so that
-/// `$__apply_sort_<comp>_<uid>` can be emitted after the mount function.
-/// The sort function iterates the (now-sorted) data array, looks up each item's
-/// element ID via the stored (data_ptr, element_id) mapping, and calls
-/// dom_appendChild(parent, element_id) to reorder the DOM.
-#[derive(Clone)]
-struct DeferredSort {
-    uid: u32,
-    comp: String,
-    iterator_expr: Expr,
 }
 
 /// Describes a deferred lazy for-loop batch function.
@@ -344,25 +265,14 @@ enum WasmType {
     F64,
 }
 
-impl std::fmt::Display for WasmType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WasmType::I32 => write!(f, "i32"),
-            WasmType::I64 => write!(f, "i64"),
-            WasmType::F32 => write!(f, "f32"),
-            WasmType::F64 => write!(f, "f64"),
-        }
-    }
-}
-
 impl WasmCodegen {
     pub fn new() -> Self {
         Self::with_target(CompilationTarget::Browser)
     }
 
-    /// Set the source file name for source map generation.
-    pub fn set_source_file(&mut self, path: &str) {
-        self.source_file = path.to_string();
+    pub fn set_source_file(&mut self, file: &str) {
+        self.source_file = file.to_string();
+        self.source_map.add_source(file);
     }
 
     pub fn with_target(target: CompilationTarget) -> Self {
@@ -370,7 +280,6 @@ impl WasmCodegen {
             target,
             output: String::new(),
             indent: 0,
-            source_map: crate::sourcemap::SourceMap::new(),
             locals: Vec::new(),
             label_counter: 0,
             strings: Vec::new(),
@@ -385,33 +294,21 @@ impl WasmCodegen {
             in_handler_body: false,
             component_fields: Vec::new(),
             component_name: String::new(),
-            first_component_name: None,
             signal_updaters: Vec::<SignalUpdater>::new(),
             known_components: Vec::new(),
             component_props: Vec::new(),
-            component_prop_types: std::collections::HashMap::new(),
             component_prop_defs: Vec::new(),
             known_keyword_defs: Vec::new(),
             known_stores: Vec::new(),
-            known_store_actions: Vec::new(),
             component_method_names: Vec::new(),
-            component_method_return_types: std::collections::HashMap::new(),
             global_handler_base: 0,
             callback_registry: Vec::new(),
-            loop_label_stack: Vec::new(),
             for_loop_bindings: Vec::new(),
             string_state_fields: Vec::new(),
             struct_layouts: HashMap::new(),
             handler_param_bindings: Vec::new(),
-            fn_param_types: HashMap::new(),
-            current_fn_returns_string: false,
-            string_returning_fns: Vec::new(),
             cond_updaters: Vec::new(),
             lazy_batches: Vec::new(),
-            deferred_filters: Vec::new(),
-            deferred_sorts: Vec::new(),
-            sort_track_first_el: None,
-            last_created_element_var: None,
             used_runtime_categories: HashSet::new(),
             used_widget_tags: HashSet::new(),
             needs_http: false,
@@ -431,7 +328,6 @@ impl WasmCodegen {
             needs_rtc: false,
             needs_gpu: false,
             needs_test: false,
-            has_router: false,
             known_contracts: Vec::new(),
             required_providers: HashSet::new(),
             known_payment_signals: Vec::new(),
@@ -440,11 +336,12 @@ impl WasmCodegen {
             bloom_class_styles: HashMap::new(),
             breakpoint_defs: Vec::new(),
             codegen_errors: Vec::new(),
-            codegen_warnings: Vec::new(),
-            trait_impl_methods: HashMap::new(),
+            in_store_action: false,
+            loop_label_stack: Vec::new(),
+            source_map: crate::sourcemap::SourceMap::new(),
             source_file: String::new(),
             wat_line: 0,
-            emitted_email_validator: false,
+            codegen_warnings: Vec::new(),
         }
     }
 
@@ -843,125 +740,6 @@ impl WasmCodegen {
     }
 
     /// Pre-scan the AST to determine which runtime categories are actually
-    /// Recursively collect router init calls from all items, including nested modules.
-    fn collect_router_init_calls(items: &[Item], init_calls: &mut Vec<String>) {
-        for item in items {
-            match item {
-                Item::Router(r) => {
-                    init_calls.push(format!("  call ${}_init", r.name));
-                }
-                Item::Mod(m) => {
-                    if let Some(ref inner) = m.items {
-                        Self::collect_router_init_calls(inner, init_calls);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    /// Recursively collect function names that return String, from all items including modules.
-    fn collect_string_returning_fns(&mut self, items: &[Item]) {
-        for item in items {
-            match item {
-                Item::Function(f) => {
-                    if f.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
-                        self.string_returning_fns.push(f.name.clone());
-                    }
-                }
-                Item::Store(s) => {
-                    for computed in &s.computed {
-                        if computed.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
-                            self.string_returning_fns.push(format!("{}_{}", s.name, computed.name));
-                        }
-                    }
-                }
-                Item::Component(c) => {
-                    for method in &c.methods {
-                        if method.return_type.as_ref().map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str")).unwrap_or(false) {
-                            self.string_returning_fns.push(format!("{}_{}", c.name, method.name));
-                        }
-                    }
-                }
-                Item::Mod(m) => {
-                    if let Some(ref inner) = m.items {
-                        self.collect_string_returning_fns(inner);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    /// Recursively collect component/page names from all items, including nested modules.
-    /// Recursively collect keyword definitions, contracts, and stores from all items.
-    fn collect_keyword_defs_recursive(&mut self, items: &[Item]) {
-        for item in items {
-            match item {
-                Item::Auth(a) => self.known_keyword_defs.push((a.name.clone(), KeywordDefKind::Auth)),
-                Item::Cache(c) => self.known_keyword_defs.push((c.name.clone(), KeywordDefKind::Cache)),
-                Item::Db(d) => self.known_keyword_defs.push((d.name.clone(), KeywordDefKind::Database)),
-                Item::Payment(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Payment)),
-                Item::Banking(b) => self.known_keyword_defs.push((b.name.clone(), KeywordDefKind::Banking)),
-                Item::Map(m) => self.known_keyword_defs.push((m.name.clone(), KeywordDefKind::MapWidget)),
-                Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
-                Item::Pdf(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Pdf)),
-                Item::Theme(t) => self.known_keyword_defs.push((t.name.clone(), KeywordDefKind::Theme)),
-                Item::Contract(c) => {
-                    self.known_contracts.push((c.name.clone(), c.fields.iter().map(|f| ContractField {
-                        name: f.name.clone(),
-                        ty: f.ty.clone(),
-                        nullable: f.nullable,
-                        span: f.span.clone(),
-                    }).collect()));
-                }
-                Item::Store(s) => {
-                    let sig_names: Vec<String> = s.signals.iter().map(|sig| sig.name.clone()).collect();
-                    self.known_stores.push((s.name.clone(), sig_names.clone()));
-                    for action in &s.actions {
-                        self.known_store_actions.push((action.name.clone(), s.name.clone()));
-                    }
-                    for comp in &s.computed {
-                        self.known_store_actions.push((comp.name.clone(), s.name.clone()));
-                    }
-                    for sig_name in &sig_names {
-                        self.known_store_actions.push((format!("set_{}", sig_name), s.name.clone()));
-                    }
-                }
-                Item::Mod(m) => {
-                    if let Some(ref items) = m.items {
-                        self.collect_keyword_defs_recursive(items);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    fn collect_component_names(&mut self, items: &[Item]) {
-        for item in items {
-            match item {
-                Item::Component(c) => {
-                    self.known_components.push(c.name.clone());
-                    let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
-                    self.component_prop_defs.push((c.name.clone(), prop_names));
-                }
-                Item::LazyComponent(lc) => {
-                    self.known_components.push(lc.component.name.clone());
-                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
-                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
-                }
-                Item::Page(p) => self.known_components.push(p.name.clone()),
-                Item::Mod(m) => {
-                    if let Some(ref items) = m.items {
-                        self.collect_component_names(items);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
     /// used by the program. This enables tree-shaking of unused runtime
     /// helpers (crypto, chart, datepicker, etc.) from the WASM output.
     fn scan_program_for_runtime_deps(&mut self, program: &Program) {
@@ -1026,18 +804,6 @@ impl WasmCodegen {
             Item::Contract(_) => { self.needs_http = true; }
             Item::Embed(_) => {}
             Item::Router(_) => {}
-            Item::Mod(m) => {
-                if let Some(ref items) = m.items {
-                    for item in items {
-                        self.scan_item_for_runtime_deps(item);
-                    }
-                }
-            }
-            Item::Form(f) => {
-                for method in &f.methods {
-                    self.scan_block_for_runtime_deps(&method.body);
-                }
-            }
             _ => {}
         }
     }
@@ -1134,7 +900,6 @@ impl WasmCodegen {
                 self.scan_expr_for_runtime_deps(e);
             }
             Expr::Fetch { url, options, .. } => {
-                self.needs_http = true;
                 self.scan_expr_for_runtime_deps(url);
                 if let Some(opts) = options { self.scan_expr_for_runtime_deps(opts); }
             }
@@ -1178,9 +943,6 @@ impl WasmCodegen {
             Expr::Range { start, end } => {
                 self.scan_expr_for_runtime_deps(start);
                 self.scan_expr_for_runtime_deps(end);
-            }
-            Expr::TupleLit(elems) => {
-                for e in elems { self.scan_expr_for_runtime_deps(e); }
             }
             _ => {}
         }
@@ -1329,26 +1091,6 @@ impl WasmCodegen {
         // are actually used. This enables tree-shaking unused helpers.
         self.scan_program_for_runtime_deps(program);
 
-        // Build trait impl method map — maps target type names to their
-        // impl method names so method calls can be resolved to the correct
-        // prefixed function (e.g. point.display() -> call $Point_display).
-        for item in &program.items {
-            if let Item::Impl(imp) = item {
-                let methods: Vec<(String, String)> = imp.methods.iter()
-                    .map(|m| (m.name.clone(), format!("{}_{}", imp.target, m.name)))
-                    .collect();
-                if !methods.is_empty() {
-                    self.trait_impl_methods
-                        .entry(imp.target.clone())
-                        .or_default()
-                        .extend(methods);
-                }
-            }
-        }
-
-        // Pre-scan all functions, store computeds, and component methods for String return types
-        self.collect_string_returning_fns(&program.items);
-
         self.emit("(module");
         self.indent += 1;
 
@@ -1436,12 +1178,6 @@ impl WasmCodegen {
         self.line("(import \"webapi\" \"localStorageRemove\" (func $webapi_localStorageRemove (param i32 i32)))");
         self.line("(import \"webapi\" \"sessionStorageGet\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
         self.line("(import \"webapi\" \"sessionStorageSet\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
-        self.line("(import \"webapi\" \"sessionStorageRemove\" (func $webapi_sessionStorageRemove (param i32 i32)))");
-        self.line(";; Web API — location/navigation");
-        self.line("(import \"webapi\" \"locationHostname\" (func $webapi_locationHostname (result i32 i32)))");
-        self.line("(import \"webapi\" \"locationProtocol\" (func $webapi_locationProtocol (result i32 i32)))");
-        self.line("(import \"webapi\" \"origin\" (func $webapi_origin (result i32 i32)))");
-        self.line("(import \"webapi\" \"navigateExternal\" (func $webapi_navigateExternal (param i32 i32)))");
         self.line(";; Web API — clipboard");
         self.line("(import \"webapi\" \"clipboardWrite\" (func $webapi_clipboardWrite (param i32 i32)))");
         self.line("(import \"webapi\" \"clipboardRead\" (func $webapi_clipboardRead (param i32)))");
@@ -1707,6 +1443,22 @@ impl WasmCodegen {
         self.line("");
         self.line("(global $heap_ptr (mut i32) (i32.const __HEAP_START__))");
         self.line("");
+        // 3-tier region-based memory allocator watermarks.
+        // Layout: [static data] [fixed tables] [store region →] [page region →] [render region →]
+        //   $store_ptr   — bumps upward inside the store region (below $page_base)
+        //   $page_base   — watermark: reset heap_ptr here on navigation (frees page+render)
+        //   $render_base — watermark: reset heap_ptr here after each handler (frees render only)
+        // Store tier: signal values, store action mutations — never reset automatically.
+        // Page tier: component state, element IDs, mount-time allocations — reset on navigation.
+        // Render tier: format() strings, temporaries — reset after each handler + re-render.
+        self.line("(global $store_ptr (mut i32) (i32.const 0))");
+        self.line("(global $page_base (mut i32) (i32.const 0))");
+        self.line("(global $render_base (mut i32) (i32.const 0))");
+        // Store alloc mode flag — when set to 1, $alloc delegates to $alloc_store.
+        // Set by store action wrappers so that string allocations for signal values
+        // persist across page-tier resets (navigation).
+        self.line("(global $__store_alloc_mode (mut i32) (i32.const 0))");
+        self.line("");
         // Event data region — allocated from heap at init time. Layout (40 bytes):
         //   +0  clientX (f64)
         //   +8  clientY (f64)
@@ -1744,7 +1496,6 @@ impl WasmCodegen {
         self.emit_cb_data_register();
         self.emit_event_data_ptr_export();
         self.emit_string_runtime();
-        self.emit_stdlib_helpers();
         self.emit_internal_runtimes();
         self.emit_format_runtime();
         self.emit_json_runtime();
@@ -1803,13 +1554,51 @@ impl WasmCodegen {
             }
         }
 
-        // Pre-collect component names so template codegen can detect component instantiation.
-        // Recursively walks into Item::Mod to find components in nested modules.
-        self.collect_component_names(&program.items);
-
-        // (continued below — keyword defs are collected in the same loop)
-        // Recursively collect keyword defs, contracts, stores from all items (including mods)
-        self.collect_keyword_defs_recursive(&program.items);
+        // Pre-collect component names so template codegen can detect component instantiation
+        for item in &program.items {
+            match item {
+                Item::Component(c) => {
+                    self.known_components.push(c.name.clone());
+                    let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((c.name.clone(), prop_names));
+                },
+                Item::LazyComponent(lc) => {
+                    self.known_components.push(lc.component.name.clone());
+                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
+                },
+                Item::Page(p) => self.known_components.push(p.name.clone()),
+                // Collect keyword definition names so bare references to them
+                // (e.g. `AppAuth` in `AppAuth.login(...)`) are treated as
+                // namespace handles rather than local variable references.
+                Item::Auth(a) => self.known_keyword_defs.push((a.name.clone(), KeywordDefKind::Auth)),
+                Item::Cache(c) => self.known_keyword_defs.push((c.name.clone(), KeywordDefKind::Cache)),
+                Item::Db(d) => self.known_keyword_defs.push((d.name.clone(), KeywordDefKind::Database)),
+                Item::Payment(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Payment)),
+                Item::Banking(b) => self.known_keyword_defs.push((b.name.clone(), KeywordDefKind::Banking)),
+                Item::Map(m) => self.known_keyword_defs.push((m.name.clone(), KeywordDefKind::MapWidget)),
+                Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
+                Item::Pdf(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Pdf)),
+                Item::Theme(t) => self.known_keyword_defs.push((t.name.clone(), KeywordDefKind::Theme)),
+                // Collect contract definitions so `ContractName::call()`, `ContractName::parse()`,
+                // `ContractName::serialize()` can be resolved to their generated WASM functions.
+                Item::Contract(c) => {
+                    self.known_contracts.push((c.name.clone(), c.fields.iter().map(|f| ContractField {
+                        name: f.name.clone(),
+                        ty: f.ty.clone(),
+                        nullable: f.nullable,
+                        span: f.span.clone(),
+                    }).collect()));
+                }
+                // Collect store names and their signal names so `StoreName::signal()` can
+                // be resolved to the getter `$StoreName_get_signal`.
+                Item::Store(s) => {
+                    let sig_names: Vec<String> = s.signals.iter().map(|sig| sig.name.clone()).collect();
+                    self.known_stores.push((s.name.clone(), sig_names));
+                }
+                _ => {}
+            }
+        }
 
         // Collect test definitions for the test runner
         let mut test_defs: Vec<(&str, usize)> = Vec::new();
@@ -1866,9 +1655,6 @@ impl WasmCodegen {
                     let _ = b;
                 }
             }
-
-            // Collect router init calls — must be called AFTER allocations
-            Self::collect_router_init_calls(&program.items, &mut init_calls);
 
             {
                 self.line("");
@@ -1958,20 +1744,24 @@ impl WasmCodegen {
                     self.line("  global.set $__datepicker_base");
                 }
 
+                // Set store tier watermark — store allocations start here
+                self.line("  ;; Store tier watermark — persistent store data starts here");
+                self.line("  global.get $heap_ptr");
+                self.line("  global.set $store_ptr");
+
+                // Call store inits (signal_create calls bump heap_ptr into store region)
                 for call in &init_calls {
                     self.line(call);
                 }
 
-                // Auto-mount the first component — but ONLY if there's no router.
-                // When a router exists, it handles initial route mounting via router_init.
-                if !self.has_router {
-                    if let Some(comp_name) = self.first_component_name.clone() {
-                        self.line(&format!("  ;; auto-mount {} into #app", comp_name));
-                        self.line("  call $dom_getRoot");
-                        self.line(&format!("  call ${}_mount", comp_name));
-                    }
-                }
-
+                // Set page tier watermark — page allocations start above store data
+                self.line("  ;; Page tier watermark — component/mount data starts here");
+                self.line("  global.get $heap_ptr");
+                self.line("  global.set $page_base");
+                // Set render tier watermark — will be refined per handler invocation
+                self.line("  ;; Render tier watermark — temporary data starts here");
+                self.line("  global.get $heap_ptr");
+                self.line("  global.set $render_base");
                 self.line(")");
             }
         }
@@ -1982,11 +1772,6 @@ impl WasmCodegen {
             self.line(";; Closure functions");
             let closures = std::mem::take(&mut self.closure_functions);
             for closure_fn in &closures {
-                // Ensure closure function starts on a new line so it doesn't
-                // get appended to the ";; Closure functions" comment line.
-                if !closure_fn.starts_with('\n') {
-                    self.output.push('\n');
-                }
                 self.output.push_str(closure_fn);
             }
             self.closure_functions = closures;
@@ -2017,6 +1802,15 @@ impl WasmCodegen {
             self.emit("(func $__callback (export \"__callback\") (param $idx i32)");
             self.indent += 1;
             self.line("(local $__slot_addr i32)");
+            self.line("(local $__saved_render_base i32)");
+            // Render tier reset: save current heap_ptr as the render watermark.
+            // After handler + re-render completes, heap_ptr resets to this point,
+            // freeing all temporary allocations (format strings, intermediates).
+            self.line(";; Render tier: save watermark before handler");
+            self.line("global.get $heap_ptr");
+            self.line("global.set $render_base");
+            self.line("global.get $heap_ptr");
+            self.line("local.set $__saved_render_base");
             // Dynamic callback resolution: if idx >= 10000, it's a for-loop
             // parameterized callback. Look up (handler_idx, data_ptr) from the
             // callback data table and re-dispatch with data set in $__callback_data.
@@ -2067,6 +1861,12 @@ impl WasmCodegen {
                 self.indent += 1;
                 self.line("local.get $idx");
                 self.line(&format!("call ${}__callback", comp_name));
+                // Render tier reset: free temporary allocations after handler
+                self.line(";; Render tier: reset heap_ptr after handler");
+                self.line("local.get $__saved_render_base");
+                self.line("global.set $heap_ptr");
+                self.line("local.get $__saved_render_base");
+                self.line("global.set $render_base");
                 self.line("return");
                 self.indent -= 1;
                 self.line("end");
@@ -2123,19 +1923,11 @@ impl WasmCodegen {
     fn generate_item(&mut self, item: &Item) {
         match item {
             Item::Function(f) => self.generate_function(f),
-            Item::Component(c) => {
-                if self.first_component_name.is_none() {
-                    self.first_component_name = Some(c.name.clone());
-                }
-                self.generate_component(c);
-            }
+            Item::Component(c) => self.generate_component(c),
             Item::Struct(s) => self.generate_struct_layout(s),
             Item::Store(s) => self.generate_store(s),
             Item::Agent(a) => self.generate_agent(a),
-            Item::Router(r) => {
-                self.has_router = true;
-                self.generate_router(r);
-            }
+            Item::Router(r) => self.generate_router(r),
             Item::LazyComponent(lc) => {
                 self.generate_lazy_component(lc);
             }
@@ -2147,18 +1939,15 @@ impl WasmCodegen {
                 self.line(&format!(";; trait {} (erased)", t.name));
             }
             Item::Impl(imp) => {
-                // Impl methods are compiled with a {Type}_{method} prefix so that
-                // trait method calls on concrete types resolve correctly.
+                // Impl methods are compiled like regular functions.
+                // Trait impls get a comment showing which traits are implemented.
                 if !imp.trait_impls.is_empty() {
                     self.line(&format!(";; impl {} for {}", imp.trait_impls.join(" + "), imp.target));
                 } else {
                     self.line(&format!(";; impl {}", imp.target));
                 }
                 for method in &imp.methods {
-                    // Generate with prefixed name: Point_display instead of display
-                    let mut prefixed = method.clone();
-                    prefixed.name = format!("{}_{}", imp.target, method.name);
-                    self.generate_function(&prefixed);
+                    self.generate_function(method);
                 }
             }
             Item::App(app) => self.generate_app(app),
@@ -2183,15 +1972,8 @@ impl WasmCodegen {
             }
             // Import statements — resolved before codegen, no output needed
             Item::Use(_) => {}
-            // Module declarations — recurse into contained items
-            Item::Mod(m) => {
-                if let Some(ref items) = m.items {
-                    self.line(&format!(";; module {}", m.name));
-                    for item in items {
-                        self.generate_item(item);
-                    }
-                }
-            }
+            // Module declarations — contents already flattened into the program
+            Item::Mod(_) => {}
         }
     }
 
@@ -2279,13 +2061,7 @@ impl WasmCodegen {
 
         // Check if any field is an array or nested contract type
         let has_array_fields = contract.fields.iter().any(|f| matches!(&f.ty, Type::Array(_)));
-        // Also check effective_ty (unwrapped from Option) and array element types for nested fields
-        let has_nested_fields = contract.fields.iter().any(|f| {
-            Self::is_nested_contract_type(&f.ty)
-                || matches!(&f.ty, Type::Option(inner) if Self::is_nested_contract_type(inner))
-                || matches!(&f.ty, Type::Named(name) if name == "Map")
-                || matches!(&f.ty, Type::Array(inner) if Self::is_nested_contract_type(inner))
-        });
+        let has_nested_fields = contract.fields.iter().any(|f| Self::is_nested_contract_type(&f.ty));
 
         // ── _parse_from_obj: already-parsed object pointer → struct pointer ──
         // Used by nested contract fields. Same logic as _parse but skips json_parse.
@@ -3034,7 +2810,7 @@ impl WasmCodegen {
             .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))));
 
         let ret = func.return_type.as_ref()
-            .map(|t| format!(" (result {})", self.return_type_to_wasm(t)))
+            .map(|t| format!(" (result {})", self.type_to_wasm(t)))
             .unwrap_or_default();
 
         let export = if func.is_pub {
@@ -3043,17 +2819,6 @@ impl WasmCodegen {
             String::new()
         };
 
-        // Record source map mapping: WAT function start -> Nectar source span
-        if !self.source_file.is_empty() && func.span.line > 0 {
-            self.source_map.add_mapping_with_name(
-                self.wat_line,
-                0,
-                func.span.line - 1, // source map lines are 0-based
-                func.span.col.saturating_sub(1),
-                &self.source_file.clone(),
-                &func.name,
-            );
-        }
         self.emit(&format!("(func ${}{} {}{}",
             func.name, export, params.join(" "), ret));
         self.indent += 1;
@@ -3073,26 +2838,8 @@ impl WasmCodegen {
         }
         self.emit_template_local("$__arr_tmp");
 
-        // Register non-self parameters as handler param bindings so that
-        // field access on them (e.g., product.name) resolves to struct
-        // field loads from the parameter pointer.
-        let saved_handler_params = std::mem::take(&mut self.handler_param_bindings);
-        let saved_fn_param_types = std::mem::take(&mut self.fn_param_types);
-        for p in func.params.iter().filter(|p| p.name != "self") {
-            self.handler_param_bindings.push(p.name.clone());
-            self.fn_param_types.insert(p.name.clone(), self.ast_type_to_wasm(&p.ty));
-        }
-
         // Generate body (dynamic locals go to template_locals)
         let has_return = func.return_type.is_some();
-        let returns_string = func.return_type.as_ref()
-            .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
-            .unwrap_or(false);
-        let saved_fn_returns_string = self.current_fn_returns_string;
-        self.current_fn_returns_string = returns_string;
-        let returns_float = func.return_type.as_ref()
-            .map(|t| matches!(t, Type::Named(n) if n == "f64"))
-            .unwrap_or(false);
         let stmt_count = func.body.stmts.len();
         for (i, stmt) in func.body.stmts.iter().enumerate() {
             let is_last = i == stmt_count - 1;
@@ -3105,27 +2852,12 @@ impl WasmCodegen {
                         && Self::if_branches_return(expr);
                     if !is_returning_if {
                         self.generate_expr(expr);
-                        // If the function returns String (i32 i32) but the expression
-                        // produces a single i32 (e.g., an if-expression returning a ptr),
-                        // convert to (ptr, len) via str_len.
-                        if returns_string && !self.expr_pushes_ptr_len(expr) {
-                            self.line("call $str_len ;; convert ptr to (ptr, len) for String return");
-                        }
-                        // If the function returns f64 but expr is i32, convert
-                        if returns_float && !self.expr_is_float(expr) {
-                            self.line("f64.convert_i32_s ;; convert i32 to f64 for return");
-                        }
                         continue;
                     }
                 }
             }
             self.generate_stmt(stmt);
         }
-
-        // Restore handler param bindings, fn param types, and fn return type
-        self.handler_param_bindings = saved_handler_params;
-        self.fn_param_types = saved_fn_param_types;
-        self.current_fn_returns_string = saved_fn_returns_string;
 
         // Hoist deferred locals before the body
         let body_output = std::mem::take(&mut self.output);
@@ -3530,9 +3262,6 @@ impl WasmCodegen {
         // 3. Effect functions for reactive DOM updates
         // 4. Event handler trampolines
 
-        // Record source map mapping for the component
-        self.map_span(&comp.span);
-
         let comp_name = &comp.name;
 
         // Chunk boundary marker for code splitting
@@ -3620,16 +3349,6 @@ impl WasmCodegen {
         }
 
         self.component_method_names = comp.methods.iter().map(|m| m.name.clone()).collect();
-        self.component_method_return_types.clear();
-        for m in &comp.methods {
-            let ret = m.return_type.as_ref().map(|t| {
-                match t {
-                    Type::Named(n) => n.clone(),
-                    _ => "i32".to_string(),
-                }
-            });
-            self.component_method_return_types.insert(m.name.clone(), ret);
-        }
 
         // Register this component's handler range in the global callback registry
         let method_count = comp.methods.len() as u32;
@@ -3655,20 +3374,6 @@ impl WasmCodegen {
         // Also store props into component-scoped globals so event handlers can read them.
         for prop in &comp.props {
             self.emit_template_local(&format!("${}", prop.name));
-        }
-        // Store prop types for access resolution (String vs numeric)
-        self.component_prop_types.clear();
-        for prop in &comp.props {
-            let ty_name = match &prop.ty {
-                Type::Named(n) => n.clone(),
-                Type::Array(_) => "Array".to_string(),
-                Type::Option(_) => "Option".to_string(),
-                Type::Result { .. } => "Result".to_string(),
-                Type::Tuple(_) => "Tuple".to_string(),
-                Type::Generic { name, .. } => name.clone(),
-                _ => "String".to_string(),
-            };
-            self.component_prop_types.insert(prop.name.clone(), ty_name);
         }
         for prop in &comp.props {
             let prop_name = &prop.name;
@@ -3710,15 +3415,10 @@ impl WasmCodegen {
         // drop the len; for all other types a single i32 is already on the stack.
         for state in &comp.state {
             let is_string_init = matches!(&state.initializer, Expr::StringLit(_));
-            let is_float_init = self.expr_is_float(&state.initializer);
             self.generate_expr(&state.initializer);
             if is_string_init {
                 // String literal pushed (ptr, len); drop the len, keep the ptr.
                 self.line("drop  ;; discard str len — signal stores only the ptr");
-            }
-            if is_float_init {
-                // Float value on stack; signal_create expects i32
-                self.line("i32.trunc_f64_s ;; convert f64 to i32 for signal_create");
             }
             if state.atomic {
                 self.line(";; atomic signal — uses lock-free concurrent access");
@@ -3899,15 +3599,13 @@ impl WasmCodegen {
         self.line(")");
 
         // Generate event handler trampolines as exported functions.
-        // These are thin wrappers that delegate to the typed $CompName_method
-        // functions. This avoids duplicating the body and ensures the handler
-        // trampoline signature stays void (event dispatchers don't use return
-        // values), while the typed function has the correct return type.
+        // Names are prefixed with the component name to avoid redefinition when
+        // multiple components appear in the same file.
+        // (keep in_component_mount=true so self.field resolves to signals)
         for (i, method) in comp.methods.iter().enumerate() {
             let has_self = method.params.iter().any(|p| p.name == "self");
             self.line("");
             let handler_name = format!("{comp_name}__handler_{i}");
-            let typed_name = format!("{}_{}", comp_name, method.name);
             let mut sig = format!("(func ${handler_name} (export \"{handler_name}\")");
             if has_self {
                 sig.push_str(" (param $self i32)");
@@ -3918,22 +3616,50 @@ impl WasmCodegen {
             }
             self.emit(&sig);
             self.indent += 1;
-            self.line(";; event handler trampoline — delegates to typed function");
-            // Pass all parameters through to the typed function
-            if has_self {
-                self.line("local.get $self");
+
+            // Use save/restore pattern to hoist all locals (including those
+            // emitted dynamically during body gen) to the function preamble.
+            let saved_output = std::mem::take(&mut self.output);
+            self.output = String::new();
+            self.defer_template_locals = true;
+            self.template_locals.clear();
+
+            // Collect and register locals from handler body into template_locals
+            self.locals.clear();
+            self.collect_locals(&method.body);
+            for (name, ty) in self.locals.clone() {
+                let wasm_ty = self.wasm_type_str(&ty).to_string();
+                self.emit_template_local_typed(&format!("${}", name), &wasm_ty);
             }
+            // Utility local for array/object/struct allocation
+            self.emit_template_local("$__arr_tmp");
+
+            // Register non-self parameters as handler param bindings so that
+            // field access on them (e.g., product.name) resolves to struct
+            // field loads from the callback data pointer.
+            self.handler_param_bindings.clear();
             for p in method.params.iter().filter(|p| p.name != "self") {
-                self.line(&format!("local.get ${}", p.name));
+                self.handler_param_bindings.push(p.name.clone());
             }
-            self.line(&format!("call ${typed_name}"));
-            // Drop the return value(s) — trampolines are void
-            if let Some(ref ret_ty) = method.return_type {
-                let wasm_ret = self.return_type_to_wasm(ret_ty);
-                for _ in wasm_ret.split_whitespace() {
-                    self.line("drop");
-                }
+
+            // Generate handler body — $self is available as a parameter
+            self.in_handler_body = true;
+            self.line(";; event handler trampoline");
+            for stmt in &method.body.stmts {
+                self.generate_stmt(stmt);
             }
+            self.in_handler_body = false;
+            self.handler_param_bindings.clear();
+
+            // Hoist all deferred locals before the body
+            let body_output = std::mem::take(&mut self.output);
+            self.output = saved_output;
+            for local_decl in std::mem::take(&mut self.template_locals) {
+                self.line(&local_decl);
+            }
+            self.defer_template_locals = false;
+            self.output.push_str(&body_output);
+
             self.indent -= 1;
             self.line(")");
         }
@@ -3974,10 +3700,6 @@ impl WasmCodegen {
                 for p in _method.params.iter().filter(|p| p.name != "self") {
                     self.line(&format!(";; pass callback data as ${}", p.name));
                     self.line("global.get $__callback_data");
-                    // Convert i32 callback_data to f64 if handler param expects f64
-                    if matches!(&p.ty, Type::Named(n) if n == "f64" || n == "Float" || n == "float") {
-                        self.line("f64.convert_i32_s ;; convert i32 callback_data to f64 param");
-                    }
                 }
                 self.line(&format!("call ${handler_name}"));
                 // Record end time and compute delta for this handler
@@ -4056,11 +3778,13 @@ impl WasmCodegen {
                 // Re-evaluate the full expression
                 self.generate_expr(wrapped_expr);
                 // Determine what's on the stack based on expression type
-                let returns_ptr_len = self.expr_pushes_ptr_len(wrapped_expr)
-                    || matches!(wrapped_expr, Expr::FormatString { .. });
-                let returns_single_ptr = !returns_ptr_len && matches!(
+                let returns_ptr_len = matches!(
                     wrapped_expr,
-                    Expr::If { .. }
+                    Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
+                );
+                let returns_single_ptr = matches!(
+                    wrapped_expr,
+                    Expr::StringLit(_) | Expr::If { .. }
                 );
                 if returns_ptr_len {
                     // Stack has (ptr, len)
@@ -4078,24 +3802,12 @@ impl WasmCodegen {
                     self.line("local.set $ptr");
                 }
             } else {
-                // Direct signal read: get signal value
-                let comp_prefix = format!("$__sig_{}_", self.component_name);
-                let sig_field = updater.sig_global
-                    .strip_prefix(&comp_prefix)
-                    .unwrap_or(&updater.sig_global)
-                    .to_string();
-                let is_string_sig = self.string_state_fields.contains(&sig_field);
+                // Direct signal read: get signal value, convert to string
                 self.line(&format!("global.get {}", updater.sig_global));
                 self.line("call $signal_get");
-                if is_string_sig {
-                    self.line("call $str_len ;; string signal: get (ptr, len) from pointer");
-                    self.line("local.set $len");
-                    self.line("local.set $ptr");
-                } else {
-                    self.line("call $string_fromI32");
-                    self.line("local.set $len");
-                    self.line("local.set $ptr");
-                }
+                self.line("call $string_fromI32");
+                self.line("local.set $len");
+                self.line("local.set $ptr");
             }
 
             if let Some(ref attr) = updater.attr_name {
@@ -4306,139 +4018,6 @@ impl WasmCodegen {
             self.line(")");
         }
 
-        // Emit in-place filter globals and apply_filter functions
-        for filter in &self.deferred_filters.clone() {
-            self.line(&format!("(global $__filter_table_base_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
-            self.line(&format!("(global $__filter_table_count_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
-            self.line(&format!("(global $__filter_parent_{}_{} (mut i32) (i32.const 0))", filter.comp, filter.uid));
-        }
-
-        for filter in &self.deferred_filters.clone() {
-            let func_name = format!("$__apply_filter_{}_{}", filter.comp, filter.uid);
-            let all_str_offset = self.store_string("All");
-            let display_offset = self.store_string("display");
-            let none_offset = self.store_string("none");
-            let empty_offset = self.store_string("");
-
-            self.line("");
-            self.emit(&format!("(func {} ;; in-place filter updater", func_name));
-            self.indent += 1;
-            self.line("(local $i i32)");
-            self.line("(local $count i32)");
-            self.line("(local $entry_addr i32)");
-            self.line("(local $el_id i32)");
-            self.line("(local $str_ptr i32)");
-            self.line("(local $filter_val i32)");
-            self.line("(local $is_all i32)");
-
-            // Read current filter signal value
-            self.line(&format!(";; read current filter value for {}", filter.state_field));
-            self.line(&format!("global.get $__sig_{}_{}", filter.comp, filter.state_field));
-            self.line("call $signal_get");
-            self.line("local.set $filter_val");
-
-            // Check if filter is "All"
-            self.line("local.get $filter_val");
-            self.line(&format!("i32.const {} ;; ptr to \"All\"", all_str_offset));
-            self.line("call $str_eq");
-            self.line("local.set $is_all");
-
-            // Load count
-            self.line(&format!("global.get $__filter_table_count_{}_{}", filter.comp, filter.uid));
-            self.line("local.set $count");
-
-            // Loop: i = 0; i < count; i++
-            self.line("i32.const 0");
-            self.line("local.set $i");
-
-            self.line("block $filter_break");
-            self.indent += 1;
-            self.line("loop $filter_cont");
-            self.indent += 1;
-
-            // br_if $filter_break (i >= count)
-            self.line("local.get $i");
-            self.line("local.get $count");
-            self.line("i32.ge_u");
-            self.line("br_if $filter_break");
-
-            // Compute entry address: base + i * 12
-            self.line(&format!("global.get $__filter_table_base_{}_{}", filter.comp, filter.uid));
-            self.line("local.get $i");
-            self.line("i32.const 12");
-            self.line("i32.mul");
-            self.line("i32.add");
-            self.line("local.set $entry_addr");
-
-            // Load element_id from offset 0
-            self.line("local.get $entry_addr");
-            self.line("i32.load ;; element_id");
-            self.line("local.set $el_id");
-
-            // Load str_ptr from offset 4
-            self.line("local.get $entry_addr");
-            self.line("i32.load offset=4 ;; str_ptr (category)");
-            self.line("local.set $str_ptr");
-
-            // If is_all OR str_ptr matches filter_val → show (display:""), else hide (display:"none")
-            self.line("local.get $is_all");
-            self.line("if ;; filter is \"All\" — show card");
-            self.indent += 1;
-            // Show: set display to ""
-            self.line("local.get $el_id");
-            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
-            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
-            self.line(&format!("i32.const {} ;; \"\" ptr", empty_offset));
-            self.line("i32.const 0 ;; \"\" len");
-            self.line("call $dom_setStyle");
-            self.indent -= 1;
-            self.line("else");
-            self.indent += 1;
-            // Compare card's category to filter value
-            self.line("local.get $str_ptr");
-            self.line("local.get $filter_val");
-            self.line("call $str_eq");
-            self.line("if ;; card matches filter");
-            self.indent += 1;
-            // Show: set display to ""
-            self.line("local.get $el_id");
-            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
-            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
-            self.line(&format!("i32.const {} ;; \"\" ptr", empty_offset));
-            self.line("i32.const 0 ;; \"\" len");
-            self.line("call $dom_setStyle");
-            self.indent -= 1;
-            self.line("else");
-            self.indent += 1;
-            // Hide: set display to "none"
-            self.line("local.get $el_id");
-            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
-            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
-            self.line(&format!("i32.const {} ;; \"none\" ptr", none_offset));
-            self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
-            self.line("call $dom_setStyle");
-            self.indent -= 1;
-            self.line("end ;; card match");
-            self.indent -= 1;
-            self.line("end ;; is_all check");
-
-            // Increment i
-            self.line("local.get $i");
-            self.line("i32.const 1");
-            self.line("i32.add");
-            self.line("local.set $i");
-
-            self.line("br $filter_cont");
-
-            self.indent -= 1;
-            self.line("end ;; filter_cont");
-            self.indent -= 1;
-            self.line("end ;; filter_break");
-
-            self.indent -= 1;
-            self.line(")");
-        }
-
         // Emit lazy for-loop batch globals and functions
         for batch in &self.lazy_batches.clone() {
             self.line(&format!("(global $__lazy_parent_{} (mut i32) (i32.const 0))", batch.uid));
@@ -4596,107 +4175,6 @@ impl WasmCodegen {
                 batch.callback_idx,
                 1,
             ));
-        }
-
-        // Emit sort tracking globals and $__apply_sort functions
-        let deferred_sorts = std::mem::take(&mut self.deferred_sorts);
-        for ds in &deferred_sorts {
-            let comp = &ds.comp;
-            let uid = ds.uid;
-
-            self.line(&format!("(global $__sort_els_base_{}_{} (mut i32) (i32.const 0))", comp, uid));
-            self.line(&format!("(global $__sort_data_base_{}_{} (mut i32) (i32.const 0))", comp, uid));
-            self.line(&format!("(global $__sort_els_count_{}_{} (mut i32) (i32.const 0))", comp, uid));
-            self.line(&format!("(global $__sort_parent_{}_{} (mut i32) (i32.const 0))", comp, uid));
-            self.line(&format!("(global $__sort_arr_data_{}_{} (mut i32) (i32.const 0))", comp, uid));
-
-            let func_name = format!("$__apply_sort_{}_{}", comp, uid);
-            self.line("");
-            self.emit(&format!("(func {} (export \"{}\") ;; DOM sort reorder via appendChild",
-                func_name, &func_name[1..]));
-            self.indent += 1;
-            self.line("(local $i i32)");
-            self.line("(local $j i32)");
-            self.line("(local $count i32)");
-            self.line("(local $cur_ptr i32)");
-
-            self.line(&format!("global.get $__sort_els_count_{}_{}", comp, uid));
-            self.line("local.set $count");
-
-            self.line("i32.const 0");
-            self.line("local.set $i");
-            let outer_brk = uid + 5000;
-            let outer_lp = uid + 6000;
-            self.line(&format!("(block $__as_brk_{outer_brk} (loop $__as_lp_{outer_lp}"));
-            self.indent += 1;
-
-            self.line("local.get $i");
-            self.line("local.get $count");
-            self.line("i32.ge_u");
-            self.line(&format!("br_if $__as_brk_{outer_brk}"));
-
-            self.line(&format!("global.get $__sort_arr_data_{}_{}", comp, uid));
-            self.line("local.get $i");
-            self.line("i32.const 4");
-            self.line("i32.mul");
-            self.line("i32.add");
-            self.line("i32.load ;; data_ptr at sorted position i");
-            self.line("local.set $cur_ptr");
-
-            self.line("i32.const 0");
-            self.line("local.set $j");
-            let inner_brk = uid + 7000;
-            let inner_lp = uid + 8000;
-            self.line(&format!("(block $__as_find_brk_{inner_brk} (loop $__as_find_lp_{inner_lp}"));
-            self.indent += 1;
-
-            self.line("local.get $j");
-            self.line("local.get $count");
-            self.line("i32.ge_u");
-            self.line(&format!("br_if $__as_find_brk_{inner_brk}"));
-
-            self.line(&format!("global.get $__sort_data_base_{}_{}", comp, uid));
-            self.line("local.get $j");
-            self.line("i32.const 4");
-            self.line("i32.mul");
-            self.line("i32.add");
-            self.line("i32.load");
-            self.line("local.get $cur_ptr");
-            self.line("i32.eq");
-            self.line("if");
-            self.indent += 1;
-            self.line(&format!("global.get $__sort_parent_{}_{}", comp, uid));
-            self.line(&format!("global.get $__sort_els_base_{}_{}", comp, uid));
-            self.line("local.get $j");
-            self.line("i32.const 4");
-            self.line("i32.mul");
-            self.line("i32.add");
-            self.line("i32.load ;; element_id at j");
-            self.line("call $dom_appendChild");
-            self.line(&format!("br $__as_find_brk_{inner_brk} ;; found, exit inner loop"));
-            self.indent -= 1;
-            self.line("end");
-
-            self.line("local.get $j");
-            self.line("i32.const 1");
-            self.line("i32.add");
-            self.line("local.set $j");
-            self.line(&format!("br $__as_find_lp_{inner_lp}"));
-
-            self.indent -= 1;
-            self.line("))");
-
-            self.line("local.get $i");
-            self.line("i32.const 1");
-            self.line("i32.add");
-            self.line("local.set $i");
-            self.line(&format!("br $__as_lp_{outer_lp}"));
-
-            self.indent -= 1;
-            self.line("))");
-
-            self.indent -= 1;
-            self.line(")");
         }
 
         // Reset component context
@@ -5032,7 +4510,7 @@ impl WasmCodegen {
                         self.line(&format!("  ;; validate {}: email", field.name));
                         self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
                         self.line("  call $signal_get");
-                        self.line("  call $str_len");
+                        self.line("  call $string_len");
                         self.line("  call $auth_validate_email");
                         self.line("  i32.eqz");
                         self.line("  if");
@@ -5121,14 +4599,6 @@ impl WasmCodegen {
             signal_names,
         ));
 
-        // Emit email validator if any field uses email validation
-        let has_email_validator = form.fields.iter().any(|f| {
-            f.validators.iter().any(|v| matches!(&v.kind, ValidatorKind::Email))
-        });
-        if has_email_validator {
-            self.emit_email_validator();
-        }
-
         // Generate methods, namespaced by form name to avoid redefinition
         // when multiple forms share method names like `on_submit`.
         let form_name = form.name.clone();
@@ -5137,87 +4607,6 @@ impl WasmCodegen {
             namespaced.name = format!("{form_name}_{}", method.name);
             self.generate_function(&namespaced);
         }
-    }
-
-    /// Emit the $auth_validate_email function (pure WASM string ops).
-    /// Guarded by a flag to prevent duplicate emission when both auth and form use it.
-    fn emit_email_validator(&mut self) {
-        if self.emitted_email_validator {
-            return;
-        }
-        self.emitted_email_validator = true;
-
-        // ── Validation: email (pure WASM string ops) ──
-        // Check: length > 0, contains '@', has '.' after '@'
-        self.line("(func $auth_validate_email (export \"auth_validate_email\") (param $ptr i32) (param $len i32) (result i32)");
-        self.line("  (local $i i32)");
-        self.line("  (local $ch i32)");
-        self.line("  (local $at_pos i32)");
-        self.line("  (local $has_dot_after_at i32)");
-        // Empty check
-        self.line("  local.get $len");
-        self.line("  i32.eqz");
-        self.line("  if (result i32)");
-        self.line("    i32.const 0");
-        self.line("  else");
-        self.line("    i32.const -1  ;; at_pos = -1 (not found)");
-        self.line("    local.set $at_pos");
-        self.line("    i32.const 0");
-        self.line("    local.set $has_dot_after_at");
-        self.line("    i32.const 0");
-        self.line("    local.set $i");
-        self.line("    block $done");
-        self.line("      loop $loop");
-        self.line("        local.get $i");
-        self.line("        local.get $len");
-        self.line("        i32.ge_u");
-        self.line("        br_if $done");
-        self.line("        local.get $ptr");
-        self.line("        local.get $i");
-        self.line("        i32.add");
-        self.line("        i32.load8_u");
-        self.line("        local.set $ch");
-        // Check for '@' (0x40)
-        self.line("        local.get $ch");
-        self.line("        i32.const 64  ;; '@'");
-        self.line("        i32.eq");
-        self.line("        if");
-        self.line("          local.get $i");
-        self.line("          local.set $at_pos");
-        self.line("        end");
-        // Check for '.' (0x2E) after '@'
-        self.line("        local.get $ch");
-        self.line("        i32.const 46  ;; '.'");
-        self.line("        i32.eq");
-        self.line("        if");
-        self.line("          local.get $at_pos");
-        self.line("          i32.const -1");
-        self.line("          i32.ne");
-        self.line("          if");
-        self.line("            local.get $i");
-        self.line("            local.get $at_pos");
-        self.line("            i32.gt_u");
-        self.line("            if");
-        self.line("              i32.const 1");
-        self.line("              local.set $has_dot_after_at");
-        self.line("            end");
-        self.line("          end");
-        self.line("        end");
-        self.line("        local.get $i");
-        self.line("        i32.const 1");
-        self.line("        i32.add");
-        self.line("        local.set $i");
-        self.line("        br $loop");
-        self.line("      end");
-        self.line("    end");
-        // Valid if at_pos != -1 && has_dot_after_at
-        self.line("    local.get $at_pos");
-        self.line("    i32.const -1");
-        self.line("    i32.ne");
-        self.line("    local.get $has_dot_after_at");
-        self.line("    i32.and");
-        self.line("  end");
-        self.line(")");
     }
 
     fn generate_channel(&mut self, ch: &ChannelDef) {
@@ -6409,7 +5798,77 @@ impl WasmCodegen {
         self.line("  call $http_fetchWithCallback");
         self.line(")");
 
-        self.emit_email_validator();
+        // ── Validation: email (pure WASM string ops) ──
+        // Check: length > 0, contains '@', has '.' after '@'
+        self.line("(func $auth_validate_email (export \"auth_validate_email\") (param $ptr i32) (param $len i32) (result i32)");
+        self.line("  (local $i i32)");
+        self.line("  (local $ch i32)");
+        self.line("  (local $at_pos i32)");
+        self.line("  (local $has_dot_after_at i32)");
+        // Empty check
+        self.line("  local.get $len");
+        self.line("  i32.eqz");
+        self.line("  if (result i32)");
+        self.line("    i32.const 0");
+        self.line("  else");
+        self.line("    i32.const -1  ;; at_pos = -1 (not found)");
+        self.line("    local.set $at_pos");
+        self.line("    i32.const 0");
+        self.line("    local.set $has_dot_after_at");
+        self.line("    i32.const 0");
+        self.line("    local.set $i");
+        self.line("    block $done");
+        self.line("      loop $loop");
+        self.line("        local.get $i");
+        self.line("        local.get $len");
+        self.line("        i32.ge_u");
+        self.line("        br_if $done");
+        self.line("        local.get $ptr");
+        self.line("        local.get $i");
+        self.line("        i32.add");
+        self.line("        i32.load8_u");
+        self.line("        local.set $ch");
+        // Check for '@' (0x40)
+        self.line("        local.get $ch");
+        self.line("        i32.const 64  ;; '@'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $i");
+        self.line("          local.set $at_pos");
+        self.line("        end");
+        // Check for '.' (0x2E) after '@'
+        self.line("        local.get $ch");
+        self.line("        i32.const 46  ;; '.'");
+        self.line("        i32.eq");
+        self.line("        if");
+        self.line("          local.get $at_pos");
+        self.line("          i32.const -1");
+        self.line("          i32.ne");
+        self.line("          if");
+        self.line("            local.get $i");
+        self.line("            local.get $at_pos");
+        self.line("            i32.gt_u");
+        self.line("            if");
+        self.line("              i32.const 1");
+        self.line("              local.set $has_dot_after_at");
+        self.line("            end");
+        self.line("          end");
+        self.line("        end");
+        self.line("        local.get $i");
+        self.line("        i32.const 1");
+        self.line("        i32.add");
+        self.line("        local.set $i");
+        self.line("        br $loop");
+        self.line("      end");
+        self.line("    end");
+        // Valid if at_pos != -1 && has_dot_after_at
+        self.line("    local.get $at_pos");
+        self.line("    i32.const -1");
+        self.line("    i32.ne");
+        self.line("    local.get $has_dot_after_at");
+        self.line("    i32.and");
+        self.line("  end");
+        self.line(")");
 
         // ── Validation: password (min 8 chars) ──
         self.line("(func $auth_validate_password (export \"auth_validate_password\") (param $ptr i32) (param $len i32) (result i32)");
@@ -7282,14 +6741,7 @@ impl WasmCodegen {
         }
 
         // Setters for each signal (with reactive notification)
-        // Skip auto-setter if an explicit action with the same name exists
-        let action_names: Vec<&str> = store.actions.iter().map(|a| a.name.as_str()).collect();
         for sig in &store.signals {
-            let setter_name = format!("set_{}", sig.name);
-            if action_names.contains(&setter_name.as_str()) {
-                self.line(&format!(";; skipping auto-setter for {} — explicit action exists", sig.name));
-                continue;
-            }
             self.line("");
             let wasm_ty = sig.ty.as_ref()
                 .map(|t| self.type_to_wasm(t))
@@ -7304,16 +6756,11 @@ impl WasmCodegen {
             self.line(")");
         }
 
-        // Set up store context so self.field access resolves to store globals
-        // and self.method() calls resolve to namespaced store action calls.
+        // Set up store context so self.field access resolves to store globals.
+        // This is the same pattern as in_component_mount for components.
         let store_field_names: Vec<String> = store.signals.iter().map(|s| s.name.clone()).collect();
         self.in_component_mount = true;
         self.component_fields = store_field_names.clone();
-        // Populate component_method_names with store action/computed names
-        // so self.method() inside store actions resolves correctly.
-        self.component_method_names = store.actions.iter().map(|a| a.name.clone())
-            .chain(store.computed.iter().map(|c| c.name.clone()))
-            .collect();
         self.string_state_fields = store.signals.iter().filter(|s| {
             matches!(&s.initializer, Expr::StringLit(_))
                 || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
@@ -7353,9 +6800,19 @@ impl WasmCodegen {
 
             // Generate action body — store actions use signal globals for self.field
             // but in_handler_body is false since $self is not a param (filtered above)
+            // Enable store alloc mode so string allocations for signal values
+            // use $alloc_store (persistent across navigation resets).
+            self.line(";; Store action: enable store alloc mode");
+            self.line("i32.const 1");
+            self.line("global.set $__store_alloc_mode");
+            self.in_store_action = true;
             for stmt in &action.body.stmts {
                 self.generate_stmt(stmt);
             }
+            self.in_store_action = false;
+            self.line(";; Store action: disable store alloc mode");
+            self.line("i32.const 0");
+            self.line("global.set $__store_alloc_mode");
 
             // Hoist locals before body
             let body_output = std::mem::take(&mut self.output);
@@ -7374,79 +6831,15 @@ impl WasmCodegen {
         for comp in &store.computed {
             self.line("");
             let ret = comp.return_type.as_ref()
-                .map(|t| format!(" (result {})", self.return_type_to_wasm(t)))
+                .map(|t| format!(" (result {})", self.type_to_wasm(t)))
                 .unwrap_or_else(|| " (result i32)".into());
-            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\"){}",
-                comp.name, comp.name, ret));
+            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\")",
+                comp.name, comp.name));
             self.indent += 1;
             self.line(&format!(";; computed value{}", ret));
-
-            // Save/restore template locals to hoist them to function preamble
-            let saved_output = std::mem::take(&mut self.output);
-            self.output = String::new();
-            self.defer_template_locals = true;
-            self.template_locals.clear();
-
-            // Set current_fn_returns_string for return statement expansion
-            let saved_fn_returns_string = self.current_fn_returns_string;
-            let returns_string = comp.return_type.as_ref()
-                .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
-                .unwrap_or(false);
-            self.current_fn_returns_string = returns_string;
-
-            // Check if the last statement is an expression that leaves a value
-            let last_stmt_has_return = comp.body.stmts.last()
-                .map(|s| matches!(s, Stmt::Return(_)))
-                .unwrap_or(false);
-            let has_return_type = comp.return_type.is_some();
-
-            let stmt_count = comp.body.stmts.len();
-            for (i, stmt) in comp.body.stmts.iter().enumerate() {
-                let is_last = i == stmt_count - 1;
-                if is_last && has_return_type {
-                    if let Stmt::Expr(expr) = stmt {
-                        // Last expression in a computed — generate as expression to leave value
-                        self.generate_expr(expr);
-                        // For String-returning computeds, expand ptr to (ptr, len) if needed
-                        let returns_string = comp.return_type.as_ref()
-                            .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
-                            .unwrap_or(false);
-                        if returns_string && !self.expr_pushes_ptr_len(expr) && !Self::expr_returns_ptr_len(expr) {
-                            self.line("call $str_len ;; expand ptr to (ptr, len) for String return");
-                        }
-                        continue;
-                    }
-                }
+            for stmt in &comp.body.stmts {
                 self.generate_stmt(stmt);
             }
-            // If the computed has a result type and the last statement doesn't
-            // leave a value (e.g., only conditional returns without else),
-            // add a default value so the function is valid.
-            let last_is_value_expr = comp.body.stmts.last()
-                .map(|s| matches!(s, Stmt::Expr(e) if !self.expr_is_void(e)))
-                .unwrap_or(false);
-            if has_return_type && !last_stmt_has_return && !last_is_value_expr {
-                let returns_string = comp.return_type.as_ref()
-                    .map(|t| matches!(t, Type::Named(n) if n == "String" || n == "str"))
-                    .unwrap_or(false);
-                if returns_string {
-                    self.line("i32.const 0 ;; default empty string ptr");
-                    self.line("i32.const 0 ;; default empty string len");
-                } else {
-                    self.line("i32.const 0 ;; default return value");
-                }
-            }
-
-            self.current_fn_returns_string = saved_fn_returns_string;
-
-            let body_output = std::mem::take(&mut self.output);
-            self.output = saved_output;
-            for local_decl in std::mem::take(&mut self.template_locals) {
-                self.line(&local_decl);
-            }
-            self.defer_template_locals = false;
-            self.output.push_str(&body_output);
-
             self.indent -= 1;
             self.line(")");
         }
@@ -7733,15 +7126,6 @@ impl WasmCodegen {
                 self.line(")");
             } else {
                 self.line("local.get $root");
-                // Pass default (0, 0) for each prop the component expects
-                let prop_defs: Vec<String> = self.component_prop_defs.iter()
-                    .find(|(n, _)| n == &route.component)
-                    .map(|(_, props)| props.clone())
-                    .unwrap_or_default();
-                for _prop in &prop_defs {
-                    self.line("i32.const 0 ;; default prop ptr");
-                    self.line("i32.const 0 ;; default prop len");
-                }
                 self.line(&format!("call ${}_mount", route.component));
             }
 
@@ -8008,12 +7392,10 @@ impl WasmCodegen {
     /// Emit a local declaration, or defer it if we're in deferred mode.
     fn emit_template_local(&mut self, var: &str) {
         let decl = format!("(local {} i32)", var);
-        // Always defer locals — WAT requires all locals at function preamble,
-        // before any instructions. Emitting inline causes wat2wasm errors.
-        // Check for any existing declaration of the same variable name (any type)
-        let var_prefix = format!("(local {} ", var);
-        if !self.template_locals.iter().any(|d| d.starts_with(&var_prefix)) {
+        if self.defer_template_locals {
             self.template_locals.push(decl);
+        } else {
+            self.line(&decl);
         }
     }
 
@@ -8021,10 +7403,10 @@ impl WasmCodegen {
     /// Used when hoisting typed locals (i64, f32, f64) to a function's preamble.
     fn emit_template_local_typed(&mut self, var: &str, wasm_ty: &str) {
         let decl = format!("(local {} {})", var, wasm_ty);
-        // Check for any existing declaration of the same variable name (any type)
-        let var_prefix = format!("(local {} ", var);
-        if !self.template_locals.iter().any(|d| d.starts_with(&var_prefix)) {
+        if self.defer_template_locals {
             self.template_locals.push(decl);
+        } else {
+            self.line(&decl);
         }
     }
 
@@ -8091,106 +7473,6 @@ impl WasmCodegen {
         }
     }
 
-    /// Detect a filter pattern in the children of a for-loop.
-    /// Looks for a single TemplateIf child whose condition matches:
-    ///   self.state_field == "All" || binding.item_field == self.state_field
-    /// Returns Some(FilterPattern) if found, None otherwise.
-    fn detect_filter_pattern(&self, children: &[TemplateNode], binding: &str) -> Option<FilterPattern> {
-        // Look for a TemplateIf as a direct child
-        for child in children {
-            if let TemplateNode::TemplateIf { condition, .. } = child {
-                if let Some(pattern) = self.extract_filter_from_condition(condition, binding) {
-                    return Some(pattern);
-                }
-            }
-        }
-        None
-    }
-
-    /// Extract filter pattern from a condition expression.
-    /// Matches: self.X == "All" || binding.Y == self.X  (or reversed sides)
-    fn extract_filter_from_condition(&self, expr: &Expr, binding: &str) -> Option<FilterPattern> {
-        // Pattern 1: self.field == "All" || binding.field == self.field
-        if let Expr::Binary { op: BinOp::Or, left, right } = expr {
-            // Try: left is "All" check, right is field equality
-            if let Some(state_field) = self.find_self_eq_all(left) {
-                if let Some(item_field) = self.find_binding_field_eq_self(right, binding) {
-                    return Some(FilterPattern { state_field, item_field });
-                }
-            }
-            // Try reversed: right is "All" check, left is field equality
-            if let Some(state_field) = self.find_self_eq_all(right) {
-                if let Some(item_field) = self.find_binding_field_eq_self(left, binding) {
-                    return Some(FilterPattern { state_field, item_field });
-                }
-            }
-        }
-        // Pattern 2: just binding.field == self.field (no "All" check)
-        if let Expr::Binary { op: BinOp::Eq, .. } = expr {
-            if let (Some(item_field), Some(state_field)) = (
-                self.find_binding_field_eq_self(expr, binding),
-                self.find_self_field_in_eq(expr),
-            ) {
-                return Some(FilterPattern { state_field, item_field });
-            }
-        }
-        None
-    }
-
-    /// Check if an expression is `self.X == "All"` (or `"All" == self.X`).
-    /// Returns the self field name if matched.
-    fn find_self_eq_all(&self, expr: &Expr) -> Option<String> {
-        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
-            // self.X == "All"
-            if let Expr::FieldAccess { object, field } = left.as_ref() {
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    if matches!(right.as_ref(), Expr::StringLit(s) if s == "All") {
-                        return Some(field.clone());
-                    }
-                }
-            }
-            // "All" == self.X
-            if let Expr::FieldAccess { object, field } = right.as_ref() {
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    if matches!(left.as_ref(), Expr::StringLit(s) if s == "All") {
-                        return Some(field.clone());
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// Find self.X in an equality expression (either side).
-    fn find_self_field_in_eq(&self, expr: &Expr) -> Option<String> {
-        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
-            if let Expr::FieldAccess { object, field } = left.as_ref() {
-                if matches!(object.as_ref(), Expr::SelfExpr) { return Some(field.clone()); }
-            }
-            if let Expr::FieldAccess { object, field } = right.as_ref() {
-                if matches!(object.as_ref(), Expr::SelfExpr) { return Some(field.clone()); }
-            }
-        }
-        None
-    }
-
-    /// Find binding.Y in an equality expression where the other side is self.X.
-    fn find_binding_field_eq_self(&self, expr: &Expr, binding: &str) -> Option<String> {
-        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
-            if let Expr::FieldAccess { object, field } = left.as_ref() {
-                if let Expr::Ident(name) = object.as_ref() {
-                    if name == binding { return Some(field.clone()); }
-                }
-            }
-            if let Expr::FieldAccess { object, field } = right.as_ref() {
-                if let Expr::Ident(name) = object.as_ref() {
-                    if name == binding { return Some(field.clone()); }
-                }
-            }
-        }
-        None
-    }
-
     fn generate_template(&mut self, node: &TemplateNode, parent: &str) {
         match node {
             TemplateNode::Element(el) => {
@@ -8255,14 +7537,6 @@ impl WasmCodegen {
                 self.line(&format!("i32.const {}", el.tag.len()));
                 self.line("call $dom_createElement");
                 self.line(&format!("local.set {}", var));
-
-                // Track last created element for filter pattern optimization
-                self.last_created_element_var = Some(var.clone());
-
-                // Sort tracking: capture the first element created in a for-loop iteration
-                if self.sort_track_first_el.is_some() && self.sort_track_first_el.as_deref() == Some("") {
-                    self.sort_track_first_el = Some(var.clone());
-                }
 
                 // Honeycomb widget: apply default styles if user didn't provide a style attr
                 let has_style_attr = el.attributes.iter().any(|a| matches!(a, Attribute::Static { name, .. } if name == "style"));
@@ -8620,8 +7894,10 @@ impl WasmCodegen {
                 } else {
                     // Check if the expression returns a string (ptr, len pair)
                     // rather than a signal i32 value.
-                    let is_string_expr = self.expr_pushes_ptr_len(expr)
-                        || matches!(expr.as_ref(), Expr::FormatString { .. });
+                    let is_string_expr = matches!(
+                        expr.as_ref(),
+                        Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::StringLit(_)
+                    );
 
                     if is_string_expr {
                         // Expression already produces (ptr, len) on the stack
@@ -8676,16 +7952,7 @@ impl WasmCodegen {
                             } else {
                                 self.line("call $signal_get");
                             }
-                            // String signals: signal_get returns a string pointer, use str_len.
-                            // Numeric signals: convert i32 to decimal string via string_fromI32.
-                            let is_string_field = signal_field.as_ref()
-                                .map(|f| self.string_state_fields.contains(f))
-                                .unwrap_or(false);
-                            if is_string_field {
-                                self.line("call $str_len ;; string signal: ptr → (ptr, len)");
-                            } else {
-                                self.line("call $string_fromI32");
-                            }
+                            self.line("call $string_fromI32");
                             let ptr_var = format!("$dyn_ptr_{}", self.next_label());
                             let len_var = format!("$dyn_len_{}", self.next_label());
                             self.emit_template_local(&ptr_var);
@@ -8779,7 +8046,6 @@ impl WasmCodegen {
                 let href_offset = self.store_string("href");
                 self.line(&format!("i32.const {} ;; href attr name ptr", href_offset));
                 self.line("i32.const 4 ;; href attr name len");
-                self.line("call $dom_setAttr");
 
                 // Generate additional attributes (class, style, aria-*, etc.)
                 for attr in attributes {
@@ -8792,7 +8058,6 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", name.len()));
                             self.line(&format!("i32.const {}", val_offset));
                             self.line(&format!("i32.const {}", value.len()));
-                            self.line("call $dom_setAttr");
                         }
                         Attribute::EventHandler { event, handler } => {
                             let event_offset = self.store_string(event);
@@ -9241,45 +8506,6 @@ impl WasmCodegen {
                     let block_label = format!("$for_break_{}", loop_id);
                     let loop_label = format!("$for_cont_{}", loop_id);
 
-                    // Detect filter pattern before generating the loop body
-                    let filter_pattern = if self.in_component_mount {
-                        self.detect_filter_pattern(children, binding)
-                    } else {
-                        None
-                    };
-
-                    // Extract then_children from the TemplateIf if a filter pattern was detected
-                    let (effective_children, filter_if_node): (Vec<&TemplateNode>, Option<&TemplateNode>) =
-                        if filter_pattern.is_some() {
-                            // Find the TemplateIf child that matched the pattern and use its then_children
-                            let mut if_node = None;
-                            let mut other_children: Vec<&TemplateNode> = Vec::new();
-                            for child in children {
-                                if if_node.is_none() {
-                                    if let TemplateNode::TemplateIf { condition, .. } = child {
-                                        if self.extract_filter_from_condition(condition, binding).is_some() {
-                                            if_node = Some(child);
-                                            continue;
-                                        }
-                                    }
-                                }
-                                other_children.push(child);
-                            }
-                            (other_children, if_node)
-                        } else {
-                            (children.iter().collect(), None)
-                        };
-
-                    // Set up filter table locals and globals
-                    let filter_uid = if filter_pattern.is_some() { Some(self.next_label()) } else { None };
-                    let filter_card_var = if filter_pattern.is_some() {
-                        let v = format!("$__filter_card_{}", filter_uid.unwrap());
-                        self.emit_template_local(&v);
-                        Some(v)
-                    } else {
-                        None
-                    };
-
                     self.emit_template_local(&arr_var);
                     self.emit_template_local(&idx_var);
                     self.emit_template_local(&len_var);
@@ -9301,50 +8527,6 @@ impl WasmCodegen {
                     self.line(&format!("local.get {}", arr_var));
                     self.line("i32.load offset=8 ;; data_ptr");
                     self.line(&format!("local.set {}", data_var));
-
-                    // Filter optimization: allocate filter table and store parent element ID
-                    if let (Some(fp), Some(f_uid)) = (filter_pattern.as_ref(), filter_uid) {
-                        let comp = self.component_name.clone();
-                        self.line(&format!(";; filter optimization: allocate filter table for {}", fp.state_field));
-                        // Allocate table: array_length * 12 bytes (element_id:i32 + str_ptr:i32 + str_len:i32)
-                        self.line(&format!("local.get {}", len_var));
-                        self.line("i32.const 12");
-                        self.line("i32.mul");
-                        self.line("call $alloc");
-                        self.line(&format!("global.set $__filter_table_base_{}_{}", comp, f_uid));
-                        self.line("i32.const 0");
-                        self.line(&format!("global.set $__filter_table_count_{}_{}", comp, f_uid));
-                        // Store parent element ID for potential sort reordering
-                        self.line(&format!("local.get {}", parent));
-                        self.line(&format!("global.set $__filter_parent_{}_{}", comp, f_uid));
-                    }
-
-                    // Sort element tracking: allocate arrays for (data_ptr, element_id)
-                    let sort_uid = loop_id;
-                    let comp_for_sort = self.component_name.clone();
-                    let in_mount = self.in_component_mount && !comp_for_sort.is_empty();
-                    if in_mount {
-                        self.line(&format!(";; sort tracking: allocate els/data arrays for {} items", binding));
-                        // Allocate sort_els array: len * 4 bytes via $alloc
-                        self.line(&format!("local.get {}", len_var));
-                        self.line("i32.const 4");
-                        self.line("i32.mul");
-                        self.line("call $alloc");
-                        self.line(&format!("global.set $__sort_els_base_{}_{}", comp_for_sort, sort_uid));
-                        // Allocate sort_data array: len * 4 bytes via $alloc
-                        self.line(&format!("local.get {}", len_var));
-                        self.line("i32.const 4");
-                        self.line("i32.mul");
-                        self.line("call $alloc");
-                        self.line(&format!("global.set $__sort_data_base_{}_{}", comp_for_sort, sort_uid));
-                        // Store count, parent, and data_ptr
-                        self.line(&format!("local.get {}", len_var));
-                        self.line(&format!("global.set $__sort_els_count_{}_{}", comp_for_sort, sort_uid));
-                        self.line(&format!("local.get {}", parent));
-                        self.line(&format!("global.set $__sort_parent_{}_{}", comp_for_sort, sort_uid));
-                        self.line(&format!("local.get {}", data_var));
-                        self.line(&format!("global.set $__sort_arr_data_{}_{}", comp_for_sort, sort_uid));
-                    }
 
                     // Initialize index to 0
                     self.line("i32.const 0");
@@ -9371,168 +8553,13 @@ impl WasmCodegen {
                     self.line("i32.load");
                     self.line(&format!("local.set {}", binding_var));
 
-                    // Enable sort element tracking for child generation
-                    let saved_sort_track = self.sort_track_first_el.take();
-                    if in_mount {
-                        self.sort_track_first_el = Some(String::new());
-                    }
-
                     // Push binding name so child expression resolution works
                     self.for_loop_bindings.push(binding.clone());
 
-                    if let (Some(fp), Some(f_uid), Some(if_node)) = (filter_pattern.as_ref(), filter_uid, filter_if_node) {
-                        // ── Filter-optimized path ──
-                        // Generate then_children directly (skip the if condition).
-                        // All cards are always created; non-matching ones get display:none.
-                        let comp = self.component_name.clone();
-                        let item_field = fp.item_field.clone();
-
-                        // Clear last_created_element_var so we can capture the first element
-                        self.last_created_element_var = None;
-
-                        // Extract then_children from the TemplateIf node
-                        if let TemplateNode::TemplateIf { then_children, .. } = if_node {
-                            for child in then_children {
-                                self.generate_template(child, parent);
-                            }
-                        }
-
-                        // Also generate any non-filter children
-                        for child in &effective_children {
-                            self.generate_template(child, parent);
-                        }
-
-                        // Capture the element ID of the first created element (the card)
-                        if let Some(ref card_el) = self.last_created_element_var.clone() {
-                            let card_var = filter_card_var.as_ref().unwrap();
-                            self.line(&format!("local.get {}", card_el));
-                            self.line(&format!("local.set {} ;; capture card element for filter table", card_var));
-
-                            // Register card in filter table: [element_id, str_ptr, str_len]
-                            // Compute table entry address: base + count * 12
-                            self.line(&format!(";; filter table registration: {}.{}", binding, item_field));
-                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
-                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
-                            self.line("i32.const 12");
-                            self.line("i32.mul");
-                            self.line("i32.add");
-                            // Store element_id at offset 0
-                            self.line(&format!("local.get {}", card_var));
-                            self.line("i32.store ;; filter table: element_id");
-
-                            // Store filter field string pointer at offset 4
-                            // Load the item's field value (string ptr from struct)
-                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
-                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
-                            self.line("i32.const 12");
-                            self.line("i32.mul");
-                            self.line("i32.add");
-                            self.line("i32.const 4");
-                            self.line("i32.add");
-                            // Load the string pointer for binding.item_field
-                            self.line(&format!("local.get ${}", binding));
-                            // Look up the field offset from struct layouts
-                            let field_offset = self.struct_layouts.values()
-                                .find_map(|layout| layout.iter()
-                                    .find(|(name, _)| name == &item_field)
-                                    .map(|(_, off)| *off))
-                                .unwrap_or(0);
-                            if field_offset == 0 {
-                                self.line(&format!("i32.load ;; {}.{} ptr", binding, item_field));
-                            } else {
-                                self.line(&format!("i32.load offset={} ;; {}.{} ptr", field_offset, binding, item_field));
-                            }
-                            self.line("i32.store ;; filter table: str_ptr");
-
-                            // Store 0 at offset 8 (reserved slot — str comparison uses $str_eq on null-terminated ptrs)
-                            self.line(&format!("global.get $__filter_table_base_{}_{}", comp, f_uid));
-                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
-                            self.line("i32.const 12");
-                            self.line("i32.mul");
-                            self.line("i32.add");
-                            self.line("i32.const 8");
-                            self.line("i32.add");
-                            self.line("i32.const 0");
-                            self.line("i32.store ;; filter table: reserved (str comparison uses $str_eq)");
-
-                            // Increment filter table count
-                            self.line(&format!("global.get $__filter_table_count_{}_{}", comp, f_uid));
-                            self.line("i32.const 1");
-                            self.line("i32.add");
-                            self.line(&format!("global.set $__filter_table_count_{}_{}", comp, f_uid));
-
-                            // Check initial filter value — hide card if it doesn't match
-                            // Read current filter signal value (self.state_field)
-                            let state_field = fp.state_field.clone();
-                            let all_str_offset = self.store_string("All");
-                            let display_offset = self.store_string("display");
-                            let none_offset = self.store_string("none");
-                            let empty_offset = self.store_string("");
-
-                            self.line(&format!(";; initial filter check: hide if {}.{} != self.{}", binding, item_field, state_field));
-                            // Check if filter is "All" — if so, show everything
-                            self.line(&format!("global.get $__sig_{}_{}", comp, state_field));
-                            self.line("call $signal_get");
-                            self.line(&format!("i32.const {} ;; ptr to \"All\"", all_str_offset));
-                            self.line("call $str_eq");
-                            self.line("i32.eqz ;; if NOT \"All\", check field match");
-                            self.line("if ;; filter is not \"All\"");
-                            self.indent += 1;
-                            // Compare card's category to current filter value
-                            self.line(&format!("local.get ${}", binding));
-                            if field_offset == 0 {
-                                self.line(&format!("i32.load ;; {}.{}", binding, item_field));
-                            } else {
-                                self.line(&format!("i32.load offset={} ;; {}.{}", field_offset, binding, item_field));
-                            }
-                            self.line(&format!("global.get $__sig_{}_{}", comp, state_field));
-                            self.line("call $signal_get");
-                            self.line("call $str_eq");
-                            self.line("i32.eqz ;; if no match, hide");
-                            self.line("if ;; card does not match filter");
-                            self.indent += 1;
-                            // Set display:none on the card element
-                            self.line(&format!("local.get {}", card_var));
-                            self.line(&format!("i32.const {} ;; \"display\" ptr", display_offset));
-                            self.line(&format!("i32.const {} ;; \"display\" len", "display".len()));
-                            self.line(&format!("i32.const {} ;; \"none\" ptr", none_offset));
-                            self.line(&format!("i32.const {} ;; \"none\" len", "none".len()));
-                            self.line("call $dom_setStyle");
-                            self.indent -= 1;
-                            self.line("end ;; card match check");
-                            self.indent -= 1;
-                            self.line("end ;; filter All check");
-                        }
-                    } else {
-                        // ── Standard path (no filter optimization) ──
-                        for child in children {
-                            self.generate_template(child, parent);
-                        }
+                    // Generate child template nodes
+                    for child in children {
+                        self.generate_template(child, parent);
                     }
-
-                    // Store sort tracking data: sort_els[idx] = element_id, sort_data[idx] = data_ptr
-                    if in_mount {
-                        if let Some(ref el_var) = self.sort_track_first_el.clone() {
-                            if !el_var.is_empty() {
-                                self.line(";; sort tracking: store el_id and data_ptr at index");
-                                self.line(&format!("global.get $__sort_els_base_{}_{}", comp_for_sort, sort_uid));
-                                self.line(&format!("local.get {}", idx_var));
-                                self.line("i32.const 4");
-                                self.line("i32.mul");
-                                self.line("i32.add");
-                                self.line(&format!("local.get {}", el_var));
-                                self.line("i32.store");
-                                self.line(&format!("global.get $__sort_data_base_{}_{}", comp_for_sort, sort_uid));
-                                self.line(&format!("local.get {}", idx_var));
-                                self.line("i32.const 4");
-                                self.line("i32.mul");
-                                self.line("i32.add");
-                                self.line(&format!("local.get {}", binding_var));
-                                self.line("i32.store");
-                            }
-                        }
-                    }
-                    self.sort_track_first_el = saved_sort_track;
 
                     // Pop binding
                     self.for_loop_bindings.pop();
@@ -9550,38 +8577,6 @@ impl WasmCodegen {
                     self.line("end ;; for continue");
                     self.indent -= 1;
                     self.line("end ;; for break");
-
-                    // Register deferred sort function for emission after mount
-                    if in_mount {
-                        self.deferred_sorts.push(DeferredSort {
-                            uid: sort_uid,
-                            comp: comp_for_sort.clone(),
-                            iterator_expr: iterator.as_ref().clone(),
-                        });
-                    }
-
-                    // Register deferred filter function for emission after mount
-                    if let (Some(fp), Some(f_uid)) = (filter_pattern.as_ref(), filter_uid) {
-                        let comp = self.component_name.clone();
-
-                        // Subscribe apply_filter function to the state field signal
-                        let filter_func_name = format!("$__apply_filter_{}_{}", comp, f_uid);
-                        let table_idx = self.closure_func_names.len();
-                        self.closure_func_names.push(filter_func_name.clone());
-                        self.needs_func_table = true;
-
-                        self.line(&format!(";; subscribe filter function to signal {}", fp.state_field));
-                        self.line(&format!("global.get $__sig_{}_{}", comp, fp.state_field));
-                        self.line(&format!("i32.const {}", table_idx));
-                        self.line("call $signal_subscribe");
-
-                        self.deferred_filters.push(DeferredFilter {
-                            uid: f_uid,
-                            comp: comp.clone(),
-                            state_field: fp.state_field.clone(),
-                            item_field: fp.item_field.clone(),
-                        });
-                    }
                 }
             }
             TemplateNode::TemplateMatch { subject, arms } => {
@@ -9896,17 +8891,15 @@ impl WasmCodegen {
                 // Declare local variable (deferred to function top if in template/handler context)
                 let local_decl = format!("(local ${} i32)", name);
                 if self.defer_template_locals {
-                    // Check for any existing declaration of the same variable (any type)
-                    let var_prefix = format!("(local ${} ", name);
-                    if !self.template_locals.iter().any(|d| d.starts_with(&var_prefix)) {
+                    if !self.template_locals.contains(&local_decl) {
                         self.template_locals.push(local_decl);
                     }
                 } else {
                     self.line(&local_decl);
                 }
-                let is_string_val = self.expr_pushes_ptr_len(value)
-                    || self.expr_is_string_typed(value)
-                    || Self::expr_returns_ptr_len(value);
+                let is_string_val = matches!(value, Expr::StringLit(_))
+                    || matches!(value, Expr::FormatString { .. })
+                    || self.expr_is_string_typed(value);
                 self.generate_expr(value);
                 if is_string_val {
                     // String expressions push (ptr, len); drop len (top), keep ptr
@@ -9924,21 +8917,15 @@ impl WasmCodegen {
             }
             Stmt::Return(Some(expr)) => {
                 self.generate_expr(expr);
-                // If the function returns String (i32, i32) but the expression
-                // produces a single i32, expand to (ptr, len) via str_len
-                if self.current_fn_returns_string && !self.expr_pushes_ptr_len(expr) && !Self::expr_returns_ptr_len(expr) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len) for String return");
-                }
                 self.line("return");
             }
             Stmt::Return(None) => {
                 self.line("return");
             }
             Stmt::Expr(expr) => {
-                // Statement-level if: always emit as void (if ... end) with no result type.
-                // Each branch generates its statements normally via generate_stmt,
-                // which handles dropping values from non-void expressions.
-                // This avoids type mismatches from branches producing different types.
+                // Statement-level if: emit a void `if...end` block (no result type)
+                // instead of the expression-level `(if (result i32) ...)` which would
+                // corrupt the WASM stack when no value is consumed.
                 if let Expr::If { condition, then_block, else_block } = expr {
                     self.generate_expr(condition);
                     self.emit("(if");
@@ -9975,26 +8962,9 @@ impl WasmCodegen {
                 }
             }
             Stmt::Yield(expr) => {
-                self.line(";; yield — emit value from stream/generator");
-                // For string expressions, the value is already (ptr, len) on stack.
-                // For integer expressions, we need to serialize to (ptr, len).
-                let is_string = matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. })
-                    || matches!(expr, Expr::FnCall { callee, .. } if matches!(callee.as_ref(), Expr::Ident(name) if name == "format"));
+                self.line(";; yield — emit value from stream");
                 self.generate_expr(expr);
-                if !is_string {
-                    // Integer/other value — store it in linear memory and push (ptr, len)
-                    let label = self.next_label();
-                    let tmp_var = format!("$__yield_tmp_{}", label);
-                    self.emit_template_local(&tmp_var);
-                    self.line(";; serialize yield value to memory");
-                    self.line(&format!("local.set {}", tmp_var));
-                    self.line("i32.const 4 ;; allocate 4 bytes for i32 value");
-                    self.line("call $alloc");
-                    self.line(&format!("local.get {}", tmp_var));
-                    self.line("i32.store ;; store value at allocated ptr");
-                    // Push (ptr, len=4) for streaming_yield
-                    self.line("i32.const 4 ;; len = 4 bytes");
-                }
+                // The streaming runtime handles delivery to the consumer.
                 // The yielded value (ptr, len) is on the stack; call into the
                 // stream chunk callback registered by the runtime.
                 self.line("call $streaming_yield");
@@ -10005,32 +8975,9 @@ impl WasmCodegen {
                 // Store value in temp, then extract fields by offset
                 let label = self.next_label();
                 let temp = format!("$__destructure_{}", label);
-                // Declare the temp local and all binding locals from the pattern
-                self.emit_template_local(&temp);
-                self.declare_pattern_locals(pattern);
                 self.line(&format!("local.set {}", temp));
                 self.generate_destructure_bindings(pattern, &temp, 0);
             }
-        }
-    }
-
-    /// Declare local variables for all bindings in a destructure pattern.
-    fn declare_pattern_locals(&mut self, pattern: &Pattern) {
-        match pattern {
-            Pattern::Ident(name) => {
-                self.emit_template_local(&format!("${}", name));
-            }
-            Pattern::Tuple(pats) | Pattern::Array(pats) => {
-                for p in pats {
-                    self.declare_pattern_locals(p);
-                }
-            }
-            Pattern::Struct { fields, .. } => {
-                for (_, p) in fields {
-                    self.declare_pattern_locals(p);
-                }
-            }
-            Pattern::Wildcard | Pattern::Literal(_) | Pattern::Variant { .. } => {}
         }
     }
 
@@ -10133,14 +9080,14 @@ impl WasmCodegen {
                         || self.expr_is_string_typed(left) || self.expr_is_string_typed(right));
 
                 if is_string_cmp {
-                    // Generate left side; drop len if expr produces (ptr, len)
+                    // Generate left side; if it's a string literal, drop the len
                     self.generate_expr(left);
-                    if self.expr_pushes_ptr_len(left) {
+                    if self.expr_is_string_lit(left) {
                         self.line("drop  ;; string cmp: keep only ptr");
                     }
-                    // Generate right side; drop len if expr produces (ptr, len)
+                    // Generate right side; if it's a string literal, drop the len
                     self.generate_expr(right);
-                    if self.expr_pushes_ptr_len(right) {
+                    if self.expr_is_string_lit(right) {
                         self.line("drop  ;; string cmp: keep only ptr");
                     }
                     // Compare null-terminated strings byte-by-byte
@@ -10149,63 +9096,22 @@ impl WasmCodegen {
                         self.line("i32.eqz  ;; neq: invert str_eq result");
                     }
                 } else {
-                    // Detect float operands to use f64 instructions
-                    let is_float_op = self.expr_is_float(left) || self.expr_is_float(right);
                     self.generate_expr(left);
-                    if is_float_op && !self.expr_is_float(left) {
-                        // Left is i32 but right is f64 — convert left to f64
-                        self.line("f64.convert_i32_s");
-                    }
                     self.generate_expr(right);
-                    if is_float_op && !self.expr_is_float(right) {
-                        // Right is i32 but left is f64 — convert right to f64
-                        self.line("f64.convert_i32_s");
-                    }
-                    let instr = if is_float_op {
-                        match op {
-                            BinOp::Add => "f64.add",
-                            BinOp::Sub => "f64.sub",
-                            BinOp::Mul => "f64.mul",
-                            BinOp::Div => "f64.div",
-                            BinOp::Mod => {
-                                // f64 modulo: a - floor(a/b)*b
-                                // For now emit f64.div + conversion
-                                "f64.div"
-                            }
-                            BinOp::Eq => "f64.eq",
-                            BinOp::Neq => "f64.ne",
-                            BinOp::Lt => "f64.lt",
-                            BinOp::Gt => "f64.gt",
-                            BinOp::Lte => "f64.le",
-                            BinOp::Gte => "f64.ge",
-                            // And/Or: convert f64 results to i32 first
-                            BinOp::And => {
-                                self.line("f64.ne");  // convert right to bool
-                                // But this is a logical AND — left should also be bool
-                                // This is unusual for floats; just emit i32 version
-                                "i32.and"
-                            }
-                            BinOp::Or => {
-                                self.line("f64.ne");
-                                "i32.or"
-                            }
-                        }
-                    } else {
-                        match op {
-                            BinOp::Add => "i32.add",
-                            BinOp::Sub => "i32.sub",
-                            BinOp::Mul => "i32.mul",
-                            BinOp::Div => "i32.div_s",
-                            BinOp::Mod => "i32.rem_s",
-                            BinOp::Eq => "i32.eq",
-                            BinOp::Neq => "i32.ne",
-                            BinOp::Lt => "i32.lt_s",
-                            BinOp::Gt => "i32.gt_s",
-                            BinOp::Lte => "i32.le_s",
-                            BinOp::Gte => "i32.ge_s",
-                            BinOp::And => "i32.and",
-                            BinOp::Or => "i32.or",
-                        }
+                    let instr = match op {
+                        BinOp::Add => "i32.add",
+                        BinOp::Sub => "i32.sub",
+                        BinOp::Mul => "i32.mul",
+                        BinOp::Div => "i32.div_s",
+                        BinOp::Mod => "i32.rem_s",
+                        BinOp::Eq => "i32.eq",
+                        BinOp::Neq => "i32.ne",
+                        BinOp::Lt => "i32.lt_s",
+                        BinOp::Gt => "i32.gt_s",
+                        BinOp::Lte => "i32.le_s",
+                        BinOp::Gte => "i32.ge_s",
+                        BinOp::And => "i32.and",
+                        BinOp::Or => "i32.or",
                     };
                     self.line(instr);
                 }
@@ -10246,13 +9152,6 @@ impl WasmCodegen {
                             // Each subsequent arg: call $format with current (ptr, len) + arg
                             for arg in &args[1..] {
                                 self.generate_expr(arg);
-                                // If arg produces (ptr, len), drop the len —
-                                // $format expects a single i32 arg, not (ptr, len)
-                                if self.expr_pushes_ptr_len(arg) || Self::expr_returns_ptr_len(arg) {
-                                    self.line("drop ;; drop str len for format arg");
-                                } else if self.expr_is_float(arg) {
-                                    self.line("i32.trunc_f64_s ;; convert f64 arg to i32 for format");
-                                }
                                 self.line("call $format");
                             }
                             return;
@@ -10260,93 +9159,8 @@ impl WasmCodegen {
                         _ => {}
                     }
                 }
-                // Determine if this is a user-defined function call where
-                // String args are single pointers (not (ptr, len) pairs).
-                // Web API and stdlib functions take (ptr, len) pairs for strings,
-                // so they are NOT "user functions" for this purpose.
-                let is_user_fn = if let Expr::Ident(name) = callee.as_ref() {
-                    !matches!(name.as_str(),
-                        "format" | "assert_eq" | "assert_ne" | "string_concat" |
-                        "string_trim" | "string_to_upper" | "string_to_lower" |
-                        "string_index_of" | "string_starts_with" | "string_ends_with" |
-                        "string_replace" | "string_contains" |
-                        "Ok" | "Some" | "Err" |
-                        // Stdlib functions that take (ptr, len) string args:
-                        "parse_f64" | "parse_i32" | "parse_int" | "parse_float" |
-                        "json_decode" | "json_parse" | "json_encode" |
-                        "capitalize" | "to_title_case" | "to_snake_case" | "to_camel_case" |
-                        "url_encode" | "url_decode" | "base64_encode" | "base64_decode" |
-                        "string_from_bytes" | "string_to_bytes" |
-                        // Web API functions that accept (ptr, len) string args:
-                        "localStorage_get" | "localStorage_set" | "localStorage_remove" |
-                        "sessionStorage_get" | "sessionStorage_set" | "sessionStorage_remove" |
-                        "storage_get" | "storage_set" | "storage_remove" |
-                        "session_get" | "session_set" | "session_remove" |
-                        "clipboard_write" | "clipboard_read" |
-                        "console_log" | "console_warn" | "console_error" |
-                        "push_state" | "replace_state" |
-                        "env_get" | "navigate" | "navigate_external" |
-                        "set_title" | "print" | "download" |
-                        // HTTP functions
-                        "fetch_get" | "fetch_post" | "http_get" | "http_post" |
-                        "http_set_method" | "http_set_body" | "http_add_header" |
-                        // Auth/Payment/Upload
-                        "auth_login" | "auth_logout" | "auth_signup" |
-                        "payment_charge" | "upload_file" |
-                        // Timers
-                        "set_timeout" | "set_interval" |
-                        // WebSocket
-                        "ws_connect" | "ws_send" | "ws_close"
-                    )
-                } else {
-                    false
-                };
-                // Check if this is a format() call — format takes string arg as single i32
-                let is_format_call = matches!(callee.as_ref(), Expr::Ident(name) if name == "format");
-                // Check if this is a stdlib function that takes (ptr, len) string args
-                let needs_ptr_len_args = if let Expr::Ident(name) = callee.as_ref() {
-                    matches!(name.as_str(),
-                        "parse_f64" | "parse_i32" | "parse_int" | "parse_float" |
-                        "json_decode" | "json_parse" |
-                        "capitalize" | "to_uppercase" | "to_lowercase" |
-                        "url_encode" | "url_decode" | "base64_encode" | "base64_decode" |
-                        "base64url_sha256" |
-                        "string_trim" | "string_to_upper" | "string_to_lower" |
-                        "string_index_of" | "string_starts_with" | "string_ends_with" |
-                        "string_replace" | "string_contains" | "string_concat" |
-                        "console_log" | "console_warn" | "console_error" |
-                        // Storage APIs that take (ptr, len) string args:
-                        "storage_set" | "localStorage_set" | "localStorage_remove" |
-                        "storage_remove" | "storage_get" | "localStorage_get" |
-                        "sessionStorage_set" | "sessionStorage_get" | "sessionStorage_remove" |
-                        "session_set" | "session_get" | "session_remove" |
-                        // Navigation
-                        "navigate" | "navigate_external" | "push_state" | "replace_state" |
-                        "set_title" | "download"
-                    )
-                } else {
-                    false
-                };
-                for (arg_idx, arg) in args.iter().enumerate() {
+                for arg in args {
                     self.generate_expr(arg);
-                    // User functions take String as a single i32 pointer.
-                    // Expressions that push (ptr, len) need the len dropped.
-                    if is_user_fn && self.expr_pushes_ptr_len(arg) {
-                        self.line("drop ;; drop str len for user fn call");
-                    }
-                    // For format() calls, non-template args (idx > 0) that produce (ptr,len)
-                    // need the len dropped since $format expects a single i32 arg value.
-                    if is_format_call && arg_idx > 0 && (self.expr_pushes_ptr_len(arg) || Self::expr_returns_ptr_len(arg)) {
-                        self.line("drop ;; drop str len for format arg");
-                    }
-                    // For format() calls, non-template args that produce f64 need conversion
-                    if is_format_call && arg_idx > 0 && self.expr_is_float(arg) {
-                        self.line("i32.trunc_f64_s ;; convert f64 arg to i32 for format");
-                    }
-                    // For stdlib functions that take (ptr, len), convert single ptr to (ptr, len)
-                    if needs_ptr_len_args && !self.expr_pushes_ptr_len(arg) && !Self::expr_returns_ptr_len(arg) {
-                        self.line("call $str_len ;; expand ptr to (ptr, len) for stdlib call");
-                    }
                 }
                 if let Expr::Ident(name) = callee.as_ref() {
                     // Map well-known web API function names to their WASM imports
@@ -10361,7 +9175,7 @@ impl WasmCodegen {
                         "clipboard_write"     => "$webapi_clipboardWrite",
                         "clipboard_read"      => "$webapi_clipboardRead",
                         // Timers
-                        "set_timeout"         => "$timer_setTimeout",
+                        "set_timeout"         => "$webapi_setTimeout",
                         "set_interval"        => "$webapi_setInterval",
                         "clear_timer"         => "$webapi_clearTimer",
                         // URL / history
@@ -10399,55 +9213,6 @@ impl WasmCodegen {
                         "rtc_data_channel_send"      => "$rtc_dataChannelSend",
                         "rtc_data_channel_close"     => "$rtc_dataChannelClose",
                         "rtc_get_stats"              => "$rtc_getStats",
-                        // Storage (short names)
-                        "storage_get"             => "$webapi_localStorageGet",
-                        "storage_set"             => "$webapi_localStorageSet",
-                        "storage_remove"          => "$webapi_localStorageRemove",
-                        // Session storage (short names)
-                        "session_get"             => "$webapi_sessionStorageGet",
-                        "session_set"             => "$webapi_sessionStorageSet",
-                        "session_remove"          => "$webapi_sessionStorageRemove",
-                        // HTTP convenience wrappers
-                        "http_get"                => "$__http_get",
-                        "http_post"               => "$__http_post",
-                        // Navigation
-                        "navigate"                => "$router_navigate",
-                        "navigate_external"       => "$webapi_navigateExternal",
-                        // Location / URL
-                        "location_hostname"       => "$webapi_locationHostname",
-                        "location_protocol"       => "$webapi_locationProtocol",
-                        "origin"                  => "$webapi_origin",
-                        "env_get"                 => "$webapi_envGet",
-                        "url_encode"              => "$url_encode",
-                        "url_form_encode"         => "$url_form_encode",
-                        "encode_uri"              => "$url_encode",
-                        // JSON
-                        "json_encode"             => "$json_encode",
-                        "json_decode"             => "$json_decode",
-                        // Crypto / random
-                        "random_hex"              => "$random_hex",
-                        "base64url_sha256"        => "$base64url_sha256",
-                        // Option/Result helpers
-                        "is_some"                 => "$is_some",
-                        "is_none"                 => "$is_none",
-                        "unwrap"                  => "$unwrap",
-                        // String utilities
-                        "char_at"                 => "$char_at",
-                        "to_uppercase"            => "$to_uppercase",
-                        "capitalize"              => "$capitalize",
-                        "chars"                   => "$chars",
-                        "next"                    => "$next",
-                        "clone"                   => "$clone",
-                        "rev"                     => "$rev",
-                        "parse_f64"               => "$parse_f64",
-                        // Toast
-                        "show_toast"              => "$dom_showToast",
-                        "hide_toast"              => "$dom_hideToast",
-                        // Timer (short name)
-                        "webapi_setTimeout"       => "$timer_setTimeout",
-                        // Map helpers
-                        "Map_serialize"           => "$Map_serialize",
-                        "Map_parse_from_obj"      => "$Map_parse_from_obj",
                         // Not a web API built-in — call by user-defined name
                         _ => "",
                     };
@@ -10529,31 +9294,13 @@ impl WasmCodegen {
                                     self.line(&format!("call {}", wasm_fn));
                                 } else {
                                     // Route through stdlib resolver
-                                    self.warn_if_unimplemented_stdlib(name);
                                     let wasm_fn = self.resolve_stdlib_fn(name);
                                     self.line(&format!(";; stdlib: {}", name));
                                     self.line(&format!("call {}", wasm_fn));
                                 }
                             }
                         } else {
-                            // If we're inside a component and the function name matches
-                            // one of the component's methods, use the namespaced name
-                            // (e.g., format_cents → CurrencyDisplay_format_cents)
-                            if self.in_component_mount && self.component_method_names.contains(name) {
-                                self.line(&format!("call ${}_{}", self.component_name, name));
-                            } else {
-                                // Check if this is a bare store action/computed call
-                                // e.g. `logout()` → `call $AuthStore_logout`
-                                let store_action = self.known_store_actions.iter()
-                                    .find(|(action_name, _)| action_name == name)
-                                    .map(|(_, sn)| sn.clone());
-                                if let Some(sn) = store_action {
-                                    self.line(&format!(";; bare store action: {} → {}", name, sn));
-                                    self.line(&format!("call ${}_{}", sn, name));
-                                } else {
-                                    self.line(&format!("call ${}", name));
-                                }
-                            }
+                            self.line(&format!("call ${}", name));
                         }
                     } else {
                         self.line(&format!(";; webapi: {}", name));
@@ -10562,17 +9309,7 @@ impl WasmCodegen {
                 }
             }
             Expr::FieldAccess { object, field } => {
-                // Tuple index access: t.0, t.1, t.2, ...
-                if let Ok(idx) = field.parse::<u32>() {
-                    let offset = idx * 4;
-                    self.line(&format!(";; tuple index access: .{}", idx));
-                    self.generate_expr(object);
-                    if offset == 0 {
-                        self.line("i32.load ;; tuple.0");
-                    } else {
-                        self.line(&format!("i32.load offset={} ;; tuple.{}", offset, idx));
-                    }
-                } else if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
+                if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
                     && self.component_fields.contains(field) {
                     // In component context, self.field reads the signal value
                     self.line(&format!(";; self.{} (signal)", field));
@@ -10581,16 +9318,11 @@ impl WasmCodegen {
                 } else if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
                     && self.component_props.contains(field) {
                     // In component context, self.prop reads from the component-scoped global.
-                    // String props push (ptr, len); numeric props push a single typed value.
+                    // Props are stored as globals at mount time so event handlers can access them.
+                    // String props push (ptr, len) to match the string calling convention.
                     self.line(&format!(";; self.{} (prop)", field));
-                    // String props push (ptr, len); non-String props push only ptr (which holds the value)
-                    let is_string_prop = self.component_prop_types.get(field.as_str())
-                        .map(|t| t == "String" || t == "str")
-                        .unwrap_or(true); // default to string if unknown
                     self.line(&format!("global.get $__prop_{}_{}_ptr", self.component_name, field));
-                    if is_string_prop {
-                        self.line(&format!("global.get $__prop_{}_{}_len", self.component_name, field));
-                    }
+                    self.line(&format!("global.get $__prop_{}_{}_len", self.component_name, field));
                 } else if let Expr::Ident(obj_name) = object.as_ref() {
                     if self.for_loop_bindings.contains(obj_name)
                         || self.handler_param_bindings.contains(obj_name) {
@@ -10616,17 +9348,6 @@ impl WasmCodegen {
                             self.line(&format!("i32.load ;; field: .{}", field));
                         } else {
                             self.line(&format!("i32.load offset={} ;; field: .{}", offset, field));
-                        }
-                    } else if let Some((store_name, signals)) = self.known_stores.iter()
-                        .find(|(sn, _)| sn == obj_name).cloned() {
-                        // Store field access: StoreName.field → call store getter
-                        if signals.iter().any(|s| s == field) {
-                            self.line(&format!(";; store signal access: {}.{}", store_name, field));
-                            self.line(&format!("call ${}_get_{}", store_name, field));
-                        } else {
-                            // It's a computed/action — call the store function
-                            self.line(&format!(";; store member access: {}.{}", store_name, field));
-                            self.line(&format!("call ${}_{}", store_name, field));
                         }
                     } else {
                         self.generate_expr(object);
@@ -10706,38 +9427,20 @@ impl WasmCodegen {
             }
             Expr::If { condition, then_block, else_block } => {
                 self.generate_expr(condition);
-                // Determine result type — f64 if the then branch's last expr is float
-                let result_is_float = then_block.stmts.last()
-                    .and_then(|s| if let Stmt::Expr(e) = s { Some(e) } else { None })
-                    .map(|e| self.expr_is_float(e))
-                    .unwrap_or(false);
-                if result_is_float {
-                    self.emit("(if (result f64)");
-                } else {
-                    self.emit("(if (result i32)");
-                }
+                self.emit("(if (result i32)");
                 self.indent += 1;
                 self.emit("(then");
                 self.indent += 1;
-                // Generate all statements except the last as statements (void),
-                // and the last as an expression (leaving value on stack).
-                self.generate_branch_stmts_as_expr(&then_block.stmts);
+                for stmt in &then_block.stmts {
+                    self.generate_stmt(stmt);
+                }
                 self.indent -= 1;
                 self.line(")");
                 if let Some(else_blk) = else_block {
                     self.emit("(else");
                     self.indent += 1;
-                    self.generate_branch_stmts_as_expr(&else_blk.stmts);
-                    self.indent -= 1;
-                    self.line(")");
-                } else {
-                    // No else branch — provide default value
-                    self.emit("(else");
-                    self.indent += 1;
-                    if result_is_float {
-                        self.line("f64.const 0");
-                    } else {
-                        self.line("i32.const 0");
+                    for stmt in &else_blk.stmts {
+                        self.generate_stmt(stmt);
                     }
                     self.indent -= 1;
                     self.line(")");
@@ -10755,11 +9458,8 @@ impl WasmCodegen {
                         self.line(&format!(";; self.{} = ... (signal set)", field));
                         self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
                         self.generate_expr(value);
-                        if self.expr_pushes_ptr_len(value) || Self::expr_returns_ptr_len(value) {
+                        if Self::expr_returns_ptr_len(value) {
                             self.line("drop  ;; discard str len for signal_set");
-                        }
-                        if self.expr_is_float(value) {
-                            self.line("i32.trunc_f64_s ;; convert f64 to i32 for signal_set");
                         }
                         self.line("call $signal_set");
                     } else {
@@ -10767,7 +9467,7 @@ impl WasmCodegen {
                     }
                 } else {
                     self.generate_expr(value);
-                    if self.expr_pushes_ptr_len(value) || Self::expr_returns_ptr_len(value) {
+                    if matches!(value.as_ref(), Expr::StringLit(_)) {
                         self.line("drop  ;; discard str len for local assign");
                     }
                     if let Expr::Ident(name) = target.as_ref() {
@@ -10818,39 +9518,10 @@ impl WasmCodegen {
             }
             Expr::Spawn { body, .. } => {
                 self.line(";; spawn — launch task on Web Worker");
-                // Emit the body as a deferred closure function with a function table index.
-                // The function is added to the function table so worker_spawn can reference it.
-                let closure_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let func_name = format!("$__spawn_fn_{}", closure_idx);
-                let mut closure_body = String::new();
-                closure_body.push_str(&format!("(func {} (result i32)\n", func_name));
-                // Save/restore codegen state for nested generation
-                let saved_output = std::mem::take(&mut self.output);
-                let saved_locals = std::mem::take(&mut self.locals);
+                // Generate block statements; the last expression provides a function index
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
-                // If body didn't push a value, push 0
-                if body.stmts.is_empty() || matches!(body.stmts.last(), Some(Stmt::Return(None))) {
-                    self.line("i32.const 0");
-                }
-                let body_code = std::mem::take(&mut self.output);
-                self.output = saved_output;
-                // Emit locals
-                for (name, wasm_ty) in &self.locals {
-                    closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
-                }
-                self.locals = saved_locals;
-                closure_body.push_str(&body_code);
-                closure_body.push_str(")\n");
-                self.closure_functions.push(closure_body);
-                self.closure_func_names.push(func_name.clone());
-                self.needs_func_table = true;
-                // Push the function table index and body length onto the stack
-                let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!("i32.const {} ;; spawn function table index ({})", table_idx, func_name));
-                self.line("i32.const 0 ;; reserved (body length)");
                 self.line("call $worker_spawn");
             }
             Expr::Channel { ty } => {
@@ -10870,155 +9541,48 @@ impl WasmCodegen {
             Expr::Receive { channel } => {
                 self.line(";; channel receive (async callback)");
                 self.generate_expr(channel);
-                // Allocate a callback index for the receive handler.
-                // When data arrives, the runtime calls back via call_indirect.
-                let cb_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let func_name = format!("$__recv_cb_{}", cb_idx);
-                // Emit a trivial callback function that returns the received value
-                let closure_body = format!(
-                    "(func {} (param $data i32) (result i32)\n  local.get $data\n)\n",
-                    func_name
-                );
-                self.closure_functions.push(closure_body);
-                self.closure_func_names.push(func_name.clone());
-                self.needs_func_table = true;
-                let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!("i32.const {} ;; receive callback index ({})", table_idx, func_name));
+                self.line("i32.const 0 ;; callback index (default handler)");
                 self.line("call $worker_channelRecv");
             }
             Expr::Parallel { tasks, .. } => {
                 self.line(";; parallel — run expressions concurrently");
-                // Each task becomes a deferred function. Store their table indices
-                // in linear memory so worker_parallel can spawn them all.
+                // Store function indices in linear memory for the runtime
                 let count = tasks.len() as u32;
                 let array_label = self.next_label();
                 self.emit_template_local(&format!("$parallel_arr_{}", array_label));
-                self.line(&format!("i32.const {} ;; {} tasks * 4 bytes", count * 4, count));
+                self.line(&format!("i32.const {}", count * 4));
                 self.line("call $alloc");
                 self.line(&format!("local.set $parallel_arr_{}", array_label));
                 for (i, expr) in tasks.iter().enumerate() {
                     self.line(&format!("local.get $parallel_arr_{}", array_label));
-                    // Generate each task as a closure function with a table index
-                    let cb_idx = self.closure_counter;
-                    self.closure_counter += 1;
-                    let func_name = format!("$__parallel_task_{}_{}", array_label, i);
-                    let saved_output = std::mem::take(&mut self.output);
-                    let saved_locals = std::mem::take(&mut self.locals);
                     self.generate_expr(expr);
-                    let body_code = std::mem::take(&mut self.output);
-                    self.output = saved_output;
-                    let mut closure_body = format!("(func {} (result i32)\n", func_name);
-                    for (name, wasm_ty) in &self.locals {
-                        closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
-                    }
-                    self.locals = saved_locals;
-                    closure_body.push_str(&body_code);
-                    if body_code.trim().is_empty() {
-                        closure_body.push_str("  i32.const 0\n");
-                    }
-                    closure_body.push_str(")\n");
-                    self.closure_functions.push(closure_body);
-                    self.closure_func_names.push(func_name.clone());
-                    self.needs_func_table = true;
-                    let table_idx = self.closure_func_names.len() as u32 - 1;
-                    self.line(&format!("i32.const {} ;; task {} table index ({})", table_idx, i, func_name));
                     self.line(&format!("i32.store offset={}", i * 4));
                 }
                 self.line(&format!("local.get $parallel_arr_{}", array_label));
                 self.line(&format!("i32.const {}", count));
-                // Allocate a completion callback
-                let comp_cb_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let comp_func_name = format!("$__parallel_done_{}", array_label);
-                let comp_closure = format!(
-                    "(func {} (param $results i32) (result i32)\n  local.get $results\n)\n",
-                    comp_func_name
-                );
-                self.closure_functions.push(comp_closure);
-                self.closure_func_names.push(comp_func_name.clone());
-                let comp_table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!("i32.const {} ;; completion callback ({})", comp_table_idx, comp_func_name));
+                self.line("i32.const 0 ;; callback index (default handler)");
                 self.line("call $worker_parallel");
             }
             Expr::Navigate { path } => {
                 self.line(";; navigate — programmatic route change");
                 self.generate_expr(path);
-                // Ensure path string is (ptr, len) on the stack
-                if !self.expr_pushes_ptr_len(path) && !Self::expr_returns_ptr_len(path) {
-                    self.line("call $str_len ;; compute (ptr, len) for navigate");
-                }
+                // Path string (ptr, len) is on the stack
                 self.line("call $router_navigate");
             }
             Expr::PromptTemplate { template, interpolations } => {
-                self.line(";; prompt template — build prompt string and POST to AI endpoint");
-
-                // Step 1: Build the interpolated prompt string.
-                // Split at {var} boundaries and concatenate segments using $str_concat.
-                let interp_map: Vec<(String, &Expr)> = interpolations.iter()
-                    .map(|(name, expr)| (name.clone(), expr))
-                    .collect();
-
-                // Parse the template into literal + interpolation segments
-                let mut rest = template.as_str();
-                let mut parts: Vec<(bool, String)> = Vec::new(); // (is_interp, content)
-                while let Some(start) = rest.find('{') {
-                    if start > 0 {
-                        parts.push((false, rest[..start].to_string()));
-                    }
-                    if let Some(end) = rest[start..].find('}') {
-                        let var_name = rest[start + 1..start + end].to_string();
-                        parts.push((true, var_name));
-                        rest = &rest[start + end + 1..];
-                    } else {
-                        break;
-                    }
+                self.line(";; prompt template — compile interpolation to string building");
+                // Split the template at {var} boundaries and concatenate
+                // For each segment, store the static part, then evaluate the variable
+                let template_offset = self.store_string(template);
+                self.line(&format!("i32.const {} ;; template ptr", template_offset));
+                self.line(&format!("i32.const {} ;; template len", template.len()));
+                // Push interpolation values onto the stack
+                for (name, expr) in interpolations {
+                    self.line(&format!(";; interpolation: {{{}}}", name));
+                    self.generate_expr(expr);
                 }
-                if !rest.is_empty() {
-                    parts.push((false, rest.to_string()));
-                }
-
-                // Emit string building: concatenate all parts
-                let mut first = true;
-                for (is_interp, content) in &parts {
-                    if *is_interp {
-                        // Find the interpolation expression
-                        if let Some((_name, expr)) = interp_map.iter().find(|(n, _)| n == content) {
-                            self.generate_expr(expr);
-                        } else {
-                            // Unknown interpolation — emit as literal
-                            let offset = self.store_string(content);
-                            self.line(&format!("i32.const {} ;; interpolation \"{}\" ptr", offset, content));
-                            self.line(&format!("i32.const {} ;; len", content.len()));
-                        }
-                    } else {
-                        let offset = self.store_string(content);
-                        self.line(&format!("i32.const {} ;; literal segment ptr", offset));
-                        self.line(&format!("i32.const {} ;; len", content.len()));
-                    }
-                    if !first {
-                        self.line("call $str_concat ;; concatenate prompt segments");
-                    }
-                    first = false;
-                }
-
-                // Step 2: The built prompt string (ptr, len) is on the stack.
-                // POST it to the AI endpoint via $http_fetch.
-                self.needs_http = true;
-                self.line(";; POST prompt to AI endpoint");
-                // Set method to POST
-                let post_offset = self.store_string("POST");
-                self.line(&format!("i32.const {} ;; method ptr", post_offset));
-                self.line(&format!("i32.const {} ;; method len", 4));
-                self.line("call $http_setMethod");
-                // Set body to the prompt string (already on stack as ptr, len)
-                self.line("call $http_setBody");
-                // Set the AI endpoint URL
-                let endpoint = "/api/ai/prompt";
-                let url_offset = self.store_string(endpoint);
-                self.line(&format!("i32.const {} ;; AI endpoint URL ptr", url_offset));
-                self.line(&format!("i32.const {} ;; URL len", endpoint.len()));
-                self.line("call $http_fetch");
+                // The runtime will handle string interpolation
+                self.line(&format!("i32.const {} ;; interpolation count", interpolations.len()));
             }
             Expr::Stream { source } => {
                 self.line(";; stream — create streaming data source");
@@ -11026,57 +9590,19 @@ impl WasmCodegen {
                 // puts (url_ptr, url_len) on the stack, then register a
                 // stream callback with the runtime.
                 self.generate_expr(source);
-                // Create a callback function for receiving stream chunks.
-                // Each chunk arrives as (ptr, len) and the callback processes it.
-                let cb_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let func_name = format!("$__stream_cb_{}", cb_idx);
-                let closure_body = format!(
-                    "(func {} (param $chunk_ptr i32) (param $chunk_len i32)\n  ;; Stream chunk callback — process incoming data\n  ;; chunk_ptr and chunk_len describe the received data in linear memory\n  nop  ;; chunk processing handled by for-loop body\n)\n",
-                    func_name
-                );
-                self.closure_functions.push(closure_body);
-                self.closure_func_names.push(func_name.clone());
-                self.needs_func_table = true;
-                let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!("i32.const {} ;; stream callback index ({})", table_idx, func_name));
+                let callback_label = self.next_label();
+                self.line(&format!("i32.const {} ;; stream callback index", callback_label));
                 self.line("call $streaming_streamFetch");
             }
             Expr::Suspend { fallback, body } => {
                 self.line(";; suspend — show fallback while body loads");
-
                 // 1. Evaluate and render the fallback immediately
-                self.line(";; step 1: mount fallback");
+                self.line(";; evaluate fallback");
                 self.generate_expr(fallback);
-
-                // 2. Create a deferred function for the body.
-                // The body runs after a requestAnimationFrame to allow the
-                // fallback to paint first. When done, the runtime swaps.
-                let cb_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let func_name = format!("$__suspend_body_{}", cb_idx);
-
-                // Generate the body in a deferred closure function
-                let saved_output = std::mem::take(&mut self.output);
-                let saved_locals = std::mem::take(&mut self.locals);
+                // 2. Kick off async load of the body; runtime swaps fallback
+                //    for the real content when ready
+                self.line(";; evaluate body (async)");
                 self.generate_expr(body);
-                let body_code = std::mem::take(&mut self.output);
-                self.output = saved_output;
-                let mut closure_body = format!("(func {} (result i32)\n", func_name);
-                for (name, wasm_ty) in &self.locals {
-                    closure_body.push_str(&format!("  (local ${} {})\n", name, wasm_ty));
-                }
-                self.locals = saved_locals;
-                closure_body.push_str(&body_code);
-                closure_body.push_str(")\n");
-                self.closure_functions.push(closure_body);
-                self.closure_func_names.push(func_name.clone());
-                self.needs_func_table = true;
-
-                let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!(";; step 2: schedule deferred body mount (table idx {})", table_idx));
-                self.line(&format!("i32.const {} ;; body function table index", table_idx));
-
                 // The runtime manages the swap from fallback -> body
                 self.line("call $dom_lazyMount");
             }
@@ -11143,10 +9669,6 @@ impl WasmCodegen {
                 self.generate_expr(catch_body);
                 self.indent -= 1;
                 self.line(") ;; end $try_ok");
-                // If both try and catch contain explicit returns, control never
-                // reaches here.  Emit unreachable to satisfy the WASM validator
-                // which requires the stack to match the function return type.
-                self.line("unreachable ;; control never reaches here (try/catch both return)");
             }
             Expr::Animate { target, animation } => {
                 self.line(";; animate — play a named animation on target");
@@ -11211,19 +9733,10 @@ impl WasmCodegen {
                 // Deduplicate
                 free_vars.sort();
                 free_vars.dedup();
-                // Only keep names that are actually locals in the current scope.
-                // Also check template_locals for deferred local declarations (e.g., in nested closures
-                // where the outer closure's locals are in template_locals, not self.locals).
+                // Only keep names that are actually locals in the current scope
                 let local_names: Vec<String> = self.locals.iter().map(|(n, _)| n.clone()).collect();
-                let template_local_names: Vec<String> = self.template_locals.iter()
-                    .filter_map(|decl| {
-                        // Parse "(local $name type)" to extract name
-                        let s = decl.trim().trim_start_matches("(local ").trim_end_matches(')');
-                        s.split_whitespace().next().map(|n| n.trim_start_matches('$').to_string())
-                    })
-                    .collect();
                 let captures: Vec<String> = free_vars.into_iter()
-                    .filter(|v| local_names.contains(v) || self.for_loop_bindings.contains(v) || template_local_names.contains(v))
+                    .filter(|v| local_names.contains(v) || self.for_loop_bindings.contains(v))
                     .collect();
 
                 // Build the closure function signature
@@ -11237,71 +9750,17 @@ impl WasmCodegen {
                     param_list.push_str(&format!(" (param ${} {})", pname, wasm_ty));
                 }
 
-                // Save and swap codegen state for closure body generation
-                let saved_output = std::mem::take(&mut self.output);
-                let saved_indent = self.indent;
-                let saved_locals = std::mem::take(&mut self.locals);
-                let saved_template_locals = std::mem::take(&mut self.template_locals);
-                let saved_defer = self.defer_template_locals;
-                self.defer_template_locals = true;
-                self.template_locals = Vec::new();
-                self.indent = 2;
-
-                // For closures, the last expression in a Block body is the
-                // return value.  Generate all statements except the last
-                // normally, then generate the last expression without drop
-                // so its value remains on the stack as the closure result.
-                if let Expr::Block(block) = body.as_ref() {
-                    let stmt_count = block.stmts.len();
-                    for (i, stmt) in block.stmts.iter().enumerate() {
-                        let is_last = i == stmt_count - 1;
-                        if is_last {
-                            if let Stmt::Expr(expr) = stmt {
-                                self.generate_expr(expr);
-                            } else {
-                                self.generate_stmt(stmt);
-                            }
-                        } else {
-                            self.generate_stmt(stmt);
-                        }
-                    }
-                } else {
-                    self.generate_expr(body);
-                }
-
-                let body_code = std::mem::replace(&mut self.output, saved_output);
-                self.indent = saved_indent;
-
-                // Collect closure-local declarations from body generation
-                let closure_locals = std::mem::take(&mut self.template_locals);
-                self.template_locals = saved_template_locals;
-                self.defer_template_locals = saved_defer;
-                self.locals = saved_locals;
-
-                // Build closure function: signature, ALL locals, capture loads, body
+                // Generate the closure function body into a separate buffer
                 let mut closure_body = String::new();
                 closure_body.push_str(&format!("  (func {} {} (result i32)\n", func_name, param_list));
 
-                // 1. Emit ALL local declarations first (captures + body locals)
+                // If there are captures, emit locals and loads from the env pointer
                 if !captures.is_empty() {
                     for cap in &captures {
                         closure_body.push_str(&format!("    (local ${} i32)\n", cap));
                     }
-                }
-                for local_decl in &closure_locals {
-                    // Avoid redeclaring capture locals
-                    let is_capture_dup = captures.iter().any(|cap| {
-                        local_decl.contains(&format!("${} ", cap)) || local_decl.contains(&format!("${})", cap))
-                    });
-                    if !is_capture_dup {
-                        closure_body.push_str(&format!("    {}\n", local_decl));
-                    }
-                }
-
-                // 2. Emit capture env loads (after all locals are declared)
-                if !captures.is_empty() {
                     for (i, cap) in captures.iter().enumerate() {
-                        closure_body.push_str("    local.get $__env\n");
+                        closure_body.push_str(&format!("    local.get $__env\n"));
                         if i > 0 {
                             closure_body.push_str(&format!("    i32.const {}\n", i * 4));
                             closure_body.push_str("    i32.add\n");
@@ -11311,23 +9770,19 @@ impl WasmCodegen {
                     }
                 }
 
-                // 3. Emit body code
+                // Save and swap codegen state
+                let saved_output = std::mem::take(&mut self.output);
+                let saved_indent = self.indent;
+                let saved_locals = std::mem::take(&mut self.locals);
+                self.indent = 2;
+
+                self.generate_expr(body);
+
+                let body_code = std::mem::replace(&mut self.output, saved_output);
+                self.indent = saved_indent;
+                self.locals = saved_locals;
+
                 closure_body.push_str(&body_code);
-                // Determine if the closure body produces a value (i32) on the stack.
-                // If the last expression is void (method call, signal_set, console call, etc.),
-                // we need to add a default i32.const 0 since the closure type requires (result i32).
-                let body_produces_value = if let Expr::Block(block) = body.as_ref() {
-                    block.stmts.last().map(|s| match s {
-                        Stmt::Expr(e) => !self.expr_is_void(e),
-                        Stmt::Return(Some(_)) => true,
-                        _ => false,
-                    }).unwrap_or(false)
-                } else {
-                    !self.expr_is_void(body)
-                };
-                if !body_produces_value {
-                    closure_body.push_str("    i32.const 0 ;; default return for closure\n");
-                }
                 closure_body.push_str("  )\n");
 
                 self.closure_functions.push(closure_body);
@@ -11399,21 +9854,7 @@ impl WasmCodegen {
             Expr::DynamicImport { path, .. } => {
                 self.line(";; dynamic import — triggers code split and async chunk loading");
                 self.generate_expr(path);
-                // Register a callback for when the module finishes loading.
-                // The callback receives the loaded module handle as i32.
-                let cb_idx = self.closure_counter;
-                self.closure_counter += 1;
-                let func_name = format!("$__import_cb_{}", cb_idx);
-                let closure_body = format!(
-                    "(func {} (param $module_handle i32) (result i32)\n  ;; Dynamic import callback — module loaded\n  local.get $module_handle\n)\n",
-                    func_name
-                );
-                self.closure_functions.push(closure_body);
-                self.closure_func_names.push(func_name.clone());
-                self.needs_func_table = true;
-                let table_idx = self.closure_func_names.len() as u32 - 1;
-                self.line(&format!("i32.const {} ;; import callback index ({})", table_idx, func_name));
-                self.line("call $dom_loadChunk");
+                self.line("call $load_chunk");
             }
             Expr::Download { data, filename, .. } => {
                 self.line(";; download — trigger file download");
@@ -11462,13 +9903,8 @@ impl WasmCodegen {
                 self.generate_expr(subject);
                 let subj_label = self.next_label();
                 let subject_local = format!("$__match_subj_{}", subj_label);
-                self.emit_template_local(&subject_local);
+                self.locals.push((format!("__match_subj_{}", subj_label), WasmType::I32));
                 self.line(&format!("local.set {}", subject_local));
-
-                // Detect if any arm body is a string literal — if so, the
-                // match produces (ptr, len) from StringLit.  We need to drop
-                // the len so the match result is a single i32 (pointer).
-                let arms_are_string = arms.iter().any(|a| matches!(&a.body, Expr::StringLit(_)));
 
                 // Each arm becomes an if/else chain.
                 // Track how many nested if/else blocks we open so we can close them.
@@ -11484,9 +9920,6 @@ impl WasmCodegen {
                                 self.emit("(then");
                                 self.indent += 1;
                                 self.generate_expr(&arm.body);
-                                if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
-                                    self.line("drop ;; drop str len, keep ptr");
-                                }
                                 self.indent -= 1;
                                 self.line(")");
                                 self.emit("(else");
@@ -11498,9 +9931,6 @@ impl WasmCodegen {
                                 self.line(")");
                             } else {
                                 self.generate_expr(&arm.body);
-                                if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
-                                    self.line("drop ;; drop str len, keep ptr");
-                                }
                             }
                         }
                         Pattern::Literal(lit_expr) => {
@@ -11524,9 +9954,6 @@ impl WasmCodegen {
                             self.emit("(then");
                             self.indent += 1;
                             self.generate_expr(&arm.body);
-                            if arms_are_string && matches!(&arm.body, Expr::StringLit(_)) {
-                                self.line("drop ;; drop str len, keep ptr");
-                            }
                             self.indent -= 1;
                             self.line(")");
                             self.emit("(else");
@@ -11556,117 +9983,15 @@ impl WasmCodegen {
                             self.indent += 1;
                             open_ifs += 1;
                         }
-                        Pattern::Struct { name, fields, .. } => {
-                            // Struct destructuring in match arm.
-                            // The subject is a struct pointer. Bind each field
-                            // as a local by loading from the appropriate offset.
-                            self.line(&format!(";; match arm: struct {} destructure", name));
-                            for (i, (field_name, sub_pattern)) in fields.iter().enumerate() {
-                                if let Pattern::Ident(binding_name) = sub_pattern {
-                                    let offset = self.get_struct_field_offset(name, field_name)
-                                        .unwrap_or((i as u32) * 4);
-                                    self.line(&format!("local.get {}", subject_local));
-                                    if offset == 0 {
-                                        self.line(&format!("i32.load ;; field: {}", field_name));
-                                    } else {
-                                        self.line(&format!("i32.load offset={} ;; field: {}", offset, field_name));
-                                    }
-                                    self.emit_template_local(&format!("${}", binding_name));
-                                    self.line(&format!("local.set ${}", binding_name));
-                                }
-                            }
-                            if let Some(guard) = &arm.guard {
-                                self.generate_expr(guard);
-                                self.emit("(if (result i32)");
-                                self.indent += 1;
-                                self.emit("(then");
-                                self.indent += 1;
-                                self.generate_expr(&arm.body);
-                                self.indent -= 1;
-                                self.line(")");
-                                self.emit("(else");
-                                self.indent += 1;
-                                self.line("i32.const 0 ;; match fallthrough");
-                                self.indent -= 1;
-                                self.line(")");
-                                self.indent -= 1;
-                                self.line(")");
-                            } else {
-                                self.generate_expr(&arm.body);
-                            }
-                        }
-                        Pattern::Tuple(pats) => {
-                            // Tuple destructuring in match arm.
-                            // Subject is a tuple pointer. Load each element at 4-byte offsets.
-                            self.line(";; match arm: tuple destructure");
-                            for (i, sub_pattern) in pats.iter().enumerate() {
-                                if let Pattern::Ident(binding_name) = sub_pattern {
-                                    let offset = (i as u32) * 4;
-                                    self.line(&format!("local.get {}", subject_local));
-                                    if offset == 0 {
-                                        self.line(&format!("i32.load ;; tuple.{}", i));
-                                    } else {
-                                        self.line(&format!("i32.load offset={} ;; tuple.{}", offset, i));
-                                    }
-                                    self.emit_template_local(&format!("${}", binding_name));
-                                    self.line(&format!("local.set ${}", binding_name));
-                                }
-                            }
-                            if let Some(guard) = &arm.guard {
-                                self.generate_expr(guard);
-                                self.emit("(if (result i32)");
-                                self.indent += 1;
-                                self.emit("(then");
-                                self.indent += 1;
-                                self.generate_expr(&arm.body);
-                                self.indent -= 1;
-                                self.line(")");
-                                self.emit("(else");
-                                self.indent += 1;
-                                self.line("i32.const 0 ;; match fallthrough");
-                                self.indent -= 1;
-                                self.line(")");
-                                self.indent -= 1;
-                                self.line(")");
-                            } else {
-                                self.generate_expr(&arm.body);
-                            }
-                        }
-                        Pattern::Array(pats) => {
-                            // Array destructuring in match arm.
-                            // Subject is an array header pointer. Load data_ptr, then index.
-                            self.line(";; match arm: array destructure");
-                            let arr_data_label = self.next_label();
-                            let arr_data_var = format!("$__match_arr_data_{}", arr_data_label);
-                            self.locals.push((format!("__match_arr_data_{}", arr_data_label), WasmType::I32));
-                            self.line(&format!("local.get {}", subject_local));
-                            self.line("i32.load offset=8 ;; data_ptr");
-                            self.line(&format!("local.set {}", arr_data_var));
-                            for (i, sub_pattern) in pats.iter().enumerate() {
-                                if let Pattern::Ident(binding_name) = sub_pattern {
-                                    let offset = (i as u32) * 4;
-                                    self.line(&format!("local.get {}", arr_data_var));
-                                    if offset == 0 {
-                                        self.line(&format!("i32.load ;; elem[{}]", i));
-                                    } else {
-                                        self.line(&format!("i32.load offset={} ;; elem[{}]", offset, i));
-                                    }
-                                    self.locals.push((binding_name.clone(), WasmType::I32));
-                                    self.line(&format!("local.set ${}", binding_name));
-                                }
-                            }
+                        _ => {
+                            // Tuple, Struct, Array patterns — fallthrough for now
                             self.generate_expr(&arm.body);
                         }
                     }
                 }
-                // Close all open else branches.  Only the innermost else
-                // needs a fallthrough value — the outer ones already have
-                // a result from the nested (if (result i32)) expression.
-                let has_wildcard = arms.iter().any(|a| matches!(&a.pattern, Pattern::Wildcard | Pattern::Ident(_)));
-                for i in 0..open_ifs {
-                    if i == 0 && !has_wildcard {
-                        self.line("i32.const 0 ;; match fallthrough");
-                    }
+                // Close all open else branches with a default value
+                for _ in 0..open_ifs {
+                    self.line("i32.const 0 ;; match fallthrough");
                     self.indent -= 1;
                     self.line(")");
                     self.indent -= 1;
@@ -11768,39 +10093,6 @@ impl WasmCodegen {
                 // Leave header pointer on the stack
                 self.line(&format!("local.get {}", hdr_var));
             }
-            Expr::TupleLit(elements) => {
-                // Tuple layout: struct-like memory with each element at 4-byte offsets.
-                // Allocate (n * 4) bytes, store each element, leave pointer on stack.
-                let count = elements.len() as u32;
-                let size = count * 4;
-                let lbl = self.next_label();
-                let ptr_var = format!("$__tuple_ptr_{}", lbl);
-                self.emit_template_local(&ptr_var);
-
-                self.line(&format!(";; tuple literal ({} elements, {} bytes)", count, size));
-                self.line(&format!("i32.const {}", size));
-                self.line("call $alloc");
-                self.line(&format!("local.set {}", ptr_var));
-
-                // Store each element at its offset
-                for (i, elem) in elements.iter().enumerate() {
-                    let offset = (i as u32) * 4;
-                    self.line(&format!("local.get {}", ptr_var));
-                    self.generate_expr(elem);
-                    // String elements push (ptr, len) — drop len, store only ptr
-                    if matches!(elem, Expr::StringLit(_)) {
-                        self.line("drop ;; discard str len for tuple elem");
-                    }
-                    if offset == 0 {
-                        self.line(&format!("i32.store ;; tuple.{}", i));
-                    } else {
-                        self.line(&format!("i32.store offset={} ;; tuple.{}", offset, i));
-                    }
-                }
-
-                // Leave tuple pointer on the stack
-                self.line(&format!("local.get {}", ptr_var));
-            }
             Expr::While { condition, body } => {
                 let lbl = self.next_label();
                 let block_label = format!("$while_break_{}", lbl);
@@ -11817,15 +10109,10 @@ impl WasmCodegen {
                 self.line("i32.eqz");
                 self.line(&format!("br_if {}", block_label));
 
-                // Push loop labels for break/continue
-                self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
-
                 // Body
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
-
-                self.loop_label_stack.pop();
 
                 // Branch back to loop start
                 self.line(&format!("br {}", loop_label));
@@ -11836,97 +10123,6 @@ impl WasmCodegen {
                 self.line("end ;; while break");
             }
             Expr::For { binding, iterator, body } => {
-                // Check if iterator is a range expression (possibly reversed)
-                let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
-                let is_reversed_range = matches!(iterator.as_ref(),
-                    Expr::MethodCall { object, method, .. } if method == "rev" && matches!(object.as_ref(), Expr::Range { .. })
-                );
-
-                if is_range || is_reversed_range {
-                    // Range-based for loop: iterate start..end directly (no array)
-                    let lbl = self.next_label();
-                    let idx_var = format!("${}", binding);
-                    let end_var = format!("$for_end_{}", lbl);
-                    let block_label = format!("$for_break_{}", lbl);
-                    let loop_label = format!("$for_cont_{}", lbl);
-
-                    self.emit_template_local(&idx_var);
-                    self.emit_template_local(&end_var);
-
-                    self.line(&format!(";; for {} in range", binding));
-
-                    let (start_expr, end_expr) = if is_reversed_range {
-                        if let Expr::MethodCall { object, .. } = iterator.as_ref() {
-                            if let Expr::Range { start, end } = object.as_ref() {
-                                (end, start) // Reversed: start from end-1, go down to start
-                            } else { unreachable!() }
-                        } else { unreachable!() }
-                    } else if let Expr::Range { start, end } = iterator.as_ref() {
-                        (start, end)
-                    } else { unreachable!() };
-
-                    if is_reversed_range {
-                        // Reversed range: i = end - 1, loop while i >= start
-                        self.generate_expr(start_expr);
-                        self.line("i32.const 1");
-                        self.line("i32.sub");
-                        self.line(&format!("local.set {}", idx_var));
-                        self.generate_expr(end_expr);
-                        self.line("i32.const 1");
-                        self.line("i32.sub ;; end_var = start - 1 (stop before)");
-                        self.line(&format!("local.set {}", end_var));
-                    } else {
-                        self.generate_expr(start_expr);
-                        self.line(&format!("local.set {}", idx_var));
-                        self.generate_expr(end_expr);
-                        self.line(&format!("local.set {}", end_var));
-                    }
-
-                    self.line(&format!("block {} ;; for break", block_label));
-                    self.indent += 1;
-                    self.line(&format!("loop {} ;; for continue", loop_label));
-                    self.indent += 1;
-
-                    if is_reversed_range {
-                        // br_if break (idx <= end_var, i.e., idx < start)
-                        self.line(&format!("local.get {}", idx_var));
-                        self.line(&format!("local.get {}", end_var));
-                        self.line("i32.le_s");
-                        self.line(&format!("br_if {}", block_label));
-                    } else {
-                        self.line(&format!("local.get {}", idx_var));
-                        self.line(&format!("local.get {}", end_var));
-                        self.line("i32.ge_s");
-                        self.line(&format!("br_if {}", block_label));
-                    }
-
-                    // Body
-                    self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
-                    self.for_loop_bindings.push(binding.clone());
-                    for stmt in &body.stmts {
-                        self.generate_stmt(stmt);
-                    }
-                    self.for_loop_bindings.pop();
-                    self.loop_label_stack.pop();
-
-                    // Increment/decrement index
-                    self.line(&format!("local.get {}", idx_var));
-                    if is_reversed_range {
-                        self.line("i32.const 1");
-                        self.line("i32.sub");
-                    } else {
-                        self.line("i32.const 1");
-                        self.line("i32.add");
-                    }
-                    self.line(&format!("local.set {}", idx_var));
-
-                    self.line(&format!("br {}", loop_label));
-
-                    self.indent -= 1;
-                    self.line("end ;; for continue");
-                    self.indent -= 1;
-                    self.line("end ;; for break");
-                } else {
                 // Imperative for loop (non-template): iterate array
                 let lbl = self.next_label();
                 let arr_var = format!("$for_arr_{}", lbl);
@@ -11984,13 +10180,11 @@ impl WasmCodegen {
                 self.line(&format!("local.set {}", binding_var));
 
                 // Body
-                self.loop_label_stack.push((block_label.clone(), loop_label.clone()));
                 self.for_loop_bindings.push(binding.clone());
                 for stmt in &body.stmts {
                     self.generate_stmt(stmt);
                 }
                 self.for_loop_bindings.pop();
-                self.loop_label_stack.pop();
 
                 // Increment index
                 self.line(&format!("local.get {}", idx_var));
@@ -12004,21 +10198,6 @@ impl WasmCodegen {
                 self.line("end ;; for continue");
                 self.indent -= 1;
                 self.line("end ;; for break");
-                } // end else (array-based for loop)
-            }
-            Expr::Break => {
-                if let Some((break_label, _)) = self.loop_label_stack.last() {
-                    self.line(&format!("br {} ;; break", break_label));
-                } else {
-                    self.line(";; ERROR: break outside of loop");
-                }
-            }
-            Expr::Continue => {
-                if let Some((_, continue_label)) = self.loop_label_stack.last() {
-                    self.line(&format!("br {} ;; continue", continue_label));
-                } else {
-                    self.line(";; ERROR: continue outside of loop");
-                }
             }
             Expr::Block(block) => {
                 for stmt in &block.stmts {
@@ -12039,8 +10218,7 @@ impl WasmCodegen {
                 for (i, (_name, value)) in fields.iter().enumerate() {
                     self.line(&format!("local.get {}", ptr_var));
                     self.generate_expr(value);
-                    // For expressions that push (ptr, len), drop the len — store only the ptr
-                    if self.expr_pushes_ptr_len(value) {
+                    if matches!(value, Expr::StringLit(_)) {
                         self.line("drop ;; keep only str ptr for object field");
                     }
                     if i == 0 {
@@ -12056,15 +10234,55 @@ impl WasmCodegen {
                 // Borrow checking happens before codegen ensures safety.
                 self.generate_expr(inner);
             }
+            Expr::Break => {
+                if let Some((break_label, _)) = self.loop_label_stack.last() {
+                    self.line(&format!("br {} ;; break", break_label));
+                }
+            }
+            Expr::Continue => {
+                if let Some((_, continue_label)) = self.loop_label_stack.last() {
+                    self.line(&format!("br {} ;; continue", continue_label));
+                }
+            }
+            Expr::TupleLit(elements) => {
+                let lbl = self.next_label();
+                let ptr_var = format!("$__tuple_ptr_{}", lbl);
+                self.emit_template_local(&ptr_var);
+                let size = (elements.len() as u32) * 4;
+                let size = if size == 0 { 4 } else { size };
+                self.line(&format!("i32.const {} ;; tuple size", size));
+                self.line("call $alloc");
+                self.line(&format!("local.set {}", ptr_var));
+                for (i, elem) in elements.iter().enumerate() {
+                    self.line(&format!("local.get {}", ptr_var));
+                    self.generate_expr(elem);
+                    if i == 0 {
+                        self.line("i32.store ;; tuple elem 0");
+                    } else {
+                        self.line(&format!("i32.store offset={} ;; tuple elem {}", i * 4, i));
+                    }
+                }
+                self.line(&format!("local.get {}", ptr_var));
+            }
         }
     }
 
     fn emit_alloc_function(&mut self) {
         self.line(";; Bump allocator with automatic memory.grow");
+        self.line(";; Delegates to $alloc_store when $__store_alloc_mode is set");
         self.emit("(func $alloc (export \"alloc\") (param $size i32) (result i32)");
         self.indent += 1;
         self.line("(local $ptr i32)");
         self.line("(local $needed_pages i32)");
+        // Check store alloc mode — if set, delegate to $alloc_store
+        self.line("global.get $__store_alloc_mode");
+        self.line("if (result i32)");
+        self.indent += 1;
+        self.line("local.get $size");
+        self.line("call $alloc_store");
+        self.indent -= 1;
+        self.line("else");
+        self.indent += 1;
         // Save current heap pointer as the allocation start
         self.line("global.get $heap_ptr");
         self.line("local.set $ptr");
@@ -12106,6 +10324,79 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line("end");
         // Return the original pointer
+        self.line("local.get $ptr");
+        self.indent -= 1;
+        self.line("end ;; store_alloc_mode if/else");
+        self.indent -= 1;
+        self.line(")");
+
+        // $alloc_store: bump allocator for store-tier memory (signal values, store
+        // action mutations). Bumps $store_ptr upward. Store region lives below
+        // $page_base and is never automatically reset.
+        self.line("");
+        self.line(";; Store-tier bump allocator — for persistent store data");
+        self.emit("(func $alloc_store (param $size i32) (result i32)");
+        self.indent += 1;
+        self.line("(local $ptr i32)");
+        self.line("(local $needed_pages i32)");
+        self.line("global.get $store_ptr");
+        self.line("local.set $ptr");
+        self.line("global.get $store_ptr");
+        self.line("local.get $size");
+        self.line("i32.add");
+        self.line("global.set $store_ptr");
+        // Check if store_ptr exceeds current memory size
+        self.line("global.get $store_ptr");
+        self.line("memory.size");
+        self.line("i32.const 65536");
+        self.line("i32.mul");
+        self.line("i32.gt_u");
+        self.line("if ;; need more memory for store tier");
+        self.indent += 1;
+        self.line("global.get $store_ptr");
+        self.line("memory.size");
+        self.line("i32.const 65536");
+        self.line("i32.mul");
+        self.line("i32.sub");
+        self.line("i32.const 65535");
+        self.line("i32.add");
+        self.line("i32.const 65536");
+        self.line("i32.div_u");
+        self.line("local.set $needed_pages");
+        self.line("memory.size");
+        self.line("local.get $needed_pages");
+        self.line("memory.size");
+        self.line("local.get $needed_pages");
+        self.line("i32.gt_u");
+        self.line("select");
+        self.line("memory.grow");
+        self.line("drop");
+        self.indent -= 1;
+        self.line("end");
+        // Update page_base and render_base to stay above store_ptr
+        // This ensures store growth doesn't overlap page/render regions
+        self.line(";; If store grew into page region, shift page_base up");
+        self.line("global.get $store_ptr");
+        self.line("global.get $page_base");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.indent += 1;
+        self.line("global.get $store_ptr");
+        self.line("global.set $page_base");
+        self.line("global.get $store_ptr");
+        self.line("global.set $render_base");
+        // Also move heap_ptr if it's below new page_base
+        self.line("global.get $store_ptr");
+        self.line("global.get $heap_ptr");
+        self.line("i32.gt_u");
+        self.line("if");
+        self.indent += 1;
+        self.line("global.get $store_ptr");
+        self.line("global.set $heap_ptr");
+        self.indent -= 1;
+        self.line("end");
+        self.indent -= 1;
+        self.line("end");
         self.line("local.get $ptr");
         self.indent -= 1;
         self.line(")");
@@ -12932,399 +11223,6 @@ impl WasmCodegen {
         self.line(")");
     }
 
-    /// Emit stdlib helper functions that are called by bare name from Nectar code.
-    /// These are WASM-internal implementations for common operations.
-    fn emit_stdlib_helpers(&mut self) {
-        self.line("");
-        self.line(";; ── Stdlib helpers (WASM-internal) ──────────────────────────────");
-
-        // Option helpers: is_some, is_none, unwrap
-        // Option<T> layout: [tag: i32, value: i32] — tag 0 = None, 1 = Some
-        self.emit("(func $is_some (param $opt i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $opt");
-        self.line("i32.eqz");
-        self.line("i32.eqz ;; nonzero ptr = Some");
-        self.indent -= 1;
-        self.line(")");
-
-        self.emit("(func $is_none (param $opt i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $opt");
-        self.line("i32.eqz ;; zero ptr = None");
-        self.indent -= 1;
-        self.line(")");
-
-        self.emit("(func $unwrap (param $opt i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $opt ;; return the value directly (panics if null/0)");
-        self.indent -= 1;
-        self.line(")");
-
-        // clone: identity (WASM i32 values are Copy)
-        self.emit("(func $clone (param $val i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $val");
-        self.indent -= 1;
-        self.line(")");
-
-        // rev: reverse an array (returns new array with reversed elements)
-        self.emit("(func $rev (param $arr i32) (result i32)");
-        self.indent += 1;
-        self.line("(local $len i32) (local $out i32) (local $i i32)");
-        self.line("local.get $arr");
-        self.line("i32.load ;; length");
-        self.line("local.set $len");
-        self.line("local.get $len");
-        self.line("i32.const 4");
-        self.line("i32.mul");
-        self.line("i32.const 4 ;; header");
-        self.line("i32.add");
-        self.line("call $alloc");
-        self.line("local.set $out");
-        self.line("local.get $out");
-        self.line("local.get $len");
-        self.line("i32.store ;; set length");
-        self.line("i32.const 0");
-        self.line("local.set $i");
-        self.line("(block $brk (loop $lp");
-        self.indent += 1;
-        self.line("local.get $i  local.get $len  i32.ge_u  br_if $brk");
-        // out[len-1-i] = arr[i]
-        self.line("local.get $out  i32.const 4  i32.add");
-        self.line("local.get $len  i32.const 1  i32.sub  local.get $i  i32.sub");
-        self.line("i32.const 4  i32.mul  i32.add");
-        self.line("local.get $arr  i32.const 4  i32.add");
-        self.line("local.get $i  i32.const 4  i32.mul  i32.add");
-        self.line("i32.load");
-        self.line("i32.store");
-        self.line("local.get $i  i32.const 1  i32.add  local.set $i");
-        self.line("br $lp");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out");
-        self.indent -= 1;
-        self.line(")");
-
-        // char_at: get a single character at position
-        // Returns ptr to a 1-byte string in memory
-        self.emit("(func $char_at (param $str i32) (param $idx i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("(local $out i32)");
-        self.line("i32.const 2  call $alloc  local.set $out");
-        self.line("local.get $out");
-        self.line("local.get $str  local.get $idx  i32.add  i32.load8_u");
-        self.line("i32.store8");
-        self.line("local.get $out  i32.const 1  i32.add  i32.const 0  i32.store8 ;; null-terminate");
-        self.line("local.get $out");
-        self.line("i32.const 1");
-        self.indent -= 1;
-        self.line(")");
-
-        // to_uppercase: convert a string to uppercase (ASCII only)
-        self.emit("(func $to_uppercase (param $ptr i32) (param $len i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("(local $out i32) (local $i i32) (local $ch i32)");
-        self.line("local.get $len  i32.const 1  i32.add  call $alloc  local.set $out");
-        self.line("i32.const 0  local.set $i");
-        self.line("(block $brk (loop $lp");
-        self.indent += 1;
-        self.line("local.get $i  local.get $len  i32.ge_u  br_if $brk");
-        self.line("local.get $ptr  local.get $i  i32.add  i32.load8_u  local.set $ch");
-        // if ch >= 'a' && ch <= 'z' then ch -= 32
-        self.line("local.get $ch  i32.const 97  i32.ge_u");
-        self.line("local.get $ch  i32.const 122  i32.le_u");
-        self.line("i32.and");
-        self.line("(if (then");
-        self.indent += 1;
-        self.line("local.get $ch  i32.const 32  i32.sub  local.set $ch");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out  local.get $i  i32.add  local.get $ch  i32.store8");
-        self.line("local.get $i  i32.const 1  i32.add  local.set $i");
-        self.line("br $lp");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out  local.get $len  i32.add  i32.const 0  i32.store8");
-        self.line("local.get $out");
-        self.line("local.get $len");
-        self.indent -= 1;
-        self.line(")");
-
-        // capitalize: uppercase first char, rest unchanged
-        self.emit("(func $capitalize (param $ptr i32) (param $len i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("(local $out i32) (local $ch i32)");
-        self.line("local.get $len  i32.const 1  i32.add  call $alloc  local.set $out");
-        self.line("local.get $out  local.get $ptr  local.get $len  memory.copy");
-        // Uppercase first char
-        self.line("local.get $len  i32.const 0  i32.gt_u");
-        self.line("(if (then");
-        self.indent += 1;
-        self.line("local.get $out  i32.load8_u  local.set $ch");
-        self.line("local.get $ch  i32.const 97  i32.ge_u");
-        self.line("local.get $ch  i32.const 122  i32.le_u");
-        self.line("i32.and");
-        self.line("(if (then");
-        self.indent += 1;
-        self.line("local.get $out  local.get $ch  i32.const 32  i32.sub  i32.store8");
-        self.indent -= 1;
-        self.line("))");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out  local.get $len  i32.add  i32.const 0  i32.store8");
-        self.line("local.get $out");
-        self.line("local.get $len");
-        self.indent -= 1;
-        self.line(")");
-
-        // chars: returns the string pointer as-is (iterator concept)
-        self.emit("(func $chars (param $ptr i32) (param $len i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $ptr ;; chars iterator is just the string pointer");
-        self.indent -= 1;
-        self.line(")");
-
-        // next: get next char from iterator (returns char code or 0)
-        self.emit("(func $next (param $iter i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $iter");
-        self.line("i32.load8_u ;; load next byte");
-        self.indent -= 1;
-        self.line(")");
-
-        // parse_f64: stub (returns the i32 value as-is for now)
-        self.emit("(func $parse_f64 (param $ptr i32) (param $len i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $ptr ;; stub: return ptr");
-        self.indent -= 1;
-        self.line(")");
-
-        // json_decode: stub (returns the ptr as-is — JSON data is in linear memory)
-        self.emit("(func $json_decode (param $ptr i32) (param $len i32) (result i32)");
-        self.indent += 1;
-        self.line(";; json_decode — parse JSON string into memory struct");
-        self.line("local.get $ptr");
-        self.line("local.get $len");
-        self.line("call $json_parse ;; use WASM JSON parser");
-        self.indent -= 1;
-        self.line(")");
-
-        // json_encode: stub (returns ptr, len of JSON string)
-        self.emit("(func $json_encode (param $obj i32) (result i32 i32)");
-        self.indent += 1;
-        self.line(";; json_encode — serialize object to JSON string");
-        self.line("local.get $obj");
-        self.line("call $to_string ;; basic serialization");
-        self.indent -= 1;
-        self.line(")");
-
-        // url_encode: percent-encode a string (basic ASCII encoding)
-        self.emit("(func $url_encode (param $ptr i32) (param $len i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("(local $out i32) (local $i i32) (local $j i32) (local $ch i32)");
-        // Worst case: every char needs %XX = 3 bytes
-        self.line("local.get $len  i32.const 3  i32.mul  i32.const 1  i32.add  call $alloc  local.set $out");
-        self.line("i32.const 0  local.set $i");
-        self.line("i32.const 0  local.set $j");
-        self.line("(block $brk (loop $lp");
-        self.indent += 1;
-        self.line("local.get $i  local.get $len  i32.ge_u  br_if $brk");
-        self.line("local.get $ptr  local.get $i  i32.add  i32.load8_u  local.set $ch");
-        // Unreserved chars: A-Z, a-z, 0-9, -, _, ., ~
-        self.line("local.get $ch  i32.const 45  i32.eq");          // -
-        self.line("local.get $ch  i32.const 46  i32.eq  i32.or");  // .
-        self.line("local.get $ch  i32.const 95  i32.eq  i32.or");  // _
-        self.line("local.get $ch  i32.const 126  i32.eq  i32.or"); // ~
-        self.line("local.get $ch  i32.const 48  i32.ge_u  local.get $ch  i32.const 57  i32.le_u  i32.and  i32.or"); // 0-9
-        self.line("local.get $ch  i32.const 65  i32.ge_u  local.get $ch  i32.const 90  i32.le_u  i32.and  i32.or"); // A-Z
-        self.line("local.get $ch  i32.const 97  i32.ge_u  local.get $ch  i32.const 122  i32.le_u  i32.and  i32.or"); // a-z
-        self.line("(if (then");
-        self.indent += 1;
-        self.line("local.get $out  local.get $j  i32.add  local.get $ch  i32.store8");
-        self.line("local.get $j  i32.const 1  i32.add  local.set $j");
-        self.indent -= 1;
-        self.line(") (else");
-        self.indent += 1;
-        // Write %XX
-        self.line("local.get $out  local.get $j  i32.add  i32.const 37  i32.store8 ;; %");
-        self.line("local.get $j  i32.const 1  i32.add  local.set $j");
-        // High nibble
-        self.line("local.get $out  local.get $j  i32.add");
-        self.line("local.get $ch  i32.const 4  i32.shr_u  i32.const 15  i32.and");
-        self.line("call $__hex_digit");
-        self.line("i32.store8");
-        self.line("local.get $j  i32.const 1  i32.add  local.set $j");
-        // Low nibble
-        self.line("local.get $out  local.get $j  i32.add");
-        self.line("local.get $ch  i32.const 15  i32.and");
-        self.line("call $__hex_digit");
-        self.line("i32.store8");
-        self.line("local.get $j  i32.const 1  i32.add  local.set $j");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $i  i32.const 1  i32.add  local.set $i");
-        self.line("br $lp");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out");
-        self.line("local.get $j");
-        self.indent -= 1;
-        self.line(")");
-
-        // __hex_digit: convert 0-15 to ASCII hex digit
-        self.emit("(func $__hex_digit (param $v i32) (result i32)");
-        self.indent += 1;
-        self.line("(local $out i32)");
-        self.line("local.get $v  i32.const 10  i32.lt_u");
-        self.line("(if (then");
-        self.indent += 1;
-        self.line("local.get $v  i32.const 48  i32.add  local.set $out ;; '0' + v");
-        self.indent -= 1;
-        self.line(") (else");
-        self.indent += 1;
-        self.line("local.get $v  i32.const 55  i32.add  local.set $out ;; 'A' + v - 10");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out");
-        self.indent -= 1;
-        self.line(")");
-
-        // url_form_encode: stub (returns ptr, len — passthrough for now)
-        self.emit("(func $url_form_encode (param $obj i32) (result i32 i32)");
-        self.indent += 1;
-        self.line(";; url_form_encode — serialize object to form-encoded string");
-        self.line("local.get $obj");
-        self.line("call $to_string");
-        self.indent -= 1;
-        self.line(")");
-
-        // random_hex: generate random hex string of given byte length
-        // Uses crypto random if available, else simple LCG
-        self.emit("(func $random_hex (param $byte_len i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("(local $out i32) (local $i i32) (local $rand i32)");
-        self.line("local.get $byte_len  i32.const 2  i32.mul  i32.const 1  i32.add  call $alloc  local.set $out");
-        self.line("i32.const 0  local.set $i");
-        self.line("(block $brk (loop $lp");
-        self.indent += 1;
-        self.line("local.get $i  local.get $byte_len  i32.const 2  i32.mul  i32.ge_u  br_if $brk");
-        // Simple pseudo-random using heap pointer XOR
-        self.line("global.get $heap_ptr  local.get $i  i32.xor  i32.const 48271  i32.mul  i32.const 2147483647  i32.rem_u  local.set $rand");
-        self.line("local.get $out  local.get $i  i32.add");
-        self.line("local.get $rand  i32.const 16  i32.rem_u  call $__hex_digit  i32.store8");
-        self.line("local.get $i  i32.const 1  i32.add  local.set $i");
-        self.line("br $lp");
-        self.indent -= 1;
-        self.line("))");
-        self.line("local.get $out");
-        self.line("local.get $byte_len  i32.const 2  i32.mul");
-        self.indent -= 1;
-        self.line(")");
-
-        // base64url_sha256: stub (returns the input string as-is for now)
-        self.emit("(func $base64url_sha256 (param $ptr i32) (param $len i32) (result i32 i32)");
-        self.indent += 1;
-        self.line(";; base64url_sha256 — compute SHA-256 and base64url-encode");
-        self.line("local.get $ptr");
-        self.line("local.get $len");
-        self.indent -= 1;
-        self.line(")");
-
-        // show_toast / hide_toast: emit as DOM operations
-        self.emit("(func $dom_showToast (param $msg_ptr i32) (param $msg_len i32)");
-        self.indent += 1;
-        self.line(";; show_toast — display notification toast");
-        self.line("local.get $msg_ptr");
-        self.line("local.get $msg_len");
-        self.line("call $webapi_consoleLog ;; fallback: log to console");
-        self.indent -= 1;
-        self.line(")");
-
-        self.emit("(func $dom_hideToast");
-        self.indent += 1;
-        self.line(";; hide_toast — dismiss active toast");
-        self.line("nop");
-        self.indent -= 1;
-        self.line(")");
-
-        // Map helpers
-        self.emit("(func $Map_serialize (param $map i32) (result i32 i32)");
-        self.indent += 1;
-        self.line("local.get $map  call $to_string");
-        self.indent -= 1;
-        self.line(")");
-
-        self.emit("(func $Map_parse_from_obj (param $ptr i32) (result i32)");
-        self.indent += 1;
-        self.line("local.get $ptr ;; return pointer to parsed object");
-        self.indent -= 1;
-        self.line(")");
-
-        // HTTP convenience wrappers — only emit when HTTP is used
-        if self.needs_http {
-        // http_get: convenience wrapper — sets method GET, sets headers, calls fetchWithCallback
-        self.emit("(func $__http_get (param $url_ptr i32) (param $url_len i32) (param $headers i32) (param $ok_cb i32) (param $err_cb i32) (result i32)");
-        self.indent += 1;
-        // Set method to GET
-        let get_str = self.store_string("GET");
-        self.line(&format!("i32.const {}  i32.const 3  call $http_setMethod", get_str));
-        // Set headers via __readOpts if headers pointer is provided
-        self.line("local.get $headers");
-        self.line("call $__apply_headers");
-        // Fetch with callback
-        self.line("local.get $url_ptr");
-        self.line("local.get $url_len");
-        self.line("local.get $ok_cb");
-        self.line("call $http_fetchWithCallback");
-        self.line("i32.const 0 ;; return value placeholder");
-        self.indent -= 1;
-        self.line(")");
-
-        // http_post: convenience wrapper
-        self.emit("(func $__http_post (param $url_ptr i32) (param $url_len i32) (param $body_ptr i32) (param $body_len i32) (param $headers i32) (param $ok_cb i32) (param $err_cb i32) (result i32)");
-        self.indent += 1;
-        let post_str = self.store_string("POST");
-        self.line(&format!("i32.const {}  i32.const 4  call $http_setMethod", post_str));
-        // Set body
-        self.line("local.get $body_ptr");
-        self.line("local.get $body_len");
-        self.line("call $http_setBody");
-        // Set headers
-        self.line("local.get $headers");
-        self.line("call $__apply_headers");
-        // Fetch with callback
-        self.line("local.get $url_ptr");
-        self.line("local.get $url_len");
-        self.line("local.get $ok_cb");
-        self.line("call $http_fetchWithCallback");
-        self.line("i32.const 0 ;; return value placeholder");
-        self.indent -= 1;
-        self.line(")");
-
-        // __apply_headers: read header key-value pairs from object pointer
-        self.emit("(func $__apply_headers (param $headers_ptr i32)");
-        self.indent += 1;
-        self.line(";; Apply headers from object pointer using flat memory reads");
-        self.line(";; For now, treat headers_ptr as a single key-value pair object");
-        self.line(";; (key_ptr at offset 0, value at offset 4)");
-        self.line("local.get $headers_ptr");
-        self.line("i32.eqz");
-        self.line("(if (then nop) (else");
-        self.indent += 1;
-        // Read first key-value pair and add as header
-        self.line("local.get $headers_ptr  i32.load ;; key ptr");
-        self.line("local.get $headers_ptr  i32.load ;; key ptr (for len calc)");
-        self.line("call $str_len");
-        self.line("local.get $headers_ptr  i32.load offset=4 ;; value (unused in flat header)");
-        self.line("drop  drop  drop  drop ;; header application simplified");
-        self.indent -= 1;
-        self.line("))");
-        self.indent -= 1;
-        self.line(")");
-        } // end if self.needs_http
-    }
-
     /// Emit WASM-internal no-op stubs for namespaces that codegen calls but are not JS bridges.
     /// These exist so call sites in generate_* functions don't reference undefined functions.
     /// Emit WASM-internal runtimes for contract, permissions, form, lifecycle, cache, responsive, routing.
@@ -13743,6 +11641,12 @@ impl WasmCodegen {
         self.line(";; Clear router container before mounting new route");
         self.line("global.get $__router_container");
         self.line("call $dom_clearChildren");
+        // Page tier reset — same as router_navigate
+        self.line(";; Page tier reset — free page + render allocations");
+        self.line("global.get $page_base");
+        self.line("global.set $heap_ptr");
+        self.line("global.get $page_base");
+        self.line("global.set $render_base");
         self.line(";; Scan route table for matching path");
         self.line("i32.const 0  local.set $i");
         self.line("block $done");
@@ -13785,6 +11689,12 @@ impl WasmCodegen {
         self.line(";; Clear router container before mounting new route");
         self.line("global.get $__router_container");
         self.line("call $dom_clearChildren");
+        // Page tier reset — free all component/mount allocations on navigation
+        self.line(";; Page tier reset — free page + render allocations");
+        self.line("global.get $page_base");
+        self.line("global.set $heap_ptr");
+        self.line("global.get $page_base");
+        self.line("global.set $render_base");
         self.line(";; Scan route table for matching path");
         self.line("i32.const 0  local.set $i");
         self.line("block $done");
@@ -13869,25 +11779,6 @@ impl WasmCodegen {
         self.line("  end");
         self.line("end");
         self.line("local.get $ptr");
-        self.line("local.get $len");
-        self.indent -= 1;
-        self.line(")");
-
-        // string_len: compute length of null-terminated string, return just the length (i32)
-        // Used by form validators that need only the string length
-        self.emit("(func $string_len (param $ptr i32) (result i32)");
-        self.indent += 1;
-        self.line("(local $len i32)");
-        self.line("i32.const 0  local.set $len");
-        self.line("block $done");
-        self.line("  loop $scan");
-        self.line("    local.get $ptr  local.get $len  i32.add  i32.load8_u");
-        self.line("    i32.eqz  br_if $done");
-        self.line("    local.get $len  i32.const 1  i32.add  local.set $len");
-        self.line("    local.get $len  i32.const 4096  i32.ge_u  br_if $done");
-        self.line("    br $scan");
-        self.line("  end");
-        self.line("end");
         self.line("local.get $len");
         self.indent -= 1;
         self.line(")");
@@ -14999,15 +12890,10 @@ impl WasmCodegen {
     fn collect_locals(&mut self, block: &Block) {
         for stmt in &block.stmts {
             match stmt {
-                Stmt::Let { name, ty, value, .. } => {
-                    let wasm_ty = if self.expr_is_float(value) {
-                        // Float expressions always use f64 regardless of annotation
-                        WasmType::F64
-                    } else if let Some(t) = ty.as_ref() {
-                        self.ast_type_to_wasm(t)
-                    } else {
-                        WasmType::I32
-                    };
+                Stmt::Let { name, ty, .. } => {
+                    let wasm_ty = ty.as_ref()
+                        .map(|t| self.ast_type_to_wasm(t))
+                        .unwrap_or(WasmType::I32);
                     self.locals.push((name.clone(), wasm_ty));
                 }
                 Stmt::LetDestructure { pattern, .. } => {
@@ -15041,9 +12927,7 @@ impl WasmCodegen {
         match ty {
             Type::Named(name) => match name.as_str() {
                 "i32" | "u32" | "bool" => "i32".into(),
-                // i64/u64: codegen arithmetic is i32-only, so we compile i64 as i32.
-                // This limits range but avoids type mismatches throughout.
-                "i64" | "u64" => "i32".into(),
+                "i64" | "u64" => "i64".into(),
                 "f32" => "f32".into(),
                 "f64" => "f64".into(),
                 "String" => "i32".into(), // pointer
@@ -15059,29 +12943,10 @@ impl WasmCodegen {
         }
     }
 
-    /// Map a return type to its WASM representation.
-    /// String returns are (i32 i32) = (ptr, len) to match the string calling convention.
-    fn return_type_to_wasm(&self, ty: &Type) -> String {
-        match ty {
-            Type::Named(name) => match name.as_str() {
-                "i32" | "u32" | "bool" | "i64" | "u64" => "i32".into(),
-                "f32" => "f32".into(),
-                "f64" => "f64".into(),
-                "String" | "str" => "i32 i32".into(), // ptr + len
-                _ => "i32".into(), // struct pointer
-            },
-            Type::Generic { .. } => "i32".into(),
-            Type::Reference { .. } => "i32".into(),
-            Type::Array(_) => "i32".into(),
-            _ => "i32".into(),
-        }
-    }
-
     fn ast_type_to_wasm(&self, ty: &Type) -> WasmType {
         match ty {
             Type::Named(name) => match name.as_str() {
-                // i64/u64: codegen arithmetic is i32-only, so map to I32
-                "i64" | "u64" => WasmType::I32,
+                "i64" | "u64" => WasmType::I64,
                 "f32" => WasmType::F32,
                 "f64" => WasmType::F64,
                 _ => WasmType::I32,
@@ -15135,16 +13000,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__map_src_{lbl}"));
                 self.line("i32.load ;; array length");
                 self.line(&format!("local.set $__map_len_{lbl}"));
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line(&format!("local.set $__map_dst_{lbl}"));
                 self.line(&format!("local.get $__map_len_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4 ;; header");
                 self.line("i32.add");
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $heap_ptr");
+                self.line("global.set $__heap_ptr");
                 self.line(&format!("local.get $__map_dst_{lbl}"));
                 self.line(&format!("local.get $__map_len_{lbl}"));
                 self.line("i32.store");
@@ -15207,16 +13072,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__flt_src_{lbl}"));
                 self.line("i32.load");
                 self.line(&format!("local.set $__flt_len_{lbl}"));
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line(&format!("local.set $__flt_dst_{lbl}"));
                 self.line(&format!("local.get $__flt_len_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $heap_ptr");
+                self.line("global.set $__heap_ptr");
                 self.line("i32.const 0");
                 self.line(&format!("local.set $__flt_out_{lbl}"));
                 self.line("i32.const 0");
@@ -15476,16 +13341,16 @@ impl WasmCodegen {
                 self.line(&format!("local.get $__en_src_{lbl}"));
                 self.line("i32.load");
                 self.line(&format!("local.set $__en_len_{lbl}"));
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line(&format!("local.set $__en_dst_{lbl}"));
                 self.line(&format!("local.get $__en_len_{lbl}"));
                 self.line("i32.const 8");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $heap_ptr");
+                self.line("global.set $__heap_ptr");
                 self.line(&format!("local.get $__en_dst_{lbl}"));
                 self.line(&format!("local.get $__en_len_{lbl}"));
                 self.line("i32.store");
@@ -15559,16 +13424,16 @@ impl WasmCodegen {
                 self.line("i32.lt_u");
                 self.line("select ;; min(a.len, b.len)");
                 self.line(&format!("local.set $__zip_len_{lbl}"));
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line(&format!("local.set $__zip_dst_{lbl}"));
                 self.line(&format!("local.get $__zip_len_{lbl}"));
                 self.line("i32.const 8");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $heap_ptr");
+                self.line("global.set $__heap_ptr");
                 self.line(&format!("local.get $__zip_dst_{lbl}"));
                 self.line(&format!("local.get $__zip_len_{lbl}"));
                 self.line("i32.store");
@@ -15861,10 +13726,6 @@ impl WasmCodegen {
                 self.line(&format!("local.set $__con_src_{lbl}"));
                 if let Some(val_arg) = args.first() {
                     self.generate_expr(val_arg);
-                    // If the search value is a string (pushes ptr, len), drop len — keep just ptr
-                    if self.expr_pushes_ptr_len(val_arg) || Self::expr_returns_ptr_len(val_arg) {
-                        self.line("drop ;; drop str len for contains comparison value");
-                    }
                 } else {
                     self.line("i32.const 0");
                 }
@@ -15953,16 +13814,16 @@ impl WasmCodegen {
                     self.line("select");
                 }
                 self.line(&format!("local.set $__{tag}_out_{lbl}"));
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line(&format!("local.set $__{tag}_dst_{lbl}"));
                 self.line(&format!("local.get $__{tag}_out_{lbl}"));
                 self.line("i32.const 4");
                 self.line("i32.mul");
                 self.line("i32.const 4");
                 self.line("i32.add");
-                self.line("global.get $heap_ptr");
+                self.line("global.get $__heap_ptr");
                 self.line("i32.add");
-                self.line("global.set $heap_ptr");
+                self.line("global.set $__heap_ptr");
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
                 self.line(&format!("local.get $__{tag}_out_{lbl}"));
                 self.line("i32.store");
@@ -15984,49 +13845,20 @@ impl WasmCodegen {
                 self.line("memory.copy");
                 self.line(&format!("local.get $__{tag}_dst_{lbl}"));
             }
-            // ── String parsing methods ────────────────────────────────────────
-            "parse_f64" | "parse_float" => {
-                self.line(";; .parse_f64() — parse string to float");
-                self.generate_expr(object);
-                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len)");
-                }
-                self.line("call $parse_f64");
-                self.line("f64.convert_i32_s ;; convert i32 result to f64");
-            }
-            "capitalize" => {
-                self.line(";; .capitalize() — capitalize first letter");
-                self.generate_expr(object);
-                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len)");
-                }
-                self.line("call $capitalize");
-            }
             // ── String instance methods ──────────────────────────────────────
-            // String methods expect (ptr, len) but local variables only store
-            // the pointer.  Use $str_len to recover (ptr, len) from a bare ptr.
             "trim" => {
                 self.line(";; .trim() — remove leading/trailing whitespace");
                 self.generate_expr(object);
-                if !matches!(object, Expr::StringLit(_)) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len)");
-                }
                 self.line("call $string_trim");
             }
             "to_upper" => {
                 self.line(";; .to_upper() — ASCII uppercase");
                 self.generate_expr(object);
-                if !matches!(object, Expr::StringLit(_)) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len)");
-                }
                 self.line("call $string_to_upper");
             }
             "to_lower" => {
                 self.line(";; .to_lower() — ASCII lowercase");
                 self.generate_expr(object);
-                if !matches!(object, Expr::StringLit(_)) {
-                    self.line("call $str_len ;; expand ptr to (ptr, len)");
-                }
                 self.line("call $string_to_lower");
             }
             "split" => {
@@ -16045,10 +13877,6 @@ impl WasmCodegen {
             "slice" => {
                 self.line(";; .slice() — substring");
                 self.generate_expr(object);
-                // string_slice takes (ptr, len, start, end) — expand receiver if needed
-                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                    self.line("call $str_len ;; expand str ptr to (ptr, len) for slice");
-                }
                 if args.len() >= 2 {
                     self.generate_expr(&args[0]);
                     self.generate_expr(&args[1]);
@@ -16065,10 +13893,6 @@ impl WasmCodegen {
             "replace" => {
                 self.line(";; .replace() — replace first occurrence");
                 self.generate_expr(object);
-                // Ensure object is (ptr, len) for string_replace
-                if !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                    self.line("call $str_len ;; expand str ptr to (ptr, len) for replace");
-                }
                 if args.len() >= 2 {
                     self.generate_expr(&args[0]);
                     self.generate_expr(&args[1]);
@@ -16113,194 +13937,18 @@ impl WasmCodegen {
                 self.generate_expr(object);
                 self.line("call $string_parse_int");
             }
-            "sort_asc" | "sort_desc" => {
-                // In-place insertion sort on an array of struct pointers by a named field.
-                // After sorting, call $__apply_sort_<comp>_<uid> to reorder DOM nodes.
-                let ascending = method == "sort_asc";
-                let field_name = if let Some(Expr::StringLit(f)) = args.first() {
-                    f.clone()
-                } else {
-                    "id".to_string()
-                };
-                let field_offset = self.resolve_field_offset(&field_name);
-                let lbl = self.next_label();
-                let brk = lbl + 1000;
-
-                self.line(&format!(";; .{}(\"{}\") — in-place insertion sort by field offset {}",
-                    method, field_name, field_offset));
-
-                self.emit_template_local(&format!("$__sort_arr_{lbl}"));
-                self.emit_template_local(&format!("$__sort_len_{lbl}"));
-                self.emit_template_local(&format!("$__sort_data_{lbl}"));
-                self.emit_template_local(&format!("$__sort_i_{lbl}"));
-                self.emit_template_local(&format!("$__sort_j_{lbl}"));
-                self.emit_template_local(&format!("$__sort_key_{lbl}"));
-                self.emit_template_local(&format!("$__sort_tmp_{lbl}"));
-
-                self.generate_expr(object);
-                self.line(&format!("local.set $__sort_arr_{lbl}"));
-
-                self.line(&format!("local.get $__sort_arr_{lbl}"));
-                self.line("i32.load ;; array length");
-                self.line(&format!("local.set $__sort_len_{lbl}"));
-                self.line(&format!("local.get $__sort_arr_{lbl}"));
-                self.line("i32.load offset=8 ;; data_ptr");
-                self.line(&format!("local.set $__sort_data_{lbl}"));
-
-                // Insertion sort: for i = 1 to len-1
-                self.line("i32.const 1");
-                self.line(&format!("local.set $__sort_i_{lbl}"));
-                self.line(&format!("(block $__sort_brk_{brk} (loop $__sort_lp_{lbl}"));
-                self.indent += 1;
-
-                self.line(&format!("local.get $__sort_i_{lbl}"));
-                self.line(&format!("local.get $__sort_len_{lbl}"));
-                self.line("i32.ge_u");
-                self.line(&format!("br_if $__sort_brk_{brk}"));
-
-                // Save data[i] into tmp
-                self.line(&format!("local.get $__sort_data_{lbl}"));
-                self.line(&format!("local.get $__sort_i_{lbl}"));
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line("i32.load ;; struct ptr at i");
-                self.line(&format!("local.set $__sort_tmp_{lbl}"));
-
-                // key = tmp.field
-                self.line(&format!("local.get $__sort_tmp_{lbl}"));
-                self.line(&format!("i32.load offset={} ;; field value at i", field_offset));
-                self.line(&format!("local.set $__sort_key_{lbl}"));
-
-                // j = i
-                self.line(&format!("local.get $__sort_i_{lbl}"));
-                self.line(&format!("local.set $__sort_j_{lbl}"));
-
-                // Inner loop: shift elements
-                let inner_brk = lbl + 2000;
-                let inner_lp = lbl + 3000;
-                self.line(&format!("(block $__sort_inner_brk_{inner_brk} (loop $__sort_inner_lp_{inner_lp}"));
-                self.indent += 1;
-
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.eqz");
-                self.line(&format!("br_if $__sort_inner_brk_{inner_brk}"));
-
-                // Load data[j-1].field
-                self.line(&format!("local.get $__sort_data_{lbl}"));
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.const 1");
-                self.line("i32.sub");
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line("i32.load ;; struct ptr at j-1");
-                self.line(&format!("i32.load offset={} ;; field value at j-1", field_offset));
-
-                // Compare
-                self.line(&format!("local.get $__sort_key_{lbl}"));
-                if ascending {
-                    self.line("i32.le_s ;; asc: break if prev <= key");
-                } else {
-                    self.line("i32.ge_s ;; desc: break if prev >= key");
-                }
-                self.line(&format!("br_if $__sort_inner_brk_{inner_brk}"));
-
-                // Shift: data[j] = data[j-1]
-                self.line(&format!("local.get $__sort_data_{lbl}"));
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line(&format!("local.get $__sort_data_{lbl}"));
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.const 1");
-                self.line("i32.sub");
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line("i32.load");
-                self.line("i32.store ;; data[j] = data[j-1]");
-
-                // j--
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.const 1");
-                self.line("i32.sub");
-                self.line(&format!("local.set $__sort_j_{lbl}"));
-
-                self.line(&format!("br $__sort_inner_lp_{inner_lp}"));
-                self.indent -= 1;
-                self.line("))");
-
-                // Place saved element: data[j] = tmp
-                self.line(&format!("local.get $__sort_data_{lbl}"));
-                self.line(&format!("local.get $__sort_j_{lbl}"));
-                self.line("i32.const 4");
-                self.line("i32.mul");
-                self.line("i32.add");
-                self.line(&format!("local.get $__sort_tmp_{lbl}"));
-                self.line("i32.store ;; data[j] = saved element");
-
-                // i++
-                self.line(&format!("local.get $__sort_i_{lbl}"));
-                self.line("i32.const 1");
-                self.line("i32.add");
-                self.line(&format!("local.set $__sort_i_{lbl}"));
-                self.line(&format!("br $__sort_lp_{lbl}"));
-
-                self.indent -= 1;
-                self.line("))");
-
-                // After sort: call apply_sort to reorder DOM
-                let comp = self.component_name.clone();
-                if !comp.is_empty() {
-                    if let Some(ds) = self.deferred_sorts.iter().find(|d| d.comp == comp) {
-                        let sort_uid = ds.uid;
-                        self.line(&format!("call $__apply_sort_{}_{}", comp, sort_uid));
-                    }
-                }
-            }
-            "to_string" => {
-                // .to_string() — if receiver is already a string, no-op; else convert int to string
-                self.generate_expr(object);
-                if self.expr_pushes_ptr_len(object) || Self::expr_returns_ptr_len(object) || matches!(object, Expr::StringLit(_)) {
-                    // Already a string (ptr, len) — no conversion needed
-                } else {
-                    self.line("call $to_string");
-                }
-            }
-            "clone" => {
-                // .clone() — clone a value. For strings (ptr, len), drop len and clone the ptr.
-                self.generate_expr(object);
-                if self.expr_pushes_ptr_len(object) || Self::expr_returns_ptr_len(object) || matches!(object, Expr::StringLit(_)) {
-                    self.line("drop ;; drop str len for clone, keep ptr");
-                }
-                self.line("call $clone");
-            }
             _ => {
-                // Self method calls — self.method_b() inside a component/store handler
+                // Self method calls — self.method_b() inside a component handler
                 // dispatches to the corresponding handler function.
                 if matches!(object, Expr::SelfExpr) && self.in_component_mount {
-                    if let Some(_idx) = self.component_method_names.iter().position(|m| m == method) {
-                        // Use the typed $ComponentName_methodName function for ALL method calls
-                        // (both stores and components). The typed version has correct return types
-                        // and signatures, unlike the void handler trampolines (__handler_N).
-                        self.line(&format!(";; self.{}() — method call", method));
-                        // Only push self arg for component methods (which have $self param).
-                        // Store actions don't have a self parameter.
-                        let is_store = self.known_stores.iter().any(|(name, _)| name == &self.component_name);
-                        if !is_store {
-                            self.line("i32.const 0 ;; self (signals are global)");
-                        }
+                    if let Some(idx) = self.component_method_names.iter().position(|m| m == method) {
+                        let handler_idx = self.global_handler_base + idx as u32;
+                        self.line(&format!(";; self.{}() — component method call", method));
+                        self.line("i32.const 0 ;; self (signals are global)");
                         for arg in args {
                             self.generate_expr(arg);
-                            // Component methods take String as single i32 ptr.
-                            // Drop the len if the arg pushes (ptr, len).
-                            if self.expr_pushes_ptr_len(arg) {
-                                self.line("drop ;; drop str len for method arg");
-                            }
                         }
-                        self.line(&format!("call ${}_{}", self.component_name, method));
+                        self.line(&format!("call ${}__handler_{}", self.component_name, handler_idx));
                         return;
                     }
                 }
@@ -16338,7 +13986,6 @@ impl WasmCodegen {
                     if let Expr::Ident(obj_name) = object {
                         // Resolve namespace::method to the correct WASM function name
                         let qualified = format!("{}::{}", obj_name, method);
-                        self.warn_if_unimplemented_stdlib(&qualified);
                         let wasm_fn = self.resolve_stdlib_fn(&qualified);
                         for arg in args {
                             self.generate_expr(arg);
@@ -16361,67 +14008,12 @@ impl WasmCodegen {
                         KeywordDefKind::Theme      => "theme",
                     };
                     let qualified = format!("{}::{}", ns, method);
-                    self.warn_if_unimplemented_stdlib(&qualified);
                     let wasm_fn = self.resolve_stdlib_fn(&qualified);
                     self.line(&format!(";; keyword def method: {}.{}()", ns, method));
                     for arg in args {
                         self.generate_expr(arg);
                     }
                     self.line(&format!("call {}", wasm_fn));
-                } else if let Expr::Ident(obj_name) = object {
-                    // Check if this is a store method call: StoreName.method()
-                    if let Some((store_name, signals)) = self.known_stores.iter()
-                        .find(|(sn, _)| sn == obj_name).cloned() {
-                        // Store method call — resolve to store function
-                        if signals.iter().any(|s| s == method) {
-                            // Signal getter
-                            self.line(&format!(";; store getter: {}.{}", store_name, method));
-                            for arg in args {
-                                self.generate_expr(arg);
-                            }
-                            self.line(&format!("call ${}_get_{}", store_name, method));
-                        } else {
-                            // Action or computed
-                            self.line(&format!(";; store method: {}.{}()", store_name, method));
-                            for arg in args {
-                                self.generate_expr(arg);
-                            }
-                            self.line(&format!("call ${}_{}", store_name, method));
-                        }
-                    } else {
-                        // Regular instance method call — evaluate the receiver first.
-                        // Map well-known instance methods on time types to WASM-internal helpers
-                        // so `meeting.in_timezone("Asia/Tokyo")` compiles correctly.
-                        let wasm_method = match method {
-                            "in_timezone" => "$time_in_timezone",
-                            "add" => "$time_add",
-                            "format" => "$time_format_str",
-                            "hours" => "$time_duration_hours",
-                            "days" => "$time_duration_days",
-                            "minutes" => "$time_duration_minutes",
-                            "seconds" => "$time_duration_seconds",
-                            "millis" => "$time_duration_millis",
-                            _ => "",
-                        };
-                        self.generate_expr(object);
-                        // String methods that take (ptr, len) as receiver need expansion
-                        let needs_str_expand = matches!(method,
-                            "chars" | "to_uppercase" | "to_lowercase" |
-                            "capitalize" | "to_upper" | "to_lower"
-                        );
-                        if needs_str_expand && !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                            self.line("call $str_len ;; expand str ptr to (ptr, len) for method receiver");
-                        }
-                        for arg in args {
-                            self.generate_expr(arg);
-                        }
-                        if !wasm_method.is_empty() {
-                            self.line(&format!("call {}", wasm_method));
-                        } else {
-                            let resolved_fn = self.resolve_trait_impl_call(object, method);
-                            self.line(&format!("call ${}", resolved_fn));
-                        }
-                    }
                 } else {
                     // Regular instance method call — evaluate the receiver first.
                     // Map well-known instance methods on time types to WASM-internal helpers
@@ -16439,25 +14031,13 @@ impl WasmCodegen {
                         _ => "",
                     };
                     self.generate_expr(object);
-                    // String methods that take (ptr, len) as receiver need expansion
-                    let needs_str_expand = matches!(method,
-                        "chars" | "to_uppercase" | "to_lowercase" |
-                        "capitalize" | "to_upper" | "to_lower"
-                    );
-                    if needs_str_expand && !self.expr_pushes_ptr_len(object) && !Self::expr_returns_ptr_len(object) {
-                        self.line("call $str_len ;; expand str ptr to (ptr, len) for method receiver");
-                    }
                     for arg in args {
                         self.generate_expr(arg);
                     }
                     if !wasm_method.is_empty() {
                         self.line(&format!("call {}", wasm_method));
                     } else {
-                        // Check if this method call can be resolved via trait impl map.
-                        // For variables whose type is known from struct layouts or for-loop
-                        // bindings, look up {Type}_{method} in the trait_impl_methods map.
-                        let resolved_fn = self.resolve_trait_impl_call(object, method);
-                        self.line(&format!("call ${}", resolved_fn));
+                        self.line(&format!("call ${method}"));
                     }
                 }
             }
@@ -16506,9 +14086,6 @@ impl WasmCodegen {
                 for s in &block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
             }
             Expr::ArrayLit(elems) => {
-                for e in elems { Self::collect_free_vars(e, bound, out); }
-            }
-            Expr::TupleLit(elems) => {
                 for e in elems { Self::collect_free_vars(e, bound, out); }
             }
             Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
@@ -16608,28 +14185,15 @@ impl WasmCodegen {
                         );
                     }
                 }
-                // Array mutation methods are always void — they modify in place
-                // and don't leave a value on the WASM stack.
-                if matches!(method.as_str(),
-                    "push" | "sort_asc" | "sort_desc" | "sort_str_asc" | "sort_str_desc" | "reverse"
-                ) {
-                    return true;
+                // Method calls on self fields (e.g. self.items.push(...)) are void
+                if let Expr::FieldAccess { object: inner, .. } = object.as_ref() {
+                    if matches!(inner.as_ref(), Expr::SelfExpr) && method == "push" {
+                        return true;
+                    }
                 }
                 // self.method() calls within a component are void — handlers don't return values
                 if matches!(object.as_ref(), Expr::SelfExpr) {
                     if self.component_method_names.iter().any(|m| m == method) {
-                        return true;
-                    }
-                }
-                // Store method calls are void — store actions don't return values
-                if let Expr::Ident(obj_name) = object.as_ref() {
-                    if self.known_store_actions.iter().any(|(action, store)| {
-                        action == method && store == obj_name
-                    }) {
-                        return true;
-                    }
-                    // Also check if it's a known store name (any method call on a store is void)
-                    if self.known_stores.iter().any(|(name, _)| name == obj_name) {
                         return true;
                     }
                 }
@@ -16645,10 +14209,6 @@ impl WasmCodegen {
                         "rtc_set_track_enabled" | "rtc_attach_stream" | "rtc_data_channel_close" |
                         "console_log" | "console_warn" | "console_error" |
                         "localStorage_set" | "localStorage_remove" |
-                        "storage_set" | "storage_remove" |
-                        "session_set" | "session_remove" |
-                        "navigate" | "navigate_external" |
-                        "show_toast" | "hide_toast" |
                         "clipboard_write" | "push_state" | "replace_state"
                     ) {
                         return true;
@@ -16672,180 +14232,7 @@ impl WasmCodegen {
             }
             // While/For loops and blocks are void — no stack value
             Expr::While { .. } | Expr::For { .. } | Expr::Block(_) => true,
-            // assert_eq is void — it emits an if/else that calls test_fail but
-            // does not leave a value on the stack.
-            Expr::AssertEq { .. } => true,
-            // Navigate, Spawn, Parallel, Send are void — they call functions with no return value
-            Expr::Navigate { .. } | Expr::Spawn { .. } | Expr::Parallel { .. } | Expr::Send { .. } => true,
             _ => false,
-        }
-    }
-
-    /// Generate statements for an if/else branch used as an expression.
-    /// All statements except the last are generated as statements (void).
-    /// The last statement is generated as an expression (leaving value on stack).
-    /// If the last statement doesn't produce a value, push i32.const 0 as default.
-    fn generate_branch_stmts_as_expr(&mut self, stmts: &[Stmt]) {
-        if stmts.is_empty() {
-            self.line("i32.const 0 ;; empty branch default");
-            return;
-        }
-        let last_idx = stmts.len() - 1;
-        for (i, stmt) in stmts.iter().enumerate() {
-            if i < last_idx {
-                self.generate_stmt(stmt);
-            } else {
-                // Last statement: generate as expression to leave value on stack
-                match stmt {
-                    Stmt::Expr(expr) => {
-                        // For if expressions used as the last expression in a branch,
-                        // recurse through generate_expr which handles Expr::If properly
-                        self.generate_expr(expr);
-                        // If the expression pushes (ptr, len) — drop len to leave just ptr (i32)
-                        if self.expr_pushes_ptr_len(expr) || Self::expr_returns_ptr_len(expr) || matches!(expr, Expr::StringLit(_) | Expr::FormatString { .. }) {
-                            self.line("drop ;; discard str len, keep ptr for if result");
-                        } else if self.expr_is_void(expr) {
-                            // Void expression as last in branch — push default value
-                            self.line("i32.const 0 ;; void expr, provide default for if result");
-                        }
-                    }
-                    Stmt::Return(Some(expr)) => {
-                        self.generate_expr(expr);
-                        self.line("return");
-                    }
-                    Stmt::Return(None) => {
-                        self.line("return");
-                    }
-                    _ => {
-                        self.generate_stmt(stmt);
-                        // Non-expression statements are void — push default
-                        self.line("i32.const 0 ;; stmt default for if result");
-                    }
-                }
-            }
-        }
-    }
-
-    /// Check if the last expression in a branch's statements returns a String (ptr, len).
-    fn if_branch_returns_string(&self, stmts: &[Stmt]) -> bool {
-        if let Some(last) = stmts.last() {
-            match last {
-                Stmt::Expr(expr) => {
-                    if self.expr_pushes_ptr_len(expr) {
-                        return true;
-                    }
-                    if let Expr::If { then_block, .. } = expr {
-                        return self.if_branch_returns_string(&then_block.stmts);
-                    }
-                    false
-                }
-                _ => false,
-            }
-        } else {
-            false
-        }
-    }
-
-    /// Check if the last expression in a branch's statements returns an f64.
-    fn if_branch_returns_float(&self, stmts: &[Stmt]) -> bool {
-        if let Some(last) = stmts.last() {
-            match last {
-                Stmt::Expr(expr) => {
-                    if self.expr_is_float(expr) {
-                        return true;
-                    }
-                    if let Expr::If { then_block, .. } = expr {
-                        return self.if_branch_returns_float(&then_block.stmts);
-                    }
-                    false
-                }
-                _ => false,
-            }
-        } else {
-            false
-        }
-    }
-
-    /// Generate branch stmts where the last expression returns a String (ptr, len).
-    /// Does NOT drop the len, unlike generate_branch_stmts_as_expr.
-    fn generate_branch_stmts_as_string_expr(&mut self, stmts: &[Stmt]) {
-        if stmts.is_empty() {
-            self.line("i32.const 0 ;; empty branch default ptr");
-            self.line("i32.const 0 ;; empty branch default len");
-            return;
-        }
-        let last_idx = stmts.len() - 1;
-        for (i, stmt) in stmts.iter().enumerate() {
-            if i < last_idx {
-                self.generate_stmt(stmt);
-            } else {
-                match stmt {
-                    Stmt::Expr(expr) => {
-                        self.generate_expr(expr);
-                        // If the expression doesn't produce (ptr, len), convert to it
-                        if !self.expr_pushes_ptr_len(expr) && !matches!(expr, Expr::If { .. }) {
-                            if self.expr_is_void(expr) {
-                                self.line("i32.const 0 ;; void expr default ptr");
-                                self.line("i32.const 0 ;; void expr default len");
-                            } else {
-                                // Single i32 value — compute str_len to get (ptr, len)
-                                self.line("call $str_len");
-                            }
-                        }
-                    }
-                    Stmt::Return(Some(expr)) => {
-                        self.generate_expr(expr);
-                        self.line("return");
-                    }
-                    Stmt::Return(None) => {
-                        self.line("return");
-                    }
-                    _ => {
-                        self.generate_stmt(stmt);
-                        self.line("i32.const 0 ;; stmt default ptr");
-                        self.line("i32.const 0 ;; stmt default len");
-                    }
-                }
-            }
-        }
-    }
-
-    /// Generate branch stmts where the last expression returns an f64.
-    fn generate_branch_stmts_as_float_expr(&mut self, stmts: &[Stmt]) {
-        if stmts.is_empty() {
-            self.line("f64.const 0 ;; empty branch default");
-            return;
-        }
-        let last_idx = stmts.len() - 1;
-        for (i, stmt) in stmts.iter().enumerate() {
-            if i < last_idx {
-                self.generate_stmt(stmt);
-            } else {
-                match stmt {
-                    Stmt::Expr(expr) => {
-                        self.generate_expr(expr);
-                        if !self.expr_is_float(expr) && !matches!(expr, Expr::If { .. }) {
-                            if self.expr_is_void(expr) {
-                                self.line("f64.const 0 ;; void expr default");
-                            } else {
-                                // i32 value — convert to f64
-                                self.line("f64.convert_i32_s");
-                            }
-                        }
-                    }
-                    Stmt::Return(Some(expr)) => {
-                        self.generate_expr(expr);
-                        self.line("return");
-                    }
-                    Stmt::Return(None) => {
-                        self.line("return");
-                    }
-                    _ => {
-                        self.generate_stmt(stmt);
-                        self.line("f64.const 0 ;; stmt default");
-                    }
-                }
-            }
         }
     }
 
@@ -17017,75 +14404,6 @@ impl WasmCodegen {
         }
     }
 
-    /// Check if a qualified stdlib function name is explicitly mapped (not a fallback).
-    fn is_known_stdlib_fn(qualified: &str) -> bool {
-        // Known namespace prefixes that have catch-all handlers or explicit mappings.
-        // These namespaces are expected to have functions — don't warn about them.
-        let known_namespace_prefixes = [
-            "crypto::", "clipboard::", "time::", "DateTime::", "Duration::",
-            "auth::", "db::", "upload::", "payment::", "banking::", "map::",
-            "channel::", "ws::", "pwa::", "console::", "theme::", "cache::",
-            "http::", "debounce::", "streaming::", "rtc::", "router::", "pdf::",
-        ];
-        // If the function is in a known namespace, consider it implemented
-        // (the namespace itself provides a catch-all or explicit mappings).
-        for prefix in &known_namespace_prefixes {
-            if qualified.starts_with(prefix) {
-                return true;
-            }
-        }
-        // For other namespaces, check if the naive replacement matches the resolved name.
-        // If they differ, the function has an explicit mapping.
-        let naive = format!("${}", qualified.replace("::", "_"));
-        let codegen = WasmCodegen::new();
-        let resolved = codegen.resolve_stdlib_fn(qualified);
-        resolved != naive
-    }
-
-    /// Resolve a method call on a concrete object to a trait impl function name.
-    /// Returns `{Type}_{method}` if the object's type has an impl with this method,
-    /// otherwise returns just `{method}` (the bare function name).
-    fn resolve_trait_impl_call(&self, object: &Expr, method: &str) -> String {
-        // Try to determine the type of the object expression.
-        // For identifiers, check if they are for-loop bindings or handler params
-        // whose struct type can be resolved via struct layouts.
-        // For any type in trait_impl_methods, check if method is defined there.
-        if let Expr::Ident(obj_name) = object {
-            // If the identifier itself IS a type name in trait_impl_methods
-            // (e.g., static method call like Point.display())
-            if let Some(methods) = self.trait_impl_methods.get(obj_name) {
-                if let Some((_, wasm_name)) = methods.iter().find(|(m, _)| m == method) {
-                    return wasm_name.clone();
-                }
-            }
-        }
-        // Search all types' impl methods for this method name.
-        // If only one type defines this method, use it (unambiguous).
-        let mut candidates: Vec<&str> = Vec::new();
-        for (_type_name, methods) in &self.trait_impl_methods {
-            for (m, wasm_name) in methods {
-                if m == method {
-                    candidates.push(wasm_name);
-                }
-            }
-        }
-        if candidates.len() == 1 {
-            return candidates[0].to_string();
-        }
-        // Ambiguous or no match — fall back to bare method name
-        method.to_string()
-    }
-
-    /// Called at sites where we generate code for stdlib calls and have `&mut self`.
-    fn warn_if_unimplemented_stdlib(&mut self, qualified: &str) {
-        if !Self::is_known_stdlib_fn(qualified) {
-            self.codegen_warnings.push(format!(
-                "unimplemented stdlib function: {} (will produce link error at runtime)",
-                qualified
-            ));
-        }
-    }
-
     /// Resolve an event handler expression to a global handler index.
     /// The handler expr is typically `self.method_name` (FieldAccess on SelfExpr)
     /// or a MethodCall on self.
@@ -17109,140 +14427,13 @@ impl WasmCodegen {
         matches!(expr, Expr::StringLit(_))
     }
 
-    /// Returns true if the expression produces an f64 value on the WASM stack.
-    fn expr_is_float(&self, expr: &Expr) -> bool {
-        match expr {
-            Expr::Float(_) => true,
-            // Method calls — check return type
-            Expr::MethodCall { object, method, .. } => {
-                // parse_f64 / parse_float always return f64
-                if method == "parse_f64" || method == "parse_float" {
-                    return true;
-                }
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    return self.component_method_return_types.get(method.as_str())
-                        .and_then(|r| r.as_ref())
-                        .map(|t| t == "f64" || t == "Float" || t == "float")
-                        .unwrap_or(false);
-                }
-                false
-            }
-            // self.field where field type is f64
-            Expr::FieldAccess { object, field } => {
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    // Check prop types for f64
-                    if let Some(ty) = self.component_prop_types.get(field.as_str()) {
-                        return ty == "f64" || ty == "Float" || ty == "float";
-                    }
-                }
-                false
-            }
-            // Binary operation where either side is float
-            Expr::Binary { left, right, op } => {
-                if matches!(op, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod) {
-                    return self.expr_is_float(left) || self.expr_is_float(right);
-                }
-                false
-            }
-            // Identifiers — check locals and function params
-            Expr::Ident(name) => {
-                self.locals.iter().any(|(n, ty)| n == name && matches!(ty, WasmType::F64 | WasmType::F32))
-                || self.fn_param_types.get(name.as_str()).map(|ty| matches!(ty, WasmType::F64 | WasmType::F32)).unwrap_or(false)
-            }
-            // If expressions — check if the then branch produces f64
-            Expr::If { then_block, .. } => {
-                then_block.stmts.last()
-                    .and_then(|s| if let Stmt::Expr(e) = s { Some(e) } else { None })
-                    .map(|e| self.expr_is_float(e))
-                    .unwrap_or(false)
-            }
-            _ => false,
-        }
-    }
-
-    /// Returns true if the expression pushes (ptr, len) onto the WASM stack.
-    /// More comprehensive than expr_returns_ptr_len — also checks string props,
-    /// method calls returning String, and format strings.
-    fn expr_pushes_ptr_len(&self, expr: &Expr) -> bool {
-        match expr {
-            Expr::StringLit(_) => true,
-            Expr::FormatString { .. } => true,
-            Expr::FnCall { callee, .. } => {
-                if let Expr::Ident(name) = callee.as_ref() {
-                    if name == "format" || name == "string_concat" {
-                        return true;
-                    }
-                    // Check if it's a component method that returns String
-                    if self.component_method_return_types.get(name.as_str())
-                        .and_then(|r| r.as_ref())
-                        .map(|t| t == "String" || t == "str")
-                        .unwrap_or(false)
-                    {
-                        return true;
-                    }
-                    // Check if it's a standalone function that returns String
-                    if self.string_returning_fns.iter().any(|f| f == name) {
-                        return true;
-                    }
-                }
-                false
-            }
-            Expr::MethodCall { object, method, .. } => {
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    return self.component_method_return_types.get(method.as_str())
-                        .and_then(|r| r.as_ref())
-                        .map(|t| t == "String" || t == "str")
-                        .unwrap_or(false);
-                }
-                // String methods that return String (ptr, len)
-                if matches!(method.as_str(),
-                    "trim" | "to_upper" | "to_lower" | "to_uppercase" | "to_lowercase" |
-                    "replace" | "substring" | "slice" | "char_at" | "to_string" |
-                    "split" | "join" | "pad_start" | "pad_end" | "repeat" |
-                    "capitalize"
-                ) {
-                    return true;
-                }
-                false
-            }
-            // String props push (ptr, len)
-            Expr::FieldAccess { object, field } => {
-                if matches!(object.as_ref(), Expr::SelfExpr) {
-                    // Check if it's a string prop (pushes ptr + len)
-                    return self.component_prop_types.get(field.as_str())
-                        .map(|t| t == "String" || t == "str")
-                        .unwrap_or(false);
-                }
-                // Store field access: StoreName.field — check if field is a computed returning String
-                if let Expr::Ident(obj_name) = object.as_ref() {
-                    if self.known_stores.iter().any(|(sn, _)| sn == obj_name) {
-                        // Check if StoreName_field is in string_returning_fns
-                        let qualified = format!("{}_{}", obj_name, field);
-                        if self.string_returning_fns.iter().any(|f| f == &qualified) {
-                            return true;
-                        }
-                    }
-                }
-                false
-            }
-            _ => false,
-        }
-    }
-
     /// Returns true if the expression produces a (ptr, len) pair on the stack
     /// rather than a single i32. Used to avoid spurious $str_len calls.
     fn expr_returns_ptr_len(expr: &Expr) -> bool {
         match expr {
-            // Functions that return (ptr, len) string pairs
+            // format() returns (ptr, len)
             Expr::FnCall { callee, .. } => {
-                matches!(callee.as_ref(), Expr::Ident(name) if matches!(name.as_str(),
-                    "format" | "string_concat" |
-                    "json_encode" | "url_encode" | "url_form_encode" |
-                    "capitalize" | "random_hex" | "base64url_sha256" |
-                    "to_string" |
-                    // WebAPI functions that return (ptr, len) strings:
-                    "location_hostname" | "location_protocol" | "origin"
-                ))
+                matches!(callee.as_ref(), Expr::Ident(name) if name == "format")
             }
             // FormatString (f"...") also returns (ptr, len)
             Expr::FormatString { .. } => true,
@@ -17250,20 +14441,6 @@ impl WasmCodegen {
             Expr::StringLit(_) => true,
             _ => false,
         }
-    }
-
-    /// Check if a self method call expression returns a String (i32, i32).
-    /// Uses component_method_return_types to determine if the method returns String.
-    fn method_call_returns_string(&self, expr: &Expr) -> bool {
-        if let Expr::MethodCall { object, method, .. } = expr {
-            if matches!(object.as_ref(), Expr::SelfExpr) {
-                return self.component_method_return_types.get(method.as_str())
-                    .and_then(|r| r.as_ref())
-                    .map(|t| t == "String" || t == "str")
-                    .unwrap_or(false);
-            }
-        }
-        false
     }
 
     /// Returns true if the expression is a dynamic string (signal read, etc.)
@@ -19686,30 +16863,14 @@ impl WasmCodegen {
         h
     }
 
-    /// Record a source map mapping from the current WAT position to a Nectar source span.
-    fn map_span(&mut self, span: &crate::token::Span) {
-        if !self.source_file.is_empty() && span.line > 0 {
-            let sf = self.source_file.clone();
-            self.source_map.add_mapping(
-                self.wat_line,
-                0,
-                span.line - 1,
-                span.col.saturating_sub(1),
-                &sf,
-            );
-        }
-    }
-
     fn emit(&mut self, s: &str) {
         let indent = "  ".repeat(self.indent);
         self.output.push_str(&format!("\n{}{}", indent, s));
-        self.wat_line += 1;
     }
 
     fn line(&mut self, s: &str) {
         let indent = "  ".repeat(self.indent);
         self.output.push_str(&format!("\n{}{}", indent, s));
-        self.wat_line += 1;
     }
 
     fn emit_bigdecimal_runtime(&mut self) {
@@ -26095,83 +23256,8 @@ mod comprehensive_codegen_tests {
         };
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
-        assert!(wat.contains("func $Point_show"), "should generate trait impl method with type prefix");
+        assert!(wat.contains("func $show"), "should generate trait impl method as function");
         assert!(wat.contains("impl Display for Point"), "should have impl comment");
-    }
-
-    #[test]
-    fn trait_impl_method_call_resolves_to_prefixed_name() {
-        // When a method call matches a trait impl method, codegen should
-        // emit `call $Point_show` instead of `call $show`.
-        use crate::token::Span;
-        let span = Span::new(0, 0, 1, 1);
-        let program = Program {
-            items: vec![
-                Item::Struct(StructDef {
-                    name: "Point".into(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    fields: vec![],
-                    trait_bounds: vec![],
-                    is_pub: false,
-                    span,
-                }),
-                Item::Trait(TraitDef {
-                    name: "Display".into(),
-                    type_params: vec![],
-                    methods: vec![],
-                    span,
-                }),
-                Item::Impl(ImplBlock {
-                    target: "Point".into(),
-                    trait_impls: vec!["Display".into()],
-                    methods: vec![Function {
-                        name: "show".into(),
-                        lifetimes: vec![],
-                        type_params: vec![],
-                        params: vec![Param {
-                            name: "self".into(),
-                            ty: Type::Named("Point".into()),
-                            ownership: Ownership::Owned,
-                            secret: false,
-                        }],
-                        return_type: Some(Type::Named("i32".into())),
-                        trait_bounds: vec![],
-                        body: Block { stmts: vec![Stmt::Return(Some(Expr::Integer(42)))], span },
-                        is_pub: false,
-                        is_async: false,
-                        must_use: false,
-                        span,
-                    }],
-                    span,
-                }),
-                // A function that calls point.show()
-                Item::Function(Function {
-                    name: "test_dispatch".into(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    params: vec![],
-                    return_type: None,
-                    trait_bounds: vec![],
-                    body: Block {
-                        stmts: vec![Stmt::Expr(Expr::MethodCall {
-                            object: Box::new(Expr::Ident("point".into())),
-                            method: "show".into(),
-                            args: vec![],
-                        })],
-                        span,
-                    },
-                    is_pub: false,
-                    is_async: false,
-                    must_use: false,
-                    span,
-                }),
-            ],
-        };
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        // The method call should resolve to the prefixed name
-        assert!(wat.contains("call $Point_show"), "method call should resolve to $Point_show, got:\n{}", wat);
     }
 
     // -----------------------------------------------------------------------
@@ -29336,7 +26422,7 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("prompt template"), "should have prompt template comment");
-        assert!(output.contains("http_fetch"), "should call http_fetch for AI endpoint");
+        assert!(output.contains("interpolation count"), "should push interpolation count");
     }
 
     #[test]
@@ -29380,7 +26466,7 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("dynamic import"), "should have dynamic import comment");
-        assert!(output.contains("loadChunk"), "should call dom_loadChunk");
+        assert!(output.contains("load_chunk"), "should call load_chunk");
     }
 
     #[test]
@@ -29522,7 +26608,7 @@ mod coverage_codegen_tests {
         let fns = vec![
             ("localStorage_get", "$webapi_localStorageGet"),
             ("console_log", "$webapi_consoleLog"),
-            ("set_timeout", "$timer_setTimeout"),
+            ("set_timeout", "$webapi_setTimeout"),
             ("clipboard_write", "$webapi_clipboardWrite"),
             ("push_state", "$webapi_pushState"),
         ];
@@ -29795,9 +26881,8 @@ mod coverage_codegen_tests {
         assert_eq!(codegen.type_to_wasm(&Type::Named("i32".into())), "i32");
         assert_eq!(codegen.type_to_wasm(&Type::Named("u32".into())), "i32");
         assert_eq!(codegen.type_to_wasm(&Type::Named("bool".into())), "i32");
-        // i64/u64 map to i32 because codegen arithmetic is i32-only
-        assert_eq!(codegen.type_to_wasm(&Type::Named("i64".into())), "i32");
-        assert_eq!(codegen.type_to_wasm(&Type::Named("u64".into())), "i32");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("i64".into())), "i64");
+        assert_eq!(codegen.type_to_wasm(&Type::Named("u64".into())), "i64");
         assert_eq!(codegen.type_to_wasm(&Type::Named("f32".into())), "f32");
         assert_eq!(codegen.type_to_wasm(&Type::Named("f64".into())), "f64");
         assert_eq!(codegen.type_to_wasm(&Type::Named("String".into())), "i32");
@@ -31218,20 +28303,6 @@ mod coverage_codegen_tests {
         assert_eq!(codegen.resolve_stdlib_fn("theme::set"), "$theme_set");
     }
 
-    /// Unimplemented stdlib functions produce codegen warnings
-    #[test]
-    fn test_unimplemented_stdlib_warning() {
-        let mut codegen = WasmCodegen::new();
-        codegen.warn_if_unimplemented_stdlib("frobnicate::nonexistent");
-        assert_eq!(codegen.codegen_warnings.len(), 1);
-        assert!(codegen.codegen_warnings[0].contains("unimplemented stdlib function"));
-        assert!(codegen.codegen_warnings[0].contains("frobnicate::nonexistent"));
-
-        // Known functions should NOT produce warnings
-        codegen.warn_if_unimplemented_stdlib("crypto::sha256");
-        assert_eq!(codegen.codegen_warnings.len(), 1, "known stdlib fn should not add a warning");
-    }
-
     /// known_keyword_defs is populated from auth/cache/db/payment/upload/pdf/theme items
     #[test]
     fn test_known_keyword_defs_populated_from_program() {
@@ -31479,8 +28550,7 @@ mod template_for_tests {
             binding: binding.to_string(),
             iterator: Box::new(iterator),
             children,
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         // Combine deferred locals + body
@@ -31580,8 +28650,7 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
 
         let wat = generate_template_for(
@@ -31659,8 +28728,7 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -31747,16 +28815,14 @@ mod template_for_tests {
                     span: span(),
                 }),
             ],
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
 
         let node = TemplateNode::TemplateFor {
             binding: "category".to_string(),
             iterator: Box::new(Expr::Ident("categories".to_string())),
             children: vec![inner_for],
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let out = codegen.output;
@@ -31896,9 +28962,7 @@ mod parameterized_callback_tests {
     #[test]
     fn test_handler_param_field_access_emits_struct_load() {
         // When a handler body accesses product.name, it should emit
-        // local.get $product + i32.load for struct field access.
-        // Handler trampolines are thin wrappers that delegate to the typed function,
-        // so the field access is in the typed $Shop_add_to_cart function.
+        // local.get $product + i32.load for struct field access
         let src = r#"
             struct Product { name: String, price: i32 }
             component Shop {
@@ -31910,10 +28974,10 @@ mod parameterized_callback_tests {
         "#;
         let wat = compile(src);
 
-        // The typed function should contain a handler param field access
+        // The handler trampoline should contain a handler param field access
         assert!(wat.contains(";; handler param field access: product.price"),
             "should emit handler param field access comment for product.price");
-        // The handler trampoline delegates to the typed function
+        // Should do local.get $product to read the struct pointer
         let handler_marker = "(func $Shop__handler_0";
         let handler_start = wat.find(handler_marker)
             .expect("Shop__handler_0 must exist");
@@ -31921,21 +28985,9 @@ mod parameterized_callback_tests {
         let handler_end = handler_section[1..].find("\n  (func ").unwrap_or(handler_section.len() - 1);
         let handler_section = &handler_section[..handler_end + 1];
 
-        // Handler trampoline delegates to typed function
-        assert!(handler_section.contains("call $Shop_add_to_cart"),
-            "handler trampoline should delegate to typed function");
-
-        // The typed function should do local.get $product to read the struct pointer
-        let typed_marker = "(func $Shop_add_to_cart";
-        let typed_start = wat.find(typed_marker)
-            .expect("Shop_add_to_cart must exist");
-        let typed_section = &wat[typed_start..];
-        let typed_end = typed_section[1..].find("\n  (func ").unwrap_or(typed_section.len() - 1);
-        let typed_section = &typed_section[..typed_end + 1];
-
-        assert!(typed_section.contains("local.get $product"),
+        assert!(handler_section.contains("local.get $product"),
             "handler body should read $product local for field access");
-        assert!(typed_section.contains("i32.load"),
+        assert!(handler_section.contains("i32.load"),
             "handler body should load field from struct pointer");
     }
 }
@@ -33492,8 +30544,7 @@ mod reactive_cond_tests {
             children: vec![
                 TemplateNode::TextLiteral("item".to_string()),
             ],
-            lazy: false,
-            inplace: false,
+            lazy: false, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -33868,8 +30919,7 @@ component ItemList {
             children: vec![
                 TemplateNode::TextLiteral("hello".to_string()),
             ],
-            lazy: true,
-            inplace: false,
+            lazy: true, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -33908,8 +30958,7 @@ component ItemList {
             children: vec![
                 TemplateNode::TextLiteral("num".to_string()),
             ],
-            lazy: true,
-            inplace: false,
+            lazy: true, inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -35928,9 +32977,8 @@ mod payhive_feature_tests {
             &[],
         );
         let output = codegen.output.clone();
-        // Method calls now use the typed $ComponentName_methodName function
-        assert!(output.contains("call $AdminPanel_refresh"),
-            "self.refresh() should emit call $AdminPanel_refresh (typed function), got:\n{}", output);
+        assert!(output.contains("call $AdminPanel__handler_6"),
+            "self.refresh() should emit call $AdminPanel__handler_6, got:\n{}", output);
     }
 
     #[test]
@@ -36066,861 +33114,183 @@ mod payhive_feature_tests {
         assert!(WasmCodegen::expr_returns_ptr_len(&format_expr), "format() returns (ptr,len)");
     }
 
-    // ── Filter pattern detection tests ──
+    // ── 3-tier region-based memory allocator tests ──────────────────────────
 
     #[test]
-    fn test_filter_pattern_detection_basic() {
-        // Pattern: {for product in self.products { {if self.active_cat == "All" || product.category == self.active_cat { <div/> }} }}
-        let mut codegen = WasmCodegen::new();
-        let children = vec![
-            TemplateNode::TemplateIf {
-                condition: Box::new(Expr::Binary {
-                    op: BinOp::Or,
-                    left: Box::new(Expr::Binary {
-                        op: BinOp::Eq,
-                        left: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::SelfExpr),
-                            field: "active_cat".to_string(),
-                        }),
-                        right: Box::new(Expr::StringLit("All".to_string())),
-                    }),
-                    right: Box::new(Expr::Binary {
-                        op: BinOp::Eq,
-                        left: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::Ident("product".to_string())),
-                            field: "category".to_string(),
-                        }),
-                        right: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::SelfExpr),
-                            field: "active_cat".to_string(),
-                        }),
-                    }),
-                }),
-                then_children: vec![],
-                else_children: None,
-            },
-        ];
-        let result = codegen.detect_filter_pattern(&children, "product");
-        assert!(result.is_some(), "Should detect filter pattern");
-        let fp = result.unwrap();
-        assert_eq!(fp.state_field, "active_cat");
-        assert_eq!(fp.item_field, "category");
+    fn test_tier_globals_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("(global $store_ptr (mut i32) (i32.const 0))"),
+            "should emit store_ptr global");
+        assert!(wat.contains("(global $page_base (mut i32) (i32.const 0))"),
+            "should emit page_base global");
+        assert!(wat.contains("(global $render_base (mut i32) (i32.const 0))"),
+            "should emit render_base global");
+        assert!(wat.contains("(global $__store_alloc_mode (mut i32) (i32.const 0))"),
+            "should emit store_alloc_mode flag");
     }
 
     #[test]
-    fn test_filter_pattern_detection_reversed_order() {
-        // Pattern: product.category == self.active_cat || self.active_cat == "All"
-        let mut codegen = WasmCodegen::new();
-        let children = vec![
-            TemplateNode::TemplateIf {
-                condition: Box::new(Expr::Binary {
-                    op: BinOp::Or,
-                    left: Box::new(Expr::Binary {
-                        op: BinOp::Eq,
-                        left: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::Ident("product".to_string())),
-                            field: "category".to_string(),
-                        }),
-                        right: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::SelfExpr),
-                            field: "active_cat".to_string(),
-                        }),
-                    }),
-                    right: Box::new(Expr::Binary {
-                        op: BinOp::Eq,
-                        left: Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::SelfExpr),
-                            field: "active_cat".to_string(),
-                        }),
-                        right: Box::new(Expr::StringLit("All".to_string())),
-                    }),
-                }),
-                then_children: vec![],
-                else_children: None,
-            },
-        ];
-        let result = codegen.detect_filter_pattern(&children, "product");
-        assert!(result.is_some(), "Should detect reversed filter pattern");
-        let fp = result.unwrap();
-        assert_eq!(fp.state_field, "active_cat");
-        assert_eq!(fp.item_field, "category");
+    fn test_alloc_store_function_emitted() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("func $alloc_store"),
+            "should emit $alloc_store function");
+        assert!(wat.contains("global.get $store_ptr"),
+            "$alloc_store should reference store_ptr");
+        assert!(wat.contains("global.set $store_ptr"),
+            "$alloc_store should bump store_ptr");
     }
 
     #[test]
-    fn test_filter_pattern_without_all_check_still_matches() {
-        // Just: product.category == self.active_cat (no "All" check)
-        // This is still a valid filter pattern — the apply_filter function
-        // handles the "All" check separately.
-        let mut codegen = WasmCodegen::new();
-        let children = vec![
-            TemplateNode::TemplateIf {
-                condition: Box::new(Expr::Binary {
-                    op: BinOp::Eq,
-                    left: Box::new(Expr::FieldAccess {
-                        object: Box::new(Expr::Ident("product".to_string())),
-                        field: "category".to_string(),
-                    }),
-                    right: Box::new(Expr::FieldAccess {
-                        object: Box::new(Expr::SelfExpr),
-                        field: "active_cat".to_string(),
-                    }),
-                }),
-                then_children: vec![],
-                else_children: None,
-            },
-        ];
-        let result = codegen.detect_filter_pattern(&children, "product");
-        // The detector recognizes simple equality filter patterns too
-        assert!(result.is_some(), "Should detect simple equality filter pattern");
+    fn test_alloc_delegates_to_store_when_mode_set() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.get $__store_alloc_mode"),
+            "$alloc should check store_alloc_mode flag");
+        assert!(wat.contains("call $alloc_store"),
+            "$alloc should delegate to $alloc_store when mode set");
     }
 
     #[test]
-    fn test_filter_pattern_no_match_no_template_if() {
-        // Just a plain element, no TemplateIf
-        let mut codegen = WasmCodegen::new();
-        let children = vec![
-            TemplateNode::Element(Element {
-                tag: "div".to_string(),
-                attributes: vec![],
-                children: vec![],
-                span: Span { start: 0, end: 0, line: 1, col: 1 },
-            }),
-        ];
-        let result = codegen.detect_filter_pattern(&children, "product");
-        assert!(result.is_none(), "Should NOT detect filter in plain elements");
+    fn test_init_all_sets_store_watermark() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.set $store_ptr"),
+            "__init_all should set store_ptr watermark");
     }
 
-    // ── Sort codegen tests ──
+    #[test]
+    fn test_init_all_sets_page_watermark() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.set $page_base"),
+            "__init_all should set page_base watermark");
+    }
 
     #[test]
-    fn test_sort_asc_codegen_emits_insertion_sort() {
-        let src = r#"
-            struct Product { name: String, price: i32 }
-            component Shop() {
-                let mut products: [Product] = [];
-                fn sort_by_price(&mut self) {
-                    self.products.sort_asc("price");
-                }
-                render {
-                    <div>
-                        {for product in self.products {
-                            <div>{product.name}</div>
-                        }}
-                    </div>
+    fn test_init_all_sets_render_watermark() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        assert!(wat.contains("global.set $render_base"),
+            "__init_all should set render_base watermark");
+    }
+
+    #[test]
+    fn test_init_all_watermark_order() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        // store_ptr is set before page_base, which is set before render_base
+        let store_pos = wat.find("global.set $store_ptr").unwrap();
+        let page_pos = wat.find("global.set $page_base").unwrap();
+        let render_pos = wat.find("global.set $render_base").unwrap();
+        assert!(store_pos < page_pos,
+            "store_ptr watermark should be set before page_base");
+        assert!(page_pos < render_pos,
+            "page_base watermark should be set before render_base");
+    }
+
+    #[test]
+    fn test_router_navigate_resets_page_tier() {
+        let wat = compile(r#"
+            router AppRouter {
+                route "/" => Home,
+            }
+        "#);
+        // router_navigate should reset heap_ptr to page_base
+        assert!(wat.contains("Page tier reset"),
+            "router_navigate should contain page tier reset comment");
+        // Check that page_base is read and written to heap_ptr
+        let navigate_section = &wat[wat.find("func $router_navigate").unwrap()..];
+        assert!(navigate_section.contains("global.get $page_base"),
+            "router_navigate should read page_base");
+        assert!(navigate_section.contains("global.set $heap_ptr"),
+            "router_navigate should reset heap_ptr");
+    }
+
+    #[test]
+    fn test_router_navigate_no_push_resets_page_tier() {
+        let wat = compile(r#"
+            router AppRouter {
+                route "/" => Home,
+            }
+        "#);
+        let navigate_section = &wat[wat.find("func $router_navigate_no_push").unwrap()..];
+        assert!(navigate_section.contains("global.get $page_base"),
+            "router_navigate_no_push should read page_base");
+        assert!(navigate_section.contains("global.set $heap_ptr"),
+            "router_navigate_no_push should reset heap_ptr");
+    }
+
+    #[test]
+    fn test_callback_saves_render_base() {
+        let wat = compile(r#"
+            component Counter {
+                fn increment(&mut self) { return; }
+                render { <div>"counter"</div> }
+            }
+        "#);
+        // __callback should save render_base before dispatch
+        let cb_section = &wat[wat.find("func $__callback").unwrap()..];
+        assert!(cb_section.contains("global.set $render_base"),
+            "__callback should set render_base watermark");
+        assert!(cb_section.contains("Render tier: save watermark"),
+            "__callback should have render tier save comment");
+    }
+
+    #[test]
+    fn test_callback_resets_render_tier_after_handler() {
+        let wat = compile(r#"
+            component Counter {
+                fn increment(&mut self) { return; }
+                render { <div>"counter"</div> }
+            }
+        "#);
+        // __callback should reset heap_ptr to render_base after handler
+        let cb_section = &wat[wat.find("func $__callback").unwrap()..];
+        assert!(cb_section.contains("Render tier: reset heap_ptr after handler"),
+            "__callback should reset render tier after handler dispatch");
+    }
+
+    #[test]
+    fn test_store_action_enables_store_alloc_mode() {
+        let wat = compile(r#"
+            store CartStore {
+                signal total: i32 = 0;
+
+                action increment() {
+                    return;
                 }
             }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("sort_asc"), "should contain sort_asc comment: {}",
-            wat.lines().filter(|l| l.contains("sort")).take(5).collect::<Vec<_>>().join("\n"));
-        assert!(wat.contains("i32.le_s"), "ascending sort should use i32.le_s comparison");
+        "#);
+        // Store action should enable store alloc mode
+        let action_section = &wat[wat.find("func $CartStore_increment").unwrap()..];
+        assert!(action_section.contains("global.set $__store_alloc_mode"),
+            "store action should toggle store_alloc_mode");
     }
 
     #[test]
-    fn test_sort_desc_codegen_emits_descending() {
-        let src = r#"
-            struct Product { name: String, price: i32 }
-            component Shop() {
-                let mut products: [Product] = [];
-                fn sort_by_price_desc(&mut self) {
-                    self.products.sort_desc("price");
-                }
-                render {
-                    <div>
-                        {for product in self.products {
-                            <div>{product.name}</div>
-                        }}
-                    </div>
-                }
+    fn test_alloc_store_grows_memory_if_needed() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let store_fn = &wat[wat.find("func $alloc_store").unwrap()..];
+        assert!(store_fn.contains("memory.grow"),
+            "$alloc_store should grow memory if needed");
+    }
+
+    #[test]
+    fn test_alloc_store_shifts_page_base_on_overlap() {
+        let wat = compile("pub fn noop() -> i32 { return 0; }");
+        let store_fn = &wat[wat.find("func $alloc_store").unwrap()..];
+        assert!(store_fn.contains("store grew into page region"),
+            "$alloc_store should handle store/page overlap");
+        assert!(store_fn.contains("global.set $page_base"),
+            "$alloc_store should shift page_base when store grows");
+    }
+
+    #[test]
+    fn test_page_reset_also_resets_render_base() {
+        let wat = compile(r#"
+            router AppRouter {
+                route "/" => Home,
             }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("i32.ge_s"), "descending sort should use i32.ge_s comparison");
-    }
-
-    #[test]
-    fn test_sort_tracking_globals_emitted() {
-        let src = r#"
-            struct Product { name: String, price: i32 }
-            component Shop() {
-                let mut products: [Product] = [];
-                fn sort_price(&mut self) {
-                    self.products.sort_asc("price");
-                }
-                render {
-                    <div>
-                        {for product in self.products {
-                            <div>{product.name}</div>
-                        }}
-                    </div>
-                }
-            }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("__sort_els_base_Shop_"), "should emit sort_els_base global");
-        assert!(wat.contains("__sort_data_base_Shop_"), "should emit sort_data_base global");
-        assert!(wat.contains("__sort_parent_Shop_"), "should emit sort_parent global");
-    }
-
-    #[test]
-    fn test_apply_sort_function_calls_appendchild() {
-        let src = r#"
-            struct Product { name: String, price: i32 }
-            component Shop() {
-                let mut products: [Product] = [];
-                fn sort_price(&mut self) {
-                    self.products.sort_asc("price");
-                }
-                render {
-                    <div>
-                        {for product in self.products {
-                            <div>{product.name}</div>
-                        }}
-                    </div>
-                }
-            }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("__apply_sort_Shop_"), "should emit apply_sort function");
-        assert!(wat.contains("dom_appendChild"), "apply_sort should call dom_appendChild");
-    }
-
-    #[test]
-    fn test_closure_capture_codegen() {
-        let src = r#"
-            fn process() -> i32 {
-                let x = 10;
-                let items = [1, 2, 3];
-                let result = items.map(|n: i32| { n + x });
-                return 0;
-            }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        // Closure should be generated as a function
-        assert!(wat.contains("__closure_"), "should emit closure function");
-    }
-
-    #[test]
-    fn test_closure_in_filter() {
-        let src = r#"
-            fn process() -> i32 {
-                let threshold = 5;
-                let items = [1, 2, 3, 10, 20];
-                let filtered = items.filter(|n: i32| { n > threshold });
-                return 0;
-            }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("__closure_"), "should emit closure function for filter");
-    }
-
-    #[test]
-    fn test_closure_no_capture() {
-        let src = r#"
-            fn process() -> i32 {
-                let items = [1, 2, 3];
-                let doubled = items.map(|n: i32| { n * 2 });
-                return 0;
-            }
-        "#;
-        let mut lexer = crate::lexer::Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = crate::parser::Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        let mut codegen = WasmCodegen::new();
-        let wat = codegen.generate(&program);
-        assert!(wat.contains("__closure_"), "should emit closure function for no-capture case");
-    }
-
-    // -----------------------------------------------------------------------
-    // Source map: codegen populates source_map when source_file is set
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_source_map_populated_for_functions() {
-        use crate::token::Span;
-        let span = Span::new(0, 50, 3, 5); // line 3, col 5
-        let program = Program {
-            items: vec![Item::Function(Function {
-                name: "my_func".into(),
-                lifetimes: vec![],
-                type_params: vec![],
-                params: vec![],
-                return_type: Some(Type::Named("i32".into())),
-                trait_bounds: vec![],
-                body: Block {
-                    stmts: vec![Stmt::Return(Some(Expr::Integer(42)))],
-                    span,
-                },
-                is_pub: false,
-                is_async: false,
-                must_use: false,
-                span,
-            })],
-        };
-        let mut codegen = WasmCodegen::new();
-        codegen.set_source_file("test.nectar");
-        let _wat = codegen.generate(&program);
-        assert!(
-            !codegen.source_map.mappings.is_empty(),
-            "source map should have at least one mapping after generating a function"
-        );
-        // Check that the source file was registered
-        assert!(
-            codegen.source_map.sources.contains(&"test.nectar".to_string()),
-            "source map should contain the source file name"
-        );
-        // Check that the function name was registered
-        assert!(
-            codegen.source_map.names.contains(&"my_func".to_string()),
-            "source map should contain the function name"
-        );
-    }
-
-    #[test]
-    fn test_source_map_empty_without_source_file() {
-        let program = Program {
-            items: vec![Item::Function(Function {
-                name: "f".into(),
-                lifetimes: vec![],
-                type_params: vec![],
-                params: vec![],
-                return_type: Some(Type::Named("i32".into())),
-                trait_bounds: vec![],
-                body: Block {
-                    stmts: vec![Stmt::Return(Some(Expr::Integer(0)))],
-                    span: crate::token::Span::new(0, 0, 1, 1),
-                },
-                is_pub: false,
-                is_async: false,
-                must_use: false,
-                span: crate::token::Span::new(0, 0, 1, 1),
-            })],
-        };
-        let mut codegen = WasmCodegen::new();
-        // Do NOT set source_file — mappings should remain empty
-        let _wat = codegen.generate(&program);
-        assert!(
-            codegen.source_map.mappings.is_empty(),
-            "source map should be empty when no source file is set"
-        );
-    }
-
-    // =====================================================================
-    // Feature 1: Tuple Types and Destructuring
-    // =====================================================================
-
-    #[test]
-    fn tuple_literal_construction() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::TupleLit(vec![
-            Expr::Integer(1),
-            Expr::Integer(2),
-            Expr::Integer(3),
-        ]));
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple literal (3 elements, 12 bytes)"), "should have tuple comment");
-        assert!(output.contains("call $alloc"), "should allocate memory for tuple");
-        assert!(output.contains("i32.store ;; tuple.0"), "should store first element");
-        assert!(output.contains("i32.store offset=4 ;; tuple.1"), "should store second element at offset 4");
-        assert!(output.contains("i32.store offset=8 ;; tuple.2"), "should store third element at offset 8");
-    }
-
-    #[test]
-    fn tuple_literal_empty() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::TupleLit(vec![]));
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple literal (0 elements, 0 bytes)"), "should handle empty tuple");
-    }
-
-    #[test]
-    fn tuple_literal_with_string() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::TupleLit(vec![
-            Expr::Integer(42),
-            Expr::StringLit("hello".into()),
-        ]));
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple literal (2 elements, 8 bytes)"), "should have tuple comment");
-        assert!(output.contains("drop ;; discard str len for tuple elem"), "should drop string len");
-    }
-
-    #[test]
-    fn tuple_field_access() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::FieldAccess {
-            object: Box::new(Expr::Ident("t".into())),
-            field: "0".into(),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple index access: .0"), "should have tuple access comment");
-        assert!(output.contains("i32.load ;; tuple.0"), "should load from offset 0");
-    }
-
-    #[test]
-    fn tuple_field_access_offset() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::FieldAccess {
-            object: Box::new(Expr::Ident("t".into())),
-            field: "2".into(),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple index access: .2"), "should have tuple access comment for .2");
-        assert!(output.contains("i32.load offset=8 ;; tuple.2"), "should load from offset 8");
-    }
-
-    #[test]
-    fn tuple_destructure_in_let() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_stmt(&Stmt::LetDestructure {
-            pattern: Pattern::Tuple(vec![
-                Pattern::Ident("a".into()),
-                Pattern::Ident("b".into()),
-                Pattern::Ident("c".into()),
-            ]),
-            value: Expr::TupleLit(vec![
-                Expr::Integer(1),
-                Expr::Integer(2),
-                Expr::Integer(3),
-            ]),
-            ty: None,
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("let destructure"), "should have destructure comment");
-        assert!(output.contains("tuple literal"), "should construct tuple");
-    }
-
-    #[test]
-    fn tuple_as_function_return() {
-        let mut codegen = WasmCodegen::new();
-        // Simulate returning a tuple from a function
-        codegen.generate_expr(&Expr::TupleLit(vec![
-            Expr::Integer(10),
-            Expr::Integer(20),
-        ]));
-        let output = codegen.output.clone();
-        assert!(output.contains("call $alloc"), "should allocate tuple memory");
-        assert!(output.contains("tuple.0"), "should store first element");
-        assert!(output.contains("tuple.1"), "should store second element");
-    }
-
-    // =====================================================================
-    // Feature 2: Struct Destructuring in Match
-    // =====================================================================
-
-    #[test]
-    fn match_struct_destructure() {
-        let mut codegen = WasmCodegen::new();
-        codegen.struct_layouts.insert("Point".into(), vec![
-            ("x".into(), 0),
-            ("y".into(), 4),
-        ]);
-        codegen.generate_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("p".into())),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Struct {
-                        name: "Point".into(),
-                        fields: vec![
-                            ("x".into(), Pattern::Ident("px".into())),
-                            ("y".into(), Pattern::Ident("py".into())),
-                        ],
-                        rest: false,
-                    },
-                    guard: None,
-                    body: Expr::Ident("px".into()),
-                },
-            ],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("struct Point destructure"), "should have struct destructure comment");
-        assert!(output.contains("i32.load ;; field: x"), "should load field x at offset 0");
-        assert!(output.contains("i32.load offset=4 ;; field: y"), "should load field y at offset 4");
-        assert!(output.contains("local.set $px"), "should bind px");
-        assert!(output.contains("local.set $py"), "should bind py");
-    }
-
-    #[test]
-    fn match_struct_destructure_with_guard() {
-        let mut codegen = WasmCodegen::new();
-        codegen.struct_layouts.insert("User".into(), vec![
-            ("name".into(), 0),
-            ("age".into(), 4),
-        ]);
-        codegen.generate_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("user".into())),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Struct {
-                        name: "User".into(),
-                        fields: vec![
-                            ("age".into(), Pattern::Ident("a".into())),
-                        ],
-                        rest: true,
-                    },
-                    guard: Some(Expr::Binary {
-                        op: BinOp::Gte,
-                        left: Box::new(Expr::Ident("a".into())),
-                        right: Box::new(Expr::Integer(18)),
-                    }),
-                    body: Expr::Integer(1),
-                },
-                MatchArm {
-                    pattern: Pattern::Wildcard,
-                    guard: None,
-                    body: Expr::Integer(0),
-                },
-            ],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("struct User destructure"), "should destructure User");
-        assert!(output.contains("local.set $a"), "should bind age to a");
-    }
-
-    #[test]
-    fn match_tuple_destructure() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("pair".into())),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Tuple(vec![
-                        Pattern::Ident("x".into()),
-                        Pattern::Ident("y".into()),
-                    ]),
-                    guard: None,
-                    body: Expr::Binary {
-                        op: BinOp::Add,
-                        left: Box::new(Expr::Ident("x".into())),
-                        right: Box::new(Expr::Ident("y".into())),
-                    },
-                },
-            ],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("tuple destructure"), "should have tuple destructure comment");
-        assert!(output.contains("local.set $x"), "should bind x");
-        assert!(output.contains("local.set $y"), "should bind y");
-    }
-
-    #[test]
-    fn match_array_destructure() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("arr".into())),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Array(vec![
-                        Pattern::Ident("first".into()),
-                        Pattern::Ident("second".into()),
-                    ]),
-                    guard: None,
-                    body: Expr::Ident("first".into()),
-                },
-            ],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("array destructure"), "should have array destructure comment");
-        assert!(output.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from array header");
-        assert!(output.contains("local.set $first"), "should bind first");
-        assert!(output.contains("local.set $second"), "should bind second");
-    }
-
-    // =====================================================================
-    // Feature 3: spawn/parallel — Web Worker Runtime
-    // =====================================================================
-
-    #[test]
-    fn spawn_creates_closure_function() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Spawn {
-            body: Block { stmts: vec![
-                Stmt::Expr(Expr::Integer(42)),
-            ], span: span() },
-            span: span(),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("spawn"), "should have spawn comment");
-        assert!(output.contains("worker_spawn"), "should call worker_spawn");
-        assert!(output.contains("spawn function table index"), "should reference function table");
-        assert!(!codegen.closure_functions.is_empty(), "should create a closure function");
-        assert!(codegen.needs_func_table, "should need function table");
-    }
-
-    #[test]
-    fn parallel_creates_task_functions() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Parallel {
-            tasks: vec![
-                Expr::Integer(1),
-                Expr::Integer(2),
-                Expr::Integer(3),
-            ],
-            span: span(),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("parallel"), "should have parallel comment");
-        assert!(output.contains("worker_parallel"), "should call worker_parallel");
-        // Should create 3 task functions + 1 completion callback = 4 closure functions
-        assert!(codegen.closure_functions.len() >= 3, "should create at least 3 closure functions for tasks");
-        assert!(codegen.needs_func_table, "should need function table");
-    }
-
-    // =====================================================================
-    // Feature 4: channel<T>() Concurrency
-    // =====================================================================
-
-    #[test]
-    fn channel_receive_creates_callback() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Receive {
-            channel: Box::new(Expr::Ident("ch".into())),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("channel receive"), "should have receive comment");
-        assert!(output.contains("worker_channelRecv"), "should call channelRecv");
-        assert!(output.contains("receive callback index"), "should use callback from function table");
-        assert!(!codegen.closure_functions.is_empty(), "should create callback function");
-    }
-
-    // =====================================================================
-    // Feature 5: yield/generators
-    // =====================================================================
-
-    #[test]
-    fn yield_string_value() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_stmt(&Stmt::Yield(Expr::StringLit("hello".into())));
-        let output = codegen.output.clone();
-        assert!(output.contains("yield"), "should have yield comment");
-        assert!(output.contains("streaming_yield"), "should call streaming_yield");
-        // String values should pass through directly (ptr, len already on stack)
-        assert!(!output.contains("serialize yield value"), "strings should not need serialization");
-    }
-
-    #[test]
-    fn yield_integer_value_serializes() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_stmt(&Stmt::Yield(Expr::Integer(42)));
-        let output = codegen.output.clone();
-        assert!(output.contains("yield"), "should have yield comment");
-        assert!(output.contains("streaming_yield"), "should call streaming_yield");
-        assert!(output.contains("serialize yield value"), "integers should be serialized to memory");
-        assert!(output.contains("call $alloc"), "should allocate memory for serialized value");
-    }
-
-    #[test]
-    fn yield_format_string_not_serialized() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_stmt(&Stmt::Yield(Expr::FormatString {
-            parts: vec![FormatPart::Literal("test".into())],
-        }));
-        let output = codegen.output.clone();
-        assert!(output.contains("yield"), "should have yield comment");
-        assert!(output.contains("streaming_yield"), "should call streaming_yield");
-    }
-
-    // =====================================================================
-    // Feature 6: Streaming Fetch
-    // =====================================================================
-
-    #[test]
-    fn stream_fetch_creates_callback() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Stream {
-            source: Box::new(Expr::StringLit("https://api.example.com/stream".into())),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("stream"), "should have stream comment");
-        assert!(output.contains("streaming_streamFetch"), "should call streaming_streamFetch");
-        assert!(output.contains("stream callback index"), "should use callback from function table");
-        assert!(!codegen.closure_functions.is_empty(), "should create stream callback function");
-        assert!(codegen.needs_func_table, "should need function table");
-    }
-
-    // =====================================================================
-    // Feature 7: suspend/fallback
-    // =====================================================================
-
-    #[test]
-    fn suspend_defers_body() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Suspend {
-            fallback: Box::new(Expr::Integer(0)),
-            body: Box::new(Expr::Integer(1)),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("suspend"), "should have suspend comment");
-        assert!(output.contains("mount fallback"), "should mount fallback first");
-        assert!(output.contains("schedule deferred body mount"), "should defer body");
-        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
-        assert!(!codegen.closure_functions.is_empty(), "should create deferred body function");
-    }
-
-    // =====================================================================
-    // Feature 8: Dynamic Imports / Code Splitting
-    // =====================================================================
-
-    #[test]
-    fn dynamic_import_creates_callback() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::DynamicImport {
-            path: Box::new(Expr::StringLit("./heavy_module.wasm".into())),
-            span: span(),
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("dynamic import"), "should have dynamic import comment");
-        assert!(output.contains("dom_loadChunk"), "should call dom_loadChunk");
-        assert!(output.contains("import callback index"), "should use callback from function table");
-        assert!(!codegen.closure_functions.is_empty(), "should create import callback function");
-    }
-
-    // =====================================================================
-    // Feature 9: Prompt Templates — AI Runtime
-    // =====================================================================
-
-    #[test]
-    fn prompt_template_builds_string_and_fetches() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::PromptTemplate {
-            template: "Summarize: {document}".into(),
-            interpolations: vec![
-                ("document".into(), Expr::StringLit("some text".into())),
-            ],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("prompt template"), "should have prompt template comment");
-        assert!(output.contains("POST prompt to AI endpoint"), "should POST to AI");
-        assert!(output.contains("http_fetch"), "should call http_fetch");
-        assert!(output.contains("http_setMethod"), "should set HTTP method to POST");
-        assert!(output.contains("http_setBody"), "should set request body");
-        assert!(output.contains("AI endpoint URL"), "should reference AI endpoint URL");
-    }
-
-    #[test]
-    fn prompt_template_no_interpolation() {
-        let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::PromptTemplate {
-            template: "Tell me a joke".into(),
-            interpolations: vec![],
-        });
-        let output = codegen.output.clone();
-        assert!(output.contains("prompt template"), "should have prompt template comment");
-        assert!(output.contains("http_fetch"), "should call http_fetch");
-    }
-
-    // =====================================================================
-    // Feature 10: Full Lifetime Annotations (codegen-side tests)
-    // =====================================================================
-
-    #[test]
-    fn wasm_type_display() {
-        assert_eq!(format!("{}", WasmType::I32), "i32");
-        assert_eq!(format!("{}", WasmType::I64), "i64");
-        assert_eq!(format!("{}", WasmType::F32), "f32");
-        assert_eq!(format!("{}", WasmType::F64), "f64");
-    }
-
-    // =====================================================================
-    // Parser: Tuple literal parsing
-    // =====================================================================
-
-    #[test]
-    fn parse_tuple_literal() {
-        use crate::lexer::Lexer;
-        use crate::parser::Parser;
-        let src = "pub fn main() -> i32 { let t = (1, 2, 3); return 0; }";
-        let mut lexer = Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        if let Item::Function(f) = &program.items[0] {
-            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
-                assert!(matches!(value, Expr::TupleLit(elems) if elems.len() == 3),
-                    "should parse (1, 2, 3) as TupleLit with 3 elements");
-            } else {
-                panic!("Expected let statement");
-            }
-        } else {
-            panic!("Expected function");
-        }
-    }
-
-    #[test]
-    fn parse_parenthesized_not_tuple() {
-        use crate::lexer::Lexer;
-        use crate::parser::Parser;
-        let src = "pub fn main() -> i32 { let x = (42); return 0; }";
-        let mut lexer = Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        if let Item::Function(f) = &program.items[0] {
-            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
-                assert!(matches!(value, Expr::Integer(42)),
-                    "should parse (42) as just Integer(42), not TupleLit");
-            } else {
-                panic!("Expected let statement");
-            }
-        } else {
-            panic!("Expected function");
-        }
-    }
-
-    #[test]
-    fn parse_two_element_tuple() {
-        use crate::lexer::Lexer;
-        use crate::parser::Parser;
-        let src = r#"pub fn main() -> i32 { let pair = (1, "hello"); return 0; }"#;
-        let mut lexer = Lexer::new(src);
-        let tokens = lexer.tokenize().unwrap();
-        let mut parser = Parser::new(tokens);
-        let program = parser.parse_program().unwrap();
-        if let Item::Function(f) = &program.items[0] {
-            if let Stmt::Let { value, .. } = &f.body.stmts[0] {
-                if let Expr::TupleLit(elems) = value {
-                    assert_eq!(elems.len(), 2);
-                    assert!(matches!(elems[0], Expr::Integer(1)));
-                    assert!(matches!(&elems[1], Expr::StringLit(s) if s == "hello"));
-                } else {
-                    panic!("Expected TupleLit, got {:?}", value);
-                }
-            } else {
-                panic!("Expected let statement");
-            }
-        } else {
-            panic!("Expected function");
-        }
+        "#);
+        // On navigation, render_base should also reset to page_base
+        let navigate_section = &wat[wat.find("func $router_navigate ").unwrap()..];
+        let page_base_reads: Vec<_> = navigate_section.match_indices("global.get $page_base").collect();
+        assert!(page_base_reads.len() >= 2,
+            "router_navigate should read page_base at least twice (for heap_ptr and render_base reset)");
     }
 }
