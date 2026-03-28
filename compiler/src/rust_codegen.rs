@@ -16,6 +16,17 @@ struct FilterPattern {
     item_field: String,    // e.g. "category" — the product field used as filter key
 }
 
+/// A standalone conditional pattern: {if self.field == value { ... }} NOT inside a {for} loop.
+/// Elements inside the block are always created, registered for conditional toggling,
+/// and initially shown/hidden based on the state field's starting value.
+#[derive(Debug, Clone)]
+struct ConditionalPattern {
+    state_field: String,   // e.g. "cart_open"
+    value: String,         // e.g. "1" — the value that makes elements visible
+    op_is_eq: bool,        // true for ==, false for !=
+    is_string: bool,       // true if the literal value is a string (needs quotes in generated Rust)
+}
+
 pub struct RustCodegen {
     output: String,
     indent: usize,
@@ -23,10 +34,12 @@ pub struct RustCodegen {
     current_comp: String,
     handler_indices: std::collections::HashMap<String, usize>,
     filter_patterns: Vec<FilterPattern>, // detected from template analysis
+    conditional_patterns: Vec<ConditionalPattern>, // standalone {if self.field == value} blocks
     has_inplace_for: bool, // true if any for-loop in the component uses `inplace`
     last_element_var: String, // last element variable created by emit_template_node
     root_element_var: String, // root element var of the current emit_template_node call (set at creation, not overwritten by children)
     pending_filter_reg: Option<(String, String)>, // (binding, field) — when set, the next Element created will be registered as a filter card
+    pending_conditional_reg: Option<ConditionalPattern>, // when set, the next top-level Element will be registered as a conditional block
     in_for_loop: bool, // true when emitting inside a {for} loop — enables prototype optimization
     proto_counter: u32, // counter for prototype variable names
     proto_use_idx: u32, // which prototype to use next (reset per loop iteration)
@@ -42,10 +55,12 @@ impl RustCodegen {
             current_comp: String::new(),
             handler_indices: std::collections::HashMap::new(),
             filter_patterns: Vec::new(),
+            conditional_patterns: Vec::new(),
             has_inplace_for: false,
             last_element_var: String::new(),
             root_element_var: String::new(),
             pending_filter_reg: None,
+            pending_conditional_reg: None,
             in_for_loop: false,
             proto_counter: 0,
             proto_use_idx: 0,
@@ -93,7 +108,7 @@ impl RustCodegen {
         self.line("#[allow(unused_imports)]");
         self.line("use honeycomb::element::ElementTree;");
         self.line("use honeycomb::layout;");
-        self.line("use honeycomb::canvas_app::CanvasTextMeasurer;");
+        self.line("use honeycomb::measure::EstimateMeasurer;");
         self.line("use honeycomb::canvas_syscalls::*;");
         self.line("use std::cell::RefCell;");
         self.line("use serde::Deserialize;");
@@ -194,10 +209,9 @@ impl RustCodegen {
         self.line("        attr.as_ptr(), attr.len() as u32, value.as_ptr(), value.len() as u32);");
         self.line("}");
         self.line("fn to_ms_string(start: f64, end: f64) -> String {");
-        self.line("    let elapsed = ((end - start) * 100.0) as i32;");
-        self.line("    let d = elapsed / 100;");
-        self.line("    let c = elapsed - d * 100;");
-        self.line("    if c < 10 { format!(\"{}ms\", d) } else { format!(\"{}.{}ms\", d, c) }");
+        self.line("    let us = ((end - start) * 1000.0) as u64;");
+        self.line("    if us >= 1000 { format!(\"{}.{:02}ms\", us / 1000, (us % 1000) / 10) }");
+        self.line("    else { format!(\"0.{:03}ms\", us) }");
         self.line("}");
         self.line("");
     }
@@ -301,6 +315,91 @@ impl RustCodegen {
         None
     }
 
+    /// Scan template tree for standalone conditional patterns: {if self.field == value { ... }}
+    /// NOT inside a {for} loop. These are registered for O(1) visibility toggling.
+    fn detect_conditional_patterns(&mut self, node: &TemplateNode, in_for: bool) {
+        match node {
+            TemplateNode::TemplateFor { children, .. } => {
+                for child in children {
+                    self.detect_conditional_patterns(child, true);
+                }
+            }
+            TemplateNode::TemplateIf { condition, then_children, else_children } if !in_for => {
+                // Extract self.field == literal or self.field != literal
+                if let Some(pat) = self.extract_conditional_pattern(condition) {
+                    self.conditional_patterns.push(pat);
+                }
+                for child in then_children {
+                    self.detect_conditional_patterns(child, in_for);
+                }
+                if let Some(ec) = else_children {
+                    for child in ec {
+                        self.detect_conditional_patterns(child, in_for);
+                    }
+                }
+            }
+            TemplateNode::Element(el) => {
+                for child in &el.children {
+                    self.detect_conditional_patterns(child, in_for);
+                }
+            }
+            TemplateNode::Fragment(children) => {
+                for child in children {
+                    self.detect_conditional_patterns(child, in_for);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Extract a standalone conditional pattern from: self.field == literal or self.field != literal
+    fn extract_conditional_pattern(&self, expr: &Expr) -> Option<ConditionalPattern> {
+        if let Expr::Binary { op, left, right } = expr {
+            let is_eq = matches!(op, BinOp::Eq);
+            let is_neq = matches!(op, BinOp::Neq);
+            if !is_eq && !is_neq { return None; }
+            // Check for self.field on the left, literal on the right
+            if let Expr::FieldAccess { object, field } = &**left {
+                if matches!(**object, Expr::SelfExpr) {
+                    let is_string = matches!(&**right, Expr::StringLit(_));
+                    if let Some(val) = self.expr_to_literal_string(right) {
+                        return Some(ConditionalPattern {
+                            state_field: field.clone(),
+                            value: val,
+                            op_is_eq: is_eq,
+                            is_string,
+                        });
+                    }
+                }
+            }
+            // Check for literal on the left, self.field on the right
+            if let Expr::FieldAccess { object, field } = &**right {
+                if matches!(**object, Expr::SelfExpr) {
+                    let is_string = matches!(&**left, Expr::StringLit(_));
+                    if let Some(val) = self.expr_to_literal_string(left) {
+                        return Some(ConditionalPattern {
+                            state_field: field.clone(),
+                            value: val,
+                            op_is_eq: is_eq,
+                            is_string,
+                        });
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Convert a literal expression to its string representation for conditional matching.
+    fn expr_to_literal_string(&self, expr: &Expr) -> Option<String> {
+        match expr {
+            Expr::Integer(n) => Some(n.to_string()),
+            Expr::StringLit(s) => Some(s.clone()),
+            Expr::Bool(b) => Some(if *b { "true" } else { "false" }.to_string()),
+            _ => None,
+        }
+    }
+
     /// Check if a handler only assigns to a specific state field
     fn handler_only_sets_field(&self, method: &Function, field_name: &str) -> bool {
         if method.body.stmts.len() != 1 { return false; }
@@ -310,6 +409,26 @@ impl RustCodegen {
             }
         }
         false
+    }
+
+    /// Check if a handler only modifies self.fields (no method calls, no for-loops, no control flow).
+    /// Returns the list of field names modified. Empty = not a simple state update handler.
+    fn handler_modified_fields(&self, method: &Function) -> Vec<String> {
+        let mut fields = Vec::new();
+        for stmt in &method.body.stmts {
+            if let Stmt::Expr(Expr::Assign { target, .. }) = stmt {
+                if let Expr::FieldAccess { object, field } = &**target {
+                    if matches!(**object, Expr::SelfExpr) {
+                        fields.push(field.clone());
+                        continue;
+                    }
+                }
+                return Vec::new(); // Non-self assignment — not simple
+            } else {
+                return Vec::new(); // Any non-assignment statement — not simple
+            }
+        }
+        fields
     }
 
     /// Collect prototypes from a flat list of template nodes (one level deep).
@@ -530,6 +649,10 @@ impl RustCodegen {
         self.filter_patterns.clear();
         self.detect_filter_patterns(&comp.render.body, None);
 
+        // Detect standalone conditional patterns: {if self.field == value { ... }} outside {for} loops
+        self.conditional_patterns.clear();
+        self.detect_conditional_patterns(&comp.render.body, false);
+
         // Detect inplace for-loops in template
         self.has_inplace_for = self.template_has_inplace(&comp.render.body);
 
@@ -567,7 +690,6 @@ impl RustCodegen {
                 let var = format!("el_{}", self.fresh_id());
                 self.last_element_var = var.clone();
                 self.root_element_var = var.clone();
-                let pending_reg = self.pending_filter_reg.take();
                 // Use prototype if inside a for-loop (zero string parsing per element)
                 let use_proto = self.in_for_loop;
                 if use_proto {
@@ -579,12 +701,33 @@ impl RustCodegen {
                 }
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
 
-                // Pending filter card registration — emit after create+append, before children
-                if let Some((binding, field)) = pending_reg {
-                    let filter_val = format!("{}.{}", binding, field);
-                    self.line(&format!("// Auto-detected filter pattern: register card container for O(n) filtering"));
-                    self.line(&format!("tree.set_attribute({}, \"{}\", &{});", var, field, filter_val));
-                    self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", var, filter_val, filter_val));
+                // If pending conditional registration, emit it here (before recursing into children)
+                if let Some(pat) = self.pending_conditional_reg.take() {
+                    self.line(&format!(
+                        "honeycomb::canvas_app::register_conditional(\"{}\", \"{}\", {});",
+                        pat.state_field, pat.value, var
+                    ));
+                    // Set initial visibility based on current state value.
+                    // Strip __else__ prefix — it's only for Honeycomb registration, not Rust comparison.
+                    let compare_val = if pat.value.starts_with("__else__") {
+                        &pat.value[8..]
+                    } else {
+                        &pat.value
+                    };
+                    let val_literal = if pat.is_string {
+                        format!("\"{}\"", compare_val)
+                    } else {
+                        compare_val.to_string()
+                    };
+                    if pat.op_is_eq {
+                        self.line(&format!("if {} != {} {{", pat.state_field, val_literal));
+                    } else {
+                        self.line(&format!("if {} == {} {{", pat.state_field, val_literal));
+                    }
+                    self.indent += 1;
+                    self.line(&format!("tree.get_mut({}).map(|e| e.style.display_none = true);", var));
+                    self.indent -= 1;
+                    self.line("}");
                 }
 
                 // Attributes
@@ -669,22 +812,41 @@ impl RustCodegen {
                             } else {
                                 self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
                             }
-                            // Register metric text nodes
-                            let field_name = match &**expr {
-                                Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => Some(field.clone()),
+                            // Register text binding for targeted updates without tree rebuild.
+                            // Extracts (field_name, format_string) from expressions like:
+                            //   {self.cart_count}           → ("cart_count", "{}")
+                            //   {format("Cart ({})", self.cart_count)} → ("cart_count", "Cart ({})")
+                            //   {format("{}", self.product_count)}     → ("product_count", "{}")
+                            let binding_info: Option<(String, String)> = match &**expr {
+                                Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => {
+                                    Some((field.clone(), "{}".to_string()))
+                                }
                                 Expr::FnCall { callee, args } => {
                                     if let Expr::Ident(name) = &**callee {
                                         if name == "format" && args.len() == 2 {
-                                            if let Expr::FieldAccess { object, field } = &args[1] {
-                                                if matches!(**object, Expr::SelfExpr) { Some(field.clone()) } else { None }
+                                            if let Expr::StringLit(fmt_str) = &args[0] {
+                                                if let Expr::FieldAccess { object, field } = &args[1] {
+                                                    if matches!(**object, Expr::SelfExpr) {
+                                                        Some((field.clone(), fmt_str.clone()))
+                                                    } else { None }
+                                                } else { None }
                                             } else { None }
                                         } else { None }
                                     } else { None }
                                 }
                                 _ => None,
                             };
-                            if let Some(field) = field_name {
-                                self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});", field, field.len(), var));
+                            if let Some((field, fmt_str)) = binding_info {
+                                // register_metric_text for backward compat (raw "{}" only)
+                                if fmt_str == "{}" {
+                                    self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});", field, field.len(), var));
+                                }
+                                // register_text_binding for ALL text nodes with state field refs
+                                let escaped_fmt = fmt_str.replace('\\', "\\\\").replace('"', "\\\"");
+                                self.line(&format!(
+                                    "honeycomb::canvas_app::register_text_binding({}, \"{}\".as_ptr(), {}, \"{}\".as_ptr(), {});",
+                                    var, field, field.len(), escaped_fmt, fmt_str.len()
+                                ));
                             }
                         }
                         _ => {
@@ -718,19 +880,19 @@ impl RustCodegen {
                 } else {
                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
                 }
-                // Register metric text nodes for direct updates without tree rebuild
-                // Handles {self.field} and {format("{}", self.field)}
-                let field_name = match &**expr {
+                // Register text binding for targeted updates without tree rebuild.
+                let binding_info: Option<(String, String)> = match &**expr {
                     Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => {
-                        Some(field.clone())
+                        Some((field.clone(), "{}".to_string()))
                     }
                     Expr::FnCall { callee, args } => {
-                        // format("{}", self.field) → register as "field"
                         if let Expr::Ident(name) = &**callee {
                             if name == "format" && args.len() == 2 {
-                                if let Expr::FieldAccess { object, field } = &args[1] {
-                                    if matches!(**object, Expr::SelfExpr) {
-                                        Some(field.clone())
+                                if let Expr::StringLit(fmt_str) = &args[0] {
+                                    if let Expr::FieldAccess { object, field } = &args[1] {
+                                        if matches!(**object, Expr::SelfExpr) {
+                                            Some((field.clone(), fmt_str.clone()))
+                                        } else { None }
                                     } else { None }
                                 } else { None }
                             } else { None }
@@ -738,9 +900,16 @@ impl RustCodegen {
                     }
                     _ => None,
                 };
-                if let Some(field) = field_name {
-                    self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});",
-                        field, field.len(), var));
+                if let Some((field, fmt_str)) = binding_info {
+                    if fmt_str == "{}" {
+                        self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});",
+                            field, field.len(), var));
+                    }
+                    let escaped_fmt = fmt_str.replace('\\', "\\\\").replace('"', "\\\"");
+                    self.line(&format!(
+                        "honeycomb::canvas_app::register_text_binding({}, \"{}\".as_ptr(), {}, \"{}\".as_ptr(), {});",
+                        var, field, field.len(), escaped_fmt, fmt_str.len()
+                    ));
                 }
             }
             TemplateNode::Fragment(children) => {
@@ -795,14 +964,24 @@ impl RustCodegen {
 
                 for child in children {
                     if let (Some(fp), TemplateNode::TemplateIf { then_children, .. }) = (&filter_for_this_loop, child) {
-                        // Emit the then_children directly (skip the {if} — all items rendered)
-                        // Set pending filter registration — the NEXT Element created will be the card container.
-                        self.pending_filter_reg = Some((binding.clone(), fp.item_field.clone()));
+                        // Emit all items unconditionally (skip the {if} condition).
+                        // Use standard emit_template_node to keep prototype indices aligned.
                         for (ci, tc) in then_children.iter().enumerate() {
                             self.emit_template_node(tc, parent_var, comp_name);
+                            // After the first Element, register its PARENT element for filtering.
+                            // last_element_var points to the deepest child, but the card container
+                            // was appended to parent_var. Emit runtime lookup to find it.
                             if ci == 0 {
                                 if let TemplateNode::Element(_) = tc {
-                                    // Registration was emitted inside emit_template_node via pending_filter_reg.
+                                    let filter_val = format!("{}.{}", binding, fp.item_field);
+                                    self.line("// Auto-detected filter pattern: register card for O(n) filtering");
+                                    // The card container is the last child appended to the grid (parent_var)
+                                    self.line(&format!("if let Some(&card_id) = tree.get({}).and_then(|e| e.children.last()) {{", parent_var));
+                                    self.indent += 1;
+                                    self.line(&format!("tree.set_attribute(card_id, \"{}\", &{});", fp.item_field, filter_val));
+                                    self.line(&format!("honeycomb::canvas_app::register_filter_card(card_id, {}.as_ptr(), {}.len() as u32);", filter_val, filter_val));
+                                    self.indent -= 1;
+                                    self.line("}");
                                 }
                             }
                         }
@@ -815,22 +994,62 @@ impl RustCodegen {
                 self.in_for_loop = false; // reset after loop
             }
             TemplateNode::TemplateIf { condition, then_children, else_children } => {
-                let cond_rust = self.expr_to_rust(condition, comp_name);
-                self.line(&format!("if {} {{", cond_rust));
-                self.indent += 1;
-                for child in then_children {
-                    self.emit_template_node(child, parent_var, comp_name);
-                }
-                self.indent -= 1;
-                if let Some(else_nodes) = else_children {
-                    self.line("} else {");
+                // Check if this is a standalone conditional (not inside a for-loop)
+                // that matches a detected conditional pattern. If so, emit elements
+                // unconditionally and register them for O(1) visibility toggling.
+                let cond_pattern: Option<ConditionalPattern> = if !self.in_for_loop {
+                    self.extract_conditional_pattern(condition)
+                } else {
+                    None
+                };
+
+                if let Some(ref pat) = cond_pattern {
+                    // Emit all children UNCONDITIONALLY — they always exist in the tree.
+                    // Each top-level Element child gets registered via pending_conditional_reg,
+                    // which fires in the Element handler BEFORE recursing into children.
+                    self.line(&format!("// Conditional block: {} {} \"{}\" — elements always created, visibility toggled",
+                        pat.state_field, if pat.op_is_eq { "==" } else { "!=" }, pat.value));
+                    for child in then_children {
+                        if let TemplateNode::Element(_) = child {
+                            self.pending_conditional_reg = Some(pat.clone());
+                        }
+                        self.emit_template_node(child, parent_var, comp_name);
+                    }
+                    // Emit else children with inverse conditional registration
+                    if let Some(else_nodes) = else_children {
+                        self.line("// else branch — inverse conditional visibility");
+                        let else_pat = ConditionalPattern {
+                            state_field: pat.state_field.clone(),
+                            value: format!("__else__{}", pat.value),
+                            op_is_eq: !pat.op_is_eq, // inverted for initial visibility check
+                            is_string: pat.is_string,
+                        };
+                        for child in else_nodes {
+                            if let TemplateNode::Element(_) = child {
+                                self.pending_conditional_reg = Some(else_pat.clone());
+                            }
+                            self.emit_template_node(child, parent_var, comp_name);
+                        }
+                    }
+                } else {
+                    // Fallback: standard conditional emission (complex conditions)
+                    let cond_rust = self.expr_to_rust(condition, comp_name);
+                    self.line(&format!("if {} {{", cond_rust));
                     self.indent += 1;
-                    for child in else_nodes {
+                    for child in then_children {
                         self.emit_template_node(child, parent_var, comp_name);
                     }
                     self.indent -= 1;
+                    if let Some(else_nodes) = else_children {
+                        self.line("} else {");
+                        self.indent += 1;
+                        for child in else_nodes {
+                            self.emit_template_node(child, parent_var, comp_name);
+                        }
+                        self.indent -= 1;
+                    }
+                    self.line("}");
                 }
-                self.line("}");
             }
             _ => {} // Link, Outlet, Layout, TemplateMatch not yet supported
         }
@@ -899,6 +1118,52 @@ impl RustCodegen {
                     self.line("render();");
                 }
             } else {
+                // Check if this handler only modifies state fields (no sort, no filter, no control flow).
+                // Skip for data callbacks (on_data_loaded, on_response) — they NEED full rebuild.
+                let modified_fields = if is_data_callback { Vec::new() } else { self.handler_modified_fields(method) };
+
+                // Split modified fields into conditional fields (have registered {if} blocks)
+                // and display-only fields (just update text bindings).
+                let conditional_fields: Vec<String> = modified_fields.iter()
+                    .filter(|f| self.conditional_patterns.iter().any(|cp| cp.state_field == **f))
+                    .cloned().collect();
+                let display_fields: Vec<String> = modified_fields.iter()
+                    .filter(|f| !conditional_fields.contains(f))
+                    .cloned().collect();
+
+                if !conditional_fields.is_empty() {
+                    // Reactive conditional toggle — O(1) visibility, no tree rebuild
+                    self.line("// Reactive conditional toggle — O(1) visibility, no tree rebuild");
+                    for field in &conditional_fields {
+                        self.line(&format!(
+                            "{{ let _val = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().{})); honeycomb::canvas_app::toggle_conditional(\"{}\", &_val); }}",
+                            comp_name.to_uppercase(), field, field
+                        ));
+                    }
+                    for field in &display_fields {
+                        self.line(&format!(
+                            "{{ let _val = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().{})); honeycomb::canvas_app::update_text_bindings(\"{}\", &_val); }}",
+                            comp_name.to_uppercase(), field, field
+                        ));
+                    }
+                    // Targeted relayout: only the parent of the toggled elements, not the full tree
+                    for field in &conditional_fields {
+                        self.line(&format!(
+                            "honeycomb::canvas_app::relayout_conditional(\"{}\");",
+                            field
+                        ));
+                    }
+                } else if !modified_fields.is_empty() {
+                    // Simple text-only update — no visibility change, no rebuild
+                    self.line("// Simple state update — targeted text binding updates (no tree rebuild)");
+                    for field in &modified_fields {
+                        self.line(&format!(
+                            "{{ let _val = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().{})); honeycomb::canvas_app::update_text_bindings(\"{}\", &_val); }}",
+                            comp_name.to_uppercase(), field, field
+                        ));
+                    }
+                    self.line("honeycomb::canvas_app::mark_gpu_dirty();");
+                } else {
                 self.line("// Re-render after state change");
                 self.line("let _t_rebuild = perf_now();");
                 self.line("// Clear stale registrations before tree rebuild");
@@ -919,7 +1184,8 @@ impl RustCodegen {
                 self.line("unsafe { console_log(msg.as_ptr(), msg.len() as u32); }");
                 self.indent -= 1;
                 self.line("}");
-            }
+            } // end full rebuild else
+            } // end simple state update check
             // Record total handler time + update text node
             // Skip LAST OP for data callbacks (on_data_loaded, on_response) — they're init, not user interactions
             if !is_data_callback {
@@ -1234,7 +1500,7 @@ impl RustCodegen {
         self.line("honeycomb::wasm_api::TREE.with(|t| {");
         self.indent += 1;
         self.line("let mut tree = t.borrow_mut();");
-        self.line("let mut measurer = CanvasTextMeasurer { canvas_id: 0 };");
+        self.line("let mut measurer = EstimateMeasurer;");
         self.line("let vw = unsafe { canvas_get_width() };");
         self.line("let vh = unsafe { canvas_get_height() };");
         self.line("layout::compute(&mut tree, vw, 999999.0, &mut measurer);");
@@ -1495,5 +1761,196 @@ mod tests {
         let out = cg.expr_to_rust(&expr, "Shop");
         assert!(out.contains(".category.clone()"), "should reference the correct field, got: {}", out);
         assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
+    }
+
+    // ── Conditional pattern detection tests ──
+
+    #[test]
+    fn test_extract_conditional_self_eq_int() {
+        let cg = RustCodegen::new();
+        let cond = Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "cart_open".to_string(),
+            }),
+            right: Box::new(Expr::Integer(1)),
+        };
+        let pat = cg.extract_conditional_pattern(&cond);
+        assert!(pat.is_some(), "Should detect self.cart_open == 1");
+        let p = pat.unwrap();
+        assert_eq!(p.state_field, "cart_open");
+        assert_eq!(p.value, "1");
+        assert!(p.op_is_eq);
+    }
+
+    #[test]
+    fn test_extract_conditional_self_eq_string() {
+        let cg = RustCodegen::new();
+        let cond = Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "mode".to_string(),
+            }),
+            right: Box::new(Expr::StringLit("dark".to_string())),
+        };
+        let pat = cg.extract_conditional_pattern(&cond);
+        assert!(pat.is_some(), "Should detect self.mode == \"dark\"");
+        let p = pat.unwrap();
+        assert_eq!(p.state_field, "mode");
+        assert_eq!(p.value, "dark");
+        assert!(p.op_is_eq);
+    }
+
+    #[test]
+    fn test_extract_conditional_self_neq() {
+        let cg = RustCodegen::new();
+        let cond = Expr::Binary {
+            op: BinOp::Neq,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "hidden".to_string(),
+            }),
+            right: Box::new(Expr::Integer(0)),
+        };
+        let pat = cg.extract_conditional_pattern(&cond);
+        assert!(pat.is_some(), "Should detect self.hidden != 0");
+        let p = pat.unwrap();
+        assert_eq!(p.state_field, "hidden");
+        assert_eq!(p.value, "0");
+        assert!(!p.op_is_eq);
+    }
+
+    #[test]
+    fn test_extract_conditional_reversed_operands() {
+        let cg = RustCodegen::new();
+        // 1 == self.cart_open (literal on left, self on right)
+        let cond = Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Integer(1)),
+            right: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "cart_open".to_string(),
+            }),
+        };
+        let pat = cg.extract_conditional_pattern(&cond);
+        assert!(pat.is_some(), "Should detect 1 == self.cart_open");
+        let p = pat.unwrap();
+        assert_eq!(p.state_field, "cart_open");
+        assert_eq!(p.value, "1");
+    }
+
+    #[test]
+    fn test_extract_conditional_complex_not_matched() {
+        let cg = RustCodegen::new();
+        // self.x > 5 — not == or !=, should return None
+        let cond = Expr::Binary {
+            op: BinOp::Gt,
+            left: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "count".to_string(),
+            }),
+            right: Box::new(Expr::Integer(5)),
+        };
+        assert!(cg.extract_conditional_pattern(&cond).is_none());
+    }
+
+    #[test]
+    fn test_extract_conditional_non_self_not_matched() {
+        let cg = RustCodegen::new();
+        // x == 1 (not self.x)
+        let cond = Expr::Binary {
+            op: BinOp::Eq,
+            left: Box::new(Expr::Ident("x".to_string())),
+            right: Box::new(Expr::Integer(1)),
+        };
+        assert!(cg.extract_conditional_pattern(&cond).is_none());
+    }
+
+    fn make_test_element() -> Element {
+        Element {
+            tag: "div".to_string(),
+            attributes: vec![],
+            children: vec![],
+            span: crate::token::Span { start: 0, end: 0, line: 0, col: 0 },
+        }
+    }
+
+    #[test]
+    fn test_detect_conditional_patterns_standalone() {
+        let mut cg = RustCodegen::new();
+        // Build a template: {if self.cart_open == 1 { <div/> }}
+        let template = TemplateNode::TemplateIf {
+            condition: Box::new(Expr::Binary {
+                op: BinOp::Eq,
+                left: Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::SelfExpr),
+                    field: "cart_open".to_string(),
+                }),
+                right: Box::new(Expr::Integer(1)),
+            }),
+            then_children: vec![TemplateNode::Element(make_test_element())],
+            else_children: None,
+        };
+        cg.detect_conditional_patterns(&template, false);
+        assert_eq!(cg.conditional_patterns.len(), 1);
+        assert_eq!(cg.conditional_patterns[0].state_field, "cart_open");
+        assert_eq!(cg.conditional_patterns[0].value, "1");
+    }
+
+    #[test]
+    fn test_detect_conditional_patterns_inside_for_skipped() {
+        let mut cg = RustCodegen::new();
+        // {for x in items { {if self.cat == "All" { <div/> }} }}
+        // This is inside a for loop — should NOT be detected as conditional pattern
+        let template = TemplateNode::TemplateFor {
+            binding: "x".to_string(),
+            iterator: Box::new(Expr::FieldAccess {
+                object: Box::new(Expr::SelfExpr),
+                field: "items".to_string(),
+            }),
+            children: vec![TemplateNode::TemplateIf {
+                condition: Box::new(Expr::Binary {
+                    op: BinOp::Eq,
+                    left: Box::new(Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "cat".to_string(),
+                    }),
+                    right: Box::new(Expr::StringLit("All".to_string())),
+                }),
+                then_children: vec![TemplateNode::Element(make_test_element())],
+                else_children: None,
+            }],
+            lazy: false,
+            inplace: false,
+        };
+        cg.detect_conditional_patterns(&template, false);
+        assert_eq!(cg.conditional_patterns.len(), 0, "Should not detect conditionals inside for loop");
+    }
+
+    #[test]
+    fn test_expr_to_literal_string_int() {
+        let cg = RustCodegen::new();
+        assert_eq!(cg.expr_to_literal_string(&Expr::Integer(42)), Some("42".to_string()));
+    }
+
+    #[test]
+    fn test_expr_to_literal_string_string() {
+        let cg = RustCodegen::new();
+        assert_eq!(cg.expr_to_literal_string(&Expr::StringLit("hello".to_string())), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_expr_to_literal_string_bool() {
+        let cg = RustCodegen::new();
+        assert_eq!(cg.expr_to_literal_string(&Expr::Bool(true)), Some("true".to_string()));
+        assert_eq!(cg.expr_to_literal_string(&Expr::Bool(false)), Some("false".to_string()));
+    }
+
+    #[test]
+    fn test_expr_to_literal_string_complex_returns_none() {
+        let cg = RustCodegen::new();
+        assert_eq!(cg.expr_to_literal_string(&Expr::Ident("x".to_string())), None);
     }
 }

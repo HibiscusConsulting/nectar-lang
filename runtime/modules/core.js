@@ -879,6 +879,7 @@ export async function instantiate(wasmUrl, extraImports = {}) {
   R.__memory = memory;
   const { instance } = await WebAssembly.instantiateStreaming(fetch(wasmUrl), merged);
   NectarRuntime.__init(instance);
+  if (instance.exports.__init_all) instance.exports.__init_all();
   return instance;
 }
 
