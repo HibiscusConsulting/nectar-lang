@@ -1298,9 +1298,17 @@ lto = true
     // DEBUG: save generated source for inspection
     let _ = fs::write(out_dir.join("generated.rs"), &rust_source);
 
+    // Create .cargo/config.toml with memory settings for WASM
+    let cargo_dir = build_dir.join(".cargo");
+    let _ = fs::create_dir_all(&cargo_dir);
+    fs::write(cargo_dir.join("config.toml"), r#"[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=65536 --initial-memory=67108864 --max-memory=268435456"]
+"#)?;
+
     // Step 4: Compile to WASM
     println!("nectar: compiling canvas cell...");
     let cargo_result = std::process::Command::new("cargo")
+        .env("RUSTFLAGS", "-C target-feature=+simd128 -C link-args=--initial-memory=67108864 -C link-args=--max-memory=268435456")
         .arg("build")
         .arg("--target")
         .arg("wasm32-unknown-unknown")
@@ -1377,9 +1385,9 @@ fn find_honeycomb_wasm() -> Option<PathBuf> {
 
 fn generate_canvas_html(app_name: &str) -> String {
     // Single WASM binary — .nectar app compiled with Honeycomb into one module.
-    // JS provides only canvas syscalls (1-line bridges to Canvas 2D API).
-    // The WASM exports app_init(vw, vh) and app_render().
-    // Zero logic in JS. Just dispatch table + canvas syscalls (1-line browser API bridges).
+    // Automatic WebGPU detection: if navigator.gpu is available, rectangles render
+    // via instanced SDF shader on GPU canvas; text/images via Canvas 2D overlay.
+    // If WebGPU is unavailable, falls back to full Canvas 2D rendering.
     format!(r##"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1388,13 +1396,19 @@ fn generate_canvas_html(app_name: &str) -> String {
 <title>{app_name}</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
-*{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}canvas{{display:block}}
+*{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}
+.canvas-stack{{position:fixed;top:48px;left:0;width:100%;height:calc(100% - 48px)}}
+.canvas-stack canvas{{position:absolute;top:0;left:0;display:block}}
+#gpu{{z-index:1}}#c{{z-index:2;pointer-events:none}}
 nav{{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
 nav .logo{{color:#f97316;font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}}
 nav .links{{display:flex;gap:4px}}
 nav .links a{{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}}
 nav .links a:hover{{color:#e6edf3;background:rgba(255,255,255,0.06)}}
 nav .links a.active{{color:#e6edf3;background:rgba(249,115,22,0.12)}}
+.render-badge{{position:fixed;bottom:12px;left:12px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;z-index:200;font-family:-apple-system,sans-serif}}
+.render-badge.gpu{{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)}}
+.render-badge.c2d{{background:rgba(249,115,22,0.15);color:#f97316;border:1px solid rgba(249,115,22,0.3)}}
 </style>
 </head>
 <body>
@@ -1408,30 +1422,297 @@ nav .links a.active{{color:#e6edf3;background:rgba(249,115,22,0.12)}}
     <a href="/">Home</a>
   </div>
 </nav>
-<canvas id="c" style="margin-top:48px"></canvas>
+<div class="canvas-stack">
+  <canvas id="gpu"></canvas>
+  <canvas id="c"></canvas>
+</div>
+<div class="render-badge"></div>
 <script>
 (async () => {{
-const cvs = document.getElementById('c');
-let dpr = window.devicePixelRatio || 1;
 const navH = 48;
-cvs.width = window.innerWidth * dpr;
-cvs.height = (window.innerHeight - navH) * dpr;
-cvs.style.width = window.innerWidth + 'px';
-cvs.style.height = (window.innerHeight - navH) + 'px';
-let ctx = cvs.getContext('2d');
-ctx.scale(dpr, dpr);
+let dpr = window.devicePixelRatio || 1;
+let vw = window.innerWidth, vh = window.innerHeight - navH;
 const dec = new TextDecoder();
 
-// Single WASM binary — app + Honeycomb compiled together.
-// JS provides ONLY canvas syscalls (1-line bridges to Canvas 2D API).
+// ── WebGPU Detection ────────────────────────────────────────
+const hasGPU = !!navigator.gpu;
+let gpuDevice, gpuCtx, gpuFormat;
+let gpuPipeline, shadowPipeline;
+let elementBuffer, shadowBuffer, uniformBuffer, shadowUniformBuffer;
+let bindGroup, shadowBindGroup;
+let elementCount = 0, shadowCount = 0;
+let gpuViewport = new Float32Array([vw, vh]);
+let gpuScroll = new Float32Array([0, 0]);
+
+const gpuCanvas = document.getElementById('gpu');
+const cvs = document.getElementById('c');
+
+function resizeCanvases(w, h) {{
+  if (hasGPU) {{
+    gpuCanvas.width = w * dpr; gpuCanvas.height = h * dpr;
+    gpuCanvas.style.width = w + 'px'; gpuCanvas.style.height = h + 'px';
+    gpuCtx.configure({{ device: gpuDevice, format: gpuFormat, alphaMode: 'premultiplied' }});
+  }}
+  cvs.width = w * dpr; cvs.height = h * dpr;
+  cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+  ctx = cvs.getContext('2d'); ctx.scale(dpr, dpr);
+}}
+
+function rebuildElementBindGroup() {{
+  bindGroup = gpuDevice.createBindGroup({{
+    layout: gpuPipeline.getBindGroupLayout(0),
+    entries: [
+      {{ binding: 0, resource: {{ buffer: elementBuffer }} }},
+      {{ binding: 1, resource: {{ buffer: uniformBuffer }} }},
+    ],
+  }});
+}}
+
+function rebuildShadowBindGroup() {{
+  shadowBindGroup = gpuDevice.createBindGroup({{
+    layout: shadowPipeline.getBindGroupLayout(0),
+    entries: [
+      {{ binding: 0, resource: {{ buffer: shadowBuffer }} }},
+      {{ binding: 1, resource: {{ buffer: shadowUniformBuffer }} }},
+    ],
+  }});
+}}
+
+if (hasGPU) {{
+  const adapter = await navigator.gpu.requestAdapter();
+  gpuDevice = await adapter.requestDevice();
+  gpuCtx = gpuCanvas.getContext('webgpu');
+  gpuFormat = navigator.gpu.getPreferredCanvasFormat();
+
+  // ── WGSL Shaders ──────────────────────────────────────────
+  const shaderCode = `
+struct Element {{
+    pos: vec2<f32>,
+    size: vec2<f32>,
+    color: vec4<f32>,
+    corner_radius: vec4<f32>,
+    border_width: f32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+    border_color: vec4<f32>,
+    element_type: u32,
+    _pad3: f32,
+    _pad4: f32,
+    _pad5: f32,
+    _pad6: f32,
+    _pad7: f32,
+    _pad8: f32,
+    _pad9: f32,
+    _padA: f32,
+    _padB: f32,
+    _padC: f32,
+    _padD: f32,
+}};
+
+struct Uniforms {{
+    viewport: vec2<f32>,
+    scroll_offset: vec2<f32>,
+}};
+
+@group(0) @binding(0) var<storage, read> elements: array<Element>;
+@group(0) @binding(1) var<uniform> uniforms: Uniforms;
+
+struct VertexOutput {{
+    @builtin(position) position: vec4<f32>,
+    @location(0) local_pos: vec2<f32>,
+    @location(1) @interpolate(flat) instance: u32,
+}};
+
+var<private> QUAD: array<vec2<f32>, 6> = array(
+    vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
+    vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0),
+);
+
+@vertex
+fn vs_main(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -> VertexOutput {{
+    let elem = elements[iid];
+    let quad_pos = QUAD[vid];
+    let aa_expand = vec2<f32>(1.0, 1.0);
+    let world_pos = elem.pos - aa_expand - uniforms.scroll_offset + quad_pos * (elem.size + aa_expand * 2.0);
+    let clip = vec2(
+        (world_pos.x / uniforms.viewport.x) * 2.0 - 1.0,
+        1.0 - (world_pos.y / uniforms.viewport.y) * 2.0,
+    );
+    var out: VertexOutput;
+    out.position = vec4(clip, 0.0, 1.0);
+    out.local_pos = quad_pos * (elem.size + aa_expand * 2.0) - aa_expand;
+    out.instance = iid;
+    return out;
+}}
+
+fn rounded_rect_sdf(p: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 {{
+    var r: f32;
+    if (p.x < size.x * 0.5) {{
+        if (p.y < size.y * 0.5) {{ r = radii.x; }}
+        else {{ r = radii.w; }}
+    }} else {{
+        if (p.y < size.y * 0.5) {{ r = radii.y; }}
+        else {{ r = radii.z; }}
+    }}
+    r = min(r, min(size.x, size.y) * 0.5);
+    let q = abs(p - size * 0.5) - size * 0.5 + vec2(r);
+    return length(max(q, vec2(0.0))) - r;
+}}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {{
+    let elem = elements[in.instance];
+    let d = rounded_rect_sdf(in.local_pos, elem.size, elem.corner_radius);
+    let aa = fwidth(d);
+    let fill_alpha = 1.0 - smoothstep(-aa, aa, d);
+
+    var final_color = elem.color;
+    final_color.a = final_color.a * fill_alpha;
+
+    if (elem.border_width > 0.0) {{
+        let inner_d = d + elem.border_width;
+        let inner_alpha = 1.0 - smoothstep(-aa, aa, inner_d);
+        let border_mask = fill_alpha - inner_alpha;
+        let fill_part = elem.color * inner_alpha;
+        let border_part = elem.border_color * border_mask;
+        final_color = fill_part + border_part;
+        final_color.a = fill_alpha * max(elem.color.a, elem.border_color.a);
+    }}
+
+    if (final_color.a < 0.004) {{ discard; }}
+    return final_color;
+}}
+`;
+
+  const shadowShaderCode = `
+struct Shadow {{
+    pos: vec2<f32>,
+    size: vec2<f32>,
+    color: vec4<f32>,
+    corner_radius: vec4<f32>,
+    blur_radius: f32,
+    _padding: vec3<f32>,
+}};
+
+struct Uniforms {{
+    viewport: vec2<f32>,
+    scroll_offset: vec2<f32>,
+}};
+
+@group(0) @binding(0) var<storage, read> shadows: array<Shadow>;
+@group(0) @binding(1) var<uniform> uniforms: Uniforms;
+
+struct VertexOutput {{
+    @builtin(position) position: vec4<f32>,
+    @location(0) local_pos: vec2<f32>,
+    @location(1) @interpolate(flat) instance: u32,
+}};
+
+var<private> QUAD: array<vec2<f32>, 6> = array(
+    vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0),
+    vec2(1.0, 0.0), vec2(1.0, 1.0), vec2(0.0, 1.0),
+);
+
+fn rounded_rect_sdf(p: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 {{
+    var r: f32;
+    if (p.x < size.x * 0.5) {{
+        if (p.y < size.y * 0.5) {{ r = radii.x; }}
+        else {{ r = radii.w; }}
+    }} else {{
+        if (p.y < size.y * 0.5) {{ r = radii.y; }}
+        else {{ r = radii.z; }}
+    }}
+    r = min(r, min(size.x, size.y) * 0.5);
+    let q = abs(p - size * 0.5) - size * 0.5 + vec2(r);
+    return length(max(q, vec2(0.0))) - r;
+}}
+
+@vertex
+fn vs_main(@builtin(vertex_index) vid: u32, @builtin(instance_index) iid: u32) -> VertexOutput {{
+    let shadow = shadows[iid];
+    let expand = shadow.blur_radius * 2.0;
+    let expanded_pos = shadow.pos - vec2(expand) - uniforms.scroll_offset;
+    let expanded_size = shadow.size + vec2(expand * 2.0);
+    let quad_pos = QUAD[vid];
+    let world_pos = expanded_pos + quad_pos * expanded_size;
+    let clip = vec2(
+        (world_pos.x / uniforms.viewport.x) * 2.0 - 1.0,
+        1.0 - (world_pos.y / uniforms.viewport.y) * 2.0,
+    );
+    var out: VertexOutput;
+    out.position = vec4(clip, 0.0, 1.0);
+    out.local_pos = quad_pos * expanded_size;
+    out.instance = iid;
+    return out;
+}}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {{
+    let shadow = shadows[in.instance];
+    let expand = shadow.blur_radius * 2.0;
+    let local = in.local_pos - vec2(expand);
+    let d = rounded_rect_sdf(local, shadow.size, shadow.corner_radius);
+    let sigma = shadow.blur_radius * 0.5;
+    let alpha = 1.0 - smoothstep(-sigma, sigma * 2.0, d);
+    var col = shadow.color;
+    col.a = col.a * alpha;
+    if (col.a < 0.004) {{ discard; }}
+    return col;
+}}
+`;
+
+  // ── Create pipelines ──────────────────────────────────────
+  const shaderModule = gpuDevice.createShaderModule({{ code: shaderCode }});
+  const shadowModule = gpuDevice.createShaderModule({{ code: shadowShaderCode }});
+  const blendState = {{
+    color: {{ srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' }},
+    alpha: {{ srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' }},
+  }};
+  gpuPipeline = gpuDevice.createRenderPipeline({{
+    layout: 'auto',
+    vertex: {{ module: shaderModule, entryPoint: 'vs_main' }},
+    fragment: {{ module: shaderModule, entryPoint: 'fs_main',
+      targets: [{{ format: gpuFormat, blend: blendState }}] }},
+    primitive: {{ topology: 'triangle-list' }},
+  }});
+  shadowPipeline = gpuDevice.createRenderPipeline({{
+    layout: 'auto',
+    vertex: {{ module: shadowModule, entryPoint: 'vs_main' }},
+    fragment: {{ module: shadowModule, entryPoint: 'fs_main',
+      targets: [{{ format: gpuFormat, blend: blendState }}] }},
+    primitive: {{ topology: 'triangle-list' }},
+  }});
+
+  // ── Create buffers ────────────────────────────────────────
+  const INITIAL_ELEM_SIZE = 2048 * 128;
+  const INITIAL_SHADOW_SIZE = 256 * 64;
+  const UNIFORM_SIZE = 16;
+  elementBuffer = gpuDevice.createBuffer({{ size: INITIAL_ELEM_SIZE, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }});
+  shadowBuffer = gpuDevice.createBuffer({{ size: INITIAL_SHADOW_SIZE, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }});
+  uniformBuffer = gpuDevice.createBuffer({{ size: UNIFORM_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }});
+  shadowUniformBuffer = gpuDevice.createBuffer({{ size: UNIFORM_SIZE, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }});
+  rebuildElementBindGroup();
+  rebuildShadowBindGroup();
+
+  // Canvas 2D overlay for text — pointer-events go to GPU canvas
+  cvs.style.pointerEvents = 'none';
+  gpuCanvas.style.pointerEvents = 'auto';
+}} else {{
+  // Canvas 2D only — hide GPU canvas
+  gpuCanvas.style.display = 'none';
+  cvs.style.pointerEvents = 'auto';
+}}
+
+// Canvas 2D context — always needed (text overlay in GPU mode, full render in 2D mode)
+let ctx = cvs.getContext('2d');
+resizeCanvases(vw, vh);
+
+// ── WASM Imports ────────────────────────────────────────────
 let W;
+let _fh={{}}, _fs=0, _fb=new Uint8Array(0), _imgCache={{}};
 const imports = {{ env: {{
-  canvas_init: (w,h) => {{ cvs.width=w*dpr; cvs.height=h*dpr; cvs.style.width=w+'px'; cvs.style.height=h+'px'; ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr); return 1; }},
-  canvas_clear: (id) => ctx.clearRect(0,0,window.innerWidth,window.innerHeight),
-  canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
-  canvas_fill_rect: (id,x,y,w,h,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.fillRect(x,y,w,h); }},
-  canvas_stroke_rect: (id,x,y,w,h,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); }},
-  canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); }},
+  // Canvas 2D syscalls — ALWAYS real (text/images in GPU mode, everything in 2D mode)
   canvas_fill_text: (id,p,l,x,y,r,g,b,sz,bold) => {{ ctx.fillStyle=`rgb(${{r}},${{g}},${{b}})`; ctx.font=`${{bold?'bold ':''}}${{sz}}px -apple-system,BlinkMacSystemFont,sans-serif`; ctx.fillText(dec.decode(new Uint8Array(W.memory.buffer,p,l)),x,y); }},
   canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {{
     const url = dec.decode(new Uint8Array(W.memory.buffer,sp,sl));
@@ -1440,25 +1721,108 @@ const imports = {{ env: {{
   }},
   canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => {{ const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){{ try{{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}}catch(e){{}} }} }},
   canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
-  canvas_get_width: () => window.innerWidth, canvas_get_height: () => window.innerHeight - 48,
+  canvas_clear: (id) => ctx.clearRect(0,0,vw,vh),
+  canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
+  canvas_get_width: () => vw, canvas_get_height: () => vh,
+  // Canvas 2D syscalls — real in 2D mode, no-ops in GPU mode (GPU handles rects)
+  canvas_init: hasGPU ? (w,h) => {{ resizeCanvases(w,h); return 1; }} : (w,h) => {{ vw=w; vh=h; cvs.width=w*dpr; cvs.height=h*dpr; cvs.style.width=w+'px'; cvs.style.height=h+'px'; ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr); return 1; }},
+  canvas_fill_rect: hasGPU ? ()=>{{}} : (id,x,y,w,h,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.fillRect(x,y,w,h); }},
+  canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); }},
+  canvas_stroke_rect: hasGPU ? ()=>{{}} : (id,x,y,w,h,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.strokeRect(x,y,w,h); }},
+  canvas_stroke_round_rect: hasGPU ? ()=>{{}} : (id,x,y,w,h,rad,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); }},
+  canvas_draw_line: hasGPU ? ()=>{{}} : (id,x1,y1,x2,y2,r,g,b,a,w) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }},
+  canvas_draw_circle: hasGPU ? ()=>{{}} : (id,cx,cy,r,cr,cg,cb,ca) => {{ ctx.fillStyle=`rgba(${{cr}},${{cg}},${{cb}},${{ca/255}})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }},
+  canvas_save: hasGPU ? ()=>{{}} : (id) => ctx.save(),
+  canvas_restore: hasGPU ? ()=>{{}} : (id) => ctx.restore(),
+  canvas_clip_rect: hasGPU ? ()=>{{}} : (id,x,y,w,h) => {{ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); }},
+  canvas_set_shadow: hasGPU ? ()=>{{}} : (id,blur,ox,oy,r,g,b,a) => {{ ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; }},
+  canvas_clear_shadow: hasGPU ? ()=>{{}} : (id) => {{ ctx.shadowBlur=0; ctx.shadowColor='transparent'; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; }},
+  // GPU syscalls — real in GPU mode, no-ops in 2D mode
+  gpu_available: hasGPU ? () => 1 : () => 0,
+  gpu_init: hasGPU ? (w,h) => {{ resizeCanvases(w,h); return 1; }} : () => 0,
+  gpu_upload_elements: hasGPU ? (ptr,len,count) => {{
+    if (len === 0) {{ elementCount = 0; return; }}
+    const data = new Uint8Array(W.memory.buffer, ptr, len);
+    if (len > elementBuffer.size) {{
+      elementBuffer.destroy();
+      let newSize = elementBuffer.size;
+      while (newSize < len) newSize *= 2;
+      elementBuffer = gpuDevice.createBuffer({{ size: newSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }});
+      rebuildElementBindGroup();
+    }}
+    gpuDevice.queue.writeBuffer(elementBuffer, 0, data);
+    elementCount = count;
+    if (count > 0 && !window._gpuFirstLog) {{
+      window._gpuFirstLog = true;
+      console.log(`[Nectar WebGPU] ${{count}} elements, ${{(len/1024).toFixed(0)}} KB uploaded`);
+    }}
+  }} : ()=>{{}},
+  gpu_render: hasGPU ? () => {{
+    if (elementCount === 0 && shadowCount === 0) return;
+    const texture = gpuCtx.getCurrentTexture();
+    const encoder = gpuDevice.createCommandEncoder();
+    const pass = encoder.beginRenderPass({{
+      colorAttachments: [{{
+        view: texture.createView(),
+        loadOp: 'clear',
+        storeOp: 'store',
+        clearValue: {{ r: 0.043, g: 0.055, b: 0.078, a: 1.0 }},
+      }}],
+    }});
+    if (shadowCount > 0) {{
+      pass.setPipeline(shadowPipeline);
+      pass.setBindGroup(0, shadowBindGroup);
+      pass.draw(6, shadowCount);
+    }}
+    if (elementCount > 0) {{
+      pass.setPipeline(gpuPipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(6, elementCount);
+    }}
+    pass.end();
+    gpuDevice.queue.submit([encoder.finish()]);
+  }} : ()=>{{}},
+  gpu_set_viewport: hasGPU ? (w,h) => {{
+    gpuViewport[0] = w; gpuViewport[1] = h;
+    gpuDevice.queue.writeBuffer(uniformBuffer, 0, gpuViewport);
+    gpuDevice.queue.writeBuffer(shadowUniformBuffer, 0, gpuViewport);
+  }} : ()=>{{}},
+  gpu_set_scroll: hasGPU ? (x,y) => {{
+    gpuScroll[0] = x; gpuScroll[1] = y;
+    gpuDevice.queue.writeBuffer(uniformBuffer, 8, gpuScroll);
+    gpuDevice.queue.writeBuffer(shadowUniformBuffer, 8, gpuScroll);
+  }} : ()=>{{}},
+  gpu_upload_shadows: hasGPU ? (ptr,len,count) => {{
+    if (len === 0) {{ shadowCount = 0; return; }}
+    const data = new Uint8Array(W.memory.buffer, ptr, len);
+    if (len > shadowBuffer.size) {{
+      shadowBuffer.destroy();
+      let newSize = shadowBuffer.size;
+      while (newSize < len) newSize *= 2;
+      shadowBuffer = gpuDevice.createBuffer({{ size: newSize, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }});
+      rebuildShadowBindGroup();
+    }}
+    gpuDevice.queue.writeBuffer(shadowBuffer, 0, data);
+    shadowCount = count;
+  }} : ()=>{{}},
+  gpu_resize: hasGPU ? (w,h) => {{ resizeCanvases(w,h); }} : ()=>{{}},
+  gpu_upload_shader: () => 1,
+  gpu_upload_text: () => {{}},
+  gpu_upload_atlas: () => {{}},
+  gpu_request_glyph: () => 0,
+  gpu_upload_gradients: () => {{}},
+  // Always-real syscalls
   clipboard_write: (p,l) => navigator.clipboard?.writeText(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
   clipboard_read: () => 0,
   input_overlay_show: () => {{}}, input_overlay_hide: () => {{}}, input_overlay_get_value: () => 0,
   search_scroll_to: () => {{}},
   navigate: (p,l) => {{ window.location.href=dec.decode(new Uint8Array(W.memory.buffer,p,l)); }},
   performance_now: () => performance.now(),
-  canvas_draw_line: (id,x1,y1,x2,y2,r,g,b,a,w) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }},
-  canvas_save: (id) => ctx.save(), canvas_restore: (id) => ctx.restore(),
-  canvas_clip_rect: (id,x,y,w,h) => {{ ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); }},
-  canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => {{ ctx.fillStyle=`rgba(${{cr}},${{cg}},${{cb}},${{ca/255}})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); }},
-  canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => {{ ctx.strokeStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); }},
-  canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => {{ ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; }},
-  canvas_clear_shadow: (id) => {{ ctx.shadowBlur=0; ctx.shadowColor='transparent'; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; }},
   console_log: (p,l) => console.log(dec.decode(new Uint8Array(W.memory.buffer,p,l))),
   app_callback: (idx) => {{ if(W.__callback) W.__callback(idx); }},
   file_picker_open: () => 0,
   media_create: () => 0, media_play: () => {{}}, media_pause: () => {{}}, media_destroy: () => {{}},
-  // HTTP fetch — 1-line bridges to browser fetch() API
+  // HTTP fetch
   fetch_request: (up,ul,method,bp,bl,cb) => {{
     const url = dec.decode(new Uint8Array(W.memory.buffer,up,ul));
     const opts = {{ method: ['GET','POST','PUT','DELETE','PATCH'][method]||'GET', headers: {{..._fh}} }};
@@ -1469,69 +1833,80 @@ const imports = {{ env: {{
   fetch_set_header: (kp,kl,vp,vl) => {{ _fh[dec.decode(new Uint8Array(W.memory.buffer,kp,kl))]=dec.decode(new Uint8Array(W.memory.buffer,vp,vl)); }},
   fetch_response_status: () => _fs,
   fetch_response_body: (bp,bc) => {{ const n=Math.min(_fb.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(_fb.subarray(0,n)); return n; }},
-  // Storage — 1-line bridges to browser localStorage
+  // Storage
   storage_get: (kp,kl,bp,bc) => {{ const v=localStorage.getItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))); if(!v)return 0; const b=new TextEncoder().encode(v); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; }},
   storage_set: (kp,kl,vp,vl) => localStorage.setItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl)),dec.decode(new Uint8Array(W.memory.buffer,vp,vl))),
   storage_remove: (kp,kl) => localStorage.removeItem(dec.decode(new Uint8Array(W.memory.buffer,kp,kl))),
-  // Routing — 1-line bridges to browser location.hash
+  // Routing
   get_location_hash: (bp,bc) => {{ const h=location.hash.slice(1); const b=new TextEncoder().encode(h); const n=Math.min(b.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(b.subarray(0,n)); return n; }},
   set_location_hash: (p,l) => {{ location.hash=dec.decode(new Uint8Array(W.memory.buffer,p,l)); }},
   on_hashchange: (cb) => window.addEventListener('hashchange',()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }}),
-  // Timers — 1-line bridges to browser setTimeout/setInterval
+  // Timers
   set_timeout: (cb,ms) => setTimeout(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
   set_interval: (cb,ms) => setInterval(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
   clear_interval: (id) => clearInterval(id),
   clear_timeout: (id) => clearTimeout(id),
 }}}};
-let _fh={{}}, _fs=0, _fb=new Uint8Array(0), _imgCache={{}};
 
+// ── Load WASM ───────────────────────────────────────────────
 try {{
+const t0 = performance.now();
 const {{ instance }} = await WebAssembly.instantiateStreaming(fetch('app.wasm?v='+Date.now()), imports);
 W = instance.exports;
-if (W.nectar_init) {{
-  // .nectar app — build tree via nectar_init, then app_init picks it up from wasm_api::TREE
-  W.nectar_init(window.innerWidth, window.innerHeight - 48);
+const t1 = performance.now();
+
+if (hasGPU && W.app_set_gpu_mode) W.app_set_gpu_mode(1);
+if (W.nectar_init) W.nectar_init(vw, vh);
+W.app_init(vw, vh, t1 - t0);
+
+if (hasGPU) {{
+  gpuDevice.queue.writeBuffer(uniformBuffer, 0, new Float32Array([vw, vh, 0, 0]));
+  gpuDevice.queue.writeBuffer(shadowUniformBuffer, 0, new Float32Array([vw, vh, 0, 0]));
 }}
-// app_init detects pre-built tree (compiler_tree) and uses it; otherwise builds demo
-W.app_init(window.innerWidth, window.innerHeight - 48, 0);
+
 W.app_render();
+console.log(`%c[Nectar ${{hasGPU?'WebGPU':'Canvas 2D'}}]%c Initialized in ${{(t1-t0).toFixed(1)}}ms`, hasGPU?'color:#22c55e;font-weight:bold':'color:#f97316;font-weight:bold', 'color:inherit');
 }} catch(e) {{ document.body.style.color='#f00'; document.body.style.padding='20px'; document.body.style.fontSize='14px'; document.body.style.fontFamily='monospace'; document.body.innerText='WASM Error: '+e.message+'\n\n'+e.stack; console.error(e); }}
 
-// Full event wiring — all Honeycomb exports
+// ── Events ──────────────────────────────────────────────────
+const eventTarget = hasGPU ? gpuCanvas : cvs;
+
 window.addEventListener('resize', () => {{
   dpr = window.devicePixelRatio || 1;
-  cvs.width = window.innerWidth * dpr; cvs.height = (window.innerHeight - navH) * dpr;
-  cvs.style.width = window.innerWidth + 'px'; cvs.style.height = (window.innerHeight - navH) + 'px';
-  ctx = cvs.getContext('2d'); ctx.scale(dpr, dpr);
-  if (W.app_resize) W.app_resize(window.innerWidth, window.innerHeight - navH);
+  vw = window.innerWidth; vh = window.innerHeight - navH;
+  resizeCanvases(vw, vh);
+  if (hasGPU) {{
+    gpuDevice.queue.writeBuffer(uniformBuffer, 0, new Float32Array([vw, vh]));
+    gpuDevice.queue.writeBuffer(shadowUniformBuffer, 0, new Float32Array([vw, vh]));
+  }}
+  if (W.app_resize) W.app_resize(vw, vh);
   if (W.app_render) W.app_render();
 }});
-cvs.addEventListener('wheel', e => {{
+eventTarget.addEventListener('wheel', e => {{
   e.preventDefault();
   if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);
   if (W.app_scroll) W.app_scroll(e.deltaY);
   if (W.app_render) W.app_render();
 }}, {{ passive: false }});
-cvs.addEventListener('click', e => {{
+eventTarget.addEventListener('click', e => {{
   if (W.app_click) W.app_click(e.offsetX, e.offsetY);
   if (W.app_render) W.app_render();
 }});
-cvs.addEventListener('mousedown', e => {{
+eventTarget.addEventListener('mousedown', e => {{
   if (W.app_mousedown) W.app_mousedown(e.offsetX, e.offsetY, e.detail);
   if (W.app_render) W.app_render();
 }});
-cvs.addEventListener('mouseup', e => {{
+eventTarget.addEventListener('mouseup', e => {{
   if (W.app_mouseup) W.app_mouseup(e.offsetX, e.offsetY);
   if (W.app_render) W.app_render();
 }});
-let _raf = 0;
-cvs.addEventListener('mousemove', e => {{
+eventTarget.addEventListener('mousemove', e => {{
   if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, e.buttons);
   if (W.app_cursor) {{
     const c = W.app_cursor(e.offsetX, e.offsetY);
-    cvs.style.cursor = ['default','pointer','text','not-allowed'][c] || 'default';
+    eventTarget.style.cursor = ['default','pointer','text','not-allowed'][c] || 'default';
   }}
-  if (!_raf) {{ _raf = requestAnimationFrame(() => {{ if (W.app_render) W.app_render(); _raf = 0; }}); }}
+  // WASM requests re-render via canvas_request_frame when needed (drag, etc.)
 }});
 document.addEventListener('keydown', e => {{
   const mod = (e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0);
@@ -1539,17 +1914,21 @@ document.addEventListener('keydown', e => {{
   if (ch.length && 32*1024*1024 + ch.length <= W.memory.buffer.byteLength) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
   if (W.app_keydown) W.app_keydown(e.keyCode, ch.length ? 32*1024*1024 : 0, ch.length, mod);
   if (W.app_render) W.app_render();
-  // Allow ALL browser shortcuts through — only block bare keys with no modifier
   if (e.metaKey||e.ctrlKey||e.altKey||e.key.length>1) return;
 }});
 // Touch
-cvs.addEventListener('touchstart', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }}, {{ passive: false }});
-cvs.addEventListener('touchmove', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }}, {{ passive: false }});
-cvs.addEventListener('touchend', e => {{ if (W.app_touchend) W.app_touchend(0, 0); if (W.app_render) W.app_render(); }});
+eventTarget.addEventListener('touchstart', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }}, {{ passive: false }});
+eventTarget.addEventListener('touchmove', e => {{ e.preventDefault(); const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }}, {{ passive: false }});
+eventTarget.addEventListener('touchend', e => {{ if (W.app_touchend) W.app_touchend(0, 0); if (W.app_render) W.app_render(); }});
 // Caret blink
 setInterval(() => {{ if (W.app_needs_animation && W.app_needs_animation() && W.app_render) W.app_render(); }}, 500);
 
-console.log('%c[Nectar Canvas]%c .nectar + Honeycomb — single WASM binary', 'color:#f97316;font-weight:bold', 'color:inherit');
+// ── Badge ───────────────────────────────────────────────────
+const badge = document.querySelector('.render-badge');
+badge.textContent = hasGPU ? 'WebGPU' : 'Canvas 2D';
+badge.className = 'render-badge ' + (hasGPU ? 'gpu' : 'c2d');
+
+console.log(`%c[Nectar]%c ${{hasGPU?'Rectangles via WebGPU, text via Canvas 2D overlay':'Full Canvas 2D rendering'}}`, 'color:#f97316;font-weight:bold', 'color:inherit');
 }})();
 </script>
 </body>
