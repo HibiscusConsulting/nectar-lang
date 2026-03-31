@@ -2002,6 +2002,7 @@ const imports = {{ env: {{
   }},
   canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => {{ const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){{ try{{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}}catch(e){{}} }} }},
   canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
+  canvas_highlight_rect: (id,x,y,w,h,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.fillRect(x,y,w,h); }},
   canvas_clear: (id) => ctx.clearRect(0,0,vw,vh),
   canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
   canvas_get_width: () => vw, canvas_get_height: () => vh,
