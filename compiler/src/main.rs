@@ -2221,6 +2221,8 @@ eventTarget.addEventListener('mousemove', e => {{
   // WASM requests re-render via canvas_request_frame when needed (drag, etc.)
 }});
 document.addEventListener('keydown', e => {{
+  // Intercept Cmd+F and Cmd+G for WASM-native find (prevent browser find bar)
+  if ((e.metaKey||e.ctrlKey) && (e.key==='f'||e.key==='g')) e.preventDefault();
   const mod = (e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0);
   const ch = e.key.length === 1 ? new TextEncoder().encode(e.key) : new Uint8Array(0);
   if (ch.length && 32*1024*1024 + ch.length <= W.memory.buffer.byteLength) new Uint8Array(W.memory.buffer).set(ch, 32*1024*1024);
