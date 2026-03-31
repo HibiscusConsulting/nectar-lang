@@ -170,6 +170,11 @@ enum Commands {
         /// Output is a directory ready to serve.
         #[arg(long)]
         canvas: bool,
+
+        /// Also produce a DOM build for SEO/accessibility alongside canvas build.
+        /// Creates a dom/ subdirectory with real HTML for crawlers and screen readers.
+        #[arg(long)]
+        seo: bool,
     },
     /// Compile and run test blocks
     Test {
@@ -276,6 +281,7 @@ fn main() -> anyhow::Result<()> {
             target,
             verify_contracts,
             canvas,
+            seo,
         }) => {
             // Resolve dependencies first, then compile.
             if let Err(e) = cmd_install() {
@@ -288,9 +294,9 @@ fn main() -> anyhow::Result<()> {
                 anyhow::anyhow!("no input file specified for `nectar build`")
             })?;
             if canvas {
-                build_canvas_app(&input, output, no_check, opt_level, &target, verify_contracts)
+                build_canvas_app(&input, output, no_check, opt_level, &target, verify_contracts, seo)
             } else {
-                compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, verify_contracts)
+                compile(&input, output, false, false, emit_wasm, ssr, hydrate, no_check, opt_level, critical_css, &target, verify_contracts, seo)
             }
         }
         Some(Commands::Test { input, filter, watch }) => cmd_test(&input, filter, watch),
@@ -335,6 +341,7 @@ fn main() -> anyhow::Result<()> {
                 cli.critical_css,
                 "browser",
                 None,
+                false,
             )
         }
     }
@@ -1218,6 +1225,188 @@ fn item_name(item: &ast::Item) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
+// SEO / AIEO — Page meta extraction and HTML injection
+// ---------------------------------------------------------------------------
+
+/// Extracted page metadata for HTML injection (SEO, Open Graph, JSON-LD).
+struct PageMeta {
+    title: Option<String>,
+    description: Option<String>,
+    canonical: Option<String>,
+    og_image: Option<String>,
+    structured_data: Vec<(String, Vec<(String, String)>)>, // (schema_type, fields)
+    extra: Vec<(String, String)>,
+}
+
+/// Walk the parsed program and extract meta from the first PageDef that has it.
+fn extract_page_meta(program: &[ast::Item]) -> Option<PageMeta> {
+    for item in program {
+        if let ast::Item::Page(page) = item {
+            if let Some(ref meta) = page.meta {
+                let str_val = |expr: &Option<ast::Expr>| -> Option<String> {
+                    match expr {
+                        Some(ast::Expr::StringLit(s)) => Some(s.clone()),
+                        _ => None,
+                    }
+                };
+                let structured_data = meta.structured_data.iter().map(|sd| {
+                    let fields: Vec<(String, String)> = sd.fields.iter().filter_map(|(k, v)| {
+                        if let ast::Expr::StringLit(s) = v {
+                            Some((k.clone(), s.clone()))
+                        } else if let ast::Expr::Integer(n) = v {
+                            Some((k.clone(), n.to_string()))
+                        } else if let ast::Expr::Float(f) = v {
+                            Some((k.clone(), f.to_string()))
+                        } else if let ast::Expr::Bool(b) = v {
+                            Some((k.clone(), b.to_string()))
+                        } else {
+                            None
+                        }
+                    }).collect();
+                    (sd.schema_type.clone(), fields)
+                }).collect();
+                let extra = meta.extra.iter().filter_map(|(k, v)| {
+                    if let ast::Expr::StringLit(s) = v {
+                        Some((k.clone(), s.clone()))
+                    } else {
+                        None
+                    }
+                }).collect();
+                return Some(PageMeta {
+                    title: str_val(&meta.title),
+                    description: str_val(&meta.description),
+                    canonical: str_val(&meta.canonical),
+                    og_image: str_val(&meta.og_image),
+                    structured_data,
+                    extra,
+                });
+            }
+        }
+    }
+    None
+}
+
+/// Generate HTML meta tags, Open Graph tags, and JSON-LD structured data for <head>.
+fn generate_meta_html(meta: &PageMeta) -> String {
+    let mut out = String::new();
+
+    if let Some(ref title) = meta.title {
+        out.push_str(&format!("<title>{}</title>\n", html_escape(title)));
+        out.push_str(&format!("<meta property=\"og:title\" content=\"{}\">\n", html_escape(title)));
+    }
+    if let Some(ref desc) = meta.description {
+        out.push_str(&format!("<meta name=\"description\" content=\"{}\">\n", html_escape(desc)));
+        out.push_str(&format!("<meta property=\"og:description\" content=\"{}\">\n", html_escape(desc)));
+    }
+    if let Some(ref canonical) = meta.canonical {
+        out.push_str(&format!("<link rel=\"canonical\" href=\"{}\">\n", html_escape(canonical)));
+        out.push_str(&format!("<meta property=\"og:url\" content=\"{}\">\n", html_escape(canonical)));
+    }
+    if let Some(ref og_img) = meta.og_image {
+        out.push_str(&format!("<meta property=\"og:image\" content=\"{}\">\n", html_escape(og_img)));
+    }
+    out.push_str("<meta property=\"og:type\" content=\"website\">\n");
+
+    // Extra meta tags (e.g. robots, author, twitter:card)
+    for (key, val) in &meta.extra {
+        if key.starts_with("og:") || key.starts_with("twitter:") {
+            out.push_str(&format!("<meta property=\"{}\" content=\"{}\">\n", html_escape(key), html_escape(val)));
+        } else {
+            out.push_str(&format!("<meta name=\"{}\" content=\"{}\">\n", html_escape(key), html_escape(val)));
+        }
+    }
+
+    // JSON-LD structured data
+    for (schema_type, fields) in &meta.structured_data {
+        let mut json = format!("{{\"@context\":\"https://schema.org\",\"@type\":\"{}\"", schema_type);
+        for (key, val) in fields {
+            // Try to detect numeric values to avoid quoting them
+            if val.parse::<f64>().is_ok() || val == "true" || val == "false" {
+                json.push_str(&format!(",\"{}\":{}", key, val));
+            } else {
+                json.push_str(&format!(",\"{}\":\"{}\"", key, json_escape(val)));
+            }
+        }
+        json.push('}');
+        out.push_str(&format!("<script type=\"application/ld+json\">{}</script>\n", json));
+    }
+
+    out
+}
+
+/// Minimal HTML entity escaping for attribute values.
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+     .replace('"', "&quot;")
+     .replace('<', "&lt;")
+     .replace('>', "&gt;")
+}
+
+/// Minimal JSON string escaping.
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+     .replace('"', "\\\"")
+     .replace('\n', "\\n")
+     .replace('\r', "\\r")
+     .replace('\t', "\\t")
+}
+
+/// Generate a DOM-mode HTML shell that loads core.js + app.wasm with full SEO meta.
+fn generate_dom_html(app_name: &str, meta: Option<&PageMeta>, program: &ast::Program) -> String {
+    let meta_tags = meta.map(|m| generate_meta_html(m)).unwrap_or_else(|| {
+        format!("<title>{}</title>\n", app_name)
+    });
+
+    // Find the mount function to call — look for page, router, or component
+    let mount_fn = find_mount_function(program);
+
+    format!(r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{meta_tags}<link rel="icon" href="data:,">
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import {{ instantiate, wasmImports }} from './core.js';
+const instance = await instantiate('./app.wasm');
+const rootId = wasmImports.dom.getRoot();
+const mount = instance.exports['{mount_fn}'] || instance.exports.SiteRouter_init;
+if (mount) {{
+  try {{ mount(rootId); }} catch(e) {{ try {{ mount(); }} catch(e2) {{}} }}
+}}
+</script>
+</body>
+</html>"#, meta_tags = meta_tags, mount_fn = mount_fn)
+}
+
+/// Find the primary mount function name from the program AST.
+/// Prefers: router > first page > first component.
+fn find_mount_function(program: &ast::Program) -> String {
+    // Check for router first (SiteRouter_init, AppRouter_init, etc.)
+    for item in &program.items {
+        if let ast::Item::Router(r) = item {
+            return format!("{}_init", r.name);
+        }
+    }
+    // Then pages
+    for item in &program.items {
+        if let ast::Item::Page(p) = item {
+            return format!("{}_mount", p.name);
+        }
+    }
+    // Then components
+    for item in &program.items {
+        if let ast::Item::Component(c) = item {
+            return format!("{}_mount", c.name);
+        }
+    }
+    "__init_all".to_string()
+}
+
+// ---------------------------------------------------------------------------
 // Canvas app build — nectar build --canvas
 // Outputs a complete directory: .wasm + index.html + devtools
 // ---------------------------------------------------------------------------
@@ -1229,6 +1418,7 @@ fn build_canvas_app(
     opt_level: u8,
     _target: &str,
     _verify_contracts: Option<String>,
+    seo: bool,
 ) -> anyhow::Result<()> {
     let out_dir = output.unwrap_or_else(|| {
         let stem = input.file_stem().unwrap_or_default().to_string_lossy().to_string();
@@ -1354,9 +1544,12 @@ rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=655
         }
     }
 
-    // Step 6: Generate index.html (minimal canvas host — just canvas syscalls)
+    // Step 6: Extract page meta for SEO injection
+    let page_meta = extract_page_meta(&program.items);
+
+    // Step 7: Generate index.html (canvas host with SEO meta in <head>)
     let app_name = input.file_stem().unwrap_or_default().to_string_lossy();
-    let html = generate_canvas_html(&app_name);
+    let html = generate_canvas_html(&app_name, page_meta.as_ref());
     fs::write(out_dir.join("index.html"), &html)?;
 
     // Save generated Rust for inspection
@@ -1368,6 +1561,64 @@ rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=655
     println!("nectar: canvas cell built -> {}/", out_dir.display());
     println!("  index.html  (host — canvas syscalls only)");
     println!("  app.wasm    ({:.1} KB) — single binary (cell + Honeycomb engine)", wasm_kb);
+
+    // Step 8: SEO dual build — produce DOM version alongside canvas
+    if seo {
+        let dom_dir = out_dir.join("dom");
+        fs::create_dir_all(&dom_dir)?;
+
+        // Generate DOM-mode WASM (standard browser codegen)
+        let mut dom_codegen = WasmCodegen::new();
+        let wat = dom_codegen.generate(&program);
+
+        if !dom_codegen.codegen_errors.is_empty() {
+            for err in &dom_codegen.codegen_errors {
+                eprintln!("codegen error (DOM): {}", err);
+            }
+            return Err(anyhow::anyhow!("{} DOM codegen error(s)", dom_codegen.codegen_errors.len()));
+        }
+
+        // Write WAT and convert to WASM
+        let dom_wat_path = dom_dir.join("app.wat");
+        let dom_wasm_path = dom_dir.join("app.wasm");
+        fs::write(&dom_wat_path, &wat)?;
+
+        let wat2wasm_result = std::process::Command::new("wat2wasm")
+            .arg(&dom_wat_path)
+            .arg("-o")
+            .arg(&dom_wasm_path)
+            .output();
+
+        match wat2wasm_result {
+            Ok(r) if r.status.success() => {
+                let _ = fs::remove_file(&dom_wat_path);
+            }
+            _ => {
+                // Fallback: use built-in binary emitter
+                let _ = fs::remove_file(&dom_wat_path);
+                let mut emitter = WasmBinaryEmitter::new();
+                let bytes = emitter.emit(&program);
+                fs::write(&dom_wasm_path, &bytes)?;
+            }
+        }
+
+        // Copy core.js runtime — search multiple locations
+        let core_js_path = find_core_js().ok_or_else(|| {
+            anyhow::anyhow!("core.js not found — expected at runtime/modules/core.js relative to repo root")
+        })?;
+        fs::copy(&core_js_path, dom_dir.join("core.js"))?;
+
+        // Generate DOM index.html with full SEO meta
+        let dom_html = generate_dom_html(&app_name, page_meta.as_ref(), &program);
+        fs::write(dom_dir.join("index.html"), &dom_html)?;
+
+        let dom_wasm_kb = fs::metadata(&dom_wasm_path).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0);
+        println!("  dom/");
+        println!("    index.html (DOM build — SEO/accessibility/AIEO)");
+        println!("    app.wasm   ({:.1} KB) — DOM-mode WASM", dom_wasm_kb);
+        println!("    core.js    (runtime syscalls)");
+    }
+
     println!();
     println!("  Serve with: cd {} && python3 -m http.server 8080", out_dir.display());
 
@@ -1383,18 +1634,42 @@ fn find_honeycomb_wasm() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
-fn generate_canvas_html(app_name: &str) -> String {
+/// Find core.js runtime file — search relative to compiler binary, CWD, and common locations.
+fn find_core_js() -> Option<PathBuf> {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_default();
+    let candidates = [
+        exe_dir.join("../../../runtime/modules/core.js"),
+        PathBuf::from("runtime/modules/core.js"),
+        PathBuf::from("../runtime/modules/core.js"),
+        PathBuf::from("examples/core.js"),
+    ];
+    for c in &candidates {
+        if let Ok(p) = fs::canonicalize(c) {
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+fn generate_canvas_html(app_name: &str, meta: Option<&PageMeta>) -> String {
     // Single WASM binary — .nectar app compiled with Honeycomb into one module.
     // Automatic WebGPU detection: if navigator.gpu is available, rectangles render
     // via instanced SDF shader on GPU canvas; text/images via Canvas 2D overlay.
     // If WebGPU is unavailable, falls back to full Canvas 2D rendering.
+    let meta_tags = meta.map(|m| generate_meta_html(m)).unwrap_or_else(|| {
+        format!("<title>{}</title>\n", app_name)
+    });
     format!(r##"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{app_name}</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+{meta_tags}<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 *{{margin:0;padding:0;overflow:hidden}}body{{background:#0b0e14}}
 .canvas-stack{{position:fixed;top:48px;left:0;width:100%;height:calc(100% - 48px)}}
@@ -1952,6 +2227,7 @@ fn compile(
     critical_css_flag: bool,
     target: &str,
     verify_contracts_url: Option<String>,
+    seo: bool,
 ) -> anyhow::Result<()> {
     let source = fs::read_to_string(input)
         .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", input.display(), e))?;
@@ -2243,6 +2519,31 @@ fn compile(
         println!("nectar: compiled {} -> {}", input.display(), output_path.display());
     }
 
+    // SEO mode: generate index.html with meta tags + copy core.js alongside the WASM
+    if seo {
+        let page_meta = extract_page_meta(&program.items);
+        let app_name = input.file_stem().unwrap_or_default().to_string_lossy();
+
+        // Determine output directory (same dir as the WASM/WAT output)
+        let out_dir = if emit_wasm {
+            input.with_extension("wasm").parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."))
+        } else {
+            input.with_extension("wat").parent().map(|p| p.to_path_buf()).unwrap_or_else(|| PathBuf::from("."))
+        };
+
+        let html = generate_dom_html(&app_name, page_meta.as_ref(), &program);
+        fs::write(out_dir.join("index.html"), &html)?;
+        println!("nectar: SEO index.html generated with meta tags + JSON-LD");
+
+        // Copy core.js if found
+        if let Some(core_path) = find_core_js() {
+            fs::copy(&core_path, out_dir.join("core.js"))?;
+            println!("nectar: copied core.js runtime");
+        } else {
+            eprintln!("warning: core.js not found — index.html will need it at runtime");
+        }
+    }
+
     Ok(())
 }
 
@@ -2296,7 +2597,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile failed: {:?}", result);
         assert!(output.exists());
@@ -2315,7 +2616,7 @@ mod tests {
         let result = compile(
             &input,
             None,
-            true, false, false, false, false, false, 0, false, "browser", None,
+            true, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok());
     }
@@ -2331,7 +2632,7 @@ mod tests {
         let result = compile(
             &input,
             None,
-            false, true, false, false, false, false, 0, false, "browser", None,
+            false, true, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok());
     }
@@ -2348,7 +2649,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, true, false, false, false, 0, false, "browser", None,
+            false, false, true, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile wasm failed: {:?}", result);
         assert!(output.exists());
@@ -2366,7 +2667,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, true, false, false, 0, false, "browser", None,
+            false, false, false, true, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile ssr failed: {:?}", result);
         assert!(output.exists());
@@ -2384,7 +2685,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, true, false, false, 0, true, "browser", None,
+            false, false, false, true, false, false, 0, true, "browser", None, false,
         );
         assert!(result.is_ok(), "compile ssr+css failed: {:?}", result);
         assert!(output.exists());
@@ -2402,7 +2703,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, true, false, 0, false, "browser", None,
+            false, false, false, false, true, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile hydrate failed: {:?}", result);
         assert!(output.exists());
@@ -2421,7 +2722,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile no_check failed: {:?}", result);
     }
@@ -2438,7 +2739,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 1, false, "browser", None,
+            false, false, false, false, false, false, 1, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile O1 failed: {:?}", result);
     }
@@ -2451,7 +2752,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 2, false, "browser", None,
+            false, false, false, false, false, false, 2, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile O2 failed: {:?}", result);
     }
@@ -2465,7 +2766,7 @@ mod tests {
         let path = PathBuf::from("/tmp/nonexistent_xyz.nectar");
         let result = compile(
             &path, None,
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -2482,7 +2783,7 @@ mod tests {
         let input = write_temp_file(&dir, "bad.nectar", "fn { broken syntax !!!");
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -2499,7 +2800,7 @@ mod tests {
         let input = write_temp_file(&dir, "borrow_err.nectar", BORROW_ERROR_PROGRAM);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_err());
         let msg = format!("{}", result.unwrap_err());
@@ -2516,7 +2817,7 @@ mod tests {
         let input = write_temp_file(&dir, "hello.nectar", SIMPLE_PROGRAM);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile default path failed: {:?}", result);
         let expected_output = dir.path().join("hello.wat");
@@ -2852,7 +3153,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile with use import failed: {:?}", result);
         let wat = fs::read_to_string(dir.path().join("out.wat")).unwrap();
@@ -2880,7 +3181,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile with glob import failed: {:?}", result);
     }
@@ -2902,7 +3203,7 @@ mod tests {
         let result = compile(
             &main_path,
             Some(dir.path().join("out.wat")),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "compile with missing module should not hard-fail: {:?}", result);
     }
@@ -2919,7 +3220,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "wasi", None,
+            false, false, false, false, false, false, 0, false, "wasi", None, false,
         );
         assert!(result.is_ok(), "compile wasi failed: {:?}", result);
         assert!(output.exists());
@@ -2937,7 +3238,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, false, 0, false, "wasi", None,
+            false, false, false, false, false, false, 0, false, "wasi", None, false,
         );
         assert!(result.is_ok(), "compile wasi failed: {:?}", result);
         let content = fs::read_to_string(&output).unwrap();
@@ -2967,7 +3268,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         // Should compile successfully — contract inference runs but doesn't block
         assert!(result.is_ok(), "compile with fetch should succeed: {:?}", result);
@@ -3007,7 +3308,7 @@ mod tests {
         let result = compile(
             &input,
             Some(output.clone()),
-            false, false, false, false, false, true, 0, false, "browser", None,
+            false, false, false, false, false, true, 0, false, "browser", None, false,
         );
         assert!(result.is_ok(), "no_check compile should succeed: {:?}", result);
     }
@@ -3031,7 +3332,7 @@ fn check(c: Color) -> i32 {
         let input = write_temp_file(&dir, "exhaust.nectar", program_with_match);
         let result = compile(
             &input, None,
-            false, false, false, false, false, false, 0, false, "browser", None,
+            false, false, false, false, false, false, 0, false, "browser", None, false,
         );
         // This should fail if the match is non-exhaustive.
         // If the parser/type-checker doesn't catch it, the test is still valid:
@@ -3040,5 +3341,221 @@ fn check(c: Color) -> i32 {
         // (If the program happens to pass all checks, that's also fine — the important
         // thing is that exhaustiveness issues are errors, not warnings.)
         let _ = result;
+    }
+
+    // -----------------------------------------------------------------------
+    // SEO / AIEO tests
+    // -----------------------------------------------------------------------
+
+    fn test_span() -> crate::token::Span {
+        crate::token::Span::new(0, 0, 1, 1)
+    }
+
+    #[test]
+    fn test_extract_page_meta_with_full_meta() {
+        let program = crate::ast::Program {
+            items: vec![crate::ast::Item::Page(crate::ast::PageDef {
+                name: "Home".to_string(),
+                props: vec![],
+                meta: Some(crate::ast::MetaDef {
+                    title: Some(crate::ast::Expr::StringLit("My Store".to_string())),
+                    description: Some(crate::ast::Expr::StringLit("Best products online".to_string())),
+                    canonical: Some(crate::ast::Expr::StringLit("https://example.com".to_string())),
+                    og_image: Some(crate::ast::Expr::StringLit("https://example.com/og.png".to_string())),
+                    structured_data: vec![crate::ast::StructuredDataDef {
+                        schema_type: "Product".to_string(),
+                        fields: vec![
+                            ("name".to_string(), crate::ast::Expr::StringLit("Widget".to_string())),
+                            ("price".to_string(), crate::ast::Expr::Float(9.99)),
+                        ],
+                        span: test_span(),
+                    }],
+                    extra: vec![
+                        ("robots".to_string(), crate::ast::Expr::StringLit("index,follow".to_string())),
+                    ],
+                    span: test_span(),
+                }),
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                render: crate::ast::RenderBlock {
+                    body: crate::ast::TemplateNode::Fragment(vec![]),
+                    span: test_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                is_pub: false,
+                span: test_span(),
+            })],
+        };
+
+        let meta = extract_page_meta(&program.items).expect("should extract meta");
+        assert_eq!(meta.title.as_deref(), Some("My Store"));
+        assert_eq!(meta.description.as_deref(), Some("Best products online"));
+        assert_eq!(meta.canonical.as_deref(), Some("https://example.com"));
+        assert_eq!(meta.og_image.as_deref(), Some("https://example.com/og.png"));
+        assert_eq!(meta.structured_data.len(), 1);
+        assert_eq!(meta.structured_data[0].0, "Product");
+        assert_eq!(meta.structured_data[0].1.len(), 2);
+        assert_eq!(meta.extra.len(), 1);
+        assert_eq!(meta.extra[0], ("robots".to_string(), "index,follow".to_string()));
+    }
+
+    #[test]
+    fn test_extract_page_meta_none_without_meta() {
+        let program = crate::ast::Program {
+            items: vec![crate::ast::Item::Page(crate::ast::PageDef {
+                name: "About".to_string(),
+                props: vec![],
+                meta: None,
+                state: vec![],
+                methods: vec![],
+                styles: vec![],
+                render: crate::ast::RenderBlock {
+                    body: crate::ast::TemplateNode::Fragment(vec![]),
+                    span: test_span(),
+                },
+                permissions: None,
+                gestures: vec![],
+                is_pub: false,
+                span: test_span(),
+            })],
+        };
+        assert!(extract_page_meta(&program.items).is_none());
+    }
+
+    #[test]
+    fn test_generate_meta_html_title_and_description() {
+        let meta = PageMeta {
+            title: Some("Hello World".to_string()),
+            description: Some("A great page".to_string()),
+            canonical: None,
+            og_image: None,
+            structured_data: vec![],
+            extra: vec![],
+        };
+        let html = generate_meta_html(&meta);
+        assert!(html.contains("<title>Hello World</title>"));
+        assert!(html.contains("<meta name=\"description\" content=\"A great page\">"));
+        assert!(html.contains("<meta property=\"og:title\" content=\"Hello World\">"));
+        assert!(html.contains("<meta property=\"og:description\" content=\"A great page\">"));
+        assert!(html.contains("<meta property=\"og:type\" content=\"website\">"));
+    }
+
+    #[test]
+    fn test_generate_meta_html_json_ld() {
+        let meta = PageMeta {
+            title: None,
+            description: None,
+            canonical: None,
+            og_image: None,
+            structured_data: vec![
+                ("Product".to_string(), vec![
+                    ("name".to_string(), "Widget".to_string()),
+                    ("price".to_string(), "9.99".to_string()),
+                ]),
+            ],
+            extra: vec![],
+        };
+        let html = generate_meta_html(&meta);
+        assert!(html.contains("application/ld+json"));
+        assert!(html.contains("\"@context\":\"https://schema.org\""));
+        assert!(html.contains("\"@type\":\"Product\""));
+        assert!(html.contains("\"name\":\"Widget\""));
+        // 9.99 is numeric, should not be quoted
+        assert!(html.contains("\"price\":9.99"));
+    }
+
+    #[test]
+    fn test_generate_meta_html_escapes_special_chars() {
+        let meta = PageMeta {
+            title: Some("Tom & Jerry <script>".to_string()),
+            description: None,
+            canonical: None,
+            og_image: None,
+            structured_data: vec![],
+            extra: vec![],
+        };
+        let html = generate_meta_html(&meta);
+        assert!(html.contains("Tom &amp; Jerry &lt;script&gt;"));
+        assert!(!html.contains("<script>"));
+    }
+
+    #[test]
+    fn test_generate_meta_html_extra_tags() {
+        let meta = PageMeta {
+            title: None,
+            description: None,
+            canonical: None,
+            og_image: None,
+            structured_data: vec![],
+            extra: vec![
+                ("robots".to_string(), "index,follow".to_string()),
+                ("twitter:card".to_string(), "summary_large_image".to_string()),
+            ],
+        };
+        let html = generate_meta_html(&meta);
+        assert!(html.contains("<meta name=\"robots\" content=\"index,follow\">"));
+        assert!(html.contains("<meta property=\"twitter:card\" content=\"summary_large_image\">"));
+    }
+
+    #[test]
+    fn test_generate_meta_html_canonical_and_og_image() {
+        let meta = PageMeta {
+            title: None,
+            description: None,
+            canonical: Some("https://example.com/page".to_string()),
+            og_image: Some("https://example.com/img.png".to_string()),
+            structured_data: vec![],
+            extra: vec![],
+        };
+        let html = generate_meta_html(&meta);
+        assert!(html.contains("<link rel=\"canonical\" href=\"https://example.com/page\">"));
+        assert!(html.contains("<meta property=\"og:url\" content=\"https://example.com/page\">"));
+        assert!(html.contains("<meta property=\"og:image\" content=\"https://example.com/img.png\">"));
+    }
+
+    #[test]
+    fn test_generate_dom_html_with_meta() {
+        let meta = PageMeta {
+            title: Some("SEO Title".to_string()),
+            description: Some("SEO Description".to_string()),
+            canonical: None,
+            og_image: None,
+            structured_data: vec![],
+            extra: vec![],
+        };
+        let empty_prog = crate::ast::Program { items: vec![] };
+        let html = generate_dom_html("myapp", Some(&meta), &empty_prog);
+        assert!(html.contains("<title>SEO Title</title>"));
+        assert!(html.contains("<meta name=\"description\""));
+        assert!(html.contains("core.js"));
+        assert!(html.contains("app.wasm"));
+        assert!(html.contains("<div id=\"app\">"));
+        assert!(html.contains("__init_all")); // fallback mount fn
+    }
+
+    #[test]
+    fn test_generate_dom_html_without_meta() {
+        let empty_prog = crate::ast::Program { items: vec![] };
+        let html = generate_dom_html("myapp", None, &empty_prog);
+        assert!(html.contains("<title>myapp</title>"));
+        assert!(html.contains("core.js"));
+    }
+
+    #[test]
+    fn test_html_escape() {
+        assert_eq!(html_escape("a&b"), "a&amp;b");
+        assert_eq!(html_escape("a<b>c"), "a&lt;b&gt;c");
+        assert_eq!(html_escape("a\"b"), "a&quot;b");
+        assert_eq!(html_escape("normal"), "normal");
+    }
+
+    #[test]
+    fn test_json_escape() {
+        assert_eq!(json_escape("hello"), "hello");
+        assert_eq!(json_escape("say \"hi\""), "say \\\"hi\\\"");
+        assert_eq!(json_escape("line\nnew"), "line\\nnew");
+        assert_eq!(json_escape("tab\there"), "tab\\there");
     }
 }

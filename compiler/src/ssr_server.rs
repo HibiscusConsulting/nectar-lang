@@ -866,8 +866,57 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     Ok(store.into_data())
 }
 
+/// SEO metadata for HTML injection (mirrors main.rs PageMeta).
+pub struct SsrPageMeta {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub canonical: Option<String>,
+    pub og_image: Option<String>,
+    pub structured_data_json: Vec<String>,
+}
+
+/// Generate HTML meta tags for SSR <head> injection.
+fn generate_ssr_meta_html(meta: &SsrPageMeta) -> String {
+    let mut out = String::new();
+
+    if let Some(ref title) = meta.title {
+        out.push_str(&format!("    <title>{}</title>\n", ssr_html_escape(title)));
+        out.push_str(&format!("    <meta property=\"og:title\" content=\"{}\">\n", ssr_html_escape(title)));
+    }
+    if let Some(ref desc) = meta.description {
+        out.push_str(&format!("    <meta name=\"description\" content=\"{}\">\n", ssr_html_escape(desc)));
+        out.push_str(&format!("    <meta property=\"og:description\" content=\"{}\">\n", ssr_html_escape(desc)));
+    }
+    if let Some(ref canonical) = meta.canonical {
+        out.push_str(&format!("    <link rel=\"canonical\" href=\"{}\">\n", ssr_html_escape(canonical)));
+        out.push_str(&format!("    <meta property=\"og:url\" content=\"{}\">\n", ssr_html_escape(canonical)));
+    }
+    if let Some(ref og_img) = meta.og_image {
+        out.push_str(&format!("    <meta property=\"og:image\" content=\"{}\">\n", ssr_html_escape(og_img)));
+    }
+    out.push_str("    <meta property=\"og:type\" content=\"website\">\n");
+
+    for json in &meta.structured_data_json {
+        out.push_str(&format!("    <script type=\"application/ld+json\">{}</script>\n", json));
+    }
+
+    out
+}
+
+fn ssr_html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+     .replace('"', "&quot;")
+     .replace('<', "&lt;")
+     .replace('>', "&gt;")
+}
+
 /// Build the complete HTML document wrapping SSR-rendered content.
 fn build_html_shell(ssr_html: &str, path: &str) -> String {
+    build_html_shell_with_meta(ssr_html, path, None)
+}
+
+/// Build HTML shell with optional SEO meta injection.
+fn build_html_shell_with_meta(ssr_html: &str, path: &str, meta: Option<&SsrPageMeta>) -> String {
     // Derive the page mount function name from the path (same logic as SSR routing)
     let page_name = if path == "/" {
         "HomePage".to_string()
@@ -881,13 +930,16 @@ fn build_html_shell(ssr_html: &str, path: &str) -> String {
     };
     let mount_fn = format!("{}_mount", page_name);
 
+    let meta_html = meta.map(|m| generate_ssr_meta_html(m)).unwrap_or_else(|| {
+        "    <title>Nectar App</title>\n".to_string()
+    });
+
     format!(r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nectar App</title>
-    <link rel="icon" href="data:,">
+{meta_html}    <link rel="icon" href="data:,">
 </head>
 <body>
     <div id="app">{ssr}</div>
@@ -904,7 +956,7 @@ fn build_html_shell(ssr_html: &str, path: &str) -> String {
         }}
     </script>
 </body>
-</html>"#, ssr = ssr_html, mount_fn = mount_fn)
+</html>"#, meta_html = meta_html, ssr = ssr_html, mount_fn = mount_fn)
 }
 
 /// Build an error page for SSR failures.
@@ -1327,5 +1379,59 @@ mod tests {
             // Should be 404 (not configured), not 400 (bad JSON)
             assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
         });
+    }
+
+    // --- SSR meta injection tests ---
+
+    #[test]
+    fn test_build_html_shell_with_meta_injects_title() {
+        let meta = SsrPageMeta {
+            title: Some("My Store".to_string()),
+            description: Some("Best products".to_string()),
+            canonical: Some("https://example.com".to_string()),
+            og_image: Some("https://example.com/og.png".to_string()),
+            structured_data_json: vec![
+                r#"{"@context":"https://schema.org","@type":"Product","name":"Widget"}"#.to_string(),
+            ],
+        };
+        let html = build_html_shell_with_meta("<p>content</p>", "/", Some(&meta));
+        assert!(html.contains("<title>My Store</title>"));
+        assert!(html.contains("<meta name=\"description\" content=\"Best products\">"));
+        assert!(html.contains("<meta property=\"og:title\" content=\"My Store\">"));
+        assert!(html.contains("<meta property=\"og:image\" content=\"https://example.com/og.png\">"));
+        assert!(html.contains("<link rel=\"canonical\" href=\"https://example.com\">"));
+        assert!(html.contains("application/ld+json"));
+        assert!(html.contains("\"@type\":\"Product\""));
+        assert!(html.contains("core.js"));
+        assert!(html.contains("<p>content</p>"));
+    }
+
+    #[test]
+    fn test_build_html_shell_without_meta_uses_default_title() {
+        let html = build_html_shell("<p>hello</p>", "/about");
+        assert!(html.contains("<title>Nectar App</title>"));
+        assert!(html.contains("<p>hello</p>"));
+        assert!(html.contains("core.js"));
+    }
+
+    #[test]
+    fn test_ssr_html_escape() {
+        assert_eq!(ssr_html_escape("a&b"), "a&amp;b");
+        assert_eq!(ssr_html_escape("<script>"), "&lt;script&gt;");
+        assert_eq!(ssr_html_escape("say \"hi\""), "say &quot;hi&quot;");
+    }
+
+    #[test]
+    fn test_generate_ssr_meta_html_og_type() {
+        let meta = SsrPageMeta {
+            title: None,
+            description: None,
+            canonical: None,
+            og_image: None,
+            structured_data_json: vec![],
+        };
+        let html = generate_ssr_meta_html(&meta);
+        assert!(html.contains("og:type"));
+        assert!(html.contains("website"));
     }
 }

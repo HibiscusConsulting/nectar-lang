@@ -204,6 +204,23 @@ fn serve_file(path: &Path) -> Option<(Vec<u8>, &'static str)> {
     Some((bytes, ct))
 }
 
+/// Known search engine and AI crawler User-Agent patterns.
+const BOT_PATTERNS: &[&str] = &[
+    "Googlebot", "bingbot", "GPTBot", "ClaudeBot", "PerplexityBot",
+    "ChatGPT-User", "Applebot", "Slurp", "DuckDuckBot", "Baiduspider",
+    "facebookexternalhit", "Twitterbot", "LinkedInBot",
+    "Amazonbot", "anthropic-ai", "cohere-ai", "YandexBot",
+    "Bytespider", "CCBot", "PetalBot",
+];
+
+/// Check if an HTTP request comes from a known search engine or AI crawler.
+fn is_bot(request: &str) -> bool {
+    let ua_line = request.lines()
+        .find(|l| l.to_lowercase().starts_with("user-agent:"))
+        .unwrap_or("");
+    BOT_PATTERNS.iter().any(|bot| ua_line.contains(bot))
+}
+
 fn http_response(status: u16, content_type: &str, body: &[u8]) -> Vec<u8> {
     let status_text = match status {
         200 => "OK",
@@ -321,16 +338,24 @@ impl DevServer {
             return Ok(());
         }
 
-        // Serve static files from build_dir.
-        let file_path = if path == "/" {
-            build_dir.join("index.html")
+        // SEO routing: serve from dom/ subdirectory for crawlers/bots
+        let dom_dir = build_dir.join("dom");
+        let serve_dir = if is_bot(&request) && dom_dir.exists() {
+            &dom_dir
         } else {
-            build_dir.join(path.trim_start_matches('/'))
+            build_dir
+        };
+
+        // Serve static files from the selected directory.
+        let file_path = if path == "/" {
+            serve_dir.join("index.html")
+        } else {
+            serve_dir.join(path.trim_start_matches('/'))
         };
 
         let response = if let Some((body, ct)) = serve_file(&file_path) {
             http_response(200, ct, &body)
-        } else if let Some((body, _)) = serve_file(&build_dir.join("index.html")) {
+        } else if let Some((body, _)) = serve_file(&serve_dir.join("index.html")) {
             // SPA fallback: serve index.html for unmatched routes
             http_response(200, "text/html", &body)
         } else {
@@ -853,5 +878,91 @@ mod tests {
         assert_eq!(frame[2], 0xFF);
         assert_eq!(frame[3], 0xFF);
         assert_eq!(frame.len(), 4 + 65535);
+    }
+
+    // --- Bot detection tests ---
+
+    #[test]
+    fn test_is_bot_googlebot() {
+        let request = "GET / HTTP/1.1\r\nHost: example.com\r\nUser-Agent: Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_gptbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: GPTBot/1.0\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_claudebot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: ClaudeBot/1.0\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_perplexitybot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: PerplexityBot/1.0\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_bingbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0 (compatible; bingbot/2.0)\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_facebookbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: facebookexternalhit/1.1\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_twitterbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Twitterbot/1.0\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_normal_browser_chrome() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n\r\n";
+        assert!(!is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_normal_browser_firefox() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0\r\n\r\n";
+        assert!(!is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_normal_browser_safari() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15\r\n\r\n";
+        assert!(!is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_no_user_agent() {
+        let request = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+        assert!(!is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_case_insensitive_header() {
+        let request = "GET / HTTP/1.1\r\nuser-agent: Googlebot/2.1\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_amazonbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: Amazonbot/0.1\r\n\r\n";
+        assert!(is_bot(request));
+    }
+
+    #[test]
+    fn test_is_bot_linkedinbot() {
+        let request = "GET / HTTP/1.1\r\nUser-Agent: LinkedInBot/1.0\r\n\r\n";
+        assert!(is_bot(request));
     }
 }

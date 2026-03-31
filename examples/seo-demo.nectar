@@ -1,0 +1,23 @@
+// SEO Demo — demonstrates meta tag injection for crawlers and AI
+// Build: nectar build seo-demo.nectar --emit-wasm --seo
+
+page Home() {
+    meta {
+        title: "Hive Listings — Real Estate Made Simple",
+        description: "Browse thousands of listings with zero JavaScript. Powered by WASM.",
+        canonical: "https://hive.fyi",
+        og_image: "https://hive.fyi/og-card.png",
+        structured_data: Schema.Organization {
+            name: "Hive Listings",
+            url: "https://hive.fyi",
+            description: "WASM-powered real estate platform",
+        },
+    }
+
+    render {
+        <div>
+            <h1>"Hive Listings"</h1>
+            <p>"Real estate, reimagined. Zero JavaScript."</p>
+        </div>
+    }
+}
