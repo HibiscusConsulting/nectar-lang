@@ -222,6 +222,8 @@ struct CondUpdater {
     then_children: Vec<TemplateNode>,
     /// Children to render when condition is false (optional)
     else_children: Option<Vec<TemplateNode>>,
+    /// For-loop bindings in scope when this cond was created (needed for locals in mount func)
+    for_loop_bindings: Vec<String>,
 }
 
 /// Describes a signal→DOM updater (text content or attribute).
@@ -3869,6 +3871,19 @@ impl WasmCodegen {
 
             // We need a local to hold the container element ID
             self.emit_template_local("$__cond_parent");
+
+            // Declare locals for any for-loop bindings that were in scope
+            // when this cond was created — the cond mount is a separate WAT
+            // function so parent locals are not visible and must be re-declared.
+            for binding in &cond.for_loop_bindings {
+                self.emit_template_local(&format!("${}", binding));
+                // Also restore the binding in for_loop_bindings so field access resolves
+                if !self.for_loop_bindings.contains(binding) {
+                    self.for_loop_bindings.push(binding.clone());
+                }
+            }
+            let bindings_added = cond.for_loop_bindings.len();
+
             self.line(&format!("global.get {}", cond.container_global));
             self.line("local.set $__cond_parent");
 
@@ -3885,6 +3900,11 @@ impl WasmCodegen {
             self.defer_template_locals = saved_defer;
             self.template_locals = saved_locals;
             self.output.push_str(&mount_body);
+
+            // Remove for-loop bindings we added for this cond mount
+            for _ in 0..bindings_added {
+                self.for_loop_bindings.pop();
+            }
 
             // Collect any signal updaters created by children inside this cond block
             let cond_updaters_inner = std::mem::take(&mut self.signal_updaters);
@@ -4004,6 +4024,15 @@ impl WasmCodegen {
 
             self.emit_template_local("$new_val");
 
+            // Declare locals for for-loop bindings in scope when cond was created
+            for binding in &cond.for_loop_bindings {
+                self.emit_template_local(&format!("${}", binding));
+                if !self.for_loop_bindings.contains(binding) {
+                    self.for_loop_bindings.push(binding.clone());
+                }
+            }
+            let updater_bindings_added = cond.for_loop_bindings.len();
+
             // Re-evaluate the condition
             self.generate_expr(&cond.condition);
             self.line("i32.const 0");
@@ -4045,6 +4074,11 @@ impl WasmCodegen {
             self.line("call $dom_mount ;; clear container");
             self.indent -= 1;
             self.line("end");
+
+            // Remove for-loop bindings added for this updater
+            for _ in 0..updater_bindings_added {
+                self.for_loop_bindings.pop();
+            }
 
             // Hoist deferred locals
             let body_output_cond = std::mem::take(&mut self.output);
@@ -8371,6 +8405,7 @@ impl WasmCodegen {
                         condition: *condition.clone(),
                         then_children: then_children.clone(),
                         else_children: else_children.clone(),
+                        for_loop_bindings: self.for_loop_bindings.clone(),
                     });
                 }
             }
@@ -14105,6 +14140,16 @@ impl WasmCodegen {
                 self.generate_expr(object);
                 self.line("call $array_sort_asc");
             }
+            "sort_str_asc" => {
+                self.line(";; .sort_str_asc() — sort array ascending by string field");
+                self.generate_expr(object);
+                self.line("call $array_sort_str_asc");
+            }
+            "sort_str_desc" => {
+                self.line(";; .sort_str_desc() — sort array descending by string field");
+                self.generate_expr(object);
+                self.line("call $array_sort_str_desc");
+            }
             "swap" => {
                 self.line(";; .swap() — swap two array elements");
                 self.generate_expr(object);
@@ -14661,6 +14706,12 @@ impl WasmCodegen {
         self.line("  local.get $arr ;; stub — returns array unchanged");
         self.line(")");
         self.emit("(func $array_sort_desc (param $arr i32) (result i32)");
+        self.line("  local.get $arr ;; stub — returns array unchanged");
+        self.line(")");
+        self.emit("(func $array_sort_str_asc (param $arr i32) (result i32)");
+        self.line("  local.get $arr ;; stub — returns array unchanged");
+        self.line(")");
+        self.emit("(func $array_sort_str_desc (param $arr i32) (result i32)");
         self.line("  local.get $arr ;; stub — returns array unchanged");
         self.line(")");
         self.emit("(func $array_swap (param $arr i32) (param $i i32) (param $j i32)");
