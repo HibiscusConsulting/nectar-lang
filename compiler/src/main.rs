@@ -1702,12 +1702,18 @@ nav .links a.active{{color:#e6edf3;background:rgba(249,115,22,0.12)}}
   <canvas id="c"></canvas>
 </div>
 <div class="render-badge"></div>
+<div id="a11y" role="application" aria-label="Application content" style="position:fixed;top:48px;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap"></div>
 <script>
 (async () => {{
 const navH = 48;
 let dpr = window.devicePixelRatio || 1;
 let vw = window.innerWidth, vh = window.innerHeight - navH;
 const dec = new TextDecoder();
+
+// ── Accessibility DOM state ─────────────────────────────────
+const a11yRoot = document.getElementById('a11y');
+let a11yNodes = {{}};
+let a11yNextId = 1;
 
 // ── WebGPU Detection ────────────────────────────────────────
 const hasGPU = !!navigator.gpu;
@@ -2121,7 +2127,38 @@ const imports = {{ env: {{
   set_interval: (cb,ms) => setInterval(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
   clear_interval: (id) => clearInterval(id),
   clear_timeout: (id) => clearTimeout(id),
+  // ── Accessibility DOM syscalls ─────────────────────────────
+  a11y_clear: () => {{ a11yRoot.innerHTML=''; a11yNodes={{}}; a11yNextId=1; }},
+  a11y_create: (tp,tl,elemId) => {{
+    const tag=dec.decode(new Uint8Array(W.memory.buffer,tp,tl));
+    const el=document.createElement(tag);
+    const id=a11yNextId++;
+    a11yNodes[id]=el;
+    el.dataset.elemId=elemId;
+    if(id===1) a11yRoot.appendChild(el);
+    return id;
+  }},
+  a11y_set_text: (id,p,l) => {{ if(a11yNodes[id]) a11yNodes[id].textContent=dec.decode(new Uint8Array(W.memory.buffer,p,l)); }},
+  a11y_set_attr: (id,np,nl,vp,vl) => {{ if(a11yNodes[id]) a11yNodes[id].setAttribute(dec.decode(new Uint8Array(W.memory.buffer,np,nl)),dec.decode(new Uint8Array(W.memory.buffer,vp,vl))); }},
+  a11y_append_child: (pid,cid) => {{ if(a11yNodes[pid]&&a11yNodes[cid]) a11yNodes[pid].appendChild(a11yNodes[cid]); }},
+  a11y_set_bounds: (id,x,y,w,h) => {{ if(a11yNodes[id]) a11yNodes[id]._bounds={{x,y,w,h}}; }},
+  a11y_add_click_handler: (id,elemId) => {{
+    const el=a11yNodes[id]; if(!el) return;
+    const handler=(e)=>{{ e.preventDefault(); const b=el._bounds; if(b&&W.app_click){{W.app_click(b.x+b.w/2,b.y+b.h/2);W.app_render();}} }};
+    el.addEventListener('click',handler);
+    el.addEventListener('keydown',(e)=>{{ if(e.key==='Enter'||e.key===' ')handler(e); }});
+  }},
+  a11y_focus: (elemId) => {{
+    const el=a11yRoot.querySelector(`[data-elem-id="${{elemId}}"]`);
+    if(el) el.focus();
+  }},
 }}}};
+
+// ── Accessibility focus sync (screen reader → canvas) ────────
+a11yRoot.addEventListener('focusin', (e) => {{
+  const id=parseInt(e.target.dataset?.elemId);
+  if(!isNaN(id)&&W&&W.app_focus_element){{W.app_focus_element(id);W.app_render();}}
+}});
 
 // ── Load WASM ───────────────────────────────────────────────
 try {{
