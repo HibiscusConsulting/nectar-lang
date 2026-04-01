@@ -2128,6 +2128,15 @@ const imports = {{ env: {{
   set_interval: (cb,ms) => setInterval(()=>{{ if(W.__callback)W.__callback(cb); W.app_render(); }},ms),
   clear_interval: (id) => clearInterval(id),
   clear_timeout: (id) => clearTimeout(id),
+  // ── Deferred execution ─────────────────────────────────────
+  request_idle_callback: (cbIdx) => {{
+    const fn_ = () => {{
+      if (cbIdx === 9999 && W.app_build_a11y_dom) W.app_build_a11y_dom();
+      else if (W.__callback) W.__callback(cbIdx);
+    }};
+    if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(fn_);
+    else setTimeout(fn_, 50);
+  }},
   // ── Accessibility DOM syscalls ─────────────────────────────
   a11y_clear: () => {{ a11yRoot.innerHTML=''; a11yNodes={{}}; a11yNextId=1; }},
   a11y_create: (tp,tl,elemId) => {{
@@ -2178,6 +2187,20 @@ if (hasGPU) {{
 }}
 
 W.app_render();
+// Capture true end-to-end: from t0 (WASM fetch start) to products rendered.
+// Same measurement as Svelte: T_RENDER - T0 (head script to DOM complete).
+let _initDone = false;
+const _origRender = W.app_render;
+W.app_render = function() {{
+  _origRender();
+  if (!_initDone && W.app_get_product_count && W.app_get_product_count() > 0) {{
+    _initDone = true;
+    W.app_render = _origRender;
+    const tEnd = performance.now();
+    if (W.app_set_timings) W.app_set_timings(0, 0, tEnd - t0);
+    _origRender(); // re-render with updated total
+  }}
+}};
 console.log(`%c[Nectar ${{hasGPU?'WebGPU':'Canvas 2D'}}]%c Initialized in ${{(t1-t0).toFixed(1)}}ms`, hasGPU?'color:#22c55e;font-weight:bold':'color:#f97316;font-weight:bold', 'color:inherit');
 }} catch(e) {{ document.body.style.color='#f00'; document.body.style.padding='20px'; document.body.style.fontSize='14px'; document.body.style.fontFamily='monospace'; document.body.innerText='WASM Error: '+e.message+'\n\n'+e.stack; console.error(e); }}
 
