@@ -1,0 +1,50 @@
+// Status pills demo — text with padding, rounded corners, colored backgrounds
+// Build: nectar build --canvas examples/pills_demo.nectar
+
+component PillsDemo() {
+    render {
+        <div style="direction: vertical; padding: 40px; gap: 20px; background-color: #FFFFFF; width: fill; height: fill;">
+            <span style="font-size: 20px; font-weight: 700; color: #111827;">"Status Pills"</span>
+
+            <div style="direction: vertical; gap: 16px;">
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #FEE2E2; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #DC2626;">"Cancelled"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #F3F4F6; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #374151;">"Draft"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #EEF2FF; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #4F46E5;">"Active"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #F3F4F6; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #374151;">"Draft"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #DCFCE7; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #16A34A;">"Prep Complete"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #FEF3C7; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #D97706;">"Pending"</span>
+                </div>
+
+                <div style="direction: horizontal; gap: 12px; align: center;">
+                    <span style="width: hug; height: hug; padding-left: 12px; padding-right: 12px; padding-top: 4px; padding-bottom: 4px; background-color: #DBEAFE; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #2563EB;">"In Progress"</span>
+                </div>
+            </div>
+
+            <span style="font-size: 20px; font-weight: 700; color: #111827; padding-top: 20px;">"Inline Pills"</span>
+
+            <div style="direction: horizontal; gap: 8px; align: center; wrap: true;">
+                <span style="width: hug; height: hug; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; background-color: #FEE2E2; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #DC2626;">"Cancelled"</span>
+                <span style="width: hug; height: hug; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; background-color: #DCFCE7; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #16A34A;">"Active"</span>
+                <span style="width: hug; height: hug; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; background-color: #EEF2FF; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #4F46E5;">"Scheduled"</span>
+                <span style="width: hug; height: hug; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; background-color: #FEF3C7; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #D97706;">"Pending"</span>
+                <span style="width: hug; height: hug; padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px; background-color: #F3F4F6; border-radius: 9999px; font-size: 12px; font-weight: 500; color: #374151;">"Draft"</span>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,114 @@
+// Filter & Sort Demo — four optimization paths, all compiled to real WASM
+// DOM path: Filter = O(n) display:none toggle. Sort = insertion sort + appendChild reorder.
+
+struct Task {
+    name: String,
+    priority: i32,
+    category: String,
+    done: i32,
+}
+
+component FilterSortDemo() {
+    let mut active_cat: String = "All";
+    let mut task_count: i32 = 20;
+    let mut visible_count: i32 = 20;
+    let mut last_op_ms: String = "—";
+
+    let mut tasks: [Task] = [
+        Task { name: "Deploy production release", priority: 5, category: "Work", done: 0 },
+        Task { name: "Fix login timeout bug", priority: 4, category: "Work", done: 0 },
+        Task { name: "Write API documentation", priority: 3, category: "Work", done: 1 },
+        Task { name: "Review pull requests", priority: 4, category: "Work", done: 0 },
+        Task { name: "Update CI pipeline", priority: 2, category: "Work", done: 1 },
+        Task { name: "Migrate database schema", priority: 5, category: "Work", done: 0 },
+        Task { name: "Buy groceries", priority: 2, category: "Personal", done: 0 },
+        Task { name: "Call dentist", priority: 1, category: "Personal", done: 1 },
+        Task { name: "Renew gym membership", priority: 1, category: "Personal", done: 0 },
+        Task { name: "Book flights for vacation", priority: 3, category: "Personal", done: 0 },
+        Task { name: "Clean apartment", priority: 2, category: "Personal", done: 1 },
+        Task { name: "Read new Rust book", priority: 1, category: "Personal", done: 0 },
+        Task { name: "Pay electricity bill", priority: 5, category: "Urgent", done: 0 },
+        Task { name: "File tax return", priority: 5, category: "Urgent", done: 0 },
+        Task { name: "Renew car insurance", priority: 4, category: "Urgent", done: 0 },
+        Task { name: "Submit expense report", priority: 3, category: "Urgent", done: 1 },
+        Task { name: "Schedule oil change", priority: 2, category: "Urgent", done: 0 },
+        Task { name: "Replace smoke detector", priority: 4, category: "Urgent", done: 0 },
+        Task { name: "Performance review prep", priority: 3, category: "Work", done: 0 },
+        Task { name: "Order birthday gift", priority: 2, category: "Personal", done: 0 },
+    ];
+
+    fn filter_all(&mut self) {
+        self.active_cat = "All";
+    }
+
+    fn filter_work(&mut self) {
+        self.active_cat = "Work";
+    }
+
+    fn filter_personal(&mut self) {
+        self.active_cat = "Personal";
+    }
+
+    fn filter_urgent(&mut self) {
+        self.active_cat = "Urgent";
+    }
+
+    fn sort_priority_high(&mut self) {
+        self.tasks.sort_desc("priority");
+    }
+
+    fn sort_priority_low(&mut self) {
+        self.tasks.sort_asc("priority");
+    }
+
+    fn sort_done(&mut self) {
+        self.tasks.sort_asc("done");
+    }
+
+    render {
+        <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; color: #fafafa">
+            <h1 style="margin-bottom: 4px">"Filter & Sort Demo"</h1>
+            <p style="color: #71717a; margin-top: 0">"DOM path: Filter = display:none toggle. Sort = WASM insertion sort + appendChild reorder."</p>
+
+            <div style="margin-bottom: 12px">
+                <span style="color: #71717a; font-size: 13px; margin-right: 8px">"Filter:"</span>
+                <button on:click={self.filter_all} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"All"</button>
+                <button on:click={self.filter_work} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Work"</button>
+                <button on:click={self.filter_personal} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Personal"</button>
+                <button on:click={self.filter_urgent} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Urgent"</button>
+            </div>
+
+            <div style="margin-bottom: 16px">
+                <span style="color: #71717a; font-size: 13px; margin-right: 8px">"Sort:"</span>
+                <button on:click={self.sort_priority_high} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Priority High to Low"</button>
+                <button on:click={self.sort_priority_low} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Priority Low to High"</button>
+                <button on:click={self.sort_done} style="margin: 2px; padding: 6px 14px; border-radius: 6px; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer">"Incomplete First"</button>
+            </div>
+
+            <div style="margin-bottom: 16px; padding: 12px 16px; background: #18181b; border-radius: 8px; border: 1px solid #27272a; display: flex; gap: 24px; align-items: center">
+                <div>
+                    <span style="color: #71717a; font-size: 12px">"TASKS"</span>
+                    <div style="color: #fafafa; font-size: 20px; font-weight: bold">{self.task_count}</div>
+                </div>
+                <div>
+                    <span style="color: #71717a; font-size: 12px">"FILTER"</span>
+                    <div style="color: #f97316; font-size: 20px; font-weight: bold">{self.active_cat}</div>
+                </div>
+                <div>
+                    <span style="color: #71717a; font-size: 12px">"LAST OP"</span>
+                    <div style="color: #3fb950; font-size: 20px; font-weight: bold">{self.last_op_ms}</div>
+                </div>
+            </div>
+
+            {for task in self.tasks {
+                {if self.active_cat == "All" || task.category == self.active_cat {
+                    <div style="padding: 12px 16px; margin-bottom: 4px; background: #1a1f2e; border-radius: 6px; display: flex; gap: 16px; align-items: center">
+                        <span style="flex: 1">{task.name}</span>
+                        <span style="color: #f59e0b; font-size: 13px; min-width: 70px">{task.category}</span>
+                        <span style="color: #a1a1aa; font-size: 13px">{format("P{}", task.priority)}</span>
+                    </div>
+                }}
+            }}
+        </div>
+    }
+}

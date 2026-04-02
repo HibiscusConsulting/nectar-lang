@@ -448,9 +448,10 @@ component DemoApp() {
         <div>
             <h1>"Nectar Full Demo"</h1>
 
-            // Display count with format
+            // Display count with format (integer signal)
             <p>{format("Count: {}", self.count)}</p>
-            <p>{format("Label: {}", self.label)}</p>
+            // Display string signals directly (no format wrapping)
+            <p>{self.label}</p>
 
             // Buttons with on:click handlers
             <button on:click={self.increment}>"+"</button>
@@ -475,7 +476,7 @@ component DemoApp() {
             <div>
                 <button on:click={self.set_filter_all}>"All"</button>
                 <button on:click={self.set_filter_even}>"Even"</button>
-                <p>{format("Filter: {}", self.filter_text)}</p>
+                <p>{self.filter_text}</p>
             </div>
 
             // 33. Template for-loops
@@ -565,11 +566,12 @@ store AppStore {
 // 36. Router with routes and fallback
 // ============================================================
 
-router AppRouter {
-    route "/" => DemoApp,
-    route "/about" => AboutPage,
-    fallback => NotFoundPage,
-}
+// Router (commented out to avoid double-mount with __init_all)
+// router AppRouter {
+//     route "/" => DemoApp,
+//     route "/about" => AboutPage,
+//     fallback => NotFoundPage,
+// }
 
 component AboutPage() {
     render {

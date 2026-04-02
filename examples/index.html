@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hive Listings — Real Estate Made Simple</title>
+<meta property="og:title" content="Hive Listings — Real Estate Made Simple">
+<meta name="description" content="Browse thousands of listings with zero JavaScript. Powered by WASM.">
+<meta property="og:description" content="Browse thousands of listings with zero JavaScript. Powered by WASM.">
+<link rel="canonical" href="https://hive.fyi">
+<meta property="og:url" content="https://hive.fyi">
+<meta property="og:image" content="https://hive.fyi/og-card.png">
+<meta property="og:type" content="website">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Hive Listings","url":"https://hive.fyi","description":"WASM-powered real estate platform"}</script>
+<link rel="icon" href="data:,">
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { instantiate, wasmImports } from './core.js';
+const instance = await instantiate('./app.wasm');
+const rootId = wasmImports.dom.getRoot();
+const mount = instance.exports['Home_mount'] || instance.exports.SiteRouter_init;
+if (mount) {
+  try { mount(rootId); } catch(e) { try { mount(); } catch(e2) {} }
+}
+</script>
+</body>
+</html>
