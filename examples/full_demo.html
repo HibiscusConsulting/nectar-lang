@@ -19,10 +19,24 @@
 <body>
   <div id="app"></div>
   <script type="module">
-    import { instantiate, NectarRuntime } from './core.js';
-    const instance = await instantiate('./full_demo.wasm');
-    if (instance.exports.__init_all) {
-      instance.exports.__init_all();
+    import { instantiate } from './core.js';
+    try {
+      document.getElementById('app').innerHTML = '';
+      const instance = await instantiate('./full_demo.wasm', {
+        test: {
+          pass: () => {},
+          fail: () => {},
+          summary: () => {},
+        }
+      });
+      if (instance.exports.__init_all) {
+        instance.exports.__init_all();
+      }
+    } catch (e) {
+      document.getElementById('app').innerHTML =
+        '<h1 style="color:#fafafa">Nectar Full Demo</h1>' +
+        '<p style="color:#ef4444">WASM init error: ' + e.message + '</p>';
+      console.error(e);
     }
   </script>
 </body>

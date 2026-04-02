@@ -1490,7 +1490,7 @@ lto = true
     let cargo_dir = build_dir.join(".cargo");
     let _ = fs::create_dir_all(&cargo_dir);
     fs::write(cargo_dir.join("config.toml"), r#"[target.wasm32-unknown-unknown]
-rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=65536 --initial-memory=50331648 --max-memory=268435456"]
+rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=65536 --initial-memory=67108864 --max-memory=268435456"]
 "#)?;
 
     // Step 4: Compile to WASM

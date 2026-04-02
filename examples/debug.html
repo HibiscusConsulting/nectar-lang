@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Debug</title></head>
+<body style="background:#09090b;color:#fafafa;font-family:system-ui;padding:20px">
+<div id="app"></div>
+<pre id="log" style="color:#3fb950;white-space:pre-wrap"></pre>
+<script type="module">
+const log = s => { document.getElementById('log').textContent += s + '\n'; console.log(s); };
+window.onerror = (m,s,l,c,e) => log('GLOBAL ERROR: ' + m + ' at ' + s + ':' + l);
+window.addEventListener('unhandledrejection', e => log('UNHANDLED: ' + e.reason));
+try {
+    log('1. Loading core.js...');
+    const mod = await import('../runtime/modules/core.js');
+    log('2. core.js loaded, exports: ' + Object.keys(mod).join(', '));
+    log('3. Instantiating WASM...');
+    const inst = await mod.instantiate('./filter-sort-demo.wasm');
+    log('4. instantiate returned: ' + (inst ? 'OK' : 'null/undefined'));
+    if (inst && inst.exports) {
+        log('5. exports: ' + Object.keys(inst.exports).join(', '));
+    }
+    const app = document.getElementById('app');
+    log('6. #app innerHTML length: ' + app.innerHTML.length);
+    log('7. #app childElementCount: ' + app.childElementCount);
+    log('8. #app first 500 chars: ' + app.innerHTML.substring(0, 500));
+} catch(e) {
+    log('ERROR: ' + e.message);
+    log('Stack: ' + (e.stack || '').split('\n').slice(0,8).join('\n'));
+}
+</script>
+</body>
+</html>
