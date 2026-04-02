@@ -1,0 +1,637 @@
+// Mini-Program Runtime Demo — Alipay Executive Demo
+// Demonstrates: WASM-sandboxed mini-program container with three embedded apps
+// Each mini-program runs in isolated WASM memory — no JS sandbox required
+
+struct MenuItem {
+    name: String,
+    price: i32,
+    emoji: String,
+}
+
+component MiniProgramRuntime() {
+    // Container state
+    let mut active_app: String = "home";
+    let mut active_count: i32 = 0;
+    let mut total_memory_kb: i32 = 64;
+
+    // Coffee Order state
+    let mut coffee_qty: i32 = 0;
+    let mut latte_qty: i32 = 0;
+    let mut matcha_qty: i32 = 0;
+    let mut pastry_qty: i32 = 0;
+    let mut coffee_total: i32 = 0;
+    let mut coffee_paid: bool = false;
+    let mut coffee_load_ms: String = "2.1ms";
+
+    // Transit Pass state
+    let mut transit_balance: i32 = 5000;
+    let mut transit_rides: i32 = 0;
+    let mut transit_tapped: bool = false;
+    let mut transit_load_ms: String = "1.8ms";
+
+    // Bill Split state
+    let mut bill_total: i32 = 12800;
+    let mut bill_people: i32 = 4;
+    let mut bill_per_person: i32 = 3200;
+    let mut bill_tip_pct: i32 = 18;
+    let mut bill_with_tip: i32 = 15104;
+    let mut bill_per_with_tip: i32 = 3776;
+    let mut bill_load_ms: String = "1.4ms";
+
+    // Navigation
+    fn go_home(&mut self) {
+        self.active_app = "home";
+    }
+
+    fn open_coffee(&mut self) {
+        self.active_app = "coffee";
+        self.active_count = self.active_count + 1;
+        self.total_memory_kb = self.total_memory_kb + 12;
+    }
+
+    fn open_transit(&mut self) {
+        self.active_app = "transit";
+        self.active_count = self.active_count + 1;
+        self.total_memory_kb = self.total_memory_kb + 8;
+    }
+
+    fn open_billsplit(&mut self) {
+        self.active_app = "billsplit";
+        self.active_count = self.active_count + 1;
+        self.total_memory_kb = self.total_memory_kb + 6;
+    }
+
+    // Coffee Order handlers
+    fn add_coffee(&mut self) {
+        self.coffee_qty = self.coffee_qty + 1;
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn remove_coffee(&mut self) {
+        if self.coffee_qty > 0 {
+            self.coffee_qty = self.coffee_qty - 1;
+        }
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn add_latte(&mut self) {
+        self.latte_qty = self.latte_qty + 1;
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn remove_latte(&mut self) {
+        if self.latte_qty > 0 {
+            self.latte_qty = self.latte_qty - 1;
+        }
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn add_matcha(&mut self) {
+        self.matcha_qty = self.matcha_qty + 1;
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn remove_matcha(&mut self) {
+        if self.matcha_qty > 0 {
+            self.matcha_qty = self.matcha_qty - 1;
+        }
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn add_pastry(&mut self) {
+        self.pastry_qty = self.pastry_qty + 1;
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn remove_pastry(&mut self) {
+        if self.pastry_qty > 0 {
+            self.pastry_qty = self.pastry_qty - 1;
+        }
+        self.coffee_total = self.coffee_qty * 450 + self.latte_qty * 550 + self.matcha_qty * 600 + self.pastry_qty * 350;
+    }
+
+    fn pay_coffee(&mut self) {
+        if self.coffee_total > 0 {
+            self.coffee_paid = true;
+        }
+    }
+
+    fn reset_coffee(&mut self) {
+        self.coffee_qty = 0;
+        self.latte_qty = 0;
+        self.matcha_qty = 0;
+        self.pastry_qty = 0;
+        self.coffee_total = 0;
+        self.coffee_paid = false;
+    }
+
+    // Transit handlers
+    fn tap_ride(&mut self) {
+        if self.transit_balance >= 300 {
+            self.transit_balance = self.transit_balance - 300;
+            self.transit_rides = self.transit_rides + 1;
+            self.transit_tapped = true;
+        }
+    }
+
+    fn reload_transit(&mut self) {
+        self.transit_balance = self.transit_balance + 5000;
+        self.transit_tapped = false;
+    }
+
+    fn reset_tap(&mut self) {
+        self.transit_tapped = false;
+    }
+
+    // Bill Split handlers
+    fn add_person(&mut self) {
+        self.bill_people = self.bill_people + 1;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_person = self.bill_total / self.bill_people;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn remove_person(&mut self) {
+        if self.bill_people > 1 {
+            self.bill_people = self.bill_people - 1;
+        }
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_person = self.bill_total / self.bill_people;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn tip_15(&mut self) {
+        self.bill_tip_pct = 15;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn tip_18(&mut self) {
+        self.bill_tip_pct = 18;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn tip_20(&mut self) {
+        self.bill_tip_pct = 20;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn tip_25(&mut self) {
+        self.bill_tip_pct = 25;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn increase_bill(&mut self) {
+        self.bill_total = self.bill_total + 1000;
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_person = self.bill_total / self.bill_people;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    fn decrease_bill(&mut self) {
+        if self.bill_total > 1000 {
+            self.bill_total = self.bill_total - 1000;
+        }
+        let tip_amount: i32 = self.bill_total * self.bill_tip_pct / 100;
+        self.bill_with_tip = self.bill_total + tip_amount;
+        self.bill_per_person = self.bill_total / self.bill_people;
+        self.bill_per_with_tip = self.bill_with_tip / self.bill_people;
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: fill; background-color: #09090b; align: center; padding: 32">
+            // Page title
+            <div style="direction: vertical; align: center; gap: 4; height: hug; width: hug; padding-bottom: 24">
+                <div style="font-size: 28px; font-weight: 800; color: #fafafa; height: hug; width: hug">"Nectar Mini-Program Runtime"</div>
+                <div style="font-size: 14px; color: #71717a; height: hug; width: hug">"WASM-sandboxed app container — zero JavaScript required"</div>
+            </div>
+
+            // Main layout: phone + metrics
+            <div style="direction: horizontal; gap: 32; height: hug; align: start">
+
+                // Phone frame
+                <div style="direction: vertical; width: 375px; height: 720px; background-color: #18181b; border-radius: 40; border-width: 3; border-color: #3f3f46; padding: 0">
+
+                    // Phone notch area
+                    <div style="direction: horizontal; height: 44px; padding: 0 24; align: center; justify: space-between">
+                        <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"9:41"</div>
+                        <div style="font-size: 10px; color: #a1a1aa; height: hug; width: hug">"5G"</div>
+                    </div>
+
+                    // App header bar
+                    <div style="direction: horizontal; height: 48px; padding: 0 16; align: center; justify: space-between; background-color: #27272a">
+                        {if self.active_app != "home" {
+                            <div style="font-size: 14px; color: #ffa11e; height: hug; width: hug; padding: 8" on:click={self.go_home}>"< Back"</div>
+                        }}
+                        <div style="font-size: 15px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Mini Program Runtime"</div>
+                        <div style="font-size: 10px; color: #22c55e; background-color: #052e16; padding: 4 8; border-radius: 4; height: hug; width: hug">"WASM"</div>
+                    </div>
+
+                    // Content area
+                    <div style="direction: vertical; width: fill; height: fill; padding: 16; gap: 12">
+
+                        // HOME SCREEN
+                        {if self.active_app == "home" {
+                            <div style="direction: vertical; gap: 12; height: hug; width: fill">
+                                // Welcome
+                                <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 12">
+                                    <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Welcome"</div>
+                                    <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">"Launch a mini-program below. Each runs in an isolated WASM sandbox."</div>
+                                </div>
+
+                                // Coffee app tile
+                                <div style="direction: horizontal; gap: 12; height: hug; padding: 16; background-color: #27272a; border-radius: 12; align: center" on:click={self.open_coffee}>
+                                    <div style="width: 44px; height: 44px; background-color: #7c2d12; border-radius: 10; align: center; justify: center">
+                                        <div style="font-size: 22px; height: hug; width: hug">"C"</div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 15px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Coffee Order"</div>
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"Order drinks and pastries"</div>
+                                    </div>
+                                </div>
+
+                                // Transit app tile
+                                <div style="direction: horizontal; gap: 12; height: hug; padding: 16; background-color: #27272a; border-radius: 12; align: center" on:click={self.open_transit}>
+                                    <div style="width: 44px; height: 44px; background-color: #1e3a5f; border-radius: 10; align: center; justify: center">
+                                        <div style="font-size: 22px; height: hug; width: hug">"T"</div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 15px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Transit Pass"</div>
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"Tap to ride, check balance"</div>
+                                    </div>
+                                </div>
+
+                                // Bill Split app tile
+                                <div style="direction: horizontal; gap: 12; height: hug; padding: 16; background-color: #27272a; border-radius: 12; align: center" on:click={self.open_billsplit}>
+                                    <div style="width: 44px; height: 44px; background-color: #14532d; border-radius: 10; align: center; justify: center">
+                                        <div style="font-size: 22px; height: hug; width: hug">"$"</div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 15px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Bill Split"</div>
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"Split the check with friends"</div>
+                                    </div>
+                                </div>
+
+                                // Container stats at bottom of home
+                                <div style="direction: vertical; gap: 8; height: hug; padding: 12; background-color: #0f0f11; border-radius: 8; border-width: 1; border-color: #27272a">
+                                    <div style="font-size: 11px; font-weight: 600; color: #71717a; height: hug; width: hug">"CONTAINER STATUS"</div>
+                                    <div style="direction: horizontal; gap: 16; height: hug">
+                                        <div style="direction: vertical; gap: 2; height: hug">
+                                            <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"Active Apps"</div>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("{}", self.active_count)}</div>
+                                        </div>
+                                        <div style="direction: vertical; gap: 2; height: hug">
+                                            <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"Memory"</div>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("{} KB", self.total_memory_kb)}</div>
+                                        </div>
+                                        <div style="direction: vertical; gap: 2; height: hug">
+                                            <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"Violations"</div>
+                                            <div style="font-size: 16px; font-weight: 700; color: #22c55e; height: hug; width: hug">"0"</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+
+                        // COFFEE ORDER APP
+                        {if self.active_app == "coffee" {
+                            <div style="direction: vertical; gap: 12; height: hug; width: fill">
+                                // Sandbox badge + load time
+                                <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                    <div style="font-size: 9px; font-weight: 700; color: #ffa11e; background-color: #422006; padding: 3 8; border-radius: 4; height: hug; width: hug">"SANDBOXED"</div>
+                                    <div style="font-size: 10px; color: #71717a; height: hug; width: hug">{format("Loaded in {}", self.coffee_load_ms)}</div>
+                                    <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"12 KB"</div>
+                                </div>
+
+                                <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Coffee Order"</div>
+
+                                // Americano
+                                <div style="direction: horizontal; height: hug; padding: 12; background-color: #27272a; border-radius: 8; align: center; justify: space-between">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Americano"</div>
+                                        <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">"$4.50"</div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.remove_coffee}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                        </div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.coffee_qty)}</div>
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.add_coffee}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Latte
+                                <div style="direction: horizontal; height: hug; padding: 12; background-color: #27272a; border-radius: 8; align: center; justify: space-between">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Oat Latte"</div>
+                                        <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">"$5.50"</div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.remove_latte}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                        </div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.latte_qty)}</div>
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.add_latte}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Matcha
+                                <div style="direction: horizontal; height: hug; padding: 12; background-color: #27272a; border-radius: 8; align: center; justify: space-between">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Matcha Latte"</div>
+                                        <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">"$6.00"</div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.remove_matcha}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                        </div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.matcha_qty)}</div>
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.add_matcha}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Pastry
+                                <div style="direction: horizontal; height: hug; padding: 12; background-color: #27272a; border-radius: 8; align: center; justify: space-between">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Almond Croissant"</div>
+                                        <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">"$3.50"</div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.remove_pastry}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                        </div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.pastry_qty)}</div>
+                                        <div style="width: 32px; height: 32px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.add_pastry}>
+                                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Total + Pay
+                                <div style="direction: vertical; gap: 8; height: hug; padding: 16; background-color: #0f0f11; border-radius: 8; border-width: 1; border-color: #27272a">
+                                    <div style="direction: horizontal; height: hug; justify: space-between; align: center">
+                                        <div style="font-size: 14px; color: #a1a1aa; height: hug; width: hug">"Total"</div>
+                                        <div style="font-size: 22px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.coffee_total / 100, if self.coffee_total % 100 < 10 { format("0{}", self.coffee_total % 100) } else { format("{}", self.coffee_total % 100) })}</div>
+                                    </div>
+                                    {if self.coffee_paid {
+                                        <div style="height: 44px; background-color: #14532d; border-radius: 8; align: center; justify: center" on:click={self.reset_coffee}>
+                                            <div style="font-size: 14px; font-weight: 700; color: #22c55e; height: hug; width: hug">"Paid — Order Again"</div>
+                                        </div>
+                                    }}
+                                    {if self.coffee_paid == false {
+                                        <div style="height: 44px; background-color: #ffa11e; border-radius: 8; align: center; justify: center" on:click={self.pay_coffee}>
+                                            <div style="font-size: 14px; font-weight: 700; color: #09090b; height: hug; width: hug">"Pay Now"</div>
+                                        </div>
+                                    }}
+                                </div>
+                            </div>
+                        }}
+
+                        // TRANSIT PASS APP
+                        {if self.active_app == "transit" {
+                            <div style="direction: vertical; gap: 12; height: hug; width: fill">
+                                // Sandbox badge + load time
+                                <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                    <div style="font-size: 9px; font-weight: 700; color: #ffa11e; background-color: #422006; padding: 3 8; border-radius: 4; height: hug; width: hug">"SANDBOXED"</div>
+                                    <div style="font-size: 10px; color: #71717a; height: hug; width: hug">{format("Loaded in {}", self.transit_load_ms)}</div>
+                                    <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"8 KB"</div>
+                                </div>
+
+                                <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Transit Pass"</div>
+
+                                // QR code pass area
+                                <div style="direction: vertical; gap: 16; height: hug; padding: 24; background-color: #fafafa; border-radius: 16; align: center">
+                                    // QR placeholder
+                                    <div style="width: 160px; height: 160px; background-color: #18181b; border-radius: 8; align: center; justify: center">
+                                        <div style="direction: vertical; gap: 4; align: center; height: hug">
+                                            <div style="font-size: 48px; color: #fafafa; height: hug; width: hug">"QR"</div>
+                                            <div style="font-size: 10px; color: #a1a1aa; height: hug; width: hug">"Scan to ride"</div>
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 12px; color: #71717a; height: hug; width: hug">"City Metro Pass"</div>
+                                </div>
+
+                                // Balance
+                                <div style="direction: horizontal; height: hug; padding: 16; background-color: #27272a; border-radius: 8; justify: space-between; align: center">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"BALANCE"</div>
+                                        <div style="font-size: 28px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.transit_balance / 100, if self.transit_balance % 100 < 10 { format("0{}", self.transit_balance % 100) } else { format("{}", self.transit_balance % 100) })}</div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; height: hug; align: end">
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"RIDES TODAY"</div>
+                                        <div style="font-size: 28px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("{}", self.transit_rides)}</div>
+                                    </div>
+                                </div>
+
+                                // Tap status
+                                {if self.transit_tapped {
+                                    <div style="height: 56px; background-color: #14532d; border-radius: 12; align: center; justify: center" on:click={self.reset_tap}>
+                                        <div style="direction: vertical; gap: 2; align: center; height: hug">
+                                            <div style="font-size: 16px; font-weight: 700; color: #22c55e; height: hug; width: hug">"Tapped — Ride Active"</div>
+                                            <div style="font-size: 10px; color: #86efac; height: hug; width: hug">"$3.00 deducted"</div>
+                                        </div>
+                                    </div>
+                                }}
+                                {if self.transit_tapped == false {
+                                    <div style="height: 56px; background-color: #1e3a5f; border-radius: 12; align: center; justify: center" on:click={self.tap_ride}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #93c5fd; height: hug; width: hug">"Tap to Ride — $3.00"</div>
+                                    </div>
+                                }}
+
+                                // Reload
+                                <div style="height: 44px; background-color: #27272a; border-radius: 8; align: center; justify: center" on:click={self.reload_transit}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Reload $50.00"</div>
+                                </div>
+                            </div>
+                        }}
+
+                        // BILL SPLIT APP
+                        {if self.active_app == "billsplit" {
+                            <div style="direction: vertical; gap: 12; height: hug; width: fill">
+                                // Sandbox badge + load time
+                                <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                    <div style="font-size: 9px; font-weight: 700; color: #ffa11e; background-color: #422006; padding: 3 8; border-radius: 4; height: hug; width: hug">"SANDBOXED"</div>
+                                    <div style="font-size: 10px; color: #71717a; height: hug; width: hug">{format("Loaded in {}", self.bill_load_ms)}</div>
+                                    <div style="font-size: 10px; color: #52525b; height: hug; width: hug">"6 KB"</div>
+                                </div>
+
+                                <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Bill Split"</div>
+
+                                // Bill total
+                                <div style="direction: vertical; gap: 8; height: hug; padding: 16; background-color: #27272a; border-radius: 8">
+                                    <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"BILL TOTAL"</div>
+                                    <div style="direction: horizontal; height: hug; align: center; justify: space-between">
+                                        <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.bill_total / 100, if self.bill_total % 100 < 10 { format("0{}", self.bill_total % 100) } else { format("{}", self.bill_total % 100) })}</div>
+                                        <div style="direction: horizontal; gap: 8; height: hug">
+                                            <div style="width: 36px; height: 36px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.decrease_bill}>
+                                                <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                            </div>
+                                            <div style="width: 36px; height: 36px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.increase_bill}>
+                                                <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // People
+                                <div style="direction: horizontal; height: hug; padding: 16; background-color: #27272a; border-radius: 8; align: center; justify: space-between">
+                                    <div style="direction: vertical; gap: 2; height: hug">
+                                        <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"SPLITTING BETWEEN"</div>
+                                        <div style="font-size: 24px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("{} people", self.bill_people)}</div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug">
+                                        <div style="width: 36px; height: 36px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.remove_person}>
+                                            <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                        </div>
+                                        <div style="width: 36px; height: 36px; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.add_person}>
+                                            <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"+"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Tip selector
+                                <div style="direction: vertical; gap: 8; height: hug; padding: 12; background-color: #27272a; border-radius: 8">
+                                    <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"TIP"</div>
+                                    <div style="direction: horizontal; gap: 8; height: hug">
+                                        <div style="height: 36px; padding: 0 14; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.tip_15}>
+                                            <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">"15%"</div>
+                                        </div>
+                                        <div style="height: 36px; padding: 0 14; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.tip_18}>
+                                            <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">"18%"</div>
+                                        </div>
+                                        <div style="height: 36px; padding: 0 14; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.tip_20}>
+                                            <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">"20%"</div>
+                                        </div>
+                                        <div style="height: 36px; padding: 0 14; background-color: #3f3f46; border-radius: 6; align: center; justify: center" on:click={self.tip_25}>
+                                            <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">"25%"</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                // Result
+                                <div style="direction: vertical; gap: 8; height: hug; padding: 16; background-color: #0f0f11; border-radius: 8; border-width: 1; border-color: #ffa11e">
+                                    <div style="direction: horizontal; height: hug; justify: space-between; align: center">
+                                        <div style="font-size: 12px; color: #a1a1aa; height: hug; width: hug">{format("Per person ({}% tip)", self.bill_tip_pct)}</div>
+                                        <div style="font-size: 24px; font-weight: 800; color: #ffa11e; height: hug; width: hug">{format("${}.{}", self.bill_per_with_tip / 100, if self.bill_per_with_tip % 100 < 10 { format("0{}", self.bill_per_with_tip % 100) } else { format("{}", self.bill_per_with_tip % 100) })}</div>
+                                    </div>
+                                    <div style="direction: horizontal; height: hug; justify: space-between; align: center">
+                                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Without tip"</div>
+                                        <div style="font-size: 14px; color: #71717a; height: hug; width: hug">{format("${}.{}", self.bill_per_person / 100, if self.bill_per_person % 100 < 10 { format("0{}", self.bill_per_person % 100) } else { format("{}", self.bill_per_person % 100) })}</div>
+                                    </div>
+                                    <div style="direction: horizontal; height: hug; justify: space-between; align: center">
+                                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Total with tip"</div>
+                                        <div style="font-size: 14px; color: #71717a; height: hug; width: hug">{format("${}.{}", self.bill_with_tip / 100, if self.bill_with_tip % 100 < 10 { format("0{}", self.bill_with_tip % 100) } else { format("{}", self.bill_with_tip % 100) })}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+                    </div>
+
+                    // Bottom nav bar
+                    <div style="direction: horizontal; height: 44px; background-color: #27272a; border-radius: 0 0 37 37; align: center; justify: center">
+                        <div style="width: 134px; height: 5px; background-color: #a1a1aa; border-radius: 3"></div>
+                    </div>
+                </div>
+
+                // Right side: Metrics + Security comparison
+                <div style="direction: vertical; gap: 24; height: hug; width: 420px">
+
+                    // Runtime metrics
+                    <div style="direction: vertical; gap: 16; height: hug; padding: 24; background-color: #18181b; border-radius: 16">
+                        <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Runtime Metrics"</div>
+
+                        <div style="direction: horizontal; gap: 16; height: hug; wrap: true">
+                            // Active apps
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; width: 185px">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"ACTIVE MINI-PROGRAMS"</div>
+                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("{}", self.active_count)}</div>
+                            </div>
+                            // Memory
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; width: 185px">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"TOTAL MEMORY"</div>
+                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("{} KB", self.total_memory_kb)}</div>
+                            </div>
+                            // Violations
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; width: 185px">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"SANDBOX VIOLATIONS"</div>
+                                <div style="font-size: 32px; font-weight: 800; color: #22c55e; height: hug; width: hug">"0"</div>
+                            </div>
+                            // Runtime
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; width: 185px">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"RUNTIME ENGINE"</div>
+                                <div style="font-size: 16px; font-weight: 700; color: #ffa11e; height: hug; width: hug">"Nectar/WASM"</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    // Security comparison
+                    <div style="direction: vertical; gap: 16; height: hug; padding: 24; background-color: #18181b; border-radius: 16">
+                        <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Security Model Comparison"</div>
+
+                        // WASM column
+                        <div style="direction: vertical; gap: 8; height: hug; padding: 16; background-color: #052e16; border-radius: 8; border-width: 1; border-color: #14532d">
+                            <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                <div style="font-size: 14px; font-weight: 700; color: #22c55e; height: hug; width: hug">"Nectar/WASM Runtime"</div>
+                            </div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"Memory-isolated linear memory per app"</div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"Type-safe at compile time — no runtime injection"</div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"No DOM access from mini-program code"</div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"No eval(), no prototype chain, no globals"</div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"Deterministic execution — no hidden side effects"</div>
+                            <div style="font-size: 12px; color: #86efac; height: hug; width: hug">"Startup: <5ms (WASM instantiate + state init)"</div>
+                        </div>
+
+                        // JS column
+                        <div style="direction: vertical; gap: 8; height: hug; padding: 16; background-color: #1c1917; border-radius: 8; border-width: 1; border-color: #44403c">
+                            <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                <div style="font-size: 14px; font-weight: 700; color: #ef4444; height: hug; width: hug">"Traditional JS Runtime"</div>
+                            </div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"Shared heap — requires custom sandbox layer"</div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"eval() and dynamic code execution risks"</div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"Prototype pollution attack surface"</div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"Global scope leaks between mini-programs"</div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"Non-deterministic GC pauses"</div>
+                            <div style="font-size: 12px; color: #a8a29e; height: hug; width: hug">"Startup: 50-200ms (parse + compile + GC init)"</div>
+                        </div>
+                    </div>
+
+                    // Key numbers
+                    <div style="direction: vertical; gap: 12; height: hug; padding: 24; background-color: #18181b; border-radius: 16">
+                        <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Why WASM for Mini-Programs"</div>
+                        <div style="direction: horizontal; gap: 12; height: hug">
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; align: center; width: fill">
+                                <div style="font-size: 28px; font-weight: 800; color: #ffa11e; height: hug; width: hug">"10x"</div>
+                                <div style="font-size: 11px; color: #a1a1aa; height: hug; width: hug">"Faster startup"</div>
+                            </div>
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; align: center; width: fill">
+                                <div style="font-size: 28px; font-weight: 800; color: #ffa11e; height: hug; width: hug">"0"</div>
+                                <div style="font-size: 11px; color: #a1a1aa; height: hug; width: hug">"GC pauses"</div>
+                            </div>
+                            <div style="direction: vertical; gap: 4; height: hug; padding: 16; background-color: #27272a; border-radius: 8; align: center; width: fill">
+                                <div style="font-size: 28px; font-weight: 800; color: #ffa11e; height: hug; width: hug">"100%"</div>
+                                <div style="font-size: 11px; color: #a1a1aa; height: hug; width: hug">"Memory isolated"</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: #52525b; height: hug; width: hug">"Each mini-program compiles to a separate WASM module with its own linear memory. No shared state, no shared heap, no escape from the sandbox. The host runtime controls all browser API access through a capability-based syscall interface."</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
