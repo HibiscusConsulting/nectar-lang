@@ -1475,8 +1475,6 @@ path = "src/lib.rs"
 
 [dependencies]
 honeycomb = {{ path = "{}" }}
-serde = {{ version = "1", features = ["derive"] }}
-serde_json = "1"
 lol_alloc = "0.4"
 
 [profile.release]
