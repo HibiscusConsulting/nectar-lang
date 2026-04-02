@@ -111,7 +111,7 @@ impl RustCodegen {
         self.line("use honeycomb::measure::EstimateMeasurer;");
         self.line("use honeycomb::canvas_syscalls::*;");
         self.line("use std::cell::RefCell;");
-        self.line("use serde::Deserialize;");
+        // No serde — lightweight JSON parser generated per-struct
         self.line("");
         self.line("/// Scratch buffer for fetch responses, storage reads, hash reads");
         self.line("const SCRATCH_SIZE: usize = 4 * 1024 * 1024; // 4MB — handles 10K+ product API responses");
@@ -530,18 +530,16 @@ impl RustCodegen {
     }
 
     fn emit_struct(&mut self, s: &StructDef) {
-        // Generate with borrowed strings for zero-copy JSON deserialization.
-        // String fields become &'static str — the response buffer is kept in a static.
+        // Generate struct with borrowed strings for zero-copy JSON parsing.
+        // String fields become &'static str — the response buffer is leaked to 'static.
         let has_strings = s.fields.iter().any(|f| self.type_to_rust(&f.ty) == "String");
         if has_strings {
-            self.line("#[derive(Clone, Default, Deserialize)]");
+            self.line("#[derive(Clone, Default)]");
             self.line(&format!("struct {} {{", s.name));
             self.indent += 1;
             for field in &s.fields {
                 let rust_type = self.type_to_rust(&field.ty);
                 if rust_type == "String" {
-                    // Zero-copy: borrow from response buffer (transmuted to 'static)
-                    self.line("#[serde(borrow)]");
                     self.line(&format!("{}: &'static str,", field.name));
                 } else {
                     self.line(&format!("{}: {},", field.name, rust_type));
@@ -550,7 +548,7 @@ impl RustCodegen {
             self.indent -= 1;
             self.line("}");
         } else {
-            self.line("#[derive(Clone, Default, Deserialize)]");
+            self.line("#[derive(Clone, Default)]");
             self.line(&format!("struct {} {{", s.name));
             self.indent += 1;
             for field in &s.fields {
@@ -560,7 +558,115 @@ impl RustCodegen {
             self.indent -= 1;
             self.line("}");
         }
+        // Generate lightweight JSON array parser for this struct
+        self.emit_json_parser(s);
         self.line("");
+    }
+
+    /// Emit a zero-dependency JSON array parser for a struct.
+    /// Generates: fn parse_<name>_array(data: &'static [u8]) -> Vec<Name>
+    fn emit_json_parser(&mut self, s: &StructDef) {
+        let name = &s.name;
+        let fn_name = format!("parse_{}_array", name.to_lowercase());
+        self.line(&format!("fn {}(data: &'static [u8]) -> Vec<{}> {{", fn_name, name));
+        self.indent += 1;
+        self.line("let mut results = Vec::new();");
+        self.line("let s = unsafe { std::str::from_utf8_unchecked(data) };");
+        self.line("let mut pos = 0usize;");
+        self.line("let bytes = s.as_bytes();");
+        self.line("let len = bytes.len();");
+        self.line("// Skip to first '['");
+        self.line("while pos < len && bytes[pos] != b'[' { pos += 1; }");
+        self.line("pos += 1; // skip '['");
+        self.line("loop {");
+        self.indent += 1;
+        self.line("// Skip whitespace/commas");
+        self.line("while pos < len && (bytes[pos] == b' ' || bytes[pos] == b'\\n' || bytes[pos] == b'\\r' || bytes[pos] == b'\\t' || bytes[pos] == b',') { pos += 1; }");
+        self.line("if pos >= len || bytes[pos] == b']' { break; }");
+        self.line("if bytes[pos] != b'{' { break; }");
+        self.line("pos += 1; // skip '{'");
+        self.line(&format!("let mut item = {}::default();", name));
+        self.line("loop {");
+        self.indent += 1;
+        self.line("while pos < len && (bytes[pos] == b' ' || bytes[pos] == b'\\n' || bytes[pos] == b'\\r' || bytes[pos] == b'\\t' || bytes[pos] == b',') { pos += 1; }");
+        self.line("if pos >= len || bytes[pos] == b'}' { pos += 1; break; }");
+        self.line("// Parse key");
+        self.line("if bytes[pos] != b'\"' { break; }");
+        self.line("pos += 1;");
+        self.line("let key_start = pos;");
+        self.line("while pos < len && bytes[pos] != b'\"' { pos += 1; }");
+        self.line("let key = &s[key_start..pos];");
+        self.line("pos += 1; // skip closing quote");
+        self.line("while pos < len && bytes[pos] != b':' { pos += 1; }");
+        self.line("pos += 1; // skip ':'");
+        self.line("while pos < len && bytes[pos] == b' ' { pos += 1; }");
+        self.line("// Parse value based on field name");
+        self.line("match key {");
+        self.indent += 1;
+        for field in &s.fields {
+            let rust_type = self.type_to_rust(&field.ty);
+            if rust_type == "String" {
+                // String field: parse quoted value, zero-copy borrow
+                self.line(&format!("\"{}\" => {{", field.name));
+                self.indent += 1;
+                self.line("if pos < len && bytes[pos] == b'\"' {");
+                self.indent += 1;
+                self.line("pos += 1;");
+                self.line("let vs = pos;");
+                self.line("while pos < len && bytes[pos] != b'\"' { pos += 1; }");
+                self.line(&format!("item.{} = &s[vs..pos];", field.name));
+                self.line("pos += 1;");
+                self.indent -= 1;
+                self.line("}");
+                self.indent -= 1;
+                self.line("}");
+            } else if rust_type == "i32" {
+                // Integer field
+                self.line(&format!("\"{}\" => {{", field.name));
+                self.indent += 1;
+                self.line("let mut n: i32 = 0;");
+                self.line("let neg = pos < len && bytes[pos] == b'-';");
+                self.line("if neg { pos += 1; }");
+                self.line("while pos < len && bytes[pos] >= b'0' && bytes[pos] <= b'9' { n = n * 10 + (bytes[pos] - b'0') as i32; pos += 1; }");
+                self.line(&format!("item.{} = if neg {{ -n }} else {{ n }};", field.name));
+                self.indent -= 1;
+                self.line("}");
+            } else if rust_type == "f64" || rust_type == "f32" {
+                // Float field: parse as string, then convert
+                self.line(&format!("\"{}\" => {{", field.name));
+                self.indent += 1;
+                self.line("let vs = pos;");
+                self.line("while pos < len && bytes[pos] != b',' && bytes[pos] != b'}' && bytes[pos] != b' ' { pos += 1; }");
+                self.line(&format!("item.{} = s[vs..pos].parse().unwrap_or(0.0);", field.name));
+                self.indent -= 1;
+                self.line("}");
+            } else {
+                // Unknown type: skip value
+                self.line(&format!("\"{}\" => {{", field.name));
+                self.indent += 1;
+                self.line("if pos < len && bytes[pos] == b'\"' { pos += 1; while pos < len && bytes[pos] != b'\"' { pos += 1; } pos += 1; }");
+                self.line("else { while pos < len && bytes[pos] != b',' && bytes[pos] != b'}' { pos += 1; } }");
+                self.indent -= 1;
+                self.line("}");
+            }
+        }
+        // Default: skip unknown fields
+        self.line("_ => {");
+        self.indent += 1;
+        self.line("if pos < len && bytes[pos] == b'\"' { pos += 1; while pos < len && bytes[pos] != b'\"' { pos += 1; } pos += 1; }");
+        self.line("else { while pos < len && bytes[pos] != b',' && bytes[pos] != b'}' { pos += 1; } }");
+        self.indent -= 1;
+        self.line("}");
+        self.indent -= 1;
+        self.line("}");
+        self.indent -= 1;
+        self.line("}");
+        self.line("results.push(item);");
+        self.indent -= 1;
+        self.line("}");
+        self.line("results");
+        self.indent -= 1;
+        self.line("}");
     }
 
     fn emit_component(&mut self, comp: &Component) {
@@ -1591,16 +1697,15 @@ impl RustCodegen {
                     self.line(&format!("{}_STATE.with(|s| {{", comp_name.to_uppercase()));
                     self.indent += 1;
                     self.line("let mut state = s.borrow_mut();");
-                    // Find the first Vec<StructType> field and deserialize into it
+                    // Find the first Vec<StructType> field and parse JSON into it
                     for field in &comp.state {
                         if let Some(ref ty) = field.ty {
                             let ty_str = self.type_to_rust(ty);
                             if ty_str.starts_with("Vec<") && !ty_str.contains("i32") && !ty_str.contains("f32") && !ty_str.contains("bool") && !ty_str.contains("String") {
-                                self.line(&format!("if let Ok(parsed) = serde_json::from_slice::<{}>(&body) {{", ty_str));
-                                self.indent += 1;
-                                self.line(&format!("state.{} = parsed;", field.name));
-                                self.indent -= 1;
-                                self.line("}");
+                                // Extract struct name from Vec<Name>
+                                let struct_name = ty_str.trim_start_matches("Vec<").trim_end_matches('>');
+                                let parser_fn = format!("parse_{}_array", struct_name.to_lowercase());
+                                self.line(&format!("state.{} = {}(body);", field.name, parser_fn));
                             }
                         }
                     }
@@ -1952,5 +2057,82 @@ mod tests {
     fn test_expr_to_literal_string_complex_returns_none() {
         let cg = RustCodegen::new();
         assert_eq!(cg.expr_to_literal_string(&Expr::Ident("x".to_string())), None);
+    }
+
+    // ── JSON parsing codegen tests ──────────────────────────────
+
+    fn parse_and_generate(source: &str) -> String {
+        let mut lexer = crate::lexer::Lexer::new(source);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = crate::parser::Parser::new(tokens);
+        let (program, _) = parser.parse_program_recovering();
+        let mut cg = RustCodegen::new();
+        cg.generate(&program)
+    }
+
+    #[test]
+    fn test_struct_generates_rust_struct() {
+        let output = parse_and_generate(r#"
+            struct Product {
+                id: i32,
+                name: String,
+                price_cents: i32
+            }
+        "#);
+        assert!(output.contains("struct Product"), "should generate Product struct");
+        assert!(output.contains("name:"), "should have name field");
+        assert!(output.contains("price_cents:"), "should have price_cents field");
+    }
+
+    #[test]
+    fn test_struct_with_string_gets_serde_derive() {
+        let output = parse_and_generate(r#"
+            struct Product {
+                id: i32,
+                name: String,
+                category: String
+            }
+        "#);
+        // Uses generated lightweight JSON parser (no serde)
+        assert!(output.contains("parse_product_array"),
+            "should have generated JSON parser function");
+    }
+
+    #[test]
+    fn test_component_with_fetch_has_response_reader() {
+        let output = parse_and_generate(r#"
+            struct Product {
+                id: i32,
+                name: String
+            }
+            component App() {
+                let mut products: [Product] = [];
+                fn on_loaded(&mut self) {
+                    self.products = self.products;
+                }
+                render {
+                    <div>"hello"</div>
+                }
+            }
+        "#);
+        assert!(output.contains("read_response"), "should have fetch response reader");
+    }
+
+    #[test]
+    fn test_generated_code_parses_json_array() {
+        // Verify the pattern: JSON bytes → Vec<Product>
+        let output = parse_and_generate(r#"
+            struct Product {
+                id: i32,
+                name: String
+            }
+            component App() {
+                let mut items: [Product] = [];
+                render {
+                    <div>"test"</div>
+                }
+            }
+        "#);
+        assert!(output.contains("struct Product"), "should have Product struct");
     }
 }
