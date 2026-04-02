@@ -111,7 +111,7 @@ impl RustCodegen {
         self.line("use honeycomb::measure::EstimateMeasurer;");
         self.line("use honeycomb::canvas_syscalls::*;");
         self.line("use std::cell::RefCell;");
-        // No serde — lightweight JSON parser generated per-struct
+        self.line("use serde::Deserialize;");
         self.line("");
         self.line("/// Scratch buffer for fetch responses, storage reads, hash reads");
         self.line("const SCRATCH_SIZE: usize = 4 * 1024 * 1024; // 4MB — handles 10K+ product API responses");
@@ -534,12 +534,13 @@ impl RustCodegen {
         // String fields become &'static str — the response buffer is leaked to 'static.
         let has_strings = s.fields.iter().any(|f| self.type_to_rust(&f.ty) == "String");
         if has_strings {
-            self.line("#[derive(Clone, Default)]");
+            self.line("#[derive(Clone, Default, Deserialize)]");
             self.line(&format!("struct {} {{", s.name));
             self.indent += 1;
             for field in &s.fields {
                 let rust_type = self.type_to_rust(&field.ty);
                 if rust_type == "String" {
+                    self.line("#[serde(borrow)]");
                     self.line(&format!("{}: &'static str,", field.name));
                 } else {
                     self.line(&format!("{}: {},", field.name, rust_type));
@@ -548,7 +549,7 @@ impl RustCodegen {
             self.indent -= 1;
             self.line("}");
         } else {
-            self.line("#[derive(Clone, Default)]");
+            self.line("#[derive(Clone, Default, Deserialize)]");
             self.line(&format!("struct {} {{", s.name));
             self.indent += 1;
             for field in &s.fields {
@@ -1697,15 +1698,16 @@ impl RustCodegen {
                     self.line(&format!("{}_STATE.with(|s| {{", comp_name.to_uppercase()));
                     self.indent += 1;
                     self.line("let mut state = s.borrow_mut();");
-                    // Find the first Vec<StructType> field and parse JSON into it
+                    // Find the first Vec<StructType> field and deserialize into it
                     for field in &comp.state {
                         if let Some(ref ty) = field.ty {
                             let ty_str = self.type_to_rust(ty);
                             if ty_str.starts_with("Vec<") && !ty_str.contains("i32") && !ty_str.contains("f32") && !ty_str.contains("bool") && !ty_str.contains("String") {
-                                // Extract struct name from Vec<Name>
-                                let struct_name = ty_str.trim_start_matches("Vec<").trim_end_matches('>');
-                                let parser_fn = format!("parse_{}_array", struct_name.to_lowercase());
-                                self.line(&format!("state.{} = {}(body);", field.name, parser_fn));
+                                self.line(&format!("if let Ok(parsed) = serde_json::from_slice::<{}>(&body) {{", ty_str));
+                                self.indent += 1;
+                                self.line(&format!("state.{} = parsed;", field.name));
+                                self.indent -= 1;
+                                self.line("}");
                             }
                         }
                     }

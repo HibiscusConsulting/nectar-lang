@@ -1475,6 +1475,8 @@ path = "src/lib.rs"
 
 [dependencies]
 honeycomb = {{ path = "{}" }}
+serde = {{ version = "1", features = ["derive"] }}
+serde_json = "1"
 lol_alloc = "0.4"
 
 [profile.release]
@@ -1990,14 +1992,12 @@ resizeCanvases(vw, vh);
 // ── WASM Imports ────────────────────────────────────────────
 let W;
 let _fh={{}}, _fs=0, _fb=new Uint8Array(0), _imgCache={{}};
-let _imgLoaded=0, _imgTarget=20, _productsReady=false, _initT0=0;
-const _onImgLoad = () => {{ _imgLoaded++; if(_productsReady && _imgLoaded>=_imgTarget && W && W.app_set_timings){{ W.app_set_timings(0,0,performance.now()-_initT0); if(W.app_render) W.app_render(); }} if(W && W.app_render) W.app_render(); }};
 const imports = {{ env: {{
   // Canvas 2D syscalls — ALWAYS real (text/images in GPU mode, everything in 2D mode)
   canvas_fill_text: (id,p,l,x,y,r,g,b,sz,bold) => {{ ctx.fillStyle=`rgb(${{r}},${{g}},${{b}})`; ctx.font=`${{bold?'bold ':''}}${{sz}}px -apple-system,BlinkMacSystemFont,sans-serif`; ctx.fillText(dec.decode(new Uint8Array(W.memory.buffer,p,l)),x,y); }},
   canvas_draw_image: (id,sp,sl,x,y,w,h,cr) => {{
     const url = dec.decode(new Uint8Array(W.memory.buffer,sp,sl));
-    if (!_imgCache[url]) {{ const img = new Image(); img.crossOrigin='anonymous'; img.onload=_onImgLoad; img.onerror=_onImgLoad; img.src=url; _imgCache[url]=img; }}
+    if (!_imgCache[url]) {{ const img = new Image(); img.crossOrigin='anonymous'; img.onload=()=>{{ if(W.app_render) W.app_render(); }}; img.src=url; _imgCache[url]=img; }}
     const img = _imgCache[url]; if (img && img.complete && img.naturalWidth > 0) {{ try {{ if(cr>0){{ ctx.save(); ctx.beginPath(); ctx.roundRect(x,y,w,h,cr); ctx.clip(); ctx.drawImage(img,x,y,w,h); ctx.restore(); }} else {{ ctx.drawImage(img,x,y,w,h); }} }} catch(e){{}} }}
   }},
   canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => {{ const url=dec.decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=_imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){{ try{{ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}}catch(e){{}} }} }},
@@ -2186,22 +2186,7 @@ if (hasGPU) {{
   gpuDevice.queue.writeBuffer(shadowUniformBuffer, 0, new Float32Array([vw, vh, 0, 0]));
 }}
 
-_initT0 = t0;
 W.app_render();
-// Track products loaded — images tracked via _onImgLoad in canvas_draw_image
-const _origRender = W.app_render;
-W.app_render = function() {{
-  _origRender();
-  if (!_productsReady && W.app_get_product_count && W.app_get_product_count() > 0) {{
-    _productsReady = true;
-    // If enough images already loaded (cached), update total now
-    if (_imgLoaded >= _imgTarget && W.app_set_timings) {{
-      W.app_set_timings(0, 0, performance.now() - t0);
-      W.app_render = _origRender;
-      _origRender();
-    }}
-  }}
-}};
 console.log(`%c[Nectar ${{hasGPU?'WebGPU':'Canvas 2D'}}]%c Initialized in ${{(t1-t0).toFixed(1)}}ms`, hasGPU?'color:#22c55e;font-weight:bold':'color:#f97316;font-weight:bold', 'color:inherit');
 }} catch(e) {{ document.body.style.color='#f00'; document.body.style.padding='20px'; document.body.style.fontSize='14px'; document.body.style.fontFamily='monospace'; document.body.innerText='WASM Error: '+e.message+'\n\n'+e.stack; console.error(e); }}
 
