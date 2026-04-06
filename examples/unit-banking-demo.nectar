@@ -372,22 +372,22 @@ component UnitDashboard() {
                 <div style="width: hug; height: hug; font-size: 13px; color: #71717a;">"Banking-as-a-Service — zero JavaScript"</div>
             </div>
 
-            // Tab bar — static styling, active state shows via content below
+            // Tab bar
             <div style="direction: horizontal; width: fill; padding: 0 24; gap: 4; height: hug; background-color: #0d1117; border-width: 0 0 1 0; border-color: #27272a">
                 <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_payments}>
-                    <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Payments"</div>
+                    {if self.active_tab == 0 { <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Payments"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Payments"</div> }}
                 </div>
                 <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_banking}>
-                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Banking"</div>
+                    {if self.active_tab == 1 { <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Banking"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Banking"</div> }}
                 </div>
                 <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_cards}>
-                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Cards"</div>
+                    {if self.active_tab == 2 { <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Cards"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Cards"</div> }}
                 </div>
                 <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_kyc}>
-                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"KYC"</div>
+                    {if self.active_tab == 3 { <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"KYC"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"KYC"</div> }}
                 </div>
                 <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_movement}>
-                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Movement"</div>
+                    {if self.active_tab == 4 { <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Movement"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Movement"</div> }}
                 </div>
             </div>
 
@@ -461,9 +461,15 @@ component UnitDashboard() {
                             <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"10K txns — amount = ((i*7+13) % 50000) - 25000"</div>
                             <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
                                 <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.generate_transactions}>"Generate 10K"</div>
-                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }};" on:click={self.filter_all_tx}>"All"</div>
-                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }};" on:click={self.filter_debits}>"Debits"</div>
-                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }};" on:click={self.filter_credits}>"Credits"</div>
+                                <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.filter_all_tx}>
+                                    {if self.tx_filter == 0 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"All"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"All"</div> }}
+                                </div>
+                                <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.filter_debits}>
+                                    {if self.tx_filter == 1 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Debits"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Debits"</div> }}
+                                </div>
+                                <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.filter_credits}>
+                                    {if self.tx_filter == 2 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Credits"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Credits"</div> }}
+                                </div>
                             </div>
                             {if self.tx_generated == true {
                                 <div style="direction: vertical; width: fill; gap: 12px;">
@@ -522,7 +528,9 @@ component UnitDashboard() {
                         // Card actions
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
                             <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.toggle_cvv}>{if self.cvv_visible == 1 { "Hide CVV" } else { "Reveal CVV" }}</div>
-                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }}; color: #fafafa; border-width: 1px; border-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }};" on:click={self.toggle_freeze}>{if self.card_frozen == 1 { "Unfreeze" } else { "Freeze" }}</div>
+                            <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #dc2626; align: center; justify: center" on:click={self.toggle_freeze}>
+                                {if self.card_frozen == 1 { <div style="font-size: 12px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Unfreeze"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Freeze"</div> }}
+                            </div>
                         </div>
                         // Spending limits card
                         <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
@@ -555,10 +563,18 @@ component UnitDashboard() {
                         <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"4-step identity verification — all validation in WASM"</div>
                         // Step indicators
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 0 { #22d3ee } else { if self.kyc_step > 0 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 0 { #09090b } else { if self.kyc_step > 0 { #fafafa } else { #71717a } }};">"1. Personal"</div>
-                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 1 { #22d3ee } else { if self.kyc_step > 1 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 1 { #09090b } else { if self.kyc_step > 1 { #fafafa } else { #71717a } }};">"2. Address"</div>
-                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 2 { #22d3ee } else { if self.kyc_step > 2 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 2 { #09090b } else { if self.kyc_step > 2 { #fafafa } else { #71717a } }};">"3. Identity"</div>
-                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 3 { #22d3ee } else { #27272a }}; color: {if self.kyc_step == 3 { #09090b } else { #71717a }};">"4. Review"</div>
+                            <div style="width: hug; height: hug; padding: 8 14; border-radius: 8; background-color: #27272a">
+                                {if self.kyc_step == 0 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"1. Personal"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #71717a; height: hug; width: hug">"1. Personal"</div> }}
+                            </div>
+                            <div style="width: hug; height: hug; padding: 8 14; border-radius: 8; background-color: #27272a">
+                                {if self.kyc_step == 1 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"2. Address"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #71717a; height: hug; width: hug">"2. Address"</div> }}
+                            </div>
+                            <div style="width: hug; height: hug; padding: 8 14; border-radius: 8; background-color: #27272a">
+                                {if self.kyc_step == 2 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"3. Identity"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #71717a; height: hug; width: hug">"3. Identity"</div> }}
+                            </div>
+                            <div style="width: hug; height: hug; padding: 8 14; border-radius: 8; background-color: #27272a">
+                                {if self.kyc_step == 3 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"4. Review"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #71717a; height: hug; width: hug">"4. Review"</div> }}
+                            </div>
                         </div>
                         // Step 0: Personal
                         {if self.kyc_step == 0 {
@@ -647,16 +663,20 @@ component UnitDashboard() {
                         <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"ACH (ABA 3-7-1), wire, book transfer — all WASM"</div>
                         // Transfer type buttons
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 0 { #22d3ee } else { #27272a }}; color: {if self.move_type == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 0 { #22d3ee } else { #27272a }};" on:click={self.set_ach}>"ACH"</div>
-                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 1 { #22d3ee } else { #27272a }}; color: {if self.move_type == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 1 { #22d3ee } else { #27272a }};" on:click={self.set_wire}>"Wire ($25)"</div>
-                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 2 { #22d3ee } else { #27272a }}; color: {if self.move_type == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 2 { #22d3ee } else { #27272a }};" on:click={self.set_book}>"Book"</div>
+                            <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.set_ach}>
+                                {if self.move_type == 0 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"ACH"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"ACH"</div> }}
+                            </div>
+                            <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.set_wire}>
+                                {if self.move_type == 1 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Wire ($25)"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Wire ($25)"</div> }}
+                            </div>
+                            <div style="width: hug; height: 44px; padding: 0 14; border-radius: 8; background-color: #27272a; align: center; justify: center" on:click={self.set_book}>
+                                {if self.move_type == 2 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Book"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Book"</div> }}
+                            </div>
                         </div>
                         // Amount
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
                             <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</div>
-                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.move_amount))}"."
-                                {if self.cp(self.move_amount) < 10 { "0"{format("{}", self.cp(self.move_amount))} } else { {format("{}", self.cp(self.move_amount))} }}
-                            </div>
+                            <div style="width: hug; height: hug; font-size: 20px; font-weight: 700; color: #fafafa">{format("${}.{}", self.move_amount / 100, if self.move_amount % 100 < 10 { format("0{}", self.move_amount % 100) } else { format("{}", self.move_amount % 100) })}</div>
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
                             <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.move_down}>"-$100"</div>
