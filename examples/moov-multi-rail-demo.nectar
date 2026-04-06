@@ -879,6 +879,105 @@ component MoovMultiRailDemo() {
     }
 
     // ========================================================================
+    // FORMATTING HELPERS (render-only, not event handlers)
+    // ========================================================================
+
+    fn pad_cents(&self, val: i32) -> String {
+        let cents: i32 = val - (val / 100) * 100;
+        if cents < 0 {
+            let pos: i32 = 0 - cents;
+            if pos < 10 {
+                return format("0{}", pos);
+            }
+            return format("{}", pos);
+        }
+        if cents < 10 {
+            return format("0{}", cents);
+        }
+        return format("{}", cents);
+    }
+
+    fn fmt_usd(&self, val: i32) -> String {
+        let dollars: i32 = val / 100;
+        let cents_str: String = self.pad_cents(val);
+        if dollars < 0 {
+            let pos: i32 = 0 - dollars;
+            return format("-${}.{}", pos, cents_str);
+        }
+        if dollars >= 1000000 {
+            let m: i32 = dollars / 1000000;
+            let remainder: i32 = dollars - m * 1000000;
+            let thousands: i32 = remainder / 1000;
+            let ones: i32 = remainder - thousands * 1000;
+            if thousands < 10 {
+                if ones < 10 {
+                    return format("${},00{},00{}.{}", m, thousands, ones, cents_str);
+                }
+                if ones < 100 {
+                    return format("${},00{},0{}.{}", m, thousands, ones, cents_str);
+                }
+                return format("${},00{},{}.{}", m, thousands, ones, cents_str);
+            }
+            if thousands < 100 {
+                if ones < 10 {
+                    return format("${},0{},00{}.{}", m, thousands, ones, cents_str);
+                }
+                if ones < 100 {
+                    return format("${},0{},0{}.{}", m, thousands, ones, cents_str);
+                }
+                return format("${},0{},{}.{}", m, thousands, ones, cents_str);
+            }
+            if ones < 10 {
+                return format("${},{},00{}.{}", m, thousands, ones, cents_str);
+            }
+            if ones < 100 {
+                return format("${},{},0{}.{}", m, thousands, ones, cents_str);
+            }
+            return format("${},{},{}.{}", m, thousands, ones, cents_str);
+        }
+        if dollars >= 1000 {
+            let thousands: i32 = dollars / 1000;
+            let ones: i32 = dollars - thousands * 1000;
+            if ones < 10 {
+                return format("${},00{}.{}", thousands, ones, cents_str);
+            }
+            if ones < 100 {
+                return format("${},0{}.{}", thousands, ones, cents_str);
+            }
+            return format("${},{}.{}", thousands, ones, cents_str);
+        }
+        return format("${}.{}", dollars, cents_str);
+    }
+
+    fn fmt_time(&self, minutes: i32) -> String {
+        let h: i32 = minutes / 60;
+        let m: i32 = minutes - (minutes / 60) * 60;
+        if h > 12 {
+            let h12: i32 = h - 12;
+            if m < 10 {
+                return format("{}:0{} PM", h12, m);
+            }
+            return format("{}:{} PM", h12, m);
+        }
+        if h == 12 {
+            if m < 10 {
+                return format("12:0{} PM", m);
+            }
+            return format("12:{} PM", m);
+        }
+        if h == 0 {
+            if m < 10 {
+                return format("12:0{} AM", m);
+            }
+            return format("12:{} AM", m);
+        }
+        if m < 10 {
+            return format("{}:0{} AM", h, m);
+        }
+        return format("{}:{} AM", h, m);
+    }
+
+    // ========================================================================
     // RENDER
     // ========================================================================
 
@@ -957,7 +1056,7 @@ component MoovMultiRailDemo() {
                         // Stats row
                         <div style="direction: horizontal; width: fill; gap: 16">
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
-                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{format("${}.{}", self.transfer_amount / 100, self.transfer_amount - (self.transfer_amount / 100) * 100)}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{self.fmt_usd(self.transfer_amount)}</div>
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TRANSFER AMOUNT"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
@@ -965,7 +1064,7 @@ component MoovMultiRailDemo() {
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TRANSFERS SENT"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
-                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{self.fmt_usd(self.wallet_balance)}</div>
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"WALLET BALANCE"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
@@ -1035,7 +1134,7 @@ component MoovMultiRailDemo() {
                             </div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Current Time (ET)"</div>
-                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}:{}", self.current_time_et / 60, self.current_time_et - (self.current_time_et / 60) * 60)}</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_time(self.current_time_et)}</div>
                             </div>
                         </div>
 
@@ -1109,7 +1208,7 @@ component MoovMultiRailDemo() {
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Fee"</div>
-                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.rail_fee_cents / 100, self.rail_fee_cents - (self.rail_fee_cents / 100) * 100)}</div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.rail_fee_cents)}</div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Settlement"</div>
@@ -1348,7 +1447,7 @@ component MoovMultiRailDemo() {
                             </div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Batch Total"</div>
-                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.ach_batch_total / 100, self.ach_batch_total - (self.ach_batch_total / 100) * 100)}</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{self.fmt_usd(self.ach_batch_total)}</div>
                             </div>
                         </div>
                     </div>
@@ -1362,7 +1461,7 @@ component MoovMultiRailDemo() {
                         // Wallet stats row
                         <div style="direction: horizontal; width: fill; gap: 16">
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
-                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{self.fmt_usd(self.wallet_balance)}</div>
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"MOOV WALLET BALANCE"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
@@ -1370,11 +1469,11 @@ component MoovMultiRailDemo() {
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"LEDGER ENTRIES"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
-                                <div style="font-size: 24px; font-weight: 700; color: #f85149; width: hug; height: hug">{format("${}", self.ledger_debit_total / 100)}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #f85149; width: hug; height: hug">{self.fmt_usd(self.ledger_debit_total)}</div>
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TOTAL DEBITS"</div>
                             </div>
                             <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
-                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}", self.ledger_credit_total / 100)}</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{self.fmt_usd(self.ledger_credit_total)}</div>
                                 <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TOTAL CREDITS"</div>
                             </div>
                         </div>
@@ -1398,7 +1497,7 @@ component MoovMultiRailDemo() {
                                 <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.decrease_book_amount}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$50"</div>
                                 </div>
-                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.book_transfer_amount / 100, self.book_transfer_amount - (self.book_transfer_amount / 100) * 100)}</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.book_transfer_amount)}</div>
                                 <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.increase_book_amount}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$50"</div>
                                 </div>
@@ -1427,15 +1526,15 @@ component MoovMultiRailDemo() {
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Debit Total"</div>
-                                        <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{format("${}", self.ledger_debit_total / 100)}</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{self.fmt_usd(self.ledger_debit_total)}</div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Credit Total"</div>
-                                        <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("${}", self.ledger_credit_total / 100)}</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{self.fmt_usd(self.ledger_credit_total)}</div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Final Balance"</div>
-                                        <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{self.fmt_usd(self.wallet_balance)}</div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                         <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Runtime"</div>
@@ -1612,7 +1711,7 @@ component MoovMultiRailDemo() {
                                     <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_down}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$5"</div>
                                     </div>
-                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.card_amount / 100, self.card_amount - (self.card_amount / 100) * 100)}</div>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.card_amount)}</div>
                                     <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_up}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$5"</div>
                                     </div>
@@ -1686,7 +1785,7 @@ component MoovMultiRailDemo() {
                             // Capture step
                             {if self.card_captured {
                                 <div style="direction: horizontal; padding: 8 14; background-color: #0b2e1a; border-radius: 8; align: center; gap: 8">
-                                    <div style="font-size: 13px; color: #3fb950; width: hug; height: hug">{format("[OK] Captured: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</div>
+                                    <div style="font-size: 13px; color: #3fb950; width: hug; height: hug">{format("[OK] Captured: {}", self.fmt_usd(self.card_capture_amount))}</div>
                                 </div>
                             }}
 
@@ -1698,7 +1797,7 @@ component MoovMultiRailDemo() {
                             }}
                             {if self.card_status == "refunded" {
                                 <div style="direction: horizontal; padding: 8 14; background-color: #1a1e2e; border-radius: 8; align: center; gap: 8">
-                                    <div style="font-size: 13px; color: #484f58; width: hug; height: hug">{format("[R] Refunded: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</div>
+                                    <div style="font-size: 13px; color: #484f58; width: hug; height: hug">{format("[R] Refunded: {}", self.fmt_usd(self.card_capture_amount))}</div>
                                 </div>
                             }}
 
@@ -1745,19 +1844,19 @@ component MoovMultiRailDemo() {
                             <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Rail Volume Breakdown"</div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"ACH Volume"</div>
-                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.dash_ach_volume / 100, self.dash_ach_volume - (self.dash_ach_volume / 100) * 100)}</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{self.fmt_usd(self.dash_ach_volume)}</div>
                             </div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"RTP Volume"</div>
-                                <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.dash_rtp_volume / 100, self.dash_rtp_volume - (self.dash_rtp_volume / 100) * 100)}</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{self.fmt_usd(self.dash_rtp_volume)}</div>
                             </div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Wire Volume"</div>
-                                <div style="font-size: 13px; font-weight: 600; color: #d29922; width: hug; height: hug">{format("${}.{}", self.dash_wire_volume / 100, self.dash_wire_volume - (self.dash_wire_volume / 100) * 100)}</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #d29922; width: hug; height: hug">{self.fmt_usd(self.dash_wire_volume)}</div>
                             </div>
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Total Volume"</div>
-                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}", (self.dash_ach_volume + self.dash_rtp_volume + self.dash_wire_volume) / 100)}</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.dash_ach_volume + self.dash_rtp_volume + self.dash_wire_volume)}</div>
                             </div>
                         </div>
 
