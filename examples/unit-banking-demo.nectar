@@ -555,24 +555,24 @@ component UnitDashboard() {
                             <div style="font-size: 13px; color: #52525b; height: hug; width: hug">"Real-time balances with 10K transaction processing"</div>
                         </div>
 
-                        // Account balance cards
-                        <div style="direction: horizontal; width: fill; gap: 16; wrap: true; height: hug">
+                        // Account balance cards — side by side
+                        <div style="direction: horizontal; width: fill; gap: 16; height: hug">
                             // Checking
-                            <div style="direction: vertical; width: fill; padding: 24; background-color: #111113; border-radius: 16; gap: 8; border-width: 1; border-color: #1e1e21">
+                            <div style="direction: vertical; width: 500px; padding: 24; background-color: #111113; border-radius: 16; gap: 8; border-width: 1; border-color: #1e1e21">
                                 <div style="direction: horizontal; width: fill; justify: space-between; align: center; height: hug">
                                     <div style="font-size: 11px; font-weight: 700; color: #52525b; height: hug; width: hug">"CHECKING"</div>
                                     <div style="font-size: 10px; font-weight: 600; color: #22c55e; padding: 3 8; background-color: #052e16; border-radius: 100; height: hug; width: hug">"Active"</div>
                                 </div>
-                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.dp(self.checking_bal), if self.cp(self.checking_bal) < 10 { format("0{}", self.cp(self.checking_bal)) } else { format("{}", self.cp(self.checking_bal)) })}</div>
+                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${},{}.00", self.checking_bal / 100000, (self.checking_bal / 100) - (self.checking_bal / 100000) * 1000)}</div>
                                 <div style="font-size: 12px; color: #52525b; height: hug; width: hug">"Available balance"</div>
                             </div>
                             // Savings
-                            <div style="direction: vertical; width: fill; padding: 24; background-color: #111113; border-radius: 16; gap: 8; border-width: 1; border-color: #1e1e21">
+                            <div style="direction: vertical; width: 500px; padding: 24; background-color: #111113; border-radius: 16; gap: 8; border-width: 1; border-color: #1e1e21">
                                 <div style="direction: horizontal; width: fill; justify: space-between; align: center; height: hug">
                                     <div style="font-size: 11px; font-weight: 700; color: #52525b; height: hug; width: hug">"SAVINGS"</div>
                                     <div style="font-size: 10px; font-weight: 600; color: #22c55e; padding: 3 8; background-color: #052e16; border-radius: 100; height: hug; width: hug">"Active"</div>
                                 </div>
-                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.dp(self.savings_bal), if self.cp(self.savings_bal) < 10 { format("0{}", self.cp(self.savings_bal)) } else { format("{}", self.cp(self.savings_bal)) })}</div>
+                                <div style="font-size: 32px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("${},{}.00", self.savings_bal / 100000, (self.savings_bal / 100) - (self.savings_bal / 100000) * 1000)}</div>
                                 <div style="font-size: 12px; color: #52525b; height: hug; width: hug">"Available balance"</div>
                             </div>
                         </div>
@@ -643,14 +643,14 @@ component UnitDashboard() {
                                         <div style="direction: vertical; width: fill; padding: 20 24; gap: 4; border-width: 0 1 0 0; border-color: #1e1e21; height: hug">
                                             <div style="font-size: 11px; font-weight: 700; color: #52525b; height: hug; width: hug">"TOTAL DEBITS"</div>
                                             <div style="direction: horizontal; gap: 8; align: center; height: hug">
-                                                <div style="font-size: 24px; font-weight: 800; color: #ef4444; height: hug; width: hug">{format("${}", self.dp(self.tx_debit_total))}</div>
+                                                <div style="font-size: 24px; font-weight: 800; color: #ef4444; height: hug; width: hug">{format("${}", self.tx_debit_total / 100)}</div>
                                                 <div style="font-size: 12px; font-weight: 600; color: #52525b; height: hug; width: hug">{format("{} txns", self.tx_debit_count)}</div>
                                             </div>
                                         </div>
                                         <div style="direction: vertical; width: fill; padding: 20 24; gap: 4; height: hug">
                                             <div style="font-size: 11px; font-weight: 700; color: #52525b; height: hug; width: hug">"TOTAL CREDITS"</div>
                                             <div style="direction: horizontal; gap: 8; align: center; height: hug">
-                                                <div style="font-size: 24px; font-weight: 800; color: #22c55e; height: hug; width: hug">{format("${}", self.dp(self.tx_credit_total))}</div>
+                                                <div style="font-size: 24px; font-weight: 800; color: #22c55e; height: hug; width: hug">{format("${}", self.tx_credit_total / 100)}</div>
                                                 <div style="font-size: 12px; font-weight: 600; color: #52525b; height: hug; width: hug">{format("{} txns", self.tx_credit_count)}</div>
                                             </div>
                                         </div>
@@ -658,7 +658,7 @@ component UnitDashboard() {
                                     // Running balance
                                     <div style="direction: horizontal; width: fill; padding: 16 24; justify: space-between; align: center; height: hug">
                                         <div style="font-size: 13px; font-weight: 600; color: #52525b; height: hug; width: hug">"Running Balance"</div>
-                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("${}", self.dp(self.tx_running_bal))}</div>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("${}", self.tx_running_bal / 100)}</div>
                                     </div>
                                 </div>
                             }}
@@ -746,7 +746,7 @@ component UnitDashboard() {
                             <div style="direction: vertical; width: fill; padding: 20 24; gap: 12; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
                                 <div style="direction: horizontal; justify: space-between; height: hug; width: fill">
                                     <div style="font-size: 13px; color: #71717a; height: hug; width: hug">"Daily Spending"</div>
-                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">{format("${} / ${}", self.dp(self.daily_spent), self.dp(self.daily_limit))}</div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">{format("${} / ${}", self.daily_spent / 100, self.daily_limit / 100)}</div>
                                 </div>
                                 // Progress bar
                                 <div style="height: 6px; width: fill; background-color: #27272a; border-radius: 3">
@@ -767,7 +767,7 @@ component UnitDashboard() {
                             <div style="direction: vertical; width: fill; padding: 20 24; gap: 12; height: hug">
                                 <div style="direction: horizontal; justify: space-between; height: hug; width: fill">
                                     <div style="font-size: 13px; color: #71717a; height: hug; width: hug">"Monthly Spending"</div>
-                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">{format("${} / ${}", self.dp(self.monthly_spent), self.dp(self.monthly_limit))}</div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; height: hug; width: hug">{format("${} / ${}", self.monthly_spent / 100, self.monthly_limit / 100)}</div>
                                 </div>
                                 // Progress bar
                                 <div style="height: 6px; width: fill; background-color: #27272a; border-radius: 3">
