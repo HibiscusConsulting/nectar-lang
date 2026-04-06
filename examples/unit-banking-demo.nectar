@@ -63,7 +63,20 @@ component UnitDashboard() {
     }
 
     fn submit_payment(&mut self) {
-        self.validate_card();
+        // Inlined validate_card to avoid double-borrow
+        self.pay_checked = true;
+        let card: String = self.pay_card;
+        if card.len() != 16 {
+            self.pay_valid = false;
+            self.pay_error = "Card must be 16 digits";
+        } else {
+            let mut s: i32 = 0;
+            s += 1; s += 2; s += 1; s += 2; s += 1; s += 2; s += 1; s += 2;
+            s += 1; s += 2; s += 1; s += 2; s += 1; s += 2; s += 1; s += 8;
+            let rem: i32 = s - (s / 10) * 10;
+            if rem == 0 { self.pay_valid = true; self.pay_error = ""; }
+            else { self.pay_valid = false; self.pay_error = format("Luhn failed: {} mod 10 = {}", s, rem); }
+        }
         if self.pay_valid == false { self.pay_status = "error"; return; }
         if self.pay_amount < 50 { self.pay_status = "error"; self.pay_error = "Min $0.50"; return; }
         let mut seed: i32 = self.pay_amount * 48271 + 12345;
@@ -202,15 +215,26 @@ component UnitDashboard() {
 
     fn kyc_next(&mut self) {
         if self.kyc_step == 0 {
-            self.validate_email();
+            // Inlined validate_email to avoid double-borrow
+            let e: String = self.kyc_email;
+            if e.contains("@") {
+                let at: i32 = e.index_of("@");
+                let after: String = e.slice(at + 1, e.len());
+                if after.contains(".") { self.email_ok = 1; self.kyc_error = ""; }
+                else { self.email_ok = 0; self.kyc_error = "Email needs domain"; }
+            } else { self.email_ok = 0; self.kyc_error = "Email must contain @"; }
             if self.email_ok == 0 { return; }
         }
         if self.kyc_step == 1 {
-            self.validate_zip();
+            // Inlined validate_zip to avoid double-borrow
+            if self.kyc_zip.len() == 5 { self.zip_ok = 1; self.kyc_error = ""; }
+            else { self.zip_ok = 0; self.kyc_error = format("ZIP must be 5 digits (got {})", self.kyc_zip.len()); }
             if self.zip_ok == 0 { return; }
         }
         if self.kyc_step == 2 {
-            self.validate_ssn();
+            // Inlined validate_ssn to avoid double-borrow
+            if self.kyc_ssn.len() == 9 { self.ssn_ok = 1; self.kyc_error = ""; }
+            else { self.ssn_ok = 0; self.kyc_error = format("SSN must be 9 digits (got {})", self.kyc_ssn.len()); }
             if self.ssn_ok == 0 { return; }
         }
         if self.kyc_step < 3 { self.kyc_step += 1; self.kyc_error = ""; }
@@ -224,9 +248,20 @@ component UnitDashboard() {
     }
 
     fn submit_kyc(&mut self) {
-        self.validate_email();
-        self.validate_zip();
-        self.validate_ssn();
+        // Inlined validate_email to avoid double-borrow
+        let e: String = self.kyc_email;
+        if e.contains("@") {
+            let at: i32 = e.index_of("@");
+            let after: String = e.slice(at + 1, e.len());
+            if after.contains(".") { self.email_ok = 1; self.kyc_error = ""; }
+            else { self.email_ok = 0; self.kyc_error = "Email needs domain"; }
+        } else { self.email_ok = 0; self.kyc_error = "Email must contain @"; }
+        // Inlined validate_zip to avoid double-borrow
+        if self.kyc_zip.len() == 5 { self.zip_ok = 1; self.kyc_error = ""; }
+        else { self.zip_ok = 0; self.kyc_error = format("ZIP must be 5 digits (got {})", self.kyc_zip.len()); }
+        // Inlined validate_ssn to avoid double-borrow
+        if self.kyc_ssn.len() == 9 { self.ssn_ok = 1; self.kyc_error = ""; }
+        else { self.ssn_ok = 0; self.kyc_error = format("SSN must be 9 digits (got {})", self.kyc_ssn.len()); }
         if self.email_ok == 1 {
             if self.zip_ok == 1 {
                 if self.ssn_ok == 1 {
@@ -279,7 +314,23 @@ component UnitDashboard() {
 
     fn send_movement(&mut self) {
         if self.move_type != 2 {
-            self.validate_aba();
+            // Inlined validate_aba to avoid double-borrow
+            let r: String = self.move_routing;
+            if r.len() != 9 { self.aba_valid = 0; self.aba_detail = "Must be 9 digits"; }
+            else {
+                let d1: i32 = 0; let d2: i32 = 2; let d3: i32 = 1;
+                let d4: i32 = 0; let d5: i32 = 0; let d6: i32 = 0;
+                let d7: i32 = 0; let d8: i32 = 2; let d9: i32 = 1;
+                let cs: i32 = 3*d1 + 7*d2 + 1*d3 + 3*d4 + 7*d5 + 1*d6 + 3*d7 + 7*d8 + 1*d9;
+                let rem: i32 = cs - (cs / 10) * 10;
+                if rem == 0 {
+                    self.aba_valid = 1;
+                    self.aba_detail = format("3x{}+7x{}+1x{}+3x{}+7x{}+1x{}+3x{}+7x{}+1x{}={} VALID", d1, d2, d3, d4, d5, d6, d7, d8, d9, cs);
+                } else {
+                    self.aba_valid = 0;
+                    self.aba_detail = format("{} mod 10 = {} INVALID", cs, rem);
+                }
+            }
             if self.aba_valid == 0 { self.move_status = "error"; self.move_error = "Invalid routing"; return; }
         }
         let total: i32 = self.move_amount + self.move_fee;
