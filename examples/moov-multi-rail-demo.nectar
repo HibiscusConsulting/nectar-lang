@@ -947,7 +947,7 @@ component MoovMultiRailDemo() {
             </div>
 
             // ========== CONTENT ==========
-            <div style="direction: vertical; width: fill; padding: 28 32; gap: 20; max-width: 1100px; align: center; scroll: true">
+            <div style="direction: vertical; width: fill; height: fill; padding: 28 32; gap: 20; max-width: 1100px; scroll: true">
 
                 // ====================================================
                 // TAB 0: MULTI-RAIL TRANSFER ENGINE

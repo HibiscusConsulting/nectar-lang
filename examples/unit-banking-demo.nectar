@@ -368,64 +368,109 @@ component UnitDashboard() {
 
             // Title bar
             <div style="direction: vertical; width: fill; padding: 20px 32px; gap: 4px; background-color: #0d1117; border-width: 0px 0px 1px 0px; border-color: #27272a;">
-                <span style="width: hug; height: hug; font-size: 24px; font-weight: 800; color: #22d3ee;">"Unit | Nectar"</span>
-                <span style="width: hug; height: hug; font-size: 13px; color: #71717a;">"Banking-as-a-Service — zero JavaScript"</span>
+                <div style="width: hug; height: hug; font-size: 24px; font-weight: 800; color: #22d3ee;">"Unit | Nectar"</div>
+                <div style="width: hug; height: hug; font-size: 13px; color: #71717a;">"Banking-as-a-Service — zero JavaScript"</div>
             </div>
 
             // Tab bar
-            <div style="direction: horizontal; width: fill; padding: 0px 32px; gap: 0px; background-color: #09090b; border-width: 0px 0px 1px 0px; border-color: #27272a;">
-                <button style="width: hug; height: hug; min-height: 44px; padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 0px; background-color: {if self.active_tab == 0 { #22d3ee } else { #09090b }}; color: {if self.active_tab == 0 { #09090b } else { #a1a1aa }};" on:click={self.show_payments}>"Payments"</button>
-                <button style="width: hug; height: hug; min-height: 44px; padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 0px; background-color: {if self.active_tab == 1 { #22d3ee } else { #09090b }}; color: {if self.active_tab == 1 { #09090b } else { #a1a1aa }};" on:click={self.show_banking}>"Banking"</button>
-                <button style="width: hug; height: hug; min-height: 44px; padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 0px; background-color: {if self.active_tab == 2 { #22d3ee } else { #09090b }}; color: {if self.active_tab == 2 { #09090b } else { #a1a1aa }};" on:click={self.show_cards}>"Cards"</button>
-                <button style="width: hug; height: hug; min-height: 44px; padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 0px; background-color: {if self.active_tab == 3 { #22d3ee } else { #09090b }}; color: {if self.active_tab == 3 { #09090b } else { #a1a1aa }};" on:click={self.show_kyc}>"KYC"</button>
-                <button style="width: hug; height: hug; min-height: 44px; padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 0px; background-color: {if self.active_tab == 4 { #22d3ee } else { #09090b }}; color: {if self.active_tab == 4 { #09090b } else { #a1a1aa }};" on:click={self.show_movement}>"Movement"</button>
+            <div style="direction: horizontal; width: fill; padding: 0 32; gap: 0; background-color: #09090b; border-width: 0 0 1 0; border-color: #27272a">
+                {if self.active_tab == 0 {
+                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_payments}>
+                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Payments"</div>
+                    </div>
+                }}
+                {if self.active_tab != 0 {
+                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_payments}>
+                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Payments"</div>
+                    </div>
+                }}
+                {if self.active_tab == 1 {
+                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_banking}>
+                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Banking"</div>
+                    </div>
+                }}
+                {if self.active_tab != 1 {
+                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_banking}>
+                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Banking"</div>
+                    </div>
+                }}
+                {if self.active_tab == 2 {
+                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_cards}>
+                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Cards"</div>
+                    </div>
+                }}
+                {if self.active_tab != 2 {
+                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_cards}>
+                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Cards"</div>
+                    </div>
+                }}
+                {if self.active_tab == 3 {
+                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_kyc}>
+                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"KYC"</div>
+                    </div>
+                }}
+                {if self.active_tab != 3 {
+                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_kyc}>
+                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"KYC"</div>
+                    </div>
+                }}
+                {if self.active_tab == 4 {
+                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_movement}>
+                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Movement"</div>
+                    </div>
+                }}
+                {if self.active_tab != 4 {
+                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_movement}>
+                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Movement"</div>
+                    </div>
+                }}
             </div>
 
             // Content area
-            <div style="direction: vertical; width: fill; max-width: 1100px; padding: 28px 32px; gap: 16px; align: center;">
+            <div style="direction: vertical; width: fill; height: fill; max-width: 1100px; padding: 28 32; gap: 16; scroll: true">
 
                 // TAB 0: PAYMENT ACCEPTANCE
                 {if self.active_tab == 0 {
                     <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
-                        <span style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Accept Payment"</span>
-                        <span style="width: hug; height: hug; font-size: 12px; color: #71717a;">"Luhn-validated card acceptance — all validation in WASM"</span>
+                        <div style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Accept Payment"</div>
+                        <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"Luhn-validated card acceptance — all validation in WASM"</div>
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                            <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Card"</span>
-                            <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.pay_card}</span>
+                            <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Card"</div>
+                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.pay_card}</div>
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                            <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</span>
-                            <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.pay_amount))}"."
+                            <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</div>
+                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.pay_amount))}"."
                                 {if self.cp(self.pay_amount) < 10 { "0"{format("{}", self.cp(self.pay_amount))} } else { {format("{}", self.cp(self.pay_amount))} }}
-                            </span>
+                            </div>
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.pay_down}>"-$5"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.pay_up}>"+$5"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.validate_card}>"Validate"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.submit_payment}>"Charge"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_payment}>"Reset"</button>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.pay_down}>"-$5"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.pay_up}>"+$5"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.validate_card}>"Validate"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.submit_payment}>"Charge"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_payment}>"Reset"</div>
                         </div>
                         {if self.pay_checked == true {
                             <div style="direction: vertical; width: fill; gap: 4px;">
-                                {if self.pay_valid == true { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Luhn passed"</span> } else { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.pay_error}</span> }}
+                                {if self.pay_valid == true { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Luhn passed"</div> } else { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.pay_error}</div> }}
                             </div>
                         }}
                         {if self.pay_status == "success" {
                             <div style="direction: vertical; width: fill; gap: 8px;">
                                 <div style="width: fill; height: 1px; background-color: #27272a;"></div>
-                                <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Authorized"</span>
+                                <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Authorized"</div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Auth"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.pay_auth)}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Auth"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.pay_auth)}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Count"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.pay_count)}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Count"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.pay_count)}</div>
                                 </div>
                             </div>
                         }}
-                        {if self.pay_status == "error" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.pay_error}</span> }}
+                        {if self.pay_status == "error" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.pay_error}</div> }}
                     </div>
                 }}
 
@@ -435,53 +480,53 @@ component UnitDashboard() {
                         // Account balances
                         <div style="direction: horizontal; width: fill; gap: 16px; wrap: true;">
                             <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 4px; border-width: 1px; border-color: #27272a;">
-                                <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"CHECKING"</span>
-                                <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.checking_bal))}"."
+                                <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"CHECKING"</div>
+                                <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.checking_bal))}"."
                                     {if self.cp(self.checking_bal) < 10 { "0"{format("{}", self.cp(self.checking_bal))} } else { {format("{}", self.cp(self.checking_bal))} }}
-                                </span>
+                                </div>
                             </div>
                             <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 4px; border-width: 1px; border-color: #27272a;">
-                                <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"SAVINGS"</span>
-                                <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.savings_bal))}"."
+                                <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"SAVINGS"</div>
+                                <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.savings_bal))}"."
                                     {if self.cp(self.savings_bal) < 10 { "0"{format("{}", self.cp(self.savings_bal))} } else { {format("{}", self.cp(self.savings_bal))} }}
-                                </span>
+                                </div>
                             </div>
                         </div>
                         // Transaction ledger card
                         <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
-                            <span style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Transaction Ledger"</span>
-                            <span style="width: hug; height: hug; font-size: 12px; color: #71717a;">"10K txns — amount = ((i*7+13) % 50000) - 25000"</span>
+                            <div style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Transaction Ledger"</div>
+                            <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"10K txns — amount = ((i*7+13) % 50000) - 25000"</div>
                             <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.generate_transactions}>"Generate 10K"</button>
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }};" on:click={self.filter_all_tx}>"All"</button>
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }};" on:click={self.filter_debits}>"Debits"</button>
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }};" on:click={self.filter_credits}>"Credits"</button>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.generate_transactions}>"Generate 10K"</div>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 0 { #22d3ee } else { #27272a }};" on:click={self.filter_all_tx}>"All"</div>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 1 { #22d3ee } else { #27272a }};" on:click={self.filter_debits}>"Debits"</div>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }}; color: {if self.tx_filter == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.tx_filter == 2 { #22d3ee } else { #27272a }};" on:click={self.filter_credits}>"Credits"</div>
                             </div>
                             {if self.tx_generated == true {
                                 <div style="direction: vertical; width: fill; gap: 12px;">
                                     <div style="direction: horizontal; width: fill; gap: 16px; wrap: true;">
                                         <div style="direction: vertical; width: fill; background-color: #27272a; border-radius: 8px; padding: 16px; gap: 4px;">
-                                            <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"TRANSACTIONS"</span>
-                                            <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">{format("{}", self.tx_count)}</span>
+                                            <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"TRANSACTIONS"</div>
+                                            <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">{format("{}", self.tx_count)}</div>
                                         </div>
                                         <div style="direction: vertical; width: fill; background-color: #27272a; border-radius: 8px; padding: 16px; gap: 4px;">
-                                            <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"SHOWING"</span>
-                                            <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">{format("{}", self.tx_display_count)}</span>
+                                            <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"SHOWING"</div>
+                                            <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">{format("{}", self.tx_display_count)}</div>
                                         </div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; gap: 16px; wrap: true;">
                                         <div style="direction: vertical; width: fill; background-color: #27272a; border-radius: 8px; padding: 16px; gap: 4px;">
-                                            <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"DEBITS"</span>
-                                            <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.tx_debit_total))}" ("{format("{}", self.tx_debit_count)}")"</span>
+                                            <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"DEBITS"</div>
+                                            <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.tx_debit_total))}" ("{format("{}", self.tx_debit_count)}")"</div>
                                         </div>
                                         <div style="direction: vertical; width: fill; background-color: #27272a; border-radius: 8px; padding: 16px; gap: 4px;">
-                                            <span style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"CREDITS"</span>
-                                            <span style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.tx_credit_total))}" ("{format("{}", self.tx_credit_count)}")"</span>
+                                            <div style="width: hug; height: hug; font-size: 11px; font-weight: 600; color: #71717a;">"CREDITS"</div>
+                                            <div style="width: hug; height: hug; font-size: 22px; font-weight: 700; color: #fafafa;">"$"{format("{}", self.dp(self.tx_credit_total))}" ("{format("{}", self.tx_credit_count)}")"</div>
                                         </div>
                                     </div>
                                     <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                        <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Running Balance"</span>
-                                        <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.tx_running_bal))}</span>
+                                        <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Running Balance"</div>
+                                        <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.tx_running_bal))}</div>
                                     </div>
                                 </div>
                             }}
@@ -494,47 +539,47 @@ component UnitDashboard() {
                     <div style="direction: vertical; width: fill; gap: 16px;">
                         // Card visual
                         <div style="direction: vertical; width: fill; background-color: #1e1b4b; border-radius: 16px; padding: 28px; gap: 16px;">
-                            <span style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"UNIT DEBIT"</span>
-                            <span style="width: hug; height: hug; font-size: 22px; font-weight: 600; color: #e0e7ff;">"**** **** **** "{self.card_last4}</span>
+                            <div style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"UNIT DEBIT"</div>
+                            <div style="width: hug; height: hug; font-size: 22px; font-weight: 600; color: #e0e7ff;">"**** **** **** "{self.card_last4}</div>
                             <div style="direction: horizontal; width: fill; gap: 40px;">
                                 <div style="direction: vertical; gap: 2px;">
-                                    <span style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"EXPIRES"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #e0e7ff;">"11/2028"</span>
+                                    <div style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"EXPIRES"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #e0e7ff;">"11/2028"</div>
                                 </div>
                                 <div style="direction: vertical; gap: 2px;">
-                                    <span style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"CVV"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #e0e7ff;">{if self.cvv_visible == 1 { {format("{}", self.card_cvv)} } else { "***" }}</span>
+                                    <div style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"CVV"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #e0e7ff;">{if self.cvv_visible == 1 { {format("{}", self.card_cvv)} } else { "***" }}</div>
                                 </div>
                                 <div style="direction: vertical; gap: 2px;">
-                                    <span style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"STATUS"</span>
-                                    {if self.card_frozen == 1 { <span style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #f59e0b;">"FROZEN"</span> } else { <span style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #22c55e;">"ACTIVE"</span> }}
+                                    <div style="width: hug; height: hug; font-size: 10px; font-weight: 600; color: #818cf8;">"STATUS"</div>
+                                    {if self.card_frozen == 1 { <div style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #f59e0b;">"FROZEN"</div> } else { <div style="width: hug; height: hug; font-size: 14px; font-weight: 600; color: #22c55e;">"ACTIVE"</div> }}
                                 </div>
                             </div>
                         </div>
                         // Card actions
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.toggle_cvv}>{if self.cvv_visible == 1 { "Hide CVV" } else { "Reveal CVV" }}</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }}; color: #fafafa; border-width: 1px; border-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }};" on:click={self.toggle_freeze}>{if self.card_frozen == 1 { "Unfreeze" } else { "Freeze" }}</button>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.toggle_cvv}>{if self.cvv_visible == 1 { "Hide CVV" } else { "Reveal CVV" }}</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }}; color: #fafafa; border-width: 1px; border-color: {if self.card_frozen == 1 { #16a34a } else { #dc2626 }};" on:click={self.toggle_freeze}>{if self.card_frozen == 1 { "Unfreeze" } else { "Freeze" }}</div>
                         </div>
                         // Spending limits card
                         <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
-                            <span style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Spending Limits"</span>
+                            <div style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Spending Limits"</div>
                             <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Daily"</span>
-                                <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.daily_spent))}" / $"{format("{}", self.dp(self.daily_limit))}</span>
+                                <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Daily"</div>
+                                <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.daily_spent))}" / $"{format("{}", self.dp(self.daily_limit))}</div>
                             </div>
                             <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.daily_down}>"-$500"</button>
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.daily_up}>"+$500"</button>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.daily_down}>"-$500"</div>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.daily_up}>"+$500"</div>
                             </div>
                             <div style="width: fill; height: 1px; background-color: #27272a;"></div>
                             <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Monthly"</span>
-                                <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.monthly_spent))}" / $"{format("{}", self.dp(self.monthly_limit))}</span>
+                                <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Monthly"</div>
+                                <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.monthly_spent))}" / $"{format("{}", self.dp(self.monthly_limit))}</div>
                             </div>
                             <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.monthly_down}>"-$5K"</button>
-                                <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.monthly_up}>"+$5K"</button>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.monthly_down}>"-$5K"</div>
+                                <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.monthly_up}>"+$5K"</div>
                             </div>
                         </div>
                     </div>
@@ -543,29 +588,29 @@ component UnitDashboard() {
                 // TAB 3: KYC
                 {if self.active_tab == 3 {
                     <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
-                        <span style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"KYC Onboarding"</span>
-                        <span style="width: hug; height: hug; font-size: 12px; color: #71717a;">"4-step identity verification — all validation in WASM"</span>
+                        <div style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"KYC Onboarding"</div>
+                        <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"4-step identity verification — all validation in WASM"</div>
                         // Step indicators
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <span style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 0 { #22d3ee } else { if self.kyc_step > 0 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 0 { #09090b } else { if self.kyc_step > 0 { #fafafa } else { #71717a } }};">"1. Personal"</span>
-                            <span style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 1 { #22d3ee } else { if self.kyc_step > 1 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 1 { #09090b } else { if self.kyc_step > 1 { #fafafa } else { #71717a } }};">"2. Address"</span>
-                            <span style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 2 { #22d3ee } else { if self.kyc_step > 2 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 2 { #09090b } else { if self.kyc_step > 2 { #fafafa } else { #71717a } }};">"3. Identity"</span>
-                            <span style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 3 { #22d3ee } else { #27272a }}; color: {if self.kyc_step == 3 { #09090b } else { #71717a }};">"4. Review"</span>
+                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 0 { #22d3ee } else { if self.kyc_step > 0 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 0 { #09090b } else { if self.kyc_step > 0 { #fafafa } else { #71717a } }};">"1. Personal"</div>
+                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 1 { #22d3ee } else { if self.kyc_step > 1 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 1 { #09090b } else { if self.kyc_step > 1 { #fafafa } else { #71717a } }};">"2. Address"</div>
+                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 2 { #22d3ee } else { if self.kyc_step > 2 { #16a34a } else { #27272a } }}; color: {if self.kyc_step == 2 { #09090b } else { if self.kyc_step > 2 { #fafafa } else { #71717a } }};">"3. Identity"</div>
+                            <div style="width: hug; height: hug; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.kyc_step == 3 { #22d3ee } else { #27272a }}; color: {if self.kyc_step == 3 { #09090b } else { #71717a }};">"4. Review"</div>
                         </div>
                         // Step 0: Personal
                         {if self.kyc_step == 0 {
                             <div style="direction: vertical; width: fill; gap: 6px;">
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Name"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_fname}" "{self.kyc_lname}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Name"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_fname}" "{self.kyc_lname}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Email"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_email}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Email"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_email}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Phone"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_phone}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Phone"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_phone}</div>
                                 </div>
                             </div>
                         }}
@@ -573,16 +618,16 @@ component UnitDashboard() {
                         {if self.kyc_step == 1 {
                             <div style="direction: vertical; width: fill; gap: 6px;">
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Address"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_addr}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Address"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_addr}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"City/State"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_city}", "{self.kyc_state}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"City/State"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_city}", "{self.kyc_state}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"ZIP"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_zip}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"ZIP"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_zip}</div>
                                 </div>
                             </div>
                         }}
@@ -590,12 +635,12 @@ component UnitDashboard() {
                         {if self.kyc_step == 2 {
                             <div style="direction: vertical; width: fill; gap: 6px;">
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"SSN"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"***-**-"{self.kyc_ssn.slice(5, 9)}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"SSN"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"***-**-"{self.kyc_ssn.slice(5, 9)}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"DOB"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_dob}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"DOB"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_dob}</div>
                                 </div>
                             </div>
                         }}
@@ -603,93 +648,93 @@ component UnitDashboard() {
                         {if self.kyc_step == 3 {
                             <div style="direction: vertical; width: fill; gap: 6px;">
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Name"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_fname}" "{self.kyc_lname}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Name"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_fname}" "{self.kyc_lname}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Email"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_email}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Email"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_email}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Address"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_addr}", "{self.kyc_city}", "{self.kyc_state}" "{self.kyc_zip}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Address"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.kyc_addr}", "{self.kyc_city}", "{self.kyc_state}" "{self.kyc_zip}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"SSN"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"***-**-"{self.kyc_ssn.slice(5, 9)}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"SSN"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"***-**-"{self.kyc_ssn.slice(5, 9)}</div>
                                 </div>
                             </div>
                         }}
-                        {if self.kyc_error.len() > 0 { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.kyc_error}</span> }}
+                        {if self.kyc_error.len() > 0 { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.kyc_error}</div> }}
                         <div style="width: fill; height: 1px; background-color: #27272a;"></div>
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            {if self.kyc_step > 0 { <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.kyc_back}>"Back"</button> }}
-                            {if self.kyc_step < 3 { <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.kyc_next}>"Next"</button> }}
-                            {if self.kyc_step == 3 { <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #16a34a; color: #fafafa; border-width: 1px; border-color: #16a34a;" on:click={self.submit_kyc}>"Submit"</button> }}
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_kyc}>"Reset"</button>
+                            {if self.kyc_step > 0 { <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.kyc_back}>"Back"</div> }}
+                            {if self.kyc_step < 3 { <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.kyc_next}>"Next"</div> }}
+                            {if self.kyc_step == 3 { <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #16a34a; color: #fafafa; border-width: 1px; border-color: #16a34a;" on:click={self.submit_kyc}>"Submit"</div> }}
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_kyc}>"Reset"</div>
                         </div>
-                        {if self.kyc_status == "submitted" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"KYC submitted successfully"</span> }}
+                        {if self.kyc_status == "submitted" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"KYC submitted successfully"</div> }}
                     </div>
                 }}
 
                 // TAB 4: MONEY MOVEMENT
                 {if self.active_tab == 4 {
                     <div style="direction: vertical; width: fill; background-color: #18181b; border-radius: 12px; padding: 20px; gap: 12px; border-width: 1px; border-color: #27272a;">
-                        <span style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Money Movement"</span>
-                        <span style="width: hug; height: hug; font-size: 12px; color: #71717a;">"ACH (ABA 3-7-1), wire, book transfer — all WASM"</span>
+                        <div style="width: hug; height: hug; font-size: 16px; font-weight: 600; color: #fafafa;">"Money Movement"</div>
+                        <div style="width: hug; height: hug; font-size: 12px; color: #71717a;">"ACH (ABA 3-7-1), wire, book transfer — all WASM"</div>
                         // Transfer type buttons
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 0 { #22d3ee } else { #27272a }}; color: {if self.move_type == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 0 { #22d3ee } else { #27272a }};" on:click={self.set_ach}>"ACH"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 1 { #22d3ee } else { #27272a }}; color: {if self.move_type == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 1 { #22d3ee } else { #27272a }};" on:click={self.set_wire}>"Wire ($25)"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 2 { #22d3ee } else { #27272a }}; color: {if self.move_type == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 2 { #22d3ee } else { #27272a }};" on:click={self.set_book}>"Book"</button>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 0 { #22d3ee } else { #27272a }}; color: {if self.move_type == 0 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 0 { #22d3ee } else { #27272a }};" on:click={self.set_ach}>"ACH"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 1 { #22d3ee } else { #27272a }}; color: {if self.move_type == 1 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 1 { #22d3ee } else { #27272a }};" on:click={self.set_wire}>"Wire ($25)"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: {if self.move_type == 2 { #22d3ee } else { #27272a }}; color: {if self.move_type == 2 { #09090b } else { #a1a1aa }}; border-width: 1px; border-color: {if self.move_type == 2 { #22d3ee } else { #27272a }};" on:click={self.set_book}>"Book"</div>
                         </div>
                         // Amount
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                            <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</span>
-                            <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.move_amount))}"."
+                            <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</div>
+                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.move_amount))}"."
                                 {if self.cp(self.move_amount) < 10 { "0"{format("{}", self.cp(self.move_amount))} } else { {format("{}", self.cp(self.move_amount))} }}
-                            </span>
+                            </div>
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.move_down}>"-$100"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.move_up}>"+$100"</button>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.move_down}>"-$100"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.move_up}>"+$100"</div>
                         </div>
                         // Routing info (non-book transfers)
                         {if self.move_type != 2 {
                             <div style="direction: vertical; width: fill; gap: 6px;">
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Routing (ABA)"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.move_routing}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Routing (ABA)"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.move_routing}</div>
                                 </div>
                                 <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                                    <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Destination"</span>
-                                    <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.move_dest}</span>
+                                    <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Destination"</div>
+                                    <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{self.move_dest}</div>
                                 </div>
                             </div>
                         }}
                         // Action buttons
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.validate_aba}>"Validate ABA"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.send_movement}>"Send"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.settle}>"Settle"</button>
-                            <button style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_move}>"Reset"</button>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.validate_aba}>"Validate ABA"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #22d3ee; color: #09090b; border-width: 1px; border-color: #22d3ee;" on:click={self.send_movement}>"Send"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.settle}>"Settle"</div>
+                            <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.reset_move}>"Reset"</div>
                         </div>
                         // ABA validation result
                         {if self.aba_detail.len() > 0 {
                             <div style="direction: vertical; width: fill; gap: 4px;">
-                                {if self.aba_valid == 1 { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">{self.aba_detail}</span> } else { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.aba_detail}</span> }}
+                                {if self.aba_valid == 1 { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">{self.aba_detail}</div> } else { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.aba_detail}</div> }}
                             </div>
                         }}
                         // Status messages
-                        {if self.move_status == "ach_pending" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #f59e0b;">"ACH pending"</span> }}
-                        {if self.move_status == "ach_settled" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"ACH settled"</span> }}
-                        {if self.move_status == "wire_sent" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Wire sent — same-day"</span> }}
-                        {if self.move_status == "book_done" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Book transfer complete"</span> }}
-                        {if self.move_status == "error" { <span style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.move_error}</span> }}
+                        {if self.move_status == "ach_pending" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #f59e0b;">"ACH pending"</div> }}
+                        {if self.move_status == "ach_settled" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"ACH settled"</div> }}
+                        {if self.move_status == "wire_sent" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Wire sent — same-day"</div> }}
+                        {if self.move_status == "book_done" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #22c55e;">"Book transfer complete"</div> }}
+                        {if self.move_status == "error" { <div style="width: hug; height: hug; font-size: 13px; font-weight: 600; color: #ef4444;">{self.move_error}</div> }}
                         <div style="width: fill; height: 1px; background-color: #27272a;"></div>
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
-                            <span style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Transfers"</span>
-                            <span style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.move_count)}</span>
+                            <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Transfers"</div>
+                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">{format("{}", self.move_count)}</div>
                         </div>
                     </div>
                 }}
