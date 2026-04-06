@@ -1295,8 +1295,11 @@ impl RustCodegen {
                     .filter(|f| !conditional_fields.contains(f))
                     .cloned().collect();
 
-                if !conditional_fields.is_empty() {
+                if false && !conditional_fields.is_empty() {
                     // Reactive conditional toggle — O(1) visibility, no tree rebuild
+                    // DISABLED: nested conditionals inside toggled blocks don't update
+                    // correctly. Full tree rebuild is correct; re-enable when nested
+                    // conditional visibility propagation is implemented.
                     self.line("// Reactive conditional toggle — O(1) visibility, no tree rebuild");
                     for field in &conditional_fields {
                         self.line(&format!(
@@ -1317,8 +1320,10 @@ impl RustCodegen {
                             field
                         ));
                     }
-                } else if !modified_fields.is_empty() {
+                } else if false && !modified_fields.is_empty() {
                     // Simple text-only update — no visibility change, no rebuild
+                    // DISABLED: complex format expressions with interdependent fields
+                    // can't be replicated by simple {} text replacement.
                     self.line("// Simple state update — targeted text binding updates (no tree rebuild)");
                     for field in &modified_fields {
                         self.line(&format!(
