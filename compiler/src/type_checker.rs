@@ -1974,6 +1974,9 @@ impl TypeChecker {
                 Item::Payment(def) => {
                     self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
                 }
+                Item::MiniProgram(def) => {
+                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                }
                 Item::Banking(def) => {
                     self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
                 }
@@ -2131,6 +2134,14 @@ impl TypeChecker {
                     if let Some(ref f) = auth.on_login { self.check_function(f, &mut env); }
                     if let Some(ref f) = auth.on_logout { self.check_function(f, &mut env); }
                     if let Some(ref f) = auth.on_error { self.check_function(f, &mut env); }
+                }
+                Item::MiniProgram(mp) => {
+                    for method in &mp.methods {
+                        self.check_function(method, &mut env);
+                    }
+                    if let Some(ref f) = mp.on_launch { self.check_function(f, &mut env); }
+                    if let Some(ref f) = mp.on_show { self.check_function(f, &mut env); }
+                    if let Some(ref f) = mp.on_hide { self.check_function(f, &mut env); }
                 }
                 Item::Upload(upload) => {
                     for method in &upload.methods {
@@ -7592,6 +7603,12 @@ mod coverage_type_checker_tests {
                 name: "T".into(), light: None, dark: None, dark_auto: false,
                 primary: None, is_pub: false, span: span(),
             }),
+            Item::MiniProgram(MiniProgramDef {
+                name: "MP".into(), payment_provider: None, auth_provider: None,
+                map_provider: None, offline: false, cache_strategy: None,
+                on_launch: None, on_show: None, on_hide: None,
+                methods: vec![], is_pub: false, span: span(),
+            }),
             Item::Animation(AnimationBlockDef {
                 name: "A".into(), kind: AnimationKind::Spring {
                     stiffness: None, damping: None, mass: None, properties: vec![],
@@ -8388,6 +8405,66 @@ mod coverage_type_checker_tests {
         })]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "payment with valid handler should pass: {:?}", result.err());
+    }
+
+    #[test]
+    fn miniprogram_type_check_passes() {
+        let prog = program(vec![Item::MiniProgram(MiniProgramDef {
+            name: "TestMP".into(),
+            payment_provider: Some("moov".into()),
+            auth_provider: None,
+            map_provider: None,
+            offline: false,
+            cache_strategy: None,
+            on_launch: Some(Function {
+                name: "onLaunch".into(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![Param {
+                    name: "options".into(),
+                    ty: Type::Named("String".into()),
+                    ownership: Ownership::Owned,
+                    secret: false,
+                }],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                    span: span(),
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            }),
+            on_show: None,
+            on_hide: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "miniprogram with valid lifecycle hook should pass: {:?}", result.err());
+    }
+
+    #[test]
+    fn miniprogram_registers_struct_name() {
+        let prog = program(vec![Item::MiniProgram(MiniProgramDef {
+            name: "AppMP".into(),
+            payment_provider: None,
+            auth_provider: None,
+            map_provider: None,
+            offline: false,
+            cache_strategy: None,
+            on_launch: None,
+            on_show: None,
+            on_hide: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "miniprogram should register as struct name: {:?}", result.err());
     }
 
     // ── Fix 3: Vec<T> unifies with array literals ─────────────────────────

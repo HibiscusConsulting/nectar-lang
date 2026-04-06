@@ -120,6 +120,7 @@ impl StdLib {
         stdlib.register_wizard_functions();
         stdlib.register_rtc_functions();
         stdlib.register_gpu_functions();
+        stdlib.register_miniprogram_functions();
         stdlib
     }
 
@@ -3678,6 +3679,294 @@ impl StdLib {
         for f in fns { self.register_fn(f); }
     }
 
+    fn register_miniprogram_functions(&mut self) {
+        let string_ty = Type::Named("String".into());
+        let i32_ty = Type::Named("i32".into());
+        let unit_ty = Type::Named("Unit".into());
+
+        let fns = vec![
+            // ── Storage (aliases existing localStorage) ──
+            BuiltinFn {
+                name: "mp_setStorageSync".into(),
+                params: vec![
+                    BuiltinParam { name: "key".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "value".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Store a key-value pair in local storage. Aliases webapi localStorage.".into(),
+            },
+            BuiltinFn {
+                name: "mp_getStorageSync".into(),
+                params: vec![BuiltinParam { name: "key".into(), ty: string_ty.clone() }],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Read a value from local storage by key. Aliases webapi localStorage.".into(),
+            },
+            BuiltinFn {
+                name: "mp_removeStorageSync".into(),
+                params: vec![BuiltinParam { name: "key".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Remove a key from local storage. Aliases webapi localStorage.".into(),
+            },
+            BuiltinFn {
+                name: "mp_clearStorageSync".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Clear all local storage. Aliases webapi localStorage.".into(),
+            },
+            // ── Navigation ──
+            BuiltinFn {
+                name: "mp_navigateTo".into(),
+                params: vec![BuiltinParam { name: "url".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Navigate to a URL (push onto route stack). Aliases webapi pushState.".into(),
+            },
+            BuiltinFn {
+                name: "mp_navigateBack".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Navigate back one entry in the route stack.".into(),
+            },
+            BuiltinFn {
+                name: "mp_redirectTo".into(),
+                params: vec![BuiltinParam { name: "url".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Replace current route with a new URL.".into(),
+            },
+            BuiltinFn {
+                name: "mp_reLaunch".into(),
+                params: vec![BuiltinParam { name: "url".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Clear route stack and navigate to URL.".into(),
+            },
+            BuiltinFn {
+                name: "mp_switchTab".into(),
+                params: vec![BuiltinParam { name: "index".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Switch to a tab by index.".into(),
+            },
+            // ── UI/Feedback ──
+            BuiltinFn {
+                name: "mp_showToast".into(),
+                params: vec![
+                    BuiltinParam { name: "title".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "duration".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show a toast notification with title and duration (ms).".into(),
+            },
+            BuiltinFn {
+                name: "mp_hideToast".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Hide the current toast notification.".into(),
+            },
+            BuiltinFn {
+                name: "mp_showLoading".into(),
+                params: vec![BuiltinParam { name: "title".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show a loading indicator with title.".into(),
+            },
+            BuiltinFn {
+                name: "mp_hideLoading".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Hide the loading indicator.".into(),
+            },
+            BuiltinFn {
+                name: "mp_alert".into(),
+                params: vec![
+                    BuiltinParam { name: "title".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "content".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show an alert dialog with title and content. Callback on dismiss.".into(),
+            },
+            BuiltinFn {
+                name: "mp_confirm".into(),
+                params: vec![
+                    BuiltinParam { name: "title".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "content".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Show a confirm dialog. Callback receives confirm/cancel result.".into(),
+            },
+            // ── Device ──
+            BuiltinFn {
+                name: "mp_getSystemInfo".into(),
+                params: vec![],
+                return_type: string_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get system information (screen size, platform, etc.).".into(),
+            },
+            BuiltinFn {
+                name: "mp_getNetworkType".into(),
+                params: vec![BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get current network type (wifi/4g/none). Result via callback.".into(),
+            },
+            BuiltinFn {
+                name: "mp_setClipboard".into(),
+                params: vec![BuiltinParam { name: "text".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Copy text to clipboard. Aliases webapi clipboard.".into(),
+            },
+            BuiltinFn {
+                name: "mp_getClipboard".into(),
+                params: vec![BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Read text from clipboard. Result via callback.".into(),
+            },
+            BuiltinFn {
+                name: "mp_vibrate".into(),
+                params: vec![BuiltinParam { name: "duration".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Vibrate the device for given duration (ms). Aliases hardware vibrate.".into(),
+            },
+            BuiltinFn {
+                name: "mp_getLocation".into(),
+                params: vec![BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get current geolocation. Result via callback.".into(),
+            },
+            // ── Network ──
+            BuiltinFn {
+                name: "mp_request".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "method".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "body".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Make an HTTP request. Aliases http fetch.".into(),
+            },
+            BuiltinFn {
+                name: "mp_uploadFile".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "file_path".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Upload a file to a URL. Aliases upload start.".into(),
+            },
+            BuiltinFn {
+                name: "mp_downloadFile".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Download a file from a URL. Result via callback.".into(),
+            },
+            BuiltinFn {
+                name: "mp_connectSocket".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Open a WebSocket connection. Aliases ws connect.".into(),
+            },
+            BuiltinFn {
+                name: "mp_sendSocketMessage".into(),
+                params: vec![BuiltinParam { name: "msg".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Send a message on the WebSocket. Aliases ws send.".into(),
+            },
+            BuiltinFn {
+                name: "mp_closeSocket".into(),
+                params: vec![],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Close the WebSocket connection. Aliases ws close.".into(),
+            },
+            // ── Payment (routes through provider) ──
+            BuiltinFn {
+                name: "mp_tradePay".into(),
+                params: vec![
+                    BuiltinParam { name: "order_id".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "amount".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Initiate a payment. Routes through configured payment provider.".into(),
+            },
+            // ── Auth (routes through provider) ──
+            BuiltinFn {
+                name: "mp_getAuthCode".into(),
+                params: vec![
+                    BuiltinParam { name: "scopes".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get an auth code. Routes through configured auth provider.".into(),
+            },
+            BuiltinFn {
+                name: "mp_getUserInfo".into(),
+                params: vec![BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Get current user info. Routes through configured auth provider.".into(),
+            },
+            // ── Media ──
+            BuiltinFn {
+                name: "mp_chooseImage".into(),
+                params: vec![
+                    BuiltinParam { name: "count".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Open image picker. Result via callback.".into(),
+            },
+            BuiltinFn {
+                name: "mp_previewImage".into(),
+                params: vec![BuiltinParam { name: "url".into(), ty: string_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Preview an image URL in a fullscreen viewer.".into(),
+            },
+            BuiltinFn {
+                name: "mp_scan".into(),
+                params: vec![BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() }],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Open QR/barcode scanner. Result via callback.".into(),
+            },
+        ];
+        for f in fns { self.register_fn(f); }
+    }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -4279,6 +4568,81 @@ mod tests {
             assert!(!f.takes_self, "{} should not take self", name);
             assert!(!f.self_mutable, "{} should not be self_mutable", name);
         }
+    }
+
+    // -- MiniProgram functions ------------------------------------------------
+
+    #[test]
+    fn mp_storage_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_setStorageSync").is_some(), "mp_setStorageSync should be registered");
+        assert!(lib.lookup_fn("mp_getStorageSync").is_some(), "mp_getStorageSync should be registered");
+        assert!(lib.lookup_fn("mp_removeStorageSync").is_some(), "mp_removeStorageSync should be registered");
+        assert!(lib.lookup_fn("mp_clearStorageSync").is_some(), "mp_clearStorageSync should be registered");
+    }
+
+    #[test]
+    fn mp_navigation_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_navigateTo").is_some(), "mp_navigateTo should be registered");
+        assert!(lib.lookup_fn("mp_navigateBack").is_some(), "mp_navigateBack should be registered");
+        assert!(lib.lookup_fn("mp_redirectTo").is_some(), "mp_redirectTo should be registered");
+        assert!(lib.lookup_fn("mp_reLaunch").is_some(), "mp_reLaunch should be registered");
+        assert!(lib.lookup_fn("mp_switchTab").is_some(), "mp_switchTab should be registered");
+    }
+
+    #[test]
+    fn mp_ui_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_showToast").is_some(), "mp_showToast should be registered");
+        assert!(lib.lookup_fn("mp_hideToast").is_some(), "mp_hideToast should be registered");
+        assert!(lib.lookup_fn("mp_showLoading").is_some(), "mp_showLoading should be registered");
+        assert!(lib.lookup_fn("mp_hideLoading").is_some(), "mp_hideLoading should be registered");
+        assert!(lib.lookup_fn("mp_alert").is_some(), "mp_alert should be registered");
+        assert!(lib.lookup_fn("mp_confirm").is_some(), "mp_confirm should be registered");
+    }
+
+    #[test]
+    fn mp_device_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_getSystemInfo").is_some(), "mp_getSystemInfo should be registered");
+        assert!(lib.lookup_fn("mp_getNetworkType").is_some(), "mp_getNetworkType should be registered");
+        assert!(lib.lookup_fn("mp_setClipboard").is_some(), "mp_setClipboard should be registered");
+        assert!(lib.lookup_fn("mp_getClipboard").is_some(), "mp_getClipboard should be registered");
+        assert!(lib.lookup_fn("mp_vibrate").is_some(), "mp_vibrate should be registered");
+        assert!(lib.lookup_fn("mp_getLocation").is_some(), "mp_getLocation should be registered");
+    }
+
+    #[test]
+    fn mp_network_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_request").is_some(), "mp_request should be registered");
+        assert!(lib.lookup_fn("mp_uploadFile").is_some(), "mp_uploadFile should be registered");
+        assert!(lib.lookup_fn("mp_downloadFile").is_some(), "mp_downloadFile should be registered");
+        assert!(lib.lookup_fn("mp_connectSocket").is_some(), "mp_connectSocket should be registered");
+        assert!(lib.lookup_fn("mp_sendSocketMessage").is_some(), "mp_sendSocketMessage should be registered");
+        assert!(lib.lookup_fn("mp_closeSocket").is_some(), "mp_closeSocket should be registered");
+    }
+
+    #[test]
+    fn mp_payment_auth_media_functions_registered() {
+        let lib = stdlib();
+        assert!(lib.lookup_fn("mp_tradePay").is_some(), "mp_tradePay should be registered");
+        assert!(lib.lookup_fn("mp_getAuthCode").is_some(), "mp_getAuthCode should be registered");
+        assert!(lib.lookup_fn("mp_getUserInfo").is_some(), "mp_getUserInfo should be registered");
+        assert!(lib.lookup_fn("mp_chooseImage").is_some(), "mp_chooseImage should be registered");
+        assert!(lib.lookup_fn("mp_previewImage").is_some(), "mp_previewImage should be registered");
+        assert!(lib.lookup_fn("mp_scan").is_some(), "mp_scan should be registered");
+    }
+
+    #[test]
+    fn mp_tradepay_has_correct_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("mp_tradePay").unwrap();
+        assert_eq!(f.params.len(), 3);
+        assert_eq!(f.params[0].name, "order_id");
+        assert_eq!(f.params[1].name, "amount");
+        assert_eq!(f.params[2].name, "cb_idx");
     }
 
     #[test]

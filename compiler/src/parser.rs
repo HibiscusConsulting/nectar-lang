@@ -190,6 +190,7 @@ impl Parser {
             TokenKind::Embed => Ok(Item::Embed(self.parse_embed(is_pub)?)),
             TokenKind::Pdf => Ok(Item::Pdf(self.parse_pdf(is_pub)?)),
             TokenKind::Payment => Ok(Item::Payment(self.parse_payment(is_pub)?)),
+            TokenKind::MiniProgram => Ok(Item::MiniProgram(self.parse_miniprogram(is_pub)?)),
             TokenKind::Banking => Ok(Item::Banking(self.parse_banking(is_pub)?)),
             TokenKind::MapKeyword => Ok(Item::Map(self.parse_map(is_pub)?)),
             TokenKind::Auth => Ok(Item::Auth(self.parse_auth(is_pub)?)),
@@ -4099,6 +4100,83 @@ impl Parser {
         }
         self.expect(&TokenKind::RightBrace)?;
         Ok(PaymentDef { name, provider, public_key, sandbox_mode, on_success, on_error, methods, is_pub, span })
+    }
+
+    fn parse_miniprogram(&mut self, is_pub: bool) -> Result<MiniProgramDef, ParseError> {
+        let span = self.current_span();
+        self.expect(&TokenKind::MiniProgram)?;
+        let name = self.expect_ident()?;
+        self.expect(&TokenKind::LeftBrace)?;
+
+        let mut payment_provider = None;
+        let mut auth_provider = None;
+        let mut map_provider = None;
+        let mut offline = false;
+        let mut cache_strategy = None;
+        let mut on_launch = None;
+        let mut on_show = None;
+        let mut on_hide = None;
+        let mut methods = vec![];
+
+        while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            match self.peek_kind() {
+                TokenKind::Fn | TokenKind::Async => {
+                    let f = self.parse_function(false)?;
+                    match f.name.as_str() {
+                        "onLaunch" => on_launch = Some(f),
+                        "onShow" => on_show = Some(f),
+                        "onHide" => on_hide = Some(f),
+                        _ => methods.push(f),
+                    }
+                }
+                _ => {
+                    let key = self.expect_ident()?;
+                    self.expect(&TokenKind::Colon)?;
+                    match key.as_str() {
+                        "payment_provider" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                payment_provider = Some(s);
+                                self.advance();
+                            }
+                        }
+                        "auth_provider" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                auth_provider = Some(s);
+                                self.advance();
+                            }
+                        }
+                        "map_provider" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                map_provider = Some(s);
+                                self.advance();
+                            }
+                        }
+                        "cache_strategy" => {
+                            if let TokenKind::StringLit(s) = self.peek_kind() {
+                                cache_strategy = Some(s);
+                                self.advance();
+                            }
+                        }
+                        "offline" => {
+                            match self.peek_kind() {
+                                TokenKind::True => { offline = true; self.advance(); }
+                                TokenKind::False => { offline = false; self.advance(); }
+                                TokenKind::Ident(v) => { offline = v == "true"; self.advance(); }
+                                _ => {}
+                            }
+                        }
+                        _ => { self.parse_expr()?; } // skip unknown
+                    }
+                    self.match_token(&TokenKind::Comma);
+                }
+            }
+        }
+        self.expect(&TokenKind::RightBrace)?;
+        Ok(MiniProgramDef {
+            name, payment_provider, auth_provider, map_provider,
+            offline, cache_strategy, on_launch, on_show, on_hide,
+            methods, is_pub, span,
+        })
     }
 
     fn parse_banking(&mut self, is_pub: bool) -> Result<BankingDef, ParseError> {
@@ -8740,6 +8818,91 @@ mod tests {
             assert!(p.provider.is_some());
         } else {
             panic!("Expected Payment");
+        }
+    }
+
+    // --- MiniProgram ---
+
+    #[test]
+    fn test_parse_miniprogram_with_providers() {
+        let prog = parse(r#"
+            miniprogram AlipayCheckout {
+                payment_provider: "moov",
+                auth_provider: "google",
+                map_provider: "mapbox",
+                offline: true,
+                cache_strategy: "cache-first",
+                fn onLaunch(options: String) { return; }
+                fn onShow() { return; }
+                fn onHide() { return; }
+            }
+        "#);
+        if let Item::MiniProgram(mp) = &prog.items[0] {
+            assert_eq!(mp.name, "AlipayCheckout");
+            assert_eq!(mp.payment_provider.as_deref(), Some("moov"));
+            assert_eq!(mp.auth_provider.as_deref(), Some("google"));
+            assert_eq!(mp.map_provider.as_deref(), Some("mapbox"));
+            assert!(mp.offline);
+            assert_eq!(mp.cache_strategy.as_deref(), Some("cache-first"));
+            assert!(mp.on_launch.is_some());
+            assert!(mp.on_show.is_some());
+            assert!(mp.on_hide.is_some());
+        } else {
+            panic!("Expected MiniProgram");
+        }
+    }
+
+    #[test]
+    fn test_parse_miniprogram_minimal() {
+        let prog = parse(r#"
+            miniprogram MiniApp {
+                payment_provider: "stripe",
+            }
+        "#);
+        if let Item::MiniProgram(mp) = &prog.items[0] {
+            assert_eq!(mp.name, "MiniApp");
+            assert_eq!(mp.payment_provider.as_deref(), Some("stripe"));
+            assert!(mp.auth_provider.is_none());
+            assert!(mp.map_provider.is_none());
+            assert!(!mp.offline);
+            assert!(mp.cache_strategy.is_none());
+            assert!(mp.on_launch.is_none());
+            assert!(mp.on_show.is_none());
+            assert!(mp.on_hide.is_none());
+        } else {
+            panic!("Expected MiniProgram");
+        }
+    }
+
+    #[test]
+    fn test_parse_miniprogram_with_methods() {
+        let prog = parse(r#"
+            miniprogram TestMP {
+                fn handleScan() { return; }
+                fn processPayment(id: String) { return; }
+            }
+        "#);
+        if let Item::MiniProgram(mp) = &prog.items[0] {
+            assert_eq!(mp.name, "TestMP");
+            assert_eq!(mp.methods.len(), 2);
+            assert_eq!(mp.methods[0].name, "handleScan");
+            assert_eq!(mp.methods[1].name, "processPayment");
+        } else {
+            panic!("Expected MiniProgram");
+        }
+    }
+
+    #[test]
+    fn test_parse_miniprogram_offline_false() {
+        let prog = parse(r#"
+            miniprogram OfflineMP {
+                offline: false,
+            }
+        "#);
+        if let Item::MiniProgram(mp) = &prog.items[0] {
+            assert!(!mp.offline);
+        } else {
+            panic!("Expected MiniProgram");
         }
     }
 

@@ -71,6 +71,8 @@ pub enum Item {
     Theme(ThemeDef),
     /// Animation block — spring physics, keyframes, or stagger animations
     Animation(AnimationBlockDef),
+    /// Mini-program definition — super-app embedded application (Alipay/WeChat style)
+    MiniProgram(MiniProgramDef),
 }
 
 /// Contract definition — an API boundary type that generates:
@@ -552,6 +554,37 @@ pub enum AnimationKind {
         delay: Option<String>,
         selector: Option<String>,
     },
+}
+
+/// Mini-program definition — super-app embedded application (Alipay/WeChat style)
+///
+/// ```nectar
+/// miniprogram AlipayCheckout {
+///     payment_provider: "moov",
+///     auth_provider: "google",
+///     map_provider: "mapbox",
+///     offline: true,
+///     cache_strategy: "cache-first",
+///     fn onLaunch(options: String) { ... }
+///     fn onShow() { ... }
+///     fn onHide() { ... }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct MiniProgramDef {
+    pub name: String,
+    pub payment_provider: Option<String>,
+    pub auth_provider: Option<String>,
+    pub map_provider: Option<String>,
+    pub offline: bool,
+    pub cache_strategy: Option<String>,
+    pub on_launch: Option<Function>,
+    pub on_show: Option<Function>,
+    pub on_hide: Option<Function>,
+    pub methods: Vec<Function>,
+    pub is_pub: bool,
+    #[allow(dead_code)]
+    pub span: Span,
 }
 
 /// Keyboard shortcut definition inside a component

@@ -217,6 +217,7 @@ impl Formatter {
                 self.push("}\n");
             }
             Item::Payment(_) => {}
+            Item::MiniProgram(_) => {}
             Item::Banking(_) => {}
             Item::Map(_) => {}
             Item::Auth(_) => {}

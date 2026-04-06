@@ -413,12 +413,20 @@ impl RustCodegen {
 
     /// Check if a handler only modifies self.fields (no method calls, no for-loops, no control flow).
     /// Returns the list of field names modified. Empty = not a simple state update handler.
+    /// Also returns empty if any RHS references other self fields (interdependent updates
+    /// can't be handled by targeted text binding replacement).
     fn handler_modified_fields(&self, method: &Function) -> Vec<String> {
         let mut fields = Vec::new();
         for stmt in &method.body.stmts {
-            if let Stmt::Expr(Expr::Assign { target, .. }) = stmt {
+            if let Stmt::Expr(Expr::Assign { target, value, .. }) = stmt {
                 if let Expr::FieldAccess { object, field } = &**target {
                     if matches!(**object, Expr::SelfExpr) {
+                        // If RHS references any self.field, the values are interdependent.
+                        // Targeted text updates can't evaluate complex format expressions
+                        // involving division/modulo of these values, so force full rebuild.
+                        if self.expr_references_self(value) {
+                            return Vec::new();
+                        }
                         fields.push(field.clone());
                         continue;
                     }
@@ -429,6 +437,22 @@ impl RustCodegen {
             }
         }
         fields
+    }
+
+    /// Check if an expression references any self.field
+    fn expr_references_self(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::FieldAccess { object, .. } => {
+                matches!(**object, Expr::SelfExpr) || self.expr_references_self(object)
+            }
+            Expr::Binary { left, right, .. } => {
+                self.expr_references_self(left) || self.expr_references_self(right)
+            }
+            Expr::Unary { operand, .. } => self.expr_references_self(operand),
+            Expr::FnCall { args, .. } | Expr::MethodCall { args, .. } => args.iter().any(|a| self.expr_references_self(a)),
+            Expr::SelfExpr => true,
+            _ => false,
+        }
     }
 
     /// Collect prototypes from a flat list of template nodes (one level deep).
@@ -767,8 +791,15 @@ impl RustCodegen {
         let mut cb_idx = 0;
         for method in &comp.methods {
             if !method.name.starts_with("init") {
-                self.handler_indices.insert(method.name.clone(), cb_idx);
-                cb_idx += 1;
+                // Only register as callback handler if no extra params (beyond &self)
+                let extra_params = method.params.iter().filter(|p| p.name != "self").count();
+                if extra_params == 0 {
+                    self.handler_indices.insert(method.name.clone(), cb_idx);
+                    cb_idx += 1;
+                } else {
+                    // Helper method with params — still track for call resolution but no callback
+                    self.handler_indices.insert(method.name.clone(), usize::MAX);
+                }
             }
         }
 
@@ -1164,8 +1195,35 @@ impl RustCodegen {
     fn emit_handler(&mut self, comp_name: &str, method: &Function, _idx: usize) {
         let is_init = method.name.starts_with("init");
         let is_data_callback = method.name.contains("loaded") || method.name.contains("response");
+        let is_immutable = method.params.first().map(|p| p.name == "self" && matches!(p.ownership, Ownership::Borrowed)).unwrap_or(false);
+        let has_return = method.return_type.is_some();
 
-        self.line(&format!("fn {}_{}() {{", comp_name.to_lowercase(), method.name));
+        // Emit method params (skip &self/&mut self)
+        let params: Vec<String> = method.params.iter()
+            .filter(|p| p.name != "self")
+            .map(|p| format!("{}: {}", p.name, self.type_to_rust(&p.ty)))
+            .collect();
+        let ret_type = if let Some(ref rt) = method.return_type { format!(" -> {}", self.type_to_rust(rt)) } else { String::new() };
+
+        // Pure helper methods (&self with params, no state mutation) → emit as standalone functions
+        if is_immutable && !params.is_empty() {
+            self.line(&format!("fn {}_{}({}){} {{", comp_name.to_lowercase(), method.name, params.join(", "), ret_type));
+            self.indent += 1;
+            self.in_handler = false;
+            for stmt in &method.body.stmts {
+                self.emit_stmt(stmt, comp_name);
+            }
+            self.indent -= 1;
+            self.line("}");
+            self.line("");
+            return;
+        }
+
+        if params.is_empty() {
+            self.line(&format!("fn {}_{}() {{", comp_name.to_lowercase(), method.name));
+        } else {
+            self.line(&format!("fn {}_{}({}) {{", comp_name.to_lowercase(), method.name, params.join(", ")));
+        }
         self.indent += 1;
 
         // Time the entire handler cycle (state update + tree rebuild + layout)
@@ -1495,6 +1553,9 @@ impl RustCodegen {
                     format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.clone())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
                 } else if method == "reverse" {
                     format!("{}.reverse()", obj)
+                } else if (obj == "state" || obj == "self") && self.handler_indices.contains_key(method.as_str()) {
+                    // self.method(args) → comp_method(args) for component methods
+                    format!("{}_{}({})", comp_name.to_lowercase(), method, a.join(", "))
                 } else {
                     format!("{}.{}({})", obj, method, a.join(", "))
                 }
@@ -1678,6 +1739,7 @@ impl RustCodegen {
         if let Some(comp) = comp {
             let handlers: Vec<&str> = comp.methods.iter()
                 .filter(|m| !m.name.starts_with("init"))
+                .filter(|m| m.params.iter().filter(|p| p.name != "self").count() == 0)
                 .map(|m| m.name.as_str())
                 .collect();
             if !handlers.is_empty() {

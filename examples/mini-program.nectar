@@ -628,7 +628,7 @@ component MiniProgramRuntime() {
                                 <div style="font-size: 11px; color: #a1a1aa; height: hug; width: hug">"Memory isolated"</div>
                             </div>
                         </div>
-                        <div style="font-size: 12px; color: #52525b; height: hug; width: hug">"Each mini-program compiles to a separate WASM module with its own linear memory. No shared state, no shared heap, no escape from the sandbox. The host runtime controls all browser API access through a capability-based syscall interface."</div>
+                        <div style="font-size: 12px; color: #52525b; height: hug; width: fill">"Each mini-program compiles to a separate WASM module with its own linear memory. No shared state, no shared heap, no escape from the sandbox. The host runtime controls all browser API access through a capability-based syscall interface."</div>
                     </div>
                 </div>
             </div>
