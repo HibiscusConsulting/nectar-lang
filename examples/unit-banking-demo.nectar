@@ -110,6 +110,12 @@ component UnitDashboard() {
     let mut tx_credit_count: i32 = 0;
     let mut tx_running_bal: i32 = 0;
     let mut tx_display_count: i32 = 0;
+    let mut show_tx_rows: i32 = 0;
+
+    fn toggle_tx_rows(&mut self) {
+        if self.show_tx_rows == 0 { self.show_tx_rows = 1; }
+        else { self.show_tx_rows = 0; }
+    }
 
     fn generate_transactions(&mut self) {
         let mut running: i32 = self.checking_bal;
@@ -661,6 +667,87 @@ component UnitDashboard() {
                                         <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("${}", self.tx_running_bal / 100)}</div>
                                     </div>
                                 </div>
+
+                                // Show/hide transactions toggle
+                                <div style="direction: horizontal; width: fill; padding: 12 24; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                    <div style="height: 36px; padding: 0 16; background-color: #1e1e21; border-radius: 8; border-width: 1; border-color: #27272a; align: center; justify: center; width: hug" on:click={self.toggle_tx_rows}>
+                                        {if self.show_tx_rows == 1 { <div style="font-size: 12px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Hide Transactions"</div> } else { <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Show Sample Transactions"</div> }}
+                                    </div>
+                                </div>
+
+                                // Transaction rows (sample of 20)
+                                {if self.show_tx_rows == 1 {
+                                    <div style="direction: vertical; width: fill; gap: 0; height: hug">
+                                        // Column header
+                                        <div style="direction: horizontal; width: fill; padding: 8 24; justify: space-between; align: center; background-color: #111113; height: hug">
+                                            <div style="font-size: 10px; font-weight: 700; color: #52525b; width: 60px; height: hug">"#"</div>
+                                            <div style="font-size: 10px; font-weight: 700; color: #52525b; width: fill; height: hug">"TYPE"</div>
+                                            <div style="font-size: 10px; font-weight: 700; color: #52525b; width: hug; height: hug">"AMOUNT"</div>
+                                        </div>
+                                        // Rows: amount = ((i*7+13) % 50000) - 25000
+                                        // i=0: (13%50000)-25000 = -24987 → debit $249.87
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"0"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$249.87"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"1"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$249.80"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"2"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$249.73"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"3"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$249.66"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"4"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$249.59"</div>
+                                        </div>
+                                        // i=3571: (3571*7+13)%50000-25000 = 25010-25000 = 10 → credit $0.10
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"3571"</div>
+                                            <div style="font-size: 12px; color: #22c55e; width: fill; height: hug">"Credit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #22c55e; width: hug; height: hug">"+$0.10"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"3572"</div>
+                                            <div style="font-size: 12px; color: #22c55e; width: fill; height: hug">"Credit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #22c55e; width: hug; height: hug">"+$0.17"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"3573"</div>
+                                            <div style="font-size: 12px; color: #22c55e; width: fill; height: hug">"Credit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #22c55e; width: hug; height: hug">"+$0.24"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"5000"</div>
+                                            <div style="font-size: 12px; color: #22c55e; width: fill; height: hug">"Credit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #22c55e; width: hug; height: hug">"+$100.13"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"7142"</div>
+                                            <div style="font-size: 12px; color: #ef4444; width: fill; height: hug">"Debit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #ef4444; width: hug; height: hug">"-$0.06"</div>
+                                        </div>
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #1e1e21; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; width: 60px; height: hug">"9999"</div>
+                                            <div style="font-size: 12px; color: #22c55e; width: fill; height: hug">"Credit"</div>
+                                            <div style="font-size: 12px; font-weight: 600; color: #22c55e; width: hug; height: hug">"+$49.80"</div>
+                                        </div>
+                                        // Ellipsis row
+                                        <div style="direction: horizontal; width: fill; padding: 10 24; justify: center; align: center; height: hug">
+                                            <div style="font-size: 12px; color: #52525b; height: hug; width: hug">"... 9,988 more transactions"</div>
+                                        </div>
+                                    </div>
+                                }}
                             }}
                         </div>
                     </div>
