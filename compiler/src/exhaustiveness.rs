@@ -640,6 +640,7 @@ fn walk_item(item: &Item, enums: &HashMap<String, EnumInfo>, errors: &mut Vec<Ex
         Item::Embed(_) => {}
         Item::Pdf(_) => {}
         Item::Payment(_) => {}
+        Item::MiniProgram(_) => {}
         Item::Banking(_) => {}
         Item::Map(_) => {}
         Item::Auth(_) => {}

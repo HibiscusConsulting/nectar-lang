@@ -152,6 +152,7 @@ pub struct WasmCodegen {
     needs_pwa: bool,
     needs_hardware: bool,
     needs_payment: bool,
+    needs_miniprogram: bool,
     needs_banking: bool,
     needs_map: bool,
     needs_auth: bool,
@@ -222,8 +223,6 @@ struct CondUpdater {
     then_children: Vec<TemplateNode>,
     /// Children to render when condition is false (optional)
     else_children: Option<Vec<TemplateNode>>,
-    /// For-loop bindings in scope when this cond was created (needed for locals in mount func)
-    for_loop_bindings: Vec<String>,
 }
 
 /// Describes a signal→DOM updater (text content or attribute).
@@ -267,6 +266,7 @@ enum KeywordDefKind {
     Cache,
     Database,
     MapWidget,
+    MiniProgram,
     Payment,
     Upload,
     Pdf,
@@ -335,6 +335,7 @@ impl WasmCodegen {
             needs_pwa: false,
             needs_hardware: false,
             needs_payment: false,
+            needs_miniprogram: false,
             needs_banking: false,
             needs_map: false,
             needs_auth: false,
@@ -815,6 +816,7 @@ impl WasmCodegen {
             Item::Upload(_) => { self.needs_upload = true; }
             Item::Db(_) => { self.needs_db = true; }
             Item::Payment(_) => { self.needs_payment = true; }
+            Item::MiniProgram(_) => { self.needs_miniprogram = true; }
             Item::App(_) => { self.needs_pwa = true; }
             Item::Contract(_) => { self.needs_http = true; }
             Item::Embed(_) => {}
@@ -1075,6 +1077,9 @@ impl WasmCodegen {
         if name.starts_with("payment::") {
             self.needs_payment = true;
         }
+        if name.starts_with("mp::") {
+            self.needs_miniprogram = true;
+        }
         if name.starts_with("banking::") {
             self.needs_banking = true;
         }
@@ -1306,6 +1311,16 @@ impl WasmCodegen {
         self.line("(import \"payment\" \"mount\" (func $payment_mount (param i32 i32 i32 i32)))");
         self.line("(import \"payment\" \"create_element\" (func $payment_create_element (param i32 i32 i32)))");
         self.line("(import \"payment\" \"confirm\" (func $payment_confirm (param i32 i32 i32 i32 i32)))");
+        self.line("(import \"payment\" \"key_exchange\" (func $payment_key_exchange (param i32 i32 i32)))");
+        }
+
+        // ── MiniProgram — mp namespace syscalls ──────────────────────────────
+        if self.needs_miniprogram {
+        self.line("");
+        self.line(";; MiniProgram — mp namespace syscalls (clearStorage, getSystemInfo, getNetworkType)");
+        self.line("(import \"mp\" \"clearStorage\" (func $mp_clearStorage))");
+        self.line("(import \"mp\" \"getSystemInfo\" (func $mp_getSystemInfo (result i32)))");
+        self.line("(import \"mp\" \"getNetworkType\" (func $mp_getNetworkType (param i32)))");
         }
 
         // ── Banking — generic provider interface ─────────────────────────────
@@ -1516,7 +1531,7 @@ impl WasmCodegen {
 
             // Conditionally emit runtime helpers based on AST pre-scan.
             // Only emit categories that the program actually references.
-            if self.used_runtime_categories.contains("crypto") {
+            if self.used_runtime_categories.contains("crypto") || self.needs_payment {
                 self.emit_crypto_runtime();
             }
             if self.used_runtime_categories.contains("collections") {
@@ -1582,6 +1597,7 @@ impl WasmCodegen {
                 Item::Cache(c) => self.known_keyword_defs.push((c.name.clone(), KeywordDefKind::Cache)),
                 Item::Db(d) => self.known_keyword_defs.push((d.name.clone(), KeywordDefKind::Database)),
                 Item::Payment(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Payment)),
+                Item::MiniProgram(mp) => self.known_keyword_defs.push((mp.name.clone(), KeywordDefKind::MiniProgram)),
                 Item::Banking(b) => self.known_keyword_defs.push((b.name.clone(), KeywordDefKind::Banking)),
                 Item::Map(m) => self.known_keyword_defs.push((m.name.clone(), KeywordDefKind::MapWidget)),
                 Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
@@ -1647,6 +1663,9 @@ impl WasmCodegen {
                     }
                     KeywordDefKind::MapWidget => {
                         init_calls.push(format!("  call $__map_register_{}", kw_name));
+                    }
+                    KeywordDefKind::MiniProgram => {
+                        init_calls.push(format!("  call $__mp_register_{}", kw_name));
                     }
                     _ => {}
                 }
@@ -1734,7 +1753,7 @@ impl WasmCodegen {
                 self.line("  global.set $__router_path_scratch");
 
                 // Conditional allocations based on program usage
-                if self.used_runtime_categories.contains("crypto") {
+                if self.used_runtime_categories.contains("crypto") || self.needs_payment {
                     self.line("  ;; Crypto work buffers");
                     self.line("  i32.const 512 ;; crypto work buffer");
                     self.line("  call $alloc");
@@ -1931,6 +1950,7 @@ impl WasmCodegen {
             Item::Form(form) => self.generate_form(form),
             Item::Channel(ch) => self.generate_channel(ch),
             Item::Payment(payment) => self.generate_payment(payment),
+            Item::MiniProgram(mp) => self.generate_miniprogram(mp),
             Item::Banking(banking) => self.generate_banking(banking),
             Item::Map(map_def) => self.generate_map(map_def),
             Item::Auth(auth) => self.generate_auth(auth),
@@ -3871,19 +3891,6 @@ impl WasmCodegen {
 
             // We need a local to hold the container element ID
             self.emit_template_local("$__cond_parent");
-
-            // Declare locals for any for-loop bindings that were in scope
-            // when this cond was created — the cond mount is a separate WAT
-            // function so parent locals are not visible and must be re-declared.
-            for binding in &cond.for_loop_bindings {
-                self.emit_template_local(&format!("${}", binding));
-                // Also restore the binding in for_loop_bindings so field access resolves
-                if !self.for_loop_bindings.contains(binding) {
-                    self.for_loop_bindings.push(binding.clone());
-                }
-            }
-            let bindings_added = cond.for_loop_bindings.len();
-
             self.line(&format!("global.get {}", cond.container_global));
             self.line("local.set $__cond_parent");
 
@@ -3900,11 +3907,6 @@ impl WasmCodegen {
             self.defer_template_locals = saved_defer;
             self.template_locals = saved_locals;
             self.output.push_str(&mount_body);
-
-            // Remove for-loop bindings we added for this cond mount
-            for _ in 0..bindings_added {
-                self.for_loop_bindings.pop();
-            }
 
             // Collect any signal updaters created by children inside this cond block
             let cond_updaters_inner = std::mem::take(&mut self.signal_updaters);
@@ -4024,15 +4026,6 @@ impl WasmCodegen {
 
             self.emit_template_local("$new_val");
 
-            // Declare locals for for-loop bindings in scope when cond was created
-            for binding in &cond.for_loop_bindings {
-                self.emit_template_local(&format!("${}", binding));
-                if !self.for_loop_bindings.contains(binding) {
-                    self.for_loop_bindings.push(binding.clone());
-                }
-            }
-            let updater_bindings_added = cond.for_loop_bindings.len();
-
             // Re-evaluate the condition
             self.generate_expr(&cond.condition);
             self.line("i32.const 0");
@@ -4074,11 +4067,6 @@ impl WasmCodegen {
             self.line("call $dom_mount ;; clear container");
             self.indent -= 1;
             self.line("end");
-
-            // Remove for-loop bindings added for this updater
-            for _ in 0..updater_bindings_added {
-                self.for_loop_bindings.pop();
-            }
 
             // Hoist deferred locals
             let body_output_cond = std::mem::take(&mut self.output);
@@ -5041,6 +5029,8 @@ impl WasmCodegen {
         // overrides the stubs in core.js with the actual SDK calls.
         let _cb_idx = self.global_handler_base;
         self.global_handler_base += 1;
+        let key_exchange_cb_idx = self.global_handler_base;
+        self.global_handler_base += 1;
 
         // Globals for storing provider object handles
         self.line(&format!(
@@ -5052,25 +5042,112 @@ impl WasmCodegen {
             payment.name
         ));
 
-        // ── Lifecycle: init — called by __init_all, creates signals, sets status=idle ──
+        // ── Crypto globals for automatic payment encryption ──────────────
+        self.line(&format!("(global $__payment_{}_ecdh_priv_ptr (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!("(global $__payment_{}_ecdh_priv_len (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!("(global $__payment_{}_shared_key_ptr (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!("(global $__payment_{}_shared_key_len (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!("(global $__payment_{}_sign_priv_ptr (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!("(global $__payment_{}_sign_priv_len (mut i32) (i32.const 0))", payment.name));
+
+        // ── Lifecycle: init — creates signals, generates keypairs, initiates key exchange ──
         self.line(&format!(
             "(func ${}_init (export \"{}_init\")",
             payment.name, payment.name
         ));
-        // Create status signal with initial value 0 (idle)
+        self.line("  (local $ecdh_pub_ptr i32) (local $ecdh_pub_len i32)");
         self.line("  i32.const 0  ;; idle");
         self.line("  call $signal_create");
         self.line(&format!("  global.set $__sig_{}_status", payment.name));
-        // Create error signal with initial value 0 (null ptr)
         self.line("  i32.const 0  ;; no error");
         self.line("  call $signal_create");
         self.line(&format!("  global.set $__sig_{}_error", payment.name));
-        // Create token signal with initial value 0 (null ptr)
         self.line("  i32.const 0  ;; no token");
         self.line("  call $signal_create");
         self.line(&format!("  global.set $__sig_{}_token", payment.name));
-        // Register provider
         self.line(&format!("  call $__payment_register_{}", payment.name));
+        // Generate ECDH keypair
+        let ecdh_algo = self.store_string("ecdh");
+        self.line(&format!("  i32.const {}  ;; \"ecdh\" ptr", ecdh_algo));
+        self.line("  i32.const 4  ;; \"ecdh\" len");
+        self.line("  call $crypto_generate_key_pair  ;; -> pub_ptr pub_len priv_ptr priv_len");
+        self.line(&format!("  global.set $__payment_{}_ecdh_priv_len", payment.name));
+        self.line(&format!("  global.set $__payment_{}_ecdh_priv_ptr", payment.name));
+        self.line("  local.set $ecdh_pub_len");
+        self.line("  local.set $ecdh_pub_ptr");
+        // Generate Ed25519 signing keypair
+        let ed_algo = self.store_string("ed25519");
+        self.line(&format!("  i32.const {}  ;; \"ed25519\" ptr", ed_algo));
+        self.line("  i32.const 7  ;; \"ed25519\" len");
+        self.line("  call $crypto_generate_key_pair  ;; -> pub_ptr pub_len priv_ptr priv_len");
+        self.line(&format!("  global.set $__payment_{}_sign_priv_len", payment.name));
+        self.line(&format!("  global.set $__payment_{}_sign_priv_ptr", payment.name));
+        self.line("  drop  ;; drop signing pub_len");
+        self.line("  drop  ;; drop signing pub_ptr");
+        // Call key_exchange with ECDH public key
+        self.line("  local.get $ecdh_pub_ptr");
+        self.line("  local.get $ecdh_pub_len");
+        self.line(&format!("  i32.const {}  ;; key exchange callback index", key_exchange_cb_idx));
+        self.line("  call $payment_key_exchange");
+        self.line(")");
+
+        // ── Key exchange callback — derives shared AES key from server's public key ──
+        self.line(&format!(
+            "(func $__payment_{}_on_key_exchange (export \"__payment_{}_on_key_exchange\") (param $server_pub_ptr i32) (param $server_pub_len i32)",
+            payment.name, payment.name
+        ));
+        self.line("  (local $shared_ptr i32) (local $shared_len i32)");
+        self.line(&format!("  global.get $__payment_{}_ecdh_priv_ptr", payment.name));
+        self.line(&format!("  global.get $__payment_{}_ecdh_priv_len", payment.name));
+        self.line("  local.get $server_pub_ptr");
+        self.line("  local.get $server_pub_len");
+        self.line("  call $crypto_ecdh_derive  ;; -> shared_ptr shared_len");
+        self.line("  local.set $shared_len");
+        self.line("  local.set $shared_ptr");
+        let hkdf_salt = self.store_string("nectar-payment");
+        let hkdf_info = self.store_string("aes-256-gcm");
+        self.line("  local.get $shared_ptr");
+        self.line("  local.get $shared_len");
+        self.line(&format!("  i32.const {}  ;; salt \"nectar-payment\" ptr", hkdf_salt));
+        self.line("  i32.const 14  ;; salt len");
+        self.line(&format!("  i32.const {}  ;; info \"aes-256-gcm\" ptr", hkdf_info));
+        self.line("  i32.const 11  ;; info len");
+        self.line("  i32.const 32  ;; 256 bits = 32 bytes");
+        self.line("  call $crypto_hkdf_derive  ;; -> key_ptr key_len");
+        self.line(&format!("  global.set $__payment_{}_shared_key_len", payment.name));
+        self.line(&format!("  global.set $__payment_{}_shared_key_ptr", payment.name));
+        self.line(")");
+
+        // ── Encrypt and sign helper ──
+        self.line(&format!(
+            "(func $__payment_{}_encrypt_and_sign (param $plain_ptr i32) (param $plain_len i32) (result i32 i32)",
+            payment.name
+        ));
+        self.line("  (local $ct_ptr i32) (local $ct_len i32)");
+        self.line("  (local $sig_ptr i32) (local $sig_len i32)");
+        self.line("  (local $out_ptr i32) (local $out_len i32)");
+        self.line(&format!("  global.get $__payment_{}_shared_key_ptr", payment.name));
+        self.line(&format!("  global.get $__payment_{}_shared_key_len", payment.name));
+        self.line("  local.get $plain_ptr");
+        self.line("  local.get $plain_len");
+        self.line("  call $crypto_aes_gcm_encrypt  ;; -> ct_ptr ct_len");
+        self.line("  local.set $ct_len");
+        self.line("  local.set $ct_ptr");
+        self.line(&format!("  global.get $__payment_{}_sign_priv_ptr", payment.name));
+        self.line(&format!("  global.get $__payment_{}_sign_priv_len", payment.name));
+        self.line("  local.get $ct_ptr");
+        self.line("  local.get $ct_len");
+        self.line("  call $crypto_ed25519_sign  ;; -> sig_ptr sig_len");
+        self.line("  local.set $sig_len");
+        self.line("  local.set $sig_ptr");
+        self.line("  local.get $ct_len  local.get $sig_len  i32.add  i32.const 4  i32.add");
+        self.line("  local.set $out_len");
+        self.line("  local.get $out_len  call $alloc  local.set $out_ptr");
+        self.line("  local.get $out_ptr  local.get $ct_len  i32.store");
+        self.line("  local.get $out_ptr  i32.const 4  i32.add  local.get $ct_ptr  local.get $ct_len  memory.copy");
+        self.line("  local.get $out_ptr  i32.const 4  i32.add  local.get $ct_len  i32.add  local.get $sig_ptr  local.get $sig_len  memory.copy");
+        self.line("  local.get $out_ptr");
+        self.line("  local.get $out_len");
         self.line(")");
 
         // ── Lifecycle: mount — loads provider, creates element in container ──
@@ -5078,7 +5155,6 @@ impl WasmCodegen {
             "(func ${}_mount (export \"{}_mount\") (param $container_id i32) (param $cb_idx i32)",
             payment.name, payment.name
         ));
-        // Set status to loading (1)
         self.line(&format!("  global.get $__sig_{}_status", payment.name));
         self.line("  i32.const 1  ;; loading");
         self.line("  call $signal_set");
@@ -5093,7 +5169,6 @@ impl WasmCodegen {
                 self.line("  call $payment_mount");
             }
         } else {
-            // No key — still emit the call with empty string
             let empty = self.store_string("");
             self.line("  local.get $container_id");
             self.line(&format!("  i32.const {}  ;; key ptr (empty)", empty));
@@ -5114,20 +5189,37 @@ impl WasmCodegen {
         self.line("  call $payment_create_element");
         self.line(")");
 
-        // ── Lifecycle: submit — calls confirm, updates status signal ──
+        // ── Lifecycle: submit — encrypts data, then calls confirm ──
         self.line(&format!(
             "(func ${}_submit (export \"{}_submit\") (param $secret_ptr i32) (param $secret_len i32)",
             payment.name, payment.name
         ));
-        // Set status to loading
+        self.line("  (local $enc_ptr i32) (local $enc_len i32)");
+        // Guard: shared key must be available
+        self.line(&format!("  global.get $__payment_{}_shared_key_ptr", payment.name));
+        self.line("  i32.eqz");
+        self.line("  if");
+        let err_msg = self.store_string("Payment encryption not ready");
+        self.line(&format!("    global.get $__sig_{}_error", payment.name));
+        self.line(&format!("    i32.const {}  ;; error msg ptr", err_msg));
+        self.line("    call $signal_set");
+        self.line(&format!("    global.get $__sig_{}_status", payment.name));
+        self.line("    i32.const 3  ;; error");
+        self.line("    call $signal_set");
+        self.line("    return");
+        self.line("  end");
         self.line(&format!("  global.get $__sig_{}_status", payment.name));
         self.line("  i32.const 1  ;; loading");
         self.line("  call $signal_set");
-        self.line(&format!("  global.get $__payment_{}_provider_handle", payment.name));
-        self.line(&format!("  global.get $__payment_{}_element_handle", payment.name));
         self.line("  local.get $secret_ptr");
         self.line("  local.get $secret_len");
-        // Callback index for confirm result
+        self.line(&format!("  call $__payment_{}_encrypt_and_sign", payment.name));
+        self.line("  local.set $enc_len");
+        self.line("  local.set $enc_ptr");
+        self.line(&format!("  global.get $__payment_{}_provider_handle", payment.name));
+        self.line(&format!("  global.get $__payment_{}_element_handle", payment.name));
+        self.line("  local.get $enc_ptr");
+        self.line("  local.get $enc_len");
         self.line(&format!("  i32.const {}  ;; cb_idx", _cb_idx));
         self.line("  call $payment_confirm");
         self.line(")");
@@ -5448,6 +5540,113 @@ impl WasmCodegen {
             self.generate_function(handler);
         }
         for method in &payment.methods {
+            self.generate_function(method);
+        }
+    }
+
+    fn generate_miniprogram(&mut self, mp: &MiniProgramDef) {
+        self.line(&format!(";; === MiniProgram: {} ===", mp.name));
+
+        let name_offset = self.store_string(&mp.name);
+        let name_len = mp.name.len();
+
+        // Store provider config strings in data section
+        let payment_prov = mp.payment_provider.as_deref().unwrap_or("none");
+        let auth_prov = mp.auth_provider.as_deref().unwrap_or("none");
+        let map_prov = mp.map_provider.as_deref().unwrap_or("none");
+        let cache_strat = mp.cache_strategy.as_deref().unwrap_or("network-first");
+
+        let pp_offset = self.store_string(payment_prov);
+        let pp_len = payment_prov.len();
+        let ap_offset = self.store_string(auth_prov);
+        let ap_len = auth_prov.len();
+        let mp_offset = self.store_string(map_prov);
+        let mp_len = map_prov.len();
+        let cs_offset = self.store_string(cache_strat);
+        let cs_len = cache_strat.len();
+
+        // Track required providers for build system bundling
+        if let Some(ref p) = mp.payment_provider { self.required_providers.insert(p.clone()); }
+        if let Some(ref p) = mp.auth_provider { self.required_providers.insert(p.clone()); }
+        if let Some(ref p) = mp.map_provider { self.required_providers.insert(p.clone()); }
+
+        // Provider config globals
+        self.line(&format!(
+            "(global $__mp_{}_payment_provider (mut i32) (i32.const {})) ;; payment provider ptr",
+            mp.name, pp_offset
+        ));
+        self.line(&format!(
+            "(global $__mp_{}_auth_provider (mut i32) (i32.const {})) ;; auth provider ptr",
+            mp.name, ap_offset
+        ));
+        self.line(&format!(
+            "(global $__mp_{}_map_provider (mut i32) (i32.const {})) ;; map provider ptr",
+            mp.name, mp_offset
+        ));
+        self.line(&format!(
+            "(global $__mp_{}_cache_strategy (mut i32) (i32.const {})) ;; cache strategy ptr",
+            mp.name, cs_offset
+        ));
+
+        let offline_flag = if mp.offline { 1 } else { 0 };
+
+        // ── Register function (called from __init_all) ──
+        self.line(&format!(
+            "(func $__mp_register_{} (export \"__mp_register_{}\")",
+            mp.name, mp.name
+        ));
+        self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
+        self.line(&format!("  i32.const {}  ;; name len", name_len));
+        self.line(&format!("  i32.const {}  ;; payment provider ptr", pp_offset));
+        self.line(&format!("  i32.const {}  ;; payment provider len", pp_len));
+        self.line(&format!("  i32.const {}  ;; auth provider ptr", ap_offset));
+        self.line(&format!("  i32.const {}  ;; auth provider len", ap_len));
+        self.line(&format!("  i32.const {}  ;; map provider ptr", mp_offset));
+        self.line(&format!("  i32.const {}  ;; map provider len", mp_len));
+        self.line(&format!("  i32.const {}  ;; cache strategy ptr", cs_offset));
+        self.line(&format!("  i32.const {}  ;; cache strategy len", cs_len));
+        self.line(&format!("  i32.const {}  ;; offline", offline_flag));
+        self.line("  call $mp_init");
+        self.line(")");
+
+        // ── Lifecycle: onLaunch export ──
+        if let Some(ref launch_fn) = mp.on_launch {
+            self.line(&format!(
+                "(func ${}_onLaunch (export \"{}_onLaunch\") (param $options i32)",
+                mp.name, mp.name
+            ));
+            for stmt in &launch_fn.body.stmts {
+                self.generate_stmt(stmt);
+            }
+            self.line(")");
+        }
+
+        // ── Lifecycle: onShow export ──
+        if let Some(ref show_fn) = mp.on_show {
+            self.line(&format!(
+                "(func ${}_onShow (export \"{}_onShow\")",
+                mp.name, mp.name
+            ));
+            for stmt in &show_fn.body.stmts {
+                self.generate_stmt(stmt);
+            }
+            self.line(")");
+        }
+
+        // ── Lifecycle: onHide export ──
+        if let Some(ref hide_fn) = mp.on_hide {
+            self.line(&format!(
+                "(func ${}_onHide (export \"{}_onHide\")",
+                mp.name, mp.name
+            ));
+            for stmt in &hide_fn.body.stmts {
+                self.generate_stmt(stmt);
+            }
+            self.line(")");
+        }
+
+        // ── Additional methods ──
+        for method in &mp.methods {
             self.generate_function(method);
         }
     }
@@ -8405,7 +8604,6 @@ impl WasmCodegen {
                         condition: *condition.clone(),
                         then_children: then_children.clone(),
                         else_children: else_children.clone(),
-                        for_loop_bindings: self.for_loop_bindings.clone(),
                     });
                 }
             }
@@ -12070,6 +12268,11 @@ impl WasmCodegen {
         self.line("  nop  ;; auth config stored; provider SDK loaded via dom.loadScript syscall");
         self.line(")");
 
+        // mp_init: called by miniprogram block codegen to register mini-program config
+        self.emit("(func $mp_init (param $name_ptr i32) (param $name_len i32) (param $pp_ptr i32) (param $pp_len i32) (param $ap_ptr i32) (param $ap_len i32) (param $mp_ptr i32) (param $mp_len i32) (param $cs_ptr i32) (param $cs_len i32) (param $offline i32)");
+        self.line("  nop  ;; miniprogram config stored; providers loaded via their respective init");
+        self.line(")");
+
         // payment_init: called by payment block codegen to register provider (e.g. Stripe)
         self.emit("(func $payment_init (param $name_ptr i32) (param $name_len i32) (param $provider_ptr i32) (param $provider_len i32) (param $sandboxed i32)");
         self.line("  nop  ;; payment config stored; provider JS (providers/stripe.js) overrides payment.* syscalls");
@@ -14140,16 +14343,6 @@ impl WasmCodegen {
                 self.generate_expr(object);
                 self.line("call $array_sort_asc");
             }
-            "sort_str_asc" => {
-                self.line(";; .sort_str_asc() — sort array ascending by string field");
-                self.generate_expr(object);
-                self.line("call $array_sort_str_asc");
-            }
-            "sort_str_desc" => {
-                self.line(";; .sort_str_desc() — sort array descending by string field");
-                self.generate_expr(object);
-                self.line("call $array_sort_str_desc");
-            }
             "swap" => {
                 self.line(";; .swap() — swap two array elements");
                 self.generate_expr(object);
@@ -14264,6 +14457,7 @@ impl WasmCodegen {
                         KeywordDefKind::Cache      => "cache",
                         KeywordDefKind::Database   => "db",
                         KeywordDefKind::MapWidget  => "map",
+                        KeywordDefKind::MiniProgram => "mp",
                         KeywordDefKind::Payment    => "payment",
                         KeywordDefKind::Upload     => "upload",
                         KeywordDefKind::Pdf        => "pdf",
@@ -14706,12 +14900,6 @@ impl WasmCodegen {
         self.line("  local.get $arr ;; stub — returns array unchanged");
         self.line(")");
         self.emit("(func $array_sort_desc (param $arr i32) (result i32)");
-        self.line("  local.get $arr ;; stub — returns array unchanged");
-        self.line(")");
-        self.emit("(func $array_sort_str_asc (param $arr i32) (result i32)");
-        self.line("  local.get $arr ;; stub — returns array unchanged");
-        self.line(")");
-        self.emit("(func $array_sort_str_desc (param $arr i32) (result i32)");
         self.line("  local.get $arr ;; stub — returns array unchanged");
         self.line(")");
         self.emit("(func $array_swap (param $arr i32) (param $i i32) (param $j i32)");
@@ -28826,6 +29014,159 @@ mod coverage_codegen_tests {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // MiniProgram codegen
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn miniprogram_emits_provider_globals() {
+        let mp = MiniProgramDef {
+            name: "AlipayApp".into(),
+            payment_provider: Some("moov".into()),
+            auth_provider: Some("google".into()),
+            map_provider: Some("mapbox".into()),
+            offline: true,
+            cache_strategy: Some("cache-first".into()),
+            on_launch: None,
+            on_show: None,
+            on_hide: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_miniprogram(&mp);
+        let output = codegen.output.clone();
+        assert!(output.contains("MiniProgram: AlipayApp"), "should have miniprogram header");
+        assert!(output.contains("__mp_AlipayApp_payment_provider"), "should emit payment provider global");
+        assert!(output.contains("__mp_AlipayApp_auth_provider"), "should emit auth provider global");
+        assert!(output.contains("__mp_AlipayApp_map_provider"), "should emit map provider global");
+        assert!(output.contains("__mp_AlipayApp_cache_strategy"), "should emit cache strategy global");
+    }
+
+    #[test]
+    fn miniprogram_emits_lifecycle_exports() {
+        let launch_fn = Function {
+            name: "onLaunch".into(),
+            lifetimes: vec![], type_params: vec![],
+            params: vec![Param {
+                name: "options".into(),
+                ty: Type::Named("String".into()),
+                ownership: Ownership::Owned,
+                secret: false,
+            }],
+            return_type: None, trait_bounds: vec![],
+            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
+            is_pub: false, is_async: false, must_use: false, span: span(),
+        };
+        let show_fn = Function {
+            name: "onShow".into(),
+            lifetimes: vec![], type_params: vec![], params: vec![],
+            return_type: None, trait_bounds: vec![],
+            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
+            is_pub: false, is_async: false, must_use: false, span: span(),
+        };
+        let hide_fn = Function {
+            name: "onHide".into(),
+            lifetimes: vec![], type_params: vec![], params: vec![],
+            return_type: None, trait_bounds: vec![],
+            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
+            is_pub: false, is_async: false, must_use: false, span: span(),
+        };
+        let mp = MiniProgramDef {
+            name: "TestMP".into(),
+            payment_provider: None, auth_provider: None, map_provider: None,
+            offline: false, cache_strategy: None,
+            on_launch: Some(launch_fn),
+            on_show: Some(show_fn),
+            on_hide: Some(hide_fn),
+            methods: vec![],
+            is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_miniprogram(&mp);
+        let output = codegen.output.clone();
+        assert!(output.contains("TestMP_onLaunch"), "should emit onLaunch export");
+        assert!(output.contains("TestMP_onShow"), "should emit onShow export");
+        assert!(output.contains("TestMP_onHide"), "should emit onHide export");
+    }
+
+    #[test]
+    fn miniprogram_codegen_with_all_providers() {
+        let mp = MiniProgramDef {
+            name: "FullMP".into(),
+            payment_provider: Some("stripe".into()),
+            auth_provider: Some("auth0".into()),
+            map_provider: Some("google".into()),
+            offline: true,
+            cache_strategy: Some("network-first".into()),
+            on_launch: None, on_show: None, on_hide: None,
+            methods: vec![],
+            is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_miniprogram(&mp);
+        assert!(codegen.required_providers.contains("stripe"), "stripe should be tracked");
+        assert!(codegen.required_providers.contains("auth0"), "auth0 should be tracked");
+        assert!(codegen.required_providers.contains("google"), "google should be tracked");
+    }
+
+    #[test]
+    fn miniprogram_needs_flag_set_on_prescan() {
+        let src = r#"
+            miniprogram TestMP {
+                payment_provider: "moov",
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program);
+        assert!(codegen.needs_miniprogram, "needs_miniprogram flag should be set");
+    }
+
+    #[test]
+    fn miniprogram_known_keyword_defs_populated() {
+        let src = r#"
+            miniprogram MyMP {
+                payment_provider: "moov",
+            }
+        "#;
+        let mut lexer = Lexer::new(src);
+        let tokens = lexer.tokenize().unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        let mut codegen = WasmCodegen::new();
+        codegen.generate(&program);
+        assert!(
+            codegen.known_keyword_defs.iter().any(|(n, k)| n == "MyMP" && *k == KeywordDefKind::MiniProgram),
+            "MyMP should be in known_keyword_defs as MiniProgram"
+        );
+    }
+
+    #[test]
+    fn miniprogram_mp_init_called_in_register() {
+        let mp = MiniProgramDef {
+            name: "InitMP".into(),
+            payment_provider: None, auth_provider: None, map_provider: None,
+            offline: false, cache_strategy: None,
+            on_launch: None, on_show: None, on_hide: None,
+            methods: vec![],
+            is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_miniprogram(&mp);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $mp_init"), "should call mp_init");
+        assert!(output.contains("__mp_register_InitMP"), "should emit register function");
+    }
+
     /// Signal updater function is emitted and subscribed for direct self.field in template
     #[test]
     fn test_signal_updater_emitted_for_direct_signal() {
@@ -30147,6 +30488,169 @@ mod capability_primitive_tests {
         assert!(output.contains("CC_get_error"), "should emit error getter");
         assert!(output.contains("payment_validate_aba"), "should emit ABA routing validation");
         assert!(output.contains("i32.const 9"), "ABA should check for 9 digits");
+    }
+
+
+    // -----------------------------------------------------------------------
+    // Payment — automatic WASM-layer encryption
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn payment_emits_crypto_globals() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("__payment_Checkout_ecdh_priv_ptr"), "should emit ECDH private key ptr global");
+        assert!(output.contains("__payment_Checkout_ecdh_priv_len"), "should emit ECDH private key len global");
+        assert!(output.contains("__payment_Checkout_shared_key_ptr"), "should emit shared key ptr global");
+        assert!(output.contains("__payment_Checkout_shared_key_len"), "should emit shared key len global");
+        assert!(output.contains("__payment_Checkout_sign_priv_ptr"), "should emit signing key ptr global");
+        assert!(output.contains("__payment_Checkout_sign_priv_len"), "should emit signing key len global");
+    }
+
+    #[test]
+    fn payment_init_generates_keypair() {
+        let payment = PaymentDef {
+            name: "Pay".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $crypto_generate_key_pair"), "init should generate keypair");
+        assert!(output.contains("global.set $__payment_Pay_ecdh_priv_ptr"), "init should store ECDH private key");
+        assert!(output.contains("global.set $__payment_Pay_sign_priv_ptr"), "init should store signing private key");
+    }
+
+    #[test]
+    fn payment_init_calls_key_exchange() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $payment_key_exchange"), "init should call key_exchange syscall");
+    }
+
+    #[test]
+    fn payment_key_exchange_callback_derives_key() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("__payment_Checkout_on_key_exchange"), "should emit key exchange callback");
+        assert!(output.contains("call $crypto_ecdh_derive"), "callback should call ECDH derive");
+        assert!(output.contains("call $crypto_hkdf_derive"), "callback should call HKDF derive");
+        assert!(output.contains("global.set $__payment_Checkout_shared_key_ptr"), "callback should store derived AES key");
+    }
+
+    #[test]
+    fn payment_submit_encrypts_before_confirm() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        let encrypt_pos = output.find("call $__payment_Checkout_encrypt_and_sign");
+        let confirm_pos = output.find("call $payment_confirm");
+        assert!(encrypt_pos.is_some(), "submit should call encrypt_and_sign");
+        assert!(confirm_pos.is_some(), "submit should call payment_confirm");
+        assert!(encrypt_pos.unwrap() < confirm_pos.unwrap(), "encrypt must be before confirm");
+    }
+
+    #[test]
+    fn payment_encrypt_calls_aes_and_ed25519() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $crypto_aes_gcm_encrypt"), "encrypt_and_sign should call AES-GCM");
+        assert!(output.contains("call $crypto_ed25519_sign"), "encrypt_and_sign should call Ed25519 sign");
+    }
+
+    #[test]
+    fn payment_submit_guards_missing_key() {
+        let payment = PaymentDef {
+            name: "Pay".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("global.get $__payment_Pay_shared_key_ptr"), "submit should check shared key");
+        assert!(output.contains("i32.eqz"), "submit should check if key is zero");
+        assert!(output.contains("i32.const 3  ;; error"), "guard should set status to error");
+        assert!(output.contains("return"), "guard should return early");
+        assert!(codegen.strings.iter().any(|(s, _)| s == "Payment encryption not ready"), "should store error message");
+    }
+
+    #[test]
+    fn payment_crypto_runtime_auto_included() {
+        let mut codegen = WasmCodegen::new();
+        codegen.needs_payment = true;
+        let should_emit = codegen.used_runtime_categories.contains("crypto") || codegen.needs_payment;
+        assert!(should_emit, "needs_payment should force crypto runtime emission");
+    }
+
+    #[test]
+    fn payment_key_exchange_import_emitted() {
+        let payment = PaymentDef {
+            name: "Checkout".into(), provider: None, public_key: None,
+            sandbox_mode: false, on_success: None, on_error: None,
+            methods: vec![], is_pub: false, span: span(),
+        };
+        let mut codegen = WasmCodegen::new();
+        codegen.indent = 1;
+        codegen.generate_payment(&payment);
+        let output = codegen.output.clone();
+        assert!(output.contains("call $payment_key_exchange"), "should call $payment_key_exchange");
+    }
+
+    #[test]
+    fn payment_encryption_all_providers() {
+        for provider in &["stripe", "moov", "paypal", "square"] {
+            let payment = PaymentDef {
+                name: "PP".into(), provider: Some(Expr::StringLit(provider.to_string())),
+                public_key: None, sandbox_mode: false, on_success: None, on_error: None,
+                methods: vec![], is_pub: false, span: span(),
+            };
+            let mut codegen = WasmCodegen::new();
+            codegen.indent = 1;
+            codegen.generate_payment(&payment);
+            let output = codegen.output.clone();
+            assert!(output.contains("__payment_PP_ecdh_priv_ptr"), "{} should have ECDH crypto globals", provider);
+            assert!(output.contains("__payment_PP_shared_key_ptr"), "{} should have shared key globals", provider);
+            assert!(output.contains("call $__payment_PP_encrypt_and_sign"), "{} submit should encrypt", provider);
+            assert!(output.contains("call $payment_key_exchange"), "{} init should call key exchange", provider);
+        }
     }
 
     // -----------------------------------------------------------------------

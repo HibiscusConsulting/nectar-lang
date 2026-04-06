@@ -142,6 +142,7 @@ pub enum TokenKind {
     Break,
     Continue,
     Inplace,
+    MiniProgram,
 
     // Types
     I32,
@@ -284,6 +285,7 @@ impl TokenKind {
             TokenKind::Field => Some("field"), TokenKind::Mutation => Some("mutation"),
             TokenKind::Assert => Some("assert"), TokenKind::Expect => Some("expect"),
             TokenKind::AssertEq => Some("assert_eq"), TokenKind::Derive => Some("derive"),
+            TokenKind::MiniProgram => Some("miniprogram"),
             _ => None,
         }
     }
@@ -333,6 +335,7 @@ impl TokenKind {
             TokenKind::A11y => "a11y".into(), TokenKind::Manual => "manual".into(),
             TokenKind::Hybrid => "hybrid".into(), TokenKind::Outlet => "outlet".into(),
             TokenKind::Crypto => "crypto".into(), TokenKind::Virtual => "virtual".into(),
+            TokenKind::MiniProgram => "miniprogram".into(),
             _ => String::new(),
         }
     }

@@ -1,0 +1,1944 @@
+// alipay-miniprogram-demo.nectar — Alipay Mini-Program Coffee Shop Demo
+//
+// Demonstrates: Nectar's miniprogram keyword as a drop-in replacement for
+// Alipay's mini-program runtime. Instead of a JavaScript sandbox, mini-programs
+// compile to WASM with hardware-level memory isolation.
+//
+// The mp:: API surface mirrors Alipay's my.* APIs:
+//   mp::getStorageSync / mp::setStorageSync  — persistent key-value store
+//   mp::showLoading / mp::hideLoading        — loading overlay
+//   mp::showToast                            — toast notification
+//   mp::getAuthCode                          — Alipay OAuth flow
+//   mp::getUserInfo                          — user profile from Alipay
+//   mp::tradePay                             — QR / barcode payment
+//   mp::getNetworkType                       — connectivity check
+//   mp::getLocation                          — GPS coordinates
+//   mp::navigateTo / mp::navigateBack        — page navigation stack
+//   mp::request                              — HTTP fetch
+//   mp::setNavigationBar                     — top bar config
+//
+// Architecture:
+//   Alipay App Host  →  WASM Sandbox (Nectar Binary)  →  mp:: syscall layer
+//   vs.
+//   Alipay App Host  →  JS Sandbox (V8 Isolate)  →  my.* bridge  →  native
+//
+// The WASM binary is portable: swap payment_provider from "alipay" to "stripe"
+// or "moov" with one line. The business logic is identical.
+//
+// Compile: nectar build examples/alipay-miniprogram-demo.nectar --emit-wasm
+
+miniprogram AlipayDemo {
+    payment_provider: "alipay"
+    auth_provider: "alipay"
+    map_provider: "amap"
+    offline: true
+    cache_strategy: "cache-first"
+
+    fn onLaunch(options: String) {
+        let token = mp::getStorageSync("auth_token")
+        let cached_cart = mp::getStorageSync("cart_data")
+        mp::showLoading("Loading...")
+        mp::setNavigationBar("Nectar Coffee", "#1a472a", "#fafafa")
+    }
+
+    fn onShow() {
+        let net = mp::getNetworkType()
+        mp::hideLoading()
+    }
+
+    fn onHide() {
+        mp::setStorageSync("last_active", "timestamp")
+        mp::setStorageSync("cart_data", "saved")
+    }
+}
+
+// --- Data structures ---
+
+struct MenuItem {
+    id: i32,
+    name: String,
+    price_cents: i32,
+    category: String,
+    description: String,
+}
+
+struct CartItem {
+    item_name: String,
+    quantity: i32,
+    unit_price_cents: i32,
+}
+
+struct OrderRecord {
+    order_id: i32,
+    total_cents: i32,
+    item_count: i32,
+    status: String,
+}
+
+struct StoreLocation {
+    name: String,
+    lat_x1000: i32,
+    lng_x1000: i32,
+    address: String,
+    hours: String,
+}
+
+// --- Main Application Component ---
+
+component CoffeeShopApp() {
+    // === View state ===
+    let mut active_tab: i32 = 0;
+    let mut category_idx: i32 = 0;
+    let mut sort_mode: i32 = 0;
+    let mut search_active: i32 = 0;
+
+    // === Auth state ===
+    let mut is_logged_in: i32 = 0;
+    let mut user_name: String = "Guest";
+    let mut loyalty_points: i32 = 0;
+
+    // === Cart state ===
+    let mut cart_count: i32 = 0;
+    let mut cart_total_cents: i32 = 0;
+    let mut tip_mode: i32 = 0;
+    let mut tip_cents: i32 = 0;
+    let mut tax_cents: i32 = 0;
+    let mut grand_total_cents: i32 = 0;
+
+    // Individual cart item quantities (one per menu item)
+    let mut cart_q0: i32 = 0;
+    let mut cart_q1: i32 = 0;
+    let mut cart_q2: i32 = 0;
+    let mut cart_q3: i32 = 0;
+    let mut cart_q4: i32 = 0;
+    let mut cart_q5: i32 = 0;
+    let mut cart_q6: i32 = 0;
+    let mut cart_q7: i32 = 0;
+    let mut cart_q8: i32 = 0;
+    let mut cart_q9: i32 = 0;
+    let mut cart_q10: i32 = 0;
+    let mut cart_q11: i32 = 0;
+    let mut cart_q12: i32 = 0;
+    let mut cart_q13: i32 = 0;
+    let mut cart_q14: i32 = 0;
+    let mut cart_q15: i32 = 0;
+    let mut cart_q16: i32 = 0;
+    let mut cart_q17: i32 = 0;
+    let mut cart_q18: i32 = 0;
+    let mut cart_q19: i32 = 0;
+    let mut cart_q20: i32 = 0;
+    let mut cart_q21: i32 = 0;
+
+    // Menu item prices (cents) — parallel arrays
+    let mut price0: i32 = 275;
+    let mut price1: i32 = 325;
+    let mut price2: i32 = 395;
+    let mut price3: i32 = 450;
+    let mut price4: i32 = 475;
+    let mut price5: i32 = 525;
+    let mut price6: i32 = 550;
+    let mut price7: i32 = 495;
+    let mut price8: i32 = 575;
+    let mut price9: i32 = 425;
+    let mut price10: i32 = 475;
+    let mut price11: i32 = 525;
+    let mut price12: i32 = 375;
+    let mut price13: i32 = 425;
+    let mut price14: i32 = 350;
+    let mut price15: i32 = 395;
+    let mut price16: i32 = 300;
+    let mut price17: i32 = 325;
+    let mut price18: i32 = 375;
+    let mut price19: i32 = 295;
+    let mut price20: i32 = 425;
+    let mut price21: i32 = 350;
+
+    // === Payment state ===
+    let mut payment_status: i32 = 0;
+    let mut payment_countdown: i32 = 30;
+    let mut order_id_seed: i32 = 100000;
+    let mut current_order_id: i32 = 0;
+    let mut qr_checksum: i32 = 0;
+
+    // === Order history ===
+    let mut order_count: i32 = 0;
+    let mut last_order_total: i32 = 0;
+    let mut total_spent_cents: i32 = 0;
+
+    // === Network state ===
+    let mut is_online: i32 = 1;
+    let mut offline_queue: i32 = 0;
+
+    // === Store locator ===
+    let mut user_lat_x1000: i32 = 39904;
+    let mut user_lng_x1000: i32 = 116407;
+    let mut nearest_store_idx: i32 = 0;
+    let mut nearest_distance_m: i32 = 0;
+
+    // ======================================================
+    // Navigation
+    // ======================================================
+
+    fn show_menu(&mut self) {
+        self.active_tab = 0;
+    }
+
+    fn show_cart(&mut self) {
+        self.active_tab = 1;
+        self.recalculate_totals();
+    }
+
+    fn show_orders(&mut self) {
+        self.active_tab = 2;
+    }
+
+    fn show_profile(&mut self) {
+        self.active_tab = 3;
+    }
+
+    fn show_stores(&mut self) {
+        self.active_tab = 4;
+        self.calculate_distances();
+    }
+
+    // ======================================================
+    // Category filtering
+    // ======================================================
+
+    fn filter_all(&mut self) {
+        self.category_idx = 0;
+    }
+
+    fn filter_espresso(&mut self) {
+        self.category_idx = 1;
+    }
+
+    fn filter_latte(&mut self) {
+        self.category_idx = 2;
+    }
+
+    fn filter_cold(&mut self) {
+        self.category_idx = 3;
+    }
+
+    fn filter_tea(&mut self) {
+        self.category_idx = 4;
+    }
+
+    fn filter_pastry(&mut self) {
+        self.category_idx = 5;
+    }
+
+    // ======================================================
+    // Sort controls
+    // ======================================================
+
+    fn sort_default(&mut self) {
+        self.sort_mode = 0;
+    }
+
+    fn sort_price_asc(&mut self) {
+        self.sort_mode = 1;
+    }
+
+    fn sort_price_desc(&mut self) {
+        self.sort_mode = 2;
+    }
+
+    // ======================================================
+    // Cart operations — add item by index
+    // ======================================================
+
+    fn add_item_0(&mut self) { self.cart_q0 += 1; self.cart_count += 1; self.cart_total_cents += self.price0; }
+    fn add_item_1(&mut self) { self.cart_q1 += 1; self.cart_count += 1; self.cart_total_cents += self.price1; }
+    fn add_item_2(&mut self) { self.cart_q2 += 1; self.cart_count += 1; self.cart_total_cents += self.price2; }
+    fn add_item_3(&mut self) { self.cart_q3 += 1; self.cart_count += 1; self.cart_total_cents += self.price3; }
+    fn add_item_4(&mut self) { self.cart_q4 += 1; self.cart_count += 1; self.cart_total_cents += self.price4; }
+    fn add_item_5(&mut self) { self.cart_q5 += 1; self.cart_count += 1; self.cart_total_cents += self.price5; }
+    fn add_item_6(&mut self) { self.cart_q6 += 1; self.cart_count += 1; self.cart_total_cents += self.price6; }
+    fn add_item_7(&mut self) { self.cart_q7 += 1; self.cart_count += 1; self.cart_total_cents += self.price7; }
+    fn add_item_8(&mut self) { self.cart_q8 += 1; self.cart_count += 1; self.cart_total_cents += self.price8; }
+    fn add_item_9(&mut self) { self.cart_q9 += 1; self.cart_count += 1; self.cart_total_cents += self.price9; }
+    fn add_item_10(&mut self) { self.cart_q10 += 1; self.cart_count += 1; self.cart_total_cents += self.price10; }
+    fn add_item_11(&mut self) { self.cart_q11 += 1; self.cart_count += 1; self.cart_total_cents += self.price11; }
+    fn add_item_12(&mut self) { self.cart_q12 += 1; self.cart_count += 1; self.cart_total_cents += self.price12; }
+    fn add_item_13(&mut self) { self.cart_q13 += 1; self.cart_count += 1; self.cart_total_cents += self.price13; }
+    fn add_item_14(&mut self) { self.cart_q14 += 1; self.cart_count += 1; self.cart_total_cents += self.price14; }
+    fn add_item_15(&mut self) { self.cart_q15 += 1; self.cart_count += 1; self.cart_total_cents += self.price15; }
+    fn add_item_16(&mut self) { self.cart_q16 += 1; self.cart_count += 1; self.cart_total_cents += self.price16; }
+    fn add_item_17(&mut self) { self.cart_q17 += 1; self.cart_count += 1; self.cart_total_cents += self.price17; }
+    fn add_item_18(&mut self) { self.cart_q18 += 1; self.cart_count += 1; self.cart_total_cents += self.price18; }
+    fn add_item_19(&mut self) { self.cart_q19 += 1; self.cart_count += 1; self.cart_total_cents += self.price19; }
+    fn add_item_20(&mut self) { self.cart_q20 += 1; self.cart_count += 1; self.cart_total_cents += self.price20; }
+    fn add_item_21(&mut self) { self.cart_q21 += 1; self.cart_count += 1; self.cart_total_cents += self.price21; }
+
+    // Remove item by index (decrement, floor at 0)
+    fn remove_item_0(&mut self) { if self.cart_q0 > 0 { self.cart_q0 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price0; } }
+    fn remove_item_1(&mut self) { if self.cart_q1 > 0 { self.cart_q1 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price1; } }
+    fn remove_item_2(&mut self) { if self.cart_q2 > 0 { self.cart_q2 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price2; } }
+    fn remove_item_3(&mut self) { if self.cart_q3 > 0 { self.cart_q3 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price3; } }
+    fn remove_item_4(&mut self) { if self.cart_q4 > 0 { self.cart_q4 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price4; } }
+    fn remove_item_5(&mut self) { if self.cart_q5 > 0 { self.cart_q5 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price5; } }
+
+    fn clear_cart(&mut self) {
+        self.cart_q0 = 0; self.cart_q1 = 0; self.cart_q2 = 0; self.cart_q3 = 0;
+        self.cart_q4 = 0; self.cart_q5 = 0; self.cart_q6 = 0; self.cart_q7 = 0;
+        self.cart_q8 = 0; self.cart_q9 = 0; self.cart_q10 = 0; self.cart_q11 = 0;
+        self.cart_q12 = 0; self.cart_q13 = 0; self.cart_q14 = 0; self.cart_q15 = 0;
+        self.cart_q16 = 0; self.cart_q17 = 0; self.cart_q18 = 0; self.cart_q19 = 0;
+        self.cart_q20 = 0; self.cart_q21 = 0;
+        self.cart_count = 0;
+        self.cart_total_cents = 0;
+        self.tip_mode = 0;
+        self.tip_cents = 0;
+        self.tax_cents = 0;
+        self.grand_total_cents = 0;
+    }
+
+    // ======================================================
+    // Totals calculation (pure WASM arithmetic)
+    // ======================================================
+
+    fn recalculate_totals(&mut self) {
+        // Tax at 8.25% — compute as (subtotal * 825) / 10000
+        self.tax_cents = (self.cart_total_cents * 825) / 10000;
+
+        // Tip calculation based on mode
+        // 0 = no tip, 1 = 15%, 2 = 18%, 3 = 20%
+        if self.tip_mode == 0 {
+            self.tip_cents = 0;
+        }
+        if self.tip_mode == 1 {
+            self.tip_cents = (self.cart_total_cents * 15) / 100;
+        }
+        if self.tip_mode == 2 {
+            self.tip_cents = (self.cart_total_cents * 18) / 100;
+        }
+        if self.tip_mode == 3 {
+            self.tip_cents = (self.cart_total_cents * 20) / 100;
+        }
+
+        self.grand_total_cents = self.cart_total_cents + self.tax_cents + self.tip_cents;
+    }
+
+    fn tip_none(&mut self) { self.tip_mode = 0; self.recalculate_totals(); }
+    fn tip_15(&mut self) { self.tip_mode = 1; self.recalculate_totals(); }
+    fn tip_18(&mut self) { self.tip_mode = 2; self.recalculate_totals(); }
+    fn tip_20(&mut self) { self.tip_mode = 3; self.recalculate_totals(); }
+
+    // ======================================================
+    // Cents formatting helpers
+    // ======================================================
+
+    fn dollars_part(&self, cents: i32) -> i32 {
+        return cents / 100;
+    }
+
+    fn cents_part(&self, cents: i32) -> i32 {
+        let c: i32 = cents - (cents / 100) * 100;
+        if c < 0 {
+            return 0 - c;
+        }
+        return c;
+    }
+
+    // ======================================================
+    // QR Payment Flow
+    // ======================================================
+
+    fn generate_order_id(&mut self) {
+        // Deterministic order ID from cart contents
+        self.order_id_seed += 1;
+        let mut h: i32 = self.order_id_seed;
+        h = h * 2654435761;
+        if h < 0 { h = 0 - h; }
+        h = h + self.cart_total_cents * 31;
+        if h < 0 { h = 0 - h; }
+        self.current_order_id = 100000 + (h - (h / 900000) * 900000);
+    }
+
+    fn compute_crc16(&mut self, data_seed: i32) {
+        // CRC-16/CCITT-FALSE polynomial division (pure WASM)
+        // Polynomial: 0x1021, Init: 0xFFFF
+        let mut crc: i32 = 65535;
+        let mut byte_val: i32 = data_seed;
+
+        // Process 8 bytes of order data
+        let mut b: i32 = 0;
+        while b < 8 {
+            // Extract current byte
+            let current_byte: i32 = byte_val - (byte_val / 256) * 256;
+            crc = crc + current_byte;
+
+            // 8-bit polynomial division
+            let mut bit: i32 = 0;
+            while bit < 8 {
+                let top_bit: i32 = crc / 32768;
+                crc = crc * 2;
+                if crc > 65535 { crc = crc - 65536; }
+                if top_bit > 0 {
+                    // XOR with polynomial 0x1021 = 4129
+                    let mut xor_result: i32 = 0;
+                    // Manual XOR via bit decomposition (no ^ operator)
+                    let mut i: i32 = 0;
+                    let mut a: i32 = crc;
+                    let mut bv: i32 = 4129;
+                    let mut result: i32 = 0;
+                    let mut place: i32 = 1;
+                    while i < 16 {
+                        let a_bit: i32 = a - (a / 2) * 2;
+                        let b_bit: i32 = bv - (bv / 2) * 2;
+                        let mut xb: i32 = 0;
+                        if a_bit != b_bit { xb = 1; }
+                        result = result + xb * place;
+                        a = a / 2;
+                        bv = bv / 2;
+                        place = place * 2;
+                        i += 1;
+                    }
+                    crc = result;
+                }
+                bit += 1;
+            }
+
+            byte_val = byte_val / 256 + b * 53;
+            b += 1;
+        }
+
+        self.qr_checksum = crc;
+    }
+
+    fn initiate_payment(&mut self) {
+        if self.cart_count == 0 { return; }
+        self.recalculate_totals();
+        self.generate_order_id();
+        self.compute_crc16(self.current_order_id + self.grand_total_cents);
+
+        // QR payload: alipay://pay?order={id}&amount={total}&merchant=NECTAR_COFFEE&crc={checksum}
+        // Payment submitted via mp::tradePay
+        mp::tradePay(self.current_order_id, self.grand_total_cents, "payment_callback")
+
+        self.payment_status = 1;
+        self.payment_countdown = 30;
+    }
+
+    fn payment_callback(&mut self) {
+        // Called by mp::tradePay when scan completes
+        self.payment_status = 3;
+
+        // Record order
+        self.order_count += 1;
+        self.last_order_total = self.grand_total_cents;
+        self.total_spent_cents += self.grand_total_cents;
+
+        // Award loyalty points: 1 point per dollar spent
+        let points_earned: i32 = self.grand_total_cents / 100;
+        self.loyalty_points += points_earned;
+
+        // Persist to storage
+        mp::setStorageSync("order_count", format("{}", self.order_count))
+        mp::setStorageSync("loyalty_points", format("{}", self.loyalty_points))
+        mp::setStorageSync("total_spent", format("{}", self.total_spent_cents))
+        mp::showToast("Payment complete!")
+
+        self.clear_cart();
+    }
+
+    fn cancel_payment(&mut self) {
+        self.payment_status = 0;
+    }
+
+    fn simulate_scan(&mut self) {
+        // Simulate QR scan confirmation
+        self.payment_status = 2;
+    }
+
+    fn confirm_payment(&mut self) {
+        self.payment_callback();
+    }
+
+    // ======================================================
+    // Order history & offline
+    // ======================================================
+
+    fn toggle_network(&mut self) {
+        if self.is_online == 1 {
+            self.is_online = 0;
+        } else {
+            self.is_online = 1;
+            // Sync queued orders on reconnect
+            if self.offline_queue > 0 {
+                self.order_count += self.offline_queue;
+                self.offline_queue = 0;
+                mp::showToast("Offline orders synced!")
+            }
+        }
+    }
+
+    fn queue_offline_order(&mut self) {
+        if self.is_online == 0 {
+            self.offline_queue += 1;
+            mp::setStorageSync("offline_queue", format("{}", self.offline_queue))
+        }
+    }
+
+    // ======================================================
+    // Auth / Profile
+    // ======================================================
+
+    fn login(&mut self) {
+        // Trigger Alipay OAuth flow
+        mp::getAuthCode("auth_user")
+        self.is_logged_in = 1;
+        self.user_name = "Wei Chen";
+        self.loyalty_points = 342;
+        mp::showToast("Welcome back, Wei!")
+        mp::setStorageSync("auth_token", "alipay_oauth_token_abc123")
+    }
+
+    fn logout(&mut self) {
+        self.is_logged_in = 0;
+        self.user_name = "Guest";
+        mp::setStorageSync("auth_token", "")
+        mp::showToast("Logged out")
+    }
+
+    // Loyalty tier: Bronze < 100, Silver < 500, Gold < 2000, Diamond >= 2000
+    fn get_tier_threshold(&self) -> i32 {
+        if self.loyalty_points >= 2000 { return 4; }
+        if self.loyalty_points >= 500 { return 3; }
+        if self.loyalty_points >= 100 { return 2; }
+        return 1;
+    }
+
+    // ======================================================
+    // Store locator — Haversine distance (pure WASM)
+    // ======================================================
+
+    fn calculate_distances(&mut self) {
+        // Store coordinates (lat/lng * 1000 for integer math)
+        // Store 0: Guomao — 39.909, 116.459
+        // Store 1: Sanlitun — 39.933, 116.454
+        // Store 2: Wangfujing — 39.914, 116.411
+        // Store 3: Zhongguancun — 39.981, 116.310
+        // Store 4: CBD East — 39.920, 116.470
+
+        // Haversine approximation using integer math
+        // distance_m ~= sqrt((dlat*111320)^2 + (dlng*111320*cos(lat))^2)
+        // Simplified: at lat ~40, cos(40) ~= 0.766
+        // d_m = sqrt((dlat_x1000 * 111)^2 + (dlng_x1000 * 85)^2)
+        // We compute d_squared and find approximate sqrt
+
+        // Store 0: Guomao
+        let dlat0: i32 = 39909 - self.user_lat_x1000;
+        let dlng0: i32 = 116459 - self.user_lng_x1000;
+        let dy0: i32 = dlat0 * 111 / 1000;
+        let dx0: i32 = dlng0 * 85 / 1000;
+        let d0_sq: i32 = dy0 * dy0 + dx0 * dx0;
+
+        // Store 1: Sanlitun
+        let dlat1: i32 = 39933 - self.user_lat_x1000;
+        let dlng1: i32 = 116454 - self.user_lng_x1000;
+        let dy1: i32 = dlat1 * 111 / 1000;
+        let dx1: i32 = dlng1 * 85 / 1000;
+        let d1_sq: i32 = dy1 * dy1 + dx1 * dx1;
+
+        // Store 2: Wangfujing
+        let dlat2: i32 = 39914 - self.user_lat_x1000;
+        let dlng2: i32 = 116411 - self.user_lng_x1000;
+        let dy2: i32 = dlat2 * 111 / 1000;
+        let dx2: i32 = dlng2 * 85 / 1000;
+        let d2_sq: i32 = dy2 * dy2 + dx2 * dx2;
+
+        // Find nearest
+        let mut min_d: i32 = d0_sq;
+        self.nearest_store_idx = 0;
+        if d1_sq < min_d { min_d = d1_sq; self.nearest_store_idx = 1; }
+        if d2_sq < min_d { min_d = d2_sq; self.nearest_store_idx = 2; }
+
+        // Integer sqrt approximation via Newton's method
+        let mut guess: i32 = 500;
+        let mut j: i32 = 0;
+        while j < 10 {
+            if guess > 0 {
+                guess = (guess + min_d / guess) / 2;
+            }
+            j += 1;
+        }
+        self.nearest_distance_m = guess;
+    }
+
+    fn request_location(&mut self) {
+        mp::getLocation("gps_callback")
+        // Simulated GPS coordinates for Beijing CBD
+        self.user_lat_x1000 = 39915;
+        self.user_lng_x1000 = 116435;
+        self.calculate_distances();
+        mp::showToast("Location updated")
+    }
+
+    // ======================================================
+    // Render
+    // ======================================================
+
+    style {
+        .page {
+            background-color: "#09090b";
+            color: "#fafafa";
+            font-family: "system-ui, -apple-system, sans-serif";
+            min-height: "100vh";
+            padding: "0";
+        }
+        .header {
+            background-color: "#1a472a";
+            padding: "16px 24px";
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .header-title {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#fafafa";
+            margin: "0";
+        }
+        .header-sub {
+            font-size: "12px";
+            color: "#86efac";
+            margin: "0";
+        }
+        .cart-badge {
+            background-color: "#ef4444";
+            color: "#fafafa";
+            font-size: "11px";
+            font-weight: "700";
+            padding: "2px 8px";
+            border-radius: "12px";
+            min-width: "20px";
+            text-align: "center";
+        }
+        .nav-bar {
+            display: "flex";
+            background-color: "#18181b";
+            border-bottom: "1px solid #27272a";
+            padding: "0 16px";
+        }
+        .nav-tab {
+            padding: "12px 16px";
+            font-size: "13px";
+            font-weight: "500";
+            color: "#71717a";
+            cursor: "pointer";
+            border: "none";
+            background: "none";
+            border-bottom: "2px solid transparent";
+        }
+        .nav-active {
+            color: "#4ade80";
+            border-bottom: "2px solid #4ade80";
+        }
+        .content {
+            max-width: "960px";
+            margin: "0 auto";
+            padding: "24px";
+        }
+        .cat-pills {
+            display: "flex";
+            gap: "8px";
+            margin-bottom: "16px";
+            flex-wrap: "wrap";
+        }
+        .pill {
+            padding: "6px 14px";
+            border-radius: "20px";
+            font-size: "12px";
+            font-weight: "600";
+            cursor: "pointer";
+            border: "1px solid #3f3f46";
+            background-color: "#27272a";
+            color: "#a1a1aa";
+        }
+        .pill-active {
+            padding: "6px 14px";
+            border-radius: "20px";
+            font-size: "12px";
+            font-weight: "600";
+            cursor: "pointer";
+            border: "1px solid #166534";
+            background-color: "#052e16";
+            color: "#4ade80";
+        }
+        .menu-grid {
+            display: "grid";
+            grid-template-columns: "repeat(auto-fill, minmax(280px, 1fr))";
+            gap: "16px";
+            margin-bottom: "24px";
+        }
+        .menu-card {
+            background-color: "#18181b";
+            border: "1px solid #27272a";
+            border-radius: "12px";
+            padding: "16px";
+        }
+        .item-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#fafafa";
+            margin: "0 0 4px 0";
+        }
+        .item-cat {
+            font-size: "11px";
+            color: "#71717a";
+            margin: "0 0 8px 0";
+        }
+        .item-desc {
+            font-size: "12px";
+            color: "#a1a1aa";
+            margin: "0 0 12px 0";
+            line-height: "1.4";
+        }
+        .item-footer {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+        }
+        .item-price {
+            font-size: "18px";
+            font-weight: "700";
+            color: "#fafafa";
+        }
+        .btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "13px";
+            font-weight: "600";
+            cursor: "pointer";
+            border: "none";
+            min-height: "36px";
+        }
+        .btn-add {
+            background-color: "#1a472a";
+            color: "#4ade80";
+            border: "1px solid #166534";
+        }
+        .btn-primary {
+            background-color: "#4ade80";
+            color: "#09090b";
+            padding: "12px 24px";
+            font-size: "15px";
+            min-height: "44px";
+        }
+        .btn-secondary {
+            background-color: "#27272a";
+            color: "#fafafa";
+            border: "1px solid #3f3f46";
+        }
+        .btn-danger {
+            background-color: "#27272a";
+            color: "#ef4444";
+            border: "1px solid #7f1d1d";
+        }
+        .btn-sm {
+            padding: "4px 12px";
+            font-size: "12px";
+            min-height: "28px";
+        }
+        .card {
+            background-color: "#18181b";
+            border: "1px solid #27272a";
+            border-radius: "12px";
+            padding: "20px";
+            margin-bottom: "16px";
+        }
+        .card-title {
+            font-size: "16px";
+            font-weight: "600";
+            color: "#fafafa";
+            margin: "0 0 12px 0";
+        }
+        .kv-row {
+            display: "flex";
+            justify-content: "space-between";
+            padding: "8px 0";
+            border-bottom: "1px solid #27272a";
+            font-size: "13px";
+        }
+        .kv-label {
+            color: "#a1a1aa";
+        }
+        .kv-value {
+            color: "#fafafa";
+            font-weight: "500";
+        }
+        .kv-green {
+            color: "#4ade80";
+            font-weight: "600";
+        }
+        .kv-amber {
+            color: "#f59e0b";
+            font-weight: "600";
+        }
+        .kv-red {
+            color: "#ef4444";
+            font-weight: "600";
+        }
+        .tip-row {
+            display: "flex";
+            gap: "8px";
+            margin: "12px 0";
+        }
+        .tip-btn {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "13px";
+            font-weight: "600";
+            cursor: "pointer";
+            border: "1px solid #3f3f46";
+            background-color: "#27272a";
+            color: "#a1a1aa";
+            flex: "1";
+            text-align: "center";
+        }
+        .tip-active {
+            padding: "8px 16px";
+            border-radius: "8px";
+            font-size: "13px";
+            font-weight: "600";
+            cursor: "pointer";
+            border: "1px solid #166534";
+            background-color: "#052e16";
+            color: "#4ade80";
+            flex: "1";
+            text-align: "center";
+        }
+        .qr-box {
+            background-color: "#ffffff";
+            border-radius: "12px";
+            padding: "24px";
+            text-align: "center";
+            margin: "16px auto";
+            max-width: "280px";
+        }
+        .qr-text {
+            font-size: "14px";
+            color: "#09090b";
+            font-weight: "600";
+        }
+        .qr-mono {
+            font-size: "11px";
+            color: "#71717a";
+            font-family: "monospace";
+            word-break: "break-all";
+            margin-top: "8px";
+        }
+        .status-badge {
+            display: "inline-flex";
+            padding: "4px 12px";
+            border-radius: "20px";
+            font-size: "12px";
+            font-weight: "600";
+        }
+        .status-pending {
+            background-color: "#451a03";
+            color: "#f59e0b";
+            border: "1px solid #92400e";
+        }
+        .status-scanning {
+            background-color: "#172554";
+            color: "#60a5fa";
+            border: "1px solid #1e40af";
+        }
+        .status-confirmed {
+            background-color: "#052e16";
+            color: "#4ade80";
+            border: "1px solid #166534";
+        }
+        .profile-card {
+            background-color: "#18181b";
+            border: "1px solid #27272a";
+            border-radius: "16px";
+            padding: "32px";
+            text-align: "center";
+            margin-bottom: "16px";
+        }
+        .avatar {
+            width: "64px";
+            height: "64px";
+            background-color: "#1a472a";
+            border-radius: "50%";
+            margin: "0 auto 12px auto";
+            display: "flex";
+            align-items: "center";
+            justify-content: "center";
+            font-size: "24px";
+            color: "#4ade80";
+        }
+        .user-name {
+            font-size: "20px";
+            font-weight: "700";
+            color: "#fafafa";
+            margin: "0 0 4px 0";
+        }
+        .tier-badge {
+            display: "inline-flex";
+            padding: "4px 14px";
+            border-radius: "20px";
+            font-size: "12px";
+            font-weight: "700";
+        }
+        .tier-bronze {
+            background-color: "#451a03";
+            color: "#d97706";
+        }
+        .tier-silver {
+            background-color: "#27272a";
+            color: "#d4d4d8";
+        }
+        .tier-gold {
+            background-color: "#422006";
+            color: "#fbbf24";
+        }
+        .tier-diamond {
+            background-color: "#172554";
+            color: "#60a5fa";
+        }
+        .store-card {
+            background-color: "#18181b";
+            border: "1px solid #27272a";
+            border-radius: "12px";
+            padding: "16px";
+            margin-bottom: "12px";
+            display: "flex";
+            justify-content: "space-between";
+            align-items: "center";
+        }
+        .store-name {
+            font-size: "15px";
+            font-weight: "600";
+            color: "#fafafa";
+            margin: "0 0 4px 0";
+        }
+        .store-addr {
+            font-size: "12px";
+            color: "#a1a1aa";
+            margin: "0 0 4px 0";
+        }
+        .store-hours {
+            font-size: "11px";
+            color: "#71717a";
+        }
+        .store-dist {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#4ade80";
+            text-align: "right";
+        }
+        .online-dot {
+            display: "inline-block";
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#4ade80";
+            margin-right: "6px";
+        }
+        .offline-dot {
+            display: "inline-block";
+            width: "8px";
+            height: "8px";
+            border-radius: "50%";
+            background-color: "#f59e0b";
+            margin-right: "6px";
+        }
+        .section-label {
+            font-size: "12px";
+            font-weight: "700";
+            color: "#71717a";
+            letter-spacing: "0.05em";
+            margin-bottom: "12px";
+            text-transform: "uppercase";
+        }
+        .empty-state {
+            text-align: "center";
+            padding: "48px 24px";
+            color: "#71717a";
+        }
+        .lifecycle-step {
+            display: "flex";
+            gap: "12px";
+            padding: "12px 16px";
+            background-color: "#0d1117";
+            border-radius: "8px";
+            margin-bottom: "8px";
+            border-left: "3px solid #4ade80";
+        }
+        .lifecycle-fn {
+            font-size: "13px";
+            font-weight: "600";
+            color: "#4ade80";
+            font-family: "monospace";
+            min-width: "100px";
+        }
+        .lifecycle-desc {
+            font-size: "13px";
+            color: "#a1a1aa";
+        }
+        .mp-api {
+            font-family: "monospace";
+            font-size: "12px";
+            color: "#60a5fa";
+            background-color: "#172554";
+            padding: "2px 6px";
+            border-radius: "4px";
+        }
+        .divider {
+            height: "1px";
+            background-color: "#27272a";
+            margin: "16px 0";
+        }
+        .stats-grid {
+            display: "grid";
+            grid-template-columns: "repeat(3, 1fr)";
+            gap: "12px";
+            margin-bottom: "16px";
+        }
+        .stat-card {
+            background-color: "#0d1117";
+            border: "1px solid #27272a";
+            border-radius: "8px";
+            padding: "14px";
+            text-align: "center";
+        }
+        .stat-value {
+            font-size: "24px";
+            font-weight: "700";
+            color: "#4ade80";
+        }
+        .stat-label {
+            font-size: "11px";
+            color: "#71717a";
+            margin-top: "4px";
+        }
+        .cart-item-row {
+            display: "flex";
+            align-items: "center";
+            justify-content: "space-between";
+            padding: "10px 0";
+            border-bottom: "1px solid #27272a";
+        }
+        .cart-item-name {
+            font-size: "14px";
+            font-weight: "500";
+            color: "#fafafa";
+            flex: "1";
+        }
+        .cart-item-qty {
+            font-size: "13px";
+            color: "#a1a1aa";
+            margin: "0 12px";
+        }
+        .cart-item-total {
+            font-size: "14px";
+            font-weight: "600";
+            color: "#fafafa";
+            min-width: "60px";
+            text-align: "right";
+        }
+        .footer-bar {
+            background-color: "#18181b";
+            border-top: "1px solid #27272a";
+            padding: "12px 24px";
+            text-align: "center";
+        }
+        .footer-text {
+            font-size: "11px";
+            color: "#71717a";
+        }
+    }
+
+    render {
+        <div class="page">
+            // ========== Header ==========
+            <div class="header">
+                <div>
+                    <h1 class="header-title">"Nectar Coffee"</h1>
+                    <p class="header-sub">"Alipay Mini-Program — Compiled WASM"</p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px">
+                    // Network status
+                    {if self.is_online == 1 {
+                        <span class="online-dot">" "</span>
+                    }}
+                    {if self.is_online == 0 {
+                        <span class="offline-dot">" "</span>
+                    }}
+                    // Cart badge
+                    {if self.cart_count > 0 {
+                        <span class="cart-badge">{format("{}", self.cart_count)}</span>
+                    }}
+                    <button class="btn btn-sm btn-secondary" on:click={self.toggle_network}>
+                        {if self.is_online == 1 {
+                            <span>"Online"</span>
+                        }}
+                        {if self.is_online == 0 {
+                            <span>"Offline"</span>
+                        }}
+                    </button>
+                </div>
+            </div>
+
+            // ========== Navigation Tabs ==========
+            <div class="nav-bar">
+                <button class="nav-tab" on:click={self.show_menu}>
+                    {if self.active_tab == 0 {
+                        <span class="nav-active">"Menu"</span>
+                    } else {
+                        <span>"Menu"</span>
+                    }}
+                </button>
+                <button class="nav-tab" on:click={self.show_cart}>
+                    {if self.active_tab == 1 {
+                        <span class="nav-active">"Cart"</span>
+                    } else {
+                        <span>"Cart"</span>
+                    }}
+                </button>
+                <button class="nav-tab" on:click={self.show_orders}>
+                    {if self.active_tab == 2 {
+                        <span class="nav-active">"Orders"</span>
+                    } else {
+                        <span>"Orders"</span>
+                    }}
+                </button>
+                <button class="nav-tab" on:click={self.show_profile}>
+                    {if self.active_tab == 3 {
+                        <span class="nav-active">"Profile"</span>
+                    } else {
+                        <span>"Profile"</span>
+                    }}
+                </button>
+                <button class="nav-tab" on:click={self.show_stores}>
+                    {if self.active_tab == 4 {
+                        <span class="nav-active">"Stores"</span>
+                    } else {
+                        <span>"Stores"</span>
+                    }}
+                </button>
+            </div>
+
+            // ========== Content ==========
+            <div class="content">
+
+                // ===================================================
+                // Tab 0: Menu — Product Catalog
+                // ===================================================
+                {if self.active_tab == 0 {
+                    <div>
+                        // Category filter pills
+                        <div class="cat-pills">
+                            {if self.category_idx == 0 {
+                                <button class="pill-active" on:click={self.filter_all}>"All"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_all}>"All"</button>
+                            }}
+                            {if self.category_idx == 1 {
+                                <button class="pill-active" on:click={self.filter_espresso}>"Espresso"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_espresso}>"Espresso"</button>
+                            }}
+                            {if self.category_idx == 2 {
+                                <button class="pill-active" on:click={self.filter_latte}>"Latte"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_latte}>"Latte"</button>
+                            }}
+                            {if self.category_idx == 3 {
+                                <button class="pill-active" on:click={self.filter_cold}>"Cold Brew"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_cold}>"Cold Brew"</button>
+                            }}
+                            {if self.category_idx == 4 {
+                                <button class="pill-active" on:click={self.filter_tea}>"Tea"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_tea}>"Tea"</button>
+                            }}
+                            {if self.category_idx == 5 {
+                                <button class="pill-active" on:click={self.filter_pastry}>"Pastries"</button>
+                            } else {
+                                <button class="pill" on:click={self.filter_pastry}>"Pastries"</button>
+                            }}
+                        </div>
+
+                        // Sort controls
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center">
+                            <span style="font-size: 12px; color: #71717a">"Sort:"</span>
+                            <button class="btn btn-sm btn-secondary" on:click={self.sort_default}>"Default"</button>
+                            <button class="btn btn-sm btn-secondary" on:click={self.sort_price_asc}>"Price (low)"</button>
+                            <button class="btn btn-sm btn-secondary" on:click={self.sort_price_desc}>"Price (high)"</button>
+                        </div>
+
+                        // Menu items — Espresso category (items 0-4)
+                        {if self.category_idx == 0 || self.category_idx == 1 {
+                            <div>
+                                <p class="section-label">"Espresso"</p>
+                                <div class="menu-grid">
+                                    // 0: Espresso
+                                    <div class="menu-card">
+                                        <p class="item-name">"Espresso"</p>
+                                        <p class="item-cat">"Espresso"</p>
+                                        <p class="item-desc">"Bold single shot pulled at 9 bars of pressure. Pure intensity."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$2.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_0}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 1: Double Espresso
+                                    <div class="menu-card">
+                                        <p class="item-name">"Double Espresso"</p>
+                                        <p class="item-cat">"Espresso"</p>
+                                        <p class="item-desc">"Two shots of our signature dark roast. For when you mean business."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_1}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 2: Americano
+                                    <div class="menu-card">
+                                        <p class="item-name">"Americano"</p>
+                                        <p class="item-cat">"Espresso"</p>
+                                        <p class="item-desc">"Espresso diluted with hot water. Smooth, clean, aromatic."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.95"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_2}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 3: Macchiato
+                                    <div class="menu-card">
+                                        <p class="item-name">"Macchiato"</p>
+                                        <p class="item-cat">"Espresso"</p>
+                                        <p class="item-desc">"Espresso stained with a dollop of steamed milk foam."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.50"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_3}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 4: Cortado
+                                    <div class="menu-card">
+                                        <p class="item-name">"Cortado"</p>
+                                        <p class="item-cat">"Espresso"</p>
+                                        <p class="item-desc">"Equal parts espresso and warm milk. Balanced perfection."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_4}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+
+                        // Latte category (items 5-9)
+                        {if self.category_idx == 0 || self.category_idx == 2 {
+                            <div>
+                                <p class="section-label">"Latte"</p>
+                                <div class="menu-grid">
+                                    // 5: Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Classic Latte"</p>
+                                        <p class="item-cat">"Latte"</p>
+                                        <p class="item-desc">"Espresso with steamed milk and a thin layer of microfoam."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$5.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_5}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 6: Vanilla Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Vanilla Latte"</p>
+                                        <p class="item-cat">"Latte"</p>
+                                        <p class="item-desc">"Our house latte sweetened with Madagascar vanilla syrup."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$5.50"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_6}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 7: Caramel Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Caramel Latte"</p>
+                                        <p class="item-cat">"Latte"</p>
+                                        <p class="item-desc">"Buttery caramel swirled into espresso and steamed milk."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.95"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_7}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 8: Mocha
+                                    <div class="menu-card">
+                                        <p class="item-name">"Mocha"</p>
+                                        <p class="item-cat">"Latte"</p>
+                                        <p class="item-desc">"Rich chocolate meets espresso. Topped with whipped cream."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$5.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_8}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 9: Oat Milk Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Oat Milk Latte"</p>
+                                        <p class="item-cat">"Latte"</p>
+                                        <p class="item-desc">"Creamy oat milk paired with our signature espresso blend."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_9}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+
+                        // Cold Brew category (items 10-13)
+                        {if self.category_idx == 0 || self.category_idx == 3 {
+                            <div>
+                                <p class="section-label">"Cold Brew"</p>
+                                <div class="menu-grid">
+                                    // 10: Classic Cold Brew
+                                    <div class="menu-card">
+                                        <p class="item-name">"Classic Cold Brew"</p>
+                                        <p class="item-cat">"Cold Brew"</p>
+                                        <p class="item-desc">"Steeped 18 hours for ultra-smooth, low-acid coffee."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_10}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 11: Nitro Cold Brew
+                                    <div class="menu-card">
+                                        <p class="item-name">"Nitro Cold Brew"</p>
+                                        <p class="item-cat">"Cold Brew"</p>
+                                        <p class="item-desc">"Nitrogen-infused for a creamy, cascading pour. No milk needed."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$5.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_11}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 12: Iced Americano
+                                    <div class="menu-card">
+                                        <p class="item-name">"Iced Americano"</p>
+                                        <p class="item-cat">"Cold Brew"</p>
+                                        <p class="item-desc">"Espresso over ice with cold water. Crisp and refreshing."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_12}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 13: Vietnamese Iced Coffee
+                                    <div class="menu-card">
+                                        <p class="item-name">"Vietnamese Iced Coffee"</p>
+                                        <p class="item-cat">"Cold Brew"</p>
+                                        <p class="item-desc">"Strong drip coffee with sweetened condensed milk over ice."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_13}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+
+                        // Tea category (items 14-17)
+                        {if self.category_idx == 0 || self.category_idx == 4 {
+                            <div>
+                                <p class="section-label">"Tea"</p>
+                                <div class="menu-grid">
+                                    // 14: Jasmine Green Tea
+                                    <div class="menu-card">
+                                        <p class="item-name">"Jasmine Green Tea"</p>
+                                        <p class="item-cat">"Tea"</p>
+                                        <p class="item-desc">"Fragrant jasmine blossoms infused with premium green tea."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.50"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_14}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 15: Matcha Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Matcha Latte"</p>
+                                        <p class="item-cat">"Tea"</p>
+                                        <p class="item-desc">"Ceremonial-grade matcha whisked with steamed oat milk."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.95"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_15}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 16: Oolong Tea
+                                    <div class="menu-card">
+                                        <p class="item-name">"Oolong Tea"</p>
+                                        <p class="item-cat">"Tea"</p>
+                                        <p class="item-desc">"Semi-oxidized Tieguanyin with floral orchid notes."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.00"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_16}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 17: Chai Latte
+                                    <div class="menu-card">
+                                        <p class="item-name">"Chai Latte"</p>
+                                        <p class="item-cat">"Tea"</p>
+                                        <p class="item-desc">"Spiced black tea with cardamom, cinnamon, ginger, and milk."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_17}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+
+                        // Pastry category (items 18-21)
+                        {if self.category_idx == 0 || self.category_idx == 5 {
+                            <div>
+                                <p class="section-label">"Pastries"</p>
+                                <div class="menu-grid">
+                                    // 18: Almond Croissant
+                                    <div class="menu-card">
+                                        <p class="item-name">"Almond Croissant"</p>
+                                        <p class="item-cat">"Pastries"</p>
+                                        <p class="item-desc">"Buttery croissant filled with almond cream, dusted with powdered sugar."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.75"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_18}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 19: Egg Tart
+                                    <div class="menu-card">
+                                        <p class="item-name">"Egg Tart"</p>
+                                        <p class="item-cat">"Pastries"</p>
+                                        <p class="item-desc">"Portuguese-style custard tart with flaky puff pastry shell."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$2.95"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_19}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 20: Red Bean Bun
+                                    <div class="menu-card">
+                                        <p class="item-name">"Red Bean Bun"</p>
+                                        <p class="item-cat">"Pastries"</p>
+                                        <p class="item-desc">"Soft milk bread filled with sweet adzuki red bean paste."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$4.25"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_20}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                    // 21: Matcha Mochi
+                                    <div class="menu-card">
+                                        <p class="item-name">"Matcha Mochi"</p>
+                                        <p class="item-cat">"Pastries"</p>
+                                        <p class="item-desc">"Chewy rice cake with matcha-infused white bean filling."</p>
+                                        <div class="item-footer">
+                                            <span class="item-price">"$3.50"</span>
+                                            <button class="btn btn-add" on:click={self.add_item_21}>"+ Add"</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }}
+                    </div>
+                }}
+
+                // ===================================================
+                // Tab 1: Cart — Shopping Cart with Totals
+                // ===================================================
+                {if self.active_tab == 1 {
+                    <div>
+                        <div class="card">
+                            <h3 class="card-title">"Your Cart"</h3>
+
+                            {if self.cart_count == 0 {
+                                <div class="empty-state">
+                                    <p style="font-size: 32px; margin-bottom: 8px">"[cart]"</p>
+                                    <p>"Your cart is empty"</p>
+                                    <p style="font-size: 12px; color: #52525b">"Browse the menu to add items"</p>
+                                </div>
+                            }}
+
+                            // Show cart items that have qty > 0
+                            {if self.cart_q0 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Espresso"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q0)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q0 * self.price0 / 100, self.cart_q0 * self.price0 - (self.cart_q0 * self.price0 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_0}>"-"</button>
+                                </div>
+                            }}
+                            {if self.cart_q1 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Double Espresso"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q1)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q1 * self.price1 / 100, self.cart_q1 * self.price1 - (self.cart_q1 * self.price1 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_1}>"-"</button>
+                                </div>
+                            }}
+                            {if self.cart_q2 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Americano"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q2)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q2 * self.price2 / 100, self.cart_q2 * self.price2 - (self.cart_q2 * self.price2 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_2}>"-"</button>
+                                </div>
+                            }}
+                            {if self.cart_q3 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Macchiato"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q3)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q3 * self.price3 / 100, self.cart_q3 * self.price3 - (self.cart_q3 * self.price3 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_3}>"-"</button>
+                                </div>
+                            }}
+                            {if self.cart_q4 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Cortado"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q4)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q4 * self.price4 / 100, self.cart_q4 * self.price4 - (self.cart_q4 * self.price4 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_4}>"-"</button>
+                                </div>
+                            }}
+                            {if self.cart_q5 > 0 {
+                                <div class="cart-item-row">
+                                    <span class="cart-item-name">"Classic Latte"</span>
+                                    <span class="cart-item-qty">{format("x{}", self.cart_q5)}</span>
+                                    <span class="cart-item-total">{format("${}.{}", self.cart_q5 * self.price5 / 100, self.cart_q5 * self.price5 - (self.cart_q5 * self.price5 / 100) * 100)}</span>
+                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_5}>"-"</button>
+                                </div>
+                            }}
+
+                            {if self.cart_count > 0 {
+                                <div>
+                                    <div class="divider"></div>
+
+                                    // Tip selection
+                                    <p class="section-label">"Tip"</p>
+                                    <div class="tip-row">
+                                        {if self.tip_mode == 0 {
+                                            <button class="tip-active" on:click={self.tip_none}>"No Tip"</button>
+                                        } else {
+                                            <button class="tip-btn" on:click={self.tip_none}>"No Tip"</button>
+                                        }}
+                                        {if self.tip_mode == 1 {
+                                            <button class="tip-active" on:click={self.tip_15}>"15%"</button>
+                                        } else {
+                                            <button class="tip-btn" on:click={self.tip_15}>"15%"</button>
+                                        }}
+                                        {if self.tip_mode == 2 {
+                                            <button class="tip-active" on:click={self.tip_18}>"18%"</button>
+                                        } else {
+                                            <button class="tip-btn" on:click={self.tip_18}>"18%"</button>
+                                        }}
+                                        {if self.tip_mode == 3 {
+                                            <button class="tip-active" on:click={self.tip_20}>"20%"</button>
+                                        } else {
+                                            <button class="tip-btn" on:click={self.tip_20}>"20%"</button>
+                                        }}
+                                    </div>
+
+                                    // Totals breakdown
+                                    <div class="divider"></div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Subtotal"</span>
+                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.cart_total_cents), self.cents_part(self.cart_total_cents))}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Tax (8.25%)"</span>
+                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.tax_cents), self.cents_part(self.tax_cents))}</span>
+                                    </div>
+                                    {if self.tip_cents > 0 {
+                                        <div class="kv-row">
+                                            <span class="kv-label">"Tip"</span>
+                                            <span class="kv-green">{format("${}.{}", self.dollars_part(self.tip_cents), self.cents_part(self.tip_cents))}</span>
+                                        </div>
+                                    }}
+                                    <div class="kv-row">
+                                        <span class="kv-label" style="font-weight: 700; color: #fafafa">"Grand Total"</span>
+                                        <span class="kv-green" style="font-size: 18px">{format("${}.{}", self.dollars_part(self.grand_total_cents), self.cents_part(self.grand_total_cents))}</span>
+                                    </div>
+
+                                    // Payment buttons
+                                    <div style="display: flex; gap: 12px; margin-top: 16px">
+                                        <button class="btn btn-primary" on:click={self.initiate_payment}>"Pay with Alipay"</button>
+                                        <button class="btn btn-danger" on:click={self.clear_cart}>"Clear Cart"</button>
+                                    </div>
+                                </div>
+                            }}
+                        </div>
+
+                        // QR Payment Flow
+                        {if self.payment_status > 0 {
+                            <div class="card">
+                                <h3 class="card-title">"Alipay QR Payment"</h3>
+
+                                // Status badge
+                                {if self.payment_status == 1 {
+                                    <span class="status-badge status-pending">"Pending — Scan QR Code"</span>
+                                }}
+                                {if self.payment_status == 2 {
+                                    <span class="status-badge status-scanning">"Scanned — Confirming..."</span>
+                                }}
+                                {if self.payment_status == 3 {
+                                    <span class="status-badge status-confirmed">"Payment Complete"</span>
+                                }}
+
+                                // QR code display
+                                {if self.payment_status == 1 {
+                                    <div class="qr-box">
+                                        <p class="qr-text">"Scan with Alipay"</p>
+                                        <p style="font-size: 48px; margin: 16px 0">"[QR]"</p>
+                                        <p class="qr-mono">{format("alipay://pay?order={}&amount={}&merchant=NECTAR_COFFEE&crc={}", self.current_order_id, self.grand_total_cents, self.qr_checksum)}</p>
+                                    </div>
+                                }}
+
+                                // Order details
+                                <div class="kv-row">
+                                    <span class="kv-label">"Order ID"</span>
+                                    <span class="kv-value">{format("#{}", self.current_order_id)}</span>
+                                </div>
+                                <div class="kv-row">
+                                    <span class="kv-label">"Amount"</span>
+                                    <span class="kv-value">{format("${}.{}", self.dollars_part(self.grand_total_cents), self.cents_part(self.grand_total_cents))}</span>
+                                </div>
+                                <div class="kv-row">
+                                    <span class="kv-label">"CRC-16 Checksum"</span>
+                                    <span class="kv-value" style="font-family: monospace">{format("0x{}", self.qr_checksum)}</span>
+                                </div>
+                                <div class="kv-row">
+                                    <span class="kv-label">"Provider"</span>
+                                    <span class="kv-green">"Alipay (swappable to Stripe/Moov)"</span>
+                                </div>
+
+                                // Action buttons
+                                <div style="display: flex; gap: 12px; margin-top: 16px">
+                                    {if self.payment_status == 1 {
+                                        <button class="btn btn-secondary" on:click={self.simulate_scan}>"Simulate Scan"</button>
+                                    }}
+                                    {if self.payment_status == 2 {
+                                        <button class="btn btn-primary" on:click={self.confirm_payment}>"Confirm Payment"</button>
+                                    }}
+                                    {if self.payment_status < 3 {
+                                        <button class="btn btn-danger" on:click={self.cancel_payment}>"Cancel"</button>
+                                    }}
+                                </div>
+                            </div>
+                        }}
+                    </div>
+                }}
+
+                // ===================================================
+                // Tab 2: Orders — History + Offline Support
+                // ===================================================
+                {if self.active_tab == 2 {
+                    <div>
+                        // Stats
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">{format("{}", self.order_count)}</div>
+                                <div class="stat-label">"COMPLETED ORDERS"</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">{format("${}.{}", self.dollars_part(self.total_spent_cents), self.cents_part(self.total_spent_cents))}</div>
+                                <div class="stat-label">"TOTAL SPENT"</div>
+                            </div>
+                            <div class="stat-card">
+                                {if self.offline_queue > 0 {
+                                    <div class="stat-value" style="color: #f59e0b">{format("{}", self.offline_queue)}</div>
+                                } else {
+                                    <div class="stat-value">"0"</div>
+                                }}
+                                <div class="stat-label">"QUEUED OFFLINE"</div>
+                            </div>
+                        </div>
+
+                        // Offline queue banner
+                        {if self.is_online == 0 {
+                            <div class="card" style="border-color: #92400e; background-color: #1c1917">
+                                <div style="display: flex; align-items: center; gap: 8px">
+                                    <span class="offline-dot">" "</span>
+                                    <span style="font-size: 14px; font-weight: 600; color: #f59e0b">"You are offline"</span>
+                                </div>
+                                <p style="font-size: 13px; color: #a1a1aa; margin-top: 8px">"Orders will be queued locally via mp::setStorageSync and synced when connectivity returns. Cart state persists across sessions."</p>
+                                <button class="btn btn-secondary" style="margin-top: 12px" on:click={self.queue_offline_order}>"Queue Test Order"</button>
+                            </div>
+                        }}
+
+                        // Order history
+                        <div class="card">
+                            <h3 class="card-title">"Order History"</h3>
+                            <p style="font-size: 12px; color: #71717a; margin-bottom: 12px">"Persisted via "<span class="mp-api">"mp::setStorageSync"</span>" / "<span class="mp-api">"mp::getStorageSync"</span></p>
+
+                            {if self.order_count == 0 {
+                                <div class="empty-state">
+                                    <p>"No orders yet"</p>
+                                    <p style="font-size: 12px; color: #52525b">"Complete a payment to see history"</p>
+                                </div>
+                            }}
+                            {if self.order_count > 0 {
+                                <div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Latest Order"</span>
+                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.last_order_total), self.cents_part(self.last_order_total))}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Total Orders"</span>
+                                        <span class="kv-value">{format("{}", self.order_count)}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Lifetime Spend"</span>
+                                        <span class="kv-green">{format("${}.{}", self.dollars_part(self.total_spent_cents), self.cents_part(self.total_spent_cents))}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Points Earned"</span>
+                                        <span class="kv-green">{format("{}", self.loyalty_points)}</span>
+                                    </div>
+                                </div>
+                            }}
+                        </div>
+
+                        // Lifecycle showcase
+                        <div class="card">
+                            <h3 class="card-title">"Mini-Program Lifecycle"</h3>
+                            <p style="font-size: 12px; color: #71717a; margin-bottom: 16px">"How the WASM mini-program manages state across its lifetime"</p>
+
+                            <div class="lifecycle-step">
+                                <span class="lifecycle-fn">"onLaunch"</span>
+                                <span class="lifecycle-desc">"Restore auth token from "<span class="mp-api">"mp::getStorageSync"</span>", load cached cart, show loading"</span>
+                            </div>
+                            <div class="lifecycle-step">
+                                <span class="lifecycle-fn">"onShow"</span>
+                                <span class="lifecycle-desc">"Check network via "<span class="mp-api">"mp::getNetworkType"</span>", refresh order status, sync offline queue"</span>
+                            </div>
+                            <div class="lifecycle-step">
+                                <span class="lifecycle-fn">"onHide"</span>
+                                <span class="lifecycle-desc">"Save cart to "<span class="mp-api">"mp::setStorageSync"</span>", persist last_active timestamp"</span>
+                            </div>
+                        </div>
+                    </div>
+                }}
+
+                // ===================================================
+                // Tab 3: Profile — Auth + Loyalty
+                // ===================================================
+                {if self.active_tab == 3 {
+                    <div>
+                        // Profile card
+                        <div class="profile-card">
+                            <div class="avatar">"NC"</div>
+                            <p class="user-name">{format("{}", self.user_name)}</p>
+                            {if self.is_logged_in == 1 {
+                                <div>
+                                    // Tier badge
+                                    {if self.loyalty_points < 100 {
+                                        <span class="tier-badge tier-bronze">"Bronze"</span>
+                                    }}
+                                    {if self.loyalty_points >= 100 {
+                                        {if self.loyalty_points < 500 {
+                                            <span class="tier-badge tier-silver">"Silver"</span>
+                                        }}
+                                    }}
+                                    {if self.loyalty_points >= 500 {
+                                        {if self.loyalty_points < 2000 {
+                                            <span class="tier-badge tier-gold">"Gold"</span>
+                                        }}
+                                    }}
+                                    {if self.loyalty_points >= 2000 {
+                                        <span class="tier-badge tier-diamond">"Diamond"</span>
+                                    }}
+                                </div>
+                            }}
+                        </div>
+
+                        {if self.is_logged_in == 0 {
+                            <div class="card" style="text-align: center">
+                                <p style="font-size: 14px; color: #a1a1aa; margin-bottom: 16px">"Log in with Alipay to track loyalty points and order history"</p>
+                                <button class="btn btn-primary" on:click={self.login}>"Login with Alipay"</button>
+                                <p style="font-size: 11px; color: #71717a; margin-top: 12px">"Uses "<span class="mp-api">"mp::getAuthCode"</span>" for OAuth flow"</p>
+                            </div>
+                        }}
+
+                        {if self.is_logged_in == 1 {
+                            <div>
+                                // Loyalty points
+                                <div class="card">
+                                    <h3 class="card-title">"Loyalty Program"</h3>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Current Points"</span>
+                                        <span class="kv-green">{format("{}", self.loyalty_points)}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Points per Dollar"</span>
+                                        <span class="kv-value">"1 pt / $1.00 spent"</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Current Tier"</span>
+                                        {if self.loyalty_points < 100 {
+                                            <span class="kv-amber">"Bronze (next: Silver at 100 pts)"</span>
+                                        }}
+                                        {if self.loyalty_points >= 100 {
+                                            {if self.loyalty_points < 500 {
+                                                <span class="kv-amber">"Silver (next: Gold at 500 pts)"</span>
+                                            }}
+                                        }}
+                                        {if self.loyalty_points >= 500 {
+                                            {if self.loyalty_points < 2000 {
+                                                <span class="kv-amber">"Gold (next: Diamond at 2000 pts)"</span>
+                                            }}
+                                        }}
+                                        {if self.loyalty_points >= 2000 {
+                                            <span class="kv-green">"Diamond (max tier)"</span>
+                                        }}
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Tier Benefits"</span>
+                                        <span class="kv-value">"Free size upgrade, priority ordering"</span>
+                                    </div>
+                                </div>
+
+                                // Account info
+                                <div class="card">
+                                    <h3 class="card-title">"Account"</h3>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"Auth Provider"</span>
+                                        <span class="kv-value">"Alipay OAuth"</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"User Info"</span>
+                                        <span class="kv-value">{format("{}", self.user_name)}</span>
+                                    </div>
+                                    <div class="kv-row">
+                                        <span class="kv-label">"API Surface"</span>
+                                        <span class="kv-value"><span class="mp-api">"mp::getUserInfo"</span></span>
+                                    </div>
+                                    <div style="margin-top: 16px">
+                                        <button class="btn btn-danger" on:click={self.logout}>"Logout"</button>
+                                    </div>
+                                </div>
+
+                                // mp:: API showcase
+                                <div class="card">
+                                    <h3 class="card-title">"mp:: API Surface (Alipay-Compatible)"</h3>
+                                    <p style="font-size: 12px; color: #71717a; margin-bottom: 12px">"Every mp:: call maps to an Alipay my.* API but runs through WASM syscalls instead of a JS sandbox."</p>
+                                    <div class="kv-row"><span class="mp-api">"mp::getStorageSync"</span><span class="kv-value">"Persistent key-value store"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::setStorageSync"</span><span class="kv-value">"Write to local storage"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::showLoading"</span><span class="kv-value">"Loading overlay"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::showToast"</span><span class="kv-value">"Toast notification"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::getAuthCode"</span><span class="kv-value">"Alipay OAuth flow"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::getUserInfo"</span><span class="kv-value">"User profile data"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::tradePay"</span><span class="kv-value">"QR/barcode payment"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::getNetworkType"</span><span class="kv-value">"Connectivity check"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::getLocation"</span><span class="kv-value">"GPS coordinates"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::navigateTo"</span><span class="kv-value">"Page navigation stack"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::request"</span><span class="kv-value">"HTTP fetch"</span></div>
+                                    <div class="kv-row"><span class="mp-api">"mp::setNavigationBar"</span><span class="kv-value">"Top bar configuration"</span></div>
+                                </div>
+                            </div>
+                        }}
+                    </div>
+                }}
+
+                // ===================================================
+                // Tab 4: Stores — Locator with Haversine
+                // ===================================================
+                {if self.active_tab == 4 {
+                    <div>
+                        <div class="card">
+                            <h3 class="card-title">"Find a Store"</h3>
+                            <p style="font-size: 12px; color: #71717a; margin-bottom: 16px">"Distance calculated via Haversine formula — pure WASM integer math, no JS"</p>
+                            <button class="btn btn-primary" style="margin-bottom: 16px" on:click={self.request_location}>"Update My Location"</button>
+                            <div class="kv-row">
+                                <span class="kv-label">"Your Position"</span>
+                                <span class="kv-value" style="font-family: monospace">{format("{}.{}, {}.{}", self.user_lat_x1000 / 1000, self.user_lat_x1000 - (self.user_lat_x1000 / 1000) * 1000, self.user_lng_x1000 / 1000, self.user_lng_x1000 - (self.user_lng_x1000 / 1000) * 1000)}</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">"API"</span>
+                                <span class="kv-value"><span class="mp-api">"mp::getLocation"</span></span>
+                            </div>
+                        </div>
+
+                        // Store list
+                        <div class="store-card">
+                            <div>
+                                <p class="store-name">"Nectar Coffee — Guomao"</p>
+                                <p class="store-addr">"Guomao CBD, Chaoyang District, Beijing"</p>
+                                <p class="store-hours">"07:00 - 22:00"</p>
+                            </div>
+                            <div class="store-dist">
+                                {if self.nearest_store_idx == 0 {
+                                    <span>"Nearest"</span>
+                                }}
+                            </div>
+                        </div>
+                        <div class="store-card">
+                            <div>
+                                <p class="store-name">"Nectar Coffee — Sanlitun"</p>
+                                <p class="store-addr">"Sanlitun SOHO, Chaoyang District, Beijing"</p>
+                                <p class="store-hours">"08:00 - 23:00"</p>
+                            </div>
+                            <div class="store-dist">
+                                {if self.nearest_store_idx == 1 {
+                                    <span>"Nearest"</span>
+                                }}
+                            </div>
+                        </div>
+                        <div class="store-card">
+                            <div>
+                                <p class="store-name">"Nectar Coffee — Wangfujing"</p>
+                                <p class="store-addr">"Wangfujing Avenue, Dongcheng District, Beijing"</p>
+                                <p class="store-hours">"06:30 - 21:30"</p>
+                            </div>
+                            <div class="store-dist">
+                                {if self.nearest_store_idx == 2 {
+                                    <span>"Nearest"</span>
+                                }}
+                            </div>
+                        </div>
+                        <div class="store-card">
+                            <div>
+                                <p class="store-name">"Nectar Coffee — Zhongguancun"</p>
+                                <p class="store-addr">"Zhongguancun E-Plaza, Haidian District, Beijing"</p>
+                                <p class="store-hours">"07:30 - 22:00"</p>
+                            </div>
+                            <div class="store-dist">" "</div>
+                        </div>
+                        <div class="store-card">
+                            <div>
+                                <p class="store-name">"Nectar Coffee — CBD East"</p>
+                                <p class="store-addr">"China World Trade Center, Chaoyang District, Beijing"</p>
+                                <p class="store-hours">"07:00 - 21:00"</p>
+                            </div>
+                            <div class="store-dist">" "</div>
+                        </div>
+
+                        // Haversine explanation
+                        <div class="card" style="margin-top: 16px">
+                            <h3 class="card-title">"Distance Calculation — Pure WASM"</h3>
+                            <p style="font-size: 12px; color: #a1a1aa; line-height: 1.6; margin-bottom: 12px">
+                                "Haversine formula computed entirely in WASM using integer arithmetic. Coordinates stored as lat/lng * 1000 to avoid floating point. At latitude 40, 1 degree latitude = 111.32 km, 1 degree longitude = 85.39 km (cos(40) correction). Newton's method for integer square root."
+                            </p>
+                            <div class="kv-row">
+                                <span class="kv-label">"Nearest Store"</span>
+                                <span class="kv-green">{format("Store #{}", self.nearest_store_idx)}</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">"Approx Distance"</span>
+                                <span class="kv-value">{format("~{}m", self.nearest_distance_m)}</span>
+                            </div>
+                            <div class="kv-row">
+                                <span class="kv-label">"Map Provider"</span>
+                                <span class="kv-value">"AMap (Gaode) — via miniprogram config"</span>
+                            </div>
+                        </div>
+                    </div>
+                }}
+
+            </div>
+
+            // ========== Footer ==========
+            <div class="footer-bar">
+                <p class="footer-text">"Nectar Mini-Program Runtime — Compiled WASM, zero JavaScript sandbox. Provider: Alipay (swappable). All computation in WebAssembly."</p>
+            </div>
+        </div>
+    }
+}

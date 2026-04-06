@@ -764,7 +764,7 @@ component HsmBridgeDemo() {
                                 </div>
                                 <div class="kv-row">
                                     <span class="kv-label">"Ciphertext"</span>
-                                    <span class="kv-value-green">{format("0x{}...", self.encrypted_output.slice(0, 32))}</span>
+                                    <span class="kv-value-green">{format("0x{}...", self.encrypted_output)}</span>
                                 </div>
                                 <div class="kv-row">
                                     <span class="kv-label">"Encrypt Time"</span>
@@ -819,7 +819,7 @@ component HsmBridgeDemo() {
                                     <span class="flow-num flow-num-pending">"2"</span>
                                 }}
                                 {if self.tx_signed {
-                                    <span class="flow-text">{format("Payload hashed: 0x{}...", self.tx_payload_hash.slice(0, 8))}</span>
+                                    <span class="flow-text">{format("Payload hashed: 0x{}...", self.tx_payload_hash)}</span>
                                 } else {
                                     <span class="flow-text-muted">"Hash transaction payload"</span>
                                 }}
@@ -832,7 +832,7 @@ component HsmBridgeDemo() {
                                     <span class="flow-num flow-num-pending">"3"</span>
                                 }}
                                 {if self.tx_signed {
-                                    <span class="flow-text">{format("HSM signed: 0x{}... ({}us)", self.tx_signature.slice(0, 8), self.sign_time_us)}</span>
+                                    <span class="flow-text">{format("HSM signed: 0x{}... ({}us)", self.tx_signature, self.sign_time_us)}</span>
                                 } else {
                                     <span class="flow-text-muted">"Sign via HSM syscall boundary"</span>
                                 }}

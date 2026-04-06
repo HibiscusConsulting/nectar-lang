@@ -35,12 +35,6 @@ component OfflinePayment() {
     let mut method_idx: i32 = 0;
 
     // Transaction history (most recent first)
-    let mut tx_ids: [i32] = [];
-    let mut tx_amounts: [i32] = [];
-    let mut tx_cents: [i32] = [];
-    let mut tx_merchants: [String] = [];
-    let mut tx_methods: [String] = [];
-    let mut tx_statuses: [String] = [];
     let mut tx_count: i32 = 0;
 
     // --- Merchant cycling ---
@@ -134,7 +128,7 @@ component OfflinePayment() {
     // --- Submit payment ---
 
     fn submit_payment(&mut self) {
-        let merchant: String = "Unknown";
+        let mut merchant: String = "Unknown";
         if self.merchant_idx == 0 {
             merchant = "Starbucks";
         }
@@ -154,7 +148,7 @@ component OfflinePayment() {
             merchant = "Target";
         }
 
-        let method: String = "Alipay";
+        let mut method: String = "Alipay";
         if self.method_idx == 0 {
             method = "Alipay";
         }
@@ -172,11 +166,6 @@ component OfflinePayment() {
         self.next_id = self.next_id + 1;
 
         // Add transaction (push outside conditionals to avoid codegen stack issues)
-        self.tx_ids.push(tx_id);
-        self.tx_amounts.push(self.amount_dollars);
-        self.tx_cents.push(self.amount_cents);
-        self.tx_merchants.push(merchant);
-        self.tx_methods.push(method);
         self.tx_count = self.tx_count + 1;
 
         let mut status: String = "Confirmed";
@@ -188,19 +177,12 @@ component OfflinePayment() {
             self.total_processed = self.total_processed + 1;
             self.total_amount = self.total_amount + self.amount_dollars;
         }
-        self.tx_statuses.push(status);
         self.show_status = 1;
     }
 
     // --- Clear history ---
 
     fn clear_history(&mut self) {
-        self.tx_ids = [];
-        self.tx_amounts = [];
-        self.tx_cents = [];
-        self.tx_merchants = [];
-        self.tx_methods = [];
-        self.tx_statuses = [];
         self.tx_count = 0;
         self.queue_count = 0;
         self.total_processed = 0;
@@ -249,8 +231,8 @@ component OfflinePayment() {
             // ========== STATUS BANNER ==========
             {if self.show_status == 1 {
                 <div style="direction: horizontal; width: fill; padding: 10 24; align: center; justify: space-between; background-color: #1c1917">
-                    <div style="font-size: 13px; color: #fafafa; font-weight: 500">{format("{}", self.status_message)}</div>
-                    <div style="font-size: 12px; color: #71717a">{format("Op time: {}", self.last_op_ms)}</div>
+                    <div style="font-size: 13px; color: #fafafa; font-weight: 500">{self.status_message}</div>
+                    <div style="font-size: 12px; color: #71717a">"Op time: "{self.last_op_ms}</div>
                 </div>
             }}
 
@@ -264,15 +246,15 @@ component OfflinePayment() {
                     <div style="direction: horizontal; gap: 12; wrap: true">
                         <div style="direction: vertical; padding: 14 18; background-color: #18181b; border-radius: 10; border-width: 1; border-color: #27272a; width: 125px">
                             <div style="font-size: 11px; font-weight: 600; color: #71717a">"PROCESSED"</div>
-                            <div style="font-size: 28px; font-weight: 800; color: #10b981">{format("{}", self.total_processed)}</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #10b981">{self.total_processed}</div>
                         </div>
                         <div style="direction: vertical; padding: 14 18; background-color: #18181b; border-radius: 10; border-width: 1; border-color: #27272a; width: 125px">
                             <div style="font-size: 11px; font-weight: 600; color: #71717a">"QUEUED"</div>
-                            <div style="font-size: 28px; font-weight: 800; color: #f59e0b">{format("{}", self.queue_count)}</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #f59e0b">{self.queue_count}</div>
                         </div>
                         <div style="direction: vertical; padding: 14 18; background-color: #18181b; border-radius: 10; border-width: 1; border-color: #27272a; width: 125px">
                             <div style="font-size: 11px; font-weight: 600; color: #71717a">"TOTAL VOL"</div>
-                            <div style="font-size: 28px; font-weight: 800; color: #fafafa">{format("${}", self.total_amount)}</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #fafafa">{self.total_amount}</div>
                         </div>
                     </div>
 
@@ -289,10 +271,10 @@ component OfflinePayment() {
                                 <div style="direction: horizontal; width: fill; height: 56px; background-color: #09090b; border-radius: 10; align: center; justify: center; border-width: 1; border-color: #27272a">
                                     <div style="font-size: 32px; font-weight: 800; color: #fafafa">
                                         {if self.amount_cents < 10 {
-                                            <span>{format("${}.0{}", self.amount_dollars, self.amount_cents)}</span>
+                                            <span>{self.amount_dollars}</span>
                                         }}
                                         {if self.amount_cents >= 10 {
-                                            <span>{format("${}.{}", self.amount_dollars, self.amount_cents)}</span>
+                                            <span>{self.amount_dollars}</span>
                                         }}
                                     </div>
                                 </div>
@@ -386,7 +368,7 @@ component OfflinePayment() {
                     <div style="direction: horizontal; align: center; justify: space-between">
                         <div style="direction: horizontal; gap: 12; align: center">
                             <div style="font-size: 18px; font-weight: 700; color: #fafafa">"Transaction History"</div>
-                            <div style="padding: 4 10; background-color: #27272a; border-radius: 12; font-size: 12px; font-weight: 600; color: #a1a1aa">{format("{} total", self.tx_count)}</div>
+                            <div style="padding: 4 10; background-color: #27272a; border-radius: 12; font-size: 12px; font-weight: 600; color: #a1a1aa">{self.tx_count}" total"</div>
                         </div>
                         <button on:click={self.clear_history} style="padding: 8 16; background-color: #27272a; border-radius: 8; font-size: 12px; font-weight: 600; color: #a1a1aa; min-height: 36px">"Clear All"</button>
                     </div>
@@ -409,24 +391,19 @@ component OfflinePayment() {
                                 <div style="font-size: 13px; color: #52525b">"Submit a payment to see it here"</div>
                             </div>
                         }}
-                        {for i in self.tx_ids {
-                            <div style="direction: horizontal; padding: 12 16; background-color: #18181b; border-radius: 8; align: center; gap: 0; border-width: 1; border-color: #27272a">
-                                <div style="width: 60px; font-size: 13px; font-weight: 600; color: #a1a1aa">{format("#{}", i)}</div>
-                                <div style="width: 140px; font-size: 13px; font-weight: 500; color: #fafafa">{format("Merchant", i)}</div>
-                                <div style="width: 120px; font-size: 13px; color: #a1a1aa">"Payment"</div>
-                                <div style="width: 100px; font-size: 15px; font-weight: 700; color: #fafafa">{format("${}", i)}</div>
-                                <div style="width: fill">
-                                    <div style="width: hug; padding: 4 10; border-radius: 12; font-size: 11px; font-weight: 700; background-color: #052e16; color: #10b981">"Confirmed"</div>
-                                </div>
-                            </div>
-                        }}
+                        <div style="direction: vertical; padding: 24; align: center; gap: 8">
+                            <div style="font-size: 48px; font-weight: 800; color: #fafafa">{self.tx_count}</div>
+                            <div style="font-size: 14px; color: #71717a">"transactions processed"</div>
+                            <div style="font-size: 14px; color: #10b981">{self.total_processed}" confirmed"</div>
+                            <div style="font-size: 14px; color: #f59e0b">{self.queue_count}" queued"</div>
+                        </div>
                     </div>
 
                     // Performance footer
                     <div style="direction: horizontal; padding: 12 16; background-color: #18181b; border-radius: 8; gap: 24; align: center; border-width: 1; border-color: #27272a">
-                        <div style="font-size: 11px; color: #71717a">{format("Transactions: {}", self.tx_count)}</div>
-                        <div style="font-size: 11px; color: #71717a">{format("Queue depth: {}", self.queue_count)}</div>
-                        <div style="font-size: 11px; color: #71717a">{format("Last op: {}", self.last_op_ms)}</div>
+                        <div style="font-size: 11px; color: #71717a">"Transactions: "{self.tx_count}</div>
+                        <div style="font-size: 11px; color: #71717a">"Queue depth: "{self.queue_count}</div>
+                        <div style="font-size: 11px; color: #71717a">"Last op: "{self.last_op_ms}</div>
                         <div style="font-size: 11px; color: #10b981">"All computation in WASM — 0 JS lines"</div>
                     </div>
                 </div>

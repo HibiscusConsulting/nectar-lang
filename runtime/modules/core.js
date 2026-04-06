@@ -581,6 +581,14 @@ export const wasmImports = {
     mount(elId, keyPtr, keyLen, cbIdx) { console.error('[nectar] No payment provider configured. Include a provider file (e.g. providers/stripe.js).'); },
     create_element(providerId, elId, cbIdx) { console.error('[nectar] No payment provider configured.'); },
     confirm(providerId, elementId, secretPtr, secretLen, cbIdx) { console.error('[nectar] No payment provider configured.'); },
+    key_exchange(pubKeyPtr, pubKeyLen, cbIdx) { console.error('[nectar] No payment provider configured.'); },
+  },
+
+  // ── MiniProgram — mp namespace syscalls ──────────────────────────────────────
+  mp: {
+    clearStorage() { localStorage.clear(); },
+    getSystemInfo() { return R.__newString(navigator.userAgent); },
+    getNetworkType(cbIdx) { R.__cb(cbIdx); },
   },
 
   // ── Banking — generic provider interface (stubs overridden by provider JS) ──

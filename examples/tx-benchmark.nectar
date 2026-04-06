@@ -11,58 +11,6 @@ struct Transaction {
     currency: String,
 }
 
-// Pseudo-random number generator (LCG) — runs entirely in WASM
-fn lcg_next(seed: i32) -> i32 {
-    // Linear congruential generator: (a * seed + c) mod m
-    // Use bitwise AND with 0x7FFFFFFF to keep positive
-    let raw: i32 = seed * 1103515245 + 12345;
-    if raw < 0 {
-        return 0 - raw;
-    }
-    return raw;
-}
-
-// Simple checksum: sum of component values mod 256
-fn compute_checksum(id: i32, amount: i32, merchant: i32) -> i32 {
-    let sum: i32 = id + amount + merchant;
-    let mod_val: i32 = sum - (sum / 256) * 256;
-    if mod_val < 0 {
-        return 0 - mod_val;
-    }
-    return mod_val;
-}
-
-// Validate a single transaction — returns 1 for pass, 0 for fail
-fn validate_tx(tx_id: i32, amount: i32, merchant: i32, balance: i32, checksum: i32, expected_checksum: i32) -> i32 {
-    // Check 1: Amount must be positive and under limit (1,000,000 cents = $10,000)
-    if amount <= 0 {
-        return 0;
-    }
-    if amount > 1000000 {
-        return 0;
-    }
-
-    // Check 2: Sufficient funds
-    if balance < amount {
-        return 0;
-    }
-
-    // Check 3: Merchant ID in valid range (1-999 are valid merchants)
-    if merchant < 1 {
-        return 0;
-    }
-    if merchant > 999 {
-        return 0;
-    }
-
-    // Check 4: Checksum verification
-    if checksum != expected_checksum {
-        return 0;
-    }
-
-    return 1;
-}
-
 component TxBenchmark() {
     let mut tx_count: i32 = 10000;
     let mut has_run: i32 = 0;
@@ -87,6 +35,9 @@ component TxBenchmark() {
     let mut tps: i32 = 0;
     let mut total_checks: i32 = 0;
 
+
+
+
     fn run_benchmark(&mut self) {
         self.has_run = 1;
         let mut pass_count: i32 = 0;
@@ -97,20 +48,26 @@ component TxBenchmark() {
         let mut i: i32 = 0;
         while i < self.tx_count {
             // Generate pseudo-random transaction data
-            seed = lcg_next(seed);
+            seed = seed * 1103515245 + 12345;
+            if seed < 0 { seed = 0 - seed; }
             let amount: i32 = 1 + seed - (seed / 99999) * 99999;
 
-            seed = lcg_next(seed);
+            seed = seed * 1103515245 + 12345;
+            if seed < 0 { seed = 0 - seed; }
             let merchant: i32 = seed - (seed / 1200) * 1200;
 
-            seed = lcg_next(seed);
+            seed = seed * 1103515245 + 12345;
+            if seed < 0 { seed = 0 - seed; }
             let balance: i32 = seed - (seed / 200000) * 200000;
 
-            let expected: i32 = compute_checksum(i, amount, merchant);
+            let cs_sum: i32 = i + amount + merchant;
+            let mut expected: i32 = cs_sum - (cs_sum / 256) * 256;
+            if expected < 0 { expected = 0 - expected; }
 
             // Corrupt ~5% of checksums to create failures
             let mut checksum: i32 = expected;
-            seed = lcg_next(seed);
+            seed = seed * 1103515245 + 12345;
+            if seed < 0 { seed = 0 - seed; }
             let corrupt_roll: i32 = seed - (seed / 100) * 100;
             if corrupt_roll < 5 {
                 checksum = checksum + 1;
@@ -123,7 +80,13 @@ component TxBenchmark() {
             }
 
             // Validate using standalone function
-            let valid: i32 = validate_tx(i, amount, balance, merch_final, checksum, expected);
+            let mut valid: i32 = 1;
+            if amount <= 0 { valid = 0; }
+            if amount > 1000000 { valid = 0; }
+            if balance < amount { valid = 0; }
+            if merch_final < 1 { valid = 0; }
+            if merch_final > 999 { valid = 0; }
+            if checksum != expected { valid = 0; }
 
             if valid == 1 {
                 pass_count += 1;
