@@ -1445,6 +1445,10 @@ impl RustCodegen {
                 if is_string_type && val.starts_with('"') {
                     val = format!("{}.to_string()", val);
                 }
+                // String fields read from state need .clone() to avoid move-out-of-RefMut
+                if is_string_type && val.starts_with("state.") && !val.contains(".clone()") {
+                    val = format!("{}.clone()", val);
+                }
                 if *mutable {
                     self.line(&format!("let mut {} = {};", name, val));
                 } else {
@@ -1519,6 +1523,38 @@ impl RustCodegen {
                     } else {
                         format!("format!({}, {})", fmt, rest.join(", "))
                     }
+                } else if callee_str.starts_with("mp::") {
+                    // mp:: namespace calls → map to canvas-mode stubs
+                    let method = &callee_str[4..];
+                    let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
+                    match method {
+                        "showToast" | "showLoading" | "hideLoading" | "hideToast" => {
+                            if a.is_empty() { "{ /* mp stub */ }".to_string() }
+                            else { format!("{{ let _msg = {}; /* mp::{} */ }}", a[0], method) }
+                        }
+                        "setStorageSync" if a.len() == 2 => {
+                            format!("write_storage({}, {})", a[0], a[1])
+                        }
+                        "getStorageSync" if a.len() == 1 => {
+                            format!("read_storage({})", a[0])
+                        }
+                        "removeStorageSync" if a.len() == 1 => {
+                            format!("remove_storage({})", a[0])
+                        }
+                        "navigateTo" if a.len() == 1 => {
+                            format!("set_hash({})", a[0])
+                        }
+                        "navigateBack" => "{ /* mp::navigateBack */ }".to_string(),
+                        "getNetworkType" => "\"wifi\".to_string()".to_string(),
+                        "getSystemInfo" => "\"wasm\".to_string()".to_string(),
+                        "setNavigationBar" => "{ /* mp::setNavigationBar */ }".to_string(),
+                        "tradePay" | "getAuthCode" | "getUserInfo" | "request" => {
+                            format!("{{ /* mp::{} stub */ }}", method)
+                        }
+                        _ => {
+                            format!("{{ /* mp::{} not yet implemented */ }}", method)
+                        }
+                    }
                 } else {
                     let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
                     format!("{}({})", callee_str, a.join(", "))
@@ -1537,6 +1573,12 @@ impl RustCodegen {
                 } else if method == "contains" && a.len() == 1 {
                     // .contains() on String takes &str — auto-borrow
                     format!("{}.contains(&{})", obj, a[0])
+                } else if method == "index_of" && a.len() == 1 {
+                    // .index_of(substr) → .find(substr).map(|i| i as i32).unwrap_or(-1)
+                    format!("{}.find({}).map(|i| i as i32).unwrap_or(-1)", obj, a[0])
+                } else if method == "slice" && a.len() == 2 {
+                    // .slice(start, end) → safe string slicing
+                    format!("{{ let _s = &{}; let _start = ({}) as usize; let _end = ({}) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or(\"\").to_string() }}", obj, a[0], a[1])
                 } else if method == "sort_asc" && a.len() == 1 {
                     let field = a[0].trim_matches('"');
                     format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}", obj=obj, field=field)
