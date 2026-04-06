@@ -35,20 +35,20 @@ miniprogram AlipayDemo {
     cache_strategy: "cache-first"
 
     fn onLaunch(options: String) {
-        let token = mp::getStorageSync("auth_token")
-        let cached_cart = mp::getStorageSync("cart_data")
-        mp::showLoading("Loading...")
-        mp::setNavigationBar("Nectar Coffee", "#1a472a", "#fafafa")
+        let token: String = mp::getStorageSync("auth_token");
+        let cached_cart: String = mp::getStorageSync("cart_data");
+        mp::showLoading("Loading...");
+        mp::setNavigationBar("Nectar Coffee", "#1a472a", "#fafafa");
     }
 
     fn onShow() {
-        let net = mp::getNetworkType()
-        mp::hideLoading()
+        let net: String = mp::getNetworkType();
+        mp::hideLoading();
     }
 
     fn onHide() {
-        mp::setStorageSync("last_active", "timestamp")
-        mp::setStorageSync("cart_data", "saved")
+        mp::setStorageSync("last_active", "timestamp");
+        mp::setStorageSync("cart_data", "saved");
     }
 }
 
@@ -273,12 +273,24 @@ component CoffeeShopApp() {
     fn add_item_21(&mut self) { self.cart_q21 += 1; self.cart_count += 1; self.cart_total_cents += self.price21; }
 
     // Remove item by index (decrement, floor at 0)
-    fn remove_item_0(&mut self) { if self.cart_q0 > 0 { self.cart_q0 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price0; } }
-    fn remove_item_1(&mut self) { if self.cart_q1 > 0 { self.cart_q1 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price1; } }
-    fn remove_item_2(&mut self) { if self.cart_q2 > 0 { self.cart_q2 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price2; } }
-    fn remove_item_3(&mut self) { if self.cart_q3 > 0 { self.cart_q3 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price3; } }
-    fn remove_item_4(&mut self) { if self.cart_q4 > 0 { self.cart_q4 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price4; } }
-    fn remove_item_5(&mut self) { if self.cart_q5 > 0 { self.cart_q5 -= 1; self.cart_count -= 1; self.cart_total_cents -= self.price5; } }
+    fn remove_item_0(&mut self) {
+        if self.cart_q0 > 0 { self.cart_q0 = self.cart_q0 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price0; }
+    }
+    fn remove_item_1(&mut self) {
+        if self.cart_q1 > 0 { self.cart_q1 = self.cart_q1 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price1; }
+    }
+    fn remove_item_2(&mut self) {
+        if self.cart_q2 > 0 { self.cart_q2 = self.cart_q2 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price2; }
+    }
+    fn remove_item_3(&mut self) {
+        if self.cart_q3 > 0 { self.cart_q3 = self.cart_q3 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price3; }
+    }
+    fn remove_item_4(&mut self) {
+        if self.cart_q4 > 0 { self.cart_q4 = self.cart_q4 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price4; }
+    }
+    fn remove_item_5(&mut self) {
+        if self.cart_q5 > 0 { self.cart_q5 = self.cart_q5 - 1; self.cart_count = self.cart_count - 1; self.cart_total_cents = self.cart_total_cents - self.price5; }
+    }
 
     fn clear_cart(&mut self) {
         self.cart_q0 = 0; self.cart_q1 = 0; self.cart_q2 = 0; self.cart_q3 = 0;

@@ -247,7 +247,7 @@ component MoovMultiRailDemo() {
             return;
         }
 
-        self.wallet_balance -= total_cents;
+        self.wallet_balance = self.wallet_balance - total_cents;
         self.transfer_initiated = true;
         self.transfer_count += 1;
         self.transfer_status = "processing";
@@ -417,7 +417,7 @@ component MoovMultiRailDemo() {
             // Alternate debit/credit
             let is_debit: i32 = i - (i / 2) * 2;
             if is_debit == 0 {
-                balance -= amount;
+                balance = balance - amount;
                 debit_total += amount;
             } else {
                 balance += amount;
@@ -441,7 +441,7 @@ component MoovMultiRailDemo() {
         if amount > self.wallet_balance {
             return;
         }
-        self.wallet_balance -= amount;
+        self.wallet_balance = self.wallet_balance - amount;
         self.ledger_count += 2;
         self.ledger_debit_total += amount;
         self.ledger_credit_total += amount;
@@ -455,7 +455,7 @@ component MoovMultiRailDemo() {
     }
 
     fn decrease_book_amount(&mut self) {
-        self.book_transfer_amount -= 5000;
+        self.book_transfer_amount = self.book_transfer_amount - 5000;
         if self.book_transfer_amount < 100 {
             self.book_transfer_amount = 100;
         }
@@ -600,7 +600,7 @@ component MoovMultiRailDemo() {
         }
     }
     fn threshold_down(&mut self) {
-        self.screen_threshold -= 5;
+        self.screen_threshold = self.screen_threshold - 5;
         if self.screen_threshold < 10 {
             self.screen_threshold = 10;
         }
@@ -748,13 +748,13 @@ component MoovMultiRailDemo() {
     fn refund_card(&mut self) {
         if self.card_status == "captured" {
             self.card_status = "refunded";
-            self.wallet_balance -= self.card_capture_amount;
+            self.wallet_balance = self.wallet_balance - self.card_capture_amount;
             self.ledger_debit_total += self.card_capture_amount;
             self.ledger_count += 2;
         }
         if self.card_status == "partial_capture" {
             self.card_status = "refunded";
-            self.wallet_balance -= self.card_capture_amount;
+            self.wallet_balance = self.wallet_balance - self.card_capture_amount;
             self.ledger_debit_total += self.card_capture_amount;
             self.ledger_count += 2;
         }
@@ -776,7 +776,7 @@ component MoovMultiRailDemo() {
         }
     }
     fn card_amount_down(&mut self) {
-        self.card_amount -= 500;
+        self.card_amount = self.card_amount - 500;
         if self.card_amount < 100 {
             self.card_amount = 100;
         }

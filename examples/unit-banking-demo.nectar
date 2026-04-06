@@ -75,8 +75,14 @@ component UnitDashboard() {
     }
 
     fn reset_payment(&mut self) { self.pay_status = "idle"; self.pay_checked = false; self.pay_error = ""; }
-    fn pay_up(&mut self) { self.pay_amount += 500; if self.pay_amount > 999999 { self.pay_amount = 999999; } }
-    fn pay_down(&mut self) { self.pay_amount -= 500; if self.pay_amount < 100 { self.pay_amount = 100; } }
+    fn pay_up(&mut self) {
+        self.pay_amount += 500;
+        if self.pay_amount > 999999 { self.pay_amount = 999999; }
+    }
+    fn pay_down(&mut self) {
+        self.pay_amount = self.pay_amount - 500;
+        if self.pay_amount < 100 { self.pay_amount = 100; }
+    }
 
     // === 2. BANKING DASHBOARD ===
     // Checking/savings, 10K transactions: amount = ((i*7+13) % 50000) - 25000
@@ -138,10 +144,22 @@ component UnitDashboard() {
         if self.card_frozen == 0 { self.card_frozen = 1; mp::showToast("Card frozen") }
         else { self.card_frozen = 0; mp::showToast("Card unfrozen") }
     }
-    fn daily_up(&mut self) { self.daily_limit += 50000; if self.daily_limit > 2500000 { self.daily_limit = 2500000; } }
-    fn daily_down(&mut self) { self.daily_limit -= 50000; if self.daily_limit < 50000 { self.daily_limit = 50000; } }
-    fn monthly_up(&mut self) { self.monthly_limit += 500000; if self.monthly_limit > 25000000 { self.monthly_limit = 25000000; } }
-    fn monthly_down(&mut self) { self.monthly_limit -= 500000; if self.monthly_limit < 500000 { self.monthly_limit = 500000; } }
+    fn daily_up(&mut self) {
+        self.daily_limit += 50000;
+        if self.daily_limit > 2500000 { self.daily_limit = 2500000; }
+    }
+    fn daily_down(&mut self) {
+        self.daily_limit = self.daily_limit - 50000;
+        if self.daily_limit < 50000 { self.daily_limit = 50000; }
+    }
+    fn monthly_up(&mut self) {
+        self.monthly_limit += 500000;
+        if self.monthly_limit > 25000000 { self.monthly_limit = 25000000; }
+    }
+    fn monthly_down(&mut self) {
+        self.monthly_limit = self.monthly_limit - 500000;
+        if self.monthly_limit < 500000 { self.monthly_limit = 500000; }
+    }
 
     // === 4. KYC FLOW ===
     // 4-step form, signal tracks step, SSN/ZIP/email validation
@@ -183,13 +201,27 @@ component UnitDashboard() {
     }
 
     fn kyc_next(&mut self) {
-        if self.kyc_step == 0 { self.validate_email(); if self.email_ok == 0 { return; } }
-        if self.kyc_step == 1 { self.validate_zip(); if self.zip_ok == 0 { return; } }
-        if self.kyc_step == 2 { self.validate_ssn(); if self.ssn_ok == 0 { return; } }
+        if self.kyc_step == 0 {
+            self.validate_email();
+            if self.email_ok == 0 { return; }
+        }
+        if self.kyc_step == 1 {
+            self.validate_zip();
+            if self.zip_ok == 0 { return; }
+        }
+        if self.kyc_step == 2 {
+            self.validate_ssn();
+            if self.ssn_ok == 0 { return; }
+        }
         if self.kyc_step < 3 { self.kyc_step += 1; self.kyc_error = ""; }
     }
 
-    fn kyc_back(&mut self) { if self.kyc_step > 0 { self.kyc_step -= 1; self.kyc_error = ""; } }
+    fn kyc_back(&mut self) {
+        if self.kyc_step > 0 {
+            self.kyc_step = self.kyc_step - 1;
+            self.kyc_error = "";
+        }
+    }
 
     fn submit_kyc(&mut self) {
         self.validate_email();
@@ -252,7 +284,7 @@ component UnitDashboard() {
         }
         let total: i32 = self.move_amount + self.move_fee;
         if total > self.checking_bal { self.move_status = "error"; self.move_error = "Insufficient funds"; return; }
-        self.checking_bal -= total;
+        self.checking_bal = self.checking_bal - total;
         self.move_count += 1;
         self.move_error = "";
         if self.move_type == 0 { self.move_status = "ach_pending"; }
@@ -262,12 +294,22 @@ component UnitDashboard() {
 
     fn settle(&mut self) { if self.move_status == "ach_pending" { self.move_status = "ach_settled"; } }
     fn reset_move(&mut self) { self.move_status = "idle"; self.move_error = ""; }
-    fn move_up(&mut self) { self.move_amount += 10000; if self.move_amount > 9999999 { self.move_amount = 9999999; } }
-    fn move_down(&mut self) { self.move_amount -= 10000; if self.move_amount < 100 { self.move_amount = 100; } }
+    fn move_up(&mut self) {
+        self.move_amount += 10000;
+        if self.move_amount > 9999999 { self.move_amount = 9999999; }
+    }
+    fn move_down(&mut self) {
+        self.move_amount = self.move_amount - 10000;
+        if self.move_amount < 100 { self.move_amount = 100; }
+    }
 
     // Helpers
     fn dp(&self, c: i32) -> i32 { return c / 100; }
-    fn cp(&self, c: i32) -> i32 { let v: i32 = c - (c / 100) * 100; if v < 0 { return 0 - v; } return v; }
+    fn cp(&self, c: i32) -> i32 {
+        let v: i32 = c - (c / 100) * 100;
+        if v < 0 { return 0 - v; }
+        return v;
+    }
 
     // === RENDER ===
     style {
