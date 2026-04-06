@@ -883,7 +883,7 @@ component MoovMultiRailDemo() {
     // ========================================================================
 
     render {
-        <div style="direction: vertical; width: fill; height: fill; background-color: #0f1117; gap: 0">
+        <div style="direction: vertical; width: fill; height: hug; background-color: #0f1117; gap: 0">
 
             // ========== HEADER ==========
             <div style="direction: vertical; width: fill; padding: 20; background-color: #0a0d14; border-width: 0 0 1 0; border-color: #252a3a; gap: 6">
@@ -947,7 +947,7 @@ component MoovMultiRailDemo() {
             </div>
 
             // ========== CONTENT ==========
-            <div style="direction: vertical; width: fill; height: fill; padding: 28 32; gap: 20; max-width: 1100px; scroll: true">
+            <div style="direction: vertical; width: fill; padding: 28 32; gap: 20; max-width: 1100px">
 
                 // ====================================================
                 // TAB 0: MULTI-RAIL TRANSFER ENGINE
@@ -980,27 +980,27 @@ component MoovMultiRailDemo() {
                             <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Adjust parameters to see how the rail selection engine responds"</div>
 
                             // Amount presets
-                            <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_small}>
+                            <div style="direction: horizontal; gap: 10; height: hug; width: fill">
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_amount_small}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$50.00"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_medium}>
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_amount_medium}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$250.00"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_large}>
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_amount_large}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$5,000.00"</div>
                                 </div>
                             </div>
 
                             // Time presets
-                            <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_morning}>
+                            <div style="direction: horizontal; gap: 10; height: hug; width: fill">
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_time_morning}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"10:30 AM ET"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_afternoon}>
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_time_afternoon}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"3:00 PM ET"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_evening}>
+                                <div style="padding: 6 14; height: 36px; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center; width: hug" on:click={self.set_time_evening}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"6:00 PM ET (past cutoff)"</div>
                                 </div>
                             </div>

@@ -364,7 +364,7 @@ component UnitDashboard() {
 
     // === RENDER ===
     render {
-        <div style="direction: vertical; width: fill; height: fill; background-color: #09090b; padding: 0px; gap: 0px;">
+        <div style="direction: vertical; width: fill; height: hug; background-color: #09090b; padding: 0; gap: 0">
 
             // Title bar
             <div style="direction: vertical; width: fill; padding: 20px 32px; gap: 4px; background-color: #0d1117; border-width: 0px 0px 1px 0px; border-color: #27272a;">
@@ -427,7 +427,7 @@ component UnitDashboard() {
             </div>
 
             // Content area
-            <div style="direction: vertical; width: fill; height: fill; max-width: 1100px; padding: 28 32; gap: 16; scroll: true">
+            <div style="direction: vertical; width: fill; max-width: 1100px; padding: 28 32; gap: 16">
 
                 // TAB 0: PAYMENT ACCEPTANCE
                 {if self.active_tab == 0 {
