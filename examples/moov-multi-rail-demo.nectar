@@ -882,639 +882,280 @@ component MoovMultiRailDemo() {
     // RENDER
     // ========================================================================
 
-    style {
-        .page {
-            background-color: "#09090b";
-            color: "#fafafa";
-            font-family: "system-ui, -apple-system, sans-serif";
-            min-height: "100vh";
-            padding: "0";
-        }
-        .header {
-            background-color: "#0d1117";
-            border-bottom: "1px solid #27272a";
-            padding: "20px 32px";
-        }
-        .header-row {
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-        }
-        .logo-row {
-            display: "flex";
-            align-items: "center";
-            gap: "16px";
-        }
-        .logo {
-            font-size: "24px";
-            font-weight: "800";
-            color: "#8b5cf6";
-        }
-        .logo-sep {
-            font-size: "20px";
-            color: "#27272a";
-        }
-        .logo-nectar {
-            font-size: "18px";
-            font-weight: "700";
-            color: "#ffa11e";
-        }
-        .header-sub {
-            font-size: "13px";
-            color: "#71717a";
-        }
-        .badge-wasm {
-            display: "inline-flex";
-            align-items: "center";
-            padding: "4px 12px";
-            border-radius: "100px";
-            font-size: "11px";
-            font-weight: "700";
-            background-color: "#1e1b4b";
-            color: "#a78bfa";
-            border: "1px solid #4c1d95";
-        }
-        .tabs {
-            display: "flex";
-            gap: "0";
-            border-bottom: "1px solid #27272a";
-            padding: "0 32px";
-            background-color: "#09090b";
-        }
-        .tab {
-            padding: "12px 18px";
-            font-size: "13px";
-            font-weight: "500";
-            color: "#71717a";
-            cursor: "pointer";
-            border-bottom: "2px solid transparent";
-            background: "none";
-            border-top: "none";
-            border-left: "none";
-            border-right: "none";
-        }
-        .tab-active {
-            color: "#8b5cf6";
-            border-bottom: "2px solid #8b5cf6";
-        }
-        .content {
-            padding: "28px 32px";
-            max-width: "1100px";
-            margin: "0 auto";
-        }
-        .card {
-            background-color: "#18181b";
-            border: "1px solid #27272a";
-            border-radius: "12px";
-            padding: "24px";
-            margin-bottom: "20px";
-        }
-        .card-title {
-            font-size: "16px";
-            font-weight: "600";
-            color: "#fafafa";
-            margin: "0 0 16px 0";
-        }
-        .card-subtitle {
-            font-size: "12px";
-            color: "#71717a";
-            margin: "0 0 16px 0";
-        }
-        .btn-row {
-            display: "flex";
-            gap: "10px";
-            flex-wrap: "wrap";
-            margin-bottom: "16px";
-        }
-        .btn {
-            padding: "10px 20px";
-            border-radius: "8px";
-            font-size: "13px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "none";
-            min-height: "44px";
-            display: "inline-flex";
-            align-items: "center";
-            gap: "8px";
-        }
-        .btn-moov {
-            background-color: "#8b5cf6";
-            color: "#fafafa";
-        }
-        .btn-secondary {
-            background-color: "#27272a";
-            color: "#fafafa";
-            border: "1px solid #3f3f46";
-        }
-        .btn-success {
-            background-color: "#10b981";
-            color: "#09090b";
-        }
-        .btn-danger {
-            background-color: "#27272a";
-            color: "#ef4444";
-            border: "1px solid #7f1d1d";
-        }
-        .btn-sm {
-            padding: "6px 14px";
-            font-size: "12px";
-            min-height: "32px";
-        }
-        .kv-row {
-            display: "flex";
-            justify-content: "space-between";
-            padding: "10px 0";
-            border-bottom: "1px solid #27272a";
-            font-size: "13px";
-        }
-        .kv-label {
-            color: "#a1a1aa";
-        }
-        .kv-value {
-            color: "#fafafa";
-            font-family: "monospace";
-        }
-        .kv-value-green {
-            color: "#10b981";
-            font-family: "monospace";
-            font-weight: "600";
-        }
-        .kv-value-red {
-            color: "#ef4444";
-            font-family: "monospace";
-            font-weight: "600";
-        }
-        .kv-value-purple {
-            color: "#a78bfa";
-            font-family: "monospace";
-            font-weight: "600";
-        }
-        .kv-value-amber {
-            color: "#f59e0b";
-            font-family: "monospace";
-        }
-        .badge {
-            display: "inline-flex";
-            align-items: "center";
-            padding: "4px 10px";
-            border-radius: "100px";
-            font-size: "11px";
-            font-weight: "600";
-        }
-        .badge-green {
-            background-color: "#052e16";
-            color: "#10b981";
-            border: "1px solid #065f46";
-        }
-        .badge-red {
-            background-color: "#450a0a";
-            color: "#ef4444";
-            border: "1px solid #991b1b";
-        }
-        .badge-amber {
-            background-color: "#451a03";
-            color: "#f59e0b";
-            border: "1px solid #92400e";
-        }
-        .badge-purple {
-            background-color: "#1e1b4b";
-            color: "#a78bfa";
-            border: "1px solid #4c1d95";
-        }
-        .stats-row {
-            display: "flex";
-            gap: "16px";
-            margin-bottom: "20px";
-        }
-        .stat-card {
-            background-color: "#0d1117";
-            border: "1px solid #27272a";
-            border-radius: "8px";
-            padding: "16px 20px";
-            flex: "1";
-            text-align: "center";
-        }
-        .stat-value {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#8b5cf6";
-        }
-        .stat-value-green {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#10b981";
-        }
-        .stat-value-amber {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#f59e0b";
-        }
-        .stat-value-red {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#ef4444";
-        }
-        .stat-label {
-            font-size: "11px";
-            color: "#71717a";
-            text-transform: "uppercase";
-            letter-spacing: "0.05em";
-            margin-top: "4px";
-        }
-        .divider {
-            height: "1px";
-            background-color: "#27272a";
-            margin: "20px 0";
-        }
-        .mono {
-            font-family: "monospace";
-            font-size: "12px";
-            color: "#a1a1aa";
-        }
-        .code-block {
-            background-color: "#0d1117";
-            border: "1px solid #27272a";
-            border-radius: "8px";
-            padding: "16px";
-            margin: "12px 0";
-            font-family: "monospace";
-            font-size: "12px";
-            color: "#e2e8f0";
-            line-height: "1.7";
-        }
-        .rail-indicator {
-            display: "flex";
-            align-items: "center";
-            gap: "12px";
-            padding: "16px";
-            border-radius: "10px";
-            margin-bottom: "12px";
-        }
-        .rail-rtp {
-            background-color: "#052e16";
-            border: "1px solid #065f46";
-        }
-        .rail-ach {
-            background-color: "#1e1b4b";
-            border: "1px solid #4c1d95";
-        }
-        .rail-wire {
-            background-color: "#451a03";
-            border: "1px solid #92400e";
-        }
-        .flow-step {
-            display: "flex";
-            align-items: "center";
-            gap: "12px";
-            padding: "10px 0";
-        }
-        .flow-dot-done {
-            width: "10px";
-            height: "10px";
-            border-radius: "50%";
-            background-color: "#10b981";
-            flex-shrink: "0";
-        }
-        .flow-dot-active {
-            width: "10px";
-            height: "10px";
-            border-radius: "50%";
-            background-color: "#8b5cf6";
-            flex-shrink: "0";
-        }
-        .flow-dot-pending {
-            width: "10px";
-            height: "10px";
-            border-radius: "50%";
-            background-color: "#27272a";
-            flex-shrink: "0";
-        }
-        .flow-text {
-            font-size: "13px";
-            color: "#fafafa";
-        }
-        .flow-text-muted {
-            font-size: "13px";
-            color: "#52525b";
-        }
-        .nacha-row {
-            display: "flex";
-            gap: "2px";
-            margin-bottom: "2px";
-        }
-        .nacha-field {
-            padding: "4px 8px";
-            font-family: "monospace";
-            font-size: "11px";
-            border-radius: "3px";
-        }
-        .nacha-header {
-            background-color: "#1e1b4b";
-            color: "#a78bfa";
-        }
-        .nacha-batch {
-            background-color: "#052e16";
-            color: "#10b981";
-        }
-        .nacha-entry {
-            background-color: "#18181b";
-            color: "#fafafa";
-            border: "1px solid #27272a";
-        }
-        .grid-2 {
-            display: "grid";
-            grid-template-columns: "1fr 1fr";
-            gap: "20px";
-        }
-        .grid-3 {
-            display: "grid";
-            grid-template-columns: "1fr 1fr 1fr";
-            gap: "16px";
-        }
-        .screen-block {
-            padding: "16px";
-            border-radius: "10px";
-            background-color: "#450a0a";
-            border: "2px solid #ef4444";
-            margin-top: "12px";
-        }
-        .screen-flag {
-            padding: "16px";
-            border-radius: "10px";
-            background-color: "#451a03";
-            border: "2px solid #f59e0b";
-            margin-top: "12px";
-        }
-        .screen-clear {
-            padding: "16px";
-            border-radius: "10px";
-            background-color: "#052e16";
-            border: "2px solid #10b981";
-            margin-top: "12px";
-        }
-        .lifecycle-step {
-            display: "flex";
-            align-items: "center";
-            gap: "8px";
-            padding: "8px 14px";
-            border-radius: "8px";
-            margin-bottom: "6px";
-            font-size: "13px";
-        }
-        .step-done {
-            background-color: "#052e16";
-            color: "#10b981";
-        }
-        .step-active {
-            background-color: "#1e1b4b";
-            color: "#a78bfa";
-            border: "1px solid #4c1d95";
-        }
-        .step-pending {
-            background-color: "#18181b";
-            color: "#52525b";
-        }
-    }
-
     render {
-        <div class="page">
+        <div style="direction: vertical; width: fill; height: fill; background-color: #0f1117; gap: 0">
+
             // ========== HEADER ==========
-            <div class="header">
-                <div class="header-row">
-                    <div class="logo-row">
-                        <span class="logo">"moov"</span>
-                        <span class="logo-sep">"|"</span>
-                        <span class="logo-nectar">"nectar"</span>
-                        <span class="badge-wasm">"WASM-native money movement"</span>
+            <div style="direction: vertical; width: fill; padding: 20; background-color: #0a0d14; border-width: 0 0 1 0; border-color: #252a3a; gap: 6">
+                <div style="direction: horizontal; width: fill; justify: space-between; align: center; gap: 16">
+                    <div style="direction: horizontal; align: center; gap: 16">
+                        <div style="font-size: 24px; font-weight: 800; color: #4667A6; width: hug; height: hug">"moov"</div>
+                        <div style="font-size: 20px; color: #252a3a; width: hug; height: hug">"|"</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #e6edf3; width: hug; height: hug">"nectar"</div>
+                        <div style="padding: 4 12; border-radius: 100; background-color: #162040; border-width: 1; border-color: #2a4080; height: hug; width: hug">
+                            <div style="font-size: 11px; font-weight: 700; color: #6d8fd4; width: hug; height: hug">"WASM-native money movement"</div>
+                        </div>
                     </div>
-                    <span class="header-sub">"Multi-rail transfers · ACH · RTP · Cards · OFAC screening — zero JavaScript"</span>
+                    <div style="font-size: 13px; color: #6e7681; width: hug; height: hug">"Multi-rail transfers · ACH · RTP · Cards · OFAC screening — zero JavaScript"</div>
                 </div>
             </div>
 
             // ========== TABS ==========
-            <div class="tabs">
-                <button class="tab" on:click={self.show_transfer}>
+            <div style="direction: horizontal; width: fill; background-color: #0f1117; border-width: 0 0 1 0; border-color: #252a3a; padding: 0 24; gap: 0">
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_transfer}>
                     {if self.active_tab == 0 {
-                        <span class="tab-active">"Transfer Engine"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Transfer Engine"</div>
                     } else {
-                        <span>"Transfer Engine"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Transfer Engine"</div>
                     }}
-                </button>
-                <button class="tab" on:click={self.show_ach}>
+                </div>
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ach}>
                     {if self.active_tab == 1 {
-                        <span class="tab-active">"ACH Origination"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"ACH Origination"</div>
                     } else {
-                        <span>"ACH Origination"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"ACH Origination"</div>
                     }}
-                </button>
-                <button class="tab" on:click={self.show_ledger}>
+                </div>
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ledger}>
                     {if self.active_tab == 2 {
-                        <span class="tab-active">"Wallet / Ledger"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Wallet / Ledger"</div>
                     } else {
-                        <span>"Wallet / Ledger"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Wallet / Ledger"</div>
                     }}
-                </button>
-                <button class="tab" on:click={self.show_ofac}>
+                </div>
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ofac}>
                     {if self.active_tab == 3 {
-                        <span class="tab-active">"OFAC Screening"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"OFAC Screening"</div>
                     } else {
-                        <span>"OFAC Screening"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"OFAC Screening"</div>
                     }}
-                </button>
-                <button class="tab" on:click={self.show_card}>
+                </div>
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_card}>
                     {if self.active_tab == 4 {
-                        <span class="tab-active">"Card Acquiring"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Card Acquiring"</div>
                     } else {
-                        <span>"Card Acquiring"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Card Acquiring"</div>
                     }}
-                </button>
-                <button class="tab" on:click={self.show_dashboard}>
+                </div>
+                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_dashboard}>
                     {if self.active_tab == 5 {
-                        <span class="tab-active">"Dashboard"</span>
+                        <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Dashboard"</div>
                     } else {
-                        <span>"Dashboard"</span>
+                        <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Dashboard"</div>
                     }}
-                </button>
+                </div>
             </div>
 
             // ========== CONTENT ==========
-            <div class="content">
+            <div style="direction: vertical; width: fill; padding: 28 32; gap: 20; max-width: 1100px; align: center; scroll: true">
 
                 // ====================================================
                 // TAB 0: MULTI-RAIL TRANSFER ENGINE
                 // ====================================================
                 {if self.active_tab == 0 {
-                    <div>
-                        // Stats
-                        <div class="stats-row">
-                            <div class="stat-card">
-                                <div class="stat-value">{format("${}.{}", self.transfer_amount / 100, self.transfer_amount - (self.transfer_amount / 100) * 100)}</div>
-                                <div class="stat-label">"Transfer Amount"</div>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        // Stats row
+                        <div style="direction: horizontal; width: fill; gap: 16">
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{format("${}.{}", self.transfer_amount / 100, self.transfer_amount - (self.transfer_amount / 100) * 100)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TRANSFER AMOUNT"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value">{format("{}", self.transfer_count)}</div>
-                                <div class="stat-label">"Transfers Sent"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{format("{}", self.transfer_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TRANSFERS SENT"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-green">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
-                                <div class="stat-label">"Wallet Balance"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"WALLET BALANCE"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value">"0"</div>
-                                <div class="stat-label">"JS Dependencies"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">"0"</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"JS DEPENDENCIES"</div>
                             </div>
                         </div>
 
-                        // Amount presets
-                        <div class="card">
-                            <h3 class="card-title">"Configure Transfer"</h3>
-                            <p class="card-subtitle">"Adjust parameters to see how the rail selection engine responds"</p>
+                        // Configure Transfer card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Configure Transfer"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Adjust parameters to see how the rail selection engine responds"</div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_amount_small}>"$50.00"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_amount_medium}>"$250.00"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_amount_large}>"$5,000.00"</button>
+                            // Amount presets
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_small}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$50.00"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_medium}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$250.00"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_amount_large}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"$5,000.00"</div>
+                                </div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_time_morning}>"10:30 AM ET"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_time_afternoon}>"3:00 PM ET"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_time_evening}>"6:00 PM ET (past cutoff)"</button>
+                            // Time presets
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_morning}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"10:30 AM ET"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_afternoon}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"3:00 PM ET"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_time_evening}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"6:00 PM ET (past cutoff)"</div>
+                                </div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-secondary btn-sm" on:click={self.toggle_rtp}>
+                            // RTP toggle
+                            <div style="direction: horizontal; gap: 10">
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.toggle_rtp}>
                                     {if self.rtp_supported == 1 {
-                                        <span>"RTP: ON"</span>
+                                        <div style="font-size: 12px; font-weight: 600; color: #3fb950; width: hug; height: hug">"RTP: ON"</div>
                                     } else {
-                                        <span>"RTP: OFF"</span>
+                                        <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"RTP: OFF"</div>
                                     }}
-                                </button>
+                                </div>
                             </div>
 
-                            <div class="kv-row">
-                                <span class="kv-label">"Recipient"</span>
-                                <span class="kv-value">{format("{}", self.transfer_recipient)}</span>
+                            // Key-value details
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Recipient"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.transfer_recipient)}</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Routing Number"</span>
-                                <span class="kv-value">{format("{}", self.transfer_routing)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Routing Number"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.transfer_routing)}</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Account Number"</span>
-                                <span class="kv-value">{format("{}", self.transfer_account)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Account Number"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.transfer_account)}</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Memo"</span>
-                                <span class="kv-value">{format("{}", self.transfer_memo)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Memo"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.transfer_memo)}</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Current Time (ET)"</span>
-                                <span class="kv-value">{format("{}:{}", self.current_time_et / 60, self.current_time_et - (self.current_time_et / 60) * 60)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Current Time (ET)"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}:{}", self.current_time_et / 60, self.current_time_et - (self.current_time_et / 60) * 60)}</div>
                             </div>
                         </div>
 
-                        // Rail selection decision tree
-                        <div class="card">
-                            <h3 class="card-title">"Rail Selection Decision Tree (WASM)"</h3>
-                            <div class="code-block">
-                                <div>"// All logic runs in WASM linear memory"</div>
-                                <div>"// Browser extensions cannot intercept routing decisions"</div>
-                                <div>""</div>
-                                <div>"if amount <= 100000 AND rtp_supported {"</div>
-                                <div>"    → RTP (instant, $0.25 fee)"</div>
-                                <div>"} else if current_time < 16:30 ET {"</div>
-                                <div>"    → Same-Day ACH ($0.10 fee, settles today)"</div>
-                                <div>"} else {"</div>
-                                <div>"    → Standard ACH (free, 1-2 days)"</div>
-                                <div>"}"</div>
+                        // Rail Selection Decision Tree card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Rail Selection Decision Tree (WASM)"</div>
+
+                            // Code block
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// All logic runs in WASM linear memory"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Browser extensions cannot intercept routing decisions"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"if amount <= 100000 AND rtp_supported {"</div>
+                                <div style="font-size: 12px; color: #3fb950; width: hug; height: hug">"    -> RTP (instant, $0.25 fee)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"} else if current_time < 16:30 ET {"</div>
+                                <div style="font-size: 12px; color: #4667A6; width: hug; height: hug">"    -> Same-Day ACH ($0.10 fee, settles today)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"} else {"</div>
+                                <div style="font-size: 12px; color: #d29922; width: hug; height: hug">"    -> Standard ACH (free, 1-2 days)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"}"</div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.begin_transfer}>"Initiate Transfer"</button>
-                                <button class="btn btn-success" on:click={self.simulate_settlement}>"Simulate Settlement"</button>
-                                <button class="btn btn-secondary" on:click={self.reset_transfer}>"Reset"</button>
+                            // Action buttons
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.begin_transfer}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Initiate Transfer"</div>
+                                </div>
+                                <div style="padding: 10 20; background-color: #238636; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.simulate_settlement}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Simulate Settlement"</div>
+                                </div>
+                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 44px; align: center; justify: center" on:click={self.reset_transfer}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Reset"</div>
+                                </div>
                             </div>
 
                             // Transfer status flow
                             {if self.transfer_initiated {
-                                <div>
-                                    <div class="divider"></div>
+                                <div style="direction: vertical; width: fill; gap: 12">
+                                    // Divider
+                                    <div style="width: fill; height: 1px; background-color: #252a3a"></div>
 
                                     // Selected rail indicator
                                     {if self.selected_rail == "RTP" {
-                                        <div class="rail-indicator rail-rtp">
-                                            <span class="badge badge-green">"RTP"</span>
-                                            <span class="flow-text">"Real-Time Payments — instant settlement"</span>
+                                        <div style="direction: horizontal; width: fill; padding: 16; background-color: #0b2e1a; border-radius: 10; border-width: 1; border-color: #1a5c34; align: center; gap: 12">
+                                            <div style="padding: 4 10; background-color: #0b2e1a; border-radius: 100; border-width: 1; border-color: #1a5c34; width: hug; height: hug">
+                                                <div style="font-size: 11px; font-weight: 600; color: #3fb950; width: hug; height: hug">"RTP"</div>
+                                            </div>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Real-Time Payments — instant settlement"</div>
                                         </div>
                                     }}
                                     {if self.selected_rail == "Same-Day ACH" {
-                                        <div class="rail-indicator rail-ach">
-                                            <span class="badge badge-purple">"SAME-DAY ACH"</span>
-                                            <span class="flow-text">"Same-day settlement via NACHA"</span>
+                                        <div style="direction: horizontal; width: fill; padding: 16; background-color: #162040; border-radius: 10; border-width: 1; border-color: #2a4080; align: center; gap: 12">
+                                            <div style="padding: 4 10; background-color: #162040; border-radius: 100; border-width: 1; border-color: #2a4080; width: hug; height: hug">
+                                                <div style="font-size: 11px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">"SAME-DAY ACH"</div>
+                                            </div>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Same-day settlement via NACHA"</div>
                                         </div>
                                     }}
                                     {if self.selected_rail == "Standard ACH" {
-                                        <div class="rail-indicator rail-ach">
-                                            <span class="badge badge-amber">"STANDARD ACH"</span>
-                                            <span class="flow-text">"Next-day batch processing"</span>
+                                        <div style="direction: horizontal; width: fill; padding: 16; background-color: #2a1f06; border-radius: 10; border-width: 1; border-color: #5c4011; align: center; gap: 12">
+                                            <div style="padding: 4 10; background-color: #2a1f06; border-radius: 100; border-width: 1; border-color: #5c4011; width: hug; height: hug">
+                                                <div style="font-size: 11px; font-weight: 600; color: #d29922; width: hug; height: hug">"STANDARD ACH"</div>
+                                            </div>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Next-day batch processing"</div>
                                         </div>
                                     }}
 
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Selected Rail"</span>
-                                        <span class="kv-value-purple">{format("{}", self.selected_rail)}</span>
+                                    // Transfer details
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Selected Rail"</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("{}", self.selected_rail)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Fee"</span>
-                                        <span class="kv-value">{format("${}.{}", self.rail_fee_cents / 100, self.rail_fee_cents - (self.rail_fee_cents / 100) * 100)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Fee"</div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.rail_fee_cents / 100, self.rail_fee_cents - (self.rail_fee_cents / 100) * 100)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Settlement"</span>
-                                        <span class="kv-value">{format("{}", self.rail_settle_time)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Settlement"</div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.rail_settle_time)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Reason"</span>
-                                        <span class="mono">{format("{}", self.rail_reason)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Reason"</div>
+                                        <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">{format("{}", self.rail_reason)}</div>
                                     </div>
 
-                                    // Status flow
-                                    <div class="divider"></div>
-                                    <div class="flow-step">
-                                        <span class="flow-dot-done"></span>
-                                        <span class="flow-text">"Initiated"</span>
+                                    // Status flow steps
+                                    <div style="width: fill; height: 1px; background-color: #252a3a"></div>
+                                    <div style="direction: horizontal; align: center; gap: 12; padding: 10 0">
+                                        <div style="width: 10px; height: 10px; border-radius: 5; background-color: #3fb950"></div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Initiated"</div>
                                     </div>
-                                    <div class="flow-step">
-                                        <span class="flow-dot-done"></span>
-                                        <span class="flow-text">"Routing validated (ABA checksum)"</span>
+                                    <div style="direction: horizontal; align: center; gap: 12; padding: 10 0">
+                                        <div style="width: 10px; height: 10px; border-radius: 5; background-color: #3fb950"></div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Routing validated (ABA checksum)"</div>
                                     </div>
-                                    <div class="flow-step">
-                                        <span class="flow-dot-done"></span>
-                                        <span class="flow-text">{format("Rail selected: {}", self.selected_rail)}</span>
+                                    <div style="direction: horizontal; align: center; gap: 12; padding: 10 0">
+                                        <div style="width: 10px; height: 10px; border-radius: 5; background-color: #3fb950"></div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("Rail selected: {}", self.selected_rail)}</div>
                                     </div>
-                                    <div class="flow-step">
+                                    <div style="direction: horizontal; align: center; gap: 12; padding: 10 0">
                                         {if self.transfer_status == "settled" {
-                                            <span class="flow-dot-done"></span>
+                                            <div style="width: 10px; height: 10px; border-radius: 5; background-color: #3fb950"></div>
                                         } else {
-                                            <span class="flow-dot-active"></span>
+                                            <div style="width: 10px; height: 10px; border-radius: 5; background-color: #4667A6"></div>
                                         }}
                                         {if self.transfer_status == "settled" {
-                                            <span class="flow-text">"Processing complete"</span>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Processing complete"</div>
                                         } else {
-                                            <span class="flow-text">"Processing via Moov API..."</span>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Processing via Moov API..."</div>
                                         }}
                                     </div>
-                                    <div class="flow-step">
+                                    <div style="direction: horizontal; align: center; gap: 12; padding: 10 0">
                                         {if self.transfer_status == "settled" {
-                                            <span class="flow-dot-done"></span>
+                                            <div style="width: 10px; height: 10px; border-radius: 5; background-color: #3fb950"></div>
                                         } else {
-                                            <span class="flow-dot-pending"></span>
+                                            <div style="width: 10px; height: 10px; border-radius: 5; background-color: #252a3a"></div>
                                         }}
                                         {if self.transfer_status == "settled" {
-                                            <span class="flow-text">"Settled"</span>
+                                            <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Settled"</div>
                                         } else {
-                                            <span class="flow-text-muted">"Awaiting settlement"</span>
+                                            <div style="font-size: 13px; color: #484f58; width: hug; height: hug">"Awaiting settlement"</div>
                                         }}
                                     </div>
                                 </div>
@@ -1522,13 +1163,13 @@ component MoovMultiRailDemo() {
 
                             // Error states
                             {if self.transfer_status == "error_routing" {
-                                <div class="screen-block">
-                                    <span class="kv-value-red">"ERROR: Invalid ABA routing number — checksum failed"</span>
+                                <div style="direction: vertical; width: fill; padding: 16; background-color: #3d0c0c; border-radius: 10; border-width: 2; border-color: #f85149; gap: 4">
+                                    <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">"ERROR: Invalid ABA routing number — checksum failed"</div>
                                 </div>
                             }}
                             {if self.transfer_status == "error_insufficient" {
-                                <div class="screen-block">
-                                    <span class="kv-value-red">"ERROR: Insufficient wallet balance for transfer + fee"</span>
+                                <div style="direction: vertical; width: fill; padding: 16; background-color: #3d0c0c; border-radius: 10; border-width: 2; border-color: #f85149; gap: 4">
+                                    <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">"ERROR: Insufficient wallet balance for transfer + fee"</div>
                                 </div>
                             }}
                         </div>
@@ -1539,125 +1180,175 @@ component MoovMultiRailDemo() {
                 // TAB 1: ACH ORIGINATION
                 // ====================================================
                 {if self.active_tab == 1 {
-                    <div>
-                        <div class="card">
-                            <h3 class="card-title">"ABA Routing Number Validation"</h3>
-                            <p class="card-subtitle">"The real checksum algorithm — pure WASM i32 arithmetic"</p>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        // ABA Routing Validation card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"ABA Routing Number Validation"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"The real checksum algorithm — pure WASM i32 arithmetic"</div>
 
-                            <div class="code-block">
-                                <div>"// ABA Routing Number Checksum (used by every US bank)"</div>
-                                <div>"// Weights repeat: 3, 7, 1, 3, 7, 1, 3, 7, 1"</div>
-                                <div>""</div>
-                                <div>"checksum = 3*d1 + 7*d2 + 1*d3 + 3*d4 + 7*d5 + 1*d6 + 3*d7 + 7*d8 + 1*d9"</div>
-                                <div>"valid = (checksum mod 10 == 0)"</div>
-                                <div>""</div>
-                                <div>{format("// Testing: {}", self.ach_routing)}</div>
+                            // Code block
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// ABA Routing Number Checksum (used by every US bank)"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Weights repeat: 3, 7, 1, 3, 7, 1, 3, 7, 1"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"checksum = 3*d1 + 7*d2 + 1*d3 + 3*d4 + 7*d5 + 1*d6 + 3*d7 + 7*d8 + 1*d9"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"valid = (checksum mod 10 == 0)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #4667A6; width: hug; height: hug">{format("// Testing: {}", self.ach_routing)}</div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.validate_routing}>"Validate Routing Number"</button>
+                            <div style="direction: horizontal; gap: 10">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.validate_routing}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Validate Routing Number"</div>
+                                </div>
                             </div>
 
                             {if self.ach_valid == 1 {
-                                <div class="kv-row">
-                                    <span class="kv-label">"Result"</span>
-                                    <span class="badge badge-green">"VALID"</span>
+                                <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Result"</div>
+                                    <div style="padding: 4 10; background-color: #0b2e1a; border-radius: 100; border-width: 1; border-color: #1a5c34; width: hug; height: hug">
+                                        <div style="font-size: 11px; font-weight: 600; color: #3fb950; width: hug; height: hug">"VALID"</div>
+                                    </div>
                                 </div>
                             }}
                             {if self.ach_valid == 0 {
                                 {if self.ach_checksum_detail.len() > 0 {
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Result"</span>
-                                        <span class="badge badge-red">"INVALID"</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Result"</div>
+                                        <div style="padding: 4 10; background-color: #3d0c0c; border-radius: 100; border-width: 1; border-color: #6e1c1c; width: hug; height: hug">
+                                            <div style="font-size: 11px; font-weight: 600; color: #f85149; width: hug; height: hug">"INVALID"</div>
+                                        </div>
                                     </div>
                                 }}
                             }}
                             {if self.ach_checksum_detail.len() > 0 {
-                                <div class="kv-row">
-                                    <span class="kv-label">"Checksum Detail"</span>
-                                    <span class="mono">{format("{}", self.ach_checksum_detail)}</span>
+                                <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Checksum Detail"</div>
+                                    <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">{format("{}", self.ach_checksum_detail)}</div>
                                 </div>
                             }}
                         </div>
 
-                        // Entry class codes
-                        <div class="card">
-                            <h3 class="card-title">"ACH Entry Class Codes"</h3>
-                            <div class="btn-row">
-                                <button class="btn btn-secondary btn-sm" on:click={self.cycle_entry_class}>"Cycle Class Code"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.toggle_same_day}>
+                        // Entry Class Codes card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"ACH Entry Class Codes"</div>
+
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.cycle_entry_class}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Cycle Class Code"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.toggle_same_day}>
                                     {if self.ach_same_day == 1 {
-                                        <span>"Same-Day: ON"</span>
+                                        <div style="font-size: 12px; font-weight: 600; color: #3fb950; width: hug; height: hug">"Same-Day: ON"</div>
                                     } else {
-                                        <span>"Same-Day: OFF"</span>
+                                        <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Same-Day: OFF"</div>
                                     }}
-                                </button>
+                                </div>
                             </div>
 
-                            <div class="kv-row">
-                                <span class="kv-label">"Entry Class"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Entry Class"</div>
                                 {if self.ach_entry_class == 0 {
-                                    <span class="kv-value">"PPD — Prearranged Payment (Personal)"</span>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"PPD — Prearranged Payment (Personal)"</div>
                                 }}
                                 {if self.ach_entry_class == 1 {
-                                    <span class="kv-value">"CCD — Corporate Credit/Debit (Business)"</span>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"CCD — Corporate Credit/Debit (Business)"</div>
                                 }}
                                 {if self.ach_entry_class == 2 {
-                                    <span class="kv-value">"WEB — Internet-Initiated Entry (Online)"</span>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"WEB — Internet-Initiated Entry (Online)"</div>
                                 }}
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Settlement"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Settlement"</div>
                                 {if self.ach_same_day == 1 {
-                                    <span class="kv-value-green">"Same-day (before 4:30 PM ET cutoff)"</span>
+                                    <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">"Same-day (before 4:30 PM ET cutoff)"</div>
                                 } else {
-                                    <span class="kv-value">"Standard (1-2 business days)"</span>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"Standard (1-2 business days)"</div>
                                 }}
                             </div>
                         </div>
 
-                        // NACHA file format preview
-                        <div class="card">
-                            <h3 class="card-title">"NACHA File Format Structure"</h3>
-                            <p class="card-subtitle">"Field positions and lengths per ACH specification"</p>
+                        // NACHA File Format card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"NACHA File Format Structure"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Field positions and lengths per ACH specification"</div>
 
-                            <div class="nacha-row">
-                                <span class="nacha-field nacha-header">"1"</span>
-                                <span class="nacha-field nacha-header">"01"</span>
-                                <span class="nacha-field nacha-header">" 021000021"</span>
-                                <span class="nacha-field nacha-header">"0210000211234567890"</span>
-                                <span class="nacha-field nacha-header">"File Header"</span>
+                            // NACHA rows
+                            <div style="direction: horizontal; gap: 2">
+                                <div style="padding: 4 8; background-color: #162040; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #6d8fd4; width: hug; height: hug">"1"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #162040; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #6d8fd4; width: hug; height: hug">"01"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #162040; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #6d8fd4; width: hug; height: hug">" 021000021"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #162040; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #6d8fd4; width: hug; height: hug">"0210000211234567890"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #162040; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #6d8fd4; width: hug; height: hug">"File Header"</div>
+                                </div>
                             </div>
-                            <div class="nacha-row">
-                                <span class="nacha-field nacha-batch">"5"</span>
-                                <span class="nacha-field nacha-batch">"220"</span>
-                                <span class="nacha-field nacha-batch">"ACME CORP"</span>
-                                <span class="nacha-field nacha-batch">"PPD"</span>
-                                <span class="nacha-field nacha-batch">"Batch Header"</span>
+                            <div style="direction: horizontal; gap: 2">
+                                <div style="padding: 4 8; background-color: #0b2e1a; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #3fb950; width: hug; height: hug">"5"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #0b2e1a; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #3fb950; width: hug; height: hug">"220"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #0b2e1a; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #3fb950; width: hug; height: hug">"ACME CORP"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #0b2e1a; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #3fb950; width: hug; height: hug">"PPD"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #0b2e1a; border-radius: 3; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #3fb950; width: hug; height: hug">"Batch Header"</div>
+                                </div>
                             </div>
-                            <div class="nacha-row">
-                                <span class="nacha-field nacha-entry">"6"</span>
-                                <span class="nacha-field nacha-entry">"22"</span>
-                                <span class="nacha-field nacha-entry">"021000021"</span>
-                                <span class="nacha-field nacha-entry">"1234567890"</span>
-                                <span class="nacha-field nacha-entry">"0000025000"</span>
-                                <span class="nacha-field nacha-entry">"Entry Detail"</span>
+                            <div style="direction: horizontal; gap: 2">
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"6"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"22"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"021000021"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"1234567890"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"0000025000"</div>
+                                </div>
+                                <div style="padding: 4 8; background-color: #1a1e2e; border-radius: 3; border-width: 1; border-color: #252a3a; width: hug; height: hug">
+                                    <div style="font-size: 11px; color: #e6edf3; width: hug; height: hug">"Entry Detail"</div>
+                                </div>
                             </div>
 
-                            <div class="divider"></div>
+                            // Divider
+                            <div style="width: fill; height: 1px; background-color: #252a3a"></div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.add_to_batch}>"Add to Batch"</button>
-                                <button class="btn btn-danger btn-sm" on:click={self.clear_batch}>"Clear Batch"</button>
+                            // Batch actions
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.add_to_batch}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Add to Batch"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.clear_batch}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Clear Batch"</div>
+                                </div>
                             </div>
 
-                            <div class="kv-row">
-                                <span class="kv-label">"Batch Entries"</span>
-                                <span class="kv-value">{format("{}", self.ach_batch_count)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Batch Entries"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.ach_batch_count)}</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Batch Total"</span>
-                                <span class="kv-value-purple">{format("${}.{}", self.ach_batch_total / 100, self.ach_batch_total - (self.ach_batch_total / 100) * 100)}</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Batch Total"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.ach_batch_total / 100, self.ach_batch_total - (self.ach_batch_total / 100) * 100)}</div>
                             </div>
                         </div>
                     </div>
@@ -1667,80 +1358,88 @@ component MoovMultiRailDemo() {
                 // TAB 2: WALLET / DOUBLE-ENTRY LEDGER
                 // ====================================================
                 {if self.active_tab == 2 {
-                    <div>
-                        // Wallet balance
-                        <div class="stats-row">
-                            <div class="stat-card">
-                                <div class="stat-value-green">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
-                                <div class="stat-label">"Moov Wallet Balance"</div>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        // Wallet stats row
+                        <div style="direction: horizontal; width: fill; gap: 16">
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"MOOV WALLET BALANCE"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value">{format("{}", self.ledger_count)}</div>
-                                <div class="stat-label">"Ledger Entries"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{format("{}", self.ledger_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"LEDGER ENTRIES"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-red">{format("${}", self.ledger_debit_total / 100)}</div>
-                                <div class="stat-label">"Total Debits"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #f85149; width: hug; height: hug">{format("${}", self.ledger_debit_total / 100)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TOTAL DEBITS"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-green">{format("${}", self.ledger_credit_total / 100)}</div>
-                                <div class="stat-label">"Total Credits"</div>
-                            </div>
-                        </div>
-
-                        // Double-entry explanation
-                        <div class="card">
-                            <h3 class="card-title">"Double-Entry Bookkeeping"</h3>
-                            <p class="card-subtitle">"Every money movement produces two ledger entries. Assets = Liabilities + Equity."</p>
-
-                            <div class="code-block">
-                                <div>"// Transfer $250.00 from Wallet A to Wallet B"</div>
-                                <div>"// Entry 1: DEBIT  Wallet A  -$250.00"</div>
-                                <div>"// Entry 2: CREDIT Wallet B  +$250.00"</div>
-                                <div>"// Net change to ledger: $0.00 (balanced)"</div>
-                                <div>""</div>
-                                <div>"// Book transfers are instant — no rail needed"</div>
-                                <div>"// Moov moves funds between wallets in-memory"</div>
-                            </div>
-
-                            <div class="btn-row">
-                                <button class="btn btn-secondary btn-sm" on:click={self.decrease_book_amount}>"-$50"</button>
-                                <span class="kv-value">{format("${}.{}", self.book_transfer_amount / 100, self.book_transfer_amount - (self.book_transfer_amount / 100) * 100)}</span>
-                                <button class="btn btn-secondary btn-sm" on:click={self.increase_book_amount}>"+$50"</button>
-                                <button class="btn btn-moov" on:click={self.book_transfer}>"Book Transfer"</button>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("${}", self.ledger_credit_total / 100)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"TOTAL CREDITS"</div>
                             </div>
                         </div>
 
-                        // 10K ledger generation
-                        <div class="card">
-                            <h3 class="card-title">"WASM Performance: 10,000 Ledger Entries"</h3>
-                            <p class="card-subtitle">"Generate 10K double-entry records in a tight loop — pure i32 arithmetic, zero GC"</p>
+                        // Double-entry explanation card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Double-Entry Bookkeeping"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Every money movement produces two ledger entries. Assets = Liabilities + Equity."</div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.generate_ledger_entries}>"Generate 10,000 Entries"</button>
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Transfer $250.00 from Wallet A to Wallet B"</div>
+                                <div style="font-size: 12px; color: #f85149; width: hug; height: hug">"// Entry 1: DEBIT  Wallet A  -$250.00"</div>
+                                <div style="font-size: 12px; color: #3fb950; width: hug; height: hug">"// Entry 2: CREDIT Wallet B  +$250.00"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// Net change to ledger: $0.00 (balanced)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Book transfers are instant — no rail needed"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Moov moves funds between wallets in-memory"</div>
+                            </div>
+
+                            <div style="direction: horizontal; gap: 10; align: center; wrap: true">
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.decrease_book_amount}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$50"</div>
+                                </div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.book_transfer_amount / 100, self.book_transfer_amount - (self.book_transfer_amount / 100) * 100)}</div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.increase_book_amount}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$50"</div>
+                                </div>
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.book_transfer}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Book Transfer"</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        // 10K ledger generation card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"WASM Performance: 10,000 Ledger Entries"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Generate 10K double-entry records in a tight loop — pure i32 arithmetic, zero GC"</div>
+
+                            <div style="direction: horizontal; gap: 10">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.generate_ledger_entries}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Generate 10,000 Entries"</div>
+                                </div>
                             </div>
 
                             {if self.ledger_generated {
-                                <div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Entries Generated"</span>
-                                        <span class="kv-value-green">{format("{}", self.ledger_count)}</span>
+                                <div style="direction: vertical; width: fill; gap: 0">
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Entries Generated"</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("{}", self.ledger_count)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Debit Total"</span>
-                                        <span class="kv-value-red">{format("${}", self.ledger_debit_total / 100)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Debit Total"</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{format("${}", self.ledger_debit_total / 100)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Credit Total"</span>
-                                        <span class="kv-value-green">{format("${}", self.ledger_credit_total / 100)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Credit Total"</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("${}", self.ledger_credit_total / 100)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Final Balance"</span>
-                                        <span class="kv-value-purple">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Final Balance"</div>
+                                        <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.wallet_balance / 100, self.wallet_balance - (self.wallet_balance / 100) * 100)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Runtime"</span>
-                                        <span class="kv-value">"WASM (no GC, no allocation, linear memory)"</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Runtime"</div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"WASM (no GC, no allocation, linear memory)"</div>
                                     </div>
                                 </div>
                             }}
@@ -1752,127 +1451,140 @@ component MoovMultiRailDemo() {
                 // TAB 3: OFAC / SANCTIONS SCREENING
                 // ====================================================
                 {if self.active_tab == 3 {
-                    <div>
-                        <div class="card">
-                            <h3 class="card-title">"OFAC Sanctions Screening (WASM)"</h3>
-                            <p class="card-subtitle">"Name screening with fuzzy matching — runs in WASM linear memory, tamper-proof"</p>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        // OFAC Screening card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"OFAC Sanctions Screening (WASM)"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Name screening with fuzzy matching — runs in WASM linear memory, tamper-proof"</div>
 
                             // Test name presets
-                            <div class="btn-row">
-                                <button class="btn btn-success btn-sm" on:click={self.set_screen_clean}>"Clean: John Smith"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.set_screen_fuzzy}>"Fuzzy: Iran Shipping LLC"</button>
-                                <button class="btn btn-danger btn-sm" on:click={self.set_screen_blocked}>"Blocked: Osama Bin Laden"</button>
-                            </div>
-
-                            <div class="kv-row">
-                                <span class="kv-label">"Screening Name"</span>
-                                <span class="kv-value">{format("{}", self.screen_name)}</span>
-                            </div>
-
-                            // Threshold control
-                            <div class="kv-row">
-                                <span class="kv-label">"Match Threshold"</span>
-                                <div class="btn-row">
-                                    <button class="btn btn-secondary btn-sm" on:click={self.threshold_down}>"-5"</button>
-                                    <span class="kv-value-purple">{format("{}%", self.screen_threshold)}</span>
-                                    <button class="btn btn-secondary btn-sm" on:click={self.threshold_up}>"+5"</button>
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 6 14; background-color: #238636; border-radius: 8; min-height: 36px; align: center; justify: center" on:click={self.set_screen_clean}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Clean: John Smith"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_screen_fuzzy}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Fuzzy: Iran Shipping LLC"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.set_screen_blocked}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Blocked: Osama Bin Laden"</div>
                                 </div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.run_screening}>"Run OFAC Screen"</button>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Screening Name"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.screen_name)}</div>
+                            </div>
+
+                            // Threshold control
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a; align: center">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Match Threshold"</div>
+                                <div style="direction: horizontal; gap: 10; align: center">
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.threshold_down}>
+                                        <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-5"</div>
+                                    </div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("{}%", self.screen_threshold)}</div>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.threshold_up}>
+                                        <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+5"</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="direction: horizontal; gap: 10">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.run_screening}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Run OFAC Screen"</div>
+                                </div>
                             </div>
 
                             {if self.screen_run {
-                                <div>
-                                    <div class="divider"></div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Entries Checked"</span>
-                                        <span class="kv-value">{format("{} SDN records", self.screen_checked_count)}</span>
+                                <div style="direction: vertical; width: fill; gap: 12">
+                                    <div style="width: fill; height: 1px; background-color: #252a3a"></div>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Entries Checked"</div>
+                                        <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{} SDN records", self.screen_checked_count)}</div>
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Match Score"</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Match Score"</div>
                                         {if self.screen_score >= 90 {
-                                            <span class="kv-value-red">{format("{}%", self.screen_score)}</span>
+                                            <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{format("{}%", self.screen_score)}</div>
                                         }}
                                         {if self.screen_score >= 60 {
                                             {if self.screen_score < 90 {
-                                                <span class="kv-value-amber">{format("{}%", self.screen_score)}</span>
+                                                <div style="font-size: 13px; font-weight: 600; color: #d29922; width: hug; height: hug">{format("{}%", self.screen_score)}</div>
                                             }}
                                         }}
                                         {if self.screen_score < 60 {
-                                            <span class="kv-value-green">{format("{}%", self.screen_score)}</span>
+                                            <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("{}%", self.screen_score)}</div>
                                         }}
                                     </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Match Type"</span>
-                                        <span class="mono">{format("{}", self.screen_match_type)}</span>
+                                    <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                        <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Match Type"</div>
+                                        <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">{format("{}", self.screen_match_type)}</div>
                                     </div>
 
-                                    // Decision banner
+                                    // Decision banners
                                     {if self.screen_score >= 90 {
-                                        <div class="screen-block">
-                                            <div class="kv-value-red">{format("{}", self.screen_decision)}</div>
-                                            <div class="mono">"Transfer cannot proceed. Moov compliance team notified."</div>
+                                        <div style="direction: vertical; width: fill; padding: 16; background-color: #3d0c0c; border-radius: 10; border-width: 2; border-color: #f85149; gap: 6">
+                                            <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{format("{}", self.screen_decision)}</div>
+                                            <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"Transfer cannot proceed. Moov compliance team notified."</div>
                                         </div>
                                     }}
                                     {if self.screen_score >= 60 {
                                         {if self.screen_score < 90 {
-                                            <div class="screen-flag">
-                                                <div class="kv-value-amber">{format("{}", self.screen_decision)}</div>
-                                                <div class="mono">"Transfer held pending compliance review."</div>
+                                            <div style="direction: vertical; width: fill; padding: 16; background-color: #2a1f06; border-radius: 10; border-width: 2; border-color: #d29922; gap: 6">
+                                                <div style="font-size: 13px; font-weight: 600; color: #d29922; width: hug; height: hug">{format("{}", self.screen_decision)}</div>
+                                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"Transfer held pending compliance review."</div>
                                             </div>
                                         }}
                                     }}
                                     {if self.screen_score < 60 {
-                                        <div class="screen-clear">
-                                            <div class="kv-value-green">{format("{}", self.screen_decision)}</div>
-                                            <div class="mono">"Transfer may proceed."</div>
+                                        <div style="direction: vertical; width: fill; padding: 16; background-color: #0b2e1a; border-radius: 10; border-width: 2; border-color: #3fb950; gap: 6">
+                                            <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("{}", self.screen_decision)}</div>
+                                            <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"Transfer may proceed."</div>
                                         </div>
                                     }}
                                 </div>
                             }}
                         </div>
 
-                        // Levenshtein explanation
-                        <div class="card">
-                            <h3 class="card-title">"Fuzzy Matching: Levenshtein Distance"</h3>
-                            <p class="card-subtitle">"The full DP algorithm — computed in WASM, not JavaScript"</p>
+                        // Levenshtein explanation card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Fuzzy Matching: Levenshtein Distance"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"The full DP algorithm — computed in WASM, not JavaScript"</div>
 
-                            <div class="code-block">
-                                <div>"// Levenshtein edit distance — dynamic programming"</div>
-                                <div>"// For strings A[1..m] and B[1..n]:"</div>
-                                <div>""</div>
-                                <div>"D[0][j] = j    // inserting j characters"</div>
-                                <div>"D[i][0] = i    // deleting i characters"</div>
-                                <div>""</div>
-                                <div>"D[i][j] = min("</div>
-                                <div>"  D[i-1][j] + 1,        // deletion"</div>
-                                <div>"  D[i][j-1] + 1,        // insertion"</div>
-                                <div>"  D[i-1][j-1] + cost    // substitution"</div>
-                                <div>")"</div>
-                                <div>""</div>
-                                <div>"// cost = 0 if A[i] == B[j], else 1"</div>
-                                <div>"// Result: D[m][n] = minimum edits"</div>
-                                <div>""</div>
-                                <div>"// Scoring:"</div>
-                                <div>"//   exact match         → score 100 → BLOCK"</div>
-                                <div>"//   edit_distance <= 2  → score 80  → FLAG"</div>
-                                <div>"//   contains substring  → score 60  → FLAG"</div>
-                                <div>"//   below threshold     → score < T → CLEAR"</div>
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Levenshtein edit distance — dynamic programming"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// For strings A[1..m] and B[1..n]:"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"D[0][j] = j    // inserting j characters"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"D[i][0] = i    // deleting i characters"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"D[i][j] = min("</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"  D[i-1][j] + 1,        // deletion"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"  D[i][j-1] + 1,        // insertion"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"  D[i-1][j-1] + cost    // substitution"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">")"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// cost = 0 if A[i] == B[j], else 1"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Result: D[m][n] = minimum edits"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Scoring:"</div>
+                                <div style="font-size: 12px; color: #f85149; width: hug; height: hug">"//   exact match         -> score 100 -> BLOCK"</div>
+                                <div style="font-size: 12px; color: #d29922; width: hug; height: hug">"//   edit_distance <= 2  -> score 80  -> FLAG"</div>
+                                <div style="font-size: 12px; color: #d29922; width: hug; height: hug">"//   contains substring  -> score 60  -> FLAG"</div>
+                                <div style="font-size: 12px; color: #3fb950; width: hug; height: hug">"//   below threshold     -> score < T -> CLEAR"</div>
                             </div>
 
-                            <div class="kv-row">
-                                <span class="kv-label">"Security Model"</span>
-                                <span class="kv-value-green">"WASM linear memory — tamper-proof"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Security Model"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">"WASM linear memory — tamper-proof"</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Watchlist Storage"</span>
-                                <span class="kv-value">"WASM heap (cannot be read by browser extensions)"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Watchlist Storage"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"WASM heap (cannot be read by browser extensions)"</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Threshold Control"</span>
-                                <span class="kv-value">"WASM signal (cannot be modified by DevTools)"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Threshold Control"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"WASM signal (cannot be modified by DevTools)"</div>
                             </div>
                         </div>
                     </div>
@@ -1882,105 +1594,122 @@ component MoovMultiRailDemo() {
                 // TAB 4: CARD ACQUIRING
                 // ====================================================
                 {if self.active_tab == 4 {
-                    <div>
-                        <div class="card">
-                            <h3 class="card-title">"Card Acquiring via Moov"</h3>
-                            <p class="card-subtitle">"Luhn validation + authorization lifecycle — card data encrypted in WASM before JS bridge"</p>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Card Acquiring via Moov"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Luhn validation + authorization lifecycle — card data encrypted in WASM before JS bridge"</div>
 
-                            // Card input
-                            <div class="kv-row">
-                                <span class="kv-label">"Card Number"</span>
-                                <span class="kv-value">{format("{}", self.card_number)}</span>
+                            // Card input display
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Card Number"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("{}", self.card_number)}</div>
                             </div>
 
                             // Amount control
-                            <div class="kv-row">
-                                <span class="kv-label">"Amount"</span>
-                                <div class="btn-row">
-                                    <button class="btn btn-secondary btn-sm" on:click={self.card_amount_down}>"-$5"</button>
-                                    <span class="kv-value">{format("${}.{}", self.card_amount / 100, self.card_amount - (self.card_amount / 100) * 100)}</span>
-                                    <button class="btn btn-secondary btn-sm" on:click={self.card_amount_up}>"+$5"</button>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a; align: center">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Amount"</div>
+                                <div style="direction: horizontal; gap: 10; align: center">
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_down}>
+                                        <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$5"</div>
+                                    </div>
+                                    <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}.{}", self.card_amount / 100, self.card_amount - (self.card_amount / 100) * 100)}</div>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_up}>
+                                        <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$5"</div>
+                                    </div>
                                 </div>
                             </div>
 
                             // Luhn validation detail
-                            <div class="code-block">
-                                <div>"// Luhn Algorithm (WASM arithmetic)"</div>
-                                <div>"// Card: 4111 1111 1111 1111"</div>
-                                <div>""</div>
-                                <div>"// Step 1: From right, double every 2nd digit"</div>
-                                <div>"//   1  2  1  2  1  2  1  2  1  2  1  2  1  2  1  8"</div>
-                                <div>"// Step 2: If doubled > 9, subtract 9"</div>
-                                <div>"// Step 3: Sum all = 30"</div>
-                                <div>"// Step 4: 30 mod 10 = 0 → VALID"</div>
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Luhn Algorithm (WASM arithmetic)"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Card: 4111 1111 1111 1111"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// Step 1: From right, double every 2nd digit"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"//   1  2  1  2  1  2  1  2  1  2  1  2  1  2  1  8"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// Step 2: If doubled > 9, subtract 9"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// Step 3: Sum all = 30"</div>
+                                <div style="font-size: 12px; color: #3fb950; width: hug; height: hug">"// Step 4: 30 mod 10 = 0 -> VALID"</div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-moov" on:click={self.authorize_card}>"Authorize"</button>
-                                <button class="btn btn-success" on:click={self.capture_card}>"Capture (Full)"</button>
-                                <button class="btn btn-secondary" on:click={self.partial_capture}>"Capture (50%)"</button>
-                                <button class="btn btn-danger btn-sm" on:click={self.void_card}>"Void"</button>
-                                <button class="btn btn-danger btn-sm" on:click={self.refund_card}>"Refund"</button>
-                                <button class="btn btn-secondary btn-sm" on:click={self.reset_card}>"Reset"</button>
+                            // Action buttons
+                            <div style="direction: horizontal; gap: 10; wrap: true">
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.authorize_card}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Authorize"</div>
+                                </div>
+                                <div style="padding: 10 20; background-color: #238636; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.capture_card}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Capture (Full)"</div>
+                                </div>
+                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 44px; align: center; justify: center" on:click={self.partial_capture}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Capture (50%)"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.void_card}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Void"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.refund_card}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Refund"</div>
+                                </div>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.reset_card}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Reset"</div>
+                                </div>
                             </div>
 
-                            // Card lifecycle status
-                            <div class="divider"></div>
-                            <h3 class="card-title">"Authorization Lifecycle"</h3>
+                            // Card lifecycle
+                            <div style="width: fill; height: 1px; background-color: #252a3a"></div>
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Authorization Lifecycle"</div>
 
-                            // Luhn check
-                            <div class="lifecycle-step step-done">
+                            // Luhn check step
+                            <div style="direction: horizontal; padding: 8 14; background-color: #0b2e1a; border-radius: 8; align: center; gap: 8">
                                 {if self.card_checked {
                                     {if self.card_valid {
-                                        <span>"[OK] Luhn validation: PASS"</span>
+                                        <div style="font-size: 13px; color: #3fb950; width: hug; height: hug">"[OK] Luhn validation: PASS"</div>
                                     }}
                                     {if self.card_valid == false {
-                                        <span>"[X] Luhn validation: FAIL"</span>
+                                        <div style="font-size: 13px; color: #f85149; width: hug; height: hug">"[X] Luhn validation: FAIL"</div>
                                     }}
                                 } else {
-                                    <span>"[ ] Luhn validation"</span>
+                                    <div style="font-size: 13px; color: #6e7681; width: hug; height: hug">"[ ] Luhn validation"</div>
                                 }}
                             </div>
 
-                            // Authorization
+                            // Authorization step
                             {if self.card_status == "authorized" {
-                                <div class="lifecycle-step step-active">
-                                    <span>{format("[OK] Authorized — auth code: {}", self.card_auth_code)}</span>
+                                <div style="direction: horizontal; padding: 8 14; background-color: #162040; border-radius: 8; border-width: 1; border-color: #2a4080; align: center; gap: 8">
+                                    <div style="font-size: 13px; color: #6d8fd4; width: hug; height: hug">{format("[OK] Authorized — auth code: {}", self.card_auth_code)}</div>
                                 </div>
                             }}
                             {if self.card_status == "declined_luhn" {
-                                <div class="lifecycle-step step-pending">
-                                    <span>"[X] Declined — Luhn check failed"</span>
+                                <div style="direction: horizontal; padding: 8 14; background-color: #1a1e2e; border-radius: 8; align: center; gap: 8">
+                                    <div style="font-size: 13px; color: #484f58; width: hug; height: hug">"[X] Declined — Luhn check failed"</div>
                                 </div>
                             }}
 
-                            // Capture
+                            // Capture step
                             {if self.card_captured {
-                                <div class="lifecycle-step step-done">
-                                    <span>{format("[OK] Captured: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</span>
+                                <div style="direction: horizontal; padding: 8 14; background-color: #0b2e1a; border-radius: 8; align: center; gap: 8">
+                                    <div style="font-size: 13px; color: #3fb950; width: hug; height: hug">{format("[OK] Captured: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</div>
                                 </div>
                             }}
 
-                            // Void/Refund
+                            // Void/Refund steps
                             {if self.card_status == "voided" {
-                                <div class="lifecycle-step step-pending">
-                                    <span>"[V] Voided — authorization released"</span>
+                                <div style="direction: horizontal; padding: 8 14; background-color: #1a1e2e; border-radius: 8; align: center; gap: 8">
+                                    <div style="font-size: 13px; color: #484f58; width: hug; height: hug">"[V] Voided — authorization released"</div>
                                 </div>
                             }}
                             {if self.card_status == "refunded" {
-                                <div class="lifecycle-step step-pending">
-                                    <span>{format("[R] Refunded: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</span>
+                                <div style="direction: horizontal; padding: 8 14; background-color: #1a1e2e; border-radius: 8; align: center; gap: 8">
+                                    <div style="font-size: 13px; color: #484f58; width: hug; height: hug">{format("[R] Refunded: ${}.{}", self.card_capture_amount / 100, self.card_capture_amount - (self.card_capture_amount / 100) * 100)}</div>
                                 </div>
                             }}
 
-                            <div class="divider"></div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Card Data Exposure"</span>
-                                <span class="kv-value-green">"Encrypted in WASM before any JS bridge call"</span>
+                            <div style="width: fill; height: 1px; background-color: #252a3a"></div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Card Data Exposure"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">"Encrypted in WASM before any JS bridge call"</div>
                             </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"PCI Scope"</span>
-                                <span class="kv-value">"WASM linear memory only — JS never sees PAN"</span>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"PCI Scope"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">"WASM linear memory only — JS never sees PAN"</div>
                             </div>
                         </div>
                     </div>
@@ -1990,122 +1719,125 @@ component MoovMultiRailDemo() {
                 // TAB 5: TRANSFER DASHBOARD
                 // ====================================================
                 {if self.active_tab == 5 {
-                    <div>
-                        // Rail utilization
-                        <div class="stats-row">
-                            <div class="stat-card">
-                                <div class="stat-value">{format("{}", self.dash_ach_count)}</div>
-                                <div class="stat-label">"ACH Transfers"</div>
+                    <div style="direction: vertical; width: fill; gap: 20">
+                        // Rail utilization stats
+                        <div style="direction: horizontal; width: fill; gap: 16">
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">{format("{}", self.dash_ach_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"ACH TRANSFERS"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-green">{format("{}", self.dash_rtp_count)}</div>
-                                <div class="stat-label">"RTP Transfers"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">{format("{}", self.dash_rtp_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"RTP TRANSFERS"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-amber">{format("{}", self.dash_wire_count)}</div>
-                                <div class="stat-label">"Wire Transfers"</div>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #d29922; width: hug; height: hug">{format("{}", self.dash_wire_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"WIRE TRANSFERS"</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value-red">{format("{}", self.dash_failed_count)}</div>
-                                <div class="stat-label">"Failed (retried)"</div>
-                            </div>
-                        </div>
-
-                        // Volume breakdown
-                        <div class="card">
-                            <h3 class="card-title">"Rail Volume Breakdown"</h3>
-                            <div class="kv-row">
-                                <span class="kv-label">"ACH Volume"</span>
-                                <span class="kv-value-purple">{format("${}.{}", self.dash_ach_volume / 100, self.dash_ach_volume - (self.dash_ach_volume / 100) * 100)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"RTP Volume"</span>
-                                <span class="kv-value-green">{format("${}.{}", self.dash_rtp_volume / 100, self.dash_rtp_volume - (self.dash_rtp_volume / 100) * 100)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Wire Volume"</span>
-                                <span class="kv-value-amber">{format("${}.{}", self.dash_wire_volume / 100, self.dash_wire_volume - (self.dash_wire_volume / 100) * 100)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Total Volume"</span>
-                                <span class="kv-value">{format("${}", (self.dash_ach_volume + self.dash_rtp_volume + self.dash_wire_volume) / 100)}</span>
+                            <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                <div style="font-size: 24px; font-weight: 700; color: #f85149; width: hug; height: hug">{format("{}", self.dash_failed_count)}</div>
+                                <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"FAILED (RETRIED)"</div>
                             </div>
                         </div>
 
-                        // Settlement times
-                        <div class="card">
-                            <h3 class="card-title">"Average Settlement Times"</h3>
-                            <div class="grid-3">
-                                <div class="stat-card">
-                                    <div class="stat-value-green">"<10s"</div>
-                                    <div class="stat-label">"RTP Settlement"</div>
+                        // Volume breakdown card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Rail Volume Breakdown"</div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"ACH Volume"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("${}.{}", self.dash_ach_volume / 100, self.dash_ach_volume - (self.dash_ach_volume / 100) * 100)}</div>
+                            </div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"RTP Volume"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("${}.{}", self.dash_rtp_volume / 100, self.dash_rtp_volume - (self.dash_rtp_volume / 100) * 100)}</div>
+                            </div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Wire Volume"</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #d29922; width: hug; height: hug">{format("${}.{}", self.dash_wire_volume / 100, self.dash_wire_volume - (self.dash_wire_volume / 100) * 100)}</div>
+                            </div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Total Volume"</div>
+                                <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{format("${}", (self.dash_ach_volume + self.dash_rtp_volume + self.dash_wire_volume) / 100)}</div>
+                            </div>
+                        </div>
+
+                        // Settlement times card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Average Settlement Times"</div>
+                            <div style="direction: horizontal; width: fill; gap: 16">
+                                <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                    <div style="font-size: 24px; font-weight: 700; color: #3fb950; width: hug; height: hug">"<10s"</div>
+                                    <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"RTP SETTLEMENT"</div>
                                 </div>
-                                <div class="stat-card">
-                                    <div class="stat-value">"~4hrs"</div>
-                                    <div class="stat-label">"Same-Day ACH"</div>
+                                <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                    <div style="font-size: 24px; font-weight: 700; color: #4667A6; width: hug; height: hug">"~4hrs"</div>
+                                    <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"SAME-DAY ACH"</div>
                                 </div>
-                                <div class="stat-card">
-                                    <div class="stat-value-amber">"1-2 days"</div>
-                                    <div class="stat-label">"Standard ACH"</div>
+                                <div style="direction: vertical; width: fill; padding: 16 20; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; align: center; gap: 4">
+                                    <div style="font-size: 24px; font-weight: 700; color: #d29922; width: hug; height: hug">"1-2 days"</div>
+                                    <div style="font-size: 11px; font-weight: 600; color: #6e7681; width: hug; height: hug">"STANDARD ACH"</div>
                                 </div>
                             </div>
                         </div>
 
-                        // Retry with fallback
-                        <div class="card">
-                            <h3 class="card-title">"Failed Transfer Retry"</h3>
-                            <p class="card-subtitle">"When RTP fails, automatic fallback to ACH — decision logic in WASM"</p>
+                        // Failed Transfer Retry card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Failed Transfer Retry"</div>
+                            <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"When RTP fails, automatic fallback to ACH — decision logic in WASM"</div>
 
-                            <div class="code-block">
-                                <div>"// Automatic rail fallback (WASM)"</div>
-                                <div>"if rtp_transfer.status == FAILED {"</div>
-                                <div>"    // RTP network rejected — fall back to ACH"</div>
-                                <div>"    retry_as_ach(transfer)"</div>
-                                <div>"    // No user intervention needed"</div>
-                                <div>"}"</div>
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Automatic rail fallback (WASM)"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"if rtp_transfer.status == FAILED {"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"    // RTP network rejected — fall back to ACH"</div>
+                                <div style="font-size: 12px; color: #4667A6; width: hug; height: hug">"    retry_as_ach(transfer)"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"    // No user intervention needed"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"}"</div>
                             </div>
 
-                            <div class="btn-row">
-                                <button class="btn btn-danger" on:click={self.simulate_failed}>"Simulate RTP Failure + ACH Fallback"</button>
+                            <div style="direction: horizontal; gap: 10">
+                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 44px; align: center; justify: center" on:click={self.simulate_failed}>
+                                    <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">"Simulate RTP Failure + ACH Fallback"</div>
+                                </div>
                             </div>
 
                             {if self.dash_failed_count > 0 {
-                                <div class="kv-row">
-                                    <span class="kv-label">"RTP Failures"</span>
-                                    <span class="kv-value-red">{format("{}", self.dash_failed_count)}</span>
+                                <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"RTP Failures"</div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">{format("{}", self.dash_failed_count)}</div>
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">"Auto-retried via ACH"</span>
-                                    <span class="kv-value-green">{format("{}", self.dash_failed_count)}</span>
+                                <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a">
+                                    <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Auto-retried via ACH"</div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #3fb950; width: hug; height: hug">{format("{}", self.dash_failed_count)}</div>
                                 </div>
                             }}
                         </div>
 
-                        // Architecture summary
-                        <div class="card">
-                            <h3 class="card-title">"The Moov + Nectar Story"</h3>
-                            <div class="code-block">
-                                <div>"payment_provider: \"moov\"   // one line in .nectar"</div>
-                                <div>""</div>
-                                <div>"// What you get:"</div>
-                                <div>"// - Multi-rail: ACH, RTP, FedNow, wires, cards"</div>
-                                <div>"// - OFAC screening with fuzzy matching"</div>
-                                <div>"// - Double-entry ledger"</div>
-                                <div>"// - Wallet-to-wallet book transfers"</div>
-                                <div>"// - ABA routing validation"</div>
-                                <div>"// - Luhn card validation"</div>
-                                <div>""</div>
-                                <div>"// What you DON'T get:"</div>
-                                <div>"// - npm install stripe (847 transitive deps)"</div>
-                                <div>"// - node_modules/ (312 MB)"</div>
-                                <div>"// - package-lock.json (14,000 lines)"</div>
-                                <div>"// - webpack.config.js"</div>
-                                <div>"// - next.config.js"</div>
-                                <div>"// - .env.local with API keys in plaintext"</div>
-                                <div>""</div>
-                                <div>"// Moov: open-source Go infrastructure"</div>
-                                <div>"// Nectar: compiled-to-WASM, zero JS"</div>
-                                <div>"// Together: money movement without the bloat"</div>
+                        // Architecture summary card
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
+                            <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"The Moov + Nectar Story"</div>
+
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #0a0d14; border-radius: 8; border-width: 1; border-color: #252a3a; gap: 4">
+                                <div style="font-size: 12px; color: #4667A6; width: hug; height: hug">"payment_provider: \"moov\"   // one line in .nectar"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #3fb950; width: hug; height: hug">"// What you get:"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - Multi-rail: ACH, RTP, FedNow, wires, cards"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - OFAC screening with fuzzy matching"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - Double-entry ledger"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - Wallet-to-wallet book transfers"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - ABA routing validation"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">"// - Luhn card validation"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #f85149; width: hug; height: hug">"// What you DON'T get:"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - npm install stripe (847 transitive deps)"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - node_modules/ (312 MB)"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - package-lock.json (14,000 lines)"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - webpack.config.js"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - next.config.js"</div>
+                                <div style="font-size: 12px; color: #8b949e; width: hug; height: hug">"// - .env.local with API keys in plaintext"</div>
+                                <div style="font-size: 12px; color: #e6edf3; width: hug; height: hug">""</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Moov: open-source Go infrastructure"</div>
+                                <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Nectar: compiled-to-WASM, zero JS"</div>
+                                <div style="font-size: 12px; color: #4667A6; width: hug; height: hug">"// Together: money movement without the bloat"</div>
                             </div>
                         </div>
                     </div>
