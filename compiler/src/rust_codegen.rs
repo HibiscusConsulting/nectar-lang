@@ -1134,11 +1134,10 @@ impl RustCodegen {
                 // Check if this is a standalone conditional (not inside a for-loop)
                 // that matches a detected conditional pattern. If so, emit elements
                 // unconditionally and register them for O(1) visibility toggling.
-                let cond_pattern: Option<ConditionalPattern> = if !self.in_for_loop {
-                    self.extract_conditional_pattern(condition)
-                } else {
-                    None
-                };
+                // DISABLED: unconditional element creation with visibility toggling
+                // causes both branches to show when initial display_none isn't set
+                // correctly after tree rebuild. Fall through to standard if/else.
+                let cond_pattern: Option<ConditionalPattern> = None;
 
                 if let Some(ref pat) = cond_pattern {
                     // Emit all children UNCONDITIONALLY — they always exist in the tree.
