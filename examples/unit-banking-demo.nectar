@@ -372,58 +372,23 @@ component UnitDashboard() {
                 <div style="width: hug; height: hug; font-size: 13px; color: #71717a;">"Banking-as-a-Service — zero JavaScript"</div>
             </div>
 
-            // Tab bar
-            <div style="direction: horizontal; width: fill; padding: 0 32; gap: 0; background-color: #09090b; border-width: 0 0 1 0; border-color: #27272a">
-                {if self.active_tab == 0 {
-                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_payments}>
-                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Payments"</div>
-                    </div>
-                }}
-                {if self.active_tab != 0 {
-                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_payments}>
-                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Payments"</div>
-                    </div>
-                }}
-                {if self.active_tab == 1 {
-                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_banking}>
-                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Banking"</div>
-                    </div>
-                }}
-                {if self.active_tab != 1 {
-                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_banking}>
-                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Banking"</div>
-                    </div>
-                }}
-                {if self.active_tab == 2 {
-                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_cards}>
-                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Cards"</div>
-                    </div>
-                }}
-                {if self.active_tab != 2 {
-                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_cards}>
-                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Cards"</div>
-                    </div>
-                }}
-                {if self.active_tab == 3 {
-                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_kyc}>
-                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"KYC"</div>
-                    </div>
-                }}
-                {if self.active_tab != 3 {
-                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_kyc}>
-                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"KYC"</div>
-                    </div>
-                }}
-                {if self.active_tab == 4 {
-                    <div style="height: 44px; padding: 0 18; background-color: #22d3ee; align: center; justify: center" on:click={self.show_movement}>
-                        <div style="font-size: 13px; font-weight: 600; color: #09090b; height: hug; width: hug">"Movement"</div>
-                    </div>
-                }}
-                {if self.active_tab != 4 {
-                    <div style="height: 44px; padding: 0 18; background-color: #09090b; align: center; justify: center" on:click={self.show_movement}>
-                        <div style="font-size: 13px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Movement"</div>
-                    </div>
-                }}
+            // Tab bar — static styling, active state shows via content below
+            <div style="direction: horizontal; width: fill; padding: 0 24; gap: 4; height: hug; background-color: #0d1117; border-width: 0 0 1 0; border-color: #27272a">
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_payments}>
+                    <div style="font-size: 13px; font-weight: 600; color: #22d3ee; height: hug; width: hug">"Payments"</div>
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_banking}>
+                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Banking"</div>
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_cards}>
+                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Cards"</div>
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_kyc}>
+                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"KYC"</div>
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_movement}>
+                    <div style="font-size: 13px; font-weight: 500; color: #a1a1aa; height: hug; width: hug">"Movement"</div>
+                </div>
             </div>
 
             // Content area
@@ -440,9 +405,7 @@ component UnitDashboard() {
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 12px; align: center;">
                             <div style="width: hug; height: hug; font-size: 12px; color: #a1a1aa;">"Amount"</div>
-                            <div style="width: hug; height: hug; font-size: 14px; font-weight: 500; color: #fafafa;">"$"{format("{}", self.dp(self.pay_amount))}"."
-                                {if self.cp(self.pay_amount) < 10 { "0"{format("{}", self.cp(self.pay_amount))} } else { {format("{}", self.cp(self.pay_amount))} }}
-                            </div>
+                            <div style="width: hug; height: hug; font-size: 20px; font-weight: 700; color: #fafafa">{format("${}.{}", self.pay_amount / 100, if self.pay_amount % 100 < 10 { format("0{}", self.pay_amount % 100) } else { format("{}", self.pay_amount % 100) })}</div>
                         </div>
                         <div style="direction: horizontal; width: fill; gap: 8px; wrap: true;">
                             <div style="width: hug; height: hug; min-height: 44px; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; background-color: #27272a; color: #fafafa; border-width: 1px; border-color: #27272a;" on:click={self.pay_down}>"-$5"</div>
