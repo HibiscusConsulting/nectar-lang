@@ -1511,9 +1511,9 @@ rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=655
         let debug_path = out_dir.join("generated.rs");
         fs::write(&debug_path, &rust_source)?;
         eprintln!("nectar: generated Rust saved to {} for debugging", debug_path.display());
-        // Show only error lines, not warnings
+        // Show error lines including context
         for line in stderr.lines() {
-            if line.contains("error[E") || line.contains("error:") || line.starts_with("  -->") {
+            if line.contains("error") || line.starts_with("  -->") || line.contains("lib.rs") || line.contains("generated") || line.contains("mismatched") || line.contains("expected") || line.contains("found") {
                 eprintln!("{}", line);
             }
         }

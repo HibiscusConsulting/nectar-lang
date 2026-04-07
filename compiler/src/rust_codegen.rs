@@ -1370,10 +1370,6 @@ impl RustCodegen {
                 self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _total.clone());",
                     comp_name.to_uppercase()));
                 self.line("update_metric_text(\"total_ms\", &_total);");
-                // Also update product count
-                self.line(&format!("let _pc = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().product_count));",
-                    comp_name.to_uppercase()));
-                self.line("update_metric_text(\"product_count\", &_pc);");
             }
         }
 
@@ -1552,8 +1548,16 @@ impl RustCodegen {
                         "getNetworkType" => "\"wifi\".to_string()".to_string(),
                         "getSystemInfo" => "\"wasm\".to_string()".to_string(),
                         "setNavigationBar" => "{ /* mp::setNavigationBar */ }".to_string(),
-                        "tradePay" | "getAuthCode" | "getUserInfo" | "request" => {
-                            format!("{{ /* mp::{} stub */ }}", method)
+                        "request" if a.len() >= 3 => {
+                            // mp::request(url, method, body, cb_idx) → real fetch call
+                            let url = &a[0];
+                            let method_str = &a[1];
+                            let body = &a[2];
+                            let cb = if a.len() >= 4 { a[3].clone() } else { "0".to_string() };
+                            format!("{{ let _url: String = {url}.to_string(); let _m = {method_str}; let _b: String = {body}.to_string(); if _m == \"GET\" {{ fetch_get(&_url, {cb}); }} else {{ fetch_post(&_url, _b.as_bytes(), {cb}); }} }}")
+                        }
+                        "tradePay" | "getAuthCode" | "getUserInfo" => {
+                            format!("{{ /* mp::{} — requires provider connection */ }}", method)
                         }
                         _ => {
                             format!("{{ /* mp::{} not yet implemented */ }}", method)
