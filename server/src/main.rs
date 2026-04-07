@@ -40,6 +40,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/api/key-exchange", post(key_exchange))
         .route("/api/payment", post(payment))
+        .route("/api/payment/direct", post(payment_direct))
         .layer(cors)
         .with_state(state);
 
@@ -191,6 +192,18 @@ async fn payment(
 }
 
 use base64::Engine;
+
+/// POST /api/payment/direct — Unencrypted payment request for sandbox/demo mode.
+/// Accepts plain JSON PaymentRequest, dispatches directly to provider.
+/// In production, use /api/payment with encrypted payload instead.
+async fn payment_direct(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<providers::PaymentRequest>,
+) -> Result<Json<providers::PaymentResponse>, (StatusCode, Json<ErrorResponse>)> {
+    info!("Direct payment: provider={}, action={}", req.provider, req.action);
+    let response = providers::dispatch(req, &state.http_client).await;
+    Ok(Json(response))
+}
 
 #[cfg(test)]
 mod tests {
