@@ -1556,7 +1556,13 @@ impl RustCodegen {
                             let cb = if a.len() >= 4 { a[3].clone() } else { "0".to_string() };
                             format!("{{ let _url: String = {url}.to_string(); let _m = {method_str}; let _b: String = {body}.to_string(); if _m == \"GET\" {{ fetch_get(&_url, {cb}); }} else {{ fetch_post(&_url, _b.as_bytes(), {cb}); }} }}")
                         }
-                        "tradePay" | "getAuthCode" | "getUserInfo" => {
+                        "tradePay" if a.len() >= 3 => {
+                            // mp::tradePay(order_id, amount, callback_name) → real payment API call
+                            let order_id = &a[0];
+                            let amount = &a[1];
+                            format!("{{ let _oid = {}; let _amt = {}; let _url = format!(\"/api/moov/action/create_payment?amount={{}}&desc=Order+{{}}\", _amt, _oid); fetch_get(&_url, 0); }}", order_id, amount)
+                        }
+                        "getAuthCode" | "getUserInfo" => {
                             format!("{{ /* mp::{} — requires provider connection */ }}", method)
                         }
                         _ => {
