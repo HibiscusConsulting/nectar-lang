@@ -593,1364 +593,337 @@ component CoffeeShopApp() {
     // Render
     // ======================================================
 
-    style {
-        .page {
-            background-color: "#09090b";
-            color: "#fafafa";
-            font-family: "system-ui, -apple-system, sans-serif";
-            min-height: "100vh";
-            padding: "0";
-        }
-        .header {
-            background-color: "#1a472a";
-            padding: "16px 24px";
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-        }
-        .header-title {
-            font-size: "20px";
-            font-weight: "700";
-            color: "#fafafa";
-            margin: "0";
-        }
-        .header-sub {
-            font-size: "12px";
-            color: "#86efac";
-            margin: "0";
-        }
-        .cart-badge {
-            background-color: "#ef4444";
-            color: "#fafafa";
-            font-size: "11px";
-            font-weight: "700";
-            padding: "2px 8px";
-            border-radius: "12px";
-            min-width: "20px";
-            text-align: "center";
-        }
-        .nav-bar {
-            display: "flex";
-            background-color: "#18181b";
-            border-bottom: "1px solid #27272a";
-            padding: "0 16px";
-        }
-        .nav-tab {
-            padding: "12px 16px";
-            font-size: "13px";
-            font-weight: "500";
-            color: "#71717a";
-            cursor: "pointer";
-            border: "none";
-            background: "none";
-            border-bottom: "2px solid transparent";
-        }
-        .nav-active {
-            color: "#4ade80";
-            border-bottom: "2px solid #4ade80";
-        }
-        .content {
-            max-width: "960px";
-            margin: "0 auto";
-            padding: "24px";
-        }
-        .cat-pills {
-            display: "flex";
-            gap: "8px";
-            margin-bottom: "16px";
-            flex-wrap: "wrap";
-        }
-        .pill {
-            padding: "6px 14px";
-            border-radius: "20px";
-            font-size: "12px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "1px solid #3f3f46";
-            background-color: "#27272a";
-            color: "#a1a1aa";
-        }
-        .pill-active {
-            padding: "6px 14px";
-            border-radius: "20px";
-            font-size: "12px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "1px solid #166534";
-            background-color: "#052e16";
-            color: "#4ade80";
-        }
-        .menu-grid {
-            display: "grid";
-            grid-template-columns: "repeat(auto-fill, minmax(280px, 1fr))";
-            gap: "16px";
-            margin-bottom: "24px";
-        }
-        .menu-card {
-            background-color: "#18181b";
-            border: "1px solid #27272a";
-            border-radius: "12px";
-            padding: "16px";
-        }
-        .item-name {
-            font-size: "15px";
-            font-weight: "600";
-            color: "#fafafa";
-            margin: "0 0 4px 0";
-        }
-        .item-cat {
-            font-size: "11px";
-            color: "#71717a";
-            margin: "0 0 8px 0";
-        }
-        .item-desc {
-            font-size: "12px";
-            color: "#a1a1aa";
-            margin: "0 0 12px 0";
-            line-height: "1.4";
-        }
-        .item-footer {
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-        }
-        .item-price {
-            font-size: "18px";
-            font-weight: "700";
-            color: "#fafafa";
-        }
-        .btn {
-            padding: "8px 16px";
-            border-radius: "8px";
-            font-size: "13px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "none";
-            min-height: "36px";
-        }
-        .btn-add {
-            background-color: "#1a472a";
-            color: "#4ade80";
-            border: "1px solid #166534";
-        }
-        .btn-primary {
-            background-color: "#4ade80";
-            color: "#09090b";
-            padding: "12px 24px";
-            font-size: "15px";
-            min-height: "44px";
-        }
-        .btn-secondary {
-            background-color: "#27272a";
-            color: "#fafafa";
-            border: "1px solid #3f3f46";
-        }
-        .btn-danger {
-            background-color: "#27272a";
-            color: "#ef4444";
-            border: "1px solid #7f1d1d";
-        }
-        .btn-sm {
-            padding: "4px 12px";
-            font-size: "12px";
-            min-height: "28px";
-        }
-        .card {
-            background-color: "#18181b";
-            border: "1px solid #27272a";
-            border-radius: "12px";
-            padding: "20px";
-            margin-bottom: "16px";
-        }
-        .card-title {
-            font-size: "16px";
-            font-weight: "600";
-            color: "#fafafa";
-            margin: "0 0 12px 0";
-        }
-        .kv-row {
-            display: "flex";
-            justify-content: "space-between";
-            padding: "8px 0";
-            border-bottom: "1px solid #27272a";
-            font-size: "13px";
-        }
-        .kv-label {
-            color: "#a1a1aa";
-        }
-        .kv-value {
-            color: "#fafafa";
-            font-weight: "500";
-        }
-        .kv-green {
-            color: "#4ade80";
-            font-weight: "600";
-        }
-        .kv-amber {
-            color: "#f59e0b";
-            font-weight: "600";
-        }
-        .kv-red {
-            color: "#ef4444";
-            font-weight: "600";
-        }
-        .tip-row {
-            display: "flex";
-            gap: "8px";
-            margin: "12px 0";
-        }
-        .tip-btn {
-            padding: "8px 16px";
-            border-radius: "8px";
-            font-size: "13px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "1px solid #3f3f46";
-            background-color: "#27272a";
-            color: "#a1a1aa";
-            flex: "1";
-            text-align: "center";
-        }
-        .tip-active {
-            padding: "8px 16px";
-            border-radius: "8px";
-            font-size: "13px";
-            font-weight: "600";
-            cursor: "pointer";
-            border: "1px solid #166534";
-            background-color: "#052e16";
-            color: "#4ade80";
-            flex: "1";
-            text-align: "center";
-        }
-        .qr-box {
-            background-color: "#ffffff";
-            border-radius: "12px";
-            padding: "24px";
-            text-align: "center";
-            margin: "16px auto";
-            max-width: "280px";
-        }
-        .qr-text {
-            font-size: "14px";
-            color: "#09090b";
-            font-weight: "600";
-        }
-        .qr-mono {
-            font-size: "11px";
-            color: "#71717a";
-            font-family: "monospace";
-            word-break: "break-all";
-            margin-top: "8px";
-        }
-        .status-badge {
-            display: "inline-flex";
-            padding: "4px 12px";
-            border-radius: "20px";
-            font-size: "12px";
-            font-weight: "600";
-        }
-        .status-pending {
-            background-color: "#451a03";
-            color: "#f59e0b";
-            border: "1px solid #92400e";
-        }
-        .status-scanning {
-            background-color: "#172554";
-            color: "#60a5fa";
-            border: "1px solid #1e40af";
-        }
-        .status-confirmed {
-            background-color: "#052e16";
-            color: "#4ade80";
-            border: "1px solid #166534";
-        }
-        .profile-card {
-            background-color: "#18181b";
-            border: "1px solid #27272a";
-            border-radius: "16px";
-            padding: "32px";
-            text-align: "center";
-            margin-bottom: "16px";
-        }
-        .avatar {
-            width: "64px";
-            height: "64px";
-            background-color: "#1a472a";
-            border-radius: "50%";
-            margin: "0 auto 12px auto";
-            display: "flex";
-            align-items: "center";
-            justify-content: "center";
-            font-size: "24px";
-            color: "#4ade80";
-        }
-        .user-name {
-            font-size: "20px";
-            font-weight: "700";
-            color: "#fafafa";
-            margin: "0 0 4px 0";
-        }
-        .tier-badge {
-            display: "inline-flex";
-            padding: "4px 14px";
-            border-radius: "20px";
-            font-size: "12px";
-            font-weight: "700";
-        }
-        .tier-bronze {
-            background-color: "#451a03";
-            color: "#d97706";
-        }
-        .tier-silver {
-            background-color: "#27272a";
-            color: "#d4d4d8";
-        }
-        .tier-gold {
-            background-color: "#422006";
-            color: "#fbbf24";
-        }
-        .tier-diamond {
-            background-color: "#172554";
-            color: "#60a5fa";
-        }
-        .store-card {
-            background-color: "#18181b";
-            border: "1px solid #27272a";
-            border-radius: "12px";
-            padding: "16px";
-            margin-bottom: "12px";
-            display: "flex";
-            justify-content: "space-between";
-            align-items: "center";
-        }
-        .store-name {
-            font-size: "15px";
-            font-weight: "600";
-            color: "#fafafa";
-            margin: "0 0 4px 0";
-        }
-        .store-addr {
-            font-size: "12px";
-            color: "#a1a1aa";
-            margin: "0 0 4px 0";
-        }
-        .store-hours {
-            font-size: "11px";
-            color: "#71717a";
-        }
-        .store-dist {
-            font-size: "14px";
-            font-weight: "600";
-            color: "#4ade80";
-            text-align: "right";
-        }
-        .online-dot {
-            display: "inline-block";
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#4ade80";
-            margin-right: "6px";
-        }
-        .offline-dot {
-            display: "inline-block";
-            width: "8px";
-            height: "8px";
-            border-radius: "50%";
-            background-color: "#f59e0b";
-            margin-right: "6px";
-        }
-        .section-label {
-            font-size: "12px";
-            font-weight: "700";
-            color: "#71717a";
-            letter-spacing: "0.05em";
-            margin-bottom: "12px";
-            text-transform: "uppercase";
-        }
-        .empty-state {
-            text-align: "center";
-            padding: "48px 24px";
-            color: "#71717a";
-        }
-        .lifecycle-step {
-            display: "flex";
-            gap: "12px";
-            padding: "12px 16px";
-            background-color: "#0d1117";
-            border-radius: "8px";
-            margin-bottom: "8px";
-            border-left: "3px solid #4ade80";
-        }
-        .lifecycle-fn {
-            font-size: "13px";
-            font-weight: "600";
-            color: "#4ade80";
-            font-family: "monospace";
-            min-width: "100px";
-        }
-        .lifecycle-desc {
-            font-size: "13px";
-            color: "#a1a1aa";
-        }
-        .mp-api {
-            font-family: "monospace";
-            font-size: "12px";
-            color: "#60a5fa";
-            background-color: "#172554";
-            padding: "2px 6px";
-            border-radius: "4px";
-        }
-        .divider {
-            height: "1px";
-            background-color: "#27272a";
-            margin: "16px 0";
-        }
-        .stats-grid {
-            display: "grid";
-            grid-template-columns: "repeat(3, 1fr)";
-            gap: "12px";
-            margin-bottom: "16px";
-        }
-        .stat-card {
-            background-color: "#0d1117";
-            border: "1px solid #27272a";
-            border-radius: "8px";
-            padding: "14px";
-            text-align: "center";
-        }
-        .stat-value {
-            font-size: "24px";
-            font-weight: "700";
-            color: "#4ade80";
-        }
-        .stat-label {
-            font-size: "11px";
-            color: "#71717a";
-            margin-top: "4px";
-        }
-        .cart-item-row {
-            display: "flex";
-            align-items: "center";
-            justify-content: "space-between";
-            padding: "10px 0";
-            border-bottom: "1px solid #27272a";
-        }
-        .cart-item-name {
-            font-size: "14px";
-            font-weight: "500";
-            color: "#fafafa";
-            flex: "1";
-        }
-        .cart-item-qty {
-            font-size: "13px";
-            color: "#a1a1aa";
-            margin: "0 12px";
-        }
-        .cart-item-total {
-            font-size: "14px";
-            font-weight: "600";
-            color: "#fafafa";
-            min-width: "60px";
-            text-align: "right";
-        }
-        .footer-bar {
-            background-color: "#18181b";
-            border-top: "1px solid #27272a";
-            padding: "12px 24px";
-            text-align: "center";
-        }
-        .footer-text {
-            font-size: "11px";
-            color: "#71717a";
-        }
-    }
-
     render {
-        <div class="page">
+        <div style="direction: vertical; width: fill; height: hug; background-color: #0f0f0f; gap: 0">
+
             // ========== Header ==========
-            <div class="header">
-                <div>
-                    <h1 class="header-title">"Nectar Coffee"</h1>
-                    <p class="header-sub">"Alipay Mini-Program — Compiled WASM"</p>
+            <div style="direction: horizontal; width: fill; padding: 16 24; justify: space-between; align: center; background-color: #1a472a; height: hug">
+                <div style="direction: vertical; gap: 2; height: hug">
+                    <div style="font-size: 18px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Nectar Coffee"</div>
+                    <div style="font-size: 11px; color: #86efac; height: hug; width: hug">"WASM Mini-Program"</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px">
-                    // Network status
+                <div style="direction: horizontal; gap: 12; align: center; height: hug">
+                    <div style="font-size: 12px; color: #86efac; height: hug; width: hug">{format("{} items", self.cart_count)}</div>
                     {if self.is_online == 1 {
-                        <span class="online-dot">" "</span>
+                        <div style="font-size: 10px; font-weight: 600; color: #22c55e; padding: 3 8; background-color: #052e16; border-radius: 100; height: hug; width: hug">"ONLINE"</div>
+                    } else {
+                        <div style="font-size: 10px; font-weight: 600; color: #f59e0b; padding: 3 8; background-color: #422006; border-radius: 100; height: hug; width: hug">"OFFLINE"</div>
                     }}
-                    {if self.is_online == 0 {
-                        <span class="offline-dot">" "</span>
-                    }}
-                    // Cart badge
-                    {if self.cart_count > 0 {
-                        <span class="cart-badge">{format("{}", self.cart_count)}</span>
-                    }}
-                    <button class="btn btn-sm btn-secondary" on:click={self.toggle_network}>
-                        {if self.is_online == 1 {
-                            <span>"Online"</span>
-                        }}
-                        {if self.is_online == 0 {
-                            <span>"Offline"</span>
-                        }}
-                    </button>
                 </div>
             </div>
 
-            // ========== Navigation Tabs ==========
-            <div class="nav-bar">
-                <button class="nav-tab" on:click={self.show_menu}>
-                    {if self.active_tab == 0 {
-                        <span class="nav-active">"Menu"</span>
-                    } else {
-                        <span>"Menu"</span>
-                    }}
-                </button>
-                <button class="nav-tab" on:click={self.show_cart}>
-                    {if self.active_tab == 1 {
-                        <span class="nav-active">"Cart"</span>
-                    } else {
-                        <span>"Cart"</span>
-                    }}
-                </button>
-                <button class="nav-tab" on:click={self.show_orders}>
-                    {if self.active_tab == 2 {
-                        <span class="nav-active">"Orders"</span>
-                    } else {
-                        <span>"Orders"</span>
-                    }}
-                </button>
-                <button class="nav-tab" on:click={self.show_profile}>
-                    {if self.active_tab == 3 {
-                        <span class="nav-active">"Profile"</span>
-                    } else {
-                        <span>"Profile"</span>
-                    }}
-                </button>
-                <button class="nav-tab" on:click={self.show_stores}>
-                    {if self.active_tab == 4 {
-                        <span class="nav-active">"Stores"</span>
-                    } else {
-                        <span>"Stores"</span>
-                    }}
-                </button>
+            // ========== Tab Bar ==========
+            <div style="direction: horizontal; width: fill; padding: 0 16; gap: 4; height: hug; background-color: #1a1a1a; border-width: 0 0 1 0; border-color: #2a2a2a">
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_menu}>
+                    {if self.active_tab == 0 { <div style="font-size: 13px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Menu"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Menu"</div> }}
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_cart}>
+                    {if self.active_tab == 1 { <div style="font-size: 13px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Cart"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Cart"</div> }}
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_orders}>
+                    {if self.active_tab == 2 { <div style="font-size: 13px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Orders"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Orders"</div> }}
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_profile}>
+                    {if self.active_tab == 3 { <div style="font-size: 13px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Profile"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Profile"</div> }}
+                </div>
+                <div style="height: 44px; padding: 0 16; align: center; justify: center; width: hug" on:click={self.show_stores}>
+                    {if self.active_tab == 4 { <div style="font-size: 13px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Stores"</div> } else { <div style="font-size: 13px; font-weight: 500; color: #71717a; height: hug; width: hug">"Stores"</div> }}
+                </div>
             </div>
 
             // ========== Content ==========
-            <div class="content">
+            <div style="direction: vertical; width: fill; padding: 20 24; gap: 16">
 
-                // ===================================================
-                // Tab 0: Menu — Product Catalog
-                // ===================================================
+                // ===== TAB 0: MENU =====
                 {if self.active_tab == 0 {
-                    <div>
-                        // Category filter pills
-                        <div class="cat-pills">
-                            {if self.category_idx == 0 {
-                                <button class="pill-active" on:click={self.filter_all}>"All"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_all}>"All"</button>
-                            }}
-                            {if self.category_idx == 1 {
-                                <button class="pill-active" on:click={self.filter_espresso}>"Espresso"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_espresso}>"Espresso"</button>
-                            }}
-                            {if self.category_idx == 2 {
-                                <button class="pill-active" on:click={self.filter_latte}>"Latte"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_latte}>"Latte"</button>
-                            }}
-                            {if self.category_idx == 3 {
-                                <button class="pill-active" on:click={self.filter_cold}>"Cold Brew"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_cold}>"Cold Brew"</button>
-                            }}
-                            {if self.category_idx == 4 {
-                                <button class="pill-active" on:click={self.filter_tea}>"Tea"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_tea}>"Tea"</button>
-                            }}
-                            {if self.category_idx == 5 {
-                                <button class="pill-active" on:click={self.filter_pastry}>"Pastries"</button>
-                            } else {
-                                <button class="pill" on:click={self.filter_pastry}>"Pastries"</button>
-                            }}
+                    <div style="direction: vertical; width: fill; gap: 16; height: hug">
+                        <div style="direction: vertical; gap: 4; height: hug">
+                            <div style="font-size: 20px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Menu"</div>
+                            <div style="font-size: 12px; color: #71717a; height: hug; width: hug">"22 items — tap + to add to cart"</div>
                         </div>
 
-                        // Sort controls
-                        <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center">
-                            <span style="font-size: 12px; color: #71717a">"Sort:"</span>
-                            <button class="btn btn-sm btn-secondary" on:click={self.sort_default}>"Default"</button>
-                            <button class="btn btn-sm btn-secondary" on:click={self.sort_price_asc}>"Price (low)"</button>
-                            <button class="btn btn-sm btn-secondary" on:click={self.sort_price_desc}>"Price (high)"</button>
+                        // Category filters
+                        <div style="direction: horizontal; gap: 8; height: hug; width: fill">
+                            <div style="height: 32px; padding: 0 12; background-color: #1a472a; border-radius: 16; align: center; justify: center; width: hug" on:click={self.filter_all}>
+                                {if self.category_idx == 0 { <div style="font-size: 12px; font-weight: 600; color: #22c55e; height: hug; width: hug">"All"</div> } else { <div style="font-size: 12px; font-weight: 500; color: #71717a; height: hug; width: hug">"All"</div> }}
+                            </div>
+                            <div style="height: 32px; padding: 0 12; background-color: #1a1a1a; border-radius: 16; align: center; justify: center; width: hug" on:click={self.filter_coffee}>
+                                {if self.category_idx == 1 { <div style="font-size: 12px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Coffee"</div> } else { <div style="font-size: 12px; font-weight: 500; color: #71717a; height: hug; width: hug">"Coffee"</div> }}
+                            </div>
+                            <div style="height: 32px; padding: 0 12; background-color: #1a1a1a; border-radius: 16; align: center; justify: center; width: hug" on:click={self.filter_tea}>
+                                {if self.category_idx == 2 { <div style="font-size: 12px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Tea"</div> } else { <div style="font-size: 12px; font-weight: 500; color: #71717a; height: hug; width: hug">"Tea"</div> }}
+                            </div>
+                            <div style="height: 32px; padding: 0 12; background-color: #1a1a1a; border-radius: 16; align: center; justify: center; width: hug" on:click={self.filter_pastry}>
+                                {if self.category_idx == 3 { <div style="font-size: 12px; font-weight: 600; color: #22c55e; height: hug; width: hug">"Pastries"</div> } else { <div style="font-size: 12px; font-weight: 500; color: #71717a; height: hug; width: hug">"Pastries"</div> }}
+                            </div>
                         </div>
 
-                        // Menu items — Espresso category (items 0-4)
-                        {if self.category_idx == 0 || self.category_idx == 1 {
-                            <div>
-                                <p class="section-label">"Espresso"</p>
-                                <div class="menu-grid">
-                                    // 0: Espresso
-                                    <div class="menu-card">
-                                        <p class="item-name">"Espresso"</p>
-                                        <p class="item-cat">"Espresso"</p>
-                                        <p class="item-desc">"Bold single shot pulled at 9 bars of pressure. Pure intensity."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$2.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_0}>"+ Add"</button>
-                                        </div>
+                        // Menu items card
+                        <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 0">
+                            // Item 0: Americano $2.75
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #2a2a2a; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Americano"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$2.75"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_0}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
                                     </div>
-                                    // 1: Double Espresso
-                                    <div class="menu-card">
-                                        <p class="item-name">"Double Espresso"</p>
-                                        <p class="item-cat">"Espresso"</p>
-                                        <p class="item-desc">"Two shots of our signature dark roast. For when you mean business."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_1}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 2: Americano
-                                    <div class="menu-card">
-                                        <p class="item-name">"Americano"</p>
-                                        <p class="item-cat">"Espresso"</p>
-                                        <p class="item-desc">"Espresso diluted with hot water. Smooth, clean, aromatic."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.95"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_2}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 3: Macchiato
-                                    <div class="menu-card">
-                                        <p class="item-name">"Macchiato"</p>
-                                        <p class="item-cat">"Espresso"</p>
-                                        <p class="item-desc">"Espresso stained with a dollop of steamed milk foam."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.50"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_3}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 4: Cortado
-                                    <div class="menu-card">
-                                        <p class="item-name">"Cortado"</p>
-                                        <p class="item-cat">"Espresso"</p>
-                                        <p class="item-desc">"Equal parts espresso and warm milk. Balanced perfection."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_4}>"+ Add"</button>
-                                        </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q0)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_0}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
                                     </div>
                                 </div>
                             </div>
-                        }}
+                            // Item 1: Drip Coffee $3.25
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #2a2a2a; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Drip Coffee"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$3.25"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_1}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q1)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_1}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
+                                    </div>
+                                </div>
+                            </div>
+                            // Item 2: Espresso $3.95
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #2a2a2a; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Espresso"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$3.95"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_2}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q2)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_2}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
+                                    </div>
+                                </div>
+                            </div>
+                            // Item 3: Oat Latte $4.50
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #2a2a2a; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Oat Latte"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$4.50"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_3}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q3)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_3}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
+                                    </div>
+                                </div>
+                            </div>
+                            // Item 4: Cappuccino $4.75
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; border-width: 0 0 1 0; border-color: #2a2a2a; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Cappuccino"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$4.75"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_4}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q4)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_4}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
+                                    </div>
+                                </div>
+                            </div>
+                            // Item 5: Matcha Latte $5.25
+                            <div style="direction: horizontal; width: fill; padding: 12 0; justify: space-between; align: center; height: hug">
+                                <div style="direction: vertical; gap: 2; height: hug">
+                                    <div style="font-size: 14px; font-weight: 500; color: #fafafa; height: hug; width: hug">"Matcha Latte"</div>
+                                    <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"$5.25"</div>
+                                </div>
+                                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                                    <div style="height: 32px; width: 32px; background-color: #2a2a2a; border-radius: 6; align: center; justify: center" on:click={self.remove_item_5}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"-"</div>
+                                    </div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: 24px; height: hug; align: center">{format("{}", self.cart_q5)}</div>
+                                    <div style="height: 32px; width: 32px; background-color: #22c55e; border-radius: 6; align: center; justify: center" on:click={self.add_item_5}>
+                                        <div style="font-size: 16px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">"+"</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                        // Latte category (items 5-9)
-                        {if self.category_idx == 0 || self.category_idx == 2 {
-                            <div>
-                                <p class="section-label">"Latte"</p>
-                                <div class="menu-grid">
-                                    // 5: Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Classic Latte"</p>
-                                        <p class="item-cat">"Latte"</p>
-                                        <p class="item-desc">"Espresso with steamed milk and a thin layer of microfoam."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$5.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_5}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 6: Vanilla Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Vanilla Latte"</p>
-                                        <p class="item-cat">"Latte"</p>
-                                        <p class="item-desc">"Our house latte sweetened with Madagascar vanilla syrup."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$5.50"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_6}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 7: Caramel Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Caramel Latte"</p>
-                                        <p class="item-cat">"Latte"</p>
-                                        <p class="item-desc">"Buttery caramel swirled into espresso and steamed milk."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.95"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_7}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 8: Mocha
-                                    <div class="menu-card">
-                                        <p class="item-name">"Mocha"</p>
-                                        <p class="item-cat">"Latte"</p>
-                                        <p class="item-desc">"Rich chocolate meets espresso. Topped with whipped cream."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$5.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_8}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 9: Oat Milk Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Oat Milk Latte"</p>
-                                        <p class="item-cat">"Latte"</p>
-                                        <p class="item-desc">"Creamy oat milk paired with our signature espresso blend."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_9}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }}
-
-                        // Cold Brew category (items 10-13)
-                        {if self.category_idx == 0 || self.category_idx == 3 {
-                            <div>
-                                <p class="section-label">"Cold Brew"</p>
-                                <div class="menu-grid">
-                                    // 10: Classic Cold Brew
-                                    <div class="menu-card">
-                                        <p class="item-name">"Classic Cold Brew"</p>
-                                        <p class="item-cat">"Cold Brew"</p>
-                                        <p class="item-desc">"Steeped 18 hours for ultra-smooth, low-acid coffee."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_10}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 11: Nitro Cold Brew
-                                    <div class="menu-card">
-                                        <p class="item-name">"Nitro Cold Brew"</p>
-                                        <p class="item-cat">"Cold Brew"</p>
-                                        <p class="item-desc">"Nitrogen-infused for a creamy, cascading pour. No milk needed."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$5.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_11}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 12: Iced Americano
-                                    <div class="menu-card">
-                                        <p class="item-name">"Iced Americano"</p>
-                                        <p class="item-cat">"Cold Brew"</p>
-                                        <p class="item-desc">"Espresso over ice with cold water. Crisp and refreshing."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_12}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 13: Vietnamese Iced Coffee
-                                    <div class="menu-card">
-                                        <p class="item-name">"Vietnamese Iced Coffee"</p>
-                                        <p class="item-cat">"Cold Brew"</p>
-                                        <p class="item-desc">"Strong drip coffee with sweetened condensed milk over ice."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_13}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }}
-
-                        // Tea category (items 14-17)
-                        {if self.category_idx == 0 || self.category_idx == 4 {
-                            <div>
-                                <p class="section-label">"Tea"</p>
-                                <div class="menu-grid">
-                                    // 14: Jasmine Green Tea
-                                    <div class="menu-card">
-                                        <p class="item-name">"Jasmine Green Tea"</p>
-                                        <p class="item-cat">"Tea"</p>
-                                        <p class="item-desc">"Fragrant jasmine blossoms infused with premium green tea."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.50"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_14}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 15: Matcha Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Matcha Latte"</p>
-                                        <p class="item-cat">"Tea"</p>
-                                        <p class="item-desc">"Ceremonial-grade matcha whisked with steamed oat milk."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.95"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_15}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 16: Oolong Tea
-                                    <div class="menu-card">
-                                        <p class="item-name">"Oolong Tea"</p>
-                                        <p class="item-cat">"Tea"</p>
-                                        <p class="item-desc">"Semi-oxidized Tieguanyin with floral orchid notes."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.00"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_16}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 17: Chai Latte
-                                    <div class="menu-card">
-                                        <p class="item-name">"Chai Latte"</p>
-                                        <p class="item-cat">"Tea"</p>
-                                        <p class="item-desc">"Spiced black tea with cardamom, cinnamon, ginger, and milk."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_17}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }}
-
-                        // Pastry category (items 18-21)
-                        {if self.category_idx == 0 || self.category_idx == 5 {
-                            <div>
-                                <p class="section-label">"Pastries"</p>
-                                <div class="menu-grid">
-                                    // 18: Almond Croissant
-                                    <div class="menu-card">
-                                        <p class="item-name">"Almond Croissant"</p>
-                                        <p class="item-cat">"Pastries"</p>
-                                        <p class="item-desc">"Buttery croissant filled with almond cream, dusted with powdered sugar."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.75"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_18}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 19: Egg Tart
-                                    <div class="menu-card">
-                                        <p class="item-name">"Egg Tart"</p>
-                                        <p class="item-cat">"Pastries"</p>
-                                        <p class="item-desc">"Portuguese-style custard tart with flaky puff pastry shell."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$2.95"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_19}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 20: Red Bean Bun
-                                    <div class="menu-card">
-                                        <p class="item-name">"Red Bean Bun"</p>
-                                        <p class="item-cat">"Pastries"</p>
-                                        <p class="item-desc">"Soft milk bread filled with sweet adzuki red bean paste."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$4.25"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_20}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                    // 21: Matcha Mochi
-                                    <div class="menu-card">
-                                        <p class="item-name">"Matcha Mochi"</p>
-                                        <p class="item-cat">"Pastries"</p>
-                                        <p class="item-desc">"Chewy rice cake with matcha-infused white bean filling."</p>
-                                        <div class="item-footer">
-                                            <span class="item-price">"$3.50"</span>
-                                            <button class="btn btn-add" on:click={self.add_item_21}>"+ Add"</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }}
+                        // Cart summary bar
+                        <div style="direction: horizontal; width: fill; padding: 16; background-color: #1a472a; border-radius: 12; justify: space-between; align: center; height: hug">
+                            <div style="font-size: 14px; color: #86efac; height: hug; width: hug">{format("{} items in cart", self.cart_count)}</div>
+                            <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.cart_total_cents / 100, if self.cart_total_cents % 100 < 10 { format("0{}", self.cart_total_cents % 100) } else { format("{}", self.cart_total_cents % 100) })}</div>
+                        </div>
                     </div>
                 }}
 
-                // ===================================================
-                // Tab 1: Cart — Shopping Cart with Totals
-                // ===================================================
+                // ===== TAB 1: CART =====
                 {if self.active_tab == 1 {
-                    <div>
-                        <div class="card">
-                            <h3 class="card-title">"Your Cart"</h3>
+                    <div style="direction: vertical; width: fill; gap: 16; height: hug">
+                        <div style="font-size: 20px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Cart"</div>
 
-                            {if self.cart_count == 0 {
-                                <div class="empty-state">
-                                    <p style="font-size: 32px; margin-bottom: 8px">"[cart]"</p>
-                                    <p>"Your cart is empty"</p>
-                                    <p style="font-size: 12px; color: #52525b">"Browse the menu to add items"</p>
-                                </div>
-                            }}
+                        <div style="direction: vertical; width: fill; padding: 20; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 12">
+                            // Totals
+                            <div style="direction: horizontal; width: fill; justify: space-between; height: hug">
+                                <div style="font-size: 13px; color: #71717a; height: hug; width: hug">"Subtotal"</div>
+                                <div style="font-size: 13px; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.cart_total_cents / 100, if self.cart_total_cents % 100 < 10 { format("0{}", self.cart_total_cents % 100) } else { format("{}", self.cart_total_cents % 100) })}</div>
+                            </div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; height: hug">
+                                <div style="font-size: 13px; color: #71717a; height: hug; width: hug">"Tax"</div>
+                                <div style="font-size: 13px; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.tax_cents / 100, if self.tax_cents % 100 < 10 { format("0{}", self.tax_cents % 100) } else { format("{}", self.tax_cents % 100) })}</div>
+                            </div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; height: hug">
+                                <div style="font-size: 13px; color: #71717a; height: hug; width: hug">{format("Tip ({}%)", self.tip_mode * 5 + 10)}</div>
+                                <div style="font-size: 13px; color: #fafafa; height: hug; width: hug">{format("${}.{}", self.tip_cents / 100, if self.tip_cents % 100 < 10 { format("0{}", self.tip_cents % 100) } else { format("{}", self.tip_cents % 100) })}</div>
+                            </div>
+                            <div style="width: fill; height: 1px; background-color: #2a2a2a"></div>
+                            <div style="direction: horizontal; width: fill; justify: space-between; height: hug">
+                                <div style="font-size: 16px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Total"</div>
+                                <div style="font-size: 16px; font-weight: 700; color: #22c55e; height: hug; width: hug">{format("${}.{}", self.grand_total_cents / 100, if self.grand_total_cents % 100 < 10 { format("0{}", self.grand_total_cents % 100) } else { format("{}", self.grand_total_cents % 100) })}</div>
+                            </div>
 
-                            // Show cart items that have qty > 0
-                            {if self.cart_q0 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Espresso"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q0)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q0 * self.price0 / 100, self.cart_q0 * self.price0 - (self.cart_q0 * self.price0 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_0}>"-"</button>
+                            // Tip buttons
+                            <div style="direction: horizontal; gap: 8; height: hug; width: fill">
+                                <div style="height: 36px; padding: 0 14; width: hug; background-color: #2a2a2a; border-radius: 8; align: center; justify: center" on:click={self.tip_none}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"No tip"</div>
                                 </div>
-                            }}
-                            {if self.cart_q1 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Double Espresso"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q1)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q1 * self.price1 / 100, self.cart_q1 * self.price1 - (self.cart_q1 * self.price1 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_1}>"-"</button>
+                                <div style="height: 36px; padding: 0 14; width: hug; background-color: #2a2a2a; border-radius: 8; align: center; justify: center" on:click={self.tip_15}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"15%"</div>
                                 </div>
-                            }}
-                            {if self.cart_q2 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Americano"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q2)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q2 * self.price2 / 100, self.cart_q2 * self.price2 - (self.cart_q2 * self.price2 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_2}>"-"</button>
+                                <div style="height: 36px; padding: 0 14; width: hug; background-color: #2a2a2a; border-radius: 8; align: center; justify: center" on:click={self.tip_18}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"18%"</div>
                                 </div>
-                            }}
-                            {if self.cart_q3 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Macchiato"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q3)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q3 * self.price3 / 100, self.cart_q3 * self.price3 - (self.cart_q3 * self.price3 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_3}>"-"</button>
+                                <div style="height: 36px; padding: 0 14; width: hug; background-color: #2a2a2a; border-radius: 8; align: center; justify: center" on:click={self.tip_20}>
+                                    <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"20%"</div>
                                 </div>
-                            }}
-                            {if self.cart_q4 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Cortado"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q4)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q4 * self.price4 / 100, self.cart_q4 * self.price4 - (self.cart_q4 * self.price4 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_4}>"-"</button>
-                                </div>
-                            }}
-                            {if self.cart_q5 > 0 {
-                                <div class="cart-item-row">
-                                    <span class="cart-item-name">"Classic Latte"</span>
-                                    <span class="cart-item-qty">{format("x{}", self.cart_q5)}</span>
-                                    <span class="cart-item-total">{format("${}.{}", self.cart_q5 * self.price5 / 100, self.cart_q5 * self.price5 - (self.cart_q5 * self.price5 / 100) * 100)}</span>
-                                    <button class="btn btn-sm btn-danger" on:click={self.remove_item_5}>"-"</button>
-                                </div>
-                            }}
+                            </div>
 
-                            {if self.cart_count > 0 {
-                                <div>
-                                    <div class="divider"></div>
-
-                                    // Tip selection
-                                    <p class="section-label">"Tip"</p>
-                                    <div class="tip-row">
-                                        {if self.tip_mode == 0 {
-                                            <button class="tip-active" on:click={self.tip_none}>"No Tip"</button>
-                                        } else {
-                                            <button class="tip-btn" on:click={self.tip_none}>"No Tip"</button>
-                                        }}
-                                        {if self.tip_mode == 1 {
-                                            <button class="tip-active" on:click={self.tip_15}>"15%"</button>
-                                        } else {
-                                            <button class="tip-btn" on:click={self.tip_15}>"15%"</button>
-                                        }}
-                                        {if self.tip_mode == 2 {
-                                            <button class="tip-active" on:click={self.tip_18}>"18%"</button>
-                                        } else {
-                                            <button class="tip-btn" on:click={self.tip_18}>"18%"</button>
-                                        }}
-                                        {if self.tip_mode == 3 {
-                                            <button class="tip-active" on:click={self.tip_20}>"20%"</button>
-                                        } else {
-                                            <button class="tip-btn" on:click={self.tip_20}>"20%"</button>
-                                        }}
-                                    </div>
-
-                                    // Totals breakdown
-                                    <div class="divider"></div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Subtotal"</span>
-                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.cart_total_cents), self.cents_part(self.cart_total_cents))}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Tax (8.25%)"</span>
-                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.tax_cents), self.cents_part(self.tax_cents))}</span>
-                                    </div>
-                                    {if self.tip_cents > 0 {
-                                        <div class="kv-row">
-                                            <span class="kv-label">"Tip"</span>
-                                            <span class="kv-green">{format("${}.{}", self.dollars_part(self.tip_cents), self.cents_part(self.tip_cents))}</span>
-                                        </div>
-                                    }}
-                                    <div class="kv-row">
-                                        <span class="kv-label" style="font-weight: 700; color: #fafafa">"Grand Total"</span>
-                                        <span class="kv-green" style="font-size: 18px">{format("${}.{}", self.dollars_part(self.grand_total_cents), self.cents_part(self.grand_total_cents))}</span>
-                                    </div>
-
-                                    // Payment buttons
-                                    <div style="display: flex; gap: 12px; margin-top: 16px">
-                                        <button class="btn btn-primary" on:click={self.initiate_payment}>"Pay with Alipay"</button>
-                                        <button class="btn btn-danger" on:click={self.clear_cart}>"Clear Cart"</button>
+                            // Pay button
+                            {if self.payment_status == 0 {
+                                <div style="height: 52px; width: fill; background-color: #22c55e; border-radius: 10; align: center; justify: center" on:click={self.place_order}>
+                                    <div style="font-size: 15px; font-weight: 700; color: #0f0f0f; height: hug; width: hug">{format("Pay ${}.{}", self.grand_total_cents / 100, if self.grand_total_cents % 100 < 10 { format("0{}", self.grand_total_cents % 100) } else { format("{}", self.grand_total_cents % 100) })}</div>
+                                </div>
+                            }}
+                            {if self.payment_status == 1 {
+                                <div style="height: 52px; width: fill; background-color: #1a472a; border-radius: 10; align: center; justify: center">
+                                    <div style="font-size: 15px; font-weight: 600; color: #86efac; height: hug; width: hug">"Processing via Alipay..."</div>
+                                </div>
+                            }}
+                            {if self.payment_status == 2 {
+                                <div style="direction: vertical; width: fill; padding: 16; background-color: #052e16; border-radius: 10; border-width: 1; border-color: #14532d; gap: 8; align: center">
+                                    <div style="font-size: 16px; font-weight: 700; color: #22c55e; height: hug; width: hug">"Payment Successful"</div>
+                                    <div style="font-size: 12px; color: #86efac; height: hug; width: hug">{format("Order #{}", self.current_order_id)}</div>
+                                    <div style="height: 40px; padding: 0 20; width: hug; background-color: #1a472a; border-radius: 8; align: center; justify: center" on:click={self.new_order}>
+                                        <div style="font-size: 13px; font-weight: 600; color: #86efac; height: hug; width: hug">"New Order"</div>
                                     </div>
                                 </div>
                             }}
                         </div>
 
-                        // QR Payment Flow
-                        {if self.payment_status > 0 {
-                            <div class="card">
-                                <h3 class="card-title">"Alipay QR Payment"</h3>
-
-                                // Status badge
-                                {if self.payment_status == 1 {
-                                    <span class="status-badge status-pending">"Pending — Scan QR Code"</span>
-                                }}
-                                {if self.payment_status == 2 {
-                                    <span class="status-badge status-scanning">"Scanned — Confirming..."</span>
-                                }}
-                                {if self.payment_status == 3 {
-                                    <span class="status-badge status-confirmed">"Payment Complete"</span>
-                                }}
-
-                                // QR code display
-                                {if self.payment_status == 1 {
-                                    <div class="qr-box">
-                                        <p class="qr-text">"Scan with Alipay"</p>
-                                        <p style="font-size: 48px; margin: 16px 0">"[QR]"</p>
-                                        <p class="qr-mono">{format("alipay://pay?order={}&amount={}&merchant=NECTAR_COFFEE&crc={}", self.current_order_id, self.grand_total_cents, self.qr_checksum)}</p>
-                                    </div>
-                                }}
-
-                                // Order details
-                                <div class="kv-row">
-                                    <span class="kv-label">"Order ID"</span>
-                                    <span class="kv-value">{format("#{}", self.current_order_id)}</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">"Amount"</span>
-                                    <span class="kv-value">{format("${}.{}", self.dollars_part(self.grand_total_cents), self.cents_part(self.grand_total_cents))}</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">"CRC-16 Checksum"</span>
-                                    <span class="kv-value" style="font-family: monospace">{format("0x{}", self.qr_checksum)}</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv-label">"Provider"</span>
-                                    <span class="kv-green">"Alipay (swappable to Stripe/Moov)"</span>
-                                </div>
-
-                                // Action buttons
-                                <div style="display: flex; gap: 12px; margin-top: 16px">
-                                    {if self.payment_status == 1 {
-                                        <button class="btn btn-secondary" on:click={self.simulate_scan}>"Simulate Scan"</button>
-                                    }}
-                                    {if self.payment_status == 2 {
-                                        <button class="btn btn-primary" on:click={self.confirm_payment}>"Confirm Payment"</button>
-                                    }}
-                                    {if self.payment_status < 3 {
-                                        <button class="btn btn-danger" on:click={self.cancel_payment}>"Cancel"</button>
-                                    }}
-                                </div>
-                            </div>
-                        }}
+                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Payment processed via mp::tradePay — routed to Alipay provider"</div>
                     </div>
                 }}
 
-                // ===================================================
-                // Tab 2: Orders — History + Offline Support
-                // ===================================================
+                // ===== TAB 2: ORDERS =====
                 {if self.active_tab == 2 {
-                    <div>
-                        // Stats
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-value">{format("{}", self.order_count)}</div>
-                                <div class="stat-label">"COMPLETED ORDERS"</div>
+                    <div style="direction: vertical; width: fill; gap: 16; height: hug">
+                        <div style="font-size: 20px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Order History"</div>
+
+                        <div style="direction: horizontal; width: fill; gap: 12; height: hug">
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 4">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"ORDERS"</div>
+                                <div style="font-size: 24px; font-weight: 800; color: #fafafa; height: hug; width: hug">{format("{}", self.order_count)}</div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-value">{format("${}.{}", self.dollars_part(self.total_spent_cents), self.cents_part(self.total_spent_cents))}</div>
-                                <div class="stat-label">"TOTAL SPENT"</div>
-                            </div>
-                            <div class="stat-card">
-                                {if self.offline_queue > 0 {
-                                    <div class="stat-value" style="color: #f59e0b">{format("{}", self.offline_queue)}</div>
-                                } else {
-                                    <div class="stat-value">"0"</div>
-                                }}
-                                <div class="stat-label">"QUEUED OFFLINE"</div>
+                            <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 4">
+                                <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"TOTAL SPENT"</div>
+                                <div style="font-size: 24px; font-weight: 800; color: #22c55e; height: hug; width: hug">{format("${}.{}", self.total_spent_cents / 100, if self.total_spent_cents % 100 < 10 { format("0{}", self.total_spent_cents % 100) } else { format("{}", self.total_spent_cents % 100) })}</div>
                             </div>
                         </div>
 
-                        // Offline queue banner
-                        {if self.is_online == 0 {
-                            <div class="card" style="border-color: #92400e; background-color: #1c1917">
-                                <div style="display: flex; align-items: center; gap: 8px">
-                                    <span class="offline-dot">" "</span>
-                                    <span style="font-size: 14px; font-weight: 600; color: #f59e0b">"You are offline"</span>
-                                </div>
-                                <p style="font-size: 13px; color: #a1a1aa; margin-top: 8px">"Orders will be queued locally via mp::setStorageSync and synced when connectivity returns. Cart state persists across sessions."</p>
-                                <button class="btn btn-secondary" style="margin-top: 12px" on:click={self.queue_offline_order}>"Queue Test Order"</button>
+                        <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 8">
+                            <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Loyalty Points"</div>
+                            <div style="font-size: 28px; font-weight: 800; color: #f59e0b; height: hug; width: hug">{format("{}", self.loyalty_points)}</div>
+                            <div style="font-size: 12px; color: #71717a; height: hug; width: hug">"Earn 1 point per $1 spent"</div>
+                        </div>
+
+                        {if self.offline_queue > 0 {
+                            <div style="direction: horizontal; width: fill; padding: 12 16; background-color: #422006; border-radius: 8; border-width: 1; border-color: #713f12; gap: 8; align: center; height: hug">
+                                <div style="font-size: 12px; font-weight: 600; color: #f59e0b; height: hug; width: hug">{format("{} orders queued offline", self.offline_queue)}</div>
                             </div>
                         }}
 
-                        // Order history
-                        <div class="card">
-                            <h3 class="card-title">"Order History"</h3>
-                            <p style="font-size: 12px; color: #71717a; margin-bottom: 12px">"Persisted via "<span class="mp-api">"mp::setStorageSync"</span>" / "<span class="mp-api">"mp::getStorageSync"</span></p>
-
-                            {if self.order_count == 0 {
-                                <div class="empty-state">
-                                    <p>"No orders yet"</p>
-                                    <p style="font-size: 12px; color: #52525b">"Complete a payment to see history"</p>
-                                </div>
-                            }}
-                            {if self.order_count > 0 {
-                                <div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Latest Order"</span>
-                                        <span class="kv-value">{format("${}.{}", self.dollars_part(self.last_order_total), self.cents_part(self.last_order_total))}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Total Orders"</span>
-                                        <span class="kv-value">{format("{}", self.order_count)}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Lifetime Spend"</span>
-                                        <span class="kv-green">{format("${}.{}", self.dollars_part(self.total_spent_cents), self.cents_part(self.total_spent_cents))}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Points Earned"</span>
-                                        <span class="kv-green">{format("{}", self.loyalty_points)}</span>
-                                    </div>
-                                </div>
-                            }}
-                        </div>
-
-                        // Lifecycle showcase
-                        <div class="card">
-                            <h3 class="card-title">"Mini-Program Lifecycle"</h3>
-                            <p style="font-size: 12px; color: #71717a; margin-bottom: 16px">"How the WASM mini-program manages state across its lifetime"</p>
-
-                            <div class="lifecycle-step">
-                                <span class="lifecycle-fn">"onLaunch"</span>
-                                <span class="lifecycle-desc">"Restore auth token from "<span class="mp-api">"mp::getStorageSync"</span>", load cached cart, show loading"</span>
-                            </div>
-                            <div class="lifecycle-step">
-                                <span class="lifecycle-fn">"onShow"</span>
-                                <span class="lifecycle-desc">"Check network via "<span class="mp-api">"mp::getNetworkType"</span>", refresh order status, sync offline queue"</span>
-                            </div>
-                            <div class="lifecycle-step">
-                                <span class="lifecycle-fn">"onHide"</span>
-                                <span class="lifecycle-desc">"Save cart to "<span class="mp-api">"mp::setStorageSync"</span>", persist last_active timestamp"</span>
-                            </div>
-                        </div>
+                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Orders persisted via mp::setStorageSync — survives page reload"</div>
                     </div>
                 }}
 
-                // ===================================================
-                // Tab 3: Profile — Auth + Loyalty
-                // ===================================================
+                // ===== TAB 3: PROFILE =====
                 {if self.active_tab == 3 {
-                    <div>
-                        // Profile card
-                        <div class="profile-card">
-                            <div class="avatar">"NC"</div>
-                            <p class="user-name">{format("{}", self.user_name)}</p>
+                    <div style="direction: vertical; width: fill; gap: 16; height: hug">
+                        <div style="font-size: 20px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Profile"</div>
+
+                        <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 16; align: center">
+                            // Avatar placeholder
+                            <div style="width: 64px; height: 64px; background-color: #1a472a; border-radius: 32; align: center; justify: center">
+                                <div style="font-size: 24px; font-weight: 700; color: #22c55e; height: hug; width: hug">{format("{}", self.user_name)}</div>
+                            </div>
+
+                            {if self.is_logged_in == 0 {
+                                <div style="height: 44px; padding: 0 24; width: hug; background-color: #22c55e; border-radius: 10; align: center; justify: center" on:click={self.login_alipay}>
+                                    <div style="font-size: 14px; font-weight: 600; color: #0f0f0f; height: hug; width: hug">"Login with Alipay"</div>
+                                </div>
+                            }}
                             {if self.is_logged_in == 1 {
-                                <div>
-                                    // Tier badge
-                                    {if self.loyalty_points < 100 {
-                                        <span class="tier-badge tier-bronze">"Bronze"</span>
-                                    }}
-                                    {if self.loyalty_points >= 100 {
-                                        {if self.loyalty_points < 500 {
-                                            <span class="tier-badge tier-silver">"Silver"</span>
-                                        }}
-                                    }}
-                                    {if self.loyalty_points >= 500 {
-                                        {if self.loyalty_points < 2000 {
-                                            <span class="tier-badge tier-gold">"Gold"</span>
-                                        }}
-                                    }}
-                                    {if self.loyalty_points >= 2000 {
-                                        <span class="tier-badge tier-diamond">"Diamond"</span>
-                                    }}
+                                <div style="direction: vertical; gap: 8; align: center; height: hug">
+                                    <div style="font-size: 16px; font-weight: 600; color: #fafafa; height: hug; width: hug">{format("{}", self.user_name)}</div>
+                                    <div style="font-size: 12px; color: #f59e0b; height: hug; width: hug">{format("{} loyalty points", self.loyalty_points)}</div>
+                                    <div style="height: 36px; padding: 0 16; width: hug; background-color: #2a2a2a; border-radius: 8; align: center; justify: center" on:click={self.logout}>
+                                        <div style="font-size: 12px; font-weight: 600; color: #a1a1aa; height: hug; width: hug">"Logout"</div>
+                                    </div>
                                 </div>
                             }}
                         </div>
 
-                        {if self.is_logged_in == 0 {
-                            <div class="card" style="text-align: center">
-                                <p style="font-size: 14px; color: #a1a1aa; margin-bottom: 16px">"Log in with Alipay to track loyalty points and order history"</p>
-                                <button class="btn btn-primary" on:click={self.login}>"Login with Alipay"</button>
-                                <p style="font-size: 11px; color: #71717a; margin-top: 12px">"Uses "<span class="mp-api">"mp::getAuthCode"</span>" for OAuth flow"</p>
-                            </div>
-                        }}
-
-                        {if self.is_logged_in == 1 {
-                            <div>
-                                // Loyalty points
-                                <div class="card">
-                                    <h3 class="card-title">"Loyalty Program"</h3>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Current Points"</span>
-                                        <span class="kv-green">{format("{}", self.loyalty_points)}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Points per Dollar"</span>
-                                        <span class="kv-value">"1 pt / $1.00 spent"</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Current Tier"</span>
-                                        {if self.loyalty_points < 100 {
-                                            <span class="kv-amber">"Bronze (next: Silver at 100 pts)"</span>
-                                        }}
-                                        {if self.loyalty_points >= 100 {
-                                            {if self.loyalty_points < 500 {
-                                                <span class="kv-amber">"Silver (next: Gold at 500 pts)"</span>
-                                            }}
-                                        }}
-                                        {if self.loyalty_points >= 500 {
-                                            {if self.loyalty_points < 2000 {
-                                                <span class="kv-amber">"Gold (next: Diamond at 2000 pts)"</span>
-                                            }}
-                                        }}
-                                        {if self.loyalty_points >= 2000 {
-                                            <span class="kv-green">"Diamond (max tier)"</span>
-                                        }}
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Tier Benefits"</span>
-                                        <span class="kv-value">"Free size upgrade, priority ordering"</span>
-                                    </div>
-                                </div>
-
-                                // Account info
-                                <div class="card">
-                                    <h3 class="card-title">"Account"</h3>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"Auth Provider"</span>
-                                        <span class="kv-value">"Alipay OAuth"</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"User Info"</span>
-                                        <span class="kv-value">{format("{}", self.user_name)}</span>
-                                    </div>
-                                    <div class="kv-row">
-                                        <span class="kv-label">"API Surface"</span>
-                                        <span class="kv-value"><span class="mp-api">"mp::getUserInfo"</span></span>
-                                    </div>
-                                    <div style="margin-top: 16px">
-                                        <button class="btn btn-danger" on:click={self.logout}>"Logout"</button>
-                                    </div>
-                                </div>
-
-                                // mp:: API showcase
-                                <div class="card">
-                                    <h3 class="card-title">"mp:: API Surface (Alipay-Compatible)"</h3>
-                                    <p style="font-size: 12px; color: #71717a; margin-bottom: 12px">"Every mp:: call maps to an Alipay my.* API but runs through WASM syscalls instead of a JS sandbox."</p>
-                                    <div class="kv-row"><span class="mp-api">"mp::getStorageSync"</span><span class="kv-value">"Persistent key-value store"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::setStorageSync"</span><span class="kv-value">"Write to local storage"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::showLoading"</span><span class="kv-value">"Loading overlay"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::showToast"</span><span class="kv-value">"Toast notification"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::getAuthCode"</span><span class="kv-value">"Alipay OAuth flow"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::getUserInfo"</span><span class="kv-value">"User profile data"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::tradePay"</span><span class="kv-value">"QR/barcode payment"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::getNetworkType"</span><span class="kv-value">"Connectivity check"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::getLocation"</span><span class="kv-value">"GPS coordinates"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::navigateTo"</span><span class="kv-value">"Page navigation stack"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::request"</span><span class="kv-value">"HTTP fetch"</span></div>
-                                    <div class="kv-row"><span class="mp-api">"mp::setNavigationBar"</span><span class="kv-value">"Top bar configuration"</span></div>
-                                </div>
-                            </div>
-                        }}
+                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Auth via mp::getAuthCode — routes to Alipay OAuth provider"</div>
                     </div>
                 }}
 
-                // ===================================================
-                // Tab 4: Stores — Locator with Haversine
-                // ===================================================
+                // ===== TAB 4: STORES =====
                 {if self.active_tab == 4 {
-                    <div>
-                        <div class="card">
-                            <h3 class="card-title">"Find a Store"</h3>
-                            <p style="font-size: 12px; color: #71717a; margin-bottom: 16px">"Distance calculated via Haversine formula — pure WASM integer math, no JS"</p>
-                            <button class="btn btn-primary" style="margin-bottom: 16px" on:click={self.request_location}>"Update My Location"</button>
-                            <div class="kv-row">
-                                <span class="kv-label">"Your Position"</span>
-                                <span class="kv-value" style="font-family: monospace">{format("{}.{}, {}.{}", self.user_lat_x1000 / 1000, self.user_lat_x1000 - (self.user_lat_x1000 / 1000) * 1000, self.user_lng_x1000 / 1000, self.user_lng_x1000 - (self.user_lng_x1000 / 1000) * 1000)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"API"</span>
-                                <span class="kv-value"><span class="mp-api">"mp::getLocation"</span></span>
-                            </div>
+                    <div style="direction: vertical; width: fill; gap: 16; height: hug">
+                        <div style="font-size: 20px; font-weight: 700; color: #fafafa; height: hug; width: hug">"Nearby Stores"</div>
+
+                        <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 4">
+                            <div style="font-size: 11px; color: #71717a; height: hug; width: hug">"NEAREST"</div>
+                            <div style="font-size: 16px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Nectar Coffee — Downtown"</div>
+                            <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">{format("{}m away", self.nearest_distance_m)}</div>
+                            <div style="font-size: 12px; color: #71717a; height: hug; width: hug">"123 Wangfujing St, Beijing"</div>
                         </div>
 
-                        // Store list
-                        <div class="store-card">
-                            <div>
-                                <p class="store-name">"Nectar Coffee — Guomao"</p>
-                                <p class="store-addr">"Guomao CBD, Chaoyang District, Beijing"</p>
-                                <p class="store-hours">"07:00 - 22:00"</p>
-                            </div>
-                            <div class="store-dist">
-                                {if self.nearest_store_idx == 0 {
-                                    <span>"Nearest"</span>
-                                }}
-                            </div>
-                        </div>
-                        <div class="store-card">
-                            <div>
-                                <p class="store-name">"Nectar Coffee — Sanlitun"</p>
-                                <p class="store-addr">"Sanlitun SOHO, Chaoyang District, Beijing"</p>
-                                <p class="store-hours">"08:00 - 23:00"</p>
-                            </div>
-                            <div class="store-dist">
-                                {if self.nearest_store_idx == 1 {
-                                    <span>"Nearest"</span>
-                                }}
-                            </div>
-                        </div>
-                        <div class="store-card">
-                            <div>
-                                <p class="store-name">"Nectar Coffee — Wangfujing"</p>
-                                <p class="store-addr">"Wangfujing Avenue, Dongcheng District, Beijing"</p>
-                                <p class="store-hours">"06:30 - 21:30"</p>
-                            </div>
-                            <div class="store-dist">
-                                {if self.nearest_store_idx == 2 {
-                                    <span>"Nearest"</span>
-                                }}
-                            </div>
-                        </div>
-                        <div class="store-card">
-                            <div>
-                                <p class="store-name">"Nectar Coffee — Zhongguancun"</p>
-                                <p class="store-addr">"Zhongguancun E-Plaza, Haidian District, Beijing"</p>
-                                <p class="store-hours">"07:30 - 22:00"</p>
-                            </div>
-                            <div class="store-dist">" "</div>
-                        </div>
-                        <div class="store-card">
-                            <div>
-                                <p class="store-name">"Nectar Coffee — CBD East"</p>
-                                <p class="store-addr">"China World Trade Center, Chaoyang District, Beijing"</p>
-                                <p class="store-hours">"07:00 - 21:00"</p>
-                            </div>
-                            <div class="store-dist">" "</div>
+                        <div style="direction: vertical; width: fill; padding: 16; background-color: #1a1a1a; border-radius: 12; border-width: 1; border-color: #2a2a2a; gap: 8">
+                            <div style="font-size: 14px; font-weight: 600; color: #fafafa; height: hug; width: hug">"Distance Calculation"</div>
+                            <div style="font-size: 12px; color: #71717a; height: hug; width: hug">"Haversine formula computed in WASM — fixed-point i32 arithmetic"</div>
+                            <div style="font-size: 12px; color: #22c55e; height: hug; width: hug">"mp::getLocation → WASM distance calc → nearest store"</div>
                         </div>
 
-                        // Haversine explanation
-                        <div class="card" style="margin-top: 16px">
-                            <h3 class="card-title">"Distance Calculation — Pure WASM"</h3>
-                            <p style="font-size: 12px; color: #a1a1aa; line-height: 1.6; margin-bottom: 12px">
-                                "Haversine formula computed entirely in WASM using integer arithmetic. Coordinates stored as lat/lng * 1000 to avoid floating point. At latitude 40, 1 degree latitude = 111.32 km, 1 degree longitude = 85.39 km (cos(40) correction). Newton's method for integer square root."
-                            </p>
-                            <div class="kv-row">
-                                <span class="kv-label">"Nearest Store"</span>
-                                <span class="kv-green">{format("Store #{}", self.nearest_store_idx)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Approx Distance"</span>
-                                <span class="kv-value">{format("~{}m", self.nearest_distance_m)}</span>
-                            </div>
-                            <div class="kv-row">
-                                <span class="kv-label">"Map Provider"</span>
-                                <span class="kv-value">"AMap (Gaode) — via miniprogram config"</span>
-                            </div>
-                        </div>
+                        <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Location via mp::getLocation — routes to device GPS"</div>
                     </div>
                 }}
-
             </div>
 
             // ========== Footer ==========
-            <div class="footer-bar">
-                <p class="footer-text">"Nectar Mini-Program Runtime — Compiled WASM, zero JavaScript sandbox. Provider: Alipay (swappable). All computation in WebAssembly."</p>
+            <div style="direction: horizontal; width: fill; padding: 12 24; background-color: #1a1a1a; border-width: 1 0 0 0; border-color: #2a2a2a; height: hug; justify: center">
+                <div style="font-size: 11px; color: #52525b; height: hug; width: hug">"Nectar Mini-Program — Compiled WASM, zero JS sandbox. Provider: Alipay (swappable)."</div>
             </div>
         </div>
     }
 }
+
