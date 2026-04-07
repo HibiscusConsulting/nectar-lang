@@ -264,6 +264,22 @@ pub async fn handle(req: PaymentRequest, http: &reqwest::Client) -> PaymentRespo
             }
         }
 
+        "validate_routing" => {
+            let routing_number = req.params.get("routing_number")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if routing_number.is_empty() {
+                return PaymentResponse::err("moov", "validate_routing", "routing_number is required".into());
+            }
+            let path = format!("/fed/ach/search?routingNumber={}", routing_number);
+            let scope = "/fed.read".to_string();
+            match moov_get(&config, &path, &scope, http).await {
+                Ok(data) => PaymentResponse::ok("moov", "validate_routing", data),
+                Err(e) => PaymentResponse::err("moov", "validate_routing", e),
+            }
+        }
+
         "list_wallets" => {
             let path = format!("/accounts/{}/wallets", config.account_id);
             let scope = format!("/accounts/{}/wallets.read", config.account_id);

@@ -1465,7 +1465,7 @@ impl RustCodegen {
         match expr {
             Expr::Integer(n) => format!("{}", n),
             Expr::Float(f) => format!("{:.1}", f),
-            Expr::StringLit(s) => format!("\"{}\"", s),
+            Expr::StringLit(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
             Expr::Bool(b) => format!("{}", b),
             Expr::Ident(name) => {
                 if name.starts_with("self.") {
