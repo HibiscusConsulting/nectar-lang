@@ -1533,16 +1533,16 @@ impl RustCodegen {
                             else { format!("{{ let _msg = {}; /* mp::{} */ }}", a[0], method) }
                         }
                         "setStorageSync" if a.len() == 2 => {
-                            format!("write_storage({}, {})", a[0], a[1])
+                            format!("write_storage(&{}, &{})", a[0], a[1])
                         }
                         "getStorageSync" if a.len() == 1 => {
-                            format!("read_storage({})", a[0])
+                            format!("read_storage(&{})", a[0])
                         }
                         "removeStorageSync" if a.len() == 1 => {
-                            format!("remove_storage({})", a[0])
+                            format!("remove_storage(&{})", a[0])
                         }
                         "navigateTo" if a.len() == 1 => {
-                            format!("set_hash({})", a[0])
+                            format!("set_hash(&{})", a[0])
                         }
                         "navigateBack" => "{ /* mp::navigateBack */ }".to_string(),
                         "getNetworkType" => "\"wifi\".to_string()".to_string(),

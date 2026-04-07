@@ -362,7 +362,7 @@ component CoffeeShopApp() {
         // Deterministic order ID from cart contents
         self.order_id_seed += 1;
         let mut h: i32 = self.order_id_seed;
-        h = h * 2654435761;
+        h = h * 48271 + 12345;
         if h < 0 { h = 0 - h; }
         h = h + self.cart_total_cents * 31;
         if h < 0 { h = 0 - h; }
