@@ -1001,42 +1001,42 @@ component MoovMultiRailDemo() {
 
             // ========== TABS ==========
             <div style="direction: horizontal; width: fill; background-color: #0f1117; border-width: 0 0 1 0; border-color: #252a3a; padding: 0 24; gap: 0">
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_transfer}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_transfer}>
                     {if self.active_tab == 0 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Transfer Engine"</div>
                     } else {
                         <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Transfer Engine"</div>
                     }}
                 </div>
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ach}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_ach}>
                     {if self.active_tab == 1 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"ACH Origination"</div>
                     } else {
                         <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"ACH Origination"</div>
                     }}
                 </div>
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ledger}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_ledger}>
                     {if self.active_tab == 2 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Wallet / Ledger"</div>
                     } else {
                         <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Wallet / Ledger"</div>
                     }}
                 </div>
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_ofac}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_ofac}>
                     {if self.active_tab == 3 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"OFAC Screening"</div>
                     } else {
                         <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"OFAC Screening"</div>
                     }}
                 </div>
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_card}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_card}>
                     {if self.active_tab == 4 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Card Acquiring"</div>
                     } else {
                         <div style="font-size: 13px; font-weight: 500; color: #6e7681; width: hug; height: hug">"Card Acquiring"</div>
                     }}
                 </div>
-                <div style="padding: 12 18; min-height: 44px; align: center; justify: center" on:click={self.show_dashboard}>
+                <div style="padding: 12 18; height: 44px; align: center; justify: center" on:click={self.show_dashboard}>
                     {if self.active_tab == 5 {
                         <div style="font-size: 13px; font-weight: 600; color: #4667A6; width: hug; height: hug">"Dashboard"</div>
                     } else {
@@ -1106,7 +1106,7 @@ component MoovMultiRailDemo() {
 
                             // RTP toggle
                             <div style="direction: horizontal; gap: 10">
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.toggle_rtp}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.toggle_rtp}>
                                     {if self.rtp_supported == 1 {
                                         <div style="font-size: 12px; font-weight: 600; color: #3fb950; width: hug; height: hug">"RTP: ON"</div>
                                     } else {
@@ -1157,14 +1157,14 @@ component MoovMultiRailDemo() {
                             </div>
 
                             // Action buttons
-                            <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.begin_transfer}>
+                            <div style="direction: horizontal; gap: 10; height: hug; width: fill">
+                                <div style="padding: 0 20; height: 44px; width: hug; background-color: #4667A6; border-radius: 8; align: center; justify: center" on:click={self.begin_transfer}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Initiate Transfer"</div>
                                 </div>
-                                <div style="padding: 10 20; background-color: #238636; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.simulate_settlement}>
+                                <div style="padding: 0 20; height: 44px; width: hug; background-color: #238636; border-radius: 8; align: center; justify: center" on:click={self.simulate_settlement}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Simulate Settlement"</div>
                                 </div>
-                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 44px; align: center; justify: center" on:click={self.reset_transfer}>
+                                <div style="padding: 0 20; height: 44px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center" on:click={self.reset_transfer}>
                                     <div style="font-size: 13px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Reset"</div>
                                 </div>
                             </div>
@@ -1297,7 +1297,7 @@ component MoovMultiRailDemo() {
                             </div>
 
                             <div style="direction: horizontal; gap: 10">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.validate_routing}>
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; height: 44px; align: center; justify: center" on:click={self.validate_routing}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Validate Routing Number"</div>
                                 </div>
                             </div>
@@ -1332,11 +1332,11 @@ component MoovMultiRailDemo() {
                         <div style="direction: vertical; width: fill; padding: 24; background-color: #1a1e2e; border-radius: 12; border-width: 1; border-color: #252a3a; gap: 16">
                             <div style="font-size: 16px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"ACH Entry Class Codes"</div>
 
-                            <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.cycle_entry_class}>
+                            <div style="direction: horizontal; gap: 10; height: hug; width: fill">
+                                <div style="padding: 0 14; height: 36px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center" on:click={self.cycle_entry_class}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Cycle Class Code"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.toggle_same_day}>
+                                <div style="padding: 0 14; height: 36px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center" on:click={self.toggle_same_day}>
                                     {if self.ach_same_day == 1 {
                                         <div style="font-size: 12px; font-weight: 600; color: #3fb950; width: hug; height: hug">"Same-Day: ON"</div>
                                     } else {
@@ -1432,11 +1432,11 @@ component MoovMultiRailDemo() {
                             <div style="width: fill; height: 1px; background-color: #252a3a"></div>
 
                             // Batch actions
-                            <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.add_to_batch}>
+                            <div style="direction: horizontal; gap: 10; height: hug; width: fill">
+                                <div style="padding: 0 20; height: 44px; width: hug; background-color: #4667A6; border-radius: 8; align: center; justify: center" on:click={self.add_to_batch}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Add to Batch"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.clear_batch}>
+                                <div style="padding: 0 14; height: 36px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; align: center; justify: center" on:click={self.clear_batch}>
                                     <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Clear Batch"</div>
                                 </div>
                             </div>
@@ -1493,15 +1493,15 @@ component MoovMultiRailDemo() {
                                 <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"// Moov moves funds between wallets in-memory"</div>
                             </div>
 
-                            <div style="direction: horizontal; gap: 10; align: center; wrap: true">
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.decrease_book_amount}>
+                            <div style="direction: horizontal; gap: 10; align: center; height: hug; width: fill">
+                                <div style="padding: 0 14; height: 36px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center" on:click={self.decrease_book_amount}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$50"</div>
                                 </div>
                                 <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.book_transfer_amount)}</div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.increase_book_amount}>
+                                <div style="padding: 0 14; height: 36px; width: hug; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; align: center; justify: center" on:click={self.increase_book_amount}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$50"</div>
                                 </div>
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.book_transfer}>
+                                <div style="padding: 0 20; height: 44px; width: hug; background-color: #4667A6; border-radius: 8; align: center; justify: center" on:click={self.book_transfer}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Book Transfer"</div>
                                 </div>
                             </div>
@@ -1513,7 +1513,7 @@ component MoovMultiRailDemo() {
                             <div style="font-size: 12px; color: #6e7681; width: hug; height: hug">"Generate 10K double-entry records in a tight loop — pure i32 arithmetic, zero GC"</div>
 
                             <div style="direction: horizontal; gap: 10">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.generate_ledger_entries}>
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; height: 44px; align: center; justify: center" on:click={self.generate_ledger_entries}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Generate 10,000 Entries"</div>
                                 </div>
                             </div>
@@ -1558,13 +1558,13 @@ component MoovMultiRailDemo() {
 
                             // Test name presets
                             <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 6 14; background-color: #238636; border-radius: 8; min-height: 36px; align: center; justify: center" on:click={self.set_screen_clean}>
+                                <div style="padding: 6 14; background-color: #238636; border-radius: 8; height: 36px; align: center; justify: center" on:click={self.set_screen_clean}>
                                     <div style="font-size: 12px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Clean: John Smith"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.set_screen_fuzzy}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.set_screen_fuzzy}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Fuzzy: Iran Shipping LLC"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.set_screen_blocked}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; height: 36px; align: center; justify: center" on:click={self.set_screen_blocked}>
                                     <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Blocked: Osama Bin Laden"</div>
                                 </div>
                             </div>
@@ -1578,18 +1578,18 @@ component MoovMultiRailDemo() {
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a; align: center">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Match Threshold"</div>
                                 <div style="direction: horizontal; gap: 10; align: center">
-                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.threshold_down}>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.threshold_down}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-5"</div>
                                     </div>
                                     <div style="font-size: 13px; font-weight: 600; color: #6d8fd4; width: hug; height: hug">{format("{}%", self.screen_threshold)}</div>
-                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.threshold_up}>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.threshold_up}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+5"</div>
                                     </div>
                                 </div>
                             </div>
 
                             <div style="direction: horizontal; gap: 10">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.run_screening}>
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; height: 44px; align: center; justify: center" on:click={self.run_screening}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Run OFAC Screen"</div>
                                 </div>
                             </div>
@@ -1708,11 +1708,11 @@ component MoovMultiRailDemo() {
                             <div style="direction: horizontal; width: fill; justify: space-between; padding: 10 0; border-width: 0 0 1 0; border-color: #252a3a; align: center">
                                 <div style="font-size: 13px; color: #8b949e; width: hug; height: hug">"Amount"</div>
                                 <div style="direction: horizontal; gap: 10; align: center">
-                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_down}>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.card_amount_down}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"-$5"</div>
                                     </div>
                                     <div style="font-size: 13px; color: #e6edf3; width: hug; height: hug">{self.fmt_usd(self.card_amount)}</div>
-                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.card_amount_up}>
+                                    <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.card_amount_up}>
                                         <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"+$5"</div>
                                     </div>
                                 </div>
@@ -1732,22 +1732,22 @@ component MoovMultiRailDemo() {
 
                             // Action buttons
                             <div style="direction: horizontal; gap: 10; wrap: true">
-                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.authorize_card}>
+                                <div style="padding: 10 20; background-color: #4667A6; border-radius: 8; height: 44px; align: center; justify: center" on:click={self.authorize_card}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Authorize"</div>
                                 </div>
-                                <div style="padding: 10 20; background-color: #238636; border-radius: 8; min-height: 44px; align: center; justify: center" on:click={self.capture_card}>
+                                <div style="padding: 10 20; background-color: #238636; border-radius: 8; height: 44px; align: center; justify: center" on:click={self.capture_card}>
                                     <div style="font-size: 13px; font-weight: 600; color: #ffffff; width: hug; height: hug">"Capture (Full)"</div>
                                 </div>
-                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 44px; align: center; justify: center" on:click={self.partial_capture}>
+                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 44px; align: center; justify: center" on:click={self.partial_capture}>
                                     <div style="font-size: 13px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Capture (50%)"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.void_card}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; height: 36px; align: center; justify: center" on:click={self.void_card}>
                                     <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Void"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 36px; align: center; justify: center" on:click={self.refund_card}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; height: 36px; align: center; justify: center" on:click={self.refund_card}>
                                     <div style="font-size: 12px; font-weight: 600; color: #f85149; width: hug; height: hug">"Refund"</div>
                                 </div>
-                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; min-height: 36px; align: center; justify: center" on:click={self.reset_card}>
+                                <div style="padding: 6 14; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #3d4455; height: 36px; align: center; justify: center" on:click={self.reset_card}>
                                     <div style="font-size: 12px; font-weight: 600; color: #e6edf3; width: hug; height: hug">"Reset"</div>
                                 </div>
                             </div>
@@ -1894,7 +1894,7 @@ component MoovMultiRailDemo() {
                             </div>
 
                             <div style="direction: horizontal; gap: 10">
-                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; min-height: 44px; align: center; justify: center" on:click={self.simulate_failed}>
+                                <div style="padding: 10 20; background-color: #252a3a; border-radius: 8; border-width: 1; border-color: #5c1c1c; height: 44px; align: center; justify: center" on:click={self.simulate_failed}>
                                     <div style="font-size: 13px; font-weight: 600; color: #f85149; width: hug; height: hug">"Simulate RTP Failure + ACH Fallback"</div>
                                 </div>
                             </div>
