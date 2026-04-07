@@ -10,3 +10,4 @@ node_modules/
 Nectar.lock
 tarpaulin-report.json
 key.txt
+server/target/
