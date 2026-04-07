@@ -1,0 +1,14 @@
+/Users/blakeburnette/repos/nectar-lang/server/target/release/deps/serde-7d32d9b23bbf370c.d: /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/blakeburnette/repos/nectar-lang/server/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/blakeburnette/repos/nectar-lang/server/target/release/deps/libserde-7d32d9b23bbf370c.rlib: /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/blakeburnette/repos/nectar-lang/server/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/blakeburnette/repos/nectar-lang/server/target/release/deps/libserde-7d32d9b23bbf370c.rmeta: /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/blakeburnette/repos/nectar-lang/server/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs
+
+/Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/blakeburnette/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/blakeburnette/repos/nectar-lang/server/target/release/build/serde-1271ce5b4ecddfd5/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/blakeburnette/repos/nectar-lang/server/target/release/build/serde-1271ce5b4ecddfd5/out
