@@ -109,13 +109,49 @@ One command provisions hosting, database, auth, payments, caching, file storage,
 
 For SSR (`nectar build --ssr`), deploy to any platform that runs a web server (Render Web Service, AWS Lambda, Cloud Run, etc.).
 
+## Architecture (Three Layers)
+
+Nectar is built in three composable layers. Application code touches keywords and standard-library calls; provider implementations are hot-swappable behind the scenes.
+
+### 1. Keywords (language primitives)
+
+80+ reserved keywords baked into the lexer/parser. Application surfaces are first-class language constructs, not library imports.
+
+- **Structure** — `component`, `store`, `router`, `route`, `page`, `layout`, `outlet`
+- **State + reactivity** — `signal`, `action`, `computed`, `effect`, `selector`, `atomic`
+- **App surfaces** — `form`, `channel`, `agent`, `app` (PWA), `theme`, `auth`, `payment`, `banking`, `upload`, `embed`, `pdf`, `db`, `cache`, `map`, `crypto`, `miniprogram`
+- **Device + platform** — `clipboard`, `draggable`, `droppable`, `download`, `haptic`, `biometric`, `camera`, `geolocation`, `push`
+- **Safety + ops** — `secret`, `contract`, `guard`, `flag`, `trace`, `env`, `must_use`, `validate`, `schema`, `optimistic`, `invalidate`
+
+### 2. Standard library (auto-included interfaces)
+
+43 registered modules exposing the function surface for each keyword domain. No imports needed — every Nectar program has the full standard library available at compile time.
+
+- **Core types** — `Vec`, `HashMap`, `Option`, `Result`, `String`, iterator trait, `BigDecimal`
+- **Utilities** — `format`, `collections`, `url`, `mask`, `search`, `theme`, `debounce`, `throttle`, `crypto`, `csv`
+- **UI components** — `data_table`, `datepicker`, `combobox`, `chart`, `editor`, `image`, `qr`, `share`, `wizard`, `toast`, `skeleton`, `pagination`
+- **App services** — `auth`, `db`, `upload`, `payment`, `maps`, `media`, `rtc`, `gpu`, `miniprogram`
+- **Animation + layout** — `animate`, `responsive`, `syntax`
+
+### 3. Providers (concrete service integrations)
+
+Pluggable JS modules in [`providers/`](providers/) that fulfill standard-library interfaces. Application code calls keyword/stdlib APIs (e.g. `payment::charge`, `mp::tradePay`); the provider layer translates to vendor-specific HTTP/SDK calls.
+
+| Provider | Domain | Backs |
+|---|---|---|
+| [moov.js](providers/moov.js) | Banking, ACH, wallets, transfers | `banking`, `payment` |
+| [stripe.js](providers/stripe.js) | Card payments, Connect | `payment` |
+| [plaid.js](providers/plaid.js) | Bank account linking, transactions | `banking` |
+| [alipay.js](providers/alipay.js) | Chinese super-app payments | `miniprogram` (`mp::*`) |
+| [mapbox.js](providers/mapbox.js) | Maps, geocoding, directions | `map`, `maps` |
+
+Provider contract: implement the interface defined in `compiler/src/stdlib.rs`. Switching from Stripe to Moov is a config flip — application code does not change.
+
+See [Providers](docs/providers.md) for the integration model and how to add a new one.
+
 ## What You Get
 
 **Language features** — components, stores, routers, signals, structs, enums, traits, generics, ownership, borrowing, pattern matching, async/await, auto a11y, layout primitives, view transitions
-
-**Built-in keywords** — `page` (SEO), `form` (validation), `channel` (WebSocket/WebRTC), `auth`, `payment`, `upload`, `db`, `cache`, `embed`, `pdf`, `theme`, `app` (PWA), `agent` (AI), `crypto` (pure WASM)
-
-**Standard library** — `debounce`, `throttle`, `BigDecimal`, `format`, `collections`, `url`, `mask`, `search`, `toast`, `skeleton`, `pagination`, `crypto`, `chart`, `csv` — all auto-included, no imports needed
 
 **Security** — XSS structurally impossible, `secret` types, capability-based `permissions`, zero JS dependencies, no `node_modules`
 
@@ -162,7 +198,7 @@ See [`examples/`](examples/) for complete working apps:
 | [crypto.nectar](examples/crypto.nectar) | Hash, encrypt, sign |
 | [std-lib.nectar](examples/std-lib.nectar) | Standard library usage |
 
-[See all 39 examples ->](examples/)
+[See all 60+ examples ->](examples/)
 
 ## Platform
 
@@ -192,12 +228,15 @@ See [Render Modes](docs/render-modes.md) for details.
 | Doc | Contents |
 |---|---|
 | [Getting Started](docs/getting-started.md) | Install, first app, dev server |
-| [Language Reference](docs/language-reference.md) | Full syntax, types, ownership, components, stores |
+| [Language Reference](docs/language-reference.md) | Full syntax, types, ownership, components, stores, keywords |
 | [Architecture](docs/architecture.md) | Compiler pipeline, runtime, WASM bridge |
+| [Providers](docs/providers.md) | Provider model, built-in providers, adding a new provider |
 | [Render Modes](docs/render-modes.md) | DOM, Canvas, and Hybrid rendering modes |
 | [Runtime API](docs/runtime-api.md) | JS syscall layer, command buffer, WASM imports |
 | [Toolchain](docs/toolchain.md) | CLI commands, formatter, linter, LSP |
 | [AI Integration](docs/nectar-for-ai.md) | Agents, tools, prompts, streaming |
+| [Examples](docs/examples.md) | Worked examples for every keyword and stdlib module |
+| [Whitepaper](docs/whitepaper.md) | Design rationale and the case for compiled WASM-first frontends |
 
 ## License
 
