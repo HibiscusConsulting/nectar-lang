@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nectar — The Web Doesn't Need JavaScript</title>
+<meta name="description" content="Nectar compiles to WebAssembly. One language, one binary, zero dependencies. Your entire app runs in WASM.">
+<meta name="theme-color" content="#0b0e14">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0e14;--surface:#131720;--surface2:#1a1f2e;--border:#2a2f3e;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--accent:#f97316;--green:#3fb950;--blue:#58a6ff;--purple:#bc8cff;--red:#f85149}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+
+/* Nav */
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;max-width:1100px;margin:0 auto}
+nav .logo{font-size:1.4rem;font-weight:800;color:var(--accent)}
+nav .links{display:flex;gap:24px;font-size:0.95rem}
+nav .links a{color:var(--text2);font-weight:500}
+nav .links a:hover{color:var(--text)}
+.btn{display:inline-block;padding:18px 48px;border-radius:12px;font-weight:700;font-size:1.1rem;transition:all 0.15s}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:hover{background:#fb923c;text-decoration:none}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--text2);text-decoration:none}
+nav .btn{padding:10px 24px;font-size:0.9rem}
+
+/* Hero */
+.hero{text-align:center;padding:80px 24px 60px}
+.hero h1{font-size:3.8rem;font-weight:800;line-height:1.2;margin-bottom:24px}
+.hero h1 .strike{text-decoration:line-through;color:var(--text3);text-decoration-color:var(--red);text-decoration-thickness:3px}
+.hero h1 .accent{color:var(--accent);display:block;font-size:4.5rem}
+.hero .sub{font-size:1.15rem;color:var(--text2);max-width:680px;margin:0 auto 36px;line-height:1.7}
+.hero .actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;padding:60px 0;max-width:900px;margin:0 auto}
+.stat{text-align:center;padding:20px}
+.stat .val{font-size:2.4rem;font-weight:800;color:var(--accent);font-style:italic}
+.stat .val.green{color:var(--green)}
+.stat .val.blue{color:var(--blue)}
+.stat .val.purple{color:var(--purple)}
+.stat .label{font-size:0.8rem;color:var(--text3);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+
+/* Comparison */
+.comparison{padding:60px 0}
+.comparison h2{text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:40px}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:768px){.compare-grid{grid-template-columns:1fr}}
+.compare-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.compare-card.nectar{border-color:var(--accent)}
+.compare-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+.compare-header .name{font-weight:700;font-size:1rem}
+.compare-header .size{font-size:0.85rem;color:var(--text2)}
+.compare-card.nectar .compare-header{border-bottom-color:rgba(249,115,22,0.3)}
+.compare-card.nectar .compare-header .name{color:var(--accent)}
+.compare-card.nectar .compare-header .size{color:var(--accent)}
+pre{padding:20px;font-size:0.82rem;line-height:1.6;overflow-x:auto;font-family:'SF Mono',Menlo,monospace;color:var(--text2)}
+.compare-card.nectar pre{color:var(--text)}
+
+/* Features */
+.features{padding:60px 0}
+.features h2{text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:40px}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.feature{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px}
+.feature .icon{font-size:1.6rem;margin-bottom:12px}
+.feature h3{font-size:1.1rem;font-weight:700;margin-bottom:8px}
+.feature p{color:var(--text2);font-size:0.9rem;line-height:1.6}
+
+/* How it works */
+.how{padding:60px 0}
+.how h2{text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:12px}
+.how .sub{text-align:center;color:var(--text2);margin-bottom:40px;font-size:1rem}
+.pipeline{display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:40px}
+.pipe-step{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 24px;text-align:center}
+.pipe-step .top{font-size:0.75rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.pipe-step .bot{font-size:1rem;font-weight:700;color:var(--accent);margin-top:4px}
+.pipe-arrow{color:var(--text3);font-size:1.2rem}
+.checklist{max-width:500px;margin:0 auto}
+.checklist div{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:0.9rem}
+.checklist .key{color:var(--text2)}
+.checklist .val{color:var(--green);font-weight:600}
+
+/* CTA */
+.cta{text-align:center;padding:80px 24px;background:var(--surface);border-radius:24px;margin:40px 0}
+.cta h2{font-size:1.8rem;font-weight:800;margin-bottom:12px}
+.cta .sub{color:var(--text2);margin-bottom:32px;font-size:1rem}
+.cta .actions{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+/* Footer */
+footer{text-align:center;padding:40px 24px;color:var(--text3);font-size:0.85rem}
+footer a{color:var(--text2)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Nectar</div>
+  <div class="links">
+    <a href="https://github.com/HibiscusConsulting/nectar-lang">GitHub</a>
+    <a href="https://buildnectar.com/docs">Docs</a>
+    <a href="canvas-test.html" class="btn btn-primary">See the Demo</a>
+  </div>
+</nav>
+
+<section class="hero container">
+  <h1>The web <span class="strike">needs<br>JavaScript</span><br><span class="accent">doesn't.</span></h1>
+  <p class="sub">Nectar compiles to WebAssembly. One language, one binary, zero dependencies. Your entire app — logic, state, rendering — runs in WASM. JavaScript is reduced to a 10 KB syscall layer.</p>
+  <div class="actions">
+    <a href="canvas-test.html" class="btn btn-primary">See It Running →</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" class="btn btn-secondary">View Source</a>
+  </div>
+</section>
+
+<section class="container">
+  <div class="stats">
+    <div class="stat"><div class="val">0</div><div class="label">JS Dependencies</div></div>
+    <div class="stat"><div class="val green">~10KB</div><div class="label">Runtime (gzip)</div></div>
+    <div class="stat"><div class="val blue">2421</div><div class="label">Compiler Tests</div></div>
+
+    <div class="stat"><div class="val">0</div><div class="label">Virtual DOM</div></div>
+    <div class="stat"><div class="val purple">O(1)</div><div class="label">Signal Updates</div></div>
+  </div>
+</section>
+
+<section class="comparison container">
+  <h2>Write less. Ship faster.</h2>
+  <div class="compare-grid">
+    <div class="compare-card">
+      <div class="compare-header">
+        <span class="name">React + JavaScript</span>
+        <span class="size">387 KB</span>
+      </div>
+<pre>// package.json: 47 dependencies
+// node_modules: 1,247 packages
+import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{count}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(c =&gt; c + 1)}&gt;
+        +
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</pre>
+    </div>
+    <div class="compare-card nectar">
+      <div class="compare-header">
+        <span class="name">Nectar</span>
+        <span class="size">~10 KB</span>
+      </div>
+<pre>// No package.json. No node_modules.
+// One file. Compiles to WASM.
+
+component Counter() {
+    let mut count: i32 = 0;
+
+    fn increment(&amp;mut self) {
+        self.count = self.count + 1;
+    }
+
+    render {
+        &lt;div&gt;
+            &lt;p&gt;{format("{}", self.count)}&lt;/p&gt;
+            &lt;button on:click={self.increment}&gt;"+"&lt;/button&gt;
+        &lt;/div&gt;
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<section class="features container">
+  <h2>Built different.</h2>
+  <div class="feature-grid">
+    <div class="feature"><div class="icon">⚙</div><h3>Single Binary Compiler</h3><p>One Rust binary handles everything: compile, format, lint, test, dev server, LSP, package management, SSR. No toolchain to configure.</p></div>
+    <div class="feature"><div class="icon">⚡</div><h3>Fine-Grained Signals</h3><p>O(1) updates per binding. No virtual DOM, no diffing, no reconciliation. When a signal changes, only the exact DOM node updates.</p></div>
+    <div class="feature"><div class="icon">🔒</div><h3>Compile-Time Safety</h3><p>Rust-inspired borrow checker, type system, and exhaustive pattern matching. Catch bugs before they ship — not in production.</p></div>
+    <div class="feature"><div class="icon">📦</div><h3>Zero Dependencies</h3><p>No npm, no node_modules, no webpack, no bundler. Your app compiles to a .wasm binary and a 10 KB runtime. That's it.</p></div>
+    <div class="feature"><div class="icon">🌐</div><h3>Built-In Keywords</h3><p>component, store, router, page, form, auth, payment, upload, db, cache, agent — common web patterns are language primitives, not libraries.</p></div>
+    <div class="feature"><div class="icon">🚀</div><h3>SSR + Edge Deploy</h3><p>The same WASM binary runs on the server via wasmtime. Built-in SSR, hydration, and deployment to 29 Cloud Run regions.</p></div>
+  </div>
+</section>
+
+<section class="how container">
+  <h2>How Nectar works</h2>
+  <p class="sub">Your .nectar source compiles to WebAssembly. The browser loads the .wasm and a 10 KB syscall layer. Everything else is WASM.</p>
+  <div class="pipeline">
+    <div class="pipe-step"><div class="top">Source</div><div class="bot">.nectar</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="top">Compiler</div><div class="bot">Rust</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="top">Output</div><div class="bot">.wasm</div></div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step"><div class="top">Runtime</div><div class="bot">Browser</div></div>
+  </div>
+  <div class="checklist">
+    <div><span class="key">JavaScript Runtime</span><span class="val">3 KB (DOM syscalls only)</span></div>
+    <div><span class="key">Virtual DOM</span><span class="val">None — command buffer</span></div>
+    <div><span class="key">State Management</span><span class="val">WASM signals — O(1)</span></div>
+    <div><span class="key">Borrow Checker</span><span class="val">Compile-time safety</span></div>
+    <div><span class="key">node_modules</span><span class="val">Zero. Deleted.</span></div>
+    <div><span class="key">GC Pauses</span><span class="val">None — linear memory</span></div>
+    <div><span class="key">XSS Attacks</span><span class="val">Impossible — no eval</span></div>
+    <div><span class="key">Auth</span><span class="val">HttpOnly cookies by default</span></div>
+  </div>
+</section>
+
+<section class="container">
+  <div class="cta">
+    <h2>See it running.</h2>
+    <p class="sub">10,000 products. Reactive search, sort, and cart. All rendered by Honeycomb in 18ms warm. Zero JavaScript logic.</p>
+    <div class="actions">
+      <a href="canvas-test.html" class="btn btn-primary">Launch the Demo →</a>
+      <a href="https://github.com/HibiscusConsulting/nectar-lang" class="btn btn-secondary">Star on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Built by <a href="https://github.com/HibiscusConsulting">Hibiscus Consulting</a> · <a href="https://github.com/HibiscusConsulting/nectar-lang">GitHub</a> · BSL 1.1 License
+</footer>
+
+</body>
+</html>
