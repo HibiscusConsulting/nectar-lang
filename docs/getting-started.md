@@ -451,3 +451,4 @@ Now that you have the basics, explore these resources:
 - **[Runtime API Reference](runtime-api.md)** -- every WASM import function available at runtime
 - **[Architecture & Internals](architecture.md)** -- how the compiler works under the hood
 - **[Examples Guide](examples.md)** -- detailed walkthroughs of all example programs
+_Last verified deploy: 2026-05-07 16:36 EDT_
