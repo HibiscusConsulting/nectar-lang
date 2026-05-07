@@ -115,6 +115,14 @@ canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.sh
 canvas_clear_shadow: (id) => { const ctx=canvas_fns.ctx; ctx.shadowBlur=0; ctx.shadowColor="transparent"; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; },
 canvas_highlight_rect: (id,x,y,w,h,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.save(); ctx.globalAlpha=a/255; ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.fillRect(x,y,w,h); ctx.restore(); },
 request_idle_callback: (cbIdx) => { const fn_ = () => { if (cbIdx === 9999 && W.app_build_a11y_dom) W.app_build_a11y_dom(); else if (W.__callback) W.__callback(cbIdx); }; if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(fn_); else setTimeout(fn_, 50); },
+// a11y stubs — accessibility tree mirroring; not active in this demo.
+a11y_clear: () => {},
+a11y_create: () => 0,
+a11y_append_child: () => {},
+a11y_set_attr: () => {},
+a11y_set_text: () => {},
+a11y_set_bounds: () => {},
+a11y_add_click_handler: () => {},
 }};
 const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v=' + Date.now()), imports);
 const W = instance.exports;
