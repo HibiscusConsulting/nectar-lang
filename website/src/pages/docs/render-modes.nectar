@@ -1,0 +1,313 @@
+// docs/render-modes.nectar — auto-generated from docs/render-modes.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page RenderModesDoc() {
+    meta {
+        title: "Render Modes — Nectar Documentation",
+        description: "DOM, Canvas (Honeycomb), and Hybrid render targets — when and why to use each.",
+        canonical: "/docs/render-modes",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes" class="current">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Render Modes"
+                    </div>
+                    <h1>"Render Modes"</h1>
+                <p>"Nectar supports three render modes. Each page in your application can choose its own mode based on its requirements."</p>
+                <h3 id="quick-start">"Quick Start"</h3>
+                <div class="code-lang-label">"bash"</div>
+                <pre class="code-block"><code>"# DOM mode (default) — traditional browser rendering
+nectar build app.nectar --render=dom
+
+# Canvas mode — WASM layout + Canvas 2D paint, zero DOM
+nectar build app.nectar --render=canvas
+
+# Hybrid mode — Canvas paint + hidden DOM for SEO/accessibility
+nectar build app.nectar --render=hybrid"</code></pre>
+                <h3 id="per-page-render-mode">"Per-Page Render Mode"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Marketing page — needs SEO, accessibility
+page Home {
+    render: \"dom\"
+
+    render {
+        <div class=\"hero\">
+            <h1>\"Welcome to our store\"</h1>
+        </div>
+    }
+}
+
+// Dashboard — behind auth, performance-critical
+page Dashboard {
+    render: \"canvas\"
+
+    render {
+        <stack direction=\"horizontal\" gap={16}>
+            <stack width={300}><Chart data={self.metrics} /></stack>
+            <stack fill>{for item in self.feed { <FeedItem data={item} /> }}</stack>
+        </stack>
+    }
+}
+
+// Product catalog — needs both speed and SEO
+page Catalog {
+    render: \"hybrid\"
+
+    render {
+        <stack direction=\"horizontal\" wrap={true} gap={16} pad={40}>
+            {for product in self.products {
+                <ProductCard data={product} />
+            }}
+        </stack>
+    }
+}"</code></pre>
+                <p>"The template syntax is identical across all three modes. The compiler generates different output based on the render mode."</p>
+                <p>"All render modes support component composition via router layout blocks with "<code>"<Outlet />"</code>". The layout shell (navigation, footer) persists across page navigations while only the outlet content swaps."</p>
+                <h3 id="mode-comparison">"Mode Comparison"</h3>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"DOM"</th><th>"Canvas"</th><th>"Hybrid"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"10K item render"</td><td>"250-320ms"</td><td><strong>"25ms"</strong></td><td>"~30ms"</td></tr>
+                        <tr><td>"Reactive updates"</td><td>"0.10ms"</td><td>"0.10ms"</td><td>"0.10ms"</td></tr>
+                        <tr><td>"SEO / crawlers"</td><td>"Full"</td><td>"None"</td><td>"Full"</td></tr>
+                        <tr><td>"Screen readers"</td><td>"Native"</td><td>"Via hidden DOM"</td><td>"Via hidden DOM"</td></tr>
+                        <tr><td>"Text selection"</td><td>"Native"</td><td>"Via hidden DOM"</td><td>"Via hidden DOM"</td></tr>
+                        <tr><td>"Cmd+F search"</td><td>"Native"</td><td>"Via hidden DOM"</td><td>"Via hidden DOM"</td></tr>
+                        <tr><td>"Form autofill"</td><td>"Native"</td><td>"Input overlay"</td><td>"Native"</td></tr>
+                        <tr><td>"Tab navigation"</td><td>"Native"</td><td>"WASM-driven"</td><td>"WASM-driven"</td></tr>
+                        <tr><td>"Bundle size"</td><td>"48 KB"</td><td>"165 KB"</td><td>"165 KB"</td></tr>
+                        <tr><td>"DOM nodes"</td><td>"All visible"</td><td>"1 ("<code>"<canvas>"</code>")"</td><td>"All hidden"</td></tr>
+                        <tr><td>"Layout engine"</td><td>"Browser CSS"</td><td>"Honeycomb (WASM)"</td><td>"Browser CSS"</td></tr>
+                        <tr><td>"Paint engine"</td><td>"Browser"</td><td>"Canvas 2D"</td><td>"Canvas 2D"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3 id="when-to-use-each-mode">"When to Use Each Mode"</h3>
+                <h4 id="dom-mode-default">"DOM Mode (default)"</h4>
+                <p>"Use for any page where SEO, accessibility, or standard browser behavior matters. This is the default and covers most use cases."</p>
+                <ul>
+                    <li>"Marketing pages and landing pages"</li>
+                    <li>"Blog and content pages"</li>
+                    <li>"Product pages that need Google indexing"</li>
+                    <li>"Any page with forms that need autofill"</li>
+                    <li>"Pages that must meet WCAG accessibility standards"</li>
+                </ul>
+                <h4 id="canvas-mode">"Canvas Mode"</h4>
+                <p>"Use for performance-critical pages behind authentication where SEO doesn't matter."</p>
+                <ul>
+                    <li>"Admin dashboards with real-time data"</li>
+                    <li>"Data visualization and charting"</li>
+                    <li>"Internal tools and back-office applications"</li>
+                    <li>"Pages with 1000+ interactive elements"</li>
+                    <li>"Games and interactive media"</li>
+                </ul>
+                <p>"Canvas mode builds a hidden accessibility DOM via "<code>"requestIdleCallback"</code>" after first paint, so screen readers still work. Cmd+F searches the hidden DOM and scrolls the canvas to match."</p>
+                <h4 id="hybrid-mode">"Hybrid Mode"</h4>
+                <p>"Use when you need both rendering speed and full SEO/accessibility."</p>
+                <ul>
+                    <li>"E-commerce product catalogs"</li>
+                    <li>"Search results pages"</li>
+                    <li>"Directory listings"</li>
+                    <li>"Any page with large lists that must be crawlable"</li>
+                </ul>
+                <p>"Hybrid mode uses the browser's CSS engine for layout computation (via a hidden DOM), then paints the visual layer to canvas. The hidden DOM stays live for crawlers, screen readers, and browser search."</p>
+                <h3 id="layout-system">"Layout System"</h3>
+                <h4 id="dom-mode-css">"DOM Mode — CSS"</h4>
+                <p>"DOM mode uses standard CSS. Nectar's style system provides:"</p>
+                <ul>
+                    <li><strong>"Scoped styles"</strong>": Class names automatically prefixed with component name ("<code>"ProductCard__title"</code>")"</li>
+                    <li><strong>"Themes"</strong>": CSS custom properties via "<code>"theme { }"</code>" blocks"</li>
+                    <li><strong>"Breakpoints"</strong>": Named responsive ranges via "<code>"breakpoints { }"</code>" blocks"</li>
+                    <li><strong>"Critical CSS"</strong>": Automatic extraction for SSR ("<code>"--critical-css"</code>")"</li>
+                </ul>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component ProductCard {
+    styles {
+        .card {
+            display: grid;
+            gap: 16px;
+            border-radius: 12px;
+        }
+        .title {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+    }
+
+    render {
+        <div class=\"card\">
+            <h3 class=\"title\">{self.name}</h3>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="canvashybrid-mode-stacks">"Canvas/Hybrid Mode — Stacks"</h4>
+                <p>"Canvas and hybrid modes use Honeycomb's stack-based layout engine. Three layout directions, three sizing policies:"</p>
+                <p><strong>"Directions:"</strong></p>
+                <ul>
+                    <li><code>"Vertical"</code>" — children stack top to bottom (like "<code>"flex-direction: column"</code>")"</li>
+                    <li><code>"Horizontal"</code>" — children stack left to right (like "<code>"flex-direction: row"</code>")"</li>
+                    <li><code>"Layer"</code>" — children overlap on z-axis (like "<code>"position: absolute"</code>")"</li>
+                </ul>
+                <p><strong>"Sizing:"</strong></p>
+                <ul>
+                    <li><code>"Fill(weight)"</code>" — take available space, split with siblings (like "<code>"flex: 1"</code>")"</li>
+                    <li><code>"Hug"</code>" — shrink to fit content (like "<code>"width: fit-content"</code>")"</li>
+                    <li><code>"Fixed(px)"</code>" — exact pixel size (like "<code>"width: 260px"</code>")"</li>
+                </ul>
+                <p><strong>"Properties:"</strong></p>
+                <ul>
+                    <li><code>"gap"</code>" — space between children"</li>
+                    <li><code>"pad"</code>" — space inside element (padding)"</li>
+                    <li><code>"align"</code>" — cross-axis alignment (Start, Center, End, Stretch)"</li>
+                    <li><code>"justify"</code>" — main-axis distribution (Start, Center, End, SpaceBetween)"</li>
+                    <li><code>"wrap"</code>" — wrap children to next line"</li>
+                    <li><code>"scroll"</code>" — enable scroll container"</li>
+                    <li><code>"min_width"</code>", "<code>"max_width"</code>", "<code>"min_height"</code>", "<code>"max_height"</code>" — constraints"</li>
+                </ul>
+                <p><strong>"CSS compatibility:"</strong>" The layout engine accepts CSS property names directly. "<code>"flex-direction: row"</code>" maps to "<code>"direction: horizontal"</code>". "<code>"flex: 1"</code>" maps to "<code>"Fill(1.0)"</code>". Existing CSS-style properties work without changes."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// These are equivalent:
+<div style=\"display:flex;flex-direction:row;gap:16px;padding:40px;flex-wrap:wrap\">
+<stack direction=\"horizontal\" gap={16} pad={40} wrap={true}>"</code></pre>
+                <h4 id="layout-algorithm">"Layout Algorithm"</h4>
+                <p>"The layout engine uses a two-pass algorithm:"</p>
+                <ol>
+                    <li><strong>"Measure pass (bottom-up):"</strong>" Compute the intrinsic size each element wants if given infinite space. "<code>"Fill"</code>" elements contribute 0 on their fill axis. Text nodes are measured via the platform's text measurer."</li>
+                    <li><strong>"Layout pass (top-down):"</strong>" Given available space from the parent, compute final position and size. Distribute "<code>"Fill"</code>" weights proportionally. Align and justify children. Recursively layout children with constrained space."</li>
+                </ol>
+                <p>"This is the same layout algorithm used by Honeycomb, Nectar's canvas rendering engine. The same Rust code compiles to:"</p>
+                <ul>
+                    <li>"WASM (for browser canvas/hybrid mode)"</li>
+                    <li>"Native binary (planned — for desktop apps via Pollen runtime and wgpu)"</li>
+                </ul>
+                <h3 id="style-reuse-across-modes">"Style Reuse Across Modes"</h3>
+                <p>"Themes, breakpoints, and component styles are portable:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"DOM"</th><th>"Canvas/Hybrid"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"theme { accent: \"#f97316\" }"</code></td><td>"CSS custom property "<code>"var(--accent)"</code></td><td>"Resolved at compile time"</td></tr>
+                        <tr><td><code>"breakpoints { tablet: 768 }"</code></td><td><code>"@media (min-width: 768px)"</code></td><td><code>"canvas_get_width() >= 768"</code></td></tr>
+                        <tr><td>"Scoped "<code>".title"</code>" class"</td><td><code>"ProductCard__title"</code>" CSS class"</td><td>"Direct style lookup by component + class"</td></tr>
+                        <tr><td><code>"style=\"color: red\""</code></td><td>"Inline CSS"</td><td><code>"resolve_style()"</code>" parses at layout time"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"The developer writes styles once. The compiler translates to the appropriate target."</p>
+                <h3 id="architecture">"Architecture"</h3>
+                <pre class="code-block"><code>".nectar source
+     |
+  Compiler (--render flag)
+     |
+  ┌──┴──────────────┬──────────────────┐
+  DOM               Canvas             Hybrid
+  |                 |                  |
+  dom_createElement  cvs_add            dom_createElement (hidden)
+  dom_setAttr        canvas_fillRect    + canvas_fillRect (visible)
+  dom_setText        canvas_fillText    + dom_get_rect (sync)
+  |                 |                  |
+  Browser CSS       Honeycomb (WASM)    Browser CSS (layout)
+  Browser paint     Canvas 2D (paint)   Canvas 2D (paint)"</code></pre>
+                <p>"All three modes share:"</p>
+                <ul>
+                    <li>"Same "<code>".nectar"</code>" source files"</li>
+                    <li>"Same component model (signals, props, methods)"</li>
+                    <li>"Same reactive system (O(1) updates per binding)"</li>
+                    <li>"Same event handling (on:click, on:input)"</li>
+                    <li>"Same template syntax ({for ...}, {if ...}, {lazy for ...})"</li>
+                </ul>
+                <p>"Only the rendering backend changes."</p>
+                <h3 id="accessibility">"Accessibility"</h3>
+                <h4 id="dom-mode">"DOM Mode"</h4>
+                <p>"Fully accessible out of the box. Browser handles focus management, screen reader announcements, keyboard navigation."</p>
+                <h4 id="canvas-mode-2">"Canvas Mode"</h4>
+                <p>"WASM builds a hidden accessibility DOM ("<code>"opacity: 0; pointer-events: none"</code>") after first paint via "<code>"requestIdleCallback"</code>". This DOM is:"</p>
+                <ul>
+                    <li>"Invisible to the user (canvas covers it)"</li>
+                    <li>"Visible to screen readers (opacity:0 preserves accessibility tree)"</li>
+                    <li>"Searchable by Cmd+F (browser searches real DOM text)"</li>
+                    <li>"Indexed by crawlers (real HTML elements)"</li>
+                </ul>
+                <h4 id="hybrid-mode-2">"Hybrid Mode"</h4>
+                <p>"The hidden DOM used for layout computation doubles as the accessibility layer. No extra work needed — the elements already exist."</p>
+                <h3 id="vim-mode-canvashybrid">"Vim Mode (Canvas/Hybrid)"</h3>
+                <p>"Canvas and hybrid modes include an optional vim-style keyboard navigation:"</p>
+                <ul>
+                    <li><code>"Ctrl+Shift+V"</code>" — toggle vim mode on/off"</li>
+                    <li><code>"h/j/k/l"</code>" — scroll (left/down/up/right)"</li>
+                    <li><code>"g"</code>" — jump to top"</li>
+                    <li><code>"G"</code>" — jump to bottom"</li>
+                    <li><code>"Esc"</code>" — exit vim mode"</li>
+                </ul>
+                <p>"When vim mode is off, all keys type normally. A green \"VIM MODE\" badge appears when active."</p>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

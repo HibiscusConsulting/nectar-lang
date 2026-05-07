@@ -1,0 +1,658 @@
+// docs/architecture.nectar — auto-generated from docs/architecture.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page ArchitectureDoc() {
+    meta {
+        title: "Nectar Architecture & Internals — Nectar Documentation",
+        description: "Compiler pipeline (lexer, parser, borrow check, type check, optimizer, codegen) and the Honeycomb runtime.",
+        canonical: "/docs/architecture",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture" class="current">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Architecture"
+                    </div>
+                    <h1>"Nectar Architecture & Internals"</h1>
+                <p>"This document describes the internal architecture of the Nectar compiler and runtime for contributors who want to understand, modify, or extend the system."</p>
+                <hr />
+                <h3 id="table-of-contents">"Table of Contents"</h3>
+                <ol>
+                    <li><a href="#compiler-pipeline-overview">"Compiler Pipeline Overview"</a></li>
+                    <li><a href="#lexer">"Lexer"</a></li>
+                    <li><a href="#parser">"Parser"</a></li>
+                    <li><a href="#borrow-checker">"Borrow Checker"</a></li>
+                    <li><a href="#type-checker">"Type Checker"</a></li>
+                    <li><a href="#optimizer">"Optimizer"</a></li>
+                    <li><a href="#code-generation-wat">"Code Generation -- WAT"</a></li>
+                    <li><a href="#code-generation-binary-wasm">"Code Generation -- Binary WASM"</a></li>
+                    <li><a href="#runtime-bridge">"Runtime Bridge"</a></li>
+                    <li><a href="#server-side-rendering-ssr">"Server-Side Rendering (SSR)"</a></li>
+                    <li><a href="#module-resolution">"Module Resolution"</a></li>
+                    <li><a href="#source-map">"Source Map"</a></li>
+                </ol>
+                <hr />
+                <h3 id="compiler-pipeline-overview">"Compiler Pipeline Overview"</h3>
+                <p>"Nectar's compiler is a traditional multi-pass compiler written in Rust. Source code flows through the following stages:"</p>
+                <pre class="code-block"><code>"                    Nectar Source (.nectar)
+                         |
+                    +----v----+
+                    |  Lexer  |  tokenize()
+                    +----+----+
+                         |
+                   Token Stream
+                         |
+                    +----v----+
+                    | Parser  |  parse_program_recovering()
+                    +----+----+
+                         |
+                   AST (Program)
+                         |
+              +----------+----------+
+              |                     |
+       +------v------+    +--------v--------+
+       |   Module    |    | Borrow Checker  |
+       |   Loader    |    +---------+-------+
+       +------+------+             |
+              |               +----v----+
+              +------+------->|  Type   |
+                     |        | Checker |
+                     |        +----+----+
+                     |             |
+               +-----v-----+      |
+               | Exhaustive |<-----+
+               |   Check    |
+               +-----+------+
+                     |
+               +-----v---------+
+               | Monomorphize  |
+               | (generics)    |
+               +-----+---------+
+                     |
+               +-----v------+
+               | Optimizer   |
+               | (O0/O1/O2) |
+               +-----+------+
+                     |
+           +---------+---------+
+           |         |         |
+     +-----v--+ +---v----+ +--v-----+
+     |  WAT   | | Binary | |  SSR   |
+     | Codegen| |  WASM  | | Codegen|
+     +--------+ +--------+ +--------+
+           |         |         |
+        .wat      .wasm     .ssr.js"</code></pre>
+                <p>"All compiler modules live in "<code>"compiler/src/"</code>":"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Module"</th><th>"File"</th><th>"Purpose"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Lexer"</td><td><code>"lexer.rs"</code></td><td>"Tokenization"</td></tr>
+                        <tr><td>"Token definitions"</td><td><code>"token.rs"</code></td><td>"Token types, spans"</td></tr>
+                        <tr><td>"AST definitions"</td><td><code>"ast.rs"</code></td><td>"All AST node types"</td></tr>
+                        <tr><td>"Parser"</td><td><code>"parser.rs"</code></td><td>"Recursive descent + Pratt parsing"</td></tr>
+                        <tr><td>"Borrow checker"</td><td><code>"borrow_checker.rs"</code></td><td>"Ownership and lifetime validation"</td></tr>
+                        <tr><td>"Type checker"</td><td><code>"type_checker.rs"</code></td><td>"Hindley-Milner type inference"</td></tr>
+                        <tr><td>"Exhaustiveness"</td><td><code>"exhaustiveness.rs"</code></td><td>"Match pattern coverage checking"</td></tr>
+                        <tr><td>"Monomorphization"</td><td><code>"monomorphize.rs"</code></td><td>"Generic function specialization"</td></tr>
+                        <tr><td>"Optimizer"</td><td><code>"optimizer.rs"</code></td><td>"Pass manager"</td></tr>
+                        <tr><td>"Constant folding"</td><td><code>"const_fold.rs"</code></td><td>"Compile-time expression evaluation"</td></tr>
+                        <tr><td>"Dead code elimination"</td><td><code>"dce.rs"</code></td><td>"Remove unreachable statements"</td></tr>
+                        <tr><td>"Tree shaking"</td><td><code>"tree_shake.rs"</code></td><td>"Remove unused top-level items"</td></tr>
+                        <tr><td>"Runtime namespace analysis"</td><td><code>"runtime_modules.rs"</code></td><td>"Detect WASM import namespaces for dead code elimination"</td></tr>
+                        <tr><td>"WASM optimization"</td><td><code>"wasm_opt.rs"</code></td><td>"Peephole optimization on WAT output"</td></tr>
+                        <tr><td>"WAT codegen"</td><td><code>"codegen.rs"</code></td><td>"AST to WebAssembly Text Format"</td></tr>
+                        <tr><td>"Binary WASM codegen"</td><td><code>"wasm_binary.rs"</code></td><td>"AST to binary .wasm"</td></tr>
+                        <tr><td>"SSR codegen"</td><td><code>"ssr.rs"</code></td><td>"AST to server-side JS"</td></tr>
+                        <tr><td>"Module resolver"</td><td><code>"module_resolver.rs"</code></td><td>"File path resolution for modules"</td></tr>
+                        <tr><td>"Module loader"</td><td><code>"module_loader.rs"</code></td><td>"Multi-file compilation"</td></tr>
+                        <tr><td>"Package manager"</td><td><code>"package.rs"</code></td><td>"Nectar.toml parsing, lockfile"</td></tr>
+                        <tr><td>"Registry client"</td><td><code>"registry.rs"</code></td><td>"Dependency download"</td></tr>
+                        <tr><td>"Dependency resolver"</td><td><code>"resolver.rs"</code></td><td>"Version resolution"</td></tr>
+                        <tr><td>"Formatter"</td><td><code>"formatter.rs"</code></td><td>"Canonical source formatting"</td></tr>
+                        <tr><td>"Linter"</td><td><code>"linter.rs"</code></td><td>"Static analysis rules"</td></tr>
+                        <tr><td>"LSP server"</td><td><code>"lsp.rs"</code></td><td>"Language Server Protocol"</td></tr>
+                        <tr><td>"Dev server"</td><td><code>"devserver.rs"</code></td><td>"HTTP + WebSocket hot-reload server"</td></tr>
+                        <tr><td>"Source maps"</td><td><code>"sourcemap.rs"</code></td><td>"Debug mapping generation"</td></tr>
+                        <tr><td>"Standard library"</td><td><code>"stdlib.rs"</code></td><td>"Built-in types and functions"</td></tr>
+                        <tr><td>"Canvas codegen"</td><td><code>"rust_codegen.rs"</code></td><td>".nectar → Rust source for Honeycomb canvas mode"</td></tr>
+                        <tr><td>"CLI entry point"</td><td><code>"main.rs"</code></td><td>"Command-line interface"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="honeycomb-canvas-rendering-engine">"Honeycomb (Canvas Rendering Engine)"</h4>
+                <p>"When compiling with "<code>"--render=canvas"</code>", the compiler targets Honeycomb instead of the browser DOM. Honeycomb is a separate crate that provides:"</p>
+                <ul>
+                    <li><strong>"ElementTree"</strong>" — a flat "<code>"Vec<Option<Element>>"</code>" pool indexed by "<code>"u32"</code>" handles, replacing the browser's DOM tree"</li>
+                    <li><strong>"LayoutStyle / LayoutNode"</strong>" — typed structs for layout (direction, gap, padding, align, justify, sizing policies). No CSS parsing, no HashMap lookups on the hot path."</li>
+                    <li><strong>"VisualStyle"</strong>" — typed fields for rendering (background color, border, font size, opacity). No string-based style lookups."</li>
+                    <li><strong>"Stack-based layout engine"</strong>" — two-pass algorithm (measure bottom-up, layout top-down) with "<code>"Fill(weight)"</code>" / "<code>"Hug"</code>" / "<code>"Fixed(px)"</code>" sizing policies"</li>
+                    <li><strong>"Canvas 2D renderer"</strong>" — walks the element tree, culls off-screen elements, and issues "<code>"canvas_fill_rect"</code>" / "<code>"canvas_fill_text"</code>" / "<code>"canvas_draw_image"</code>" syscalls"</li>
+                    <li><strong>"Signal system"</strong>" — "<code>"O(1)"</code>" per-binding updates with "<code>"SignalEffect"</code>" variants ("<code>"SetText"</code>", "<code>"SetVisible"</code>", "<code>"SetChecked"</code>", "<code>"SetStyle"</code>"). Only affected subtrees re-layout."</li>
+                    <li><strong>"Widget catalog"</strong>" — static "<code>"WidgetDef"</code>" definitions for checkbox, toggle, slider, dropdown, datepicker, etc. with default styles and focusability"</li>
+                </ul>
+                <p>"The WASM→host boundary in canvas mode is 6 canvas syscalls (init, clear, fill_rect, fill_text, measure_text, draw_image). Everything else — layout, hit testing, signals, state, event routing — is pure WASM."</p>
+                <hr />
+                <h3 id="lexer">"Lexer"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/lexer.rs"</code></p>
+                <p>"The lexer converts raw source text into a stream of tokens. It is implemented as a hand-written scanner that processes one character at a time."</p>
+                <h4 id="token-types">"Token Types"</h4>
+                <p>"Tokens are defined in "<code>"token.rs"</code>" as the "<code>"TokenKind"</code>" enum. Major categories:"</p>
+                <ul>
+                    <li><strong>"Literals"</strong>": "<code>"Integer(i64)"</code>", "<code>"Float(f64)"</code>", "<code>"StringLit(String)"</code>", "<code>"Bool(bool)"</code>", "<code>"FormatString(Vec<FormatStringPart>)"</code></li>
+                    <li><strong>"Identifiers"</strong>": "<code>"Ident(String)"</code></li>
+                    <li><strong>"Keywords"</strong>": 50+ reserved words ("<code>"let"</code>", "<code>"fn"</code>", "<code>"component"</code>", "<code>"store"</code>", "<code>"agent"</code>", "<code>"match"</code>", etc.)"</li>
+                    <li><strong>"Type keywords"</strong>": "<code>"I32"</code>", "<code>"I64"</code>", "<code>"F32"</code>", "<code>"F64"</code>", "<code>"U32"</code>", "<code>"U64"</code>", "<code>"Bool_"</code>", "<code>"StringType"</code></li>
+                    <li><strong>"Symbols"</strong>": all operators and punctuation ("<code>"+"</code>", "<code>"-"</code>", "<code>"->"</code>", "<code>"=>"</code>", "<code>"::"</code>", etc.)"</li>
+                    <li><strong>"Lifetimes"</strong>": "<code>"Lifetime(String)"</code>" for "<code>"'a"</code>", "<code>"'static"</code>", etc."</li>
+                    <li><strong>"Special"</strong>": "<code>"Eof"</code></li>
+                </ul>
+                <h4 id="format-strings">"Format Strings"</h4>
+                <p>"The lexer handles "<code>"f\"...\""</code>" format strings specially. It splits the content into alternating literal and expression segments:"</p>
+                <pre class="code-block"><code>"f\"Hello {name}, you are {age} years old\""</code></pre>
+                <p>"Produces:"</p>
+                <pre class="code-block"><code>"FormatString([
+    Lit(\"Hello \"),
+    Expr(\"name\"),
+    Lit(\", you are \"),
+    Expr(\"age\"),
+    Lit(\" years old\"),
+])"</code></pre>
+                <h4 id="spans">"Spans"</h4>
+                <p>"Every token carries a "<code>"Span"</code>" with byte offsets and line/column positions for error reporting:"</p>
+                <div class="code-lang-label">"rust"</div>
+                <pre class="code-block"><code>"pub struct Span {
+    pub start: usize,  // byte offset
+    pub end: usize,
+    pub line: u32,
+    pub col: u32,
+}"</code></pre>
+                <hr />
+                <h3 id="parser">"Parser"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/parser.rs"</code></p>
+                <p>"The parser is a hand-written recursive descent parser with Pratt parsing for expressions. It produces a typed AST defined in "<code>"ast.rs"</code>"."</p>
+                <h4 id="error-recovery">"Error Recovery"</h4>
+                <p>"The parser implements error recovery so that multiple errors can be reported in a single compilation. When a parse error occurs:"</p>
+                <ol>
+                    <li>"The error is recorded in "<code>"self.errors"</code></li>
+                    <li>"The parser calls "<code>"synchronize()"</code>" to skip tokens until a recovery point"</li>
+                    <li>"Parsing continues from the next valid position"</li>
+                </ol>
+                <p>"Three synchronization contexts are used:"</p>
+                <ul>
+                    <li><strong>"TopLevel"</strong>": skip to the next top-level keyword ("<code>"fn"</code>", "<code>"component"</code>", "<code>"struct"</code>", etc.)"</li>
+                    <li><strong>"Statement"</strong>": skip to the next semicolon or statement-starting keyword"</li>
+                    <li><strong>"Block"</strong>": skip to the matching closing brace (counting nesting)"</li>
+                </ul>
+                <p>"The public API returns both the (partial) AST and collected errors:"</p>
+                <div class="code-lang-label">"rust"</div>
+                <pre class="code-block"><code>"pub fn parse_program_recovering(&mut self) -> (Program, Vec<ParseError>)"</code></pre>
+                <h4 id="top-level-items">"Top-Level Items"</h4>
+                <p>"The parser dispatches on the first token to determine the item type:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"First Token(s)"</th><th>"Parsed As"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"fn"</code></td><td><code>"Item::Function"</code></td></tr>
+                        <tr><td><code>"async fn"</code></td><td><code>"Item::Function"</code>" (async)"</td></tr>
+                        <tr><td><code>"component"</code></td><td><code>"Item::Component"</code></td></tr>
+                        <tr><td><code>"struct"</code></td><td><code>"Item::Struct"</code></td></tr>
+                        <tr><td><code>"enum"</code></td><td><code>"Item::Enum"</code></td></tr>
+                        <tr><td><code>"impl"</code></td><td><code>"Item::Impl"</code></td></tr>
+                        <tr><td><code>"trait"</code></td><td><code>"Item::Trait"</code></td></tr>
+                        <tr><td><code>"use"</code></td><td><code>"Item::Use"</code></td></tr>
+                        <tr><td><code>"mod"</code></td><td><code>"Item::Mod"</code></td></tr>
+                        <tr><td><code>"store"</code></td><td><code>"Item::Store"</code></td></tr>
+                        <tr><td><code>"agent"</code></td><td><code>"Item::Agent"</code></td></tr>
+                        <tr><td><code>"router"</code></td><td><code>"Item::Router"</code></td></tr>
+                        <tr><td><code>"lazy component"</code></td><td><code>"Item::LazyComponent"</code></td></tr>
+                        <tr><td><code>"test"</code></td><td><code>"Item::Test"</code></td></tr>
+                        <tr><td><code>"pub"</code>" (prefix)"</td><td>"Sets "<code>"is_pub"</code>" on the following item"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="expression-parsing-pratt-parser">"Expression Parsing (Pratt Parser)"</h4>
+                <p>"Expressions are parsed using a Pratt (top-down operator precedence) parser. The precedence levels from lowest to highest:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Level"</th><th>"Operations"</th><th>"Method"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"1"</td><td>"Assignment ("<code>"="</code>", "<code>"+="</code>", "<code>"-="</code>", "<code>"*="</code>", "<code>"/="</code>")"</td><td><code>"parse_assignment()"</code></td></tr>
+                        <tr><td>"2"</td><td>"Logical OR (`\\"</td><td>"\\"</td><td>"`)"</td><td><code>"parse_or()"</code></td></tr>
+                        <tr><td>"3"</td><td>"Logical AND ("<code>"&&"</code>")"</td><td><code>"parse_and()"</code></td></tr>
+                        <tr><td>"4"</td><td>"Equality ("<code>"=="</code>", "<code>"!="</code>")"</td><td><code>"parse_equality()"</code></td></tr>
+                        <tr><td>"5"</td><td>"Comparison ("<code>"<"</code>", "<code>">"</code>", "<code>"<="</code>", "<code>">="</code>")"</td><td><code>"parse_comparison()"</code></td></tr>
+                        <tr><td>"6"</td><td>"Additive ("<code>"+"</code>", "<code>"-"</code>")"</td><td><code>"parse_additive()"</code></td></tr>
+                        <tr><td>"7"</td><td>"Multiplicative ("<code>"*"</code>", "<code>"/"</code>", "<code>"%"</code>")"</td><td><code>"parse_multiplicative()"</code></td></tr>
+                        <tr><td>"8"</td><td>"Unary ("<code>"-"</code>", "<code>"!"</code>", "<code>"&"</code>", "<code>"&mut"</code>")"</td><td><code>"parse_unary()"</code></td></tr>
+                        <tr><td>"9"</td><td>"Postfix ("<code>"."</code>", "<code>"()"</code>", "<code>"[]"</code>", "<code>"?"</code>")"</td><td><code>"parse_postfix()"</code></td></tr>
+                        <tr><td>"10"</td><td>"Primary (literals, idents, control flow)"</td><td><code>"parse_primary()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="template-parsing">"Template Parsing"</h4>
+                <p>"Template nodes are parsed in "<code>"parse_template_node()"</code>". The parser handles:"</p>
+                <ul>
+                    <li><strong>"Elements"</strong>": "<code>"<tag attr=\"val\">children</tag>"</code>" and self-closing "<code>"<tag />"</code></li>
+                    <li><strong>"Text literals"</strong>": "<code>"\"string content\""</code></li>
+                    <li><strong>"Expressions"</strong>": "<code>"{expr}"</code>" embedded in templates"</li>
+                    <li><strong>"Link elements"</strong>": "<code>"<Link to=\"/path\">text</Link>"</code>" special handling"</li>
+                    <li><strong>"Attributes"</strong>": static, dynamic, event handlers ("<code>"on:event"</code>"), ARIA, role, bind"</li>
+                </ul>
+                <p>"Mismatched closing tags are detected and reported as errors."</p>
+                <h4 id="component-body-parsing">"Component Body Parsing"</h4>
+                <p>"Inside a component body, the parser expects one of:"</p>
+                <ul>
+                    <li><code>"let"</code>" / "<code>"let mut"</code>" -- state field"</li>
+                    <li><code>"signal"</code>" -- reactive signal field"</li>
+                    <li><code>"fn"</code>" -- method"</li>
+                    <li><code>"style"</code>" -- scoped CSS block"</li>
+                    <li><code>"transition"</code>" -- CSS transition declarations"</li>
+                    <li><code>"render"</code>" -- template render block"</li>
+                    <li><code>"error_boundary"</code>" -- error handling with fallback UI"</li>
+                </ul>
+                <h4 id="store-body-parsing">"Store Body Parsing"</h4>
+                <p>"Inside a store body:"</p>
+                <ul>
+                    <li><code>"signal"</code>" -- reactive state field"</li>
+                    <li><code>"action"</code>" / "<code>"async action"</code>" -- mutation methods"</li>
+                    <li><code>"computed"</code>" -- derived values"</li>
+                    <li><code>"effect"</code>" -- side-effect callbacks"</li>
+                </ul>
+                <hr />
+                <h3 id="borrow-checker">"Borrow Checker"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/borrow_checker.rs"</code></p>
+                <p>"Nectar implements a simplified version of Rust's borrow checker to catch memory safety issues at compile time."</p>
+                <h4 id="ownership-model">"Ownership Model"</h4>
+                <p>"Every value has a single owner. When a value is assigned to a new binding, ownership is "<strong>"moved"</strong>" and the original binding becomes invalid:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let a = create_data();
+let b = a;          // ownership moves to b
+// a is no longer valid"</code></pre>
+                <h4 id="borrow-rules">"Borrow Rules"</h4>
+                <p>"The borrow checker enforces these rules:"</p>
+                <ol>
+                    <li><strong>"At any time, you can have either"</strong>" one mutable reference ("<code>"&mut"</code>") "<strong>"or"</strong>" any number of immutable references ("<code>"&"</code>"), but not both simultaneously."</li>
+                    <li><strong>"References must always be valid"</strong>" -- a reference cannot outlive the data it points to."</li>
+                    <li><strong>"No use after move"</strong>" -- once a value is moved, the original binding cannot be used."</li>
+                </ol>
+                <h4 id="error-types">"Error Types"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Error Kind"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"UseAfterMove"</code></td><td>"Value used after being moved to another binding"</td></tr>
+                        <tr><td><code>"DoubleMutBorrow"</code></td><td>"Two simultaneous mutable borrows of the same value"</td></tr>
+                        <tr><td><code>"MutBorrowWhileImmBorrowed"</code></td><td>"Mutable borrow while immutable borrows exist"</td></tr>
+                        <tr><td><code>"ImmBorrowWhileMutBorrowed"</code></td><td>"Immutable borrow while a mutable borrow exists"</td></tr>
+                        <tr><td><code>"BorrowOutlivesScope"</code></td><td>"Reference outlives the scope of the borrowed value"</td></tr>
+                        <tr><td><code>"AssignWhileBorrowed"</code></td><td>"Assignment to a variable that is currently borrowed"</td></tr>
+                        <tr><td><code>"LifetimeViolation"</code></td><td>"Named lifetime constraint is violated"</td></tr>
+                        <tr><td><code>"MissingLifetimeAnnotation"</code></td><td>"Lifetime annotation required but not provided"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="implementation">"Implementation"</h4>
+                <p>"The checker maintains a "<code>"VarState"</code>" for each variable binding:"</p>
+                <ul>
+                    <li><strong>"Owned"</strong>" -- the variable owns its value, not borrowed"</li>
+                    <li><strong>"Moved"</strong>" -- the value has been moved elsewhere"</li>
+                    <li><strong>"Borrowed { count }"</strong>" -- immutably borrowed "<code>"count"</code>" times"</li>
+                    <li><strong>"MutBorrowed"</strong>" -- mutably borrowed"</li>
+                </ul>
+                <p>"It walks the AST, updating states as it encounters let bindings, assignments, borrows, and function calls. Scope boundaries trigger cleanup of borrows created within that scope."</p>
+                <h4 id="lifetime-validation">"Lifetime Validation"</h4>
+                <p>"When functions have lifetime parameters (e.g., "<code>"<'a>"</code>"), the checker validates that:"</p>
+                <ul>
+                    <li>"Returned references have a lifetime that matches or outlives the function's declared lifetime"</li>
+                    <li>"References stored in data structures have appropriate lifetime annotations"</li>
+                    <li>"Lifetime elision rules are applied correctly for common patterns"</li>
+                </ul>
+                <hr />
+                <h3 id="type-checker">"Type Checker"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/type_checker.rs"</code></p>
+                <p>"Nectar uses Hindley-Milner type inference with unification."</p>
+                <h4 id="internal-type-representation">"Internal Type Representation"</h4>
+                <p>"Types during inference are represented as "<code>"Ty"</code>":"</p>
+                <div class="code-lang-label">"rust"</div>
+                <pre class="code-block"><code>"enum Ty {
+    Var(TypeId),        // unresolved type variable
+    I32, I64, U32, U64, F32, F64, Bool, String_, Unit,
+    Array(Box<Ty>),
+    Option_(Box<Ty>),
+    Tuple(Vec<Ty>),
+    Function { params: Vec<Ty>, ret: Box<Ty> },
+    Reference { mutable: bool, lifetime: Option<String>, inner: Box<Ty> },
+    Struct(String),
+    Enum(String),
+    Iterator(Box<Ty>),
+    Result_ { ok: Box<Ty>, err: Box<Ty> },
+    TypeParam(String),
+    SelfType,
+    Error,              // sentinel to prevent cascading errors
+}"</code></pre>
+                <h4 id="inference-algorithm">"Inference Algorithm"</h4>
+                <ol>
+                    <li><strong>"Fresh type variables"</strong>" are created for each expression and binding without an explicit type annotation."</li>
+                    <li><strong>"Constraint generation"</strong>" walks the AST, generating equality constraints between types (e.g., the condition in an "<code>"if"</code>" must be "<code>"Bool"</code>", both branches must have the same type)."</li>
+                    <li><strong>"Unification"</strong>" solves constraints by substituting type variables with concrete types. When "<code>"Ty::Var(a)"</code>" must equal "<code>"Ty::I32"</code>", the substitution "<code>"a -> I32"</code>" is recorded."</li>
+                    <li><strong>"Occurs check"</strong>" prevents infinite types (e.g., "<code>"T = Array<T>"</code>")."</li>
+                </ol>
+                <h4 id="substitution-table">"Substitution Table"</h4>
+                <p>"A substitution table maps "<code>"TypeId"</code>" to "<code>"Ty"</code>". Looking up a type variable follows the chain until a concrete type or an unresolved variable is found."</p>
+                <h4 id="type-checking-phases">"Type Checking Phases"</h4>
+                <ol>
+                    <li><strong>"Collect definitions"</strong>" -- register all structs, enums, traits, and function signatures"</li>
+                    <li><strong>"Check item bodies"</strong>" -- infer types within function bodies, component methods, store actions, etc."</li>
+                    <li><strong>"Verify trait implementations"</strong>" -- ensure all required methods are implemented with matching signatures"</li>
+                    <li><strong>"Report errors"</strong>" -- unresolved type variables or unsatisfied constraints produce error messages"</li>
+                </ol>
+                <h4 id="exhaustiveness-checking">"Exhaustiveness Checking"</h4>
+                <p><strong>"File"</strong>": "<code>"compiler/src/exhaustiveness.rs"</code></p>
+                <p>"After type checking, a separate pass checks that "<code>"match"</code>" expressions cover all possible patterns. Non-exhaustive matches produce warnings (not errors) to avoid blocking compilation."</p>
+                <hr />
+                <h3 id="optimizer">"Optimizer"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/optimizer.rs"</code></p>
+                <p>"The optimizer runs after type checking and before code generation. It operates on the AST."</p>
+                <h4 id="optimization-levels">"Optimization Levels"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Level"</th><th>"Passes"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"O0"</td><td>"None"</td></tr>
+                        <tr><td>"O1"</td><td>"Constant folding + Dead code elimination"</td></tr>
+                        <tr><td>"O2"</td><td>"O1 + Tree shaking + WASM-level peephole optimization"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="constant-folding">"Constant Folding"</h4>
+                <p><strong>"File"</strong>": "<code>"compiler/src/const_fold.rs"</code></p>
+                <p>"Evaluates compile-time constant expressions:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Before optimization
+let x = 2 + 3 * 4;
+
+// After constant folding
+let x = 14;"</code></pre>
+                <p>"Handles arithmetic on integer and float literals, boolean logic, and string operations."</p>
+                <h4 id="dead-code-elimination-dce">"Dead Code Elimination (DCE)"</h4>
+                <p><strong>"File"</strong>": "<code>"compiler/src/dce.rs"</code></p>
+                <p>"Removes unreachable code:"</p>
+                <ul>
+                    <li>"Statements after "<code>"return"</code>" in the same block"</li>
+                    <li>"Branches of "<code>"if"</code>" where the condition is a constant "<code>"true"</code>"/"<code>"false"</code></li>
+                    <li>"Unused variable bindings (when the initializer has no side effects)"</li>
+                </ul>
+                <h4 id="tree-shaking">"Tree Shaking"</h4>
+                <p><strong>"File"</strong>": "<code>"compiler/src/tree_shake.rs"</code></p>
+                <p>"Removes unused top-level items. Starting from entry points (components with "<code>"render"</code>" blocks, exported functions), it traces which functions, structs, enums, and stores are reachable. Unreachable items are removed from the AST."</p>
+                <h4 id="wasm-level-optimization">"WASM-Level Optimization"</h4>
+                <p><strong>"File"</strong>": "<code>"compiler/src/wasm_opt.rs"</code></p>
+                <p>"At "<code>"-O2"</code>", a post-codegen pass performs peephole optimizations on the emitted WAT:"</p>
+                <ul>
+                    <li>"Redundant "<code>"local.get"</code>"/"<code>"local.set"</code>" pairs"</li>
+                    <li>"Constant instruction sequences that can be simplified"</li>
+                    <li>"Dead code within WASM function bodies"</li>
+                </ul>
+                <p>"Statistics are reported:"</p>
+                <pre class="code-block"><code>"nectar: wasm optimization: 12 patterns optimized, 340 bytes saved"</code></pre>
+                <hr />
+                <h3 id="code-generation-wat">"Code Generation -- WAT"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/codegen.rs"</code></p>
+                <p>"The primary code generator emits WebAssembly Text Format (WAT). WAT is human-readable and can be converted to binary WASM by external tools or Nectar's built-in binary emitter."</p>
+                <h4 id="architecture">"Architecture"</h4>
+                <p><code>"WasmCodegen"</code>" maintains:"</p>
+                <ul>
+                    <li><strong>"Output buffer"</strong>" -- the accumulated WAT string"</li>
+                    <li><strong>"Locals table"</strong>" -- local variables in the current function scope"</li>
+                    <li><strong>"String interning table"</strong>" -- deduplicated string constants with their memory offsets"</li>
+                    <li><strong>"Closure counter"</strong>" -- for generating unique closure function names"</li>
+                    <li><strong>"Function table"</strong>" -- for indirect calls (closures, event handlers)"</li>
+                </ul>
+                <h4 id="import-generation">"Import Generation"</h4>
+                <p>"The codegen emits imports for the runtime's WASM import namespaces (all provided by the single "<code>"core.js"</code>" runtime file):"</p>
+                <div class="code-lang-label">"wat"</div>
+                <pre class="code-block"><code>"(import \"env\" \"memory\" (memory 1))
+(import \"dom\" \"createElement\" (func $dom_createElement (param i32 i32) (result i32)))
+(import \"signal\" \"create\" (func $signal_create (param i32) (result i32)))
+(import \"http\" \"fetch\" (func $http_fetch (param i32 i32 i32 i32) (result i32)))
+;; ... and many more"</code></pre>
+                <h4 id="component-compilation">"Component Compilation"</h4>
+                <p>"For each component, the codegen produces:"</p>
+                <ol>
+                    <li>"A "<strong>"mount function"</strong>" ("<code>"ComponentName_mount"</code>") that creates DOM elements, sets up signals, registers event handlers, and builds the initial DOM tree"</li>
+                    <li><strong>"Handler functions"</strong>" ("<code>"__handler_N"</code>") for each event handler"</li>
+                    <li><strong>"Effect functions"</strong>" ("<code>"__effect_N"</code>") for reactive signal subscriptions"</li>
+                    <li>"An "<strong>"init function"</strong>" ("<code>"ComponentName_init"</code>") for store initialization"</li>
+                </ol>
+                <h4 id="signal-compilation">"Signal Compilation"</h4>
+                <p>"Signal state fields are compiled to WASM globals backed by runtime signal objects:"</p>
+                <ol>
+                    <li><code>"signal.create(initialValue)"</code>" creates the signal at initialization"</li>
+                    <li><code>"signal.get(id)"</code>" reads the value (with automatic dependency tracking)"</li>
+                    <li><code>"signal.set(id, newValue)"</code>" updates the value (triggering re-renders)"</li>
+                    <li><code>"signal.subscribe(id, effectFnIdx)"</code>" registers an effect that re-runs when the signal changes"</li>
+                </ol>
+                <h4 id="string-interning">"String Interning"</h4>
+                <p>"String literals are stored in the WASM linear memory data section. The codegen assigns each unique string a memory offset and emits "<code>"(data ...)"</code>" segments. At runtime, strings are referenced by "<code>"(ptr, len)"</code>" pairs."</p>
+                <h4 id="closure-compilation">"Closure Compilation"</h4>
+                <p>"Closures are compiled to standalone WASM functions with captured variables passed as parameters. They are registered in the function table for indirect calling."</p>
+                <hr />
+                <h3 id="code-generation-binary-wasm">"Code Generation -- Binary WASM"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/wasm_binary.rs"</code></p>
+                <p>"The binary emitter produces valid "<code>".wasm"</code>" files directly, without going through WAT text."</p>
+                <h4 id="binary-format">"Binary Format"</h4>
+                <p>"The emitter writes the standard WebAssembly binary format:"</p>
+                <ol>
+                    <li><strong>"Magic number"</strong>": "<code>"\\0asm"</code>" (4 bytes)"</li>
+                    <li><strong>"Version"</strong>": 1 (4 bytes)"</li>
+                    <li>
+                        <p><strong>"Sections"</strong>" in order:"</p>
+                        <ul>
+                            <li>"Type section (function signatures)"</li>
+                            <li>"Import section (runtime imports)"</li>
+                            <li>"Function section (type indices for each function)"</li>
+                            <li>"Memory section"</li>
+                            <li>"Global section"</li>
+                            <li>"Export section (mounted functions, handlers)"</li>
+                            <li>"Code section (function bodies)"</li>
+                            <li>"Data section (interned strings)"</li>
+                        </ul>
+                    </li>
+                </ol>
+                <h4 id="leb128-encoding">"LEB128 Encoding"</h4>
+                <p>"All integer values in the binary format use LEB128 (Little-Endian Base 128) variable-length encoding, which the emitter handles in dedicated "<code>"write_leb128_u32"</code>" and "<code>"write_leb128_i32"</code>" methods."</p>
+                <h4 id="function-bodies">"Function Bodies"</h4>
+                <p>"Function bodies are compiled to WASM bytecode opcodes:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Opcode"</th><th>"Hex"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"unreachable"</code></td><td><code>"0x00"</code></td><td>"Trap"</td></tr>
+                        <tr><td><code>"nop"</code></td><td><code>"0x01"</code></td><td>"No operation"</td></tr>
+                        <tr><td><code>"block"</code></td><td><code>"0x02"</code></td><td>"Begin block"</td></tr>
+                        <tr><td><code>"loop"</code></td><td><code>"0x03"</code></td><td>"Begin loop"</td></tr>
+                        <tr><td><code>"if"</code></td><td><code>"0x04"</code></td><td>"Conditional"</td></tr>
+                        <tr><td><code>"else"</code></td><td><code>"0x05"</code></td><td>"Else branch"</td></tr>
+                        <tr><td><code>"end"</code></td><td><code>"0x0B"</code></td><td>"End block/if/loop"</td></tr>
+                        <tr><td><code>"br"</code></td><td><code>"0x0C"</code></td><td>"Branch"</td></tr>
+                        <tr><td><code>"br_if"</code></td><td><code>"0x0D"</code></td><td>"Conditional branch"</td></tr>
+                        <tr><td><code>"return"</code></td><td><code>"0x0F"</code></td><td>"Return from function"</td></tr>
+                        <tr><td><code>"local.get"</code></td><td><code>"0x20"</code></td><td>"Get local variable"</td></tr>
+                        <tr><td><code>"local.set"</code></td><td><code>"0x21"</code></td><td>"Set local variable"</td></tr>
+                        <tr><td><code>"i32.const"</code></td><td><code>"0x41"</code></td><td>"Push i32 constant"</td></tr>
+                        <tr><td><code>"i32.add"</code></td><td><code>"0x6A"</code></td><td>"Integer addition"</td></tr>
+                        <tr><td>"..."</td><td>"..."</td><td>"(full WASM instruction set)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <hr />
+                <h3 id="runtime-bridge">"Runtime Bridge"</h3>
+                <p><strong>"File"</strong>": "<code>"runtime/modules/core.js"</code></p>
+                <p>"The JavaScript runtime provides host functions that WASM modules import. It bridges the gap between WASM's linear memory model and browser APIs."</p>
+                <h4 id="initialization-flow">"Initialization Flow"</h4>
+                <ol>
+                    <li><code>"NectarRuntime.mount(wasmUrl, rootElement)"</code>" is called with the "<code>".wasm"</code>" URL and a root DOM element"</li>
+                    <li>"The runtime creates a "<code>"WebAssembly.Memory"</code>" and builds the import object with all host function namespaces (provided by the single "<code>"core.js"</code>" file)"</li>
+                    <li>"The WASM module is instantiated with the import object"</li>
+                    <li>"Store "<code>"*_init"</code>" exports are called to initialize global stores"</li>
+                    <li>"The first "<code>"*_mount"</code>" export is called to render the initial component"</li>
+                </ol>
+                <h4 id="signal-system">"Signal System"</h4>
+                <p>"The runtime implements a pull-based reactivity system:"</p>
+                <ul>
+                    <li><strong>"Signals"</strong>" are observable values with "<code>"get()"</code>" and "<code>"set()"</code>" methods"</li>
+                    <li><strong>"Effects"</strong>" are functions that automatically re-run when their signal dependencies change"</li>
+                    <li><strong>"Dependency tracking"</strong>" works via a global "<code>"currentEffect"</code>" variable: when an effect runs, any "<code>"signal.get()"</code>" calls automatically register the effect as a subscriber"</li>
+                    <li><strong>"Scheduling"</strong>" uses "<code>"requestAnimationFrame"</code>" to batch multiple signal updates into a single DOM update pass"</li>
+                    <li><strong>"Batching"</strong>" groups multiple signal updates so effects only fire once after the batch completes"</li>
+                </ul>
+                <h4 id="worker-pool">"Worker Pool"</h4>
+                <p>"For concurrency ("<code>"spawn"</code>", "<code>"parallel"</code>"), the runtime maintains a pool of Web Workers:"</p>
+                <ul>
+                    <li>"Each worker loads a copy of the WASM module"</li>
+                    <li>"Tasks are distributed to available workers"</li>
+                    <li>"Results are communicated back via "<code>"postMessage"</code></li>
+                    <li>"The pool size defaults to 4 workers"</li>
+                </ul>
+                <h4 id="agent-manager">"Agent Manager"</h4>
+                <p>"The "<code>"AgentManager"</code>" class coordinates AI agent interactions:"</p>
+                <ul>
+                    <li>"Maintains a tool registry mapping tool names to WASM function indices"</li>
+                    <li>"Manages message history per agent"</li>
+                    <li>"Dispatches tool calls from the AI to WASM-exported functions"</li>
+                    <li>"Handles streaming responses"</li>
+                </ul>
+                <h4 id="router">"Router"</h4>
+                <p>"The client-side router:"</p>
+                <ul>
+                    <li>"Parses route patterns into regex with named capture groups"</li>
+                    <li>"Listens to "<code>"popstate"</code>" events for browser back/forward"</li>
+                    <li>"Uses "<code>"history.pushState"</code>" for programmatic navigation"</li>
+                    <li>"Supports guards (auth checks) before mounting routes"</li>
+                    <li>"Manages component mounting/unmounting when routes change"</li>
+                </ul>
+                <hr />
+                <h3 id="server-side-rendering-ssr">"Server-Side Rendering (SSR)"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/ssr.rs"</code></p>
+                <p>"The SSR codegen emits a JavaScript module that can render components to HTML strings on the server."</p>
+                <h4 id="how-it-works">"How It Works"</h4>
+                <ol>
+                    <li>"Components are compiled to JavaScript functions that build HTML strings"</li>
+                    <li>"Signal reads return initial values (no reactivity on the server)"</li>
+                    <li>"Event handlers are omitted (they are only needed on the client)"</li>
+                    <li>"The output is a complete HTML fragment ready to be embedded in a page"</li>
+                </ol>
+                <h4 id="hydration">"Hydration"</h4>
+                <p>"The hydration bundle ("<code>"--hydrate"</code>") generates a lightweight client module that:"</p>
+                <ol>
+                    <li>"Walks the existing server-rendered DOM"</li>
+                    <li>"Attaches event handlers to existing elements (instead of recreating them)"</li>
+                    <li>"Sets up reactive signal subscriptions"</li>
+                    <li>"Takes over from the static HTML seamlessly"</li>
+                </ol>
+                <hr />
+                <h3 id="module-resolution">"Module Resolution"</h3>
+                <p><strong>"Files"</strong>": "<code>"compiler/src/module_resolver.rs"</code>", "<code>"compiler/src/module_loader.rs"</code></p>
+                <h4 id="file-lookup">"File Lookup"</h4>
+                <p>"When the parser encounters "<code>"mod foo;"</code>", the module loader searches for:"</p>
+                <ol>
+                    <li><code>"./foo.nectar"</code>" (sibling file)"</li>
+                    <li><code>"./foo/mod.nectar"</code>" (directory module)"</li>
+                </ol>
+                <p>"relative to the file containing the "<code>"mod"</code>" declaration."</p>
+                <h4 id="multi-file-compilation">"Multi-File Compilation"</h4>
+                <p>"The "<code>"ModuleLoader"</code>" performs multi-file compilation:"</p>
+                <ol>
+                    <li>"Scans the root AST for "<code>"mod"</code>" declarations"</li>
+                    <li>"Recursively loads and parses each external module"</li>
+                    <li>"Merges all module ASTs into a single "<code>"Program"</code></li>
+                    <li>"The merged program is then borrow-checked, type-checked, and compiled as a unit"</li>
+                </ol>
+                <h4 id="dependency-graph">"Dependency Graph"</h4>
+                <p>"For packages with "<code>"Nectar.toml"</code>", the resolver builds a dependency graph:"</p>
+                <ol>
+                    <li>"Parse "<code>"Nectar.toml"</code>" to get declared dependencies"</li>
+                    <li>"Resolve version constraints against the registry"</li>
+                    <li>"Download packages to the local cache ("<code>"~/.nectar/cache/"</code>")"</li>
+                    <li>"Write "<code>"Nectar.lock"</code>" with pinned versions"</li>
+                    <li>"Make dependency source files available for module loading"</li>
+                </ol>
+                <hr />
+                <h3 id="source-map">"Source Map"</h3>
+                <p><strong>"File"</strong>": "<code>"compiler/src/sourcemap.rs"</code></p>
+                <p>"The source map module generates debug mapping information that connects WASM bytecode positions back to Nectar source locations. This enables:"</p>
+                <ul>
+                    <li>"Browser DevTools to show Nectar source when debugging WASM"</li>
+                    <li>"Error stack traces with Nectar file names and line numbers"</li>
+                    <li>"Breakpoint setting in Nectar source files"</li>
+                </ul>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

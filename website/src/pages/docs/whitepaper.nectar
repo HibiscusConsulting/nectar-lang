@@ -1,0 +1,461 @@
+// docs/whitepaper.nectar — auto-generated from docs/whitepaper.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page WhitepaperDoc() {
+    meta {
+        title: "Nectar: A Compiled-to-WebAssembly Language That Eliminates JavaScript from Web Applications — Nectar Documentation",
+        description: "Design rationale and the case for compiled, WASM-first frontends.",
+        canonical: "/docs/whitepaper",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper" class="current">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Whitepaper"
+                    </div>
+                    <h1>"Nectar: A Compiled-to-WebAssembly Language That Eliminates JavaScript from Web Applications"</h1>
+                <p><strong>"Blake Burnette"</strong>" Hibiscus Consulting March 2026"</p>
+                <hr />
+                <h3 id="abstract">"Abstract"</h3>
+                <p>"We present Nectar, a compiled-to-WebAssembly language designed to prove that modern web applications do not require JavaScript for computation, state management, or rendering logic. Nectar compiles "<code>".nectar"</code>" source files to "<code>".wasm"</code>" binaries that run in the browser with a 3 KB JavaScript syscall layer ("<code>"core.js"</code>") that provides pure bridges to browser APIs. All logic, all computation, all state management, and all rendering decisions execute in Rust-compiled WebAssembly."</p>
+                <p>"We benchmark Nectar against React 18 and Svelte 5 on an identical 10,000-product e-commerce application with unique images, reactive state, category filtering, and sorting. Nectar renders 10,000 products in "<strong>"4ms"</strong>" (cached) vs React's "<strong>"1,268ms"</strong>" and Svelte's "<strong>"325ms"</strong>". Category filtering completes in "<strong>"0.10ms"</strong>" vs React's "<strong>"44.90ms"</strong>" and Svelte's "<strong>"5,000ms"</strong>". The total application bundle is "<strong>"48 KB"</strong>" with zero npm dependencies, zero node_modules, and zero garbage collection pauses."</p>
+                <hr />
+                <h3 id="1-introduction">"1. Introduction"</h3>
+                <p>"The modern web stack has accumulated extraordinary complexity. A typical production React application ships 200-500 KB of JavaScript before application code, requires a build pipeline (webpack, Babel, TypeScript, PostCSS), manages thousands of npm dependencies, and executes in a garbage-collected runtime that introduces unpredictable latency spikes. The virtual DOM — React's central abstraction — performs O(n) diffing work on every state change, even when a single text node needs updating."</p>
+                <p>"Svelte improved on this by compiling away the virtual DOM, generating imperative DOM updates at build time. But Svelte applications still execute as JavaScript, subject to the same garbage collector, the same prototype chain overhead, and the same JIT compilation warmup."</p>
+                <p>"Nectar asks a different question: "<strong>"what if the web framework was the WebAssembly binary itself?"</strong></p>
+                <h4 id="11-design-thesis">"1.1 Design Thesis"</h4>
+                <p>"Nectar exists to prove that the web does not need JavaScript. It is a compiled-to-WASM language where all logic, all computation, all state management, and all rendering decisions run in Rust/WASM. JavaScript is treated as a thin, unavoidable syscall layer — an impedance mismatch minimized, not a tool reached for."</p>
+                <p>"The only JavaScript in a Nectar application is "<code>"core.js"</code>" (~3 KB gzipped), which provides pure bridges to browser APIs that WebAssembly physically cannot call: DOM manipulation, "<code>"fetch()"</code>", "<code>"WebSocket"</code>", "<code>"IndexedDB"</code>", "<code>"localStorage"</code>", timers, and similar platform interfaces. Each bridge function is 1-3 lines with zero logic — no "<code>"if"</code>" statements, no loops, no string operations."</p>
+                <h4 id="12-contributions">"1.2 Contributions"</h4>
+                <p>"This paper makes the following contributions:"</p>
+                <ol>
+                    <li><strong>"Architecture"</strong>": A compiler pipeline that transforms "<code>".nectar"</code>" source through lexing, parsing, type-checking, borrow-checking, and optimization into WebAssembly Text Format (WAT), then to "<code>".wasm"</code>" binaries."</li>
+                    <li><strong>"Reactive signal system"</strong>": A fine-grained reactivity model implemented entirely in WASM linear memory. Each signal update triggers O(1) DOM updates via function table indirect calls — no diffing, no reconciliation."</li>
+                    <li><strong>"Memory system"</strong>": All reserved memory regions (signal tables, callback tables, contract schemas, route tables, etc.) are heap-allocated at initialization via a bump allocator, eliminating hardcoded address collisions."</li>
+                    <li><strong>"Import pruning"</strong>": Only browser API namespaces actually used by the program are included in the WASM binary. A simple counter app ships 3 import namespaces; a full e-commerce app ships 6 of 22 available."</li>
+                    <li><strong>"Benchmark results"</strong>": Head-to-head comparison against React 18 and Svelte 5 on identical workloads, demonstrating 65-315x improvement in initial render time and 450x improvement in reactive update latency."</li>
+                </ol>
+                <hr />
+                <h3 id="2-architecture">"2. Architecture"</h3>
+                <h4 id="21-compiler-pipeline">"2.1 Compiler Pipeline"</h4>
+                <pre class="code-block"><code>".nectar source
+     |
+  Lexer --> Token stream
+     |
+  Parser --> AST
+     |
+  Type checker + Borrow checker + Contract inference
+     |
+  Optimizations (constant folding, DCE, tree shaking)
+     |
+  Codegen --> WAT (WebAssembly Text Format)
+     |
+  wat2wasm / built-in binary emitter --> .wasm
+     |
+  Browser loads .wasm + core.js (~3 KB gzip)"</code></pre>
+                <p>"The entire toolchain is a single Rust binary ("<code>"nectar"</code>"). There is no npm, no node_modules, no webpack, no Babel, no PostCSS, no package.json. The compiler handles compilation, formatting, linting, testing, dev server with hot reload, LSP for editor integration, server-side rendering, and package management."</p>
+                <h4 id="22-rendering-model">"2.2 Rendering Model"</h4>
+                <p>"Nectar uses a two-phase rendering model:"</p>
+                <p><strong>"Phase 1 — Initial Mount (synchronous):"</strong>" The component's "<code>"mount()"</code>" function builds an HTML string in WASM linear memory via string concatenation, then makes a single "<code>"innerHTML"</code>" call to inject it into the DOM. This is one JS boundary crossing for the entire initial render."</p>
+                <p><strong>"Phase 2 — Reactive Updates (signal-driven):"</strong>" After mount, DOM updates flow through a command buffer in WASM linear memory. Each signal change writes opcodes (SET_TEXT, SET_ATTR, CLASS_ADD, etc.) to the buffer. A single "<code>"flush()"</code>" call per animation frame executes all pending operations. This batches DOM mutations and minimizes JS boundary crossings."</p>
+                <p>"For large lists ("<code>"lazy for"</code>"), the initial mount renders the first 20 items synchronously. Remaining items are rendered via "<code>"requestAnimationFrame"</code>" in batches of 50, self-chaining until complete. This ensures the initial paint is not blocked by list size."</p>
+                <h4 id="23-signal-system">"2.3 Signal System"</h4>
+                <p>"Signals are the reactive primitive. Each signal occupies 72 bytes in a heap-allocated table:"</p>
+                <pre class="code-block"><code>"Signal entry (72 bytes):
+  +0   value (i32)
+  +4   subscriber_count (i32)
+  +8   subscribers[15] (i32 * 15) — function table indices
+  +68  padding (4 bytes)"</code></pre>
+                <p>"When a signal's value changes, "<code>"signal_set"</code>" iterates its subscriber list and calls each subscriber via "<code>"call_indirect"</code>" using the WebAssembly function table. Each subscriber is a compiler-generated updater function that reads the new value and performs a targeted DOM update — typically a single "<code>"dom_setText"</code>" or "<code>"dom_setAttr"</code>" call."</p>
+                <p>"This gives "<strong>"O(1) per binding"</strong>" update complexity. A component with 50 signal-bound text nodes that changes one signal triggers exactly one DOM update, not 50. There is no diffing, no tree walking, no reconciliation."</p>
+                <h4 id="24-memory-management">"2.4 Memory Management"</h4>
+                <p>"Nectar uses a bump allocator for all heap allocations:"</p>
+                <div class="code-lang-label">"wasm"</div>
+                <pre class="code-block"><code>"(func $alloc (param $size i32) (result i32)
+  ;; Save current heap pointer as allocation start
+  ;; Bump heap pointer by size
+  ;; If new pointer exceeds memory, grow by doubling
+  ;; Return original pointer
+)"</code></pre>
+                <p>"All reserved memory regions are allocated from this heap at "<code>"__init_all"</code>" time:"</p>
+                <ul>
+                    <li>"Signal table (1024 entries x 72 bytes = 72 KB)"</li>
+                    <li>"Pending signal notifications (4 KB)"</li>
+                    <li>"Callback data table (128 KB)"</li>
+                    <li>"Contract, permissions, form, cleanup, cache, route, SEO tables"</li>
+                    <li>"Crypto work buffers (conditional)"</li>
+                    <li>"Datepicker state (conditional)"</li>
+                </ul>
+                <p>"There are no hardcoded memory addresses. The bump allocator handles growth via "<code>"memory.grow"</code>", and allocations cannot collide regardless of program size."</p>
+                <h4 id="25-import-pruning">"2.5 Import Pruning"</h4>
+                <p>"The compiler performs an AST pre-scan to determine which browser API namespaces the program actually uses. Only referenced namespaces are included as WASM imports:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Namespace"</th><th>"Imports"</th><th>"When Included"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"dom"</td><td>"25"</td><td>"Always (core rendering)"</td></tr>
+                        <tr><td>"timer"</td><td>"7"</td><td>"Always (rAF, setTimeout)"</td></tr>
+                        <tr><td>"webapi"</td><td>"16"</td><td>"Always (console, storage, history)"</td></tr>
+                        <tr><td>"time"</td><td>"4"</td><td>"Always (Intl formatting)"</td></tr>
+                        <tr><td>"http"</td><td>"5"</td><td>"Program uses "<code>"fetch()"</code>" or contracts"</td></tr>
+                        <tr><td>"ws"</td><td>"9"</td><td>"Program defines "<code>"channel"</code></td></tr>
+                        <tr><td>"db"</td><td>"5"</td><td>"Program defines "<code>"db"</code></td></tr>
+                        <tr><td>"rtc"</td><td>"31"</td><td>"Program uses WebRTC"</td></tr>
+                        <tr><td>"gpu"</td><td>"18"</td><td>"Program uses WebGPU"</td></tr>
+                        <tr><td>"..."</td><td>"..."</td><td>"..."</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"A minimal counter app includes 4 namespaces (~52 imports). A full e-commerce app includes 6 namespaces. The maximum is 22 namespaces (~165 imports). Unused namespaces add zero bytes to the binary."</p>
+                <hr />
+                <h3 id="3-benchmark-methodology">"3. Benchmark Methodology"</h3>
+                <h4 id="31-test-application">"3.1 Test Application"</h4>
+                <p>"All three implementations render an identical e-commerce application:"</p>
+                <ul>
+                    <li><strong>"10,000 product cards"</strong>", each with a unique image (real photographs, ~10 KB each, self-hosted)"</li>
+                    <li><strong>"Unique product names"</strong>" (\"Product #0\" through \"Product #9999\")"</li>
+                    <li><strong>"Unique prices"</strong>" computed from a deterministic formula"</li>
+                    <li><strong>"5 categories"</strong>" (Electronics, Clothing, Home, Sports, Books) distributed evenly"</li>
+                    <li><strong>"Category filter pills"</strong>" with reactive active-state highlighting"</li>
+                    <li><strong>"Sort buttons"</strong>" (Price ascending, Price descending, Name A-Z) with array mutation and re-render"</li>
+                    <li><strong>"Shopping cart"</strong>" with add/clear operations and reactive count display"</li>
+                    <li><strong>"Performance timing cards"</strong>" measuring Script Load, Object Build, Render, Total, and Last Operation"</li>
+                </ul>
+                <h4 id="32-implementation-details">"3.2 Implementation Details"</h4>
+                <p><strong>"Nectar (WASM):"</strong></p>
+                <ul>
+                    <li>"Single "<code>".nectar"</code>" source file compiled to "<code>".wasm"</code>" (48 KB)"</li>
+                    <li>"Runtime: "<code>"core.js"</code>" (3 KB gzipped)"</li>
+                    <li>"Rendering: "<code>"innerHTML"</code>" mount for initial batch + "<code>"requestAnimationFrame"</code>" drain for remaining items"</li>
+                    <li><strong>"Initial render strategy"</strong>": "<code>"lazy for"</code>" renders the first 20 items synchronously during mount, then schedules the remaining 9,980 items via rAF in batches of 50. The timing measurement captures the mount function (20 items), not the full 10K render."</li>
+                    <li>"Reactive updates: signal-subscribed "<code>"dom_setAttr"</code>" / "<code>"dom_setText"</code>" for targeted DOM mutations"</li>
+                    <li>"No npm dependencies, no build pipeline beyond "<code>"nectar build"</code></li>
+                </ul>
+                <p><strong>"React 18:"</strong></p>
+                <ul>
+                    <li>"Production build of React 18 from CDN ("<code>"react.production.min.js"</code>")"</li>
+                    <li><code>"React.createElement"</code>" calls (no JSX transpiler — measuring pure runtime, not build overhead)"</li>
+                    <li>"10,000 "<code>"ProductCard"</code>" functional components with "<code>"useCallback"</code>", "<code>"useState"</code></li>
+                    <li><strong>"Initial render strategy"</strong>": All 10,000 products rendered synchronously via "<code>"products.map()"</code>". React creates 10K virtual DOM nodes, reconciles, and commits all 10K DOM elements before the timer stops."</li>
+                    <li>"Category filter and sort trigger "<code>"setState"</code>" and full reconciliation of the entire component tree"</li>
+                </ul>
+                <p><strong>"Svelte 5 (simulated):"</strong></p>
+                <ul>
+                    <li>"Imperative DOM manipulation matching Svelte's compiled output"</li>
+                    <li>"No virtual DOM, direct "<code>"createElement"</code>" + "<code>"innerHTML"</code>" for product cards"</li>
+                    <li><strong>"Initial render strategy"</strong>": All 10,000 products rendered synchronously in a loop. Each card built via innerHTML, appended to the grid. Timer stops after all 10K DOM nodes exist."</li>
+                    <li>"Reactive updates: targeted DOM mutations (className, textContent) — no grid re-render on filter"</li>
+                    <li>"Represents the best-case for a compiled JS framework — no framework overhead, pure DOM"</li>
+                </ul>
+                <h4 id="33-environment">"3.3 Environment"</h4>
+                <ul>
+                    <li><strong>"Server"</strong>": Google Cloud Run (us-central1), nginx serving static files"</li>
+                    <li><strong>"Domain"</strong>": buildnectar.com with Google Cloud Load Balancer"</li>
+                    <li><strong>"Client"</strong>": macOS, Chrome, measured via "<code>"performance.now()"</code></li>
+                    <li><strong>"Network"</strong>": ~50-60ms warm RTT to us-central1"</li>
+                    <li><strong>"Images"</strong>": 10,000 unique JPEG photographs, ~10 KB average, self-hosted on same origin"</li>
+                </ul>
+                <p>"All benchmarks are live and reproducible at:"</p>
+                <ul>
+                    <li>"Nectar: https://buildnectar.com/app/"</li>
+                    <li>"React 18: https://buildnectar.com/app/react.html"</li>
+                    <li>"Svelte 5: https://buildnectar.com/app/svelte.html"</li>
+                </ul>
+                <hr />
+                <h3 id="4-results">"4. Results"</h3>
+                <h4 id="41-initial-load-cached-warm-browser">"4.1 Initial Load (Cached — Warm Browser)"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Metric"</th><th>"Nectar"</th><th>"React 18"</th><th>"Svelte 5"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Script/WASM Load"</td><td>"3.0 ms"</td><td>"incl. in total"</td><td>"1.4-1.7 ms"</td></tr>
+                        <tr><td>"Build 10K Objects"</td><td>"0.0 ms (in mount)"</td><td>"incl. in total"</td><td>"0.9-1.0 ms"</td></tr>
+                        <tr><td>"Render"</td><td>"2.3 ms (20 items*)"</td><td>"1,268 ms (10K items)"</td><td>"322-341 ms (10K items)"</td></tr>
+                        <tr><td><strong>"Total"</strong></td><td><strong>"5.3 ms"</strong></td><td><strong>"1,268 ms"</strong></td><td><strong>"325-344 ms"</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><strong>"\\* Nectar's "<code>"lazy for"</code>" renders 20 items synchronously, then background-renders the remaining 9,980 via "<code>"requestAnimationFrame"</code>" in batches of 50."</strong>" React and Svelte render all 10,000 items synchronously. The user sees above-the-fold content at the Nectar time (5.3ms); the remaining items fill in over subsequent frames without blocking interaction."</p>
+                <p>"This is a language-level feature, not a benchmarking trick. "<code>"lazy for"</code>" is a keyword modifier — the developer writes "<code>"{lazy for item in items { ... }}"</code>" and the compiler generates the rAF drain. It exists because rendering 10K DOM nodes synchronously is never the right user experience regardless of framework speed."</p>
+                <p><strong>"Apples-to-apples synchronous render:"</strong>" When Nectar renders all 10,000 items synchronously (using "<code>"{for ...}"</code>" instead of "<code>"{lazy for ...}"</code>"), it measures "<strong>"230-320ms"</strong>" — on par with Svelte's 325ms. This is expected: both frameworks call the same browser DOM APIs ("<code>"createElement"</code>", "<code>"appendChild"</code>", "<code>"setAttribute"</code>") through the same Blink C++ engine. WASM cannot make the DOM faster; the DOM is the bottleneck, not the framework."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Render strategy"</th><th>"Nectar"</th><th>"Svelte 5"</th><th>"React 18"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Synchronous 10K"</td><td>"230-320 ms"</td><td>"325-344 ms"</td><td>"1,268 ms"</td></tr>
+                        <tr><td>"Lazy (first paint)"</td><td><strong>"5.3 ms"</strong></td><td>"N/A (manual)"</td><td>"N/A (manual)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"React's 1,268ms synchronous render is 4x slower than Nectar/Svelte because React adds virtual DOM construction, tree diffing, and reconciliation on top of the DOM calls — O(n) overhead that Nectar and Svelte avoid entirely."</p>
+                <p><strong>"The real performance advantage is not DOM rendering."</strong>" It is reactive updates after render (Section 4.3), where Nectar's signal system delivers 50-449x improvements over JS frameworks on identical work."</p>
+                <h4 id="42-initial-load-cold-first-visit">"4.2 Initial Load (Cold — First Visit)"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Metric"</th><th>"Nectar"</th><th>"React 18"</th><th>"Svelte 5"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Fetch + Compile"</td><td>"63.3 ms"</td><td>"incl. in total"</td><td>"1.4-1.7 ms"</td></tr>
+                        <tr><td>"Heap Init"</td><td>"0.1 ms"</td><td>"—"</td><td>"—"</td></tr>
+                        <tr><td>"Mount"</td><td>"4.0 ms (20 items*)"</td><td>"—"</td><td>"—"</td></tr>
+                        <tr><td><strong>"Total"</strong></td><td><strong>"67.4 ms"</strong></td><td><strong>"~1,300+ ms"</strong></td><td><strong>"~350+ ms"</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"On a cold load, Nectar's total is dominated by the network fetch of the 48 KB "<code>".wasm"</code>" binary (~50-60ms round trip). The actual WASM execution — heap initialization, 10,000 product struct construction, and initial 20-item batch rendering — takes 4.1ms. Note that WASM compilation is cached by the browser after the first visit; subsequent loads skip this cost entirely."</p>
+                <h4 id="43-reactive-operations">"4.3 Reactive Operations"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Operation"</th><th>"Nectar"</th><th>"React 18"</th><th>"Svelte 5"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Category filter (click)"</td><td><strong>"0.10 ms"</strong></td><td><strong>"44.90 ms"</strong></td><td><strong>"5.00 ms"</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"This is the fairest comparison in the benchmark. All three frameworks have already rendered the full product grid. The user clicks a category pill. The only work is updating pill styles and a metric label — no list re-rendering."</p>
+                <p><strong>"Nectar (0.10ms):"</strong>" Category filter writes one signal value ("<code>"active_cat"</code>"), which triggers O(1) updates to 6 category pill elements and 2 metric display elements via "<code>"dom_setAttr"</code>" and "<code>"dom_setText"</code>". Total: 8 targeted DOM calls. Zero diffing, zero tree walking, zero reconciliation."</p>
+                <p><strong>"React 18 (44.90ms):"</strong>" "<code>"setActiveCat(cat)"</code>" triggers a full re-render of the App component. React re-evaluates the entire function body, re-creates all 10,000 "<code>"ProductCard"</code>" virtual DOM elements via "<code>"products.map()"</code>", diffs the entire virtual DOM tree against the previous version, determines that only 6 pill classNames and 2 text nodes changed, and commits those 8 DOM mutations. The 44ms is overwhelmingly spent on the diff of 10,000 unchanged product cards — work that produces no DOM changes."</p>
+                <p><strong>"Svelte 5 (5.00ms):"</strong>" The imperative approach directly updates 6 pill "<code>"className"</code>" properties and 1 metric "<code>"textContent"</code>" property. No grid re-render, no diffing. The 5ms is the JavaScript overhead of 7 DOM property assignments — function call dispatch, string comparison, and the JS-to-C++ browser binding layer. This is the theoretical floor for a JavaScript framework: zero wasted work, and it's still 50x slower than WASM."</p>
+                <p><strong>"Why Nectar is 50x faster than Svelte on identical work:"</strong>" Both perform the same 7-8 DOM mutations. The difference is execution context. Svelte's JavaScript must cross the JS engine's function call boundary for each DOM API call, with type checks, scope chain lookups, and potential GC pauses. Nectar's WASM calls "<code>"dom_setAttr"</code>" via a pre-compiled import that resolves to a direct function pointer in the host — no type checking, no scope chain, no GC. The signal subscriber dispatch is a "<code>"call_indirect"</code>" instruction that resolves in one CPU cycle via the WASM function table."</p>
+                <h4 id="44-bundle-size">"4.4 Bundle Size"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>""</th><th>"Nectar"</th><th>"React 18"</th><th>"Svelte 5"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Application binary"</td><td>"48 KB"</td><td>"—"</td><td>"—"</td></tr>
+                        <tr><td>"Framework runtime"</td><td>"3 KB (core.js)"</td><td>"~130 KB (react + react-dom)"</td><td>"0 KB (compiled away)"</td></tr>
+                        <tr><td>"npm dependencies"</td><td>"0"</td><td>"2+"</td><td>"0"</td></tr>
+                        <tr><td>"node_modules"</td><td>"0"</td><td>"thousands"</td><td>"hundreds"</td></tr>
+                        <tr><td>"Build pipeline"</td><td><code>"nectar build"</code></td><td>"webpack + babel + ..."</td><td>"vite + svelte-plugin + ..."</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"Nectar's total wire size is "<strong>"51 KB"</strong>" (48 KB WASM + 3 KB core.js). Estimated gzip: "<strong>"~20 KB"</strong>"."</p>
+                <hr />
+                <h3 id="5-why-webassembly-is-faster">"5. Why WebAssembly is Faster"</h3>
+                <h4 id="51-no-garbage-collection">"5.1 No Garbage Collection"</h4>
+                <p>"JavaScript's garbage collector introduces unpredictable pause times. When the GC runs, all JavaScript execution stops. In a React application rendering 10,000 components, each component creates multiple JavaScript objects (props, state, virtual DOM nodes, closures). These objects become garbage after reconciliation and must be collected."</p>
+                <p>"Nectar uses a bump allocator in WASM linear memory. Allocation is a pointer increment — O(1), deterministic, no pauses. There is no garbage collector because there is no garbage: the bump allocator grows monotonically, and memory is reclaimed only when the page unloads."</p>
+                <h4 id="52-no-virtual-dom-overhead">"5.2 No Virtual DOM Overhead"</h4>
+                <p>"React's rendering model:"</p>
+                <pre class="code-block"><code>"State change → re-render component tree → diff old vs new VDOM →
+compute minimal DOM patches → apply patches"</code></pre>
+                <p>"Nectar's rendering model:"</p>
+                <pre class="code-block"><code>"Signal change → call subscribed updater → updater calls dom_setText/dom_setAttr"</code></pre>
+                <p>"The virtual DOM adds an O(n) intermediary step that Nectar eliminates entirely. Signal subscriptions create a direct edge from state to DOM node, bypassing any intermediate representation."</p>
+                <h4 id="53-no-jit-warmup">"5.3 No JIT Warmup"</h4>
+                <p>"JavaScript engines use Just-In-Time compilation: code starts interpreted, then gets compiled to machine code after the engine observes it's \"hot.\" This means the first execution of any code path is significantly slower than subsequent executions."</p>
+                <p>"WebAssembly is compiled ahead of time. The browser compiles the "<code>".wasm"</code>" binary to machine code before execution begins. There is no warmup, no interpretation phase, no deoptimization. The first signal update is exactly as fast as the millionth."</p>
+                <h4 id="54-linear-memory-access-patterns">"5.4 Linear Memory Access Patterns"</h4>
+                <p>"WASM linear memory is a contiguous byte array. Data structures (signal tables, product arrays, string buffers) are laid out in predictable, cache-friendly patterns. The CPU can prefetch effectively because access patterns are sequential."</p>
+                <p>"JavaScript objects are scattered across the heap with pointer indirection at every field access. The "<code>"product.name"</code>" access in JavaScript involves: read object pointer → follow hidden class pointer → find property offset → read value. In WASM: "<code>"i32.load offset=0"</code>" — one instruction, one memory access."</p>
+                <hr />
+                <h3 id="6-security-properties">"6. Security Properties"</h3>
+                <p>"Nectar's WASM-first architecture provides security properties that are impossible in JavaScript applications:"</p>
+                <h4 id="61-memory-isolation">"6.1 Memory Isolation"</h4>
+                <p>"WASM linear memory is opaque to JavaScript. A script executing on the same page — including XSS payloads, malicious browser extensions, or compromised third-party libraries — cannot read WASM linear memory. Payment card numbers, routing numbers, and authentication tokens stored in WASM are inaccessible to "<code>"document.querySelector"</code>", prototype pollution, or any DOM-based attack vector."</p>
+                <h4 id="62-no-supply-chain-attack-surface">"6.2 No Supply Chain Attack Surface"</h4>
+                <p>"A Nectar application has zero npm dependencies. The "<code>".wasm"</code>" binary and "<code>"core.js"</code>" are the entire dependency tree. There are no transitive dependencies, no "<code>"package-lock.json"</code>" with thousands of packages from unknown authors, no "<code>"postinstall"</code>" scripts that execute arbitrary code during "<code>"npm install"</code>"."</p>
+                <h4 id="63-binary-verifiability">"6.3 Binary Verifiability"</h4>
+                <p>"The "<code>".wasm"</code>" binary is deterministic: the same source produces the same binary. It is immutable at runtime — there is no "<code>"eval()"</code>", no "<code>"Function()"</code>" constructor, no dynamic code generation. The binary can be hashed and verified. A Content Security Policy can restrict execution to exactly one known hash."</p>
+                <h4 id="64-no-prototype-pollution">"6.4 No Prototype Pollution"</h4>
+                <p>"JavaScript's prototype chain is a persistent attack vector. Modifying "<code>"Object.prototype"</code>" or "<code>"Array.prototype"</code>" can alter the behavior of every object in the application. WASM has no prototype chain. It has no objects. It has linear memory and function tables — neither of which can be modified by JavaScript."</p>
+                <hr />
+                <h3 id="65-render-modes-dom-canvas-hybrid">"6.5 Render Modes — DOM, Canvas, Hybrid"</h3>
+                <p>"Nectar supports three render modes, selectable per page:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"page Home      { render: \"dom\" }     // marketing — SEO-first
+page Dashboard { render: \"canvas\" }  // behind auth — max speed
+page Catalog   { render: \"hybrid\" }  // both: canvas speed + SEO"</code></pre>
+                <h4 id="comparison">"Comparison"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>""</th><th>"DOM"</th><th>"Canvas"</th><th>"Hybrid"</th></tr></thead>
+                        <tbody>
+                        <tr><td><strong>"10K render"</strong></td><td>"250-320ms"</td><td><strong>"25ms"</strong></td><td>"~30ms"</td></tr>
+                        <tr><td><strong>"Reactive update"</strong></td><td>"0.10ms"</td><td>"0.10ms"</td><td>"0.10ms"</td></tr>
+                        <tr><td><strong>"SEO/crawlers"</strong></td><td>"Full"</td><td>"None"</td><td>"Full (hidden DOM)"</td></tr>
+                        <tr><td><strong>"Accessibility"</strong></td><td>"Native"</td><td>"None*"</td><td>"Full (hidden DOM)"</td></tr>
+                        <tr><td><strong>"Text selection"</strong></td><td>"Native"</td><td>"WASM-driven*"</td><td>"Native (hidden DOM)"</td></tr>
+                        <tr><td><strong>"Cmd+F search"</strong></td><td>"Native"</td><td>"Via hidden DOM*"</td><td>"Native (hidden DOM)"</td></tr>
+                        <tr><td><strong>"Form autofill"</strong></td><td>"Native"</td><td>"Overlay "<code>"<input>"</code>"*"</td><td>"Native (hidden DOM)"</td></tr>
+                        <tr><td><strong>"Bundle size"</strong></td><td>"48 KB"</td><td>"156 KB (layout engine)"</td><td>"~200 KB"</td></tr>
+                        <tr><td><strong>"DOM nodes"</strong></td><td>"10,000+"</td><td>"1 ("<code>"<canvas>"</code>")"</td><td>"10,000+ (hidden)"</td></tr>
+                        <tr><td><strong>"Memory"</strong></td><td>"Browser-managed"</td><td>"WASM linear memory"</td><td>"Both"</td></tr>
+                        <tr><td><strong>"Implementation"</strong></td><td>"Stable"</td><td>"Experimental*"</td><td>"Planned"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"\\* Canvas mode features marked with asterisks are implemented but experimental."</p>
+                <h4 id="dom-mode-default">"DOM Mode (default)"</h4>
+                <p>"The browser's layout engine (CSS) computes positions. Nectar generates DOM elements via "<code>"innerHTML"</code>" and updates them via signal-subscribed "<code>"dom_setAttr"</code>"/"<code>"dom_setText"</code>" calls. The 250ms floor on 10K items is the cost of "<code>"createElement"</code>" — identical across Nectar, Svelte, and any framework that uses the DOM."</p>
+                <p><strong>"Best for:"</strong>" Marketing pages, content sites, SEO-critical pages, accessibility-critical applications."</p>
+                <h4 id="canvas-mode-experimental">"Canvas Mode (experimental)"</h4>
+                <p>"Honeycomb — Nectar's canvas rendering engine — compiles to WASM and runs a stack-based layout engine with Canvas 2D painting. All product data, layout computation, rendering, state management, and event handling run in WASM. The browser provides 12 canvas 2D syscalls (each 1-3 lines). Total JS: ~60 lines of event forwarding."</p>
+                <p><strong>"25ms for 10K products"</strong>" — 10x faster than Svelte, 50x faster than React. Zero DOM nodes for products."</p>
+                <p><strong>"Best for:"</strong>" Dashboards, data visualization, admin panels, any page behind auth where SEO doesn't matter."</p>
+                <h4 id="hybrid-mode-planned">"Hybrid Mode (planned)"</h4>
+                <p>"Render the DOM normally but hidden ("<code>"display:none"</code>"). Read "<code>"getBoundingClientRect()"</code>" for each element — the browser computes layout. Paint to canvas using browser-computed positions. The hidden DOM stays live for crawlers, screen readers, Cmd+F, and text selection."</p>
+                <p><strong>"Best for:"</strong>" Product catalogs, e-commerce, any page that needs both speed and SEO."</p>
+                <h4 id="unified-style-system-write-once-render-anywhere">"Unified Style System — Write Once, Render Anywhere"</h4>
+                <p>"A key architectural decision: the same component styles work across all three render modes. The developer writes styles once; the compiler translates them to the appropriate target."</p>
+                <p><strong>"DOM mode"</strong>" emits CSS — scoped class names, custom properties, media queries. The browser's CSS engine handles layout and paint."</p>
+                <p><strong>"Canvas/Hybrid mode"</strong>" uses Honeycomb, a stack-based layout engine and canvas rendering engine. It accepts CSS property names directly:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"CSS (DOM mode)"</th><th>"Nectar Layout (Canvas/Hybrid)"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"display: flex; flex-direction: column"</code></td><td><code>"direction: vertical"</code></td></tr>
+                        <tr><td><code>"display: flex; flex-direction: row"</code></td><td><code>"direction: horizontal"</code></td></tr>
+                        <tr><td><code>"position: absolute; z-index"</code></td><td><code>"direction: layer"</code></td></tr>
+                        <tr><td><code>"flex: 1"</code></td><td><code>"Fill(1.0)"</code></td></tr>
+                        <tr><td><code>"width: fit-content"</code></td><td><code>"Hug"</code></td></tr>
+                        <tr><td><code>"width: 260px"</code></td><td><code>"Fixed(260)"</code></td></tr>
+                        <tr><td><code>"gap"</code>", "<code>"padding"</code>", "<code>"align-items"</code>", "<code>"justify-content"</code></td><td>"Same names, same values"</td></tr>
+                        <tr><td><code>"flex-wrap: wrap"</code></td><td><code>"wrap: true"</code></td></tr>
+                        <tr><td><code>"overflow: scroll"</code></td><td><code>"scroll: true"</code></td></tr>
+                        <tr><td><code>"min-width"</code>" / "<code>"max-width"</code></td><td>"Same names"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"The layout engine's "<code>"resolve_style()"</code>" function parses both Nectar-native properties ("<code>"direction: horizontal"</code>") and CSS-legacy properties ("<code>"flex-direction: row"</code>"). Existing component styles compile without changes."</p>
+                <p><strong>"Theme tokens"</strong>" ("<code>"var(--accent)"</code>") are resolved at compile time in canvas mode — the compiler substitutes the concrete value since there's no CSS engine at runtime. "<strong>"Breakpoints"</strong>" check "<code>"canvas_get_width()"</code>" instead of "<code>"@media"</code>" queries. "<strong>"Scoped styles"</strong>" generate unique class prefixes in DOM mode and direct style lookups in canvas mode."</p>
+                <p>"Honeycomb powers multiple platforms:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Platform"</th><th>"Layout Engine"</th><th>"Renderer"</th><th>"Status"</th></tr></thead>
+                        <tbody>
+                        <tr><td><strong>"Browser (DOM)"</strong></td><td>"Browser CSS engine"</td><td>"Browser paint"</td><td>"Stable"</td></tr>
+                        <tr><td><strong>"Browser (Canvas/Hybrid)"</strong></td><td>"Honeycomb (WASM)"</td><td>"Canvas 2D syscalls"</td><td>"Beta"</td></tr>
+                        <tr><td><strong>"Native Desktop (Pollen)"</strong></td><td>"Honeycomb (native binary)"</td><td>"wgpu GPU shaders"</td><td>"In Development"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>"One layout algorithm. Multiple renderers. Same "<code>".nectar"</code>" source file."</p>
+                <hr />
+                <h3 id="7-current-limitations">"7. Current Limitations"</h3>
+                <p>"Nectar is a working language with 2,547 compiler tests across 105K+ lines of Rust. Two production apps have been built: PayHive (62 .nectar files, 460 KB WASM) and Hive Listings (60 .nectar files, 899 KB WASM). The following features remain aspirational:"</p>
+                <ul>
+                    <li><strong>"Async/await"</strong>": Parsed but no async runtime in WASM. Async operations use callback patterns."</li>
+                    <li><strong>"Lazy for re-render"</strong>": Sorting/filtering mutates the array in WASM memory but the DOM does not re-render the product grid. The reactive system updates signal-bound attributes (pills, metrics) but not list content."</li>
+                    <li><strong>"String comparison in match"</strong>": Use "<code>"if/else"</code>" chains instead."</li>
+                    <li><strong>"Yield / generators"</strong>": Parsed but no generator runtime."</li>
+                </ul>
+                <p>"The following features that were previously aspirational now have working codegen:"</p>
+                <ul>
+                    <li><strong>"Generic types / monomorphization"</strong>": The "<code>"monomorphize.rs"</code>" pass specializes generic functions for each concrete type."</li>
+                    <li><strong>"Static trait dispatch"</strong>": "<code>"impl Trait for Type"</code>" resolves at compile time."</li>
+                    <li><strong>"Break/continue"</strong>": Compile to WASM "<code>"br"</code>" instructions."</li>
+                    <li><strong>"Tuple types"</strong>": Literal construction and "<code>".0"</code>"/"<code>".1"</code>" access."</li>
+                    <li><strong>"Struct/tuple/array destructuring"</strong>": Works in match arms."</li>
+                    <li><strong>"Closures with environment capture"</strong>": Compiled to function table entries."</li>
+                    <li><strong>"Spawn/parallel/channel"</strong>": Web Worker codegen exists."</li>
+                    <li><strong>"Streaming fetch"</strong>": codegen emits "<code>"streaming_streamFetch"</code>"."</li>
+                    <li><strong>"Dynamic imports"</strong>": codegen emits "<code>"dom_loadChunk"</code>"."</li>
+                    <li><strong>"Prompt templates"</strong>": codegen builds interpolated string and triggers fetch."</li>
+                    <li><strong>"Lifetime validation"</strong>": Borrow checker enforces NLL, field borrows, return ref verification, reborrowing."</li>
+                    <li><strong>"Component composition"</strong>": Router layout blocks with "<code>"<Outlet />"</code>"."</li>
+                </ul>
+                <p>"These are engineering work items, not architectural limitations. The core thesis — that all computation belongs in WASM — is validated by the benchmark results."</p>
+                <hr />
+                <h3 id="8-related-work">"8. Related Work"</h3>
+                <p><strong>"Yew"</strong>" (Rust + WASM): Virtual DOM in WASM. Yew imports the React reconciliation model into Rust, adding VDOM diffing overhead. Nectar eliminates the virtual DOM entirely."</p>
+                <p><strong>"Leptos"</strong>" (Rust + WASM): Fine-grained reactivity in Rust, closer to Nectar's signal model. Leptos compiles Rust to WASM but requires the full Rust standard library, producing larger binaries. Nectar's custom language produces minimal WASM."</p>
+                <p><strong>"Blazor"</strong>" (.NET + WASM): Ships the .NET runtime in WASM (~2 MB+). Nectar's entire output is 48 KB."</p>
+                <p><strong>"AssemblyScript"</strong>" (TypeScript-like → WASM): Compiles a TypeScript subset to WASM but is a general-purpose language, not a web framework. No built-in components, signals, or DOM rendering model."</p>
+                <hr />
+                <h3 id="9-conclusion">"9. Conclusion"</h3>
+                <p>"Nectar demonstrates that JavaScript is not necessary for building fast, interactive web applications. By compiling a purpose-built language directly to WebAssembly, Nectar achieves:"</p>
+                <ul>
+                    <li><strong>"5.3ms first paint"</strong>" on 10,000 products via "<code>"lazy for"</code>" (language-level rAF batching)"</li>
+                    <li><strong>"230-320ms synchronous 10K render"</strong>" — on par with Svelte, 4x faster than React"</li>
+                    <li><strong>"449x faster reactive updates"</strong>" than React 18 (0.10ms vs 44.90ms)"</li>
+                    <li><strong>"50x faster reactive updates"</strong>" than Svelte 5 on identical DOM work (0.10ms vs 5.00ms)"</li>
+                    <li><strong>"54 KB total bundle"</strong>" with zero dependencies"</li>
+                    <li><strong>"Memory isolation"</strong>" that makes XSS data exfiltration impossible"</li>
+                </ul>
+                <p>"The synchronous render benchmark proves that WASM cannot outrun the DOM — when both frameworks call "<code>"createElement"</code>" 10,000 times, they hit the same browser engine. Nectar's advantage is architectural: "<code>"lazy for"</code>" eliminates the synchronous render entirely, and the signal system eliminates per-update reconciliation. The 50-449x reactive update advantage is where WASM's zero-GC, zero-VDOM execution model delivers measurable value."</p>
+                <p>"The benchmark application is live and reproducible at https://buildnectar.com/app/ with identical React and Svelte implementations for direct comparison. All source code is public. We invite scrutiny."</p>
+                <p>"JavaScript was the right answer in 2010 when it was the only language that ran in the browser. WebAssembly changed that in 2017. Nectar is what happens when you take that change seriously."</p>
+                <hr />
+                <h3 id="10-availability">"10. Availability"</h3>
+                <ul>
+                    <li><strong>"Compiler source"</strong>": https://github.com/HibiscusConsulting/nectar-lang"</li>
+                    <li><strong>"Live demo"</strong>": https://buildnectar.com/app/"</li>
+                    <li><strong>"React benchmark"</strong>": https://buildnectar.com/app/react.html"</li>
+                    <li><strong>"Svelte benchmark"</strong>": https://buildnectar.com/app/svelte.html"</li>
+                    <li><strong>"License"</strong>": MIT"</li>
+                    <li><strong>"Compiler"</strong>": 105K+ lines of Rust, 2,547 tests, 34 source modules"</li>
+                    <li><strong>"Production apps"</strong>": PayHive (62 files, 460 KB WASM), Hive Listings (60 files, 899 KB WASM)"</li>
+                </ul>
+                <hr />
+                <p><em>"Nectar is developed by Blake Burnette at Hibiscus Consulting. For inquiries: jbburnette2@gmail.com"</em></p>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

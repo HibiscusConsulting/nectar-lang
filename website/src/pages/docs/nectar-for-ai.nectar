@@ -1,0 +1,1279 @@
+// docs/nectar-for-ai.nectar — auto-generated from docs/nectar-for-ai.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page NectarForAiDoc() {
+    meta {
+        title: "Nectar -- Complete AI Reference — Nectar Documentation",
+        description: "Agents, tools, prompts, and streaming — building AI-native applications in Nectar.",
+        canonical: "/docs/nectar-for-ai",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai" class="current">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""AI Integration"
+                    </div>
+                    <h1>"Nectar -- Complete AI Reference"</h1>
+                <p>"This is the definitive reference for AI assistants generating Nectar code. Every feature documented here has been verified to compile and produce working WASM output. Features that are parsed but not yet fully functional in codegen are clearly marked as NOT YET WORKING."</p>
+                <h3 id="core-thesis">"Core Thesis"</h3>
+                <p>"Nectar compiles to WebAssembly. All logic, state, rendering, and computation run in WASM. The only JavaScript is "<code>"core.js"</code>" (~3 KB gzip) -- a thin syscall layer for browser APIs that WASM physically cannot call (DOM, fetch, WebSocket, IndexedDB, etc.). There is no "<code>"node_modules"</code>", no "<code>"package.json"</code>", no bundler."</p>
+                <p>"The compiler is a single Rust binary called "<code>"nectar"</code>"."</p>
+                <hr />
+                <h3 id="build-and-run">"Build and Run"</h3>
+                <div class="code-lang-label">"bash"</div>
+                <pre class="code-block"><code>"nectar build app.nectar --emit-wasm   # Compile .nectar to .wasm + core.js
+nectar dev --src . --port 3000        # Dev server with hot reload
+nectar fmt app.nectar                 # Format source
+nectar lint app.nectar                # Lint source
+nectar test app.nectar                # Run tests
+nectar check app.nectar               # Type-check + borrow-check without emitting WASM
+nectar build --ssr                    # Server-side rendering"</code></pre>
+                <hr />
+                <h3 id="types">"Types"</h3>
+                <pre class="code-block"><code>"i32  i64  u32  u64  f32  f64  bool  String
+[T]  Option<T>  Result<T, E>"</code></pre>
+                <h4 id="additional-type-notes">"Additional type notes:"</h4>
+                <ul>
+                    <li><code>"(T, U)"</code>" -- tuple types work. Construction via "<code>"(a, b)"</code>" and access via "<code>".0"</code>", "<code>".1"</code>" compile to WASM."</li>
+                    <li><code>"&T"</code>" / "<code>"&mut T"</code>" / "<code>"&'a T"</code>" -- borrow syntax is parsed and checked by the borrow checker but does not affect WASM output (WASM has no references). The borrow checker enforces field-level borrows, NLL, return ref verification, and reborrowing."</li>
+                    <li><code>"fn(T) -> U"</code>" -- function types parse but higher-order functions are limited"</li>
+                    <li>"Generics like "<code>"fn first<T>(items: [T]) -> T"</code>" -- generic type parameters are monomorphized. The compiler specializes each generic function for every concrete type it is called with."</li>
+                </ul>
+                <hr />
+                <h3 id="variables">"Variables"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let x: i32 = 42;              // immutable binding
+let mut count: i32 = 0;       // mutable binding (compiles to WASM local)"</code></pre>
+                <p>"Inside components, "<code>"let mut"</code>" fields become reactive signals:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Counter() {
+    let mut count: i32 = 0;           // reactive signal -- DOM auto-updates
+    let mut name: String = \"hello\";   // string signal
+    let mut items: [Product] = [];    // array signal
+    // ...
+}"</code></pre>
+                <h4 id="variable-notes">"Variable notes:"</h4>
+                <ul>
+                    <li><code>"signal name: String = \"\";"</code>" -- the "<code>"signal"</code>" keyword is parsed but in practice "<code>"let mut"</code>" inside components achieves the same thing and is the proven pattern"</li>
+                    <li><code>"let (a, b) = expr;"</code>" -- let-binding tuple destructuring parses but has no codegen. Use "<code>"match"</code>" for destructuring."</li>
+                    <li><code>"let User { name, .. } = user;"</code>" -- let-binding struct destructuring parses but has no codegen. Use "<code>"match"</code>" for destructuring."</li>
+                    <li>"Tuple, struct, and array destructuring WORK in "<code>"match"</code>" arms"</li>
+                </ul>
+                <hr />
+                <h3 id="functions">"Functions"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn add(a: i32, b: i32) -> i32 {
+    a + b
+}"</code></pre>
+                <p>"Functions compile to WASM functions. They can take typed parameters and return values."</p>
+                <h4 id="inside-components-methods-use-mut-self">"Inside components, methods use `&mut self`:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn increment(&mut self) {
+    self.count = self.count + 1;
+}"</code></pre>
+                <h4 id="what-does-not-work-for-functions">"What does NOT work for functions:"</h4>
+                <ul>
+                    <li><code>"async fn"</code>" -- parses but async/await has no runtime support"</li>
+                    <li><code>"f\"Hello {name}\""</code>" -- format string interpolation ("<code>"f\"...\""</code>") parses into the AST but is NOT reliably generated in codegen. Use "<code>"format(\"{}\", value)"</code>" instead."</li>
+                </ul>
+                <h4 id="what-does-work-for-functions">"What DOES work for functions:"</h4>
+                <ul>
+                    <li>"Generic functions ("<code>"fn first<T>(items: [T]) -> T"</code>") -- monomorphized at compile time for each concrete type"</li>
+                    <li>"Lifetime annotations ("<code>"fn first<'a>(x: &'a str) -> &'a str"</code>") -- validated by the borrow checker"</li>
+                    <li><code>"where T: Display"</code>" bounds -- static trait dispatch at compile time"</li>
+                    <li>"Closures with environment capture -- compiled to function table entries"</li>
+                </ul>
+                <hr />
+                <h3 id="ownership-and-borrowing">"Ownership and Borrowing"</h3>
+                <p>"The borrow checker runs at compile time and enforces:"</p>
+                <ul>
+                    <li>"One owner per value"</li>
+                    <li>"Assignment moves by default"</li>
+                    <li><code>"&val"</code>" for immutable borrows"</li>
+                    <li><code>"&mut val"</code>" for exclusive mutable borrows"</li>
+                </ul>
+                <p>"However, at the WASM level these are erased. Borrow checking prevents invalid programs at compile time, but the generated WASM uses i32 values and pointers regardless."</p>
+                <hr />
+                <h3 id="struct">"Struct"</h3>
+                <p>"Struct definitions compile to linear memory layouts with 4-byte field offsets."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"struct Product {
+    name: String,
+    category: String,
+    price: String,
+    rating: String,
+    stock: String,
+    img: String,
+}"</code></pre>
+                <h4 id="struct-construction-works">"Struct construction (works):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let p = Product {
+    name: \"Widget\",
+    category: \"Electronics\",
+    price: \"$49.99\",
+    rating: \"4.5\",
+    stock: \"In Stock\",
+    img: \"https://example.com/img.jpg\",
+};"</code></pre>
+                <h4 id="field-access-works">"Field access (works):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let n = p.name;      // field access from local variable
+item.category         // field access from for-loop binding
+product.price         // field access from handler parameter"</code></pre>
+                <h4 id="what-works-for-structs">"What works for structs:"</h4>
+                <ul>
+                    <li>"Generic structs -- monomorphized at compile time"</li>
+                    <li><code>"impl"</code>" blocks with methods -- method calls compile to "<code>"call $Type_method"</code></li>
+                    <li>"Trait implementations ("<code>"impl Display for User"</code>") -- static trait dispatch, no vtable needed"</li>
+                    <li>"Struct destructuring in match arms"</li>
+                </ul>
+                <hr />
+                <h3 id="enum">"Enum"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"enum Status {
+    Active,
+    Inactive,
+    Error(String),
+}"</code></pre>
+                <p>"Enums parse and are used in pattern matching. However, full enum variant construction and matching beyond "<code>"Ok"</code>"/"<code>"Err"</code>"/"<code>"Some"</code>"/"<code>"None"</code>" is limited."</p>
+                <hr />
+                <h3 id="component-fully-working">"Component (FULLY WORKING)"</h3>
+                <p>"The fundamental UI building block. This is the most complete and battle-tested feature."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component CounterPanel() {
+    let mut count: i32 = 0;
+    let mut updates: i32 = 0;
+
+    fn increment(&mut self) {
+        self.count = self.count + 1;
+        self.updates = self.updates + 1;
+    }
+
+    fn decrement(&mut self) {
+        self.count = self.count - 1;
+        self.updates = self.updates + 1;
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
+        self.updates = self.updates + 1;
+    }
+
+    render {
+        <div class=\"counter\">
+            <span class=\"value\">{format(\"{}\", self.count)}</span>
+            <button class=\"btn\" on:click={self.increment}>\"+\"</button>
+            <button class=\"btn\" on:click={self.decrement}>\"-\"</button>
+            <button class=\"btn\" on:click={self.reset}>\"Reset\"</button>
+            <div class=\"info\">
+                <span>\"Updates: \"</span>
+                <span>{format(\"{}\", self.updates)}</span>
+            </div>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="what-compiles-inside-a-component">"What compiles inside a component:"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"Syntax"</th><th>"Status"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Mutable state (i32)"</td><td><code>"let mut count: i32 = 0;"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Mutable state (String)"</td><td><code>"let mut name: String = \"hello\";"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Mutable state (array)"</td><td><code>"let mut items: [Product] = [];"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Methods"</td><td><code>"fn name(&mut self) { ... }"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Init lifecycle"</td><td><code>"fn init(&mut self) { ... }"</code></td><td>"WORKS -- called after signals created, before render"</td></tr>
+                        <tr><td>"Style blocks"</td><td><code>"style { .class { prop: \"val\"; } }"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Render block"</td><td><code>"render { <div>...</div> }"</code></td><td>"WORKS"</td></tr>
+                        <tr><td>"Props"</td><td><code>"component Foo(label: String)"</code></td><td>"WORKS -- passed as ptr+len pairs"</td></tr>
+                        <tr><td>"Child components"</td><td><code>"<ChildComp />"</code></td><td>"WORKS"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="how-components-compile">"How components compile:"</h4>
+                <p>"Each component produces:"</p>
+                <ol>
+                    <li><strong>"Signal globals"</strong>" -- one "<code>"(global $__sig_CompName_field (mut i32))"</code>" per "<code>"let mut"</code>" field"</li>
+                    <li><strong>"A mount function"</strong>" -- "<code>"CompName_mount(root)"</code>" that creates DOM, initializes signals, and sets up reactive bindings"</li>
+                    <li><strong>"Handler trampolines"</strong>" -- one function per method, dispatched via "<code>"call_indirect"</code>" from "<code>"__callback"</code></li>
+                    <li><strong>"Signal updater functions"</strong>" -- auto-generated functions that re-read signal values and call "<code>"dom_setText"</code>" to update DOM nodes"</li>
+                </ol>
+                <h4 id="reactive-signals-and-dom-updates">"Reactive signals and DOM updates:"</h4>
+                <p>"When you write "<code>"{format(\"{}\", self.count)}"</code>" in a template, the compiler:"</p>
+                <ol>
+                    <li>"Creates a text node during mount"</li>
+                    <li>"Generates a signal updater function that reads "<code>"$__sig_Counter_count"</code>", converts it to a string, and calls "<code>"dom_setText"</code></li>
+                    <li>"Subscribes the updater to the signal via "<code>"signal_subscribe"</code></li>
+                    <li>"When "<code>"self.count"</code>" changes in a method, "<code>"signal_set"</code>" fires, which triggers the updater via "<code>"call_indirect"</code></li>
+                </ol>
+                <p>"This gives O(1) DOM updates per signal change. No virtual DOM. No diffing."</p>
+                <hr />
+                <h3 id="displaying-values-in-templates">"Displaying Values in Templates"</h3>
+                <h4 id="integers-use-format-value">"Integers: use `format(\"{}\", value)`"</h4>
+                <p>"The "<code>"format"</code>" function converts an i32 to a string. This is the proven pattern from the demo:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<span>{format(\"{}\", self.count)}</span>
+<span>{format(\"{}\", self.product_count)}</span>"</code></pre>
+                <p><code>"format"</code>" compiles to "<code>"call $format"</code>" which calls the WASM-internal "<code>"$string_fromI32"</code>" function to produce a (ptr, len) string pair."</p>
+                <h4 id="strings-use-directly">"Strings: use directly"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<span>{self.name}</span>
+<span>{self.active_cat}</span>"</code></pre>
+                <p>"String signals are stored as pointers. When accessed in templates, the signal value (a string ptr) is used directly."</p>
+                <h4 id="static-text-use-string-literals">"Static text: use string literals"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<span>\"Hello world\"</span>
+<p>\"Click the button to increment\"</p>"</code></pre>
+                <p>"String literals are stored in WASM linear memory at compile time."</p>
+                <h4 id="concatenating-text-and-expressions">"Concatenating text and expressions:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<p>\"Last added: \"{self.last_added}</p>
+<p>\"Count: \"{format(\"{}\", self.count)}</p>"</code></pre>
+                <p>"Adjacent text literals and expressions in a template each become their own text node, appearing side by side in the DOM."</p>
+                <hr />
+                <h3 id="template-syntax-inside-render-blocks">"Template Syntax (inside render blocks)"</h3>
+                <h4 id="elements-with-static-attributes-works">"Elements with static attributes (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div class=\"wrapper\" id=\"main\">\"content\"</div>
+<input type=\"text\" class=\"search-box\" placeholder=\"Search...\" />
+<img src=\"static.png\" alt=\"photo\" loading=\"lazy\" width=\"280\" height=\"180\" />
+<button type=\"submit\" disabled>\"Submit\"</button>"</code></pre>
+                <p>"Static attributes compile to "<code>"dom_setAttr"</code>" calls during mount."</p>
+                <h4 id="dynamic-attributes-works">"Dynamic attributes (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<img src={product.img} alt={product.name} />"</code></pre>
+                <p>"Dynamic attributes evaluate the expression at mount time and call "<code>"dom_setAttr"</code>" with the result. The expression must produce a string (ptr)."</p>
+                <h4 id="style-attribute-works">"Style attribute (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div style=\"color:var(--text2);font-size:0.9rem;margin-bottom:8px\">\"text\"</div>
+<div style=\"margin-top:24px;grid-template-columns:1fr 1fr\">\"grid\"</div>"</code></pre>
+                <p>"The "<code>"style"</code>" attribute is a static string attribute -- it compiles to a "<code>"dom_setAttr"</code>" call."</p>
+                <h4 id="boolean-attributes-works">"Boolean attributes (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<button disabled>\"Can't click\"</button>
+<input type=\"checkbox\" checked />"</code></pre>
+                <p>"Attributes without "<code>"=\"value\""</code>" are emitted as boolean attributes."</p>
+                <h4 id="event-handlers-works">"Event handlers (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<button on:click={self.increment}>\"Click me\"</button>
+<button on:click={self.set_cat_all}>\"All\"</button>"</code></pre>
+                <p>"The handler reference resolves to a function table index. When the event fires, JavaScript calls "<code>"__callback(index)"</code>" which dispatches to the correct WASM handler trampoline."</p>
+                <h4 id="event-handlers-with-captured-data-works">"Event handlers with captured data (WORKS):"</h4>
+                <p>"Inside "<code>"{for ...}"</code>" loops, event handlers capture the current loop item:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{for product in self.products {
+    <button on:click={self.add_to_cart}>\"Add\"</button>
+}}"</code></pre>
+                <p>"The compiler calls "<code>"$__cb_register_with_data"</code>" to create a parameterized callback that captures the item pointer. When the handler fires, the item pointer is passed via "<code>"$__callback_data"</code>"."</p>
+                <h4 id="conditional-rendering-with-if-works">"Conditional rendering with `{if ...}` (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{if self.show_cart == 1 {
+    <div class=\"cart-panel\">
+        <h3>\"Shopping Cart\"</h3>
+        <p>\"Items in cart: \"{format(\"{}\", self.cart_count)}</p>
+    </div>
+}}"</code></pre>
+                <p>"The compiler generates:"</p>
+                <ol>
+                    <li>"A container element"</li>
+                    <li>"A "<code>"cond_updater"</code>" function that evaluates the condition"</li>
+                    <li>"When the condition becomes true, it mounts the children into the container"</li>
+                    <li>"When the condition becomes false, it clears the container ("<code>"dom_clearChildren"</code>")"</li>
+                    <li>"The updater is subscribed to the signals used in the condition"</li>
+                </ol>
+                <h4 id="conditional-class-names-works">"Conditional class names (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<button class={if self.active_cat == \"Electronics\" { \"pill active\" } else { \"pill\" }}
+        on:click={self.set_cat_electronics}>
+    \"Electronics\"
+</button>"</code></pre>
+                <p>"The "<code>"{if cond { \"a\" } else { \"b\" }}"</code>" expression inside an attribute evaluates at mount time and produces one of the two string values."</p>
+                <h4 id="for-loops-works">"For loops (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{for item in self.cart_items {
+    <div class=\"cart-item\">
+        <span>{item.name}</span>
+        <span>{item.category}</span>
+        <span>{item.price}</span>
+    </div>
+}}"</code></pre>
+                <p>"For loops iterate over array signals. Each iteration creates DOM elements and binds field access to the current struct pointer. The loop variable is a pointer into the array's linear memory."</p>
+                <h4 id="lazy-for-loops-works">"Lazy for loops (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{lazy for product in self.products {
+    <div class=\"product-card\">
+        <img src={product.img} alt={product.name} />
+        <div>{product.name}</div>
+        <button on:click={self.add_to_cart}>\"Add to Cart\"</button>
+    </div>
+}}"</code></pre>
+                <p>"Lazy for loops render the first batch (20 items) immediately, then render subsequent batches when a sentinel element becomes visible via IntersectionObserver. This is the recommended pattern for rendering large lists."</p>
+                <h4 id="match-in-templates">"Match in templates:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{match status {
+    Some(val) => <span>{val}</span>,
+    None => <span>\"Loading...\"</span>,
+}}"</code></pre>
+                <p>"Template match is parsed and basic patterns work. See \"Pattern Matching\" below for caveats."</p>
+                <h4 id="child-components-works">"Child components (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<EcommercePanel />
+<CounterPanel />"</code></pre>
+                <p>"The compiler detects known component names and emits:"</p>
+                <ol>
+                    <li>"A container div via "<code>"dom_createElement"</code></li>
+                    <li><code>"dom_appendChild"</code>" to attach it to the parent"</li>
+                    <li><code>"call $ComponentName_mount"</code>" with the container as "<code>"$root"</code></li>
+                </ol>
+                <h4 id="fragment-works">"Fragment (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<Fragment>
+    <h1>\"Title\"</h1>
+    <p>\"Body\"</p>
+</Fragment>"</code></pre>
+                <p>"Fragments render their children directly into the parent without a wrapper element."</p>
+                <h4 id="select-elements-works">"Select elements (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<select class=\"filter\">
+    <option value=\"all\">\"All\"</option>
+    <option value=\"active\">\"Active\"</option>
+</select>"</code></pre>
+                <p><code>"<select>"</code>" is a regular HTML element and compiles like any other element."</p>
+                <hr />
+                <h3 id="store-fully-working">"Store (FULLY WORKING)"</h3>
+                <p>"Global reactive state container. Components can read signals and dispatch actions."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"store CartStore {
+    signal count: i32 = 0;
+
+    action add() {
+        self.count = self.count + 1;
+    }
+
+    action clear() {
+        self.count = 0;
+    }
+}"</code></pre>
+                <h4 id="what-compiles-for-stores">"What compiles for stores:"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"Status"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"signal name: Type = init;"</code></td><td>"WORKS -- creates WASM global"</td></tr>
+                        <tr><td><code>"action name() { ... }"</code></td><td>"WORKS -- compiles to exported function"</td></tr>
+                        <tr><td><code>"computed name() -> Type { ... }"</code></td><td>"WORKS -- compiles to exported function"</td></tr>
+                        <tr><td><code>"effect name() { ... }"</code></td><td>"WORKS -- compiles to exported function"</td></tr>
+                        <tr><td><code>"selector"</code></td><td>"WORKS -- compiles to exported function"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="store-codegen">"Store codegen:"</h4>
+                <p>"A store named "<code>"CartStore"</code>" with "<code>"signal count: i32 = 0"</code>" produces:"</p>
+                <ul>
+                    <li><code>"(global $__sig_CartStore_count (mut i32) (i32.const -1))"</code>" -- signal ID"</li>
+                    <li><code>"(func $CartStore_init ...)"</code>" -- creates the signal"</li>
+                    <li><code>"(func $CartStore_get_count ...)"</code>" -- reads signal value"</li>
+                    <li><code>"(func $CartStore_set_count ...)"</code>" -- writes signal value with reactive notification"</li>
+                    <li><code>"(func $CartStore_add ...)"</code>" -- the action function"</li>
+                </ul>
+                <h4 id="calling-store-methods-from-components">"Calling store methods from components:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// In a component event handler:
+fn handle_add(&mut self) {
+    CartStore::add();
+}"</code></pre>
+                <p><code>"CartStore::add()"</code>" compiles to "<code>"call $CartStore_add"</code>". Signal getters compile to "<code>"call $CartStore_get_count"</code>"."</p>
+                <h4 id="store-limitations">"Store limitations:"</h4>
+                <ul>
+                    <li><code>"async action"</code>" -- parses but async runtime is not implemented"</li>
+                </ul>
+                <hr />
+                <h3 id="contract-fully-working">"Contract (FULLY WORKING)"</h3>
+                <p>"Type-safe API boundaries with compile-time schema hashing and WASM-native JSON parsing."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"contract UserResponse {
+    id: i32,
+    name: String,
+    email: String,
+    role: String,
+}"</code></pre>
+                <h4 id="what-the-compiler-generates">"What the compiler generates:"</h4>
+                <ol>
+                    <li><strong>"Schema hash"</strong>" -- SHA-256 of the canonical field representation, baked into the WASM binary"</li>
+                    <li><strong><code>"UserResponse_parse(json_ptr, json_len) -> struct_ptr"</code></strong>" -- WASM-native JSON parser that extracts fields by name and allocates a struct"</li>
+                    <li><strong><code>"UserResponse_serialize(struct_ptr) -> (json_ptr, json_len)"</code></strong>" -- WASM-native JSON serializer that builds JSON from struct fields"</li>
+                    <li><strong><code>"UserResponse_call(url_ptr, url_len, method_ptr, method_len, body_ptr, body_len, callback_idx)"</code></strong>" -- HTTP request using typed setters (setMethod, setBody, addHeader) with async callback"</li>
+                    <li><strong><code>"__contract_register_UserResponse()"</code></strong>" -- registers schema with runtime for drift detection"</li>
+                </ol>
+                <h4 id="using-contracts-for-api-communication">"Using contracts for API communication:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Define the contract
+contract ProductList {
+    products: [Product],
+    total: i32,
+}
+
+// Call an API endpoint
+fn load_products(&mut self) {
+    ProductList::call(
+        \"/api/products\",    // url
+        \"GET\",              // method
+        \"\",                 // body (empty for GET)
+        42                  // callback index
+    );
+}
+
+// Parse a JSON response
+fn handle_response(&mut self, json_ptr: i32, json_len: i32) {
+    let data = ProductList::parse(json_ptr, json_len);
+    // data is now a struct pointer with fields at 4-byte offsets
+}
+
+// Serialize a struct to JSON
+fn send_data(&mut self) {
+    let json = ProductList::serialize(data_ptr);
+    // json is (ptr, len) pair
+}"</code></pre>
+                <h4 id="contract-fields-support">"Contract fields support:"</h4>
+                <ul>
+                    <li><code>"i32"</code>", "<code>"i64"</code>", "<code>"u32"</code>", "<code>"u64"</code>" -- integer types (JSON type: integer)"</li>
+                    <li><code>"f32"</code>", "<code>"f64"</code>" -- float types (JSON type: number)"</li>
+                    <li><code>"bool"</code>" -- boolean (JSON type: boolean)"</li>
+                    <li><code>"String"</code>" -- string (JSON type: string)"</li>
+                    <li><code>"[T]"</code>" -- array types (JSON type: array)"</li>
+                    <li><code>"Type?"</code>" -- nullable fields (adds "<code>"\"nullable\":true"</code>" to schema)"</li>
+                </ul>
+                <h4 id="the-json-parser-is-wasm-native">"The JSON parser is WASM-native:"</h4>
+                <p>"There is no "<code>"JSON.parse()"</code>" in JavaScript. The compiler generates WASM functions ("<code>"$json_parse"</code>", "<code>"$json_get_field"</code>", "<code>"$json_serialize_object"</code>") that parse and build JSON directly in linear memory."</p>
+                <hr />
+                <h3 id="router-fully-working">"Router (FULLY WORKING)"</h3>
+                <p>"Client-side routing with path matching and guard conditions."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    route \"/\" => Home,
+    route \"/about\" => About,
+    route \"/user/:id\" => UserProfile,
+    route \"/admin/*\" => Admin guard { AuthStore::is_logged_in() },
+    fallback => NotFound,
+}"</code></pre>
+                <h4 id="what-the-compiler-generates-2">"What the compiler generates:"</h4>
+                <ol>
+                    <li><strong><code>"AppRouter_init()"</code></strong>" -- registers all routes with path patterns and component mount function indices"</li>
+                    <li><strong><code>"__route_mount_N(root)"</code></strong>" -- one mount function per route that delegates to the component's mount function"</li>
+                    <li><strong>"Route guards"</strong>" -- if a guard expression is present, it is evaluated before mounting; if it returns 0, the mount is skipped"</li>
+                    <li><strong><code>"AppRouter_fallback_mount(root)"</code></strong>" -- mount function for the fallback route"</li>
+                </ol>
+                <h4 id="path-patterns">"Path patterns:"</h4>
+                <ul>
+                    <li>"Static: "<code>"\"/about\""</code></li>
+                    <li>"Parameters: "<code>"\"/user/:id\""</code>" -- "<code>":id"</code>" is extracted as a parameter"</li>
+                    <li>"Wildcard: "<code>"\"/admin/*\""</code>" -- matches any path under "<code>"/admin/"</code></li>
+                </ul>
+                <h4 id="programmatic-navigation">"Programmatic navigation:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn go_home(&mut self) {
+    navigate(\"/\");
+}"</code></pre>
+                <p><code>"navigate(\"/path\")"</code>" compiles to WASM calls that update the URL via "<code>"history.pushState"</code>" and trigger route matching."</p>
+                <h4 id="component-composition-with-layout-blocks-works">"Component composition with layout blocks (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    layout {
+        <div>
+            <NavBar />
+            <Outlet />
+            <Footer />
+        </div>
+    }
+
+    route \"/\" => Home,
+    route \"/about\" => About,
+    fallback => NotFound,
+}"</code></pre>
+                <p><code>"<Outlet />"</code>" marks where the routed page content renders. The surrounding layout persists across navigations. The codegen generates a container div with "<code>"id=\"__nectar_outlet\""</code>" for route content swapping."</p>
+                <hr />
+                <h3 id="database-indexeddb-works">"Database (IndexedDB) (WORKS)"</h3>
+                <p>"Client-side persistence via IndexedDB."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"db CartDB {
+    version: 1,
+}"</code></pre>
+                <h4 id="what-the-compiler-generates-3">"What the compiler generates:"</h4>
+                <ul>
+                    <li><code>"CartDB_init()"</code>" -- opens the IndexedDB database"</li>
+                    <li><code>"CartDB_put(key_ptr, key_len, val_ptr, val_len)"</code>" -- store a value"</li>
+                    <li><code>"CartDB_get(key_ptr, key_len, cb_idx)"</code>" -- retrieve a value (async via callback)"</li>
+                    <li><code>"CartDB_delete(key_ptr, key_len)"</code>" -- delete a value"</li>
+                    <li><code>"CartDB_getAll(cb_idx)"</code>" -- retrieve all values (async via callback)"</li>
+                </ul>
+                <h4 id="with-named-stores">"With named stores:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"db AppDatabase {
+    version: 1,
+
+    store \"users\" {
+        key: \"id\",
+        index \"by_email\" => \"email\",
+    }
+
+    store \"posts\" {
+        key: \"id\",
+        index \"by_date\" => \"createdAt\",
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="arrays-and-vec-works">"Arrays and Vec (WORKS)"</h3>
+                <p>"Arrays are the primary collection type. They compile to pointers into linear memory."</p>
+                <h4 id="construction">"Construction:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let mut items: [Product] = [];           // empty array
+let mut numbers: [i32] = [1, 2, 3];     // array literal"</code></pre>
+                <h4 id="push">"Push:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"self.products.push(Product {
+    name: \"Widget\",
+    category: \"Electronics\",
+    price: \"$49.99\",
+    rating: \"4.5\",
+    stock: \"In Stock\",
+    img: \"https://example.com/img.jpg\",
+});"</code></pre>
+                <p><code>"push"</code>" appends to the array's linear memory region. For component state arrays, this updates the signal."</p>
+                <h4 id="indexing">"Indexing:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let item = self.products[i];    // index access"</code></pre>
+                <h4 id="length">"Length:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let n = items.len();"</code></pre>
+                <h4 id="contains">"Contains:"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let found = items.contains(value);"</code></pre>
+                <hr />
+                <h3 id="string-operations-works">"String Operations (WORKS)"</h3>
+                <p>"All string operations run in WASM -- no JavaScript string processing."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let s = \"  hello world  \";
+let trimmed = s.trim();                    // \"hello world\"
+let upper = s.to_upper();                  // \"  HELLO WORLD  \"
+let lower = s.to_lower();                  // \"  hello world  \"
+let parts = s.split(\" \");                  // splits into array
+let replaced = s.replace(\"hello\", \"hi\");   // \"  hi world  \"
+let idx = s.index_of(\"world\");            // returns offset or -1
+let yes = s.starts_with(\"  he\");          // bool
+let no = s.ends_with(\"xyz\");              // bool
+let sub = s.slice(2, 7);                  // \"hello\"
+let n = \"42\".parse_int();                 // 42"</code></pre>
+                <hr />
+                <h3 id="iterator-methods-works">"Iterator Methods (WORKS)"</h3>
+                <p>"These compile to WASM loops with closure callbacks via "<code>"call_indirect"</code>"."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let doubled = items.map(|x: i32| x * 2);
+let evens = items.filter(|x: i32| x % 2 == 0);
+let sum = items.fold(0, |acc: i32, x: i32| acc + x);
+let total = items.reduce(|a: i32, b: i32| a + b);
+let found = items.find(|x: i32| x > 10);
+let has_big = items.any(|x: i32| x > 100);
+let all_pos = items.all(|x: i32| x > 0);"</code></pre>
+                <hr />
+                <h3 id="control-flow">"Control Flow"</h3>
+                <h4 id="ifelse-works">"If/else (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"if m == 1 {
+    cat = \"Clothing\";
+}
+
+if self.show_cart == 0 {
+    self.show_cart = 1;
+} else {
+    self.show_cart = 0;
+}"</code></pre>
+                <h4 id="while-loops-works">"While loops (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let mut i: i32 = 0;
+while i < 400 {
+    // ... body ...
+    i = i + 1;
+}"</code></pre>
+                <h4 id="for-loops-in-methods-works">"For loops in methods (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for item in self.items {
+    // process item
+}"</code></pre>
+                <h4 id="range-expressions-works">"Range expressions (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for i in 0..10 {
+    // i goes from 0 to 9
+}"</code></pre>
+                <h4 id="additional-control-flow-that-works">"Additional control flow that works:"</h4>
+                <ul>
+                    <li><code>"break"</code>" -- compiles to WASM "<code>"br"</code>" targeting the correct block"</li>
+                    <li><code>"continue"</code>" -- compiles to WASM "<code>"br"</code>" targeting the loop header"</li>
+                    <li>"Compound assignment: "<code>"-="</code>", "<code>"*="</code>", "<code>"/="</code>" work alongside "<code>"+="</code></li>
+                    <li><code>"for chunk in stream fetch(url) { ... }"</code>" -- streaming fetch codegen exists"</li>
+                </ul>
+                <hr />
+                <h3 id="pattern-matching">"Pattern Matching"</h3>
+                <h4 id="result-and-option-matching-works">"Result and Option matching (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match result {
+    Ok(value) => { /* use value */ },
+    Err(e) => { /* handle error */ },
+}
+
+match option {
+    Some(val) => { /* use val */ },
+    None => { /* handle none */ },
+}"</code></pre>
+                <h4 id="wildcard-patterns-works">"Wildcard patterns (WORKS):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match x {
+    1 => { /* ... */ },
+    2 => { /* ... */ },
+    _ => { /* default */ },
+}"</code></pre>
+                <h4 id="what-works-for-pattern-matching">"What works for pattern matching:"</h4>
+                <ul>
+                    <li>"Struct destructuring in match arms -- "<code>"User { name, age, .. } => ..."</code></li>
+                    <li>"Tuple destructuring in match arms -- "<code>"(x, y) => ..."</code></li>
+                    <li>"Array destructuring in match arms -- "<code>"[first, ..] => ..."</code></li>
+                    <li>"Guards ("<code>"match x { n if n > 0 => ... }"</code>") -- supported in codegen"</li>
+                </ul>
+                <h4 id="what-has-limited-support">"What has limited support:"</h4>
+                <ul>
+                    <li>"Enum variant matching beyond Ok/Err/Some/None -- basic codegen exists"</li>
+                    <li>"Nested pattern matching -- parses but codegen coverage is incomplete"</li>
+                </ul>
+                <hr />
+                <h3 id="result-and-option-types-works">"Result and Option Types (WORKS)"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Construction
+let ok_val = Ok(42);
+let err_val = Err(\"something went wrong\");
+let some_val = Some(42);
+let none_val = None;
+
+// The ? operator propagates errors
+let value = some_function()?;   // returns early on Err/None"</code></pre>
+                <p><code>"Ok"</code>", "<code>"Err"</code>", and "<code>"Some"</code>" compile to tagged allocations in linear memory: "<code>"[tag, value]"</code>" at 4-byte offsets. The "<code>"?"</code>" operator inspects the tag at offset 0 and branches accordingly."</p>
+                <hr />
+                <h3 id="closures-works">"Closures (WORKS)"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let double = |x: i32| x * 2;
+items.map(|x: i32| x * 2);
+items.filter(|x: i32| x > 0);"</code></pre>
+                <p>"Closures compile to WASM functions with unique names. They are added to the function table for indirect calls."</p>
+                <hr />
+                <h3 id="let-declarations-in-methods-works">"Let Declarations in Methods (WORKS)"</h3>
+                <p>"Local variables in methods are hoisted to WASM function locals:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn init(&mut self) {
+    let mut i: i32 = 0;
+    let cat: String = \"Electronics\";
+    let img: String = \"https://example.com/img.jpg\";
+    let m: i32 = i - (i / 5) * 5;
+    // ...
+}"</code></pre>
+                <p>"The compiler scans the method body, collects all "<code>"let"</code>" bindings, and emits "<code>"(local $name type)"</code>" declarations at the function preamble before any instructions. This is required by WASM's validation rules."</p>
+                <hr />
+                <h3 id="arithmetic-and-comparison-works">"Arithmetic and Comparison (WORKS)"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"a + b    a - b    a * b    a / b    a % b      // arithmetic
+a == b   a != b   a < b   a > b   a <= b  a >= b  // comparison
+a && b   a || b   !a                            // logical
+x = 42                                          // assignment"</code></pre>
+                <p>"Integer arithmetic compiles to WASM "<code>"i32.add"</code>", "<code>"i32.sub"</code>", etc. String equality compiles to a byte-by-byte comparison function."</p>
+                <hr />
+                <h3 id="http-and-fetch">"HTTP and Fetch"</h3>
+                <h4 id="via-contracts-recommended-see-contract-section-above">"Via contracts (RECOMMENDED -- see Contract section above):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"ContractName::call(url, method, body, callback_idx);"</code></pre>
+                <h4 id="via-typed-setters-works">"Via typed setters (WORKS):"</h4>
+                <p>"The HTTP namespace uses typed setters instead of serialized option objects:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// These compile to individual WASM import calls:
+http.setMethod(\"POST\");
+http.setBody(json_str);
+http.addHeader(\"Authorization\", \"Bearer token\");
+http.fetch(url);"</code></pre>
+                <h4 id="via-the-fetch-expression-parsed-but-limited">"Via the fetch expression (PARSED but limited):"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let response = fetch(\"/api/data\");"</code></pre>
+                <p>"The "<code>"Expr::Fetch"</code>" AST node is parsed but the codegen for standalone fetch expressions is less complete than the contract-based approach."</p>
+                <hr />
+                <h3 id="auth-works">"Auth (WORKS)"</h3>
+                <p>"Authentication with OAuth providers."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"auth AppAuth {
+    provider \"google\" {
+        client_id: env(\"GOOGLE_CLIENT_ID\"),
+        scopes: [\"openid\", \"email\", \"profile\"],
+    }
+
+    session: \"cookie\",
+
+    fn on_login(&mut self) {
+        navigate(\"/dashboard\");
+    }
+}"</code></pre>
+                <p>"The compiler generates initialization and handler functions. Auth uses HttpOnly cookies by default for session storage (server-side verification)."</p>
+                <hr />
+                <h3 id="payment-works">"Payment (WORKS)"</h3>
+                <p>"PCI-compliant payment processing via sandboxed iframes."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"payment Checkout {
+    provider: \"stripe\",
+    public_key: env(\"STRIPE_PUBLIC_KEY\"),
+    sandbox: true,
+}"</code></pre>
+                <p>"Generates registration and handler functions. Card data never touches component state."</p>
+                <hr />
+                <h3 id="upload-works">"Upload (WORKS)"</h3>
+                <p>"File uploads with endpoint, size limits, and MIME type filtering."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"upload AvatarUpload {
+    endpoint: \"/api/upload/avatar\",
+    max_size: 5242880,
+    accept: [\"image/png\", \"image/jpeg\"],
+    chunked: true,
+}"</code></pre>
+                <hr />
+                <h3 id="cache-works">"Cache (WORKS)"</h3>
+                <p>"Data caching with queries and mutations."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"cache ApiCache {
+    strategy: \"stale-while-revalidate\",
+    ttl: 300,
+    persist: true,
+    max_entries: 100,
+
+    query get_users() : fetch(\"/api/users\") -> UserResponse {
+        ttl: 60,
+        invalidate_on: [\"user_created\"],
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="channel-websocket-works">"Channel / WebSocket (WORKS)"</h3>
+                <p>"Real-time WebSocket connections."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"channel ChatRoom {
+    url: \"wss://api.example.com/ws/chat\",
+    reconnect: true,
+    heartbeat: 30000,
+
+    on_message fn(msg) {
+        // handle incoming message
+    }
+
+    on_connect fn() {
+        // connected
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="theme-works">"Theme (WORKS)"</h3>
+                <p>"Light/dark theme with CSS custom properties."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"theme AppTheme {
+    light {
+        bg: \"#ffffff\",
+        text: \"#1a1a1a\",
+        primary: \"#4a90d9\",
+    }
+
+    dark {
+        bg: \"#1a1a1a\",
+        text: \"#e0e0e0\",
+        primary: \"#6ab0ff\",
+    }
+}"</code></pre>
+                <p>"Generates CSS custom properties ("<code>"--bg"</code>", "<code>"--text"</code>", "<code>"--primary"</code>"). Usage in styles: "<code>"background: var(--bg);"</code></p>
+                <hr />
+                <h3 id="app-pwa-works">"App / PWA (WORKS)"</h3>
+                <p>"Progressive Web App configuration."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"app MyApp {
+    manifest {
+        name: \"My Application\",
+        short_name: \"MyApp\",
+        start_url: \"/\",
+        theme_color: \"#4a90d9\",
+        display: \"standalone\",
+    }
+
+    offline {
+        precache: [\"/\", \"/about\"],
+        strategy: \"cache-first\",
+    }
+}"</code></pre>
+                <p>"Generates manifest JSON and service worker registration functions."</p>
+                <hr />
+                <h3 id="page-works">"Page (WORKS)"</h3>
+                <p>"SEO-optimized pages with meta tags."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"page BlogPost(slug: String) {
+    signal post: Option<Post> = None;
+
+    meta {
+        title: \"Blog Post\",
+        description: \"A blog post\",
+    }
+
+    render {
+        <article>
+            <h1>\"Blog Post\"</h1>
+        </article>
+    }
+}"</code></pre>
+                <p>"Pages compile like components but with additional SEO metadata generation."</p>
+                <hr />
+                <h3 id="form-works">"Form (WORKS)"</h3>
+                <p>"Declarative forms with built-in validation."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"form ContactForm {
+    field name: String {
+        label: \"Name\",
+        required,
+        min_length: 2,
+    }
+
+    field email: String {
+        label: \"Email\",
+        required,
+        email,
+    }
+}"</code></pre>
+                <p>"Generates form schema JSON and registration function. Built-in validators: "<code>"required"</code>", "<code>"min_length"</code>", "<code>"max_length"</code>", "<code>"pattern"</code>", "<code>"email"</code>", "<code>"url"</code>", "<code>"min"</code>", "<code>"max"</code>", "<code>"custom"</code>"."</p>
+                <hr />
+                <h3 id="embed-works">"Embed (WORKS)"</h3>
+                <p>"Third-party script embedding with sandboxing."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"embed Analytics {
+    src: \"https://analytics.example.com/script.js\",
+    loading: \"defer\",
+    sandbox: true,
+}"</code></pre>
+                <hr />
+                <h3 id="pdf-works">"PDF (WORKS)"</h3>
+                <p>"PDF document definition."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"pdf Invoice {
+    page_size: \"A4\",
+    orientation: \"portrait\",
+
+    render {
+        <div>\"Invoice content\"</div>
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="animation-works">"Animation (WORKS)"</h3>
+                <p>"Spring physics, keyframes, and stagger animations."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"spring MenuSlide {
+    stiffness: 200,
+    damping: 20,
+    mass: 1,
+    properties: [\"transform\", \"opacity\"],
+}
+
+keyframes FadeIn {
+    0% { opacity: \"0\" }
+    100% { opacity: \"1\" }
+    duration: \"0.3s\",
+    easing: \"ease-out\",
+}"</code></pre>
+                <hr />
+                <h3 id="breakpoints-works">"Breakpoints (WORKS)"</h3>
+                <p>"Responsive design breakpoints."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"breakpoints {
+    mobile: 320,
+    tablet: 768,
+    desktop: 1024,
+}"</code></pre>
+                <hr />
+                <h3 id="agent-works">"Agent (WORKS)"</h3>
+                <p>"AI agent definition with tools and system prompt."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"agent Assistant {
+    prompt system = \"You are a helpful assistant.\";
+
+    tool search(query: String) -> String {
+        // tool implementation
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="modules-works">"Modules (WORKS)"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"mod utils;                           // loads utils.nectar
+mod helpers {                        // inline module
+    pub fn cap(s: String) -> String {
+        // ...
+    }
+}
+use models::User;                    // import"</code></pre>
+                <hr />
+                <h3 id="timer-and-console-works">"Timer and Console (WORKS)"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Performance timing
+let t0 = timer.now();          // calls $timer_now import
+// ... work ...
+let elapsed = timer.now();     // measure elapsed time
+
+// Console output
+webapi.consoleLog(\"message\");  // calls $webapi_consoleLog import"</code></pre>
+                <hr />
+                <h3 id="crypto-wasm-internal-works">"Crypto (WASM-Internal, WORKS)"</h3>
+                <p>"All cryptography runs in pure WASM -- no JavaScript, no Web Crypto API."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let hash = crypto::sha256(data);
+let mac = crypto::hmac(key, data);
+let ct = crypto::encrypt(key, plaintext);         // AES-GCM
+let pt = crypto::decrypt(key, ciphertext);
+let sig = crypto::sign(private_key, data);         // Ed25519
+let ok = crypto::verify(public_key, data, sig);
+let dk = crypto::derive_key(password, salt);       // PBKDF2
+let uuid = crypto::random_uuid();
+let bytes = crypto::random_bytes(32);"</code></pre>
+                <hr />
+                <h3 id="wasm-architecture">"WASM Architecture"</h3>
+                <h4 id="how-nectar-compiles">"How Nectar compiles:"</h4>
+                <pre class="code-block"><code>".nectar source
+     |
+Lexer -> Token stream
+     |
+Parser -> AST
+     |
+Type checker + Borrow checker
+     |
+Optimizations (const folding, DCE, tree shaking)
+     |
+Codegen -> WAT (WebAssembly Text Format)
+     |
+wasm_binary -> .wasm binary
+     |
+Browser loads .wasm + core.js (~3 KB gzip)"</code></pre>
+                <h4 id="signal-system">"Signal System:"</h4>
+                <p>"Every "<code>"let mut"</code>" field in a component becomes a signal:"</p>
+                <ol>
+                    <li><strong>"Signal creation"</strong>": "<code>"signal_create(initial_value) -> signal_id"</code></li>
+                    <li><strong>"Signal read"</strong>": "<code>"signal_get(signal_id) -> value"</code></li>
+                    <li><strong>"Signal write"</strong>": "<code>"signal_set(signal_id, new_value)"</code>" -- triggers all subscribed effects"</li>
+                    <li><strong>"Signal subscribe"</strong>": "<code>"signal_subscribe(signal_id, updater_func_table_idx)"</code>" -- registers an effect function"</li>
+                </ol>
+                <h4 id="dom-update-flow">"DOM Update Flow:"</h4>
+                <ol>
+                    <li>"User clicks button -> JS calls "<code>"__callback(handler_idx)"</code></li>
+                    <li>"WASM handler runs (e.g., "<code>"self.count = self.count + 1"</code>")"</li>
+                    <li>"Handler calls "<code>"signal_set"</code>" for the updated field"</li>
+                    <li><code>"signal_set"</code>" triggers subscribed updater functions via "<code>"call_indirect"</code></li>
+                    <li>"Updater reads the new signal value, converts to string, calls "<code>"dom_setText"</code></li>
+                    <li>"JS "<code>"dom_setText"</code>" updates the actual DOM text node"</li>
+                </ol>
+                <p>"Total JS calls per signal change: 1 ("<code>"dom_setText"</code>"). No virtual DOM. No diffing."</p>
+                <h4 id="command-buffer">"Command Buffer:"</h4>
+                <p>"For bulk DOM operations, WASM writes opcodes into a command buffer in linear memory. A single "<code>"flush()"</code>" call per animation frame executes them all. Opcodes include: SET_TEXT, SET_ATTR, SET_STYLE, CLASS_ADD, CLASS_REMOVE, APPEND_CHILD, REMOVE_CHILD."</p>
+                <h4 id="call-indirect-and-function-table">"Call Indirect and Function Table:"</h4>
+                <p>"Event handlers and signal updaters use WASM's "<code>"call_indirect"</code>" instruction. Each handler function is registered in a function table at a unique index. The "<code>"__callback"</code>" dispatcher uses this index to route events to the correct handler."</p>
+                <h4 id="linear-memory-layout">"Linear Memory Layout:"</h4>
+                <pre class="code-block"><code>"[0..255]        Reserved
+[256..]         String data (interned at compile time)
+[heap..]        Dynamic allocations (structs, arrays, signal values)"</code></pre>
+                <p>"Strings are interned: "<code>"self.store_string(\"text\")"</code>" returns an offset. At runtime, string comparisons use byte-by-byte comparison in WASM."</p>
+                <hr />
+                <h3 id="complete-working-example">"Complete Working Example"</h3>
+                <p>"This is the pattern proven by the demo application. An AI generating Nectar code should follow this structure:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// 1. Define data structures
+struct Product {
+    name: String,
+    category: String,
+    price: String,
+}
+
+// 2. Define contracts for API communication
+contract ProductResponse {
+    id: i32,
+    name: String,
+    price: String,
+}
+
+// 3. Define stores for shared state
+store CartStore {
+    signal count: i32 = 0;
+
+    action add() {
+        self.count = self.count + 1;
+    }
+
+    action clear() {
+        self.count = 0;
+    }
+}
+
+// 4. Define database for persistence
+db AppDB {
+    version: 1,
+}
+
+// 5. Build components
+component ProductList() {
+    let mut products: [Product] = [];
+    let mut product_count: i32 = 0;
+    let mut active_filter: String = \"all\";
+
+    fn init(&mut self) {
+        let mut i: i32 = 0;
+        while i < 100 {
+            let cat: String = \"Electronics\";
+            let m: i32 = i - (i / 3) * 3;
+            if m == 1 {
+                cat = \"Clothing\";
+            }
+            if m == 2 {
+                cat = \"Home\";
+            }
+            self.products.push(Product {
+                name: \"Product\",
+                category: cat,
+                price: \"$29.99\",
+            });
+            i = i + 1;
+        }
+        self.product_count = 100;
+    }
+
+    fn set_filter_all(&mut self) {
+        self.active_filter = \"all\";
+        self.product_count = 100;
+    }
+
+    fn set_filter_electronics(&mut self) {
+        self.active_filter = \"Electronics\";
+        self.product_count = 34;
+    }
+
+    fn add_to_cart(&mut self, product: Product) {
+        CartStore::add();
+    }
+
+    render {
+        <div class=\"app\">
+            <h1>\"Product Catalog\"</h1>
+            <div class=\"controls\">
+                <button class={if self.active_filter == \"all\" { \"btn active\" } else { \"btn\" }}
+                        on:click={self.set_filter_all}>
+                    \"All\"
+                </button>
+                <button class={if self.active_filter == \"Electronics\" { \"btn active\" } else { \"btn\" }}
+                        on:click={self.set_filter_electronics}>
+                    \"Electronics\"
+                </button>
+            </div>
+            <p>\"Showing: \"{format(\"{}\", self.product_count)}\" products\"</p>
+            <div class=\"product-grid\">
+                {lazy for product in self.products {
+                    <div class=\"product-card\">
+                        <div class=\"name\">{product.name}</div>
+                        <div class=\"category\">{product.category}</div>
+                        <div class=\"price\">{product.price}</div>
+                        <button class=\"add-btn\" on:click={self.add_to_cart}>
+                            \"Add to Cart\"
+                        </button>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}
+
+// 6. Set up routing
+router AppRouter {
+    route \"/\" => ProductList,
+    fallback => ProductList,
+}"</code></pre>
+                <hr />
+                <h3 id="feature-status-summary">"Feature Status Summary"</h3>
+                <h4 id="features-with-working-codegen-use-these">"Features with working codegen (use these):"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"Status"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Generic types / monomorphization"</td><td>"Working -- functions specialized per concrete type"</td></tr>
+                        <tr><td>"Trait / impl dispatch"</td><td>"Working -- static dispatch at compile time"</td></tr>
+                        <tr><td>"Tuple types "<code>"(T, U)"</code></td><td>"Working -- literal construction and "<code>".0"</code>"/"<code>".1"</code>" access"</td></tr>
+                        <tr><td>"Tuple/struct/array destructuring in "<code>"match"</code></td><td>"Working"</td></tr>
+                        <tr><td><code>"break"</code>" / "<code>"continue"</code>" in loops"</td><td>"Working -- compiles to WASM "<code>"br"</code></td></tr>
+                        <tr><td><code>"spawn { }"</code>" / "<code>"parallel { }"</code></td><td>"Working -- Web Worker codegen"</td></tr>
+                        <tr><td><code>"channel<T>()"</code>" / "<code>"ch.send()"</code>" / "<code>"ch.recv()"</code></td><td>"Working -- MessageChannel codegen"</td></tr>
+                        <tr><td><code>"suspend(<Fallback />) { <Heavy /> }"</code></td><td>"Working -- codegen for fallback rendering"</td></tr>
+                        <tr><td>"Dynamic imports "<code>"import(\"./module\")"</code></td><td>"Working -- codegen emits "<code>"dom_loadChunk"</code></td></tr>
+                        <tr><td><code>"prompt \"...\""</code>" (AI prompt templates)"</td><td>"Working -- builds string and triggers fetch"</td></tr>
+                        <tr><td>"Streaming fetch "<code>"for chunk in stream fetch(url)"</code></td><td>"Working -- codegen emits "<code>"streaming_streamFetch"</code></td></tr>
+                        <tr><td>"Closures with environment capture"</td><td>"Working -- compiled to function table entries"</td></tr>
+                        <tr><td>"Component composition ("<code>"<Outlet />"</code>")"</td><td>"Working -- router layout blocks"</td></tr>
+                        <tr><td>"Lifetime validation"</td><td>"Working -- NLL, field borrows, return ref verification, reborrowing"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="features-with-limited-or-no-codegen-use-with-caution">"Features with limited or no codegen (use with caution):"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Feature"</th><th>"Status"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"async fn"</code>" / "<code>"await"</code></td><td>"Parsed, no async runtime"</td></tr>
+                        <tr><td><code>"f\"string {interpolation}\""</code></td><td>"Parsed into AST as FormatString, codegen exists but less proven than "<code>"format()"</code></td></tr>
+                        <tr><td><code>"let (a, b) = expr;"</code>" destructuring"</td><td>"Parsed but no codegen -- use "<code>"match"</code>" instead"</td></tr>
+                        <tr><td><code>"try { } catch e { }"</code></td><td>"Parsed, limited codegen"</td></tr>
+                        <tr><td><code>"yield"</code></td><td>"Parsed, no generator runtime"</td></tr>
+                        <tr><td><code>"bind:value={signal}"</code></td><td>"Parsed and codegen exists, but less battle-tested than on:click handlers"</td></tr>
+                        <tr><td>"Full enum variant matching"</td><td>"Limited -- Ok/Err/Some/None work, custom enum variants are incomplete"</td></tr>
+                        <tr><td>"WebRTC ("<code>"rtc::"</code>" namespace)"</td><td>"Parsed, runtime imports exist but end-to-end is untested"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <hr />
+                <h3 id="quick-reference-patterns-that-compile">"Quick Reference: Patterns That Compile"</h3>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Integer to string for display
+{format(\"{}\", self.count)}
+
+// String comparison
+if self.active == \"all\" { ... }
+
+// String signal in template
+{self.name}
+
+// Static text
+\"Hello world\"
+
+// Adjacent text + expression
+\"Count: \"{format(\"{}\", self.count)}
+
+// Conditional class
+class={if self.active == \"x\" { \"active\" } else { \"inactive\" }}
+
+// Event handler
+on:click={self.method_name}
+
+// Conditional block
+{if self.flag == 1 { <div>\"visible\"</div> }}
+
+// For loop with struct access
+{for item in self.items { <div>{item.field}</div> }}
+
+// Lazy for loop (large lists)
+{lazy for item in self.items { <div>{item.field}</div> }}
+
+// Array push
+self.items.push(StructName { field: \"value\" });
+
+// While loop
+while i < n { i = i + 1; }
+
+// Modulo (no % operator in demo, use subtraction)
+let m: i32 = i - (i / 5) * 5;
+
+// Integer to string
+format(\"{}\", int_value)
+
+// Store action call
+StoreName::action_name();
+
+// Contract parse
+ContractName::parse(json_ptr, json_len);
+
+// Navigate
+navigate(\"/path\");"</code></pre>
+                <hr />
+                <h3 id="key-differences-from-rust">"Key Differences from Rust"</h3>
+                <p>"If you know Rust, these are the differences:"</p>
+                <ol>
+                    <li><strong>"No "<code>"println!"</code>" macro"</strong>" -- use "<code>"webapi.consoleLog()"</code>" or render in templates"</li>
+                    <li><strong>"No "<code>"String::from()"</code></strong>" -- string literals are directly usable"</li>
+                    <li><strong>"No "<code>"Vec::new()"</code></strong>" -- use "<code>"[]"</code>" for empty arrays"</li>
+                    <li><strong>"No iterators with "<code>".collect()"</code></strong>" -- map/filter/fold return arrays directly"</li>
+                    <li><strong>"No "<code>"match"</code>" on strings"</strong>" -- use "<code>"if/else"</code>" chains for string comparisons"</li>
+                    <li><strong>"No "<code>"impl"</code>" methods in practice"</strong>" -- use component methods with "<code>"&mut self"</code></li>
+                    <li><strong>"No generics"</strong>" -- use concrete types everywhere"</li>
+                    <li><strong>"No "<code>"use std::..."</code></strong>" -- stdlib is auto-included, accessed via "<code>"crypto::"</code>", "<code>"format()"</code>", etc."</li>
+                    <li><strong><code>"format(\"{}\", val)"</code>" not "<code>"format!(\"{}\", val)"</code></strong>" -- it is a function, not a macro"</li>
+                    <li><strong>"Signal updates are automatic"</strong>" -- assigning to "<code>"self.field"</code>" in a method triggers DOM updates"</li>
+                </ol>
+                <hr />
+                <h3 id="file-structure-for-a-nectar-app">"File Structure for a Nectar App"</h3>
+                <pre class="code-block"><code>"my-app/
+  app.nectar          # Main application file
+  components.nectar   # Additional components (use mod)
+  styles.css          # Optional external CSS (loaded by core.js)"</code></pre>
+                <p>"Build: "<code>"nectar build app.nectar --emit-wasm"</code></p>
+                <p>"Output:"</p>
+                <pre class="code-block"><code>"  app.wasm            # Compiled WebAssembly binary
+  core.js             # Runtime syscall layer (~3 KB gzip)
+  index.html          # Generated HTML shell"</code></pre>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

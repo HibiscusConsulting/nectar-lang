@@ -1,0 +1,878 @@
+// docs/toolchain.nectar — auto-generated from docs/toolchain.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page ToolchainDoc() {
+    meta {
+        title: "Nectar Toolchain Reference — Nectar Documentation",
+        description: "CLI reference, formatter, linter, LSP, package manager, dev server.",
+        canonical: "/docs/toolchain",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain" class="current">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Toolchain"
+                    </div>
+                    <h1>"Nectar Toolchain Reference"</h1>
+                <p>"This document covers every command, flag, and configuration option in the Nectar toolchain."</p>
+                <hr />
+                <h3 id="table-of-contents">"Table of Contents"</h3>
+                <ol>
+                    <li><a href="#overview">"Overview"</a></li>
+                    <li><a href="#nectar-build">"nectar build"</a></li>
+                    <li><a href="#nectar-check">"nectar check"</a></li>
+                    <li><a href="#nectar-test">"nectar test"</a></li>
+                    <li><a href="#nectar-fmt">"nectar fmt"</a></li>
+                    <li><a href="#nectar-lint">"nectar lint"</a></li>
+                    <li><a href="#nectar-dev">"nectar dev"</a></li>
+                    <li><a href="#nectar-init">"nectar init"</a></li>
+                    <li><a href="#nectar-add">"nectar add"</a></li>
+                    <li><a href="#nectar-install">"nectar install"</a></li>
+                    <li><a href="#-lsp-language-server">"--lsp (Language Server)"</a></li>
+                    <li><a href="#-ssr-hydrate-server-side-rendering">"--ssr / --hydrate (Server-Side Rendering)"</a></li>
+                    <li><a href="#direct-compilation-mode">"Direct Compilation Mode"</a></li>
+                    <li><a href="#nectartoml-configuration">"Nectar.toml Configuration"</a></li>
+                </ol>
+                <hr />
+                <h3 id="overview">"Overview"</h3>
+                <p>"The "<code>"nectar"</code>" command-line tool is the central entry point for compiling, testing, formatting, linting, and running Nectar programs. It also includes a development server, package manager, and language server."</p>
+                <pre class="code-block"><code>"nectar [COMMAND] [OPTIONS] [FILE]
+
+Commands:
+  build     Compile the project (and its dependencies)
+  check     Type-check, borrow-check, and lint without codegen (fast)
+  test      Compile and run test blocks
+  fmt       Format Nectar source files
+  lint      Run the linter on Nectar source files
+  dev       Start the development server with hot reload
+  init      Initialize a new Nectar project
+  add       Add a dependency to Nectar.toml
+  install   Resolve and download all dependencies
+
+Flags:
+  --lsp     Start the Language Server Protocol server
+  --help    Show help information
+  --version Show version information"</code></pre>
+                <hr />
+                <h3 id="nectar-build">"nectar build"</h3>
+                <p>"Compile Nectar source files to WebAssembly."</p>
+                <h4 id="usage">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar build <input> [OPTIONS]"</code></pre>
+                <h4 id="arguments">"Arguments"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Argument"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<input>"</code></td><td>"Source file to compile ("<code>".nectar"</code>")"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="flags">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"-o"</code>", "<code>"--output <file>"</code></td><td>"Output file path (default: "<code>"<input>.wat"</code>" or "<code>"<input>.wasm"</code>")"</td></tr>
+                        <tr><td><code>"--emit-wasm"</code></td><td>"Emit binary "<code>".wasm"</code>" instead of "<code>".wat"</code>" text format"</td></tr>
+                        <tr><td><code>"--ssr"</code></td><td>"Emit SSR (server-side rendering) JavaScript module"</td></tr>
+                        <tr><td><code>"--hydrate"</code></td><td>"Emit client hydration bundle"</td></tr>
+                        <tr><td><code>"--no-check"</code></td><td>"Skip borrow checker and type checker"</td></tr>
+                        <tr><td><code>"-O"</code>", "<code>"--optimize <level>"</code></td><td>"Optimization level: 0, 1, or 2 (default: 0)"</td></tr>
+                        <tr><td><code>"--critical-css"</code></td><td>"Extract and inline critical CSS for SSR builds (use with "<code>"--ssr"</code>")"</td></tr>
+                        <tr><td><code>"--sw"</code></td><td>"Generate service worker with precache manifest"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="optimization-levels">"Optimization Levels"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Level"</th><th>"Description"</th><th>"Passes"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"-O0"</code></td><td>"No optimizations (default)"</td><td>"None"</td></tr>
+                        <tr><td><code>"-O1"</code></td><td>"Basic optimizations"</td><td>"Constant folding + Dead code elimination"</td></tr>
+                        <tr><td><code>"-O2"</code></td><td>"Full optimizations"</td><td>"All of "<code>"-O1"</code>" + Tree shaking + WASM-level peephole optimization"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="output-formats">"Output Formats"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Format"</th><th>"Flag"</th><th>"Extension"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"WAT"</td><td>"(default)"</td><td><code>".wat"</code></td><td>"WebAssembly Text Format -- human-readable, useful for debugging"</td></tr>
+                        <tr><td>"WASM"</td><td><code>"--emit-wasm"</code></td><td><code>".wasm"</code></td><td>"Binary WebAssembly -- production-ready, smaller size"</td></tr>
+                        <tr><td>"SSR"</td><td><code>"--ssr"</code></td><td><code>".ssr.js"</code></td><td>"JavaScript module for server-side rendering"</td></tr>
+                        <tr><td>"Hydrate"</td><td><code>"--hydrate"</code></td><td><code>".hydrate.wat"</code></td><td>"Client-side hydration bundle"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="examples">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Basic compilation to WAT
+nectar build app.nectar
+
+# Compile to binary WASM with full optimization
+nectar build app.nectar --emit-wasm -O2
+
+# Compile with custom output path
+nectar build src/main.nectar -o dist/app.wasm --emit-wasm
+
+# Server-side rendering
+nectar build app.nectar --ssr
+
+# Client hydration bundle
+nectar build app.nectar --hydrate
+
+# Skip checks for faster iteration
+nectar build app.nectar --no-check
+
+# SSR with critical CSS inlining
+nectar build app.nectar --ssr --critical-css
+
+# Generate with service worker and precache manifest
+nectar build app.nectar --emit-wasm -O2 --sw"</code></pre>
+                <h4 id="service-worker-generation-sw">"Service Worker Generation (`--sw`)"</h4>
+                <p>"When "<code>"--sw"</code>" is passed to "<code>"nectar build"</code>", the compiler:"</p>
+                <ol>
+                    <li><strong>"Copies "<code>"nectar-service-worker.js"</code></strong>" to the output directory as "<code>"nectar-sw.js"</code></li>
+                    <li><strong>"Stamps "<code>"CACHE_VERSION"</code></strong>" with a hash derived from the build output (ensures cache busting on new deploys)"</li>
+                    <li><strong>"Generates a precache manifest"</strong>" listing all output files ("<code>".wasm"</code>", "<code>".js"</code>", "<code>".css"</code>", "<code>".html"</code>") and injects it as "<code>"self.__NECTAR_PRECACHE_MANIFEST__"</code>" at the top of the service worker"</li>
+                    <li><strong>"Injects a registration call"</strong>" into the output HTML via "<code>"core.js"</code>": "<code>""</code><code>"html <script type=\"module\"> import { sw } from './core.js'; sw.register(); </script> "</code><code>""</code></li>
+                </ol>
+                <p>"The generated service worker is fully self-contained and requires no configuration. It uses cache-first for static assets, network-first for API calls, and includes an offline fallback. Service worker registration, update detection, and offline status are all handled by the "<code>"sw"</code>" namespace in "<code>"core.js"</code>"."</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Build with service worker
+nectar build app.nectar --emit-wasm --sw
+
+# Output directory will contain:
+#   app.wasm
+#   core.js               (unified runtime with SW registration)
+#   nectar-sw.js          (service worker with stamped version + manifest)"</code></pre>
+                <h4 id="compilation-pipeline">"Compilation Pipeline"</h4>
+                <p>"When you run "<code>"nectar build"</code>", the compiler performs these steps in order:"</p>
+                <ol>
+                    <li><strong>"Dependency resolution"</strong>" -- resolves "<code>"Nectar.toml"</code>" dependencies (if present)"</li>
+                    <li><strong>"Lexing"</strong>" -- tokenizes the source file"</li>
+                    <li><strong>"Parsing"</strong>" -- builds an AST with error recovery"</li>
+                    <li><strong>"Module loading"</strong>" -- resolves and loads "<code>"mod"</code>" declarations"</li>
+                    <li><strong>"Borrow checking"</strong>" -- validates ownership rules (unless "<code>"--no-check"</code>")"</li>
+                    <li><strong>"Type checking"</strong>" -- Hindley-Milner type inference (unless "<code>"--no-check"</code>")"</li>
+                    <li><strong>"Exhaustiveness checking"</strong>" -- warns about non-exhaustive match patterns"</li>
+                    <li><strong>"Monomorphization"</strong>" -- specializes generic functions for concrete types"</li>
+                    <li><strong>"Optimization"</strong>" -- runs enabled optimization passes"</li>
+                    <li><strong>"Code generation"</strong>" -- emits WAT, WASM, SSR JS, or hydration bundle"</li>
+                    <li><strong>"Source map emission"</strong>" -- writes "<code>".map"</code>" file if source mappings were recorded"</li>
+                </ol>
+                <hr />
+                <h3 id="nectar-check">"nectar check"</h3>
+                <p>"Run all analysis passes (type checking, borrow checking, and linting) without generating any WASM output. This is significantly faster than "<code>"nectar build"</code>" because it skips codegen, optimization, and WASM emission entirely."</p>
+                <h4 id="usage-2">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar check <input>"</code></pre>
+                <h4 id="arguments-2">"Arguments"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Argument"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<input>"</code></td><td>"Source file to check ("<code>".nectar"</code>")"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="analysis-pipeline">"Analysis Pipeline"</h4>
+                <p>"When you run "<code>"nectar check"</code>", the compiler performs these steps in order:"</p>
+                <ol>
+                    <li><strong>"Lexing"</strong>" -- tokenizes the source file"</li>
+                    <li><strong>"Parsing"</strong>" -- builds an AST with error recovery"</li>
+                    <li><strong>"Module loading"</strong>" -- resolves and loads "<code>"mod"</code>" declarations (if present)"</li>
+                    <li><strong>"Type checking"</strong>" -- Hindley-Milner type inference"</li>
+                    <li><strong>"Borrow checking"</strong>" -- validates ownership and borrowing rules"</li>
+                    <li><strong>"Exhaustiveness checking"</strong>" -- warns about non-exhaustive match patterns"</li>
+                    <li><strong>"Linting"</strong>" -- runs all lint rules"</li>
+                </ol>
+                <p>"Notably absent: optimization, codegen, and WASM emission. This makes "<code>"nectar check"</code>" the fastest way to verify correctness."</p>
+                <h4 id="output-format">"Output Format"</h4>
+                <p>"All diagnostics use the standard "<code>"file:line:col"</code>" format:"</p>
+                <pre class="code-block"><code>"app.nectar:12:5: type error: expected `i32`, found `String`
+app.nectar:20:9: borrow error: cannot borrow `x` as mutable; already borrowed as immutable
+app.nectar:31:1: warning [unused-variable] variable `tmp` is declared but never used"</code></pre>
+                <p>"If no issues are found:"</p>
+                <pre class="code-block"><code>"nectar check: app.nectar is clean — no errors, no warnings"</code></pre>
+                <h4 id="exit-codes">"Exit Codes"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Code"</th><th>"Meaning"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"0"</td><td>"No errors (warnings may be present)"</td></tr>
+                        <tr><td>"1"</td><td>"One or more errors found"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="when-to-use">"When to Use"</h4>
+                <ul>
+                    <li><strong>"During development"</strong>" -- run "<code>"nectar check"</code>" for rapid feedback without waiting for WASM generation"</li>
+                    <li><strong>"In CI pipelines"</strong>" -- use "<code>"nectar check"</code>" as a fast gate before the slower "<code>"nectar build"</code>" step"</li>
+                    <li><strong>"Editor integration"</strong>" -- wire "<code>"nectar check"</code>" to your save hook for instant error reporting"</li>
+                    <li><strong>"Pre-commit hooks"</strong>" -- validate correctness before committing"</li>
+                </ul>
+                <h4 id="examples-2">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Check a single file
+nectar check app.nectar
+
+# Use in CI (fails on errors, warnings are non-fatal)
+nectar check src/main.nectar || exit 1
+
+# Quick feedback loop during development
+nectar check src/main.nectar && nectar build src/main.nectar --emit-wasm"</code></pre>
+                <hr />
+                <h3 id="nectar-test">"nectar test"</h3>
+                <p>"Compile and run test blocks defined with the "<code>"test"</code>" keyword."</p>
+                <h4 id="usage-3">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar test <input> [OPTIONS]"</code></pre>
+                <h4 id="arguments-3">"Arguments"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Argument"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<input>"</code></td><td>"Source file containing tests ("<code>".nectar"</code>")"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="flags-2">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"--filter <pattern>"</code></td><td>"Only run tests whose name contains "<code>"<pattern>"</code></td></tr>
+                        <tr><td><code>"--watch"</code></td><td>"Re-run tests automatically whenever the source file changes"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="test-execution">"Test Execution"</h4>
+                <p>"The test runner finds all top-level "<code>"test \"name\" { ... }"</code>" blocks in the specified file. Tests are validated through the full compilation pipeline (lex, parse, borrow check, type check, codegen). Test WASM modules are executed via "<strong>"wasmtime"</strong>" when possible. If wasmtime execution fails (e.g., the module uses browser APIs that wasmtime cannot provide), the test falls back to compilation-only validation."</p>
+                <h4 id="test-output">"Test Output"</h4>
+                <pre class="code-block"><code>"running 3 tests
+  test addition works ... ok
+  test string concat ... ok
+  test user creation ... ok
+
+test result: ok. 3 passed; 0 failed"</code></pre>
+                <h4 id="filtering-tests">"Filtering Tests"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Run only tests containing \"user\" in their name
+nectar test tests.nectar --filter \"user\""</code></pre>
+                <h4 id="watch-mode">"Watch Mode"</h4>
+                <p>"When "<code>"--watch"</code>" is passed, Nectar monitors the source file for changes and automatically re-runs the test suite on each save. The console is cleared between runs, and each run is stamped with a timestamp. A 200ms debounce prevents double-fires from editors that perform multiple writes on save. Press "<strong>"Ctrl+C"</strong>" to stop."</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Watch mode — re-runs on every file change
+nectar test tests.nectar --watch
+
+# Combine watch mode with a filter
+nectar test tests.nectar --watch --filter \"auth\""</code></pre>
+                <p>"Watch output:"</p>
+                <pre class="code-block"><code>"[14:32:07] Running tests...
+
+running 3 tests
+  test addition works ... ok
+  test string concat ... ok
+  test user creation ... ok
+
+test result: ok. 3 passed; 0 failed"</code></pre>
+                <p>"Watch mode re-runs tests automatically when source files change:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar test app.nectar --watch
+nectar test app.nectar --watch --filter \"auth\""</code></pre>
+                <h4 id="examples-3">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Run all tests
+nectar test tests.nectar
+
+# Filter by name
+nectar test tests.nectar --filter \"auth\"
+
+# Watch mode
+nectar test tests.nectar --watch
+
+# Watch + filter
+nectar test tests.nectar --watch --filter \"auth\""</code></pre>
+                <hr />
+                <h3 id="nectar-fmt">"nectar fmt"</h3>
+                <p>"Format Nectar source files according to canonical style."</p>
+                <h4 id="usage-4">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar fmt [OPTIONS] [<input>]"</code></pre>
+                <h4 id="flags-3">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<input>"</code></td><td>"Source file to format ("<code>".nectar"</code>")"</td></tr>
+                        <tr><td><code>"--check"</code></td><td>"Check formatting without writing changes. Exits with code 1 if reformatting is needed"</td></tr>
+                        <tr><td><code>"--stdin"</code></td><td>"Read source from stdin instead of a file (output goes to stdout)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="formatting-rules">"Formatting Rules"</h4>
+                <p>"The formatter applies these canonical style rules:"</p>
+                <ul>
+                    <li><strong>"Indentation"</strong>": 4 spaces"</li>
+                    <li><strong>"Braces"</strong>": opening brace on the same line as the declaration"</li>
+                    <li><strong>"Trailing commas"</strong>": added after the last item in lists"</li>
+                    <li><strong>"Line length"</strong>": long expressions are wrapped at reasonable widths"</li>
+                    <li><strong>"Blank lines"</strong>": one blank line between top-level items"</li>
+                    <li><strong>"Semicolons"</strong>": consistent semicolon placement for statements"</li>
+                </ul>
+                <h4 id="editor-integration">"Editor Integration"</h4>
+                <p><strong>"VS Code"</strong>": Install the Nectar extension (which uses "<code>"--lsp"</code>") for format-on-save, or configure "<code>"nectar fmt --stdin"</code>" as an external formatter."</p>
+                <p><strong>"Neovim"</strong>": Configure in your "<code>"init.lua"</code>":"</p>
+                <div class="code-lang-label">"lua"</div>
+                <pre class="code-block"><code>"vim.api.nvim_create_autocmd(\"BufWritePre\", {
+  pattern = \"*.nectar\",
+  callback = function()
+    vim.cmd(\"silent !nectar fmt \" .. vim.fn.expand(\"%\"))
+    vim.cmd(\"edit\")
+  end,
+})"</code></pre>
+                <h4 id="ci-integration">"CI Integration"</h4>
+                <p>"Use "<code>"--check"</code>" in continuous integration to verify formatting:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar fmt --check src/main.nectar || (echo \"Run 'nectar fmt' to fix formatting\" && exit 1)"</code></pre>
+                <h4 id="examples-4">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Format a file in place
+nectar fmt app.nectar
+
+# Check without modifying
+nectar fmt --check app.nectar
+
+# Format from stdin (e.g., pipe from another command)
+cat app.nectar | nectar fmt --stdin"</code></pre>
+                <hr />
+                <h3 id="nectar-lint">"nectar lint"</h3>
+                <p>"Run static analysis on Nectar source files."</p>
+                <h4 id="usage-5">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar lint <input> [OPTIONS]"</code></pre>
+                <h4 id="flags-4">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<input>"</code></td><td>"Source file to lint ("<code>".nectar"</code>")"</td></tr>
+                        <tr><td><code>"--fix"</code></td><td>"Attempt to auto-fix warnings (where supported)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="lint-rules">"Lint Rules"</h4>
+                <p>"The linter checks for 10 rules, all enabled by default:"</p>
+                <h5 id="1-unused-variable-warning">"1. `unused-variable` (Warning)"</h5>
+                <p>"Detects variables that are declared but never used. Prefix with "<code>"_"</code>" to suppress."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: variable `x` is declared but never used
+let x = 42;
+
+// OK: prefixed with underscore
+let _x = 42;"</code></pre>
+                <h5 id="2-unused-function-warning">"2. `unused-function` (Warning)"</h5>
+                <p>"Detects private functions that are defined but never called."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: function `helper` is defined but never called
+fn helper() { }"</code></pre>
+                <h5 id="3-unused-import-warning">"3. `unused-import` (Warning)"</h5>
+                <p>"Detects imported names that are never referenced in the file."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: imported name `utils` is never used
+use std::utils;"</code></pre>
+                <h5 id="4-mutable-not-mutated-warning">"4. `mutable-not-mutated` (Warning)"</h5>
+                <p>"Detects variables declared as "<code>"mut"</code>" but never assigned to after declaration."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: variable `count` is declared as `mut` but is never mutated
+let mut count = 0;
+println(count);  // only read, never written"</code></pre>
+                <h5 id="5-empty-block-warning">"5. `empty-block` (Warning)"</h5>
+                <p>"Detects functions, if blocks, or else blocks with empty bodies."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: function `todo` has an empty body
+fn todo() { }
+
+// Warning: if block has an empty body
+if condition { }"</code></pre>
+                <h5 id="6-snake-case-functions-warning">"6. `snake-case-functions` (Warning)"</h5>
+                <p>"Functions and methods should use "<code>"snake_case"</code>" naming."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: function `myFunction` should use snake_case naming
+fn myFunction() { }
+
+// OK
+fn my_function() { }"</code></pre>
+                <h5 id="7-pascal-case-types-warning">"7. `pascal-case-types` (Warning)"</h5>
+                <p>"Types (structs, enums, components, stores, traits) should use "<code>"PascalCase"</code>" naming."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Warning: struct `my_struct` should use PascalCase naming
+struct my_struct { }
+
+// OK
+struct MyStruct { }"</code></pre>
+                <h5 id="8-unreachable-code-warning">"8. `unreachable-code` (Warning)"</h5>
+                <p>"Detects code after a "<code>"return"</code>" statement in the same block."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn example() -> i32 {
+    return 42;
+    let x = 10;  // Warning: unreachable code after return statement
+}"</code></pre>
+                <h5 id="9-single-match-info">"9. `single-match` (Info)"</h5>
+                <p>"Suggests using "<code>"if let"</code>" when a "<code>"match"</code>" has only one non-wildcard arm."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Info: this match has a single non-wildcard arm; consider using `if let`
+match value {
+    Some(x) => use(x),
+    _ => {},
+}"</code></pre>
+                <h5 id="10-redundant-clone-info">"10. `redundant-clone` (Info)"</h5>
+                <p>"Flags "<code>".clone()"</code>" calls that may be unnecessary if the source variable is not used afterwards."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Info: `data.clone()` may be redundant -- consider moving instead
+let copy = data.clone();"</code></pre>
+                <h4 id="output-format-2">"Output Format"</h4>
+                <p>"Lint warnings follow this format:"</p>
+                <pre class="code-block"><code>"<file>:<line>:<column>: <severity> [<rule>] <message>"</code></pre>
+                <p>"Example:"</p>
+                <pre class="code-block"><code>"app.nectar:12:5: warning [unused-variable] variable `x` is declared but never used
+app.nectar:20:1: warning [snake-case-functions] function `myHandler` should use snake_case naming"</code></pre>
+                <h4 id="exit-codes-2">"Exit Codes"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Code"</th><th>"Meaning"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"0"</td><td>"No warnings or errors"</td></tr>
+                        <tr><td>"1"</td><td>"One or more warnings or errors found"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="examples-5">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Lint a file
+nectar lint app.nectar
+
+# Lint with auto-fix
+nectar lint app.nectar --fix"</code></pre>
+                <hr />
+                <h3 id="nectar-dev">"nectar dev"</h3>
+                <p>"Start a development server with hot reload."</p>
+                <h4 id="usage-6">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar dev [OPTIONS]"</code></pre>
+                <h4 id="flags-5">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Default"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"--src <dir>"</code></td><td><code>"."</code></td><td>"Source directory to watch"</td></tr>
+                        <tr><td><code>"--build-dir <dir>"</code></td><td><code>"./build"</code></td><td>"Build output directory"</td></tr>
+                        <tr><td><code>"-p"</code>", "<code>"--port <port>"</code></td><td><code>"3000"</code></td><td>"Port to serve on"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="how-it-works">"How It Works"</h4>
+                <p>"The dev server:"</p>
+                <ol>
+                    <li><strong>"Starts an HTTP server"</strong>" on the specified port, serving the build directory"</li>
+                    <li><strong>"Watches "<code>".nectar"</code>" files"</strong>" in the source directory using filesystem polling"</li>
+                    <li><strong>"Recompiles on change"</strong>" when a source file is modified"</li>
+                    <li><strong>"Notifies the browser"</strong>" via WebSocket for hot module replacement (HMR)"</li>
+                    <li><strong>"SPA fallback"</strong>" -- unmatched routes serve "<code>"index.html"</code>", enabling client-side routing without 404s"</li>
+                </ol>
+                <h4 id="websocket-protocol">"WebSocket Protocol"</h4>
+                <p>"The dev server communicates with the browser runtime using a simple WebSocket protocol:"</p>
+                <ul>
+                    <li><strong>"Server to Client"</strong>": "<code>"{\"type\": \"hmr\"}"</code>" -- signals that the WASM module has been recompiled and should be hot-reloaded"</li>
+                    <li>"The client runtime reconnects automatically if the WebSocket connection drops"</li>
+                </ul>
+                <h4 id="source-map-emission">"Source Map Emission"</h4>
+                <p>"When the compiler records source mappings during codegen, it automatically writes a "<code>".map"</code>" file alongside the output. This enables browser DevTools to show Nectar source when debugging WASM."</p>
+                <h4 id="examples-6">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Start with defaults (port 3000, watch current directory)
+nectar dev
+
+# Custom port and source directory
+nectar dev --src src --port 8080
+
+# Custom build directory
+nectar dev --build-dir dist --port 4000"</code></pre>
+                <hr />
+                <h3 id="nectar-init">"nectar init"</h3>
+                <p>"Initialize a new Nectar project by creating an "<code>"Nectar.toml"</code>" manifest."</p>
+                <h4 id="usage-7">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar init [OPTIONS]"</code></pre>
+                <h4 id="flags-6">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"--name <name>"</code></td><td>"Project name (defaults to the current directory name)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="generated-file">"Generated File"</h4>
+                <p><code>"nectar init"</code>" creates an "<code>"Nectar.toml"</code>" file in the current directory:"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[package]
+name = \"my-project\"
+version = \"0.1.0\"
+
+[dependencies]"</code></pre>
+                <p>"If an "<code>"Nectar.toml"</code>" already exists, the command fails with an error."</p>
+                <h4 id="example">"Example"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"mkdir my-app
+cd my-app
+nectar init --name my-app"</code></pre>
+                <hr />
+                <h3 id="nectar-add">"nectar add"</h3>
+                <p>"Add a dependency to "<code>"Nectar.toml"</code>"."</p>
+                <h4 id="usage-8">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar add <package> [OPTIONS]"</code></pre>
+                <h4 id="arguments-4">"Arguments"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Argument"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<package>"</code></td><td>"Package name to add"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="flags-7">"Flags"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Default"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"--version <req>"</code></td><td><code>"*"</code>" (latest)"</td><td>"Version requirement (e.g., "<code>"^1.0"</code>", "<code>"~2.3"</code>", "<code>"=1.2.3"</code>")"</td></tr>
+                        <tr><td><code>"--path <dir>"</code></td><td>"(none)"</td><td>"Local path dependency"</td></tr>
+                        <tr><td><code>"--features <list>"</code></td><td>"(none)"</td><td>"Comma-separated list of features to enable"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="dependency-formats">"Dependency Formats"</h4>
+                <p><strong>"Simple version dependency"</strong>":"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar add my-lib --version \"^1.0\""</code></pre>
+                <p>"Adds to "<code>"Nectar.toml"</code>":"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[dependencies]
+my-lib = \"^1.0\""</code></pre>
+                <p><strong>"Detailed dependency with features"</strong>":"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar add ui-kit --version \"^2.0\" --features \"animations,themes\""</code></pre>
+                <p>"Adds to "<code>"Nectar.toml"</code>":"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[dependencies.ui-kit]
+version = \"^2.0\"
+features = [\"animations\", \"themes\"]"</code></pre>
+                <p><strong>"Local path dependency"</strong>":"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar add shared-lib --path \"../shared-lib\""</code></pre>
+                <p>"Adds to "<code>"Nectar.toml"</code>":"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[dependencies.shared-lib]
+path = \"../shared-lib\""</code></pre>
+                <hr />
+                <h3 id="nectar-install">"nectar install"</h3>
+                <p>"Resolve and download all dependencies declared in "<code>"Nectar.toml"</code>"."</p>
+                <h4 id="usage-9">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar install"</code></pre>
+                <h4 id="behavior">"Behavior"</h4>
+                <ol>
+                    <li>"Reads "<code>"Nectar.toml"</code>" from the current directory"</li>
+                    <li>"Resolves the dependency graph (fetching version metadata from the registry)"</li>
+                    <li>"Downloads packages to the local cache"</li>
+                    <li>"Writes "<code>"Nectar.lock"</code>" with pinned versions and checksums"</li>
+                </ol>
+                <p>"If no "<code>"Nectar.toml"</code>" exists or there are no dependencies, the command succeeds silently."</p>
+                <h4 id="output">"Output"</h4>
+                <pre class="code-block"><code>"resolved 3 dependencies
+  http-client v1.2.0
+  json-parser v0.8.3
+  ui-components v2.1.0"</code></pre>
+                <h4 id="nectarlock">"Nectar.lock"</h4>
+                <p>"The lockfile ("<code>"Nectar.lock"</code>") pins exact versions for reproducible builds:"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"version = 1
+
+[[packages]]
+name = \"http-client\"
+version = \"1.2.0\"
+source = \"registry+~/.nectar/cache/http-client-1.2.0\""</code></pre>
+                <p>"Commit "<code>"Nectar.lock"</code>" to version control for reproducible builds."</p>
+                <hr />
+                <h3 id="-lsp-language-server">"--lsp (Language Server)"</h3>
+                <p>"Start the Language Server Protocol (LSP) server for editor integration."</p>
+                <h4 id="usage-10">"Usage"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar --lsp"</code></pre>
+                <h4 id="lsp-capabilities">"LSP Capabilities"</h4>
+                <p>"The Nectar language server provides:"</p>
+                <ul>
+                    <li><strong>"Diagnostics"</strong>" -- real-time error and warning reporting as you type"</li>
+                    <li><strong>"Go to Definition"</strong>" -- jump to the definition of functions, types, and variables"</li>
+                    <li><strong>"Hover Information"</strong>" -- type information and documentation on hover"</li>
+                    <li><strong>"Completion"</strong>" -- context-aware code completion for keywords, types, and identifiers, including "<strong>"dot-completion"</strong>" that resolves the type of the expression before the dot and suggests its fields and methods"</li>
+                    <li><strong>"Formatting"</strong>" -- document formatting using the built-in formatter"</li>
+                </ul>
+                <h4 id="vs-code-setup">"VS Code Setup"</h4>
+                <p>"Install the Nectar VS Code extension, or configure manually in "<code>".vscode/settings.json"</code>":"</p>
+                <div class="code-lang-label">"json"</div>
+                <pre class="code-block"><code>"{
+  \"nectar.serverPath\": \"/path/to/nectar\",
+  \"nectar.serverArgs\": [\"--lsp\"]
+}"</code></pre>
+                <h4 id="neovim-setup-nvim-lspconfig">"Neovim Setup (nvim-lspconfig)"</h4>
+                <div class="code-lang-label">"lua"</div>
+                <pre class="code-block"><code>"local lspconfig = require('lspconfig')
+
+lspconfig.nectar = {
+  default_config = {
+    cmd = { 'nectar', '--lsp' },
+    filetypes = { 'nectar' },
+    root_dir = lspconfig.util.root_pattern('Nectar.toml', '.git'),
+  },
+}
+
+lspconfig.nectar.setup({})"</code></pre>
+                <h4 id="other-editors">"Other Editors"</h4>
+                <p>"Any editor supporting LSP can use Nectar's language server. Point the editor's LSP client to "<code>"nectar --lsp"</code>" as the server command."</p>
+                <hr />
+                <h3 id="-ssr-hydrate-server-side-rendering">"--ssr / --hydrate (Server-Side Rendering)"</h3>
+                <p>"Nectar supports server-side rendering (SSR) with client-side hydration for fast initial page loads."</p>
+                <h4 id="ssr-workflow">"SSR Workflow"</h4>
+                <p><strong>"Step 1: Generate the SSR bundle"</strong></p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar build app.nectar --ssr"</code></pre>
+                <p>"This produces "<code>"app.ssr.js"</code>", a JavaScript module that renders your components to HTML strings on the server."</p>
+                <p><strong>"Step 2: Generate the hydration bundle"</strong></p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar build app.nectar --hydrate"</code></pre>
+                <p>"This produces "<code>"app.hydrate.wat"</code>" (or "<code>".wasm"</code>" with "<code>"--emit-wasm"</code>"), a lightweight client bundle that attaches event handlers and reactivity to the server-rendered HTML without re-rendering."</p>
+                <p><strong>"Step 3: Serve from your backend"</strong></p>
+                <div class="code-lang-label">"javascript"</div>
+                <pre class="code-block"><code>"// Node.js example
+const { render } = require('./app.ssr.js');
+const html = render({ props: { /* ... */ } });
+
+res.send(`
+<!DOCTYPE html>
+<html>
+<body>
+  <div id=\"app\">${html}</div>
+  <script src=\"core.js\"></script>
+  <script>
+    const runtime = new NectarRuntime();
+    runtime.mount('app.hydrate.wasm', document.getElementById('app'));
+  </script>
+</body>
+</html>
+`);"</code></pre>
+                <h4 id="benefits">"Benefits"</h4>
+                <ul>
+                    <li><strong>"Faster First Paint"</strong>" -- users see content immediately from the server-rendered HTML"</li>
+                    <li><strong>"SEO Friendly"</strong>" -- search engines can index the server-rendered content"</li>
+                    <li><strong>"Smaller Client Bundle"</strong>" -- the hydration bundle skips initial DOM creation"</li>
+                </ul>
+                <h4 id="critical-css-inlining-critical-css">"Critical CSS Inlining (`--critical-css`)"</h4>
+                <p>"When building with "<code>"--ssr --critical-css"</code>", the compiler extracts styles that are needed for the initial render and inlines them directly into the SSR output. This eliminates the flash of unstyled content (FOUC) and provides instant visual feedback."</p>
+                <p><strong>"How it works:"</strong></p>
+                <ol>
+                    <li>
+                        <p>"The compiler analyzes all components in the program and classifies their styles as "<strong>"critical"</strong>" or "<strong>"deferred"</strong>":"</p>
+                        <ul>
+                            <li><strong>"Critical"</strong>": styles from non-lazy components, styles from the first route's component in each router, built-in skeleton and reset CSS"</li>
+                            <li><strong>"Deferred"</strong>": styles from "<code>"lazy component"</code>" definitions and components not on the initial route"</li>
+                        </ul>
+                    </li>
+                    <li>"Critical CSS is inlined in a "<code>"<style data-nectar-critical>"</code>" tag in the "<code>"<head>"</code></li>
+                    <li>"Deferred CSS is written to a separate "<code>".css"</code>" file and loaded asynchronously using the "<code>"media=\"print\""</code>" / "<code>"onload"</code>" pattern"</li>
+                    <li>"A "<code>"window.__nectarCriticalLoaded"</code>" flag is set so the client-side runtime knows not to double-inject styles that are already present"</li>
+                </ol>
+                <p><strong>"Usage:"</strong></p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Build SSR module with critical CSS extraction
+nectar build app.nectar --ssr --critical-css"</code></pre>
+                <p>"This produces:"</p>
+                <ul>
+                    <li><code>"app.ssr.js"</code>" -- SSR module with critical CSS inlined in the output"</li>
+                    <li><code>"app.ssr.css"</code>" -- deferred CSS loaded asynchronously by the client"</li>
+                </ul>
+                <p><strong>"What is always inlined:"</strong></p>
+                <p>"The following base styles are always included in the critical CSS, even if no component explicitly declares them:"</p>
+                <ul>
+                    <li><strong>"Nectar reset"</strong>" -- minimal box-sizing reset and hydration transition"</li>
+                    <li><strong>"Skeleton loading"</strong>" -- "<code>".nectar-skeleton"</code>", "<code>".nectar-skeleton-text"</code>", "<code>".nectar-skeleton-avatar"</code>", "<code>".nectar-skeleton-rect"</code>" with shimmer animation"</li>
+                </ul>
+                <p><strong>"Server integration:"</strong></p>
+                <div class="code-lang-label">"javascript"</div>
+                <pre class="code-block"><code>"const { renderApp } = require('./app.ssr.js');
+
+// renderApp automatically includes:
+// - <style data-nectar-critical>...</style> in <head>
+// - <link rel=\"stylesheet\" href=\"styles.css\" media=\"print\" onload=\"this.media='all'\">
+// - <script>window.__nectarCriticalLoaded = true;</script>
+const html = renderApp('App', {});"</code></pre>
+                <hr />
+                <h3 id="direct-compilation-mode">"Direct Compilation Mode"</h3>
+                <p>"For quick one-off compilations, you can pass a file directly to "<code>"nectar"</code>" without a subcommand:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar app.nectar [OPTIONS]"</code></pre>
+                <p>"This is equivalent to "<code>"nectar build app.nectar"</code>" but also supports debug flags:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Flag"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"--emit-tokens"</code></td><td>"Print the token stream and exit (for debugging the lexer)"</td></tr>
+                        <tr><td><code>"--emit-ast"</code></td><td>"Print the AST and exit (for debugging the parser)"</td></tr>
+                        <tr><td><code>"--emit-wasm"</code></td><td>"Emit binary "<code>".wasm"</code></td></tr>
+                        <tr><td><code>"--ssr"</code></td><td>"Emit SSR JavaScript module"</td></tr>
+                        <tr><td><code>"--hydrate"</code></td><td>"Emit hydration bundle"</td></tr>
+                        <tr><td><code>"--no-check"</code></td><td>"Skip borrow checker and type checker"</td></tr>
+                        <tr><td><code>"-O <level>"</code></td><td>"Optimization level"</td></tr>
+                        <tr><td><code>"-o <file>"</code></td><td>"Output file path"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="examples-7">"Examples"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Debug: see all tokens
+nectar app.nectar --emit-tokens
+
+# Debug: see the full AST
+nectar app.nectar --emit-ast
+
+# Quick compile
+nectar app.nectar --emit-wasm -O2 -o dist/app.wasm"</code></pre>
+                <hr />
+                <h3 id="nectartoml-configuration">"Nectar.toml Configuration"</h3>
+                <p><code>"Nectar.toml"</code>" is the project manifest, similar to "<code>"Cargo.toml"</code>" or "<code>"package.json"</code>"."</p>
+                <h4 id="structure">"Structure"</h4>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[package]
+name = \"my-app\"
+version = \"0.1.0\"
+
+[dependencies]
+http-client = \"^1.0\"
+json-parser = \"~0.8\"
+
+[dependencies.ui-kit]
+version = \"^2.0\"
+features = [\"animations\", \"themes\"]
+
+[dependencies.shared-lib]
+path = \"../shared-lib\""</code></pre>
+                <h4 id="package-section">"Package Section"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Field"</th><th>"Type"</th><th>"Description"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"name"</code></td><td>"String"</td><td>"Project name"</td></tr>
+                        <tr><td><code>"version"</code></td><td>"String"</td><td>"Project version (semver)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="dependencies-section">"Dependencies Section"</h4>
+                <p>"Dependencies can be specified in two forms:"</p>
+                <p><strong>"Simple"</strong>": just a version string."</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[dependencies]
+my-lib = \"^1.0\""</code></pre>
+                <p><strong>"Detailed"</strong>": version, features, path, or registry URL."</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[dependencies.my-lib]
+version = \"^2.0\"
+features = [\"feature-a\", \"feature-b\"]
+path = \"../my-lib\"             # local path (optional)
+registry_url = \"https://...\"   # custom registry (optional)"</code></pre>
+                <h4 id="version-requirements">"Version Requirements"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Syntax"</th><th>"Meaning"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"\"^1.0\""</code></td><td>"Compatible with 1.0 (>=1.0.0, <2.0.0)"</td></tr>
+                        <tr><td><code>"\"~1.2\""</code></td><td>"Approximately 1.2 (>=1.2.0, <1.3.0)"</td></tr>
+                        <tr><td><code>"\"=1.2.3\""</code></td><td>"Exactly 1.2.3"</td></tr>
+                        <tr><td><code>"\"*\""</code></td><td>"Any version (latest)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

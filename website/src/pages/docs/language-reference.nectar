@@ -1,0 +1,2172 @@
+// docs/language-reference.nectar — auto-generated from docs/language-reference.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page LanguageReferenceDoc() {
+    meta {
+        title: "Nectar Language Reference — Nectar Documentation",
+        description: "Full Nectar syntax: types, ownership, components, stores, traits, generics, every keyword.",
+        canonical: "/docs/language-reference",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference" class="current">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Language Reference"
+                    </div>
+                    <h1>"Nectar Language Reference"</h1>
+                <p>"This document is the reference for the Nectar programming language. It covers every language construct, from lexical structure to templates, with syntax, semantics, and examples."</p>
+                <blockquote>
+                    <p><strong>"Accuracy note"</strong>": Features marked with "<strong>"(PLANNED)"</strong>" are parsed by the compiler but do not yet have working codegen or runtime support. Do not rely on them for production code. Everything else compiles to working WASM."</p>
+                </blockquote>
+                <hr />
+                <h3 id="table-of-contents">"Table of Contents"</h3>
+                <ol>
+                    <li><a href="#lexical-structure">"Lexical Structure"</a></li>
+                    <li><a href="#types">"Types"</a></li>
+                    <li><a href="#variables">"Variables"</a></li>
+                    <li><a href="#functions">"Functions"</a></li>
+                    <li><a href="#components">"Components"</a></li>
+                    <li><a href="#stores">"Stores"</a></li>
+                    <li><a href="#structs-and-enums">"Structs and Enums"</a></li>
+                    <li><a href="#traits">"Traits"</a></li>
+                    <li><a href="#expressions">"Expressions"</a></li>
+                    <li><a href="#string-operations">"String Operations"</a></li>
+                    <li><a href="#array-operations-and-iterators">"Array Operations and Iterators"</a></li>
+                    <li><a href="#error-handling">"Error Handling (Result, Option, ?)"</a></li>
+                    <li><a href="#statements">"Statements"</a></li>
+                    <li><a href="#patterns">"Patterns"</a></li>
+                    <li><a href="#modules">"Modules"</a></li>
+                    <li><a href="#templates">"Templates"</a></li>
+                    <li><a href="#agents">"Agents"</a></li>
+                    <li><a href="#routers">"Routers"</a></li>
+                    <li><a href="#contracts">"Contracts"</a></li>
+                    <li><a href="#pages">"Pages"</a></li>
+                    <li><a href="#forms">"Forms"</a></li>
+                    <li><a href="#channels">"Channels"</a></li>
+                    <li><a href="#auth">"Auth"</a></li>
+                    <li><a href="#payment">"Payment"</a></li>
+                    <li><a href="#upload">"Upload"</a></li>
+                    <li><a href="#db">"Db"</a></li>
+                    <li><a href="#cache">"Cache"</a></li>
+                    <li><a href="#embed">"Embed"</a></li>
+                    <li><a href="#pdf">"Pdf"</a></li>
+                    <li><a href="#app-pwa">"App (PWA)"</a></li>
+                    <li><a href="#theme">"Theme"</a></li>
+                    <li><a href="#breakpoints">"Breakpoints"</a></li>
+                    <li><a href="#animations">"Animations"</a></li>
+                    <li><a href="#testing">"Testing"</a></li>
+                </ol>
+                <hr />
+                <h3 id="lexical-structure">"Lexical Structure"</h3>
+                <h4 id="comments">"Comments"</h4>
+                <p>"Nectar supports single-line comments with "<code>"//"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// This is a comment
+let x: i32 = 42; // inline comment"</code></pre>
+                <h4 id="keywords">"Keywords"</h4>
+                <p>"The following identifiers are reserved keywords in Nectar:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Category"</th><th>"Keywords"</th></tr></thead>
+                        <tbody>
+                        <tr><td><strong>"Declarations"</strong></td><td><code>"fn"</code>", "<code>"component"</code>", "<code>"struct"</code>", "<code>"enum"</code>", "<code>"impl"</code>", "<code>"trait"</code>", "<code>"store"</code>", "<code>"agent"</code>", "<code>"router"</code>", "<code>"mod"</code>", "<code>"use"</code>", "<code>"pub"</code>", "<code>"test"</code>", "<code>"lazy"</code></td></tr>
+                        <tr><td><strong>"Variables"</strong></td><td><code>"let"</code>", "<code>"mut"</code>", "<code>"signal"</code>", "<code>"own"</code>", "<code>"ref"</code></td></tr>
+                        <tr><td><strong>"Control Flow"</strong></td><td><code>"if"</code>", "<code>"else"</code>", "<code>"match"</code>", "<code>"for"</code>", "<code>"in"</code>", "<code>"while"</code>", "<code>"return"</code>", "<code>"yield"</code></td></tr>
+                        <tr><td><strong>"Async/Concurrency"</strong></td><td><code>"async"</code>", "<code>"await"</code>", "<code>"fetch"</code>", "<code>"spawn"</code>", "<code>"channel"</code>", "<code>"select"</code>", "<code>"parallel"</code>", "<code>"stream"</code>", "<code>"suspend"</code></td></tr>
+                        <tr><td><strong>"AI"</strong></td><td><code>"prompt"</code>", "<code>"tool"</code></td></tr>
+                        <tr><td><strong>"Routing"</strong></td><td><code>"route"</code>", "<code>"fallback"</code>", "<code>"guard"</code>", "<code>"navigate"</code>", "<code>"layout"</code>", "<code>"outlet"</code></td></tr>
+                        <tr><td><strong>"Components"</strong></td><td><code>"render"</code>", "<code>"style"</code>", "<code>"transition"</code>", "<code>"animate"</code></td></tr>
+                        <tr><td><strong>"Accessibility"</strong></td><td><code>"a11y"</code>", "<code>"manual"</code>", "<code>"hybrid"</code></td></tr>
+                        <tr><td><strong>"Stores"</strong></td><td><code>"action"</code>", "<code>"effect"</code>", "<code>"computed"</code></td></tr>
+                        <tr><td><strong>"Domain Keywords"</strong></td><td><code>"page"</code>", "<code>"form"</code>", "<code>"field"</code>", "<code>"contract"</code>", "<code>"auth"</code>", "<code>"payment"</code>", "<code>"upload"</code>", "<code>"db"</code>", "<code>"cache"</code>", "<code>"embed"</code>", "<code>"pdf"</code>", "<code>"app"</code>", "<code>"theme"</code>", "<code>"crypto"</code></td></tr>
+                        <tr><td><strong>"Domain Sub-blocks"</strong></td><td><code>"meta"</code>", "<code>"schema"</code>", "<code>"permissions"</code>", "<code>"manifest"</code>", "<code>"offline"</code>", "<code>"push"</code>", "<code>"query"</code>", "<code>"mutation"</code>", "<code>"gesture"</code>", "<code>"breakpoint"</code>", "<code>"fluid"</code></td></tr>
+                        <tr><td><strong>"Animations"</strong></td><td><code>"spring"</code>", "<code>"keyframes"</code>", "<code>"stagger"</code></td></tr>
+                        <tr><td><strong>"Error Handling"</strong></td><td><code>"try"</code>", "<code>"catch"</code></td></tr>
+                        <tr><td><strong>"Testing"</strong></td><td><code>"assert"</code>", "<code>"assert_eq"</code>", "<code>"expect"</code></td></tr>
+                        <tr><td><strong>"Values"</strong></td><td><code>"true"</code>", "<code>"false"</code>", "<code>"self"</code>", "<code>"Self"</code></td></tr>
+                        <tr><td><strong>"Types"</strong></td><td><code>"i32"</code>", "<code>"i64"</code>", "<code>"f32"</code>", "<code>"f64"</code>", "<code>"u32"</code>", "<code>"u64"</code>", "<code>"bool"</code>", "<code>"String"</code>", "<code>"secret"</code></td></tr>
+                        <tr><td><strong>"Other"</strong></td><td><code>"as"</code>", "<code>"where"</code>", "<code>"derive"</code>", "<code>"Link"</code>", "<code>"must_use"</code>", "<code>"chunk"</code>", "<code>"atomic"</code>", "<code>"virtual"</code></td></tr>
+                        <tr><td><strong>"Component Blocks"</strong></td><td><code>"skeleton"</code>", "<code>"error_boundary"</code>", "<code>"Fragment"</code>" (parsed as special identifiers, not reserved tokens)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="operators-and-symbols">"Operators and Symbols"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Symbol"</th><th>"Meaning"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"+"</code>", "<code>"-"</code>", "<code>"*"</code>", "<code>"/"</code>", "<code>"%"</code></td><td>"Arithmetic"</td></tr>
+                        <tr><td><code>"=="</code>", "<code>"!="</code>", "<code>"<"</code>", "<code>">"</code>", "<code>"<="</code>", "<code>">="</code></td><td>"Comparison"</td></tr>
+                        <tr><td><code>"&&"</code>", `\\"</td><td>"\\"</td><td><code>", "</code>"!`"</td><td>"Logical"</td></tr>
+                        <tr><td><code>"="</code></td><td>"Assignment"</td></tr>
+                        <tr><td><code>"+="</code>", "<code>"-="</code>", "<code>"*="</code>", "<code>"/="</code></td><td>"Compound assignment"</td></tr>
+                        <tr><td><code>"&"</code>", "<code>"&mut"</code></td><td>"Borrow / mutable borrow"</td></tr>
+                        <tr><td><code>"->"</code></td><td>"Return type arrow"</td></tr>
+                        <tr><td><code>"=>"</code></td><td>"Fat arrow (match arms, routes)"</td></tr>
+                        <tr><td><code>"::"</code></td><td>"Path separator"</td></tr>
+                        <tr><td><code>"."</code></td><td>"Field access / method call"</td></tr>
+                        <tr><td><code>"?"</code></td><td>"Error propagation (try operator)"</td></tr>
+                        <tr><td>"`\\"</td><td>"`"</td><td>"Closure parameter delimiter"</td></tr>
+                        <tr><td><code>","</code></td><td>"Separator"</td></tr>
+                        <tr><td><code>":"</code></td><td>"Type annotation / key-value separator"</td></tr>
+                        <tr><td><code>";"</code></td><td>"Statement terminator"</td></tr>
+                        <tr><td><code>"( )"</code>", "<code>"{ }"</code>", "<code>"[ ]"</code>", "<code>"< >"</code></td><td>"Grouping / blocks / arrays / generics"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="literals">"Literals"</h4>
+                <p><strong>"Integers"</strong>" are written as decimal numbers and are typed as "<code>"i64"</code>" by default:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let x = 42;
+let y = -7;
+let big = 1000000;"</code></pre>
+                <p><strong>"Floating-point numbers"</strong>" use a decimal point and are typed as "<code>"f64"</code>" by default:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let pi = 3.14159;
+let neg = -2.5;"</code></pre>
+                <p><strong>"Strings"</strong>" are double-quoted:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let greeting = \"Hello, world!\";"</code></pre>
+                <p><strong>"Format strings"</strong>" are prefixed with "<code>"f"</code>" and support "<code>"{expression}"</code>" interpolation:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let name = \"Nectar\";
+let msg = f\"Hello {name}, you have {count} messages\";"</code></pre>
+                <p><strong>"Booleans"</strong>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let yes = true;
+let no = false;"</code></pre>
+                <h4 id="lifetimes">"Lifetimes"</h4>
+                <p>"Lifetimes are annotated with a leading apostrophe and are used in reference types and generic parameters:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn first<'a>(items: &'a [i32]) -> &'a i32 {
+    return items[0];
+}"</code></pre>
+                <p>"The special lifetime "<code>"'static"</code>" denotes a reference that lives for the entire program duration."</p>
+                <hr />
+                <h3 id="types">"Types"</h3>
+                <p>"Nectar has a rich type system combining primitive types, compound types, and ownership-aware reference types."</p>
+                <h4 id="primitive-types">"Primitive Types"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Type"</th><th>"Description"</th><th>"Size"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"i32"</code></td><td>"32-bit signed integer"</td><td>"4 bytes"</td></tr>
+                        <tr><td><code>"i64"</code></td><td>"64-bit signed integer"</td><td>"8 bytes"</td></tr>
+                        <tr><td><code>"u32"</code></td><td>"32-bit unsigned integer"</td><td>"4 bytes"</td></tr>
+                        <tr><td><code>"u64"</code></td><td>"64-bit unsigned integer"</td><td>"8 bytes"</td></tr>
+                        <tr><td><code>"f32"</code></td><td>"32-bit floating point"</td><td>"4 bytes"</td></tr>
+                        <tr><td><code>"f64"</code></td><td>"64-bit floating point"</td><td>"8 bytes"</td></tr>
+                        <tr><td><code>"bool"</code></td><td>"Boolean ("<code>"true"</code>"/"<code>"false"</code>")"</td><td>"1 byte"</td></tr>
+                        <tr><td><code>"String"</code></td><td>"UTF-8 string"</td><td>"variable"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="arrays">"Arrays"</h4>
+                <p>"Arrays use bracket syntax and hold elements of a single type:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let numbers: [i32] = [1, 2, 3, 4, 5];
+let names: [String] = [\"Alice\", \"Bob\"];
+let empty: [f64] = [];"</code></pre>
+                <h4 id="tuples">"Tuples"</h4>
+                <p>"Tuples combine a fixed number of values of potentially different types:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let pair: (i32, String) = (42, \"hello\");
+let triple: (bool, f64, String) = (true, 3.14, \"pi\");"</code></pre>
+                <p>"Tuple elements are accessed by index using "<code>".0"</code>", "<code>".1"</code>", etc.:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let x = pair.0;    // 42
+let s = pair.1;    // \"hello\""</code></pre>
+                <h4 id="option">"Option"</h4>
+                <p><code>"Option<T>"</code>" represents a value that may or may not be present:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let found: Option<User> = None;
+let found: Option<User> = Some(user);"</code></pre>
+                <h4 id="result">"Result"</h4>
+                <p><code>"Result<T, E>"</code>" represents an operation that may succeed with "<code>"T"</code>" or fail with "<code>"E"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn parse(input: String) -> Result<i32, String> {
+    // ...
+}"</code></pre>
+                <h4 id="reference-types">"Reference Types"</h4>
+                <p>"References provide borrowed access to values without taking ownership:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let r: &i32 = &x;           // immutable borrow
+let mr: &mut i32 = &mut x;  // mutable borrow
+let lr: &'a i32 = &x;       // lifetime-annotated borrow
+let lmr: &'a mut i32 = &mut x; // lifetime-annotated mutable borrow"</code></pre>
+                <h4 id="generic-types">"Generic Types"</h4>
+                <p>"Generic types are parameterized with angle brackets:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let items: Vec<i32> = vec_new();
+let map: HashMap<String, User> = hash_map_new();"</code></pre>
+                <h4 id="function-types">"Function Types"</h4>
+                <p>"Function types describe callable signatures:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let callback: fn(i32) -> bool = |x| x > 0;"</code></pre>
+                <h4 id="self-and-self-type">"Self and Self Type"</h4>
+                <p>"Within "<code>"impl"</code>" blocks and component methods, "<code>"self"</code>" refers to the current instance and "<code>"Self"</code>" refers to the enclosing type."</p>
+                <hr />
+                <h3 id="variables">"Variables"</h3>
+                <h4 id="let-bindings">"Let Bindings"</h4>
+                <p>"Variables are introduced with "<code>"let"</code>". They are immutable by default:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let name = \"Nectar\";
+let count: i32 = 0;"</code></pre>
+                <h4 id="mutable-variables">"Mutable Variables"</h4>
+                <p>"Add "<code>"mut"</code>" to make a variable mutable:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let mut counter: i32 = 0;
+counter = counter + 1;"</code></pre>
+                <h4 id="signal-variables">"Signal Variables"</h4>
+                <p>"Signals are reactive variables that automatically trigger re-renders when their value changes. They are used inside components and stores:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"signal count: i32 = 0;
+signal name: String = \"default\";"</code></pre>
+                <h4 id="type-annotations">"Type Annotations"</h4>
+                <p>"Type annotations follow the variable name after a colon. They are optional when the type can be inferred:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let x: i32 = 42;      // explicit type
+let y = 42;            // inferred as i64
+let z: f64 = 3.14;    // explicit type"</code></pre>
+                <h4 id="ownership">"Ownership"</h4>
+                <p>"Nectar uses an ownership system inspired by Rust. Every value has a single owner, and ownership can be transferred (moved) or borrowed:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let a = \"hello\";
+let b = a;           // a is moved to b; a can no longer be used
+
+let c = \"world\";
+let d = &c;          // d borrows c immutably; c is still valid
+let e = &mut c;      // e borrows c mutably; no other borrows allowed"</code></pre>
+                <p>"The "<code>"own"</code>" keyword can explicitly mark owned transfer:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let data = own create_data();"</code></pre>
+                <h4 id="destructuring">"Destructuring"</h4>
+                <p>"Destructuring is supported in match arms for tuples, structs, and arrays:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Tuple destructuring in match
+match get_point() {
+    (0, 0) => { /* origin */ },
+    (x, y) => { /* use x, y */ },
+}
+
+// Struct destructuring in match
+match user {
+    User { name, age, .. } => { /* use name, age */ },
+}
+
+// Array destructuring in match
+match items {
+    [first, second, ..] => { /* use first, second */ },
+}"</code></pre>
+                <p>"Note: "<code>"let"</code>"-binding destructuring ("<code>"let (x, y) = expr;"</code>") is parsed but not yet in codegen. Use match arms for destructuring."</p>
+                <hr />
+                <h3 id="functions">"Functions"</h3>
+                <h4 id="basic-functions">"Basic Functions"</h4>
+                <p>"Functions are declared with the "<code>"fn"</code>" keyword:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn greet(name: String) -> String {
+    return f\"Hello, {name}!\";
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}"</code></pre>
+                <h4 id="visibility">"Visibility"</h4>
+                <p>"Functions can be made public with "<code>"pub"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"pub fn api_handler(request: Request) -> Response {
+    // accessible from other modules
+}"</code></pre>
+                <h4 id="async-functions-planned">"Async Functions **(PLANNED)**"</h4>
+                <p>"Prefix "<code>"fn"</code>" with "<code>"async"</code>" for asynchronous functions. Parsed by the compiler but no async runtime exists yet:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"async fn fetch_data(url: String) -> String {
+    let response = await fetch(url);
+    return response.json();
+}"</code></pre>
+                <h4 id="generic-functions">"Generic Functions"</h4>
+                <p>"Functions can have type parameters. The compiler monomorphizes generic functions -- specializing them for each concrete type they are called with:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn identity<T>(value: T) -> T {
+    return value;
+}
+
+fn first<'a, T>(items: &'a [T]) -> &'a T {
+    return items[0];
+}"</code></pre>
+                <p>"When called with "<code>"identity(42)"</code>", the compiler generates "<code>"identity__i32"</code>". When called with "<code>"identity(\"hello\")"</code>", it generates "<code>"identity__String"</code>"."</p>
+                <h4 id="where-clauses-trait-bounds">"Where Clauses (Trait Bounds)"</h4>
+                <p>"Constrain type parameters with "<code>"where"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn print_all<T>(items: [T]) where T: Display {
+    for item in items {
+        println(item.to_string());
+    }
+}"</code></pre>
+                <h4 id="self-parameters">"Self Parameters"</h4>
+                <p>"Methods take "<code>"self"</code>" as their first parameter, with optional borrowing:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn method(self)              // takes ownership
+fn method(&self)             // immutable borrow
+fn method(&mut self)         // mutable borrow"</code></pre>
+                <h4 id="return-type">"Return Type"</h4>
+                <p>"The return type follows "<code>"->"</code>". Functions without an explicit return type return the unit type "<code>"()"</code>". The last expression in a function body is implicitly returned:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn double(x: i32) -> i32 {
+    x * 2   // implicit return
+}"</code></pre>
+                <hr />
+                <h3 id="components">"Components"</h3>
+                <p>"Components are first-class UI primitives in Nectar. They combine state, behavior, and rendering into a single declaration."</p>
+                <h4 id="basic-component">"Basic Component"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Hello(name: String) {
+    render {
+        <div>
+            <h1>\"Hello from Nectar!\"</h1>
+            <p>{name}</p>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="props">"Props"</h4>
+                <p>"Props are declared as parameters in parentheses after the component name. They are immutable by default and can have default values:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Button(label: String, disabled: bool = false) {
+    render {
+        <button disabled={disabled}>{label}</button>
+    }
+}"</code></pre>
+                <h4 id="state-let">"State (let)"</h4>
+                <p>"Local state is declared with "<code>"let"</code>" or "<code>"let mut"</code>" inside the component body:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Counter(initial: i32) {
+    let mut count: i32 = initial;
+
+    // ...
+}"</code></pre>
+                <h4 id="reactive-state-signal">"Reactive State (signal)"</h4>
+                <p>"Signals are reactive state variables that automatically update the DOM when changed:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component UserProfile(id: String) {
+    signal user_name: String = \"Loading...\";
+
+    // When user_name changes, the DOM updates automatically
+    render {
+        <span>{self.user_name}</span>
+    }
+}"</code></pre>
+                <h4 id="methods">"Methods"</h4>
+                <p>"Components can define methods for event handling and business logic:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Counter(initial: i32) {
+    let mut count: i32 = initial;
+
+    fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+
+    fn decrement(&mut self) {
+        self.count = self.count - 1;
+    }
+
+    render {
+        <div>
+            <span>{self.count}</span>
+            <button on:click={self.increment}>\"+1\"</button>
+            <button on:click={self.decrement}>\"-1\"</button>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="scoped-styles">"Scoped Styles"</h4>
+                <p>"CSS styles are scoped to the component automatically. Styles never leak to parent or sibling components:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Card() {
+    style {
+        .card {
+            padding: \"16px\";
+            border-radius: \"8px\";
+            box-shadow: \"0 2px 8px rgba(0,0,0,0.1)\";
+        }
+        .card h2 {
+            color: \"#1e293b\";
+            margin-bottom: \"8px\";
+        }
+    }
+
+    render {
+        <div class=\"card\">
+            <h2>\"My Card\"</h2>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="canvas-mode-styles-honeycomb">"Canvas Mode Styles (Honeycomb)"</h4>
+                <p>"In canvas mode ("<code>"nectar build --canvas"</code>"), CSS is not used. Instead, Honeycomb's layout engine uses typed style properties set as inline attributes:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div style=\"direction: vertical; padding: 16px; gap: 12px; background-color: #18181b;\">
+    <span style=\"font-size: 15px; font-weight: 600; color: #fafafa;\">\"Title\"</span>
+    <button style=\"width: fill; height: 44px; background-color: #ffa11e; border-radius: 8px;\">
+        \"Click me\"
+    </button>
+</div>"</code></pre>
+                <p><strong>"Canvas layout properties:"</strong>" "<code>"direction"</code>" (vertical/horizontal/layer), "<code>"width"</code>", "<code>"height"</code>", "<code>"padding"</code>", "<code>"gap"</code>", "<code>"align"</code>", "<code>"justify"</code>", "<code>"wrap"</code>", "<code>"min-width"</code>", "<code>"max-width"</code>", "<code>"min-height"</code>", "<code>"max-height"</code>", "<code>"scroll"</code>", "<code>"position"</code>", "<code>"z-index"</code>", "<code>"display"</code></p>
+                <p><strong>"Canvas visual properties:"</strong>" "<code>"background-color"</code>", "<code>"color"</code>", "<code>"font-size"</code>", "<code>"font-weight"</code>", "<code>"line-height"</code>", "<code>"border-radius"</code>", "<code>"border-width"</code>", "<code>"border-color"</code>", "<code>"opacity"</code>", "<code>"text-decoration"</code>", "<code>"text-overflow"</code></p>
+                <p><strong>"Canvas sizing values:"</strong>" "<code>"fill"</code>" (stretch to parent), "<code>"hug"</code>" (shrink to content), "<code>"Npx"</code>" (fixed pixels)"</p>
+                <p>"Key differences from CSS: no "<code>"display: flex"</code>" (everything is flex by default), no "<code>"margin"</code>" (use "<code>"padding"</code>" + "<code>"gap"</code>"), no CSS grid (use "<code>"wrap: true"</code>"), no media queries, no pseudo-classes. See CLAUDE.md for the full comparison table."</p>
+                <h4 id="critical-styles">"Critical Styles"</h4>
+                <p>"When building with "<code>"nectar build --ssr --critical-css"</code>", the compiler automatically determines which component styles are critical (needed for the initial above-the-fold render) and which can be deferred."</p>
+                <p>"By default, all non-lazy component styles are treated as critical. Lazy component styles are deferred unless the component is the first route target in a router."</p>
+                <p>"The following built-in utility classes are always inlined as critical CSS:"</p>
+                <ul>
+                    <li><code>".nectar-skeleton"</code>" -- base skeleton loading placeholder with shimmer animation"</li>
+                    <li><code>".nectar-skeleton-text"</code>" -- text-shaped skeleton placeholder"</li>
+                    <li><code>".nectar-skeleton-avatar"</code>" -- circular avatar-shaped skeleton placeholder"</li>
+                    <li><code>".nectar-skeleton-rect"</code>" -- rectangular skeleton placeholder"</li>
+                </ul>
+                <p>"These can be used directly in component templates to provide instant loading feedback during SSR hydration:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component UserProfile(id: u32) {
+    state user: Option<User> = None;
+
+    render {
+        <div class=\"profile\">
+            {match self.user {
+                Some(u) => <span>{u.name}</span>,
+                None => <div class=\"nectar-skeleton nectar-skeleton-text\" />,
+            }}
+        </div>
+    }
+}"</code></pre>
+                <h4 id="transitions">"Transitions"</h4>
+                <p>"Declare CSS transitions on component properties:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component FadeBox() {
+    transition {
+        opacity: \"0.3s ease\";
+        transform: \"0.5s cubic-bezier(0.4, 0, 0.2, 1)\";
+    }
+
+    render {
+        <div class=\"fade-box\">\"Content\"</div>
+    }
+}"</code></pre>
+                <h4 id="error-boundaries">"Error Boundaries"</h4>
+                <p>"Error boundaries catch rendering errors and display fallback UI:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component SafeWidget() {
+    error_boundary {
+        fallback {
+            <div class=\"error\">\"Something went wrong.\"</div>
+        }
+        {
+            <RiskyComponent />
+        }
+    }
+
+    render {
+        <div>\"Widget content\"</div>
+    }
+}"</code></pre>
+                <h4 id="skeleton-screens">"Skeleton Screens"</h4>
+                <p>"Skeleton screens define placeholder UI that renders immediately (including during SSR) while the component's data is loading. The skeleton block is shown first and automatically replaced with the real "<code>"render"</code>" content once the component's signals change from their initial values."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component UserProfile(id: u32) {
+    signal user: Option<User> = None;
+
+    skeleton {
+        <div class=\"skeleton\">
+            <div class=\"skeleton-avatar\" />
+            <div class=\"skeleton-line\" style=\"width: 60%\" />
+            <div class=\"skeleton-line\" style=\"width: 40%\" />
+        </div>
+    }
+
+    render {
+        <div class=\"profile\">
+            <img src={self.user.avatar} />
+            <h1>{self.user.name}</h1>
+        </div>
+    }
+}"</code></pre>
+                <p><strong>"How it works:"</strong></p>
+                <ul>
+                    <li>"During SSR, the skeleton HTML is rendered with a "<code>"data-nectar-skeleton"</code>" marker and a built-in "<code>"nectar-skeleton"</code>" CSS class that applies a pulse animation."</li>
+                    <li>"On the client, the skeleton DOM is mounted first into the root element."</li>
+                    <li>"An effect watches the component's signals. When any signal changes from its initial value, the skeleton fades out and the real "<code>"render"</code>" content fades in."</li>
+                    <li>"Built-in CSS provides both a pulse animation and a shimmer effect for elements with "<code>"skeleton-"</code>" prefixed class names."</li>
+                </ul>
+                <p><strong>"Skeleton blocks are optional."</strong>" Components without a "<code>"skeleton"</code>" block render their "<code>"render"</code>" content immediately as before."</p>
+                <h4 id="generic-components">"Generic Components"</h4>
+                <p>"Components can accept type parameters with optional trait bounds. Generic monomorphization applies:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component List<T>(items: [T]) where T: Display {
+    render {
+        <ul>
+            {for item in items {
+                <li>{item.to_string()}</li>
+            }}
+        </ul>
+    }
+}"</code></pre>
+                <h4 id="accessibility-a11y">"Accessibility (a11y)"</h4>
+                <p>"By default, all components get automatic accessibility support — the compiler injects ARIA attributes, roles, keyboard handlers, and focus styles."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Default: a11y auto (compiler generates everything)
+component SearchBox(placeholder: String) {
+    render {
+        <input type=\"text\" placeholder={placeholder} />
+    }
+}
+
+// Opt out entirely
+component CustomWidget() {
+    a11y manual;
+    render {
+        <div role=\"slider\" aria-valuenow=\"50\" tabindex=\"0\">
+            // Developer handles all a11y
+        </div>
+    }
+}
+
+// Hybrid: developer overrides specific attrs, compiler fills the rest
+component ToggleButton(active: bool) {
+    a11y hybrid;
+    render {
+        <button aria-pressed={active}>
+            // Compiler auto-adds focus styles, keyboard handling
+        </button>
+    }
+}"</code></pre>
+                <h4 id="layout-primitives">"Layout Primitives"</h4>
+                <p>"Language-level layout constructs that compile to semantic HTML + CSS at build time. Zero runtime cost — pure compile-time sugar."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Dashboard() {
+    render {
+        <Stack gap=\"24\">
+            <Row gap=\"16\" align=\"center\">
+                <h1>\"Dashboard\"</h1>
+                <Button label=\"Refresh\" />
+            </Row>
+            <Grid cols=\"3\" gap=\"16\">
+                <Card title=\"Users\" />
+                <Card title=\"Revenue\" />
+                <Card title=\"Orders\" />
+            </Grid>
+            <Sidebar side=\"left\" width=\"250\">
+                <NavMenu />
+                <MainContent />
+            </Sidebar>
+        </Stack>
+    }
+}"</code></pre>
+                <p>"Available layout primitives:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Primitive"</th><th>"Compiles to"</th><th>"Attributes"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"<Stack>"</code></td><td><code>"<section>"</code>" with "<code>"flex-direction:column"</code></td><td><code>"gap"</code></td></tr>
+                        <tr><td><code>"<Row>"</code></td><td><code>"<div>"</code>" with "<code>"flex-direction:row"</code></td><td><code>"gap"</code>", "<code>"align"</code></td></tr>
+                        <tr><td><code>"<Grid>"</code></td><td><code>"<div>"</code>" with "<code>"display:grid"</code></td><td><code>"cols"</code>", "<code>"rows"</code>", "<code>"gap"</code></td></tr>
+                        <tr><td><code>"<Center>"</code></td><td><code>"<div>"</code>" with "<code>"margin:0 auto"</code></td><td><code>"max_width"</code></td></tr>
+                        <tr><td><code>"<Cluster>"</code></td><td><code>"<div>"</code>" with "<code>"flex-wrap:wrap"</code></td><td><code>"gap"</code></td></tr>
+                        <tr><td><code>"<Sidebar>"</code></td><td><code>"<div>"</code>" with "<code>"flex"</code>" + sidebar sizing"</td><td><code>"side"</code>", "<code>"width"</code></td></tr>
+                        <tr><td><code>"<Switcher>"</code></td><td><code>"<div>"</code>" with "<code>"flex-wrap"</code>" + threshold"</td><td><code>"threshold"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="lazy-components">"Lazy Components"</h4>
+                <p>"Lazy components are only loaded when first rendered, enabling code splitting:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"lazy component HeavyChart(data: [f64]) {
+    render {
+        <canvas />
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="stores">"Stores"</h3>
+                <p>"Stores provide global reactive state management, similar to Redux/Flux patterns. Any component can read from and dispatch actions to a store."</p>
+                <h4 id="basic-store">"Basic Store"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"store CounterStore {
+    signal count: i32 = 0;
+    signal step: i32 = 1;
+
+    action increment(&mut self) {
+        self.count = self.count + self.step;
+    }
+
+    action decrement(&mut self) {
+        self.count = self.count - self.step;
+    }
+
+    computed double_count(&self) -> i32 {
+        self.count * 2
+    }
+
+    effect on_count_change(&self) {
+        println(self.count);
+    }
+}"</code></pre>
+                <h4 id="signal-fields">"Signal Fields"</h4>
+                <p>"Store state is declared with "<code>"signal"</code>". These are reactive: any component reading a signal will automatically re-render when it changes."</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"signal count: i32 = 0;
+signal user: Option<User> = None;"</code></pre>
+                <h4 id="actions">"Actions"</h4>
+                <p>"Actions are methods that mutate store state. They can be synchronous or asynchronous:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Synchronous action
+action increment(&mut self) {
+    self.count = self.count + 1;
+}
+
+// Async action
+async action fetch_user(&mut self, id: u32) {
+    let response = await fetch(f\"https://api.example.com/users/{id}\");
+    self.user = response.json();
+}"</code></pre>
+                <h4 id="computed-values">"Computed Values"</h4>
+                <p>"Computed values are derived from signals. They are cached and only recompute when their dependencies change:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"computed is_logged_in(&self) -> bool {
+    match self.status {
+        AuthStatus::LoggedIn(_) => true,
+        _ => false,
+    }
+}"</code></pre>
+                <h4 id="effects">"Effects"</h4>
+                <p>"Effects are side-effect callbacks that run whenever their signal dependencies change:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"effect on_auth_change(&self) {
+    match self.status {
+        AuthStatus::LoggedIn(user) => {
+            println(f\"User logged in: {user.name}\");
+        }
+        _ => {}
+    }
+}"</code></pre>
+                <h4 id="using-stores-from-components">"Using Stores from Components"</h4>
+                <p>"Components access store state and dispatch actions using the "<code>"StoreName::"</code>" syntax:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Dashboard() {
+    render {
+        <div>
+            <p>{f\"Count: {CounterStore::get_count()}\"}</p>
+            <button on:click={CounterStore::increment}>\"+\"</button>
+        </div>
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="structs-and-enums">"Structs and Enums"</h3>
+                <h4 id="struct-definition">"Struct Definition"</h4>
+                <p>"Structs group named fields together:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"struct User {
+    id: u32,
+    name: String,
+    email: String,
+}
+
+pub struct Point<T> {
+    pub x: T,
+    pub y: T,
+}"</code></pre>
+                <p>"Fields can be marked "<code>"pub"</code>" for public visibility. Structs support lifetimes and generic type parameters:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"struct Ref<'a, T> {
+    value: &'a T,
+}"</code></pre>
+                <h4 id="struct-initialization">"Struct Initialization"</h4>
+                <p>"Create struct instances with field-value syntax:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let user = User {
+    id: 1,
+    name: \"Alice\",
+    email: \"alice@example.com\",
+};"</code></pre>
+                <h4 id="enum-definition">"Enum Definition"</h4>
+                <p>"Enums define a type that can be one of several variants. Variants may carry data:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"enum Filter {
+    All,
+    Active,
+    Completed,
+}
+
+enum AuthStatus {
+    LoggedOut,
+    Loading,
+    LoggedIn(User),
+    Error(String),
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}"</code></pre>
+                <h4 id="impl-blocks">"Impl Blocks"</h4>
+                <p>"Add methods to structs and enums with "<code>"impl"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"impl User {
+    fn full_name(&self) -> String {
+        return f\"{self.first_name} {self.last_name}\";
+    }
+
+    pub fn new(name: String, email: String) -> Self {
+        return User { id: 0, name: name, email: email };
+    }
+}"</code></pre>
+                <h4 id="trait-implementations">"Trait Implementations"</h4>
+                <p>"Implement traits for types with "<code>"impl Trait for Type"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"impl Display for User {
+    fn to_string(&self) -> String {
+        return f\"User({self.name})\";
+    }
+}"</code></pre>
+                <hr />
+                <h3 id="traits">"Traits"</h3>
+                <h4 id="trait-definition">"Trait Definition"</h4>
+                <p>"Traits define shared behavior (interfaces). Methods can have default implementations:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"trait Display {
+    fn to_string(&self) -> String;
+}
+
+trait Drawable {
+    fn draw(&self);
+
+    fn bounds(&self) -> (f64, f64) {
+        // default implementation
+        return (0.0, 0.0);
+    }
+}"</code></pre>
+                <h4 id="generic-traits">"Generic Traits"</h4>
+                <p>"Traits can have type parameters:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"trait Container<T> {
+    fn get(&self, index: i32) -> T;
+    fn size(&self) -> i32;
+}"</code></pre>
+                <h4 id="trait-bounds">"Trait Bounds"</h4>
+                <p>"Use trait bounds to constrain generic type parameters:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn print_item<T>(item: T) where T: Display {
+    println(item.to_string());
+}"</code></pre>
+                <p>"Trait dispatch is static -- the compiler resolves the concrete implementation at compile time. There is no vtable or dynamic dispatch."</p>
+                <hr />
+                <h3 id="expressions">"Expressions"</h3>
+                <p>"Nectar is expression-oriented. Most constructs produce a value."</p>
+                <h4 id="arithmetic-expressions">"Arithmetic Expressions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let sum = a + b;
+let diff = a - b;
+let product = a * b;
+let quotient = a / b;
+let remainder = a % b;
+let negated = -x;"</code></pre>
+                <h4 id="comparison-expressions">"Comparison Expressions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"a == b    // equal
+a != b    // not equal
+a < b     // less than
+a > b     // greater than
+a <= b    // less or equal
+a >= b    // greater or equal"</code></pre>
+                <h4 id="logical-expressions">"Logical Expressions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"a && b    // logical AND
+a || b    // logical OR
+!a        // logical NOT"</code></pre>
+                <h4 id="assignment-expressions">"Assignment Expressions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"x = 42;
+x += 1;     // desugars to x = x + 1
+x -= 1;
+x *= 2;
+x /= 2;"</code></pre>
+                <h4 id="field-access-and-method-calls">"Field Access and Method Calls"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"user.name              // field access
+user.full_name()       // method call
+items.len()            // method call
+items.push(42)         // method call with argument"</code></pre>
+                <h4 id="function-calls">"Function Calls"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"greet(\"Alice\")
+add(1, 2)
+Module::function(arg)"</code></pre>
+                <h4 id="index-expressions">"Index Expressions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"items[0]
+matrix[i][j]"</code></pre>
+                <h4 id="ifelse-expressions">"If/Else Expressions"</h4>
+                <p><code>"if"</code>"/"<code>"else"</code>" is an expression that produces a value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let max = if a > b { a } else { b };
+
+if condition {
+    do_something();
+}
+
+if x > 0 {
+    \"positive\"
+} else {
+    \"non-positive\"
+}"</code></pre>
+                <h4 id="match-expressions">"Match Expressions"</h4>
+                <p>"Pattern matching with "<code>"match"</code>":"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match status {
+    AuthStatus::LoggedIn(user) => show_dashboard(user),
+    AuthStatus::Loading => show_spinner(),
+    AuthStatus::Error(msg) => show_error(msg),
+    _ => show_login(),
+}"</code></pre>
+                <h4 id="for-loops">"For Loops"</h4>
+                <p>"Iterate over collections:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for item in items {
+    process(item);
+}
+
+for todo in &mut self.todos {
+    if todo.id == id {
+        todo.done = !todo.done;
+    }
+}"</code></pre>
+                <p>"Iterate over integer ranges:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for i in 0..10 {
+    process(i);   // i = 0, 1, 2, ..., 9
+}"</code></pre>
+                <h4 id="while-loops">"While Loops"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"while count < 10 {
+    count = count + 1;
+}"</code></pre>
+                <h4 id="break-and-continue">"Break and Continue"</h4>
+                <p><code>"break"</code>" exits the current loop, "<code>"continue"</code>" skips to the next iteration:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for item in items {
+    if item.skip {
+        continue;
+    }
+    if item.done {
+        break;
+    }
+    process(item);
+}"</code></pre>
+                <p>"Both compile to WASM "<code>"br"</code>" instructions targeting the correct block/loop label."</p>
+                <h4 id="closures">"Closures"</h4>
+                <p>"Closures (lambdas) are used primarily as arguments to map/filter/reduce:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// With type annotations
+let add = |a: i32, b: i32| a + b;
+
+// Without type annotations
+let double = |x| x * 2;
+
+// Block body
+let process = |item: Item| {
+    validate(item);
+    save(item);
+};"</code></pre>
+                <p>"Closures can also be written with "<code>"fn"</code>" syntax in certain positions:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"items.filter(fn(t: &Todo) -> bool { !t.done })"</code></pre>
+                <blockquote>
+                    <p>"Closures with environment capture compile to WASM functions in the function table. They work for map/filter/reduce callbacks and event handlers."</p>
+                </blockquote>
+                <h4 id="await-expressions-planned">"Await Expressions **(PLANNED)**"</h4>
+                <p>"Await an asynchronous operation. Parsed but no async runtime:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let response = await fetch(\"https://api.example.com/data\");
+let data = await process(response);"</code></pre>
+                <h4 id="fetch-expressions">"Fetch Expressions"</h4>
+                <p>"First-class HTTP communication:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Simple GET
+let response = fetch(\"https://api.example.com/users\");
+
+// With options
+let response = fetch(\"https://api.example.com/posts\", {
+    method: \"POST\",
+    headers: { \"Content-Type\": \"application/json\" },
+    body: json_string,
+});"</code></pre>
+                <h4 id="spawn-and-channel-expressions">"Spawn and Channel Expressions"</h4>
+                <p>"Concurrency primitives backed by Web Workers and MessageChannel:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Spawn work on a background thread
+spawn {
+    heavy_computation()
+}
+
+// Create a typed channel
+let ch = channel<i32>();
+
+// Send and receive
+ch.send(42);
+let value = ch.recv();"</code></pre>
+                <h4 id="parallel-expressions">"Parallel Expressions"</h4>
+                <p>"Run multiple expressions concurrently via Web Workers:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"parallel {
+    fetch_users(),
+    fetch_posts(),
+    fetch_comments(),
+}"</code></pre>
+                <h4 id="trycatch-expressions">"Try/Catch Expressions"</h4>
+                <p>"Structured error handling:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"try {
+    let data = parse(input)?;
+    process(data);
+} catch err {
+    log_error(err);
+}"</code></pre>
+                <h4 id="error-propagation-operator">"Error Propagation (`?` Operator)"</h4>
+                <p>"The "<code>"?"</code>" postfix operator unwraps a "<code>"Result"</code>" or "<code>"Option"</code>", propagating the error on failure:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn load_config() -> Result<Config, String> {
+    let text = read_file(\"config.toml\")?;
+    let config = parse_toml(text)?;
+    return Ok(config);
+}"</code></pre>
+                <h4 id="navigate-expressions">"Navigate Expressions"</h4>
+                <p>"Programmatic client-side navigation:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"navigate(\"/user/42\");
+navigate(f\"/posts/{post_id}\");"</code></pre>
+                <h4 id="stream-expressions">"Stream Expressions"</h4>
+                <p>"Process async data as it arrives via streaming fetch:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for chunk in stream fetch(\"https://api.example.com/stream\") {
+    process_chunk(chunk);
+}"</code></pre>
+                <h4 id="suspend-expressions">"Suspend Expressions"</h4>
+                <p>"Show fallback content while loading:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"suspend(<LoadingSpinner />) {
+    <HeavyComponent />
+}"</code></pre>
+                <h4 id="animate-expressions">"Animate Expressions"</h4>
+                <p>"Trigger a named animation imperatively:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"animate(element, \"fadeIn\");"</code></pre>
+                <h4 id="format-strings">"Format Strings"</h4>
+                <p>"Interpolate expressions into strings:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let msg = f\"Hello {name}, you have {count} items\";
+let url = f\"https://api.example.com/users/{id}\";"</code></pre>
+                <h4 id="prompt-templates">"Prompt Templates"</h4>
+                <p>"AI prompt templates with interpolation. The codegen builds the interpolated string and triggers a fetch:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let p = prompt \"Summarize the following document: {document}\";"</code></pre>
+                <h4 id="struct-initialization-2">"Struct Initialization"</h4>
+                <p>"Construct struct instances inline:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let user = User { name: \"Alice\", age: 30 };"</code></pre>
+                <h4 id="borrow-and-mutable-borrow">"Borrow and Mutable Borrow"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let r = &value;         // immutable borrow
+let mr = &mut value;    // mutable borrow"</code></pre>
+                <h4 id="block-expressions">"Block Expressions"</h4>
+                <p>"Blocks are expressions that evaluate to their last expression:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let result = {
+    let x = compute();
+    let y = transform(x);
+    x + y
+};"</code></pre>
+                <hr />
+                <h3 id="string-operations">"String Operations"</h3>
+                <p>"Nectar strings support built-in methods that compile directly to WASM. No imports needed."</p>
+                <h4 id="length">"Length"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let s = \"hello\";
+let n = s.len();  // 5"</code></pre>
+                <h4 id="case-conversion">"Case Conversion"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let upper = s.to_upper();  // \"HELLO\"
+let lower = s.to_lower();  // \"hello\""</code></pre>
+                <h4 id="trimming">"Trimming"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let trimmed = s.trim();  // removes leading/trailing whitespace"</code></pre>
+                <h4 id="splitting">"Splitting"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let parts = s.split(\",\");  // returns [String]"</code></pre>
+                <h4 id="contains">"Contains"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let has = s.contains(\"ell\");  // true"</code></pre>
+                <h4 id="string-formatting">"String Formatting"</h4>
+                <p>"Use "<code>"format()"</code>" to convert values to strings:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let text = format(\"{}\", 42);        // \"42\"
+let msg = format(\"count: {}\", n);   // \"count: 5\""</code></pre>
+                <p>"Or use format string literals:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let msg = f\"Hello {name}, count is {count}\";"</code></pre>
+                <blockquote>
+                    <p><strong>"Note"</strong>": "<code>"format()"</code>" is the more battle-tested path for int-to-string conversion. Format strings ("<code>"f\"...\""</code>") are parsed and have codegen but are less proven."</p>
+                </blockquote>
+                <hr />
+                <h3 id="array-operations-and-iterators">"Array Operations and Iterators"</h3>
+                <h4 id="array-literals-and-indexing">"Array Literals and Indexing"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let items = [1, 2, 3, 4, 5];
+let first = items[0];         // 1
+let third = items[2];         // 3"</code></pre>
+                <h4 id="length-and-push">"Length and Push"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let n = items.len();          // 5
+items.push(6);                // appends to array"</code></pre>
+                <h4 id="contains-2">"Contains"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let has = items.contains(3);  // true"</code></pre>
+                <h4 id="map">"Map"</h4>
+                <p>"Transform each element, returning a new array:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let doubled = items.map(|x| x * 2);
+// or with explicit types:
+let doubled = items.map(fn(x: i32) -> i32 { x * 2 });"</code></pre>
+                <h4 id="filter">"Filter"</h4>
+                <p>"Select elements matching a predicate:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let evens = items.filter(|x| x % 2 == 0);
+let active = todos.filter(fn(t: &Todo) -> bool { !t.done });"</code></pre>
+                <h4 id="reduce">"Reduce"</h4>
+                <p>"Fold elements into a single value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let sum = items.reduce(0, |acc, x| acc + x);"</code></pre>
+                <h4 id="range-expressions">"Range Expressions"</h4>
+                <p>"Range expressions produce integer sequences for use in for loops:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"for i in 0..10 {
+    // i goes from 0 to 9 (exclusive end)
+    process(i);
+}
+
+for i in start..end {
+    // dynamic range
+}"</code></pre>
+                <h4 id="lazy-for-loops">"Lazy For Loops"</h4>
+                <p>"For large collections, "<code>"lazy for"</code>" renders only the first 20 items initially, then uses IntersectionObserver to load more as the user scrolls:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{lazy for item in self.items {
+    <div>{item.name}</div>
+}}"</code></pre>
+                <p>"This compiles to a batch function in the WASM function table that renders the next 20 items each time the sentinel element becomes visible."</p>
+                <hr />
+                <h3 id="error-handling">"Error Handling"</h3>
+                <h4 id="result-type">"Result Type"</h4>
+                <p><code>"Result<T, E>"</code>" represents an operation that may succeed or fail:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+fn parse(input: String) -> Result<i32, String> {
+    // ...
+}"</code></pre>
+                <h4 id="option-type">"Option Type"</h4>
+                <p><code>"Option<T>"</code>" represents a value that may or may not be present:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let found: Option<User> = None;
+let found: Option<User> = Some(user);"</code></pre>
+                <h4 id="the-operator">"The `?` Operator"</h4>
+                <p>"The "<code>"?"</code>" postfix operator unwraps a "<code>"Result"</code>" or "<code>"Option"</code>", propagating the error on failure:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fn load_config() -> Result<Config, String> {
+    let text = read_file(\"config.toml\")?;
+    let config = parse_toml(text)?;
+    return Ok(config);
+}"</code></pre>
+                <h4 id="trycatch">"Try/Catch"</h4>
+                <p>"Structured error handling:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"try {
+    let data = parse(input)?;
+    process(data);
+} catch err {
+    log_error(err);
+}"</code></pre>
+                <blockquote>
+                    <p><strong>"Note"</strong>": Try/catch has limited codegen. The "<code>"?"</code>" operator is more reliable."</p>
+                </blockquote>
+                <h4 id="pattern-matching-on-resultoption">"Pattern Matching on Result/Option"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match result {
+    Ok(value) => use_value(value),
+    Err(msg) => show_error(msg),
+}
+
+match maybe_user {
+    Some(user) => show_profile(user),
+    None => show_login(),
+}"</code></pre>
+                <blockquote>
+                    <p><strong>"Note"</strong>": Matching on Ok/Err/Some/None works well. Custom enum variant matching is more limited."</p>
+                </blockquote>
+                <hr />
+                <h3 id="statements">"Statements"</h3>
+                <h4 id="let-statements">"Let Statements"</h4>
+                <p>"Bind a value to a name:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"let x = 42;
+let mut name: String = \"Nectar\";
+let (a, b) = get_pair();           // PLANNED: tuple destructuring not yet in codegen
+let User { name, email, .. } = user; // PLANNED: struct destructuring not yet in codegen"</code></pre>
+                <h4 id="signal-statements">"Signal Statements"</h4>
+                <p>"Declare a reactive signal:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"signal count: i32 = 0;
+signal visible: bool = true;"</code></pre>
+                <h4 id="return-statements">"Return Statements"</h4>
+                <p>"Exit a function with an optional value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"return;
+return 42;
+return Ok(result);"</code></pre>
+                <h4 id="yield-statements-planned">"Yield Statements **(PLANNED)**"</h4>
+                <p>"Emit a value from a stream. Parsed but no generator runtime:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"yield chunk;
+yield f\"data: {value}\\n\";"</code></pre>
+                <h4 id="expression-statements">"Expression Statements"</h4>
+                <p>"Any expression can appear as a statement. A trailing semicolon is optional:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"process(data);
+self.count = self.count + 1;"</code></pre>
+                <hr />
+                <h3 id="patterns">"Patterns"</h3>
+                <p>"Patterns are used in "<code>"match"</code>" arms, "<code>"let"</code>" destructuring, and "<code>"for"</code>" bindings."</p>
+                <h4 id="wildcard-pattern">"Wildcard Pattern"</h4>
+                <p>"Matches anything, ignores the value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"_ => default_action(),"</code></pre>
+                <h4 id="identifier-pattern">"Identifier Pattern"</h4>
+                <p>"Binds the matched value to a name:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"x => use_value(x),"</code></pre>
+                <h4 id="literal-pattern">"Literal Pattern"</h4>
+                <p>"Matches a specific value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"42 => handle_forty_two(),
+\"hello\" => handle_greeting(),
+true => handle_true(),"</code></pre>
+                <h4 id="variant-pattern">"Variant Pattern"</h4>
+                <p>"Matches an enum variant, optionally binding inner fields:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"Some(value) => use_value(value),
+AuthStatus::LoggedIn(user) => show_user(user),
+None => show_empty(),"</code></pre>
+                <h4 id="tuple-pattern">"Tuple Pattern"</h4>
+                <p>"Destructure a tuple in match arms:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match point {
+    (0, 0) => handle_origin(),
+    (x, _) => use_x_only(x),
+}"</code></pre>
+                <h4 id="struct-pattern">"Struct Pattern"</h4>
+                <p>"Destructure a struct in match arms, with an optional "<code>".."</code>" to ignore remaining fields:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match user {
+    User { name, age, .. } => greet(name, age),
+}"</code></pre>
+                <h4 id="array-pattern">"Array Pattern"</h4>
+                <p>"Destructure an array in match arms:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"match items {
+    [first, second, ..] => process(first, second),
+}"</code></pre>
+                <blockquote>
+                    <p><strong>"Note"</strong>": "<code>"let"</code>"-binding destructuring ("<code>"let (x, y) = expr;"</code>", "<code>"let User { name, .. } = user;"</code>") is parsed but not yet in codegen. Use match arms for destructuring."</p>
+                </blockquote>
+                <hr />
+                <h3 id="modules">"Modules"</h3>
+                <h4 id="module-declaration">"Module Declaration"</h4>
+                <p>"Declare an external module (loaded from a separate file):"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"mod utils;          // loads ./utils.nectar or ./utils/mod.nectar
+mod networking;     // loads ./networking.nectar"</code></pre>
+                <p>"Declare an inline module:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"mod helpers {
+    pub fn capitalize(s: String) -> String {
+        // ...
+    }
+}"</code></pre>
+                <h4 id="useimport">"Use/Import"</h4>
+                <p>"Import items from other modules:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Import a single item
+use std::string;
+
+// Import with alias
+use http::Client as HttpClient;
+
+// Glob import (all public items)
+use utils::*;
+
+// Group import
+use std::{string, collections, io};
+
+// Group import with aliases
+use models::{User, Post as BlogPost};"</code></pre>
+                <h4 id="visibility-2">"Visibility"</h4>
+                <p>"Items are private by default. Mark them "<code>"pub"</code>" for public access:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"pub struct User { ... }
+pub fn create_user(...) { ... }
+
+struct Internal { ... }  // private"</code></pre>
+                <hr />
+                <h3 id="templates">"Templates"</h3>
+                <p>"Templates are the JSX-like rendering syntax used in component "<code>"render"</code>" blocks."</p>
+                <h4 id="elements">"Elements"</h4>
+                <p>"HTML elements with static attributes:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div class=\"container\">
+    <h1>\"Title\"</h1>
+    <p>\"Paragraph text\"</p>
+</div>"</code></pre>
+                <h4 id="self-closing-elements">"Self-Closing Elements"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<input placeholder=\"Enter text\" />
+<br />
+<NavBar />"</code></pre>
+                <h4 id="static-attributes">"Static Attributes"</h4>
+                <p>"String-valued attributes:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div class=\"card\" id=\"main\">
+<input type=\"text\" placeholder=\"Search...\" />"</code></pre>
+                <h4 id="dynamic-attributes">"Dynamic Attributes"</h4>
+                <p>"Expression-valued attributes use curly braces:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div class={dynamic_class}>
+<span>{self.count}</span>
+<img src={image_url} />"</code></pre>
+                <h4 id="event-handlers">"Event Handlers"</h4>
+                <p>"Event handlers use the "<code>"on:event"</code>" syntax:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<button on:click={self.handle_click}>\"Click me\"</button>
+<input on:submit={self.handle_submit} />
+<div on:mouseover={self.show_tooltip} />"</code></pre>
+                <h4 id="two-way-bindings">"Two-Way Bindings"</h4>
+                <p>"The "<code>"bind:property"</code>" syntax creates two-way data binding between a signal and a form element:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<input bind:value={search_query} />
+<input type=\"checkbox\" bind:checked={is_active} />"</code></pre>
+                <blockquote>
+                    <p><strong>"Note"</strong>": Parsed and codegen exists, but less battle-tested than "<code>"on:click"</code>" handlers."</p>
+                </blockquote>
+                <h4 id="aria-attributes">"ARIA Attributes"</h4>
+                <p>"Accessibility attributes are first-class:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<button aria-label=\"Close dialog\" aria-expanded={is_open}>
+<nav aria-hidden=\"true\">
+<div aria-live=\"polite\" aria-describedby=\"description\">"</code></pre>
+                <h4 id="role-attributes">"Role Attributes"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<div role=\"button\" tabindex=\"0\">
+<nav role=\"navigation\">"</code></pre>
+                <h4 id="text-content">"Text Content"</h4>
+                <p>"Text content is written as string literals inside elements:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<p>\"This is text content.\"</p>"</code></pre>
+                <h4 id="expression-interpolation">"Expression Interpolation"</h4>
+                <p>"Expressions inside curly braces render their value:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<span>{self.count}</span>
+<p>{f\"Total: {items.len()} items\"}</p>"</code></pre>
+                <h4 id="conditional-rendering">"Conditional Rendering"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{if self.loading {
+    <div>\"Loading...\"</div>
+}}
+
+{if show_details {
+    <Details data={self.data} />
+} else {
+    <Summary />
+}}"</code></pre>
+                <h4 id="list-rendering">"List Rendering"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{for item in self.items {
+    <li>{item.name}</li>
+}}
+
+{for post in PostService::get_posts() {
+    <article>
+        <h3>{post.title}</h3>
+        <p>{post.body}</p>
+    </article>
+}}"</code></pre>
+                <h4 id="lazy-list-rendering">"Lazy List Rendering"</h4>
+                <p>"For large collections, "<code>"lazy for"</code>" renders only the first 20 items initially and uses IntersectionObserver to load more as the user scrolls:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{lazy for item in self.items {
+    <div class=\"card\">{item.name}</div>
+}}"</code></pre>
+                <p>"The compiler emits a batch function in the WASM function table that renders the next 20 items each time a sentinel element becomes visible. Range-based lazy for ("<code>"lazy for i in 0..1000"</code>") is also supported."</p>
+                <h4 id="match-in-templates">"Match in Templates"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"{match status {
+    Some(err) => <div class=\"error\">{err.message}</div>,
+    None => <span />,
+}}"</code></pre>
+                <h4 id="link-elements">"Link Elements"</h4>
+                <p>"The "<code>"<Link>"</code>" element provides client-side navigation:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<Link to=\"/\">\"Home\"</Link>
+<Link to=\"/about\">\"About\"</Link>
+<Link to={f\"/user/{id}\"}>\"Profile\"</Link>"</code></pre>
+                <h4 id="fragment">"Fragment"</h4>
+                <p>"Group multiple elements without an extra wrapper node:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<Fragment>
+    <h1>\"Title\"</h1>
+    <p>\"Content\"</p>
+</Fragment>"</code></pre>
+                <h4 id="child-components">"Child Components"</h4>
+                <p>"Render other components as elements:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<NavBar />
+<Counter initial={0} />
+<UserCard user={current_user} />"</code></pre>
+                <hr />
+                <h3 id="agents">"Agents"</h3>
+                <p>"Agents are first-class constructs for building AI-powered interactions. They wrap LLM communication with tool definitions and reactive UI."</p>
+                <h4 id="agent-definition">"Agent Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"agent ChatBot {
+    prompt system = \"You are a helpful coding assistant.\";
+
+    signal messages: [Message] = [];
+    signal input: String = \"\";
+    signal streaming: bool = false;
+
+    tool search_docs(query: String) -> String {
+        let results = await fetch(f\"https://api.example.com/search?q={query}\");
+        return results.json().summary;
+    }
+
+    tool run_code(language: String, code: String) -> String {
+        let result = await fetch(\"https://api.example.com/execute\", {
+            method: \"POST\",
+            body: { language: language, code: code },
+        });
+        return result.json().output;
+    }
+
+    fn send(&mut self) {
+        let msg = Message { role: \"user\", content: self.input };
+        self.messages.push(msg);
+        self.input = \"\";
+        self.streaming = true;
+        ai::chat_stream(self.messages, self.tools);
+    }
+
+    render {
+        <div class=\"chat\">
+            <div class=\"messages\">
+                {for msg in self.messages {
+                    <div class={msg.role}>{msg.content}</div>
+                }}
+            </div>
+            <input value={self.input} on:submit={self.send} />
+        </div>
+    }
+}"</code></pre>
+                <h4 id="system-prompt">"System Prompt"</h4>
+                <p>"Define the AI's system prompt:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"prompt system = \"You are a helpful assistant specializing in data analysis.\";"</code></pre>
+                <h4 id="tools">"Tools"</h4>
+                <p>"Tools are functions the AI can call. They have typed parameters and return types:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"tool get_weather(city: String) -> String {
+    let result = await fetch(f\"https://api.example.com/weather?city={city}\");
+    return result.json().forecast;
+}"</code></pre>
+                <hr />
+                <h3 id="routers">"Routers"</h3>
+                <p>"Routers map URL paths to components for client-side navigation."</p>
+                <h4 id="router-definition">"Router Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    route \"/\" => Home,
+    route \"/about\" => About,
+    route \"/user/:id\" => UserProfile,
+    route \"/admin/*\" => AdminPanel guard { AuthStore::is_logged_in() },
+    fallback => NotFound,
+}"</code></pre>
+                <h4 id="route-patterns">"Route Patterns"</h4>
+                <ul>
+                    <li><strong>"Static"</strong>": "<code>"\"/about\""</code>" -- matches exactly "<code>"/about"</code></li>
+                    <li><strong>"Parameterized"</strong>": "<code>"\"/user/:id\""</code>" -- captures "<code>"id"</code>" from the URL"</li>
+                    <li><strong>"Wildcard"</strong>": "<code>"\"/admin/*\""</code>" -- matches any path under "<code>"/admin/"</code></li>
+                </ul>
+                <h4 id="route-guards">"Route Guards"</h4>
+                <p>"Guards are expressions that must evaluate to "<code>"true"</code>" for the route to be accessible:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"route \"/admin/*\" => AdminPanel guard { AuthStore::is_logged_in() },"</code></pre>
+                <h4 id="fallback-route">"Fallback Route"</h4>
+                <p>"The fallback component renders when no route matches:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"fallback => NotFound,"</code></pre>
+                <h4 id="router-layouts">"Router Layouts"</h4>
+                <p>"Persistent layout shells where only the outlet content swaps on navigation:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    layout {
+        <Stack>
+            <NavBar />
+            <Outlet />
+            <Footer />
+        </Stack>
+    }
+
+    route \"/\" => Home,
+    route \"/about\" => About,
+    route \"/settings\" => Settings,
+    fallback => NotFound,
+}"</code></pre>
+                <p><code>"<Outlet />"</code>" marks where routed content renders. The surrounding layout (NavBar, Footer) persists across navigation — no re-render, no flicker."</p>
+                <h4 id="view-transitions">"View Transitions"</h4>
+                <p>"Animate between page navigations with the "<code>"transition"</code>" keyword:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    transition \"fade\";  // Default transition for all routes
+
+    route \"/\" => Home,
+    route \"/about\" => About transition \"slide-left\",  // Per-route override
+    route \"/settings\" => Settings,
+    fallback => NotFound,
+}"</code></pre>
+                <p>"Transitions are WASM-internal — the animation math and DOM orchestration happen through the command buffer."</p>
+                <h4 id="programmatic-navigation">"Programmatic Navigation"</h4>
+                <p>"Navigate from code:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"navigate(\"/user/42\");"</code></pre>
+                <hr />
+                <h3 id="contracts">"Contracts"</h3>
+                <p>"Contracts define type-safe API boundaries. The compiler validates that API responses match the contract at compile time, and the WASM runtime validates at the wire level using a built-in JSON parser (no JS "<code>"JSON.parse"</code>")."</p>
+                <h4 id="contract-definition">"Contract Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"contract UserResponse {
+    id: i32,
+    name: String,
+    email: String,
+    role: enum { Admin, User, Guest },
+    avatar: String?,    // ? = nullable (Option<String>)
+}"</code></pre>
+                <p>"Fields can be any type, including inline enums. The "<code>"?"</code>" suffix makes a field nullable (wraps in "<code>"Option<T>"</code>")."</p>
+                <h4 id="what-the-compiler-generates">"What the compiler generates"</h4>
+                <p>"For each contract, the compiler emits:"</p>
+                <ul>
+                    <li><strong><code>"$__contract_register_<Name>"</code></strong>" -- registers the contract schema (name, fields, types) in WASM memory"</li>
+                    <li><strong><code>"$__contract_validate_<Name>"</code></strong>" -- validates a JSON buffer against the contract fields using the WASM JSON parser ("<code>"$json_parse"</code>" + "<code>"$json_get_field"</code>")"</li>
+                    <li>"A deterministic hash of the contract shape for cache invalidation"</li>
+                </ul>
+                <h4 id="using-contracts">"Using Contracts"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Parse a JSON response against a contract
+let user = UserResponse::parse(json_ptr, json_len);"</code></pre>
+                <h4 id="contract-inference">"Contract Inference"</h4>
+                <p>"The "<code>"contract_infer"</code>" module can infer contract shapes from fetch response patterns at compile time."</p>
+                <h4 id="contract-verification">"Contract Verification"</h4>
+                <p>"The "<code>"contract_verify"</code>" module validates at compile time that contract field types are consistent across usages."</p>
+                <p>"Contracts can be bound to "<code>"channel"</code>" definitions ("<code>"channel ChatRoom -> ChatMessage"</code>") and "<code>"cache"</code>" queries ("<code>"query get_users() : fetch(...) -> UserResponse"</code>")."</p>
+                <hr />
+                <h3 id="pages">"Pages"</h3>
+                <p>"Pages are SEO-optimized components with meta tags, structured data, and server-rendering support."</p>
+                <h4 id="page-definition">"Page Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"page BlogPost(slug: String) {
+    signal post: Option<Post> = None;
+
+    meta {
+        title: f\"Blog - {self.post.title}\",
+        description: self.post.excerpt,
+        og_image: self.post.cover_image,
+        og_type: \"article\",
+    }
+
+    schema {
+        type: \"Article\",
+        headline: self.post.title,
+        author: self.post.author,
+    }
+
+    async fn load(&mut self) {
+        self.post = Some(await fetch(f\"/api/posts/{slug}\").json());
+    }
+
+    style { .post { max-width: \"800px\"; margin: \"0 auto\"; } }
+
+    render {
+        <article class=\"post\">
+            <h1>{self.post.title}</h1>
+            <p>{self.post.body}</p>
+        </article>
+    }
+}"</code></pre>
+                <h4 id="page-blocks">"Page Blocks"</h4>
+                <ul>
+                    <li><strong><code>"meta"</code></strong>" — title, description, Open Graph tags, canonical URL"</li>
+                    <li><strong><code>"schema"</code></strong>" — JSON-LD structured data (auto-generated)"</li>
+                    <li><strong><code>"permissions"</code></strong>" — capability restrictions"</li>
+                    <li><strong><code>"gesture"</code></strong>" — gesture handlers (swipe, pinch, etc.)"</li>
+                    <li><strong>"state, signals, methods, style, render"</strong>" — same as components"</li>
+                </ul>
+                <p>"Build modes: "<code>"nectar build --ssr"</code>" for server rendering, "<code>"nectar build --ssg"</code>" for static generation."</p>
+                <hr />
+                <h3 id="forms">"Forms"</h3>
+                <p>"Declarative forms with built-in validation. No form libraries needed."</p>
+                <h4 id="form-definition">"Form Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"form ContactForm {
+    field name: String {
+        label: \"Full Name\",
+        placeholder: \"Jane Doe\",
+        required,
+        min_length: 2,
+        max_length: 100,
+    }
+
+    field email: String {
+        label: \"Email\",
+        required,
+        email,
+    }
+
+    field website: Option<String> {
+        label: \"Website\",
+        url,
+    }
+
+    async fn on_submit(&mut self) {
+        await fetch(\"/api/contact\", { method: \"POST\", body: self.values() });
+    }
+
+    render {
+        <form on:submit={self.on_submit}>
+            {self.render_fields()}
+            <button type=\"submit\" disabled={!self.is_valid()}>\"Send\"</button>
+        </form>
+    }
+}"</code></pre>
+                <h4 id="built-in-validators">"Built-in Validators"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Validator"</th><th>"Syntax"</th><th>"Purpose"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"required"</code></td><td><code>"required"</code>" or "<code>"required: \"message\""</code></td><td>"Field must not be empty"</td></tr>
+                        <tr><td><code>"min_length"</code></td><td><code>"min_length: 2"</code></td><td>"Minimum string length"</td></tr>
+                        <tr><td><code>"max_length"</code></td><td><code>"max_length: 100"</code></td><td>"Maximum string length"</td></tr>
+                        <tr><td><code>"pattern"</code></td><td><code>"pattern: \"^[a-z]+$\""</code></td><td>"Regex pattern match"</td></tr>
+                        <tr><td><code>"email"</code></td><td><code>"email"</code></td><td>"Valid email format"</td></tr>
+                        <tr><td><code>"url"</code></td><td><code>"url"</code></td><td>"Valid URL format"</td></tr>
+                        <tr><td><code>"validate"</code></td><td><code>"validate: custom_fn"</code></td><td>"Custom validation function"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="automatic-features">"Automatic Features"</h4>
+                <ul>
+                    <li><code>"self.is_valid()"</code>" — returns true when all fields pass validation"</li>
+                    <li><code>"self.values()"</code>" — returns form data"</li>
+                    <li><code>"self.reset()"</code>" — resets all fields"</li>
+                    <li>"Dirty tracking and per-field error state are automatic"</li>
+                </ul>
+                <hr />
+                <h3 id="channels">"Channels"</h3>
+                <p>"WebSocket connections with automatic reconnection and type-safe messages."</p>
+                <h4 id="channel-definition">"Channel Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"channel ChatRoom -> ChatMessage {
+    url: f\"wss://api.example.com/ws/chat\",
+    reconnect: true,
+    heartbeat: 30000,
+
+    on_connect {
+        println(\"Connected\");
+    }
+
+    on_message {
+        ChatStore::add_message(message);
+    }
+
+    on_disconnect {
+        println(\"Disconnected\");
+    }
+
+    fn send_text(&mut self, text: String) {
+        self.send(ChatMessage { user: \"me\", text: text, timestamp: now() });
+    }
+}"</code></pre>
+                <h4 id="channel-options">"Channel Options"</h4>
+                <ul>
+                    <li><strong><code>"-> ContractName"</code></strong>" — binds message types to a contract"</li>
+                    <li><strong><code>"url"</code></strong>" — WebSocket URL (expression)"</li>
+                    <li><strong><code>"reconnect"</code></strong>" — auto-reconnect on disconnect (boolean)"</li>
+                    <li><strong><code>"heartbeat"</code></strong>" — keepalive interval in milliseconds (integer)"</li>
+                    <li><strong>"Lifecycle handlers"</strong>" — "<code>"on_connect"</code>", "<code>"on_message"</code>", "<code>"on_disconnect"</code></li>
+                    <li><strong>"Methods"</strong>" — regular "<code>"fn"</code>" or "<code>"async fn"</code></li>
+                </ul>
+                <hr />
+                <h3 id="auth">"Auth"</h3>
+                <p>"Declarative OAuth/authentication with session management."</p>
+                <h4 id="auth-definition">"Auth Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"auth AppAuth {
+    provider \"google\" {
+        client_id: env(\"GOOGLE_CLIENT_ID\"),
+        scopes: [\"openid\", \"email\", \"profile\"],
+    }
+
+    provider \"github\" {
+        client_id: env(\"GITHUB_CLIENT_ID\"),
+        scopes: [\"user:email\"],
+    }
+
+    session: \"cookie\",
+
+    fn on_login(&mut self) { navigate(\"/dashboard\"); }
+    fn on_logout(&mut self) { navigate(\"/\"); }
+    fn on_error(&mut self) { println(\"Auth error\"); }
+}"</code></pre>
+                <h4 id="auth-options">"Auth Options"</h4>
+                <ul>
+                    <li><strong><code>"provider \"name\" { ... }"</code></strong>" — OAuth provider config with "<code>"client_id"</code>" and "<code>"scopes"</code></li>
+                    <li><strong><code>"session"</code></strong>" — session storage strategy ("<code>"\"cookie\""</code>" or "<code>"\"local\""</code>")"</li>
+                    <li><strong>"Lifecycle hooks"</strong>" — "<code>"on_login"</code>", "<code>"on_logout"</code>", "<code>"on_error"</code></li>
+                </ul>
+                <hr />
+                <h3 id="payment">"Payment"</h3>
+                <p>"PCI-compliant payment processing via sandboxed iframes."</p>
+                <h4 id="payment-definition">"Payment Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"payment Checkout {
+    provider: \"stripe\",
+    public_key: env(\"STRIPE_PUBLIC_KEY\"),
+    sandbox: true,
+
+    async fn on_success(&mut self) {
+        await fetch(\"/api/orders/confirm\", { method: \"POST\" });
+        navigate(\"/thank-you\");
+    }
+
+    fn on_error(&mut self) {
+        println(\"Payment failed\");
+    }
+}"</code></pre>
+                <p>"Card data never touches component state. The compiler guarantees payment data isolation through sandboxed iframes."</p>
+                <hr />
+                <h3 id="upload">"Upload"</h3>
+                <p>"File uploads with progress tracking, validation, and chunked transfer."</p>
+                <h4 id="upload-definition">"Upload Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"upload AvatarUpload {
+    endpoint: \"/api/upload/avatar\",
+    max_size: 5242880,
+    accept: [\"image/png\", \"image/jpeg\", \"image/webp\"],
+    chunked: true,
+
+    fn on_progress(&mut self) { /* track progress */ }
+    async fn on_complete(&mut self) { /* handle result */ }
+    fn on_error(&mut self) { /* handle error */ }
+}"</code></pre>
+                <h4 id="upload-options">"Upload Options"</h4>
+                <ul>
+                    <li><strong><code>"endpoint"</code></strong>" — upload URL (expression)"</li>
+                    <li><strong><code>"max_size"</code></strong>" — maximum file size in bytes (integer)"</li>
+                    <li><strong><code>"accept"</code></strong>" — allowed MIME types (string array)"</li>
+                    <li><strong><code>"chunked"</code></strong>" — enable chunked/resumable uploads (boolean)"</li>
+                    <li><strong>"Lifecycle hooks"</strong>" — "<code>"on_progress"</code>", "<code>"on_complete"</code>", "<code>"on_error"</code></li>
+                </ul>
+                <hr />
+                <h3 id="db">"Db"</h3>
+                <p>"Client-side database abstraction over IndexedDB with declarative schema."</p>
+                <h4 id="db-definition">"Db Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"db AppDatabase {
+    version: 1,
+
+    store \"users\" {
+        key: \"id\",
+        index \"by_email\" => \"email\",
+        index \"by_name\" => \"name\",
+    }
+
+    store \"posts\" {
+        key: \"id\",
+        index \"by_author\" => \"authorId\",
+    }
+}"</code></pre>
+                <h4 id="store-options">"Store Options"</h4>
+                <ul>
+                    <li><strong><code>"version"</code></strong>" — schema version (integer, triggers migration on change)"</li>
+                    <li>
+                        <p><strong><code>"store \"name\" { ... }"</code></strong>" — object store definition"</p>
+                        <ul>
+                            <li><strong><code>"key"</code></strong>" — primary key field (string, defaults to "<code>"\"id\""</code>")"</li>
+                            <li><strong><code>"index \"name\" => \"field\""</code></strong>" — index definitions"</li>
+                        </ul>
+                    </li>
+                </ul>
+                <hr />
+                <h3 id="cache">"Cache"</h3>
+                <p>"Data caching with stale-while-revalidate, TTL, and optimistic updates."</p>
+                <h4 id="cache-definition">"Cache Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"cache ApiCache {
+    strategy: \"stale-while-revalidate\",
+    ttl: 300,
+    persist: true,
+    max_entries: 100,
+
+    query get_users() : fetch(\"/api/users\") -> UserResponse {
+        ttl: 60,
+        stale: 30,
+        invalidate_on: [\"user_created\"],
+    }
+
+    mutation create_user(data: UserInput) : fetch(\"/api/users\", { method: \"POST\", body: data }) {
+        optimistic: true,
+        rollback_on_error: true,
+        invalidate: [\"get_users\"],
+    }
+}"</code></pre>
+                <h4 id="query-options">"Query Options"</h4>
+                <ul>
+                    <li><strong><code>"ttl"</code></strong>" — time-to-live in seconds (integer)"</li>
+                    <li><strong><code>"stale"</code></strong>" — stale-while-revalidate window (integer)"</li>
+                    <li><strong><code>"invalidate_on"</code></strong>" — events that bust the cache (string array)"</li>
+                    <li><strong><code>"-> ContractName"</code></strong>" — type binding for response validation"</li>
+                </ul>
+                <h4 id="mutation-options">"Mutation Options"</h4>
+                <ul>
+                    <li><strong><code>"optimistic"</code></strong>" — apply changes before server confirms (boolean)"</li>
+                    <li><strong><code>"rollback_on_error"</code></strong>" — revert optimistic update on failure (boolean)"</li>
+                    <li><strong><code>"invalidate"</code></strong>" — queries to refetch after mutation (string array)"</li>
+                </ul>
+                <hr />
+                <h3 id="embed">"Embed"</h3>
+                <p>"Third-party script embedding with security controls."</p>
+                <h4 id="embed-definition">"Embed Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"embed Analytics {
+    src: \"https://analytics.example.com/script.js\",
+    loading: \"defer\",
+    sandbox: true,
+    integrity: \"sha384-abc123...\",
+
+    permissions {
+        allow: [\"analytics\"],
+        deny: [\"dom_access\", \"network\"],
+    }
+}"</code></pre>
+                <h4 id="embed-options">"Embed Options"</h4>
+                <ul>
+                    <li><strong><code>"src"</code></strong>" — script URL (required, expression)"</li>
+                    <li><strong><code>"loading"</code></strong>" — load strategy: "<code>"\"defer\""</code>", "<code>"\"async\""</code>", "<code>"\"lazy\""</code>", "<code>"\"idle\""</code></li>
+                    <li><strong><code>"sandbox"</code></strong>" — isolate script from your DOM (boolean)"</li>
+                    <li><strong><code>"integrity"</code></strong>" — subresource integrity hash (expression)"</li>
+                    <li><strong><code>"permissions"</code></strong>" — capability restrictions"</li>
+                </ul>
+                <hr />
+                <h3 id="pdf">"Pdf"</h3>
+                <p>"PDF generation from render blocks."</p>
+                <h4 id="pdf-definition">"Pdf Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"pdf Invoice {
+    page_size: \"A4\",
+    orientation: \"portrait\",
+    margins: \"2cm\",
+
+    render {
+        <div class=\"invoice\">
+            <h1>\"Invoice #1234\"</h1>
+            <table><tr><td>\"Item\"</td><td>\"$100\"</td></tr></table>
+        </div>
+    }
+}"</code></pre>
+                <p>"Trigger download: "<code>"Invoice::download(\"invoice.pdf\");"</code></p>
+                <hr />
+                <h3 id="app-pwa">"App (PWA)"</h3>
+                <p>"Progressive Web App configuration."</p>
+                <h4 id="app-definition">"App Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"app MyApp {
+    manifest {
+        name: \"My Application\",
+        short_name: \"MyApp\",
+        start_url: \"/\",
+        theme_color: \"#4a90d9\",
+        display: \"standalone\",
+    }
+
+    offline {
+        precache: [\"/\", \"/about\", \"/offline\"],
+        strategy: \"cache-first\",
+        fallback: OfflinePage,
+    }
+
+    push {
+        vapid_key: env(\"VAPID_PUBLIC_KEY\"),
+        on_message: handle_push,
+    }
+}"</code></pre>
+                <h4 id="app-blocks">"App Blocks"</h4>
+                <ul>
+                    <li><strong><code>"manifest"</code></strong>" — key-value pairs for the web app manifest"</li>
+                    <li><strong><code>"offline"</code></strong>" — "<code>"precache"</code>" (URL array), "<code>"strategy"</code>" (string), "<code>"fallback"</code>" (page name)"</li>
+                    <li><strong><code>"push"</code></strong>" — "<code>"vapid_key"</code>" (expression), "<code>"on_message"</code>" (function name)"</li>
+                </ul>
+                <hr />
+                <h3 id="theme">"Theme"</h3>
+                <p>"Design tokens for light/dark modes."</p>
+                <h4 id="theme-definition">"Theme Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"theme AppTheme {
+    light {
+        bg: \"#ffffff\",
+        text: \"#1a1a1a\",
+        primary: \"#4a90d9\",
+    }
+
+    dark {
+        bg: \"#1a1a1a\",
+        text: \"#e0e0e0\",
+        primary: \"#6ab0ff\",
+    }
+}"</code></pre>
+                <p>"The compiler generates CSS custom properties ("<code>"--bg"</code>", "<code>"--text"</code>", "<code>"--primary"</code>") and a toggle mechanism. Respects "<code>"prefers-color-scheme"</code>" by default."</p>
+                <p>"Usage in styles: "<code>"background: var(--bg);"</code>" Toggle: "<code>"AppTheme::toggle();"</code>" or "<code>"AppTheme::set(\"dark\");"</code></p>
+                <hr />
+                <h3 id="breakpoints">"Breakpoints"</h3>
+                <p>"Responsive design breakpoints."</p>
+                <h4 id="breakpoints-definition">"Breakpoints Definition"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"breakpoints {
+    mobile: 320,
+    tablet: 768,
+    desktop: 1024,
+    wide: 1440,
+}"</code></pre>
+                <p>"Values are pixel widths (integers). Use in styles as "<code>"@mobile"</code>", "<code>"@tablet"</code>", "<code>"@desktop"</code>"."</p>
+                <hr />
+                <h3 id="animations">"Animations"</h3>
+                <p>"Three animation primitives."</p>
+                <h4 id="spring">"Spring"</h4>
+                <p>"Physics-based animation with configurable stiffness, damping, and mass:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"spring MenuSlide {
+    stiffness: 200,
+    damping: 20,
+    mass: 1,
+    properties: [\"transform\", \"opacity\"],
+}"</code></pre>
+                <h4 id="keyframes">"Keyframes"</h4>
+                <p>"CSS keyframe animations with percentage-based frames:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"keyframes FadeIn {
+    0% { opacity: \"0\", transform: \"translateY(10px)\" }
+    100% { opacity: \"1\", transform: \"translateY(0)\" }
+    duration: \"0.3s\",
+    easing: \"ease-out\",
+}"</code></pre>
+                <h4 id="stagger">"Stagger"</h4>
+                <p>"Stagger an animation across multiple elements:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"stagger ListReveal {
+    animation: FadeIn,
+    delay: \"50ms\",
+    selector: \".list-item\",
+}"</code></pre>
+                <p>"All animations automatically respect "<code>"prefers-reduced-motion"</code>"."</p>
+                <hr />
+                <h3 id="testing">"Testing"</h3>
+                <h4 id="test-blocks">"Test Blocks"</h4>
+                <p>"Test blocks define named test cases:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"addition works\" {
+    let result = add(2, 3);
+    assert_eq(result, 5);
+}
+
+test \"user creation\" {
+    let user = User::new(\"Alice\", \"alice@test.com\");
+    assert(user.name == \"Alice\");
+    assert_eq(user.email, \"alice@test.com\");
+}"</code></pre>
+                <h4 id="assertions">"Assertions"</h4>
+                <p><strong><code>"assert(condition)"</code></strong>" -- asserts that a condition is true:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"assert(x > 0);
+assert(list.len() > 0, \"list should not be empty\");"</code></pre>
+                <p><strong><code>"assert_eq(left, right)"</code></strong>" -- asserts that two values are equal:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"assert_eq(result, 42);
+assert_eq(name, \"Alice\", \"names should match\");"</code></pre>
+                <p>"Both assertion forms accept an optional message string as the last argument."</p>
+                <h4 id="running-tests">"Running Tests"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar test tests.nectar
+nectar test tests.nectar --filter \"addition\"
+nectar test tests.nectar --verbose"</code></pre>
+                <h4 id="component-testing-with-the-test-renderer">"Component Testing with the Test Renderer"</h4>
+                <p>"Nectar includes a built-in test renderer that mounts components into a virtual DOM for testing without a browser. The "<code>"render()"</code>" function returns a "<code>"TestElement"</code>" with query and interaction methods."</p>
+                <h5 id="mounting-a-component">"Mounting a Component"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"greeting renders correctly\" {
+    let el = render(<Greeting name=\"Nectar\" />);
+    let heading = el.findByText(\"Hello, Nectar!\");
+    assert(heading.exists());
+}"</code></pre>
+                <h5 id="query-methods">"Query Methods"</h5>
+                <ul>
+                    <li><strong><code>"findByText(text)"</code></strong>" -- find a descendant element containing the given text"</li>
+                    <li><strong><code>"findByRole(role)"</code></strong>" -- find an element with a matching ARIA "<code>"role"</code>" attribute"</li>
+                    <li><strong><code>"findByAttribute(name, value)"</code></strong>" -- find an element with a specific attribute value"</li>
+                    <li><strong><code>"children()"</code></strong>" -- get all direct child "<code>"TestElement"</code>"s"</li>
+                    <li><strong><code>"getText()"</code></strong>" -- get the text content of the element and its descendants"</li>
+                    <li><strong><code>"getAttribute(name)"</code></strong>" -- get a single attribute value"</li>
+                    <li><strong><code>"exists()"</code></strong>" -- returns "<code>"true"</code>" if the element was found"</li>
+                </ul>
+                <h5 id="interaction-methods">"Interaction Methods"</h5>
+                <ul>
+                    <li><strong><code>"click()"</code></strong>" -- dispatch a click event on the element"</li>
+                    <li><strong><code>"type(text)"</code></strong>" -- simulate text input (sets value, fires input and change events)"</li>
+                </ul>
+                <h5 id="simulating-user-interaction">"Simulating User Interaction"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"counter increments on click\" {
+    let el = render(<Counter />);
+    let btn = el.findByText(\"+1\");
+    let display = el.findByRole(\"counter\");
+
+    btn.click();
+    assert_eq(display.getText(), \"1\");
+
+    btn.click();
+    btn.click();
+    assert_eq(display.getText(), \"3\");
+}"</code></pre>
+                <p>"After each "<code>"click()"</code>" or "<code>"type()"</code>" call, the test renderer processes all reactive updates synchronously. Subsequent queries reflect the updated DOM state -- no manual flushing is required."</p>
+                <h5 id="testing-props-and-defaults">"Testing Props and Defaults"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Badge(label: String = \"default\") {
+    render { <span>{self.label}</span> }
+}
+
+test \"default prop is applied\" {
+    let el = render(<Badge />);
+    assert_eq(el.findByText(\"default\").getText(), \"default\");
+}
+
+test \"explicit prop overrides default\" {
+    let el = render(<Badge label=\"custom\" />);
+    assert_eq(el.findByText(\"custom\").getText(), \"custom\");
+}"</code></pre>
+                <h5 id="testing-conditional-and-list-rendering">"Testing Conditional and List Rendering"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"conditional rendering\" {
+    let el = render(<Alert show={true} />);
+    assert(el.findByText(\"Warning!\").exists());
+}
+
+test \"list rendering\" {
+    let el = render(<ItemList items={[\"a\", \"b\", \"c\"]} />);
+    assert(el.findByText(\"a\").exists());
+    assert(el.findByText(\"b\").exists());
+    assert(el.findByText(\"c\").exists());
+}"</code></pre>
+                <h5 id="testing-store-integration">"Testing Store Integration"</h5>
+                <p>"Components that read from stores can be tested end-to-end:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"store-connected component updates on action\" {
+    let el = render(<StoreCounter />);
+    let btn = el.findByText(\"+1\");
+
+    btn.click();
+
+    let display = el.findByRole(\"display\");
+    assert_eq(display.getText(), \"Store count: 1\");
+}"</code></pre>
+                <h4 id="agent-testing">"Agent Testing"</h4>
+                <p>"Agents are testable like components but have additional capabilities for verifying tool registration, tool dispatch, and AI interaction mocking."</p>
+                <h5 id="testing-tool-registration">"Testing Tool Registration"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"agent registers tools\" {
+    let tools = MyAgent::get_registered_tools();
+    assert_eq(tools.len(), 2);
+    assert_eq(tools[0].name, \"search\");
+    assert_eq(tools[1].name, \"calculate\");
+}"</code></pre>
+                <p><code>"get_registered_tools()"</code>" returns metadata about each "<code>"tool"</code>" block: name, parameter names and types, and return type."</p>
+                <h5 id="testing-tool-dispatch">"Testing Tool Dispatch"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"dispatch tool with typed args\" {
+    let result = await MyAgent::dispatch_tool(\"search\", {
+        query: \"nectar language\",
+    });
+    // Verify the tool executed correctly
+}"</code></pre>
+                <p><code>"dispatch_tool(name, args)"</code>" invokes a tool by name with a typed argument object, simulating what the runtime does when the AI model requests a tool call."</p>
+                <h5 id="mocking-ai-responses">"Mocking AI Responses"</h5>
+                <p>"The "<code>"ai::mock_response()"</code>" and "<code>"ai::mock_tool_call()"</code>" functions install canned responses for testing without a real LLM:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"mock a text response\" {
+    ai::mock_response(\"The answer is 42.\");
+    let response = await ai::chat_complete(messages);
+    assert_eq(response.content, \"The answer is 42.\");
+}
+
+test \"mock a tool call response\" {
+    ai::mock_tool_call(\"get_weather\", { city: \"Paris\" });
+    let response = await ai::chat_complete(messages);
+    assert_eq(response.tool_calls[0].name, \"get_weather\");
+}"</code></pre>
+                <h5 id="mocking-streaming-responses">"Mocking Streaming Responses"</h5>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"mock streaming tokens\" {
+    ai::mock_stream([\"Hello\", \" \", \"world\"]);
+    let mut text = \"\";
+    for chunk in stream ai::chat_stream(messages) {
+        text = text + chunk;
+    }
+    assert_eq(text, \"Hello world\");
+}"</code></pre>
+                <h4 id="async-test-patterns">"Async Test Patterns"</h4>
+                <p>"Test blocks support "<code>"await"</code>" for testing asynchronous operations:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"async fetch in tests\" {
+    let response = await fetch(\"https://api.example.com/data\");
+    assert(response.status == 200 || response.status == 0);
+}"</code></pre>
+                <p>"In the test environment, HTTP imports are stubbed by the test runner. The "<code>"fetch"</code>" calls resolve immediately without hitting real endpoints. This allows testing the async control flow without external dependencies."</p>
+                <p>"For sequential async operations:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"sequential async\" {
+    let a = await fetch(\"https://api.example.com/step1\");
+    let b = await fetch(\"https://api.example.com/step2\");
+    assert(true, \"both requests completed\");
+}"</code></pre>
+                <h4 id="test-organization-best-practices">"Test Organization Best Practices"</h4>
+                <p><strong>"Use descriptive test names."</strong>" Test names appear in the output when tests fail. Use full sentences that describe the expected behavior:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"// Good
+test \"counter increments on click\" { ... }
+test \"empty list renders zero total\" { ... }
+test \"login fails with invalid credentials\" { ... }
+
+// Avoid
+test \"test1\" { ... }
+test \"counter\" { ... }"</code></pre>
+                <p><strong>"One assertion focus per test."</strong>" Each test should verify one behavior. Multiple "<code>"assert"</code>" calls are fine when they verify facets of the same behavior:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"user creation sets all fields\" {
+    let user = User::new(\"Alice\", \"alice@test.com\", 30);
+    assert_eq(user.name, \"Alice\");
+    assert_eq(user.email, \"alice@test.com\");
+    assert_eq(user.age, 30);
+}"</code></pre>
+                <p><strong>"Organize tests near related code."</strong>" Place "<code>"test"</code>" blocks at the bottom of the file after the types and functions they test, or in dedicated test files:"</p>
+                <pre class="code-block"><code>"examples/
+    todo.nectar              # Application code
+    tests.nectar             # Unit tests for logic
+    component-tests.nectar   # Component integration tests
+    agent-tests.nectar       # Agent behavior tests"</code></pre>
+                <p><strong>"Use "<code>"--filter"</code>" for focused testing."</strong>" During development, run only the tests relevant to your current change:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar test tests.nectar --filter \"fibonacci\"
+nectar test component-tests.nectar --filter \"counter\""</code></pre>
+                <p><strong>"Reset shared state between tests."</strong>" When testing stores or agents, call the "<code>"clear"</code>" or "<code>"reset"</code>" method at the start of each test to avoid state leaking between tests:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"store starts fresh\" {
+    MyStore::reset();
+    assert_eq(MyStore::get_count(), 0);
+}"</code></pre>
+                <p><strong>"Test error paths, not just happy paths."</strong>" Use "<code>"Result"</code>", "<code>"Option"</code>", and "<code>"try/catch"</code>" to verify that error handling works correctly:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"division by zero returns error\" {
+    let result = divide(10.0, 0.0);
+    match result {
+        Result::Ok(_) => assert(false, \"should not succeed\"),
+        Result::Err(e) => assert_eq(e, \"division by zero\"),
+    }
+}"</code></pre>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

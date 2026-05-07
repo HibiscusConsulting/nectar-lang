@@ -1,0 +1,480 @@
+// docs/runtime-api.nectar — auto-generated from docs/runtime-api.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page RuntimeApiDoc() {
+    meta {
+        title: "Nectar Runtime API — Nectar Documentation",
+        description: "The JS syscall layer, command buffer, WASM imports — how Nectar talks to the browser.",
+        canonical: "/docs/runtime-api",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api" class="current">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Runtime API"
+                    </div>
+                    <h1>"Nectar Runtime API"</h1>
+                <p>"This document describes the complete runtime layer that bridges Nectar's WASM modules to browser APIs. Understanding this architecture is critical for compiler development and debugging."</p>
+                <h3 id="architecture">"Architecture"</h3>
+                <p>"Nectar's runtime is a single JavaScript file ("<code>"runtime/modules/core.js"</code>", ~900 lines) that provides browser API syscalls to WASM. "<strong>"All logic runs in WASM."</strong>" JavaScript functions are 1-3 lines each — pure bridges with zero computation."</p>
+                <h4 id="what-lives-where">"What Lives Where"</h4>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Layer"</th><th>"Runs in"</th><th>"Examples"</th></tr></thead>
+                        <tbody>
+                        <tr><td><strong>"Application logic"</strong></td><td>"WASM"</td><td>"Components, stores, routing, validation, crypto, formatting"</td></tr>
+                        <tr><td><strong>"Reactive system"</strong></td><td>"WASM"</td><td>"Signals, effects, memos, dependency tracking, batching"</td></tr>
+                        <tr><td><strong>"String operations"</strong></td><td>"WASM"</td><td>"Concat, fromI32, fromF64, fromBool — all in linear memory"</td></tr>
+                        <tr><td><strong>"Animation math"</strong></td><td>"WASM"</td><td>"Spring physics, easing, interpolation"</td></tr>
+                        <tr><td><strong>"Browser syscalls"</strong></td><td>"JS (core.js)"</td><td>"DOM, fetch, WebSocket, IndexedDB, timers, clipboard"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="key-patterns">"Key Patterns"</h4>
+                <p><strong>"Command Buffer (mount/flush):"</strong></p>
+                <ul>
+                    <li>"Initial render: WASM builds an HTML string in linear memory → single "<code>"mount()"</code>" call sets "<code>"innerHTML"</code></li>
+                    <li>"Updates: WASM writes opcodes into a command buffer in linear memory → single "<code>"flush()"</code>" call per animation frame reads and executes them all"</li>
+                    <li>"This collapses ~50 individual WASM→JS boundary crossings into 1-2 per frame"</li>
+                </ul>
+                <p><strong><code>"__readOpts"</code>" pattern:"</strong>" WASM writes flat (key_ptr, key_len, val_ptr, val_len) tuples terminated by (0,0) into linear memory. JS reads them to build option objects for browser APIs. Replaces all JSON.parse/stringify. Zero serialization overhead."</p>
+                <p><strong>"Typed setters:"</strong>" For complex APIs like fetch, WASM calls "<code>"setMethod()"</code>", "<code>"setBody()"</code>", "<code>"addHeader()"</code>" individually before triggering the call. No option object serialization."</p>
+                <p><strong>"Callbacks:"</strong>" WASM registers callback indices. JS calls "<code>"R.__cb(cbIdx)"</code>" when async operations complete. Data is written to WASM linear memory before the callback fires."</p>
+                <p><strong>"Element registry:"</strong>" DOM elements are registered by integer ID. WASM refers to elements by ID, never by reference. "<code>"R.__registerElement(el)"</code>" returns an integer handle."</p>
+                <hr />
+                <h3 id="flush-opcodes">"Flush Opcodes"</h3>
+                <p>"The command buffer uses these opcodes for batched DOM updates:"</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Opcode"</th><th>"Value"</th><th>"Operation"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"OP_SET_TEXT"</code></td><td>"1"</td><td>"Set textContent on element"</td></tr>
+                        <tr><td><code>"OP_SET_ATTR"</code></td><td>"2"</td><td>"Set attribute (name, value)"</td></tr>
+                        <tr><td><code>"OP_REMOVE_ATTR"</code></td><td>"3"</td><td>"Remove attribute"</td></tr>
+                        <tr><td><code>"OP_APPEND_CHILD"</code></td><td>"4"</td><td>"Append child element"</td></tr>
+                        <tr><td><code>"OP_REMOVE_CHILD"</code></td><td>"5"</td><td>"Remove child element"</td></tr>
+                        <tr><td><code>"OP_INSERT_BEFORE"</code></td><td>"6"</td><td>"Insert element before reference"</td></tr>
+                        <tr><td><code>"OP_SET_STYLE"</code></td><td>"7"</td><td>"Set inline style property"</td></tr>
+                        <tr><td><code>"OP_CLASS_ADD"</code></td><td>"8"</td><td>"Add CSS class"</td></tr>
+                        <tr><td><code>"OP_CLASS_REMOVE"</code></td><td>"9"</td><td>"Remove CSS class"</td></tr>
+                        <tr><td><code>"OP_CLASS_TOGGLE"</code></td><td>"10"</td><td>"Toggle CSS class"</td></tr>
+                        <tr><td><code>"OP_SET_INNER_HTML"</code></td><td>"11"</td><td>"Set innerHTML"</td></tr>
+                        <tr><td><code>"OP_ADD_EVENT"</code></td><td>"12"</td><td>"Add event listener"</td></tr>
+                        <tr><td><code>"OP_REMOVE_EVENT"</code></td><td>"13"</td><td>"Remove event listener"</td></tr>
+                        <tr><td><code>"OP_FOCUS"</code></td><td>"14"</td><td>"Focus element"</td></tr>
+                        <tr><td><code>"OP_BLUR"</code></td><td>"15"</td><td>"Blur element"</td></tr>
+                        <tr><td><code>"OP_SET_PROPERTY"</code></td><td>"16"</td><td>"Set DOM property (value, checked, etc.)"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <hr />
+                <h3 id="namespaces">"Namespaces"</h3>
+                <p>"core.js exports 16 namespaces via "<code>"wasmImports"</code>". Each namespace contains only functions that call browser APIs WASM physically cannot invoke."</p>
+                <h4 id="dom">"dom"</h4>
+                <p>"DOM manipulation, element queries, and rendering."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"mount"</code></td><td>"containerElId, htmlPtr, htmlLen"</td><td><code>"el.innerHTML = html"</code></td></tr>
+                        <tr><td><code>"hydrateRefs"</code></td><td>"containerElId"</td><td><code>"querySelectorAll('[data-nid]')"</code></td></tr>
+                        <tr><td><code>"flush"</code></td><td>"bufPtr, bufLen"</td><td>"Reads opcode buffer, executes batched DOM ops"</td></tr>
+                        <tr><td><code>"getElementById"</code></td><td>"ptr, len"</td><td><code>"document.getElementById()"</code></td></tr>
+                        <tr><td><code>"querySelector"</code></td><td>"ptr, len"</td><td><code>"document.querySelector()"</code></td></tr>
+                        <tr><td><code>"createElement"</code></td><td>"ptr, len"</td><td><code>"document.createElement()"</code></td></tr>
+                        <tr><td><code>"createTextNode"</code></td><td>"ptr, len"</td><td><code>"document.createTextNode()"</code></td></tr>
+                        <tr><td><code>"getBody"</code></td><td>"—"</td><td><code>"document.body"</code></td></tr>
+                        <tr><td><code>"getHead"</code></td><td>"—"</td><td><code>"document.head"</code></td></tr>
+                        <tr><td><code>"getRoot"</code></td><td>"—"</td><td><code>"document.getElementById('app')"</code>" or "<code>"document.body"</code></td></tr>
+                        <tr><td><code>"getDocumentElement"</code></td><td>"—"</td><td><code>"document.documentElement"</code></td></tr>
+                        <tr><td><code>"addEventListener"</code></td><td>"elId, evtPtr, evtLen, cbIdx"</td><td><code>"el.addEventListener()"</code>" — marshals event data (clientX/Y, keyCode, modifiers, key, dataTransfer)"</td></tr>
+                        <tr><td><code>"removeEventListener"</code></td><td>"elId, evtPtr, evtLen, cbIdx"</td><td><code>"el.removeEventListener()"</code></td></tr>
+                        <tr><td><code>"lazyMount"</code></td><td>"containerElId, urlPtr, urlLen, cbIdx"</td><td><code>"import(url)"</code>" dynamic module loading"</td></tr>
+                        <tr><td><code>"setTitle"</code></td><td>"ptr, len"</td><td><code>"document.title = str"</code></td></tr>
+                        <tr><td><code>"getScrollTop"</code></td><td>"elId"</td><td><code>"el.scrollTop"</code></td></tr>
+                        <tr><td><code>"getScrollLeft"</code></td><td>"elId"</td><td><code>"el.scrollLeft"</code></td></tr>
+                        <tr><td><code>"getClientHeight"</code></td><td>"elId"</td><td><code>"el.clientHeight"</code></td></tr>
+                        <tr><td><code>"getClientWidth"</code></td><td>"elId"</td><td><code>"el.clientWidth"</code></td></tr>
+                        <tr><td><code>"getWindowWidth"</code></td><td>"—"</td><td><code>"window.innerWidth"</code></td></tr>
+                        <tr><td><code>"getWindowHeight"</code></td><td>"—"</td><td><code>"window.innerHeight"</code></td></tr>
+                        <tr><td><code>"getOuterHtml"</code></td><td>"—"</td><td><code>"document.documentElement.outerHTML"</code></td></tr>
+                        <tr><td><code>"setDragData"</code></td><td>"fmtPtr, fmtLen, dataPtr, dataLen"</td><td><code>"dataTransfer.setData()"</code></td></tr>
+                        <tr><td><code>"getDragData"</code></td><td>"fmtPtr, fmtLen"</td><td><code>"dataTransfer.getData()"</code></td></tr>
+                        <tr><td><code>"preventDefault"</code></td><td>"—"</td><td><code>"event.preventDefault()"</code></td></tr>
+                        <tr><td><code>"loadScript"</code></td><td>"urlPtr, urlLen, cbIdx"</td><td>"Creates "<code>"<script>"</code>" element, sets src"</td></tr>
+                        <tr><td><code>"loadChunk"</code></td><td>"urlPtr, urlLen"</td><td>"Creates "<code>"<script>"</code>", returns promise ID"</td></tr>
+                        <tr><td><code>"decodeImage"</code></td><td>"srcPtr, srcLen, cbIdx"</td><td><code>"new Image()"</code>", "<code>"img.decode()"</code></td></tr>
+                        <tr><td><code>"progressiveImage"</code></td><td>"elId, lowPtr, lowLen, highPtr, highLen"</td><td>"Sets low-res src, swaps to high-res on load"</td></tr>
+                        <tr><td><code>"print"</code></td><td>"elId"</td><td><code>"contentWindow.print()"</code></td></tr>
+                        <tr><td><code>"reloadModule"</code></td><td>"urlPtr, urlLen, cbIdx"</td><td><code>"fetch()"</code>" → "<code>"WebAssembly.compile()"</code>" → "<code>"WebAssembly.instantiate()"</code></td></tr>
+                        <tr><td><code>"download"</code></td><td>"dataPtr, dataLen, namePtr, nameLen"</td><td><code>"Blob"</code>" → "<code>"URL.createObjectURL()"</code>" → "<code>"<a>"</code>" click → "<code>"URL.revokeObjectURL()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="timer">"timer"</h4>
+                <p>"Timing and animation frame scheduling."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"setTimeout"</code></td><td>"cbIdx, ms"</td><td><code>"setTimeout()"</code></td></tr>
+                        <tr><td><code>"clearTimeout"</code></td><td>"id"</td><td><code>"clearTimeout()"</code></td></tr>
+                        <tr><td><code>"setInterval"</code></td><td>"cbIdx, ms"</td><td><code>"setInterval()"</code></td></tr>
+                        <tr><td><code>"clearInterval"</code></td><td>"id"</td><td><code>"clearInterval()"</code></td></tr>
+                        <tr><td><code>"requestAnimationFrame"</code></td><td>"cbIdx"</td><td><code>"requestAnimationFrame()"</code></td></tr>
+                        <tr><td><code>"cancelAnimationFrame"</code></td><td>"id"</td><td><code>"cancelAnimationFrame()"</code></td></tr>
+                        <tr><td><code>"now"</code></td><td>"—"</td><td><code>"performance.now()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="webapi">"webapi"</h4>
+                <p>"General browser APIs — storage, clipboard, location, history, console, sharing, performance."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"localStorageGet"</code></td><td>"keyPtr, keyLen"</td><td><code>"localStorage.getItem()"</code></td></tr>
+                        <tr><td><code>"localStorageSet"</code></td><td>"keyPtr, keyLen, valPtr, valLen"</td><td><code>"localStorage.setItem()"</code></td></tr>
+                        <tr><td><code>"localStorageRemove"</code></td><td>"keyPtr, keyLen"</td><td><code>"localStorage.removeItem()"</code></td></tr>
+                        <tr><td><code>"sessionStorageGet"</code></td><td>"keyPtr, keyLen"</td><td><code>"sessionStorage.getItem()"</code></td></tr>
+                        <tr><td><code>"sessionStorageSet"</code></td><td>"keyPtr, keyLen, valPtr, valLen"</td><td><code>"sessionStorage.setItem()"</code></td></tr>
+                        <tr><td><code>"clipboardWrite"</code></td><td>"ptr, len"</td><td><code>"navigator.clipboard.writeText()"</code></td></tr>
+                        <tr><td><code>"clipboardRead"</code></td><td>"cbIdx"</td><td><code>"navigator.clipboard.readText()"</code></td></tr>
+                        <tr><td><code>"getLocationHref"</code></td><td>"—"</td><td><code>"location.href"</code></td></tr>
+                        <tr><td><code>"getLocationSearch"</code></td><td>"—"</td><td><code>"location.search"</code></td></tr>
+                        <tr><td><code>"getLocationHash"</code></td><td>"—"</td><td><code>"location.hash"</code></td></tr>
+                        <tr><td><code>"getLocationPathname"</code></td><td>"—"</td><td><code>"location.pathname"</code></td></tr>
+                        <tr><td><code>"pushState"</code></td><td>"urlPtr, urlLen"</td><td><code>"history.pushState()"</code></td></tr>
+                        <tr><td><code>"replaceState"</code></td><td>"urlPtr, urlLen"</td><td><code>"history.replaceState()"</code></td></tr>
+                        <tr><td><code>"consoleLog"</code></td><td>"ptr, len"</td><td><code>"console.log()"</code></td></tr>
+                        <tr><td><code>"consoleWarn"</code></td><td>"ptr, len"</td><td><code>"console.warn()"</code></td></tr>
+                        <tr><td><code>"consoleError"</code></td><td>"ptr, len"</td><td><code>"console.error()"</code></td></tr>
+                        <tr><td><code>"onPopState"</code></td><td>"cbIdx"</td><td><code>"addEventListener('popstate')"</code></td></tr>
+                        <tr><td><code>"envGet"</code></td><td>"namePtr, nameLen"</td><td><code>"window.__env[name]"</code></td></tr>
+                        <tr><td><code>"canShare"</code></td><td>"—"</td><td><code>"!!navigator.share"</code></td></tr>
+                        <tr><td><code>"nativeShare"</code></td><td>"titlePtr, titleLen, textPtr, textLen, urlPtr, urlLen"</td><td><code>"navigator.share()"</code></td></tr>
+                        <tr><td><code>"perfMark"</code></td><td>"namePtr, nameLen"</td><td><code>"performance.mark()"</code></td></tr>
+                        <tr><td><code>"perfMeasure"</code></td><td>"namePtr, nameLen, startPtr, startLen, endPtr, endLen"</td><td><code>"performance.measure()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="http">"http"</h4>
+                <p>"HTTP communication via typed setters — no serialization."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"setMethod"</code></td><td>"ptr, len"</td><td>"Stores method string for next fetch"</td></tr>
+                        <tr><td><code>"setBody"</code></td><td>"ptr, len"</td><td>"Stores body string for next fetch"</td></tr>
+                        <tr><td><code>"addHeader"</code></td><td>"keyPtr, keyLen, valPtr, valLen"</td><td>"Adds to headers for next fetch"</td></tr>
+                        <tr><td><code>"fetch"</code></td><td>"urlPtr, urlLen"</td><td><code>"fetch()"</code>" with stored method/body/headers, returns promise ID"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><strong>"Pattern:"</strong>" WASM calls "<code>"setMethod(\"POST\")"</code>", "<code>"addHeader(\"Content-Type\", \"application/json\")"</code>", "<code>"setBody(json)"</code>", then "<code>"fetch(url)"</code>". Each call is a simple string store — zero serialization overhead."</p>
+                <h4 id="observe">"observe"</h4>
+                <p>"Intersection, resize, and mutation observers."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"matchMedia"</code></td><td>"queryPtr, queryLen"</td><td><code>"matchMedia()"</code>" — returns boolean"</td></tr>
+                        <tr><td><code>"intersectionObserver"</code></td><td>"cbIdx, optsPtr"</td><td><code>"new IntersectionObserver()"</code>" — uses "<code>"__readOpts"</code>" for options"</td></tr>
+                        <tr><td><code>"observe"</code></td><td>"obsId, elId"</td><td><code>"observer.observe(el)"</code></td></tr>
+                        <tr><td><code>"unobserve"</code></td><td>"obsId, elId"</td><td><code>"observer.unobserve(el)"</code></td></tr>
+                        <tr><td><code>"disconnect"</code></td><td>"obsId"</td><td><code>"observer.disconnect()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="ws">"ws"</h4>
+                <p>"WebSocket connections."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"connect"</code></td><td>"urlPtr, urlLen"</td><td><code>"new WebSocket(url)"</code></td></tr>
+                        <tr><td><code>"send"</code></td><td>"wsId, dataPtr, dataLen"</td><td><code>"ws.send(str)"</code></td></tr>
+                        <tr><td><code>"sendBinary"</code></td><td>"wsId, ptr, len"</td><td><code>"ws.send(Uint8Array)"</code></td></tr>
+                        <tr><td><code>"close"</code></td><td>"wsId"</td><td><code>"ws.close()"</code></td></tr>
+                        <tr><td><code>"closeWithCode"</code></td><td>"wsId, code, reasonPtr, reasonLen"</td><td><code>"ws.close(code, reason)"</code></td></tr>
+                        <tr><td><code>"onOpen"</code></td><td>"wsId, cbIdx"</td><td><code>"ws.addEventListener('open')"</code></td></tr>
+                        <tr><td><code>"onMessage"</code></td><td>"wsId, cbIdx"</td><td><code>"ws.addEventListener('message')"</code>" — writes data to WASM memory"</td></tr>
+                        <tr><td><code>"onClose"</code></td><td>"wsId, cbIdx"</td><td><code>"ws.addEventListener('close')"</code></td></tr>
+                        <tr><td><code>"onError"</code></td><td>"wsId, cbIdx"</td><td><code>"ws.addEventListener('error')"</code></td></tr>
+                        <tr><td><code>"getReadyState"</code></td><td>"wsId"</td><td><code>"ws.readyState"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="db">"db"</h4>
+                <p>"IndexedDB operations."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"open"</code></td><td>"namePtr, nameLen, version, cbIdx"</td><td><code>"indexedDB.open()"</code>" — creates 'default' store on upgrade"</td></tr>
+                        <tr><td><code>"put"</code></td><td>"dbId, storePtr, storeLen, keyPtr, keyLen, valPtr, valLen"</td><td><code>"objectStore.put()"</code></td></tr>
+                        <tr><td><code>"get"</code></td><td>"dbId, storePtr, storeLen, keyPtr, keyLen, cbIdx"</td><td><code>"objectStore.get()"</code></td></tr>
+                        <tr><td><code>"delete"</code></td><td>"dbId, storePtr, storeLen, keyPtr, keyLen"</td><td><code>"objectStore.delete()"</code></td></tr>
+                        <tr><td><code>"getAll"</code></td><td>"dbId, storePtr, storeLen, cbIdx"</td><td><code>"objectStore.getAll()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="worker">"worker"</h4>
+                <p>"Web Workers and message channels."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"spawn"</code></td><td>"codePtr, codeLen"</td><td><code>"new Worker(Blob URL)"</code>" from code string"</td></tr>
+                        <tr><td><code>"channelCreate"</code></td><td>"—"</td><td><code>"new MessageChannel()"</code>" — returns port1 ID"</td></tr>
+                        <tr><td><code>"channelSend"</code></td><td>"portId, dataPtr, dataLen"</td><td><code>"port.postMessage()"</code></td></tr>
+                        <tr><td><code>"channelRecv"</code></td><td>"portId, cbIdx"</td><td><code>"port.onmessage"</code>", "<code>"port.start()"</code></td></tr>
+                        <tr><td><code>"parallel"</code></td><td>"fnPtrsPtr, fnCount, cbIdx"</td><td>"Callback dispatch (stub)"</td></tr>
+                        <tr><td><code>"await"</code></td><td>"promiseId"</td><td>"Returns promise object"</td></tr>
+                        <tr><td><code>"postMessage"</code></td><td>"workerId, dataPtr, dataLen"</td><td><code>"worker.postMessage()"</code></td></tr>
+                        <tr><td><code>"onMessage"</code></td><td>"workerId, cbIdx"</td><td><code>"worker.addEventListener('message')"</code></td></tr>
+                        <tr><td><code>"terminate"</code></td><td>"workerId"</td><td><code>"worker.terminate()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="pwa">"pwa"</h4>
+                <p>"Service workers, push notifications, and caching."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"cachePrecache"</code></td><td>"namePtr, nameLen"</td><td><code>"caches.open()"</code></td></tr>
+                        <tr><td><code>"registerPush"</code></td><td>"optsPtr"</td><td><code>"pushManager.subscribe()"</code>" — uses "<code>"__readOpts"</code>" for options"</td></tr>
+                        <tr><td><code>"registerServiceWorker"</code></td><td>"pathPtr, pathLen, cbIdx"</td><td><code>"navigator.serviceWorker.register()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="hardware">"hardware"</h4>
+                <p>"Device hardware access."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"haptic"</code></td><td>"pattern"</td><td><code>"navigator.vibrate()"</code></td></tr>
+                        <tr><td><code>"biometricAuth"</code></td><td>"optsPtr, successCb, failCb"</td><td><code>"navigator.credentials.get()"</code>" — uses "<code>"__readOpts"</code></td></tr>
+                        <tr><td><code>"cameraCapture"</code></td><td>"constraintsPtr, cbIdx"</td><td><code>"navigator.mediaDevices.getUserMedia()"</code>" — uses "<code>"__readOpts"</code></td></tr>
+                        <tr><td><code>"geolocationCurrent"</code></td><td>"cbIdx"</td><td><code>"navigator.geolocation.getCurrentPosition()"</code>" — writes lat/lon to WASM memory"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="payment">"payment"</h4>
+                <p>"Payment processing via sandboxed iframes."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"processPayment"</code></td><td>"elId, msgPtr, msgLen, cbIdx"</td><td><code>"contentWindow.postMessage()"</code>", listens for response via "<code>"window.addEventListener('message')"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="auth">"auth"</h4>
+                <p>"OAuth and credential management."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"login"</code></td><td>"urlPtr, urlLen"</td><td><code>"location.href = url"</code>" (redirect to OAuth provider)"</td></tr>
+                        <tr><td><code>"logout"</code></td><td>"urlPtr, urlLen"</td><td><code>"location.href = url"</code>" (redirect to logout endpoint)"</td></tr>
+                        <tr><td><code>"getRawCookies"</code></td><td>"—"</td><td><code>"document.cookie"</code></td></tr>
+                        <tr><td><code>"setCookie"</code></td><td>"ptr, len"</td><td><code>"document.cookie = str"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="upload">"upload"</h4>
+                <p>"File input and transfer."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"init"</code></td><td>"acceptPtr, acceptLen, multiple, cbIdx"</td><td>"Creates "<code>"<input type=\"file\">"</code>", calls "<code>"click()"</code></td></tr>
+                        <tr><td><code>"start"</code></td><td>"urlPtr, urlLen, cbIdx"</td><td><code>"new XMLHttpRequest()"</code>", opens POST, tracks "<code>"progress"</code>"/"<code>"load"</code>" events"</td></tr>
+                        <tr><td><code>"cancel"</code></td><td>"xhrId"</td><td><code>"xhr.abort()"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="time">"time"</h4>
+                <p>"Locale-aware date/time formatting (the only valid use of "<code>"Intl"</code>" from JS)."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"now"</code></td><td>"—"</td><td><code>"Date.now()"</code></td></tr>
+                        <tr><td><code>"format"</code></td><td>"ms, localePtr, localeLen"</td><td><code>"new Intl.DateTimeFormat(locale).format()"</code></td></tr>
+                        <tr><td><code>"getTimezoneOffset"</code></td><td>"—"</td><td><code>"new Date().getTimezoneOffset()"</code></td></tr>
+                        <tr><td><code>"formatDate"</code></td><td>"ms, localePtr, localeLen, optsPtr"</td><td><code>"new Intl.DateTimeFormat(locale, opts).format()"</code>" — uses "<code>"__readOpts"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="streaming">"streaming"</h4>
+                <p>"Server-Sent Events and streaming fetch."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"streamFetch"</code></td><td>"urlPtr, urlLen, cbIdx"</td><td><code>"fetch()"</code>" → "<code>"body.getReader()"</code>" → pumps chunks with "<code>"read()"</code></td></tr>
+                        <tr><td><code>"sseConnect"</code></td><td>"urlPtr, urlLen, cbIdx"</td><td><code>"new EventSource(url)"</code>", listens for "<code>"message"</code>" events"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h4 id="rtc">"rtc"</h4>
+                <p>"WebRTC peer connections, data channels, and media tracks."</p>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Function"</th><th>"Parameters"</th><th>"Browser API"</th></tr></thead>
+                        <tbody>
+                        <tr><td><code>"createPeer"</code></td><td>"optsPtr"</td><td><code>"new RTCPeerConnection(opts)"</code></td></tr>
+                        <tr><td><code>"createPeerWithIce"</code></td><td>"urlsPtr, urlsLen"</td><td><code>"new RTCPeerConnection({iceServers:[{urls}]})"</code></td></tr>
+                        <tr><td><code>"createOffer"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.createOffer()"</code></td></tr>
+                        <tr><td><code>"createAnswer"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.createAnswer()"</code></td></tr>
+                        <tr><td><code>"setLocalDescription"</code></td><td>"pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx"</td><td><code>"pc.setLocalDescription()"</code></td></tr>
+                        <tr><td><code>"setRemoteDescription"</code></td><td>"pcId, typePtr, typeLen, sdpPtr, sdpLen, cbIdx"</td><td><code>"pc.setRemoteDescription()"</code></td></tr>
+                        <tr><td><code>"addIceCandidate"</code></td><td>"pcId, candPtr, candLen, midPtr, midLen, cbIdx"</td><td><code>"pc.addIceCandidate()"</code></td></tr>
+                        <tr><td><code>"createDataChannel"</code></td><td>"pcId, labelPtr, labelLen, optsPtr"</td><td><code>"pc.createDataChannel()"</code></td></tr>
+                        <tr><td><code>"dataChannelSend"</code></td><td>"dcId, dataPtr, dataLen"</td><td><code>"dc.send(string)"</code></td></tr>
+                        <tr><td><code>"dataChannelSendBinary"</code></td><td>"dcId, ptr, len"</td><td><code>"dc.send(Uint8Array)"</code></td></tr>
+                        <tr><td><code>"dataChannelClose"</code></td><td>"dcId"</td><td><code>"dc.close()"</code></td></tr>
+                        <tr><td><code>"dataChannelGetState"</code></td><td>"dcId"</td><td><code>"dc.readyState"</code></td></tr>
+                        <tr><td><code>"onDataChannelMessage"</code></td><td>"dcId, cbIdx"</td><td><code>"dc.onmessage"</code></td></tr>
+                        <tr><td><code>"onDataChannelOpen"</code></td><td>"dcId, cbIdx"</td><td><code>"dc.onopen"</code></td></tr>
+                        <tr><td><code>"onDataChannelClose"</code></td><td>"dcId, cbIdx"</td><td><code>"dc.onclose"</code></td></tr>
+                        <tr><td><code>"addTrack"</code></td><td>"pcId, trackId, streamId"</td><td><code>"pc.addTrack()"</code></td></tr>
+                        <tr><td><code>"removeTrack"</code></td><td>"pcId, senderId"</td><td><code>"pc.removeTrack()"</code></td></tr>
+                        <tr><td><code>"getStats"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.getStats()"</code></td></tr>
+                        <tr><td><code>"close"</code></td><td>"pcId"</td><td><code>"pc.close()"</code></td></tr>
+                        <tr><td><code>"onIceCandidate"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onicecandidate"</code></td></tr>
+                        <tr><td><code>"onIceCandidateFull"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onicecandidate"</code>" (full candidate object)"</td></tr>
+                        <tr><td><code>"onTrack"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.ontrack"</code></td></tr>
+                        <tr><td><code>"onDataChannel"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.ondatachannel"</code></td></tr>
+                        <tr><td><code>"onConnectionStateChange"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onconnectionstatechange"</code></td></tr>
+                        <tr><td><code>"onIceConnectionStateChange"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.oniceconnectionstatechange"</code></td></tr>
+                        <tr><td><code>"onIceGatheringStateChange"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onicegatheringstatechange"</code></td></tr>
+                        <tr><td><code>"onSignalingStateChange"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onsignalingstate"</code></td></tr>
+                        <tr><td><code>"onNegotiationNeeded"</code></td><td>"pcId, cbIdx"</td><td><code>"pc.onnegotiationneeded"</code></td></tr>
+                        <tr><td><code>"getConnectionState"</code></td><td>"pcId"</td><td><code>"pc.connectionState"</code></td></tr>
+                        <tr><td><code>"getIceConnectionState"</code></td><td>"pcId"</td><td><code>"pc.iceConnectionState"</code></td></tr>
+                        <tr><td><code>"getSignalingState"</code></td><td>"pcId"</td><td><code>"pc.signalingState"</code></td></tr>
+                        <tr><td><code>"attachStream"</code></td><td>"elId, streamId"</td><td><code>"el.srcObject = stream"</code></td></tr>
+                        <tr><td><code>"getUserMedia"</code></td><td>"optsPtr, cbIdx"</td><td><code>"navigator.mediaDevices.getUserMedia()"</code></td></tr>
+                        <tr><td><code>"getDisplayMedia"</code></td><td>"optsPtr, cbIdx"</td><td><code>"navigator.mediaDevices.getDisplayMedia()"</code></td></tr>
+                        <tr><td><code>"stopTrack"</code></td><td>"trackId"</td><td><code>"track.stop()"</code></td></tr>
+                        <tr><td><code>"setTrackEnabled"</code></td><td>"trackId, enabled"</td><td><code>"track.enabled = bool"</code></td></tr>
+                        <tr><td><code>"getTrackKind"</code></td><td>"trackId"</td><td><code>"track.kind"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <hr />
+                <h3 id="wasm-internal-features-no-js">"WASM-Internal Features (No JS)"</h3>
+                <p>"These features run entirely in WASM with zero JavaScript involvement:"</p>
+                <ul>
+                    <li><strong>"Reactive signals"</strong>" — dependency graph, effect scheduling, batching, memos"</li>
+                    <li><strong>"String runtime"</strong>" — concat, fromI32, fromF64, fromBool, toString"</li>
+                    <li><strong>"Router matching"</strong>" — URL parsing, pattern matching, parameter extraction"</li>
+                    <li><strong>"Form validation"</strong>" — schema checking, field validation, error collection"</li>
+                    <li><strong>"Crypto"</strong>" — SHA-256/512/384/1, AES-GCM/CBC/CTR, Ed25519, HMAC-SHA256/512, PBKDF2, HKDF, ECDH, UUID v4, random bytes — all pure WASM, zero JS"</li>
+                    <li><strong>"Formatting"</strong>" — number/currency/date formatting with compiled-in locale tables"</li>
+                    <li><strong>"Collections"</strong>" — BTreeMap, HashSet, Vec, etc."</li>
+                    <li><strong>"BigDecimal"</strong>" — arbitrary precision arithmetic"</li>
+                    <li><strong>"URL parsing"</strong>" — RFC 3986 compliant parser"</li>
+                    <li><strong>"Fuzzy search"</strong>" — approximate string matching"</li>
+                    <li><strong>"Feature flags"</strong>" — compile-time constants in WASM data section"</li>
+                    <li><strong>"Caching logic"</strong>" — LRU, TTL, invalidation"</li>
+                    <li><strong>"Permissions enforcement"</strong>" — capability checks"</li>
+                    <li><strong>"Animation math"</strong>" — spring physics, easing functions, interpolation"</li>
+                    <li><strong>"Gesture recognition"</strong>" — velocity, direction, distance calculations"</li>
+                    <li><strong>"Virtual scroll"</strong>" — visible range calculation"</li>
+                    <li><strong>"Style injection"</strong>" — scoped CSS generation"</li>
+                    <li><strong>"A11y"</strong>" — ARIA attribute management, focus trapping"</li>
+                    <li><strong>"Theming"</strong>" — CSS custom property generation"</li>
+                    <li><strong>"SEO"</strong>" — meta tag generation, JSON-LD, sitemap"</li>
+                    <li><strong>"Tracing/observability"</strong>" — performance marks, spans"</li>
+                    <li><strong>"State management"</strong>" — atomic operations on shared memory"</li>
+                    <li><strong>"Chart"</strong>" — line, bar, pie, scatter chart generation"</li>
+                    <li><strong>"CSV"</strong>" — parse, stringify, typed parsing, export"</li>
+                    <li><strong>"Date picker"</strong>" — date selection, formatting, range validation"</li>
+                    <li><strong>"Toast"</strong>" — notification queue, positioning, auto-dismiss"</li>
+                    <li><strong>"Debounce/throttle"</strong>" — rate limiting for event handlers"</li>
+                    <li><strong>"Pagination"</strong>" — page calculation, offset/limit generation"</li>
+                    <li><strong>"Input masking"</strong>" — phone, currency, custom format masks"</li>
+                </ul>
+                <hr />
+                <h3 id="exported-functions">"Exported Functions"</h3>
+                <p>"core.js also exports:"</p>
+                <div class="code-lang-label">"javascript"</div>
+                <pre class="code-block"><code>"export function instantiate(wasmUrl)  // Load and initialize a WASM module
+export function hydrate(wasmInstance, rootElement)  // Attach WASM to server-rendered DOM"</code></pre>
+                <p><code>"instantiate()"</code>" is the main entry point — fetches the WASM file, compiles it, creates the runtime bridge, and calls the module's "<code>"main()"</code>" export."</p>
+                <p><code>"hydrate()"</code>" is the SSR entry point — registers the root element and calls the module's "<code>"__hydrate()"</code>" export if present."</p>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}
