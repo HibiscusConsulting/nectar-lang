@@ -21,12 +21,9 @@ STATIC_DIR = REPO / "website" / "static"
 DIST_DIR = REPO / "website" / "dist"
 DOCS_OUT = DIST_DIR / "docs"
 
-# Pre-built demo apps tracked at the repo root. Each entry maps a source
-# directory to the site URL path where its index.html (and assets) should live.
-DEMO_APPS: list[tuple[str, str]] = [
-    ("canvas_app-build", "app/canvas"),  # 10K-products canvas demo (incl. #data-table)
-    ("comparison", "app/svelte"),         # Nectar vs Svelte 5 comparison
-]
+# Demo HTML, WASM, and API JSON live in website/static/app/ — copied verbatim
+# by copy_static_assets() along with the marketing homepage. Route mappings
+# (/app/canvas -> /app/canvas.html, etc.) are handled by nginx.
 
 # (slug, title, group)
 DOCS: list[tuple[str, str, str]] = [
@@ -270,19 +267,6 @@ def copy_static_assets():
         print(f"  copied {rel} -> dist/{rel}")
 
 
-def copy_demo_apps():
-    """Copy each pre-built demo app into dist/<url-path>/."""
-    for src_name, dest_path in DEMO_APPS:
-        src = REPO / src_name
-        dst = DIST_DIR / dest_path
-        if not src.exists():
-            print(f"  skip {src_name} (not in repo)")
-            continue
-        if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns("generated.rs", "*.wat", src_name))
-        n = sum(1 for _ in dst.rglob("*") if _.is_file())
-        print(f"  copied {src_name}/ -> dist/{dest_path}/ ({n} files)")
 
 
 def build():
@@ -290,8 +274,6 @@ def build():
     print(f"Building site into {DIST_DIR}")
     print("Copying static assets:")
     copy_static_assets()
-    print("Copying demo apps:")
-    copy_demo_apps()
     print("Rendering doc pages:")
     for slug, title, group in DOCS:
         md = DOCS_DIR / f"{slug}.md"

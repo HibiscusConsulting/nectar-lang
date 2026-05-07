@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nectar Canvas Mode — Zero DOM</title>
+<meta http-equiv="Cache-Control" content="no-store">
+<meta http-equiv="Pragma" content="no-cache">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0e14;overflow:hidden}
+nav{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+nav .logo{color:#f97316;font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}
+nav .links{display:flex;gap:4px}
+nav .links a{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}
+nav .links a:hover{color:#e6edf3;background:rgba(255,255,255,0.06)}
+nav .links a.active{color:#e6edf3;background:rgba(249,115,22,0.12)}
+nav .links a.ext{color:#6e7681;font-size:12px}
+nav .links a.ext:hover{color:#8b949e}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Nectar</a>
+  <div class="links">
+    <a href="/canvas-test" id="nav-ecom">Nectar Demo</a>
+    <a href="/canvas-test#data-table" id="nav-dt">Data Table</a>
+    <a href="/trading" id="nav-trading">Trading</a>
+    <a href="/svelte" id="nav-svelte">Svelte 5</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank" class="ext">GitHub</a>
+    <a href="/" id="nav-home" class="ext">Home</a>
+  </div>
+</nav>
+<div id="seo" role="main" aria-label="Product catalog" style="position:absolute;top:48px;left:0;width:100%;z-index:0;opacity:0;pointer-events:none"></div>
+<script type="module">
+// ── Bootstrap: load WASM, forward events. That's it. ─────────
+const t0 = performance.now();
+const dec = new TextDecoder();
+const seoContainer = document.getElementById('seo');
+const domEls = [null, seoContainer]; // 0=null, 1=root (SEO container)
+const canvas_fns = {};
+const imports = { env: { canvas_init: (w,h) => {
+  const c = document.createElement('canvas');
+  const dpr = devicePixelRatio;
+  c.width = w * dpr; c.height = h * dpr;
+  c.style.cssText = 'position:fixed;top:48px;left:0;width:100%;height:calc(100% - 48px)';
+  document.body.appendChild(c);
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvas_fns.ctx = ctx; canvas_fns.canvas = c;
+  return 1;
+},
+canvas_clear: () => { const ctx = canvas_fns.ctx; ctx.clearRect(0, 0, ctx.canvas.width/devicePixelRatio, ctx.canvas.height/devicePixelRatio); },
+canvas_fill_rect: (id,x,y,w,h,r,g,b,a) => { canvas_fns.ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`; canvas_fns.ctx.fillRect(x,y,w,h); },
+canvas_stroke_rect: (id,x,y,w,h,r,g,b,a,lw) => { const ctx = canvas_fns.ctx; ctx.strokeStyle = `rgba(${r},${g},${b},${a/255})`; ctx.lineWidth = lw; ctx.strokeRect(x,y,w,h); },
+canvas_round_rect: (id,x,y,w,h,rad,r,g,b,a) => { const ctx = canvas_fns.ctx; ctx.fillStyle = `rgba(${r},${g},${b},${a/255})`; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.fill(); },
+canvas_fill_text: (id,ptr,len,x,y,r,g,b,size,bold) => {
+  const ctx = canvas_fns.ctx;
+  const text = new TextDecoder().decode(new Uint8Array(W.memory.buffer, ptr, len));
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.font = `${bold?'bold ':''}${size}px -apple-system,sans-serif`;
+  ctx.fillText(text, x, y);
+},
+canvas_draw_image: (id,srcPtr,srcLen,x,y,w,h,clipR) => {
+  const ctx = canvas_fns.ctx;
+  const src = new TextDecoder().decode(new Uint8Array(W.memory.buffer, srcPtr, srcLen));
+  if (!canvas_fns.imgs) canvas_fns.imgs = new Map();
+  let img = canvas_fns.imgs.get(src);
+  if (img?.complete && img.naturalWidth > 0) {
+    if (clipR > 0) { ctx.save(); ctx.beginPath(); ctx.roundRect(x,y,w,h,[clipR,clipR,0,0]); ctx.clip(); }
+    ctx.drawImage(img, x, y, w, h);
+    if (clipR > 0) ctx.restore();
+  } else if (!img) {
+    img = new Image(); img.src = src; canvas_fns.imgs.set(src, img);
+    img.onload = () => W.app_render();
+  }
+},
+canvas_measure_text: (id,ptr,len,size) => { canvas_fns.ctx.font = `${size}px -apple-system,sans-serif`; return Math.ceil(canvas_fns.ctx.measureText(new TextDecoder().decode(new Uint8Array(W.memory.buffer,ptr,len))).width); },
+canvas_get_width: () => window.innerWidth,
+canvas_get_height: () => window.innerHeight - 48,
+canvas_request_frame: (cb) => requestAnimationFrame(() => W.app_render()),
+clipboard_write: (ptr, len) => { navigator.clipboard.writeText(new TextDecoder().decode(new Uint8Array(W.memory.buffer, ptr, len))); },
+clipboard_read: (buf, cap) => { if (!canvas_fns._pasteData) return 0; const bytes = new TextEncoder().encode(canvas_fns._pasteData); const len = Math.min(bytes.length, cap); new Uint8Array(W.memory.buffer).set(bytes.subarray(0, len), buf); canvas_fns._pasteData = null; return len; },
+input_overlay_show: (x, y, w, h, vp, vl, id) => {
+  let inp = document.getElementById('nectar-input-overlay');
+  if (!inp) { inp = document.createElement('input'); inp.id = 'nectar-input-overlay'; inp.style.cssText = 'position:fixed;z-index:10;border:2px solid #f97316;background:#1a1f2e;color:#e6edf3;font:14px -apple-system,sans-serif;padding:4px 8px;border-radius:6px;outline:none'; document.body.appendChild(inp); }
+  inp.style.left = x + 'px'; inp.style.top = y + 'px'; inp.style.width = w + 'px'; inp.style.height = h + 'px'; inp.style.display = 'block';
+  inp.value = new TextDecoder().decode(new Uint8Array(W.memory.buffer, vp, vl));
+  inp.dataset.elementId = id; inp.focus();
+},
+input_overlay_hide: () => { const inp = document.getElementById('nectar-input-overlay'); if (inp) inp.style.display = 'none'; },
+input_overlay_get_value: (buf, cap) => { const inp = document.getElementById('nectar-input-overlay'); if (!inp) return 0; const bytes = new TextEncoder().encode(inp.value); const len = Math.min(bytes.length, cap); new Uint8Array(W.memory.buffer).set(bytes.subarray(0, len), buf); return len; },
+search_scroll_to: (idx) => { W.app_search_sync(idx); W.app_render(); },
+navigate: (ptr, len) => { window.location.href = new TextDecoder().decode(new Uint8Array(W.memory.buffer, ptr, len)); },
+performance_now: () => performance.now(),
+canvas_draw_line: (id,x1,y1,x2,y2,r,g,b,a,w) => { const ctx=canvas_fns.ctx; ctx.strokeStyle=`rgba(${r},${g},${b},${a/255})`; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); },
+canvas_save: () => canvas_fns.ctx.save(),
+canvas_restore: () => canvas_fns.ctx.restore(),
+canvas_clip_rect: (id,x,y,w,h) => { const ctx=canvas_fns.ctx; ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); },
+canvas_draw_circle: (id,cx,cy,r,cr,cg,cb,ca) => { const ctx=canvas_fns.ctx; ctx.fillStyle=`rgba(${cr},${cg},${cb},${ca/255})`; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); },
+canvas_stroke_round_rect: (id,x,y,w,h,rad,r,g,b,a,lw) => { const ctx=canvas_fns.ctx; ctx.strokeStyle=`rgba(${r},${g},${b},${a/255})`; ctx.lineWidth=lw; ctx.beginPath(); ctx.roundRect(x,y,w,h,rad); ctx.stroke(); },
+  canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${r},${g},${b},${a/255})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; },
+  canvas_clear_shadow: (id) => { const ctx=canvas_fns.ctx; ctx.shadowBlur=0; ctx.shadowColor="transparent"; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; },
+  canvas_highlight_rect: (id,x,y,w,h,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.save(); ctx.globalAlpha=a/255; ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.fillRect(x,y,w,h); ctx.restore(); },
+  a11y_clear: () => {},
+  a11y_create: () => 0,
+  a11y_set_text: () => {},
+  a11y_set_attr: () => {},
+  a11y_append_child: () => {},
+  a11y_set_bounds: () => {},
+  a11y_add_click_handler: () => {},
+  a11y_focus: () => {},
+file_picker_open: (ap,al,m) => { const inp=document.createElement('input'); inp.type='file'; inp.accept=new TextDecoder().decode(new Uint8Array(W.memory.buffer,ap,al)); inp.click(); return 0; },
+canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => { const url=new TextDecoder().decode(new Uint8Array(W.memory.buffer,sp,sl)); const img=imgCache&&imgCache[url]; if(img&&img.complete&&img.naturalWidth>0){try{canvas_fns.ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);}catch(e){}} },
+console_log: (ptr, len) => { console.log(new TextDecoder().decode(new Uint8Array(W.memory.buffer, ptr, len))); },
+app_callback: (idx) => { if(W.__callback) W.__callback(idx); W.app_render(); },
+media_create: () => 0, media_play: () => {}, media_pause: () => {}, media_destroy: () => {},
+gpu_upload_elements: () => {},
+gpu_upload_shadows: () => {},
+gpu_render: () => {},
+gpu_set_scroll: () => {},
+gpu_set_viewport: () => {},
+request_idle_callback: (cbIdx) => { const fn_ = () => { if (cbIdx === 9999 && W.app_build_a11y_dom) W.app_build_a11y_dom(); else if (W.__callback) W.__callback(cbIdx); }; if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(fn_); else setTimeout(fn_, 50); },
+fetch_request: (up,ul,method,bp,bl,cb) => { const url=dec.decode(new Uint8Array(W.memory.buffer,up,ul)); const methods=['GET','POST','PUT','DELETE','PATCH']; const opts={method:methods[method]||'GET'}; if(bl>0) opts.body=new Uint8Array(W.memory.buffer,bp,bl).slice(); fetch(url,opts).then(async r=>{canvas_fns._fs=r.status;canvas_fns._fb=new Uint8Array(await r.arrayBuffer());if(W.__callback)W.__callback(cb);W.app_render();}).catch(()=>{canvas_fns._fs=0;canvas_fns._fb=new Uint8Array(0);}); },
+fetch_set_header: () => {},
+fetch_response_status: () => canvas_fns._fs || 0,
+fetch_response_body: (bp,bc) => { const fb=canvas_fns._fb; if(!fb||!fb.length) return 0; const n=Math.min(fb.length,bc); new Uint8Array(W.memory.buffer,bp,bc).set(fb.subarray(0,n)); return n; },
+}};
+const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v=' + Date.now()), imports);
+const W = instance.exports;
+const t1 = performance.now();
+
+// Init app (builds 10K products in WASM — timing is self-measured)
+console.time('app_init');
+W.app_init(window.innerWidth, window.innerHeight - 48, t1 - t0);
+console.timeEnd('app_init');
+
+// Route-based mode switching
+function setMode(hash) {
+  console.time('setMode');
+  if (hash === '#data-table') { W.app_set_mode(1); }
+  else { W.app_set_mode(0); }
+  updateActiveNav(hash);
+  console.time('app_render');
+  W.app_render();
+  console.timeEnd('app_render');
+  console.timeEnd('setMode');
+}
+
+function updateActiveNav(hash) {
+  document.querySelectorAll('nav .links a').forEach(a => a.classList.remove('active'));
+  if (hash === '#data-table') document.getElementById('nav-dt')?.classList.add('active');
+  else document.getElementById('nav-ecom')?.classList.add('active');
+}
+
+// Init mode from URL hash
+setMode(location.hash);
+console.time('first_render');
+W.app_render();
+console.timeEnd('first_render');
+console.log(`[TIMING] total JS from WASM load to first render: ${(performance.now() - t0).toFixed(1)}ms`);
+
+// Data table link — switch mode via hash
+document.getElementById('nav-dt')?.addEventListener('click', e => {
+  e.preventDefault();
+  location.hash = 'data-table';
+  setMode('#data-table');
+});
+document.getElementById('nav-ecom')?.addEventListener('click', e => {
+  e.preventDefault();
+  location.hash = '';
+  setMode('');
+});
+
+window.addEventListener('hashchange', () => setMode(location.hash));
+
+console.log('%c[Honeycomb DevTools]%c Cmd+Shift+I to toggle inspector | W.app_dump_tree() to dump element tree', 'color:#3b82f6;font-weight:bold', 'color:inherit');
+
+// Fetch real product data from backend API and update cards
+fetch('/api/products?per_page=10000&v=' + Date.now())
+  .then(r => r.json())
+  .then(products => {
+    const enc = new TextEncoder();
+    const mem = new Uint8Array(W.memory.buffer);
+    const scratch = 32 * 1024 * 1024; // safe offset above heap in 64MB memory
+    products.forEach((p, i) => {
+      // Write name
+      const nameBytes = enc.encode(p.name);
+      mem.set(nameBytes, scratch);
+      W.app_set_product_name(i, scratch, nameBytes.length);
+      // Write price
+      const price = '$' + Math.floor(p.price_cents / 100) + '.' + (p.price_cents % 100 < 10 ? '0' : '') + (p.price_cents % 100);
+      const priceBytes = enc.encode(price);
+      mem.set(priceBytes, scratch);
+      W.app_set_product_price(i, scratch, priceBytes.length);
+      // Write category
+      const catBytes = enc.encode(p.category);
+      mem.set(catBytes, scratch);
+      W.app_set_product_category(i, scratch, catBytes.length);
+      // Write image src
+      const imgBytes = enc.encode(p.image_url);
+      mem.set(imgBytes, scratch);
+      W.app_set_product_image(i, scratch, imgBytes.length);
+    });
+    W.app_render();
+    console.log(`Updated ${products.length} products from backend API`);
+  })
+  .catch(e => console.log('Backend not available, using synthetic data:', e.message));
+
+// Debug: write layout dump to a scratch buffer WASM can fill
+if (W.app_debug_dump) {
+  const bufSize = 8192;
+  const bufPtr = W.alloc(bufSize);
+  const len = W.app_debug_dump(bufPtr, bufSize);
+  if (len > 0) {
+    const text = new TextDecoder().decode(new Uint8Array(W.memory.buffer, bufPtr, len));
+    console.log(text);
+  }
+}
+
+// Build accessibility DOM after first paint (doesn't block render)
+requestIdleCallback(() => { if (W.app_build_a11y_dom) W.app_build_a11y_dom(); });
+
+// Events → WASM
+canvas_fns.canvas.addEventListener('wheel', e => { e.preventDefault(); W.app_mousemove(e.offsetX, e.offsetY, 0); W.app_scroll(e.deltaY); W.app_render(); }, { passive: false });
+canvas_fns.canvas.addEventListener('click', e => {
+  W.app_click(e.offsetX, e.offsetY); W.app_render(); checkCaretBlink();
+});
+window.addEventListener('resize', () => {
+  const c = canvas_fns.canvas; const dpr = devicePixelRatio;
+  const vh = innerHeight - 48;
+  c.width = innerWidth * dpr; c.height = vh * dpr;
+  c.style.width = innerWidth + 'px'; c.style.height = vh + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  canvas_fns.ctx = ctx;
+  W.app_resize(innerWidth, vh); W.app_render();
+});
+
+// Keyboard → WASM
+const enc = new TextEncoder();
+document.addEventListener('keydown', e => {
+  // Don't prevent Cmd+F (let browser search the hidden SEO DOM)
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') return;
+  // Cmd+C: copy selected canvas text to clipboard
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
+    const buf = new Uint8Array(1024);
+    // Write buf ptr into WASM memory at a scratch offset
+    const len = W.app_get_selection(1024*1024, 1024);
+    if (len > 0) {
+      const text = new TextDecoder().decode(new Uint8Array(W.memory.buffer, 1024*1024, len));
+      navigator.clipboard.writeText(text);
+      e.preventDefault();
+    }
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && 'vx'.includes(e.key.toLowerCase())) return;
+  // Tab: prevent default to avoid leaving canvas
+  if (e.key === 'Tab') e.preventDefault();
+
+  const mods = (e.shiftKey ? 1 : 0) | ((e.metaKey || e.ctrlKey) ? 2 : 0) | (e.altKey ? 4 : 0);
+  const charBytes = enc.encode(e.key.length === 1 ? e.key : '');
+  // Write char to WASM memory scratch area
+  if (charBytes.length > 0) {
+    new Uint8Array(W.memory.buffer).set(charBytes, 0);
+  }
+  W.app_keydown(e.keyCode, 0, charBytes.length, mods);
+  W.app_render(); checkCaretBlink();
+});
+
+// Paste: store clipboard text, then trigger Ctrl+V in WASM which calls clipboard_read
+document.addEventListener('paste', e => {
+  const text = e.clipboardData?.getData('text') || '';
+  if (!text) return;
+  canvas_fns._pasteData = text;
+  W.app_keydown(86, 0, 0, 2); // key_code=86 (V), modifiers=2 (Ctrl)
+  W.app_render(); checkCaretBlink();
+  e.preventDefault();
+});
+
+// File drop from OS
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  if (!e.dataTransfer?.files?.length) return;
+  const file = e.dataTransfer.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    const bytes = new Uint8Array(reader.result);
+    const nameBytes = enc.encode(file.name);
+    const scratch = 1024 * 1024 + 8192;
+    new Uint8Array(W.memory.buffer).set(nameBytes, scratch);
+    new Uint8Array(W.memory.buffer).set(bytes, scratch + 4096);
+    if (W.app_file_dropped) W.app_file_dropped(scratch, nameBytes.length, scratch + 4096, bytes.length);
+    W.app_render();
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+// Mouse drag → WASM (for text selection)
+canvas_fns.canvas.addEventListener('mousedown', e => {
+  W.app_mousedown(e.offsetX, e.offsetY, e.detail || 1); // detail = click count (1, 2, 3)
+  W.app_render();
+});
+// Mousemove: update hover state, throttle render via rAF
+let _movePending = false;
+canvas_fns.canvas.addEventListener('mousemove', e => {
+  W.app_mousemove(e.offsetX, e.offsetY, e.buttons);
+  const cursor = W.app_cursor(e.offsetX, e.offsetY);
+  canvas_fns.canvas.style.cursor = cursor === 1 ? 'pointer' : cursor === 2 ? 'text' : cursor === 3 ? 'not-allowed' : 'default';
+  if (!_movePending) { _movePending = true; requestAnimationFrame(() => { _movePending = false; W.app_render(); }); }
+});
+canvas_fns.canvas.addEventListener('mouseup', e => {
+  W.app_mouseup(e.offsetX, e.offsetY); W.app_render();
+});
+
+// Caret blink: re-render at 2Hz when a text input is focused
+let _caretInterval = null;
+function checkCaretBlink() {
+  const needs = W.app_needs_animation?.() ?? 0;
+  if (needs && !_caretInterval) {
+    _caretInterval = setInterval(() => W.app_render(), 500);
+  } else if (!needs && _caretInterval) {
+    clearInterval(_caretInterval); _caretInterval = null;
+  }
+}
+
+// Right-click context menu → WASM hit test
+canvas_fns.canvas.addEventListener('contextmenu', e => {
+  const hit = W.app_contextmenu(e.offsetX, e.offsetY);
+  if (hit < 4294967295) { // != u32::MAX
+    e.preventDefault();
+    // Could show a custom context menu here
+    console.log('Context menu on Product #' + hit);
+  }
+});
+
+// Cmd+F search sync: when browser find highlights text in hidden DOM,
+// detect which article and scroll canvas to match.
+// The browser adds ::highlight pseudo-element or scrolls to the match.
+// We detect this via a Selection change or scrollIntoView on the hidden container.
+const seoDiv = document.getElementById('seo');
+if (seoDiv) {
+  // Watch for the browser scrolling the hidden container to a find match
+  new MutationObserver(() => {
+    // Check if any article has browser-generated highlight
+    const selection = document.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const article = range.startContainer.parentElement?.closest('article');
+      if (article && seoDiv.contains(article)) {
+        const idx = Array.from(seoDiv.children).indexOf(article);
+        if (idx >= 0) { W.app_search_sync(idx); W.app_render(); }
+      }
+    }
+  }).observe(seoDiv, { subtree: true, childList: true, characterData: true });
+
+  // Also watch for focus changes (Cmd+F Enter jumps between matches)
+  document.addEventListener('selectionchange', () => {
+    const sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const node = sel.anchorNode;
+    if (!node || !seoDiv.contains(node)) return;
+    const article = node.parentElement?.closest ? node.parentElement.closest('article') : null;
+    if (!article) return;
+    const idx = Array.from(seoDiv.children).indexOf(article);
+    if (idx >= 0) { W.app_search_sync(idx); W.app_render(); }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Terminal — Honeycomb</title>
+<meta http-equiv="Cache-Control" content="no-store">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;overflow:hidden}
+nav{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,sans-serif}
+nav .logo{color:#f97316;font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}
+nav .links{display:flex;gap:4px}
+nav .links a{color:#8b949e;text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}
+nav .links a:hover{color:#e6edf3;background:rgba(255,255,255,0.06)}
+nav .links a.active{color:#e6edf3;background:rgba(249,115,22,0.12)}
+nav .links a.ext{color:#6e7681;font-size:12px}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Nectar</a>
+  <div class="links">
+    <a href="/nectar">Nectar Demo</a>
+    <a href="/canvas-test#data-table">Data Table</a>
+    <a href="/trading" class="active">Trading</a>
+    <a href="/svelte">Svelte 5</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank" class="ext">GitHub</a>
+    <a href="/">Home</a>
+  </div>
+</nav>
+<canvas id="c"></canvas>
+<script>
+(async () => {
+const cvs = document.getElementById('c');
+const dpr = window.devicePixelRatio || 1;
+const NAV_H = 48;
+cvs.width = window.innerWidth * dpr;
+cvs.height = (window.innerHeight - NAV_H) * dpr;
+cvs.style.cssText = `position:fixed;top:${NAV_H}px;left:0;width:100%;height:calc(100% - ${NAV_H}px)`;
+const ctx = cvs.getContext('2d');
+ctx.scale(dpr, dpr);
+const vw = window.innerWidth, vh = window.innerHeight - NAV_H;
+
+// Stock data
+const NUM_STOCKS = 500;
+let stocks = [];
+let totalUpdates = 0;
+let updatesThisSec = 0;
+let upsDisplay = 0;
+let scrollY = 0;
+let lastSecond = Math.floor(Date.now() / 1000);
+let selectedStock = -1; // index of selected stock for detail panel
+const PANEL_W = 480;
+let lastBatchTimeMs = 0; // time for last batch of updates
+let perUpdateUs = 0; // microseconds per individual update
+
+// Flash state: stock_id -> {color, startTime}
+const flashes = new Map();
+
+// Colors
+const BG = '#0a0e17';
+const SURFACE = '#131722';
+const ROW_ALT = '#0f1520';
+const BORDER = '#1a1e2d';
+const HEADER_BG = '#131722';
+const TEXT = '#d1d4dc';
+const TEXT_SEC = '#787b86';
+const TEXT_MUTED = '#4a4e59';
+const UP = '#089981';
+const DOWN = '#f23645';
+const UP_FLASH = 'rgba(8,153,129,0.25)';
+const DOWN_FLASH = 'rgba(242,54,69,0.25)';
+
+// Column layout
+const COLS = [
+  { label: 'SYMBOL', w: 80, align: 'left' },
+  { label: 'NAME', w: 140, align: 'left' },
+  { label: 'LAST', w: 80, align: 'right' },
+  { label: 'CHG', w: 72, align: 'right' },
+  { label: 'CHG %', w: 64, align: 'right' },
+  { label: 'CHART', w: 64, align: 'center' },
+  { label: 'VOLUME', w: 80, align: 'right' },
+  { label: 'HIGH', w: 72, align: 'right' },
+  { label: 'LOW', w: 72, align: 'right' },
+  { label: 'MKT CAP', w: 80, align: 'right' },
+];
+const SPARK_POINTS = 60; // 60 seconds of history
+
+const ROW_H = 28;
+const HEADER_H = 32;
+const INFO_H = 36;
+
+function formatPrice(p) { return '$' + p.toFixed(2); }
+function formatChange(c) { return (c >= 0 ? '+' : '') + c.toFixed(2); }
+function formatPct(p) { return (p >= 0 ? '+' : '') + p.toFixed(2) + '%'; }
+function formatVol(v) {
+  if (v >= 1e9) return (v/1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return (v/1e3).toFixed(0) + 'K';
+  return '' + v;
+}
+
+function render() {
+  ctx.clearRect(0, 0, vw, vh);
+
+  // Background
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, vw, vh);
+
+  // Info bar
+  ctx.fillStyle = SURFACE;
+  ctx.fillRect(0, 0, vw, INFO_H);
+  ctx.fillStyle = TEXT;
+  ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillText('Trading Terminal', 12, 24);
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.fillStyle = UP;
+  ctx.fillText(`${stocks.length} stocks`, 170, 24);
+  ctx.fillStyle = TEXT_SEC;
+  ctx.fillText(`${totalUpdates.toLocaleString()} updates  |  ${upsDisplay.toLocaleString()} upd/sec  |  ${perUpdateUs.toFixed(3)}ms/update  |  batch: ${lastBatchTimeMs.toFixed(3)}ms`, 260, 24);
+
+  // Live indicator
+  ctx.fillStyle = UP;
+  ctx.beginPath();
+  ctx.arc(vw - 24, 18, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = TEXT_SEC;
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.fillText('LIVE', vw - 55, 22);
+
+  // Column headers
+  const headerY = INFO_H;
+  ctx.fillStyle = HEADER_BG;
+  ctx.fillRect(0, headerY, vw, HEADER_H);
+  ctx.strokeStyle = BORDER;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, headerY + HEADER_H); ctx.lineTo(vw, headerY + HEADER_H); ctx.stroke();
+
+  ctx.font = '500 11px -apple-system, sans-serif';
+  ctx.fillStyle = TEXT_SEC;
+  let colX = 8;
+  for (const col of COLS) {
+    if (col.align === 'right') {
+      ctx.textAlign = 'right';
+      ctx.fillText(col.label, colX + col.w - 8, headerY + 20);
+    } else {
+      ctx.textAlign = 'left';
+      ctx.fillText(col.label, colX + 8, headerY + 20);
+    }
+    colX += col.w;
+  }
+  ctx.textAlign = 'left';
+
+  // Rows
+  const startY = INFO_H + HEADER_H;
+  const visibleRows = Math.ceil(vh / ROW_H) + 1;
+  const startIdx = Math.floor(scrollY / ROW_H);
+  const now = Date.now();
+
+  for (let vi = 0; vi < visibleRows; vi++) {
+    const idx = startIdx + vi;
+    if (idx >= stocks.length) break;
+    const s = stocks[idx];
+    const y = startY + vi * ROW_H - (scrollY % ROW_H);
+    if (y + ROW_H < 0 || y > vh) continue;
+
+    // Row background (alternating)
+    ctx.fillStyle = idx % 2 === 0 ? BG : ROW_ALT;
+    ctx.fillRect(0, y, vw, ROW_H);
+
+    // Flash effect
+    const flash = flashes.get(idx);
+    if (flash) {
+      const elapsed = now - flash.startTime;
+      if (elapsed < 700) {
+        const alpha = Math.max(0, 1 - elapsed / 700) * 0.3;
+        ctx.fillStyle = flash.color === 'up'
+          ? `rgba(8,153,129,${alpha})`
+          : `rgba(242,54,69,${alpha})`;
+        ctx.fillRect(0, y, vw, ROW_H);
+      } else {
+        flashes.delete(idx);
+      }
+    }
+
+    // Row border
+    ctx.strokeStyle = BORDER;
+    ctx.beginPath(); ctx.moveTo(0, y + ROW_H); ctx.lineTo(vw, y + ROW_H); ctx.stroke();
+
+    const change = s.price - s.open;
+    const changePct = (change / s.open) * 100;
+    const changeColor = change >= 0 ? UP : DOWN;
+    const textY = y + 18;
+
+    colX = 8;
+    ctx.font = '600 13px -apple-system, sans-serif';
+    // Symbol
+    ctx.fillStyle = TEXT;
+    ctx.textAlign = 'left';
+    ctx.fillText(s.ticker, colX + 8, textY);
+    colX += COLS[0].w;
+
+    // Name
+    ctx.font = '400 12px -apple-system, sans-serif';
+    ctx.fillStyle = TEXT_SEC;
+    ctx.fillText(s.name, colX + 8, textY);
+    colX += COLS[1].w;
+
+    // Last price
+    ctx.font = '400 12px "SF Mono", Consolas, monospace';
+    ctx.fillStyle = TEXT;
+    ctx.textAlign = 'right';
+    ctx.fillText(formatPrice(s.price), colX + COLS[2].w - 8, textY);
+    colX += COLS[2].w;
+
+    // Change
+    ctx.fillStyle = changeColor;
+    ctx.fillText(formatChange(change), colX + COLS[3].w - 8, textY);
+    colX += COLS[3].w;
+
+    // Change %
+    ctx.fillText(formatPct(changePct), colX + COLS[4].w - 8, textY);
+    colX += COLS[4].w;
+
+    // Sparkline chart
+    if (s.history.length > 1) {
+      const sparkW = COLS[5].w - 12;
+      const sparkH = 16;
+      const sparkX = colX + 6;
+      const sparkY = y + (ROW_H - sparkH) / 2;
+      const pts = s.history;
+      const mn = Math.min(...pts);
+      const mx = Math.max(...pts);
+      const range = mx - mn || 1;
+      ctx.strokeStyle = change >= 0 ? UP : DOWN;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let pi = 0; pi < pts.length; pi++) {
+        const px = sparkX + (pi / (pts.length - 1)) * sparkW;
+        const py = sparkY + sparkH - ((pts[pi] - mn) / range) * sparkH;
+        if (pi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    colX += COLS[5].w;
+
+    // Volume
+    ctx.fillStyle = TEXT_SEC;
+    ctx.fillText(formatVol(s.volume), colX + COLS[6].w - 8, textY);
+    colX += COLS[6].w;
+
+    // High
+    ctx.fillText(formatPrice(s.high), colX + COLS[7].w - 8, textY);
+    colX += COLS[7].w;
+
+    // Low
+    ctx.fillText(formatPrice(s.low), colX + COLS[8].w - 8, textY);
+    colX += COLS[8].w;
+
+    // Market cap
+    ctx.fillText(s.market_cap + 'B', colX + COLS[9].w - 8, textY);
+    colX += COLS[9].w;
+  }
+
+  ctx.textAlign = 'left';
+
+  // ── Stock Detail Panel ────────────────────────────────
+  if (selectedStock >= 0 && selectedStock < stocks.length) {
+    const s = stocks[selectedStock];
+    const px = vw - PANEL_W;
+    const change = s.price - s.open;
+    const changePct = s.open > 0 ? (change / s.open) * 100 : 0;
+    const isUp = change >= 0;
+    const dirColor = isUp ? UP : DOWN;
+
+    // Panel background + shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(0, 0, px, vh);
+    ctx.fillStyle = '#0A0E17';
+    ctx.fillRect(px, 0, PANEL_W, vh);
+    ctx.strokeStyle = '#1E222D';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, vh); ctx.stroke();
+
+    let py = 0;
+
+    // Header: ticker + name + close button
+    ctx.fillStyle = '#131722';
+    ctx.fillRect(px, py, PANEL_W, 56);
+    ctx.fillStyle = TEXT;
+    ctx.font = 'bold 16px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(s.ticker, px + 16, py + 24);
+    ctx.fillStyle = TEXT_SEC;
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText(s.name, px + 16 + ctx.measureText(s.ticker).width + 12, py + 24);
+    ctx.fillText(s.sector || 'Technology', px + 16, py + 42);
+    // Close button
+    ctx.fillStyle = TEXT_SEC;
+    ctx.font = '18px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('✕', px + PANEL_W - 16, py + 28);
+    ctx.textAlign = 'left';
+    py += 56;
+
+    // Price block
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 32px "SF Mono", Consolas, monospace';
+    ctx.fillText(formatPrice(s.price), px + 16, py + 36);
+    ctx.fillStyle = dirColor;
+    ctx.font = '600 14px "SF Mono", Consolas, monospace';
+    const arrow = isUp ? '▲' : '▼';
+    ctx.fillText(`${arrow} ${formatChange(change)} (${formatPct(changePct)})`, px + 16, py + 58);
+    // Market status
+    ctx.fillStyle = UP;
+    ctx.beginPath(); ctx.arc(px + 320, py + 54, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = TEXT_SEC;
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillText('LIVE', px + 328, py + 58);
+    py += 72;
+
+    // OHLCV bar
+    ctx.fillStyle = '#131722';
+    ctx.fillRect(px, py, PANEL_W, 32);
+    ctx.strokeStyle = '#1E222D';
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + PANEL_W, py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, py + 32); ctx.lineTo(px + PANEL_W, py + 32); ctx.stroke();
+    ctx.font = '500 11px "SF Mono", Consolas, monospace';
+    const ohlcv = [
+      ['O', formatPrice(s.open)], ['H', formatPrice(s.high)],
+      ['L', formatPrice(s.low)], ['C', formatPrice(s.price)],
+      ['V', formatVol(s.volume)]
+    ];
+    for (let oi = 0; oi < ohlcv.length; oi++) {
+      const ox = px + 16 + oi * 90;
+      ctx.fillStyle = TEXT_MUTED;
+      ctx.fillText(ohlcv[oi][0], ox, py + 20);
+      ctx.fillStyle = TEXT;
+      ctx.fillText(ohlcv[oi][1], ox + 14, py + 20);
+    }
+    py += 36;
+
+    // Chart area — line chart from history
+    const chartX = px + 8, chartW = PANEL_W - 64, chartH = 200, chartY = py + 8;
+    ctx.fillStyle = '#0A0E17';
+    ctx.fillRect(px, py, PANEL_W, chartH + 16);
+
+    if (s.history.length > 1) {
+      const pts = s.history;
+      const mn = Math.min(...pts);
+      const mx = Math.max(...pts);
+      const range = mx - mn || 0.01;
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(30,34,45,0.5)';
+      ctx.lineWidth = 1;
+      for (let gi = 0; gi < 5; gi++) {
+        const gy = chartY + (gi / 4) * chartH;
+        ctx.beginPath(); ctx.moveTo(chartX, gy); ctx.lineTo(chartX + chartW, gy); ctx.stroke();
+        // Price labels on right
+        const gp = mx - (gi / 4) * range;
+        ctx.fillStyle = TEXT_SEC;
+        ctx.font = '10px "SF Mono", Consolas, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(gp.toFixed(2), px + PANEL_W - 8, gy + 4);
+      }
+      ctx.textAlign = 'left';
+
+      // Line chart with gradient fill
+      ctx.beginPath();
+      for (let pi = 0; pi < pts.length; pi++) {
+        const lx = chartX + (pi / (pts.length - 1)) * chartW;
+        const ly = chartY + chartH - ((pts[pi] - mn) / range) * chartH;
+        if (pi === 0) ctx.moveTo(lx, ly); else ctx.lineTo(lx, ly);
+      }
+      ctx.strokeStyle = '#2962FF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Fill under line
+      ctx.lineTo(chartX + chartW, chartY + chartH);
+      ctx.lineTo(chartX, chartY + chartH);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
+      grad.addColorStop(0, 'rgba(41,98,255,0.2)');
+      grad.addColorStop(1, 'rgba(41,98,255,0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Volume bars (bottom 25%)
+      const volH = chartH * 0.25;
+      const maxVol = Math.max(1, ...pts.map((_, i) => i < pts.length - 1 ? Math.abs(pts[i+1] - pts[i]) : 0));
+      for (let vi = 1; vi < pts.length; vi++) {
+        const vx = chartX + (vi / (pts.length - 1)) * chartW;
+        const vDelta = pts[vi] - pts[vi-1];
+        const vh2 = Math.max(2, (Math.abs(vDelta) / maxVol) * volH);
+        ctx.fillStyle = vDelta >= 0 ? 'rgba(8,153,129,0.3)' : 'rgba(242,54,69,0.3)';
+        ctx.fillRect(vx - 1, chartY + chartH - vh2, 3, vh2);
+      }
+    }
+    py += chartH + 20;
+
+    // Key Statistics grid
+    ctx.fillStyle = TEXT_SEC;
+    ctx.font = '600 11px -apple-system, sans-serif';
+    ctx.fillText('KEY STATISTICS', px + 16, py + 4);
+    py += 16;
+
+    const stats = [
+      ['Market Cap', s.market_cap + 'B', 'P/E Ratio', (15 + (s.id * 7) % 35).toFixed(2)],
+      ['EPS (TTM)', (s.price / (15 + (s.id * 7) % 35)).toFixed(2), 'Div Yield', ((s.id * 3) % 40 / 10).toFixed(2) + '%'],
+      ['52-Wk High', formatPrice(s.high * 1.15), '52-Wk Low', formatPrice(s.low * 0.85)],
+      ['Avg Volume', formatVol(s.volume * 0.8), 'Beta', (0.5 + (s.id * 13) % 20 / 10).toFixed(2)],
+      ['Day Range', formatPrice(s.low) + '–' + formatPrice(s.high), 'Shares Out', formatVol(s.volume * 100)],
+    ];
+
+    for (const row of stats) {
+      ctx.strokeStyle = 'rgba(30,34,45,0.3)';
+      ctx.beginPath(); ctx.moveTo(px + 16, py + 28); ctx.lineTo(px + PANEL_W - 16, py + 28); ctx.stroke();
+      // Left stat
+      ctx.fillStyle = TEXT_SEC;
+      ctx.font = '400 12px -apple-system, sans-serif';
+      ctx.fillText(row[0], px + 16, py + 18);
+      ctx.fillStyle = TEXT;
+      ctx.font = '500 13px "SF Mono", Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(row[1], px + PANEL_W / 2 - 8, py + 18);
+      // Right stat
+      ctx.fillStyle = TEXT_SEC;
+      ctx.font = '400 12px -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(row[2], px + PANEL_W / 2 + 8, py + 18);
+      ctx.fillStyle = TEXT;
+      ctx.font = '500 13px "SF Mono", Consolas, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(row[3], px + PANEL_W - 16, py + 18);
+      ctx.textAlign = 'left';
+      py += 30;
+    }
+  }
+
+  requestAnimationFrame(render);
+}
+
+// Generate initial synthetic data (no server needed for demo)
+const TICKER_LIST = ['AAPL','MSFT','GOOG','AMZN','META','NVDA','TSLA','JPM','V','JNJ',
+  'UNH','PG','HD','MA','DIS','PYPL','NFLX','INTC','AMD','CRM',
+  'BA','CAT','GS','IBM','KO','MCD','NKE','WMT','XOM','CVX'];
+
+for (let i = 0; i < NUM_STOCKS; i++) {
+  let ticker = TICKER_LIST[i % TICKER_LIST.length];
+  if (i >= TICKER_LIST.length) ticker += Math.floor(i / TICKER_LIST.length);
+  const price = +(50 + Math.random() * 450).toFixed(2);
+  stocks.push({
+    id: i,
+    ticker,
+    name: 'Company #' + i,
+    price,
+    open: price,
+    high: price,
+    low: price,
+    volume: Math.floor(100000 + Math.random() * 10000000),
+    market_cap: +(price * (1 + Math.random() * 999) / 1000).toFixed(1),
+    sector: ['Technology','Financials','Healthcare','Energy','Consumer','Industrial','Materials','Utilities','Telecom','Real Estate'][i % 10],
+    history: [price], // sparkline data
+  });
+}
+
+// Simulated price feed — random walk at 1000 updates/sec
+// No server needed — runs entirely in the browser for the demo
+function simulateTick() {
+  const t0 = performance.now();
+  const batchSize = 50;
+  for (let b = 0; b < batchSize; b++) {
+    const idx = Math.floor(Math.random() * NUM_STOCKS);
+    const s = stocks[idx];
+    // Random walk: Gaussian-ish small change
+    let change = (Math.random() - 0.5) * 0.04 * s.price * 0.01;
+    if (Math.random() < 0.01) change *= 5; // occasional larger move
+    s.price = Math.max(1, +(s.price + change).toFixed(2));
+    s.high = Math.max(s.high, s.price);
+    s.low = Math.min(s.low, s.price);
+    s.volume += Math.floor(100 + Math.random() * 5000);
+    s.history.push(s.price);
+    if (s.history.length > SPARK_POINTS) s.history.shift();
+    totalUpdates++;
+    updatesThisSec++;
+
+    // Flash
+    flashes.set(idx, {
+      color: s.price >= s.open ? 'up' : 'down',
+      startTime: Date.now()
+    });
+  }
+
+  lastBatchTimeMs = performance.now() - t0;
+  perUpdateUs = lastBatchTimeMs / batchSize;
+
+  // Update UPS counter every second
+  const sec = Math.floor(Date.now() / 1000);
+  if (sec !== lastSecond) {
+    upsDisplay = updatesThisSec;
+    updatesThisSec = 0;
+    lastSecond = sec;
+  }
+}
+
+// 20 ticks/sec × 50 updates = 1000 updates/sec
+setInterval(simulateTick, 50);
+
+// Scroll
+cvs.addEventListener('wheel', e => {
+  e.preventDefault();
+  const maxScroll = Math.max(0, stocks.length * ROW_H - vh + INFO_H + HEADER_H);
+  scrollY = Math.max(0, Math.min(maxScroll, scrollY + e.deltaY));
+}, { passive: false });
+
+// Click to select stock
+cvs.addEventListener('click', e => {
+  const clickX = e.offsetX;
+  const clickY = e.offsetY;
+  const panelX = vw - PANEL_W;
+
+  // If panel is open and click is inside panel area
+  if (selectedStock >= 0 && clickX > panelX) {
+    // Close button: top-right corner of panel header (56px tall)
+    if (clickX > panelX + PANEL_W - 40 && clickY < 56) {
+      selectedStock = -1;
+      return;
+    }
+    return; // absorb clicks inside panel
+  }
+
+  // Click on dark overlay closes panel
+  if (selectedStock >= 0 && clickX < panelX) {
+    selectedStock = -1;
+    return;
+  }
+
+  // Click on grid rows
+  const gridStartY = INFO_H + HEADER_H;
+  if (clickY < gridStartY) return;
+  const rowIdx = Math.floor((clickY - gridStartY + scrollY) / ROW_H);
+  if (rowIdx >= 0 && rowIdx < stocks.length) {
+    selectedStock = rowIdx;
+  }
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') selectedStock = -1;
+});
+
+// Cursor changes
+cvs.addEventListener('mousemove', e => {
+  const clickY = e.offsetY;
+  const gridStartY = INFO_H + HEADER_H;
+  const panelX = vw - PANEL_W;
+  // Close button hover
+  if (selectedStock >= 0 && e.offsetX > panelX + PANEL_W - 40 && clickY < 56) {
+    cvs.style.cursor = 'pointer';
+    return;
+  }
+  // Dark overlay hover
+  if (selectedStock >= 0 && e.offsetX < panelX) {
+    cvs.style.cursor = 'pointer';
+    return;
+  }
+  // Grid row hover
+  if (clickY > gridStartY && (selectedStock < 0 || e.offsetX < panelX)) {
+    cvs.style.cursor = 'pointer';
+  } else {
+    cvs.style.cursor = 'default';
+  }
+});
+
+window.addEventListener('resize', () => {
+  location.reload();
+});
+
+requestAnimationFrame(render);
+console.log('[Trading Terminal] 500 stocks, 1000 updates/sec, canvas rendering');
+})();
+</script>
+</body>
+</html>
