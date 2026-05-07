@@ -105,6 +105,12 @@ canvas_draw_image_clip: (id,sp,sl,sx,sy,sw,sh,dx,dy,dw,dh) => { const url=new Te
 console_log: (ptr, len) => { console.log(new TextDecoder().decode(new Uint8Array(W.memory.buffer, ptr, len))); },
 app_callback: () => {},
 media_create: () => 0, media_play: () => {}, media_pause: () => {}, media_destroy: () => {},
+// GPU stubs — layout.wasm imports these even on the canvas (non-GPU) path.
+gpu_upload_elements: () => {},
+gpu_upload_shadows: () => {},
+gpu_render: () => {},
+gpu_set_scroll: () => {},
+gpu_set_viewport: () => {},
 }};
 const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v=' + Date.now()), imports);
 const W = instance.exports;
