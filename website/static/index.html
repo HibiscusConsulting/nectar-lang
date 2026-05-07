@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nectar — The Web Without JavaScript</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="description" content="Nectar is a compiled-to-WebAssembly language that eliminates JavaScript from your stack. One binary compiler. Zero dependencies. Pure performance.">
+<meta name="theme-color" content="#0b0e14">
+<meta property="og:title" content="Nectar — The Web Without JavaScript">
+<meta property="og:description" content="A compiled-to-WASM language with signals, components, and reactivity. No virtual DOM, no garbage collector, no node_modules.">
+<meta property="og:type" content="website">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0e14;--surface:#131720;--surface2:#1a1f2e;--border:#2a2f3e;
+  --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
+  --accent:#f97316;--accent2:#fb923c;--green:#3fb950;--red:#f85149;
+  --blue:#58a6ff;--purple:#bc8cff;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;line-height:1.6;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Nav ─────────────────────────── */
+nav{position:fixed;top:0;left:0;width:100%;height:48px;background:#0d1117;border-bottom:1px solid #21262d;display:flex;align-items:center;padding:0 16px;z-index:100;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.nav-brand{color:var(--accent);font-size:16px;font-weight:700;text-decoration:none;margin-right:auto}
+.nav-links{display:flex;gap:4px}
+.nav-links a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;padding:6px 14px;border-radius:6px;transition:color 150ms,background 150ms}
+.nav-links a:hover{color:var(--text);text-decoration:none;background:rgba(255,255,255,0.06)}
+.nav-links a.active{color:var(--text);background:rgba(249,115,22,0.12)}
+.nav-links a.ext{color:var(--text3);font-size:12px}
+.nav-links a.ext:hover{color:var(--text2)}
+
+/* ── Hero ────────────────────────── */
+.hero{text-align:center;padding:80px 24px 60px;max-width:900px;margin:0 auto}
+.hero h1{font-size:clamp(2.5rem, 5vw, 4.5rem);font-weight:900;line-height:1.1;margin-bottom:24px}
+.hero h1 .accent{color:var(--accent)}
+.hero h1 .strike{color:var(--text3);text-decoration:line-through;text-decoration-color:var(--red)}
+.hero .sub{font-size:clamp(1rem, 2vw, 1.3rem);color:var(--text2);max-width:650px;margin:0 auto 40px;line-height:1.5}
+.hero-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn-primary{background:var(--accent);color:#000;padding:14px 36px;border-radius:10px;font-size:1.1rem;font-weight:700;display:inline-flex;align-items:center;gap:8px;transition:all 0.15s}
+.btn-primary:hover{background:var(--accent2);text-decoration:none;transform:translateY(-1px)}
+.btn-secondary{background:var(--surface2);color:var(--text);padding:14px 36px;border-radius:10px;font-size:1.1rem;font-weight:600;border:2px solid var(--border);transition:all 0.15s}
+.btn-secondary:hover{border-color:var(--text2);text-decoration:none}
+
+/* ── Stats bar ───────────────────── */
+.stats{display:flex;justify-content:center;gap:48px;padding:40px 24px;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-value{font-size:2rem;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;font-family:"SF Mono",SFMono-Regular,Consolas,monospace}
+.stat-label{font-size:0.8rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* ── Code comparison ─────────────── */
+.compare{max-width:1100px;margin:0 auto;padding:60px 24px}
+.compare h2{text-align:center;font-size:2rem;font-weight:800;margin-bottom:40px}
+.compare h2 .accent{color:var(--accent)}
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.code-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.code-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.code-header .lang{font-weight:700;font-size:0.85rem}
+.code-header .tag{font-size:0.7rem;padding:3px 10px;border-radius:4px;font-weight:600}
+.tag-old{background:rgba(248,81,73,0.15);color:var(--red)}
+.tag-new{background:rgba(63,185,80,0.15);color:var(--green)}
+.code-body{padding:20px;font-family:"SF Mono",SFMono-Regular,Consolas,monospace;font-size:0.8rem;line-height:1.7;color:var(--text2);white-space:pre;overflow-x:auto}
+.code-body .kw{color:var(--purple)}
+.code-body .fn{color:var(--blue)}
+.code-body .str{color:var(--green)}
+.code-body .cm{color:var(--text3)}
+.code-body .num{color:var(--accent)}
+
+/* ── Features ────────────────────── */
+.features{max-width:1100px;margin:0 auto;padding:60px 24px}
+.features h2{text-align:center;font-size:2rem;font-weight:800;margin-bottom:40px}
+.features h2 .accent{color:var(--accent)}
+.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.feature{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px}
+.feature-icon{font-size:1.5rem;margin-bottom:12px}
+.feature h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+.feature p{color:var(--text2);font-size:0.85rem;line-height:1.5}
+
+/* ── Architecture ────────────────── */
+.arch{max-width:900px;margin:0 auto;padding:60px 24px;text-align:center}
+.arch h2{font-size:2rem;font-weight:800;margin-bottom:16px}
+.arch h2 .accent{color:var(--accent)}
+.arch .sub{color:var(--text2);margin-bottom:32px;font-size:1rem}
+.pipeline{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:40px}
+.pipe-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 28px;text-align:center}
+.pipe-label{font-size:0.7rem;color:var(--text3);display:block}
+.pipe-value{font-size:1rem;font-weight:700;display:block}
+.pipe-arrow{color:var(--accent);font-size:1.5rem;font-weight:700}
+.arch-table{width:100%;border-collapse:collapse;text-align:left}
+.arch-table td{padding:14px 20px;border-bottom:1px solid var(--border);font-size:0.9rem}
+.arch-table td:first-child{color:var(--text2);width:40%}
+.g{color:var(--green);font-weight:600}
+.r{color:var(--red);font-weight:600}
+
+/* ── CTA ─────────────────────────── */
+.cta{text-align:center;padding:80px 24px;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:60px 0}
+.cta h2{font-size:2.5rem;font-weight:900;margin-bottom:16px}
+.cta h2 .accent{color:var(--accent)}
+.cta p{color:var(--text2);font-size:1.1rem;margin-bottom:32px;max-width:600px;margin-left:auto;margin-right:auto}
+.cta-buttons{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+/* ── Footer ──────────────────────── */
+footer{text-align:center;padding:40px 24px;color:var(--text3);font-size:0.85rem}
+footer a{color:var(--accent)}
+
+/* ── Responsive ──────────────────── */
+@media(max-width:768px){
+  .compare-grid{grid-template-columns:1fr}
+  .feature-grid{grid-template-columns:1fr}
+  .stats{gap:24px}
+  .hero-buttons{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-brand">Nectar</a>
+  <div class="nav-links">
+    <a href="/app/canvas">Nectar Demo</a>
+    <a href="/app/canvas#data-table">Data Table</a>
+    <a href="/app/trading">Trading</a>
+    <a href="/app/svelte">Svelte 5</a>
+    <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank" class="ext">GitHub</a>
+    <a href="/" class="active">Home</a>
+  </div>
+</nav>
+<div style="height:48px"></div>
+
+<section class="hero">
+  <h1>The web <span class="strike">needs JavaScript</span><br><span class="accent">doesn't.</span></h1>
+  <p class="sub">Nectar compiles to WebAssembly. One language, one binary, zero dependencies. Your entire app — logic, state, rendering — runs in WASM. JavaScript is reduced to a 3 KB syscall layer.</p>
+  <div class="hero-buttons">
+    <a href="/app/canvas" class="btn-primary">Nectar Demo (10K products) &rarr;</a>
+    <a href="/app/svelte" class="btn-secondary">Svelte 5 Comparison</a>
+  </div>
+  <p style="color:var(--text3);font-size:0.8rem;margin-top:16px">Note: The Svelte demo may time out on first load with 10K products. Try refreshing if it appears blank.</p>
+</section>
+
+<section class="stats">
+  <div class="stat"><div class="stat-value">0</div><div class="stat-label">JS Dependencies</div></div>
+  <div class="stat"><div class="stat-value">~3KB</div><div class="stat-label">Runtime (gzip)</div></div>
+  <div class="stat"><div class="stat-value">2248+</div><div class="stat-label">Compiler Tests</div></div>
+  <div class="stat"><div class="stat-value">0</div><div class="stat-label">Virtual DOM</div></div>
+  <div class="stat"><div class="stat-value">O(1)</div><div class="stat-label">Signal Updates</div></div>
+</section>
+
+<section class="compare">
+  <h2>Write <span class="accent">less</span>. Ship <span class="accent">faster</span>.</h2>
+  <div class="compare-grid">
+    <div class="code-card">
+      <div class="code-header"><span class="lang">React + JavaScript</span><span class="tag tag-old">387 KB</span></div>
+      <div class="code-body"><span class="cm">// package.json: 47 dependencies</span>
+<span class="cm">// node_modules: 1,247 packages</span>
+<span class="kw">import</span> React, { useState } <span class="kw">from</span> <span class="str">'react'</span>;
+<span class="kw">import</span> ReactDOM <span class="kw">from</span> <span class="str">'react-dom'</span>;
+
+<span class="kw">function</span> <span class="fn">Counter</span>() {
+  <span class="kw">const</span> [count, setCount] = <span class="fn">useState</span>(<span class="num">0</span>);
+  <span class="kw">return</span> (
+    &lt;div&gt;
+      &lt;p&gt;{count}&lt;/p&gt;
+      &lt;button onClick={() =&gt; setCount(c =&gt; c + <span class="num">1</span>)}&gt;
+        +
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</div>
+    </div>
+    <div class="code-card">
+      <div class="code-header"><span class="lang">Nectar</span><span class="tag tag-new">~3 KB</span></div>
+      <div class="code-body"><span class="cm">// No package.json. No node_modules.</span>
+<span class="cm">// One file. Compiles to WASM.</span>
+
+<span class="kw">component</span> <span class="fn">Counter</span>() {
+    <span class="kw">let mut</span> count: <span class="kw">i32</span> = <span class="num">0</span>;
+
+    <span class="kw">fn</span> <span class="fn">increment</span>(&amp;<span class="kw">mut</span> self) {
+        self.count = self.count + <span class="num">1</span>;
+    }
+
+    <span class="kw">render</span> {
+        &lt;div&gt;
+            &lt;p&gt;{<span class="fn">format</span>(<span class="str">"{}"</span>, self.count)}&lt;/p&gt;
+            &lt;button on:click={self.increment}&gt;<span class="str">"+"</span>&lt;/button&gt;
+        &lt;/div&gt;
+    }
+}</div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <h2>Built <span class="accent">different</span>.</h2>
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="feature-icon">&#9881;</div>
+      <h3>Single Binary Compiler</h3>
+      <p>One Rust binary handles everything: compile, format, lint, test, dev server, LSP, package management, SSR. No toolchain to configure.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#9889;</div>
+      <h3>Fine-Grained Signals</h3>
+      <p>O(1) updates per binding. No virtual DOM, no diffing, no reconciliation. When a signal changes, only the exact DOM node updates.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#128274;</div>
+      <h3>Compile-Time Safety</h3>
+      <p>Rust-inspired borrow checker, type system, and exhaustive pattern matching. Catch bugs before they ship — not in production.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#128230;</div>
+      <h3>Zero Dependencies</h3>
+      <p>No npm, no node_modules, no webpack, no bundler. Your app compiles to a .wasm binary and a 3 KB runtime. That's it.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#127760;</div>
+      <h3>Built-In Keywords</h3>
+      <p>component, store, router, page, form, auth, payment, upload, db, cache, agent — common web patterns are language primitives, not libraries.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">&#128640;</div>
+      <h3>SSR + Edge Deploy</h3>
+      <p>The same WASM binary runs on the server via wasmtime. Built-in SSR, hydration, and deployment to 29 Cloud Run regions.</p>
+    </div>
+  </div>
+</section>
+
+<section class="arch">
+  <h2>How <span class="accent">Nectar</span> works</h2>
+  <p class="sub">Your .nectar source compiles to WebAssembly. The browser loads the .wasm and a 3 KB syscall layer. Everything else is WASM.</p>
+  <div class="pipeline">
+    <div class="pipe-box"><span class="pipe-label">Source</span><span class="pipe-value">.nectar</span></div>
+    <span class="pipe-arrow">&rarr;</span>
+    <div class="pipe-box"><span class="pipe-label">Compiler</span><span class="pipe-value">Rust</span></div>
+    <span class="pipe-arrow">&rarr;</span>
+    <div class="pipe-box"><span class="pipe-label">Output</span><span class="pipe-value">.wasm</span></div>
+    <span class="pipe-arrow">&rarr;</span>
+    <div class="pipe-box"><span class="pipe-label">Runtime</span><span class="pipe-value">Browser</span></div>
+  </div>
+  <table class="arch-table">
+    <tr><td>JavaScript Runtime</td><td class="g">3 KB (DOM syscalls only)</td></tr>
+    <tr><td>Virtual DOM</td><td class="r">None — command buffer</td></tr>
+    <tr><td>State Management</td><td class="g">WASM signals — O(1)</td></tr>
+    <tr><td>Borrow Checker</td><td class="g">Compile-time safety</td></tr>
+    <tr><td>node_modules</td><td class="r">Zero. Deleted.</td></tr>
+    <tr><td>GC Pauses</td><td class="r">None — linear memory</td></tr>
+    <tr><td>XSS Attacks</td><td class="r">Impossible — no eval</td></tr>
+    <tr><td>Auth</td><td class="g">HttpOnly cookies by default</td></tr>
+  </table>
+</section>
+
+<section class="cta">
+  <h2>See it <span class="accent">running</span>.</h2>
+  <p>10,000 products. Canvas rendering engine. Reactive signals. All running in WebAssembly. Side-by-side with Svelte 5.</p>
+  <div class="cta-buttons">
+    <a href="/app/canvas" class="btn-primary">Nectar Demo &rarr;</a>
+    <a href="/app/svelte" class="btn-secondary">Svelte 5 Comparison</a>
+  </div>
+</section>
+
+<footer>
+  <p>Built by <a href="https://github.com/HibiscusConsulting">Hibiscus Consulting</a> &bull; <a href="https://github.com/HibiscusConsulting/nectar-lang">GitHub</a> &bull; BSL 1.1 License</p>
+</footer>
+
+</body>
+</html>

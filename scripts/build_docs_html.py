@@ -10,12 +10,14 @@ Usage:
 
 from __future__ import annotations
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Iterable
 
 REPO = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO / "docs"
+STATIC_DIR = REPO / "website" / "static"
 DIST_DIR = REPO / "website" / "dist"
 DOCS_OUT = DIST_DIR / "docs"
 
@@ -246,9 +248,27 @@ def docs_index_page() -> str:
 """
 
 
+def copy_static_assets():
+    """Copy everything in website/static/ verbatim into dist/."""
+    if not STATIC_DIR.exists():
+        return
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    for src in STATIC_DIR.rglob("*"):
+        if src.is_dir():
+            continue
+        rel = src.relative_to(STATIC_DIR)
+        dst = DIST_DIR / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        print(f"  copied {rel} -> dist/{rel}")
+
+
 def build():
     DOCS_OUT.mkdir(parents=True, exist_ok=True)
-    print(f"Building docs into {DOCS_OUT}")
+    print(f"Building site into {DIST_DIR}")
+    print("Copying static assets:")
+    copy_static_assets()
+    print("Rendering doc pages:")
     for slug, title, group in DOCS:
         md = DOCS_DIR / f"{slug}.md"
         if not md.exists():
