@@ -2,6 +2,9 @@
 //
 // This website is built with Nectar, proving the language works
 // for real-world production use.
+//
+// Documentation routes are auto-generated. Edit DOC_REGISTRY in
+// scripts/build_docs_pages.py and rerun the script to update them.
 
 app BuildNectar {
     manifest {
@@ -21,7 +24,16 @@ app BuildNectar {
     router SiteRouter {
         route "/" => Home,
         route "/docs" => Docs,
-        route "/docs/:section" => DocsSection,
+        route "/docs/getting-started" => GettingStartedDoc,
+        route "/docs/language-reference" => LanguageReferenceDoc,
+        route "/docs/examples" => ExamplesDoc,
+        route "/docs/render-modes" => RenderModesDoc,
+        route "/docs/providers" => ProvidersDoc,
+        route "/docs/runtime-api" => RuntimeApiDoc,
+        route "/docs/toolchain" => ToolchainDoc,
+        route "/docs/nectar-for-ai" => NectarForAiDoc,
+        route "/docs/architecture" => ArchitectureDoc,
+        route "/docs/whitepaper" => WhitepaperDoc,
         route "/install" => Install,
         route "/examples" => Examples,
         route "/playground" => Playground,

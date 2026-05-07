@@ -1,0 +1,890 @@
+// docs/examples.nectar — auto-generated from docs/examples.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page ExamplesDoc() {
+    meta {
+        title: "Nectar Examples Guide — Nectar Documentation",
+        description: "Worked examples for every keyword and standard-library module, copy-pastable end-to-end.",
+        canonical: "/docs/examples",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples" class="current">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Examples"
+                    </div>
+                    <h1>"Nectar Examples Guide"</h1>
+                <p>"This document walks through each example program in the "<code>"examples/"</code>" directory, explaining the concepts demonstrated and how they fit together."</p>
+                <hr />
+                <h3 id="table-of-contents">"Table of Contents"</h3>
+                <ol>
+                    <li><a href="#hellonectar-hello-world">"hello.nectar -- Hello World"</a></li>
+                    <li><a href="#counternectar-stateful-counter">"counter.nectar -- Stateful Counter"</a></li>
+                    <li><a href="#todonectar-todo-application">"todo.nectar -- Todo Application"</a></li>
+                    <li><a href="#apinectar-api-communication">"api.nectar -- API Communication"</a></li>
+                    <li><a href="#storenectar-global-state-management">"store.nectar -- Global State Management"</a></li>
+                    <li><a href="#appnectar-routed-application-with-styles">"app.nectar -- Routed Application with Styles"</a></li>
+                    <li><a href="#ai-chatnectar-ai-chat-interface">"ai-chat.nectar -- AI Chat Interface"</a></li>
+                    <li><a href="#testsnectar-comprehensive-test-patterns">"tests.nectar -- Comprehensive Test Patterns"</a></li>
+                    <li><a href="#component-testsnectar-component-testing-patterns">"component-tests.nectar -- Component Testing Patterns"</a></li>
+                    <li><a href="#agent-testsnectar-agent-testing-patterns">"agent-tests.nectar -- Agent Testing Patterns"</a></li>
+                </ol>
+                <hr />
+                <h3 id="hellonectar-hello-world">"hello.nectar -- Hello World"</h3>
+                <p><strong>"Concepts"</strong>": components, props, render templates"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Hello(name: String) {
+    render {
+        <div>
+            <h1>\"Hello from Nectar!\"</h1>
+            <p>{name}</p>
+        </div>
+    }
+}"</code></pre>
+                <p>"This is the simplest possible Nectar program. It demonstrates:"</p>
+                <ul>
+                    <li><strong>"Component declaration"</strong>": "<code>"component Hello(...)"</code>" defines a reusable UI building block. The component name must be PascalCase."</li>
+                    <li><strong>"Props"</strong>": "<code>"name: String"</code>" declares a property that the parent passes in when using "<code>"<Hello name=\"World\" />"</code>"."</li>
+                    <li><strong>"Render block"</strong>": Every component must have a "<code>"render { ... }"</code>" block that describes its DOM output."</li>
+                    <li><strong>"Template syntax"</strong>": Nectar uses a JSX-like syntax. Static text is written in double quotes ("<code>"\"Hello from Nectar!\""</code>"), and dynamic expressions are wrapped in curly braces ("<code>"{name}"</code>")."</li>
+                </ul>
+                <p><strong>"To compile and run:"</strong></p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"nectar build examples/hello.nectar --emit-wasm"</code></pre>
+                <hr />
+                <h3 id="counternectar-stateful-counter">"counter.nectar -- Stateful Counter"</h3>
+                <p><strong>"Concepts"</strong>": mutable state, methods, event handlers, ownership"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component Counter(initial: i32) {
+    let mut count: i32 = initial;
+
+    fn increment(&mut self) {
+        self.count = self.count + 1;
+    }
+
+    fn decrement(&mut self) {
+        self.count = self.count - 1;
+    }
+
+    render {
+        <div>
+            <h2>\"Counter\"</h2>
+            <span>{self.count}</span>
+            <button on:click={self.increment}>\"+1\"</button>
+            <button on:click={self.decrement}>\"-1\"</button>
+        </div>
+    }
+}"</code></pre>
+                <p>"This example introduces interactivity:"</p>
+                <ul>
+                    <li><strong>"Mutable state"</strong>": "<code>"let mut count: i32 = initial;"</code>" declares a state variable that can change over time. The initial value comes from the "<code>"initial"</code>" prop."</li>
+                    <li><strong>"Methods"</strong>": "<code>"fn increment(&mut self)"</code>" and "<code>"fn decrement(&mut self)"</code>" are component methods. They take "<code>"&mut self"</code>" (a mutable borrow of the component) because they modify "<code>"self.count"</code>"."</li>
+                    <li><strong>"Event handlers"</strong>": "<code>"on:click={self.increment}"</code>" binds the button's click event to the method. Nectar's reactivity system ensures that when "<code>"self.count"</code>" changes, only the "<code>"<span>"</code>" displaying the count is updated in the DOM -- no virtual DOM diffing is needed."</li>
+                    <li><strong>"Ownership"</strong>": The "<code>"&mut self"</code>" parameter signals that these methods borrow the component mutably. Nectar's borrow checker ensures you cannot hold other borrows while calling these methods."</li>
+                </ul>
+                <hr />
+                <h3 id="todonectar-todo-application">"todo.nectar -- Todo Application"</h3>
+                <p><strong>"Concepts"</strong>": structs, enums, ownership, collections, pattern matching, closures"</p>
+                <p>"This is a more complete application demonstrating data modeling and business logic."</p>
+                <h4 id="data-model">"Data Model"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"struct Todo {
+    id: u32,
+    text: String,
+    done: bool,
+}
+
+enum Filter {
+    All,
+    Active,
+    Completed,
+}"</code></pre>
+                <ul>
+                    <li><strong>"Structs"</strong>" define product types -- "<code>"Todo"</code>" groups an ID, text, and completion status."</li>
+                    <li><strong>"Enums"</strong>" define sum types -- "<code>"Filter"</code>" can be one of three variants."</li>
+                </ul>
+                <h4 id="component-state">"Component State"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component TodoApp() {
+    let mut todos: [Todo] = [];
+    let mut next_id: u32 = 0;
+    let mut filter: Filter = Filter::All;"</code></pre>
+                <p>"The component maintains three pieces of state:"</p>
+                <ul>
+                    <li>"A dynamic array of "<code>"Todo"</code>" items"</li>
+                    <li>"An auto-incrementing ID counter"</li>
+                    <li>"The current filter selection"</li>
+                </ul>
+                <h4 id="adding-todos">"Adding Todos"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    fn add_todo(&mut self, text: String) {
+        let todo = Todo {
+            id: self.next_id,
+            text: text,
+            done: false,
+        };
+        self.next_id = self.next_id + 1;
+        self.todos.push(todo);
+    }"</code></pre>
+                <p>"Key ownership concept: when "<code>"todo"</code>" is pushed into "<code>"self.todos"</code>", ownership is "<strong>"moved"</strong>". The local variable "<code>"todo"</code>" is no longer accessible after the push. This is how Nectar prevents use-after-free bugs at compile time."</p>
+                <h4 id="toggling-completion">"Toggling Completion"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    fn toggle(&mut self, id: u32) {
+        for todo in &mut self.todos {
+            if todo.id == id {
+                todo.done = !todo.done;
+            }
+        }
+    }"</code></pre>
+                <p>"The "<code>"&mut self.todos"</code>" borrows the array mutably, giving each "<code>"todo"</code>" in the loop a mutable reference. This allows in-place modification without cloning."</p>
+                <h4 id="filtering-with-pattern-matching">"Filtering with Pattern Matching"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    fn visible_todos(&self) -> [&Todo] {
+        match self.filter {
+            Filter::All => &self.todos,
+            Filter::Active => self.todos.iter().filter(fn(t: &Todo) -> bool { !t.done }),
+            Filter::Completed => self.todos.iter().filter(fn(t: &Todo) -> bool { t.done }),
+        }
+    }"</code></pre>
+                <ul>
+                    <li><strong>"Pattern matching"</strong>": "<code>"match"</code>" exhaustively handles all "<code>"Filter"</code>" variants."</li>
+                    <li><strong>"Borrowing"</strong>": "<code>"&self"</code>" means this is a read-only method. The return type "<code>"[&Todo]"</code>" returns borrowed references, not copies."</li>
+                    <li><strong>"Closures"</strong>": "<code>"fn(t: &Todo) -> bool { !t.done }"</code>" is a typed closure used as a filter predicate."</li>
+                </ul>
+                <hr />
+                <h3 id="apinectar-api-communication">"api.nectar -- API Communication"</h3>
+                <p><strong>"Concepts"</strong>": stores, async actions, HTTP fetch, error handling, computed values"</p>
+                <p>"This example shows how to build a data-driven application that communicates with a REST API."</p>
+                <h4 id="data-types">"Data Types"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"struct Post {
+    id: u32,
+    title: String,
+    body: String,
+    user_id: u32,
+}
+
+struct ApiError {
+    status: u32,
+    message: String,
+}"</code></pre>
+                <h4 id="store-with-async-actions">"Store with Async Actions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"store PostService {
+    signal posts: [Post] = [];
+    signal loading: bool = false;
+    signal error: Option<ApiError> = None;"</code></pre>
+                <p>"The store uses three signals to track loading state, data, and errors. Any component reading these signals will automatically re-render when they change."</p>
+                <h4 id="get-request">"GET Request"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    async action fetch_posts(&mut self) {
+        self.loading = true;
+        self.error = None;
+
+        let response = await fetch(\"https://jsonplaceholder.typicode.com/posts\");
+
+        if response.status == 200 {
+            self.posts = response.json();
+        } else {
+            self.error = Some(ApiError {
+                status: response.status,
+                message: \"Failed to fetch posts\",
+            });
+        }
+        self.loading = false;
+    }"</code></pre>
+                <ul>
+                    <li><strong><code>"async action"</code></strong>" declares an asynchronous store action."</li>
+                    <li><strong><code>"await fetch(...)"</code></strong>" makes an HTTP GET request and waits for the response."</li>
+                    <li><strong><code>"response.json()"</code></strong>" parses the response body as JSON into the typed "<code>"[Post]"</code>" array."</li>
+                    <li><strong>"Error handling"</strong>" uses "<code>"Option<ApiError>"</code>" to represent the presence or absence of an error."</li>
+                </ul>
+                <h4 id="post-request-with-body">"POST Request with Body"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    async action create_post(&mut self, title: String, body: String) {
+        self.loading = true;
+
+        let response = await fetch(\"https://jsonplaceholder.typicode.com/posts\", {
+            method: \"POST\",
+            headers: {
+                \"Content-Type\": \"application/json\",
+            },
+            body: format(\"{\\\"title\\\": \\\"{}\\\", \\\"body\\\": \\\"{}\\\", \\\"userId\\\": 1}\", title, body),
+        });"</code></pre>
+                <p>"The second argument to "<code>"fetch"</code>" is an options object with "<code>"method"</code>", "<code>"headers"</code>", and "<code>"body"</code>" fields."</p>
+                <h4 id="computed-values">"Computed Values"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    computed post_count(&self) -> u32 {
+        self.posts.len()
+    }"</code></pre>
+                <p>"Computed values are derived from signals and cached. "<code>"post_count"</code>" automatically updates whenever "<code>"self.posts"</code>" changes."</p>
+                <h4 id="using-the-store-from-a-component">"Using the Store from a Component"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component PostList() {
+    render {
+        <div>
+            {if PostService::get_loading() {
+                <div>\"Loading...\"</div>
+            }}
+
+            {for post in PostService::get_posts() {
+                <li>
+                    <h3>{post.title}</h3>
+                    <button on:click={PostService::delete_post(post.id)}>\"Delete\"</button>
+                </li>
+            }}
+
+            <p>{format(\"Total: {} posts\", PostService::post_count())}</p>
+        </div>
+    }
+}"</code></pre>
+                <p>"Components access store state via "<code>"StoreName::get_field()"</code>" and dispatch actions via "<code>"StoreName::action_name(args)"</code>". The reactive system ensures the UI stays in sync."</p>
+                <hr />
+                <h3 id="storenectar-global-state-management">"store.nectar -- Global State Management"</h3>
+                <p><strong>"Concepts"</strong>": Flux/Redux pattern, multiple stores, auth flow, effects"</p>
+                <p>"This example demonstrates more advanced store patterns."</p>
+                <h4 id="auth-store-with-multiple-states">"Auth Store with Multiple States"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"enum AuthStatus {
+    LoggedOut,
+    Loading,
+    LoggedIn(User),
+    Error(String),
+}
+
+store AuthStore {
+    signal status: AuthStatus = AuthStatus::LoggedOut;
+    signal token: String = \"\";"</code></pre>
+                <p>"The auth status is modeled as an enum with four states. This is more robust than using separate boolean flags."</p>
+                <h4 id="async-login-flow">"Async Login Flow"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    async action login(&mut self, email: String, password: String) {
+        self.status = AuthStatus::Loading;
+
+        let response = await fetch(\"https://api.example.com/auth/login\", {
+            method: \"POST\",
+            headers: { \"Content-Type\": \"application/json\" },
+            body: format(\"{\\\"email\\\": \\\"{}\\\", \\\"password\\\": \\\"{}\\\"}\", email, password),
+        });
+
+        if response.status == 200 {
+            let user = response.json();
+            self.token = response.headers.get(\"Authorization\");
+            self.status = AuthStatus::LoggedIn(user);
+        } else {
+            self.status = AuthStatus::Error(\"Login failed\");
+        }
+    }"</code></pre>
+                <p>"The login action transitions through "<code>"Loading"</code>" to either "<code>"LoggedIn"</code>" or "<code>"Error"</code>", and the UI reactively updates at each step."</p>
+                <h4 id="computed-values-2">"Computed Values"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    computed is_logged_in(&self) -> bool {
+        match self.status {
+            AuthStatus::LoggedIn(_) => true,
+            _ => false,
+        }
+    }"</code></pre>
+                <p>"This computed value can be used as a route guard or in conditional rendering. It only recomputes when "<code>"self.status"</code>" changes."</p>
+                <h4 id="effects-side-effects">"Effects (Side Effects)"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    effect on_auth_change(&self) {
+        match self.status {
+            AuthStatus::LoggedIn(user) => {
+                println(format(\"User logged in: {}\", user.name));
+            }
+            AuthStatus::Error(msg) => {
+                println(format(\"Auth error: {}\", msg));
+            }
+            _ => {}
+        }
+    }"</code></pre>
+                <p>"Effects run automatically whenever their signal dependencies change. They are used for side effects like logging, analytics, or syncing with external systems."</p>
+                <h4 id="multiple-stores">"Multiple Stores"</h4>
+                <p>"The example also defines a "<code>"CounterStore"</code>" to show that applications can have multiple independent stores:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"store CounterStore {
+    signal count: i32 = 0;
+    signal step: i32 = 1;
+
+    action increment(&mut self) {
+        self.count = self.count + self.step;
+    }
+
+    computed double_count(&self) -> i32 {
+        self.count * 2
+    }
+}"</code></pre>
+                <p>"Components can read from and dispatch to any number of stores simultaneously."</p>
+                <hr />
+                <h3 id="appnectar-routed-application-with-styles">"app.nectar -- Routed Application with Styles"</h3>
+                <p><strong>"Concepts"</strong>": router definition, parameterized routes, guards, scoped CSS, Link navigation, programmatic navigation"</p>
+                <p>"This is the most architecturally complete example, showing how to build a multi-page application."</p>
+                <h4 id="store-for-route-guards">"Store for Route Guards"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"store AuthStore {
+    signal is_logged_in: bool = false;
+    signal username: String = \"\";
+
+    action login(&mut self, user: String) {
+        self.is_logged_in = true;
+        self.username = user;
+    }
+}"</code></pre>
+                <h4 id="scoped-styles">"Scoped Styles"</h4>
+                <p>"Each component declares its own CSS that is automatically scoped:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component NavBar() {
+    style {
+        .navbar {
+            display: \"flex\";
+            gap: \"16px\";
+            padding: \"12px 24px\";
+            background: \"#1e293b\";
+            color: \"white\";
+        }
+        .navbar a {
+            color: \"#93c5fd\";
+            text-decoration: \"none\";
+        }
+    }
+
+    render {
+        <nav class=\"navbar\">
+            <Link to=\"/\">\"Home\"</Link>
+            <Link to=\"/about\">\"About\"</Link>
+        </nav>
+    }
+}"</code></pre>
+                <p>"Key style features:"</p>
+                <ul>
+                    <li>"Styles are declared inside "<code>"style { ... }"</code>" blocks within the component"</li>
+                    <li>"CSS properties are written as "<code>"property: \"value\";"</code>" pairs"</li>
+                    <li>"Selectors can be nested ("<code>".navbar a"</code>")"</li>
+                    <li>"All styles are automatically scoped so they never affect other components"</li>
+                    <li>"The runtime generates unique scope attributes and prefixes selectors"</li>
+                </ul>
+                <h4 id="link-navigation">"Link Navigation"</h4>
+                <p><code>"<Link to=\"/path\">"</code>" creates client-side navigation links that update the URL and mount the corresponding component without a full page reload:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"<Link to=\"/\">\"Home\"</Link>
+<Link to=\"/about\">\"About\"</Link>
+<Link to=\"/user/42\">\"Profile\"</Link>"</code></pre>
+                <h4 id="parameterized-routes">"Parameterized Routes"</h4>
+                <p>"Components can receive route parameters as props:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component UserProfile(id: String) {
+    signal user_name: String = \"Loading...\";
+
+    render {
+        <div class=\"profile\">
+            <h2>{self.user_name}</h2>
+            <span>{format(\"User ID: {}\", self.id)}</span>
+        </div>
+    }
+}"</code></pre>
+                <p>"The "<code>"id"</code>" parameter is extracted from the URL pattern "<code>"/user/:id"</code>"."</p>
+                <h4 id="programmatic-navigation">"Programmatic Navigation"</h4>
+                <p>"Components can navigate programmatically using the "<code>"navigate()"</code>" function:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"component NotFound() {
+    fn go_home(&self) {
+        navigate(\"/\");
+    }
+
+    render {
+        <div>
+            <h1>\"404\"</h1>
+            <button on:click={self.go_home}>\"Go Home\"</button>
+        </div>
+    }
+}"</code></pre>
+                <h4 id="router-definition">"Router Definition"</h4>
+                <p>"The router maps URL patterns to components:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"router AppRouter {
+    route \"/\" => Home,
+    route \"/about\" => About,
+    route \"/user/:id\" => UserProfile,
+    route \"/admin/*\" => AdminPanel guard { AuthStore::is_logged_in() },
+    fallback => NotFound,
+}"</code></pre>
+                <p>"Key routing features:"</p>
+                <ul>
+                    <li><strong>"Static routes"</strong>": "<code>"\"/\""</code>", "<code>"\"/about\""</code>" -- exact matches"</li>
+                    <li><strong>"Parameterized routes"</strong>": "<code>"\"/user/:id\""</code>" -- captures "<code>"id"</code>" from the URL"</li>
+                    <li><strong>"Wildcard routes"</strong>": "<code>"\"/admin/*\""</code>" -- matches any sub-path under "<code>"/admin/"</code></li>
+                    <li><strong>"Guards"</strong>": "<code>"guard { AuthStore::is_logged_in() }"</code>" -- the route is only accessible when the guard expression evaluates to "<code>"true"</code></li>
+                    <li><strong>"Fallback"</strong>": "<code>"fallback => NotFound"</code>" -- rendered when no route matches (404 page)"</li>
+                </ul>
+                <hr />
+                <h3 id="ai-chatnectar-ai-chat-interface">"ai-chat.nectar -- AI Chat Interface"</h3>
+                <p><strong>"Concepts"</strong>": agents, system prompts, tool definitions, streaming, reactive UI"</p>
+                <p>"This example demonstrates Nectar's first-class AI interaction primitives."</p>
+                <h4 id="agent-declaration">"Agent Declaration"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"agent ChatBot {
+    prompt system = \"You are a helpful coding assistant.\";
+
+    signal messages: [Message] = [];
+    signal input: String = \"\";
+    signal streaming: bool = false;"</code></pre>
+                <p>"The "<code>"agent"</code>" keyword defines a special component type that wraps LLM interaction. It combines:"</p>
+                <ul>
+                    <li>"A system prompt"</li>
+                    <li>"Reactive state (signals)"</li>
+                    <li>"Tool definitions"</li>
+                    <li>"Methods"</li>
+                    <li>"A render block"</li>
+                </ul>
+                <h4 id="tool-definitions">"Tool Definitions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    tool search_docs(query: String) -> String {
+        let results = await fetch(format(\"https://api.example.com/search?q={}\", query));
+        return results.json().summary;
+    }
+
+    tool run_code(language: String, code: String) -> String {
+        let result = await fetch(\"https://api.example.com/execute\", {
+            method: \"POST\",
+            body: { language: language, code: code },
+        });
+        return result.json().output;
+    }
+
+    tool get_weather(city: String) -> String {
+        let result = await fetch(format(\"https://api.example.com/weather?city={}\", city));
+        return result.json().forecast;
+    }"</code></pre>
+                <p>"Tools are functions that the AI model can call during a conversation. They have:"</p>
+                <ul>
+                    <li><strong>"Typed parameters"</strong>" (used to generate JSON schemas for the AI)"</li>
+                    <li><strong>"Return types"</strong>" (the result is fed back to the AI)"</li>
+                    <li><strong>"Async bodies"</strong>" that can make HTTP requests or perform computation"</li>
+                </ul>
+                <p>"When the AI decides to call a tool, the runtime:"</p>
+                <ol>
+                    <li>"Parses the tool call from the streaming response"</li>
+                    <li>"Dispatches to the corresponding WASM-exported function"</li>
+                    <li>"Sends the result back to the AI for continued reasoning"</li>
+                </ol>
+                <h4 id="streaming-chat">"Streaming Chat"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    fn send(&mut self) {
+        let msg = Message { role: \"user\", content: self.input };
+        self.messages.push(msg);
+        self.input = \"\";
+        self.streaming = true;
+
+        ai::chat_stream(self.messages, self.tools);
+    }"</code></pre>
+                <p><code>"ai::chat_stream"</code>" initiates a streaming completion. Tokens arrive one at a time, and the UI updates reactively:"</p>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    fn on_stream_token(&mut self, token: String) {
+        let last = self.messages.len() - 1;
+        if self.messages[last].role == \"assistant\" {
+            self.messages[last].content = self.messages[last].content + token;
+        } else {
+            self.messages.push(Message { role: \"assistant\", content: token });
+        }
+    }"</code></pre>
+                <p>"Each incoming token triggers a signal update, which triggers a DOM update, giving the user a real-time streaming experience."</p>
+                <h4 id="reactive-chat-ui">"Reactive Chat UI"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"    render {
+        <div class=\"chat\">
+            <div class=\"messages\">
+                {for msg in self.messages {
+                    <div class={msg.role}>
+                        <span class=\"role-label\">{msg.role}</span>
+                        <div class=\"content\">{msg.content}</div>
+                    </div>
+                }}
+                {if self.streaming {
+                    <div class=\"typing\">
+                        <span class=\"dot\">\".\"</span>
+                        <span class=\"dot\">\".\"</span>
+                        <span class=\"dot\">\".\"</span>
+                    </div>
+                }}
+            </div>
+            <div class=\"input-area\">
+                <input value={self.input} placeholder=\"Ask me anything...\" on:submit={self.send} />
+                <button on:click={self.clear_history}>\"Clear\"</button>
+            </div>
+        </div>
+    }"</code></pre>
+                <p>"The template demonstrates:"</p>
+                <ul>
+                    <li><strong>"List rendering"</strong>" with "<code>"for msg in self.messages"</code></li>
+                    <li><strong>"Dynamic classes"</strong>" with "<code>"class={msg.role}"</code></li>
+                    <li><strong>"Conditional rendering"</strong>" with "<code>"if self.streaming"</code></li>
+                    <li><strong>"Event binding"</strong>" on both the input ("<code>"on:submit"</code>") and button ("<code>"on:click"</code>")"</li>
+                </ul>
+                <p>"The entire chat interface is reactive. When a new message is added or a streaming token appends content, only the affected DOM nodes update."</p>
+                <hr />
+                <h3 id="testsnectar-comprehensive-test-patterns">"tests.nectar -- Comprehensive Test Patterns"</h3>
+                <p><strong>"Concepts"</strong>": test blocks, assertions, testing functions, structs, enums, pattern matching, ownership, async, error handling, computed values, closures"</p>
+                <p>"This file demonstrates every major testing pattern in Nectar. Tests are defined with "<code>"test \"name\" { ... }"</code>" blocks and use "<code>"assert()"</code>" and "<code>"assert_eq()"</code>" for verification."</p>
+                <h4 id="basic-assertions">"Basic Assertions"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"assert with boolean condition\" {
+    assert(true);
+    assert(1 + 1 == 2);
+    assert(10 > 5);
+}
+
+test \"assert_eq with custom message\" {
+    let result = fibonacci(6);
+    assert_eq(result, 8, \"6th fibonacci number should be 8\");
+}"</code></pre>
+                <ul>
+                    <li><strong><code>"assert(condition)"</code></strong>" verifies a boolean expression is true."</li>
+                    <li><strong><code>"assert_eq(left, right)"</code></strong>" verifies two values are equal."</li>
+                    <li>"Both accept an optional trailing message string for better failure diagnostics."</li>
+                </ul>
+                <h4 id="testing-functions-pure-logic">"Testing Functions (Pure Logic)"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"fibonacci sequence\" {
+    assert_eq(fibonacci(0), 0);
+    assert_eq(fibonacci(1), 1);
+    assert_eq(fibonacci(10), 55);
+}"</code></pre>
+                <p>"Pure functions are the simplest to test. Call the function, check the return value. No setup or teardown needed."</p>
+                <h4 id="testing-structs-and-enums">"Testing Structs and Enums"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"struct methods\" {
+    let origin = Point::new(0.0, 0.0);
+    let target = Point::new(3.0, 4.0);
+    let dist = origin.distance(&target);
+    assert_eq(dist, 5.0);
+}
+
+test \"enum method — shape areas\" {
+    let circle = Shape::Circle(1.0);
+    assert(circle.area() > 3.14);
+    assert(circle.area() < 3.15);
+}"</code></pre>
+                <p>"Construct instances, call methods, and verify results. Enum tests should cover each variant."</p>
+                <h4 id="testing-pattern-matching">"Testing Pattern Matching"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"match on enum variants\" {
+    let shape = Shape::Circle(2.0);
+    let label = match shape {
+        Shape::Circle(r) => format(\"circle with radius {}\", r),
+        Shape::Rectangle(w, h) => format(\"{}x{} rectangle\", w, h),
+        Shape::Triangle(_, _, _) => \"triangle\",
+    };
+    assert_eq(label, \"circle with radius 2\");
+}"</code></pre>
+                <p>"Verify that "<code>"match"</code>" arms bind variables correctly and that wildcard patterns work as expected."</p>
+                <h4 id="testing-ownership-and-borrowing">"Testing Ownership and Borrowing"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"borrowing preserves original\" {
+    let data = [1, 2, 3];
+    let borrowed = &data;
+    assert_eq(borrowed.len(), 3);
+    assert_eq(data.len(), 3);  // still accessible
+}
+
+test \"mutable borrow allows modification\" {
+    let mut items: [i32] = [1, 2, 3];
+    let borrowed = &mut items;
+    borrowed.push(4);
+    assert_eq(items.len(), 4);
+}"</code></pre>
+                <p>"Tests can verify that ownership moves and borrows behave correctly at runtime. Immutable borrows preserve access to the original; mutable borrows allow modification."</p>
+                <h4 id="testing-async-operations">"Testing Async Operations"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"async fetch returns response\" {
+    let response = await fetch(\"https://api.example.com/users/1\");
+    assert(response.status == 200 || response.status == 0);
+}"</code></pre>
+                <p>"The test runner stubs HTTP imports, so "<code>"await fetch(...)"</code>" resolves immediately. This verifies that async/await syntax works in test blocks without hitting real endpoints."</p>
+                <h4 id="testing-error-handling">"Testing Error Handling"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"try/catch captures error\" {
+    let result = try {
+        let val = divide(10.0, 0.0);
+        match val {
+            Result::Ok(v) => v,
+            Result::Err(e) => { throw e; }
+        }
+    } catch err {
+        -1.0
+    };
+    assert_eq(result, -1.0);
+}"</code></pre>
+                <p>"Use "<code>"try { ... } catch err { ... }"</code>" to verify that error paths produce the expected fallback values."</p>
+                <h4 id="testing-computed-values-stores">"Testing Computed Values (Stores)"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"store computed values reflect state\" {
+    assert_eq(TestCounterStore::double_count(), 0);
+    TestCounterStore::increment();
+    assert_eq(TestCounterStore::double_count(), 2);
+    assert(TestCounterStore::is_positive());
+}"</code></pre>
+                <p>"Store signals and computed values can be tested by dispatching actions and checking the derived state."</p>
+                <h4 id="testing-closures">"Testing Closures"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"closure captures value\" {
+    let multiplier = 3;
+    let triple = fn(x: i32) -> i32 { x * multiplier };
+    assert_eq(triple(5), 15);
+}
+
+test \"closure as filter predicate\" {
+    let numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let evens = numbers.iter().filter(fn(n: &i32) -> bool { n % 2 == 0 });
+    assert_eq(evens.len(), 5);
+}"</code></pre>
+                <p>"Closures capture variables from their surrounding scope. They work naturally as arguments to higher-order functions like "<code>"filter"</code>", "<code>"map"</code>", and "<code>"sort"</code>"."</p>
+                <hr />
+                <h3 id="component-testsnectar-component-testing-patterns">"component-tests.nectar -- Component Testing Patterns"</h3>
+                <p><strong>"Concepts"</strong>": test renderer, mounting, click simulation, props, signals, conditional rendering, list rendering, event handlers, store integration"</p>
+                <p>"This file uses Nectar's test renderer to mount components into a virtual DOM and verify their behavior without a browser."</p>
+                <h4 id="mounting-and-checking-initial-render">"Mounting and Checking Initial Render"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"greeting renders with default prop\" {
+    let el = render(<Greeting />);
+    let heading = el.findByText(\"Hello, World!\");
+    assert(heading.exists());
+}
+
+test \"counter renders initial value\" {
+    let el = render(<Counter />);
+    let display = el.findByRole(\"counter\");
+    assert_eq(display.getText(), \"0\");
+}"</code></pre>
+                <p><code>"render(<Component />)"</code>" returns a "<code>"TestElement"</code>" that provides query methods:"</p>
+                <ul>
+                    <li><strong><code>"findByText(text)"</code></strong>" -- find a descendant containing the given text"</li>
+                    <li><strong><code>"findByRole(role)"</code></strong>" -- find by ARIA role attribute"</li>
+                    <li><strong><code>"findByAttribute(name, value)"</code></strong>" -- find by any attribute"</li>
+                </ul>
+                <h4 id="simulating-clicks-and-verifying-state-changes">"Simulating Clicks and Verifying State Changes"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"counter increments on click\" {
+    let el = render(<Counter />);
+    let inc_btn = el.findByText(\"+1\");
+    let display = el.findByRole(\"counter\");
+
+    inc_btn.click();
+    assert_eq(display.getText(), \"1\");
+}"</code></pre>
+                <p>"Call "<code>".click()"</code>" on a "<code>"TestElement"</code>" to dispatch a click event. The component's reactive state updates, and subsequent queries reflect the new DOM."</p>
+                <h4 id="testing-props-with-default-values">"Testing Props with Default Values"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"default props are applied\" {
+    let el = render(<Greeting />);
+    let heading = el.findByText(\"Hello, World!\");
+    assert(heading.exists());
+}
+
+test \"explicit props override defaults\" {
+    let el = render(<Counter initial={100} />);
+    let display = el.findByRole(\"counter\");
+    assert_eq(display.getText(), \"100\");
+}"</code></pre>
+                <p>"Components with "<code>"prop_name: Type = default"</code>" apply the default when no value is passed. Explicit values override the default."</p>
+                <h4 id="testing-signal-updates-and-dom-reactivity">"Testing Signal Updates and DOM Reactivity"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"theme toggle updates displayed text\" {
+    let el = render(<ThemeToggle />);
+    let status = el.findByRole(\"status\");
+    assert_eq(status.getText(), \"Light Mode\");
+
+    let toggle_btn = el.findByText(\"Toggle Theme\");
+    toggle_btn.click();
+    assert_eq(status.getText(), \"Dark Mode\");
+}"</code></pre>
+                <p>"After a click triggers a signal update, all DOM queries return the updated content. No manual \"flush\" or \"tick\" is needed -- the test renderer processes updates synchronously."</p>
+                <h4 id="testing-conditional-rendering">"Testing Conditional Rendering"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"conditional rendering shows message when true\" {
+    let el = render(<ConditionalMessage show={true} />);
+    let message = el.findByText(\"This message is visible\");
+    assert(message.exists());
+}"</code></pre>
+                <p>"Conditional "<code>"{if ... { ... }}"</code>" blocks in templates are tested by mounting with different props and verifying which elements are present."</p>
+                <h4 id="testing-list-rendering">"Testing List Rendering"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"number list renders all items\" {
+    let el = render(<NumberList items={[10, 20, 30]} />);
+    assert(el.findByText(\"10\").exists());
+    assert(el.findByText(\"20\").exists());
+    assert(el.findByText(\"30\").exists());
+}"</code></pre>
+                <p><code>"{for item in collection { ... }}"</code>" loops produce one element per item. Verify each rendered item exists in the virtual DOM."</p>
+                <h4 id="testing-event-handlers">"Testing Event Handlers"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"todo list add button creates item\" {
+    let el = render(<TodoList />);
+    let input = el.findByAttribute(\"placeholder\", \"What needs to be done?\");
+    let add_btn = el.findByText(\"Add\");
+
+    input.type(\"Buy groceries\");
+    add_btn.click();
+
+    let todo = el.findByText(\"Buy groceries\");
+    assert(todo.exists());
+}"</code></pre>
+                <p>"Use "<code>".type(text)"</code>" to simulate text input and "<code>".click()"</code>" to trigger buttons. Then query the DOM to verify the handler's effect."</p>
+                <h4 id="testing-store-integration-from-components">"Testing Store Integration from Components"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"store counter increment updates display\" {
+    let el = render(<StoreCounter />);
+    let inc_btn = el.findByText(\"+1\");
+    let display = el.findByRole(\"display\");
+
+    inc_btn.click();
+    assert_eq(display.getText(), \"Store count: 1\");
+}"</code></pre>
+                <p>"Components that read from stores via "<code>"StoreName::get_field()"</code>" and dispatch via "<code>"StoreName::action()"</code>" can be tested end-to-end. The test renderer processes store updates synchronously."</p>
+                <hr />
+                <h3 id="agent-testsnectar-agent-testing-patterns">"agent-tests.nectar -- Agent Testing Patterns"</h3>
+                <p><strong>"Concepts"</strong>": tool registration, tool dispatch, message history, AI response mocking, streaming"</p>
+                <p>"This file tests AI agents -- their tool definitions, message management, and mocked AI interactions."</p>
+                <h4 id="testing-tool-registration">"Testing Tool Registration"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"agent registers expected tools\" {
+    let tools = TestAssistant::get_registered_tools();
+    assert_eq(tools.len(), 3);
+    assert_eq(tools[0].name, \"search_docs\");
+    assert_eq(tools[1].name, \"calculate\");
+    assert_eq(tools[2].name, \"get_weather\");
+}"</code></pre>
+                <p><code>"AgentName::get_registered_tools()"</code>" returns metadata about all "<code>"tool"</code>" blocks defined in the agent, including parameter names, types, and return types."</p>
+                <h4 id="testing-tool-dispatch-with-typed-args">"Testing Tool Dispatch with Typed Args"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"dispatch search_docs tool\" {
+    TestAssistant::clear_history();
+    let result = await TestAssistant::dispatch_tool(\"search_docs\", {
+        query: \"nectar language tutorial\",
+    });
+    let log = TestAssistant::get_tool_call_log();
+    assert_eq(log[0], \"search_docs: nectar language tutorial\");
+}"</code></pre>
+                <p><code>"dispatch_tool(name, args)"</code>" invokes a tool by name with a typed argument object. This simulates what the runtime does when the AI model requests a tool call."</p>
+                <h4 id="testing-message-history-management">"Testing Message History Management"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"messages preserve role and content\" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message(\"What is Nectar?\");
+    TestAssistant::add_assistant_message(\"Nectar is a programming language.\");
+
+    let messages = TestAssistant::get_messages();
+    assert_eq(messages[0].role, \"user\");
+    assert_eq(messages[1].role, \"assistant\");
+}"</code></pre>
+                <p>"Agent state (messages, tool call logs) is managed through methods defined in the agent. Tests verify the history tracks roles, ordering, and content correctly."</p>
+                <h4 id="mocking-ai-responses">"Mocking AI Responses"</h4>
+                <div class="code-lang-label">"nectar"</div>
+                <pre class="code-block"><code>"test \"mock chat_complete returns canned response\" {
+    TestAssistant::clear_history();
+    TestAssistant::add_user_message(\"What is 2+2?\");
+    ai::mock_response(\"The answer is 4.\");
+
+    let response = await ai::chat_complete(TestAssistant::get_messages());
+    assert_eq(response.content, \"The answer is 4.\");
+}"</code></pre>
+                <p>"The "<code>"ai::mock_response()"</code>" function installs a canned response that "<code>"ai::chat_complete"</code>" returns instead of calling a real LLM. Use "<code>"ai::mock_tool_call()"</code>" to simulate the AI requesting a tool, and "<code>"ai::mock_stream()"</code>" to test token-by-token streaming."</p>
+                <hr />
+                <h3 id="running-the-examples">"Running the Examples"</h3>
+                <p>"All examples can be compiled from the repository root:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Compile to WAT (human-readable)
+nectar build examples/hello.nectar
+
+# Compile to binary WASM
+nectar build examples/counter.nectar --emit-wasm
+
+# Compile with optimizations
+nectar build examples/app.nectar --emit-wasm -O2
+
+# Start the dev server for interactive development
+nectar dev --src examples --port 3000"</code></pre>
+                <p>"For the AI chat example, you will need an LLM API endpoint at "<code>"/api/chat"</code>" that accepts OpenAI-compatible requests. The runtime handles the streaming protocol automatically."</p>
+                <h4 id="running-tests">"Running Tests"</h4>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"# Run all tests in a file
+nectar test examples/tests.nectar
+
+# Run with verbose output
+nectar test examples/tests.nectar --verbose
+
+# Filter tests by name
+nectar test examples/tests.nectar --filter \"fibonacci\"
+nectar test examples/component-tests.nectar --filter \"counter\"
+nectar test examples/agent-tests.nectar --filter \"tool\"
+
+# Run all test files at once
+nectar test examples/tests.nectar examples/component-tests.nectar examples/agent-tests.nectar"</code></pre>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}

@@ -238,6 +238,27 @@ See [Render Modes](docs/render-modes.md) for details.
 | [Examples](docs/examples.md) | Worked examples for every keyword and stdlib module |
 | [Whitepaper](docs/whitepaper.md) | Design rationale and the case for compiled WASM-first frontends |
 
+## Documentation Site
+
+The Markdown files in `docs/` are the source of truth. They are surfaced on
+[buildnectar.com/docs](https://buildnectar.com/docs) by `scripts/build_docs_pages.py`,
+which converts each `docs/*.md` file into a corresponding Nectar page under
+`website/src/pages/docs/`.
+
+When you edit anything in `docs/`, regenerate the website pages:
+
+```bash
+python3 scripts/build_docs_pages.py
+```
+
+The script also rewrites `website/src/pages/docs.nectar` (the docs hub) and
+`website/src/app.nectar` (the router) so the new pages are reachable.
+Generated `.nectar` files carry a "DO NOT EDIT" header — make all content
+changes in `docs/*.md` and rerun the script.
+
+To add a brand-new top-level doc, add the source file to `docs/` and append
+an entry to `DOC_REGISTRY` in the script.
+
 ## License
 
 MIT License — see [LICENSE](LICENSE).

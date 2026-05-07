@@ -1,67 +1,70 @@
 // docs.nectar — Documentation hub
+// auto-generated from scripts/build_docs_pages.py.
+// The hub overview + sidebar mirror DOC_REGISTRY in that script.
 
 page Docs() {
     meta {
         title: "Nectar Documentation",
-        description: "Learn how to build frontend applications with Nectar. Guides, API reference, and examples.",
+        description: "Learn how to build frontend applications with Nectar. Guides, language reference, architecture, and AI integration.",
         canonical: "/docs",
     }
 
     render {
-        <main class="docs-page">
+        <main class="doc-page">
             <Nav />
 
-            <div class="docs-layout">
-                <aside class="docs-sidebar">
-                    <h3>"Getting Started"</h3>
-                    <a href="/docs/installation">"Installation"</a>
-                    <a href="/docs/hello-world">"Hello World"</a>
-                    <a href="/docs/project-structure">"Project Structure"</a>
-
-                    <h3>"Core Concepts"</h3>
-                    <a href="/docs/components">"Components"</a>
-                    <a href="/docs/state">"State & Signals"</a>
-                    <a href="/docs/routing">"Routing"</a>
-                    <a href="/docs/styling">"Styling"</a>
-
-                    <h3>"Safety"</h3>
-                    <a href="/docs/contracts">"API Contracts"</a>
-                    <a href="/docs/security">"Security"</a>
-                    <a href="/docs/error-handling">"Error Handling"</a>
-
-                    <h3>"Features"</h3>
-                    <a href="/docs/forms">"Forms"</a>
-                    <a href="/docs/seo">"SEO & AAIO"</a>
-                    <a href="/docs/pwa">"PWA & Mobile"</a>
-                    <a href="/docs/realtime">"Real-time Channels"</a>
-                    <a href="/docs/concurrency">"Concurrency"</a>
-
-                    <h3>"Toolchain"</h3>
-                    <a href="/docs/cli">"CLI Reference"</a>
-                    <a href="/docs/build-targets">"Build Targets"</a>
-                    <a href="/docs/testing">"Testing"</a>
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
                 </aside>
 
-                <div class="docs-content">
+                <div class="doc-content">
                     <h1>"Nectar Documentation"</h1>
                     <p>"Nectar is a compiled-to-WASM frontend language. It replaces JavaScript, React, and their entire ecosystem with a single compiler that produces safe, fast, native-feeling web applications."</p>
+                    <p>"Browse the full documentation below — every guide, reference, and example. Pick a topic from the sidebar or jump in from the cards."</p>
 
-                    <h2>"Why Nectar?"</h2>
-                    <p>"Every web framework makes trade-offs. Nectar eliminates them:"</p>
-
+                    <h2 id="getting-started">"Getting Started"</h2>
                     <div class="doc-cards">
-                        <div class="doc-card">
-                            <h3>"Security by default"</h3>
-                            <p>"XSS is structurally impossible. No innerHTML, no eval, no prototype chain. Secret types prevent accidental leaks. Capabilities restrict component access."</p>
-                        </div>
-                        <div class="doc-card">
-                            <h3>"SEO without SSR servers"</h3>
-                            <p>"The page keyword pre-renders HTML at build time. JSON-LD, sitemaps, and meta tags are compiler outputs, not afterthoughts."</p>
-                        </div>
-                        <div class="doc-card">
-                            <h3>"Mobile without frameworks"</h3>
-                            <p>"PWA manifest, gestures, haptic feedback, camera access — all language constructs. Build once, deploy as PWA, TWA, or Capacitor app."</p>
-                        </div>
+                        <a class="doc-card" href="/docs/getting-started" aria-label="Getting Started"><h3>"Getting Started"</h3><p>"Install the compiler, scaffold a project, run the dev server, and ship your first build."</p></a>
+                    </div>
+                    <h2 id="language">"Language"</h2>
+                    <div class="doc-cards">
+                        <a class="doc-card" href="/docs/language-reference" aria-label="Language Reference"><h3>"Language Reference"</h3><p>"Full Nectar syntax: types, ownership, components, stores, traits, generics, every keyword."</p></a>
+                        <a class="doc-card" href="/docs/examples" aria-label="Examples"><h3>"Examples"</h3><p>"Worked examples for every keyword and standard-library module, copy-pastable end-to-end."</p></a>
+                    </div>
+                    <h2 id="platform">"Platform"</h2>
+                    <div class="doc-cards">
+                        <a class="doc-card" href="/docs/render-modes" aria-label="Render Modes"><h3>"Render Modes"</h3><p>"DOM, Canvas (Honeycomb), and Hybrid render targets — when and why to use each."</p></a>
+                        <a class="doc-card" href="/docs/providers" aria-label="Providers"><h3>"Providers"</h3><p>"The keyword/stdlib/provider three-layer model, built-in providers, and how to add a new one."</p></a>
+                        <a class="doc-card" href="/docs/runtime-api" aria-label="Runtime API"><h3>"Runtime API"</h3><p>"The JS syscall layer, command buffer, WASM imports — how Nectar talks to the browser."</p></a>
+                    </div>
+                    <h2 id="toolchain">"Toolchain"</h2>
+                    <div class="doc-cards">
+                        <a class="doc-card" href="/docs/toolchain" aria-label="Toolchain"><h3>"Toolchain"</h3><p>"CLI reference, formatter, linter, LSP, package manager, dev server."</p></a>
+                    </div>
+                    <h2 id="ai">"AI"</h2>
+                    <div class="doc-cards">
+                        <a class="doc-card" href="/docs/nectar-for-ai" aria-label="AI Integration"><h3>"AI Integration"</h3><p>"Agents, tools, prompts, and streaming — building AI-native applications in Nectar."</p></a>
+                    </div>
+                    <h2 id="internals">"Internals"</h2>
+                    <div class="doc-cards">
+                        <a class="doc-card" href="/docs/architecture" aria-label="Architecture"><h3>"Architecture"</h3><p>"Compiler pipeline (lexer, parser, borrow check, type check, optimizer, codegen) and the Honeycomb runtime."</p></a>
+                        <a class="doc-card" href="/docs/whitepaper" aria-label="Whitepaper"><h3>"Whitepaper"</h3><p>"Design rationale and the case for compiled, WASM-first frontends."</p></a>
                     </div>
                 </div>
             </div>
@@ -71,19 +74,46 @@ page Docs() {
     }
 
     style {
-        .docs-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
-        .docs-layout { display: grid; grid-template-columns: 250px 1fr; max-width: 1200px; margin: 0 auto; }
-        .docs-sidebar { padding: 2rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-        .docs-sidebar h3 { color: #e94560; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2rem; margin-bottom: 0.5rem; }
-        .docs-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0; font-size: 0.95rem; }
-        .docs-sidebar a:hover { color: #ffffff; }
-        .docs-content { padding: 3rem; }
-        .docs-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; }
-        .docs-content h2 { font-size: 1.8rem; color: #ffffff; margin-top: 2rem; margin-bottom: 1rem; }
-        .docs-content p { color: #a0a0b0; line-height: 1.7; margin-bottom: 1rem; }
-        .doc-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
-        .doc-card { background: #16213e; padding: 1.5rem; border-radius: 8px; border: 1px solid #2a2a4e; }
-        .doc-card h3 { color: #ffffff; margin-bottom: 0.5rem; }
-        .doc-card p { color: #a0a0b0; font-size: 0.9rem; }
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+        .doc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; margin: 1rem 0 2rem; }
+        .doc-card { display: block; background: #16213e; padding: 1.4rem; border-radius: 10px; border: 1px solid #2a2a4e; text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
+        .doc-card:hover { border-color: #e94560; transform: translateY(-2px); text-decoration: none; }
+        .doc-card h3 { color: #ffffff; margin: 0 0 0.5rem; font-size: 1.1rem; }
+        .doc-card p { color: #a0a0b0; font-size: 0.92rem; margin: 0; line-height: 1.5; }
     }
 }

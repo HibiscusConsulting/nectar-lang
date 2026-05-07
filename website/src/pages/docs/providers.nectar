@@ -1,0 +1,148 @@
+// docs/providers.nectar — auto-generated from docs/providers.md
+// DO NOT EDIT BY HAND. Run scripts/build_docs_pages.py to regenerate.
+
+page ProvidersDoc() {
+    meta {
+        title: "Providers — Nectar Documentation",
+        description: "The keyword/stdlib/provider three-layer model, built-in providers, and how to add a new one.",
+        canonical: "/docs/providers",
+    }
+
+    render {
+        <main class="doc-page">
+            <Nav />
+
+            <div class="doc-layout">
+                <aside class="doc-sidebar">
+                <div class="doc-sidebar-group">"Getting Started"</div>
+                <a href="/docs/getting-started">"Getting Started"</a>
+                <div class="doc-sidebar-group">"Language"</div>
+                <a href="/docs/language-reference">"Language Reference"</a>
+                <a href="/docs/examples">"Examples"</a>
+                <div class="doc-sidebar-group">"Platform"</div>
+                <a href="/docs/render-modes">"Render Modes"</a>
+                <a href="/docs/providers" class="current">"Providers"</a>
+                <a href="/docs/runtime-api">"Runtime API"</a>
+                <div class="doc-sidebar-group">"Toolchain"</div>
+                <a href="/docs/toolchain">"Toolchain"</a>
+                <div class="doc-sidebar-group">"AI"</div>
+                <a href="/docs/nectar-for-ai">"AI Integration"</a>
+                <div class="doc-sidebar-group">"Internals"</div>
+                <a href="/docs/architecture">"Architecture"</a>
+                <a href="/docs/whitepaper">"Whitepaper"</a>
+                </aside>
+
+                <div class="doc-content">
+                    <div class="doc-breadcrumbs">
+                        <a href="/docs">"Documentation"</a>" / ""Providers"
+                    </div>
+                    <h1>"Providers"</h1>
+                <p>"Providers are the third layer of Nectar's architecture. Keywords define language primitives, the standard library defines interfaces, and providers fulfill those interfaces with concrete vendor integrations."</p>
+                <h3 id="the-three-layers">"The Three Layers"</h3>
+                <pre class="code-block"><code>"Keywords            payment, banking, db, miniprogram, map, ...
+   |
+   v
+Standard Library    payment::charge, mp::tradePay, banking::transfer, ...
+   |                (interfaces declared in compiler/src/stdlib.rs)
+   v
+Providers           providers/stripe.js, providers/moov.js, providers/alipay.js, ...
+                    (concrete HTTP/SDK calls to a vendor)"</code></pre>
+                <p>"Application code only ever touches the top two layers. Swapping providers is a configuration change, not a code change."</p>
+                <h3 id="built-in-providers">"Built-in Providers"</h3>
+                <div class="doc-table-wrap">
+                    <table class="doc-table">
+                        <thead><tr><th>"Provider"</th><th>"File"</th><th>"Domain"</th><th>"Fulfills"</th></tr></thead>
+                        <tbody>
+                        <tr><td>"Moov"</td><td><a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/providers/moov.js">"providers/moov.js"</a></td><td>"Banking, ACH, wallets, transfers"</td><td><code>"banking"</code>", "<code>"payment"</code></td></tr>
+                        <tr><td>"Stripe"</td><td><a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/providers/stripe.js">"providers/stripe.js"</a></td><td>"Card payments, Connect"</td><td><code>"payment"</code></td></tr>
+                        <tr><td>"Plaid"</td><td><a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/providers/plaid.js">"providers/plaid.js"</a></td><td>"Bank account linking, transactions"</td><td><code>"banking"</code></td></tr>
+                        <tr><td>"Alipay"</td><td><a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/providers/alipay.js">"providers/alipay.js"</a></td><td>"Chinese super-app payments"</td><td><code>"miniprogram"</code>" ("<code>"mp::*"</code>")"</td></tr>
+                        <tr><td>"Mapbox"</td><td><a href="https://github.com/HibiscusConsulting/nectar-lang/blob/main/providers/mapbox.js">"providers/mapbox.js"</a></td><td>"Maps, geocoding, directions"</td><td><code>"map"</code>", "<code>"maps"</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3 id="provider-contract">"Provider Contract"</h3>
+                <p>"A provider is a JavaScript module that exports the function set declared by a stdlib registration in "<code>"compiler/src/stdlib.rs"</code>". The compiler emits WASM imports against the stdlib interface; the provider supplies the implementations at runtime."</p>
+                <p>"For the "<code>"payment"</code>" keyword, the compiler emits imports such as:"</p>
+                <pre class="code-block"><code>"payment::charge(amount: BigDecimal, customer_id: String) -> Result<ChargeId, Error>
+payment::refund(charge_id: ChargeId, amount: Option<BigDecimal>) -> Result<RefundId, Error>
+payment::list_charges(customer_id: String) -> Result<Vec<Charge>, Error>"</code></pre>
+                <p>"A provider for "<code>"payment"</code>" (e.g. "<code>"stripe.js"</code>") exports JavaScript functions that satisfy those signatures and translate the calls to the Stripe API."</p>
+                <h3 id="switching-providers">"Switching Providers"</h3>
+                <p>"Provider selection is configured in "<code>"nectar.toml"</code>":"</p>
+                <div class="code-lang-label">"toml"</div>
+                <pre class="code-block"><code>"[providers]
+payment = \"stripe\"      # or \"moov\"
+banking = \"moov\"        # or \"plaid\"
+miniprogram = \"alipay\"  # provider for mp:: namespace
+map = \"mapbox\""</code></pre>
+                <p>"Application code does not change. The compiler links the WASM imports to the configured provider at build time."</p>
+                <h3 id="adding-a-new-provider">"Adding a New Provider"</h3>
+                <ol>
+                    <li>"Create "<code>"providers/<name>.js"</code>" exporting the function set declared by the stdlib module you are fulfilling."</li>
+                    <li>"Add a "<code>"[providers]"</code>" entry to "<code>"nectar.toml"</code>" pointing the keyword to the new provider."</li>
+                    <li>"Run "<code>"nectar test"</code>" against the example app for the relevant keyword to verify the contract is satisfied."</li>
+                </ol>
+                <p>"Provider modules can call any external HTTP API or SDK. They run in the JavaScript syscall layer, not in WASM, so they have full access to "<code>"fetch"</code>", browser APIs, and Node SDKs (when running under SSR or wasmtime)."</p>
+                <h3 id="provider-agnostic-namespaces">"Provider-Agnostic Namespaces"</h3>
+                <p>"Some keyword domains have multiple competing vendors with different APIs. Nectar exposes a vendor-agnostic namespace that providers fulfill in their own way:"</p>
+                <ul>
+                    <li><strong><code>"mp::*"</code></strong>" — miniprogram namespace. "<code>"mp::tradePay"</code>", "<code>"mp::login"</code>", "<code>"mp::shareToFriends"</code>" map to whichever super-app provider is configured (Alipay first, more to follow)."</li>
+                    <li><strong><code>"banking::*"</code></strong>" — Moov and Plaid both fulfill the "<code>"banking"</code>" interface, with different account-linking flows handled internally by the provider."</li>
+                    <li><strong><code>"payment::*"</code></strong>" — Stripe and Moov both fulfill the "<code>"payment"</code>" interface, with "<code>"payment::charge"</code>" semantics translated to whichever vendor is selected."</li>
+                </ul>
+                <p>"This is the same pattern as filesystem abstractions in OS kernels: the application asks for an action, the kernel routes to the configured driver."</p>
+                <h3 id="testing-providers">"Testing Providers"</h3>
+                <p>"Each provider ships with a contract test in "<code>"compiler/tests/providers/"</code>" that verifies the exported function set matches the stdlib interface. CI fails if a provider drifts from the contract."</p>
+                <h3 id="why-providers-are-separate-from-the-compiler">"Why Providers Are Separate from the Compiler"</h3>
+                <ul>
+                    <li><strong>"Vendor lock-in is a configuration concern, not a language concern."</strong>" Application code stays portable."</li>
+                    <li><strong>"Providers can ship out-of-band."</strong>" Adding Square as a third payment provider does not require a compiler release."</li>
+                    <li><strong>"Audit and substitution."</strong>" Providers can be swapped during incident response (Stripe outage → fall back to Moov) without redeploying the application."</li>
+                </ul>
+                </div>
+            </div>
+
+            <Footer />
+        </main>
+    }
+
+    style {
+        .doc-page { color: #e0e0e0; background: #1a1a2e; min-height: 100vh; }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1280px; margin: 0 auto; gap: 0; }
+        .doc-sidebar { padding: 2rem 1.5rem; border-right: 1px solid #2a2a4e; position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box; }
+        .doc-sidebar-group { color: #e94560; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; }
+        .doc-sidebar-group:first-child { margin-top: 0; }
+        .doc-sidebar a { display: block; color: #a0a0b0; text-decoration: none; padding: 0.3rem 0.5rem; font-size: 0.92rem; border-radius: 4px; }
+        .doc-sidebar a:hover { color: #ffffff; background: #2a2a4e; }
+        .doc-sidebar a.current { color: #ffffff; background: #16213e; border-left: 2px solid #e94560; padding-left: 0.4rem; }
+        .doc-content { padding: 3rem 3rem 6rem; max-width: 860px; box-sizing: border-box; }
+        .doc-content h1 { font-size: 2.5rem; color: #ffffff; margin-bottom: 1rem; line-height: 1.2; }
+        .doc-content h2 { font-size: 1.6rem; color: #ffffff; margin-top: 2.5rem; margin-bottom: 1rem; padding-top: 0.5rem; border-top: 1px solid #2a2a4e; }
+        .doc-content h3 { font-size: 1.25rem; color: #ffffff; margin-top: 2rem; margin-bottom: 0.75rem; }
+        .doc-content h4 { font-size: 1.05rem; color: #d0d0d8; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .doc-content h5, .doc-content h6 { font-size: 0.95rem; color: #d0d0d8; margin-top: 1.25rem; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .doc-content p { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; }
+        .doc-content a { color: #58a6ff; text-decoration: none; }
+        .doc-content a:hover { text-decoration: underline; }
+        .doc-content ul, .doc-content ol { color: #c8c8d4; line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+        .doc-content li { margin-bottom: 0.4rem; }
+        .doc-content strong { color: #ffffff; }
+        .doc-content em { color: #e0e0ea; }
+        .doc-content code { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 0.88em; background: #0d1117; color: #e94560; padding: 0.15em 0.4em; border-radius: 4px; border: 1px solid #2a2a4e; }
+        .doc-content pre.code-block { background: #0d1117; border: 1px solid #2a2a4e; border-radius: 8px; padding: 1.2rem 1.4rem; overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content pre.code-block code { background: transparent; color: #e6edf3; border: none; padding: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre; display: block; }
+        .doc-content blockquote { border-left: 3px solid #e94560; padding: 0.5rem 1rem; color: #b8b8c4; background: #16213e; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .doc-content blockquote p { margin: 0.4rem 0; }
+        .doc-content hr { border: none; border-top: 1px solid #2a2a4e; margin: 2.5rem 0; }
+        .doc-content .doc-table-wrap { overflow-x: auto; margin: 1.25rem 0; }
+        .doc-content table.doc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+        .doc-content table.doc-table th, .doc-content table.doc-table td { padding: 0.6rem 0.9rem; text-align: left; border: 1px solid #2a2a4e; vertical-align: top; }
+        .doc-content table.doc-table thead th { background: #16213e; color: #ffffff; font-weight: 600; }
+        .doc-content table.doc-table tbody tr:nth-child(odd) { background: rgba(22, 33, 62, 0.4); }
+        .doc-content img { max-width: 100%; height: auto; border-radius: 6px; margin: 1rem 0; }
+        .doc-breadcrumbs { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+        .doc-breadcrumbs a { color: #8b949e; }
+        .doc-breadcrumbs a:hover { color: #ffffff; }
+    }
+}
