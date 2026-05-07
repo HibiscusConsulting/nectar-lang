@@ -1,34 +1,33 @@
-# Build stage — compiles Nectar website to static files
-FROM rust:1.85 AS builder
+# buildnectar.com — static site served by nginx.
+# website/dist/ is pre-built locally via scripts/build_docs_html.py
+# (and the marketing index.html is hand-curated).
 
-WORKDIR /app
-COPY . .
-RUN cargo build --release
-
-# For now, serve pre-built static files
-# Once nectar build --target ssg works end-to-end, this becomes:
-# RUN ./target/release/nectar build website/src/app.nectar --target ssg --output /dist
-
-# Serve stage — lightweight static file server
 FROM nginx:alpine
 
-# Copy static output
-COPY website/dist/ /usr/share/nginx/html/
+COPY dist/ /usr/share/nginx/html/
 
-# Nginx config for SPA routing
-RUN echo 'server { \
-    listen 8080; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    # Cache static assets \
-    location ~* \.(wasm|js|css|png|jpg|svg|ico)$ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Nginx config: clean URLs for /docs (try .html extension), SPA fallback elsewhere
+RUN printf 'server {\n\
+    listen 8080;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    \n\
+    # Clean URLs for documentation: /docs/foo -> /docs/foo.html\n\
+    location /docs/ {\n\
+        try_files $uri $uri.html $uri/index.html /docs/index.html;\n\
+    }\n\
+    \n\
+    # Top-level routes fall back to the marketing homepage\n\
+    location / {\n\
+        try_files $uri $uri.html $uri/ /index.html;\n\
+    }\n\
+    \n\
+    # Long-cache immutable assets\n\
+    location ~* \\.(wasm|js|css|png|jpg|jpeg|svg|ico|woff2?)$ {\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, immutable";\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
