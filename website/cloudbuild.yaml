@@ -1,24 +1,51 @@
 # Cloud Build config for buildnectar.com
-# Triggers on push to main, deploys to Cloud Run
+# Triggers on push to main, deploys to Cloud Run service `buildnectar-www`
+# in project `nectar-edge` (us-central1).
+#
+# Pipeline:
+#   1. Generate static doc pages from docs/*.md via scripts/build_docs_html.py
+#   2. Build Docker image from website/ context using website/Dockerfile
+#   3. Push to Artifact Registry
+#   4. Deploy to Cloud Run
 
 steps:
-  # Build the container
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/buildnectar-website', '-f', 'website/Dockerfile', '.']
+  # 1. Generate doc HTML pages from markdown source
+  - name: 'pandoc/core:latest'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        apk add --no-cache python3
+        python3 scripts/build_docs_html.py
 
-  # Push to Container Registry
+  # 2. Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/buildnectar-website']
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www:$SHORT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www:latest'
+      - '-f'
+      - 'website/Dockerfile'
+      - 'website/'
 
-  # Deploy to Cloud Run
+  # 3. Push image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www'
+
+  # 4. Deploy to Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'buildnectar-website'
-      - '--image=gcr.io/$PROJECT_ID/buildnectar-website'
-      - '--platform=managed'
+      - 'buildnectar-www'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www:$SHORT_SHA'
       - '--region=us-central1'
+      - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=8080'
       - '--memory=256Mi'
@@ -27,7 +54,8 @@ steps:
       - '--max-instances=10'
 
 images:
-  - 'gcr.io/$PROJECT_ID/buildnectar-website'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www:$SHORT_SHA'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/buildnectar-www:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
