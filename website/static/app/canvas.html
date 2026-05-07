@@ -111,6 +111,10 @@ gpu_upload_shadows: () => {},
 gpu_render: () => {},
 gpu_set_scroll: () => {},
 gpu_set_viewport: () => {},
+canvas_set_shadow: (id,blur,ox,oy,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.shadowBlur=blur; ctx.shadowColor=`rgba(${r},${g},${b},${a/255})`; ctx.shadowOffsetX=ox; ctx.shadowOffsetY=oy; },
+canvas_clear_shadow: (id) => { const ctx=canvas_fns.ctx; ctx.shadowBlur=0; ctx.shadowColor="transparent"; ctx.shadowOffsetX=0; ctx.shadowOffsetY=0; },
+canvas_highlight_rect: (id,x,y,w,h,r,g,b,a) => { const ctx=canvas_fns.ctx; ctx.save(); ctx.globalAlpha=a/255; ctx.fillStyle=`rgb(${r},${g},${b})`; ctx.fillRect(x,y,w,h); ctx.restore(); },
+request_idle_callback: (cbIdx) => { const fn_ = () => { if (cbIdx === 9999 && W.app_build_a11y_dom) W.app_build_a11y_dom(); else if (W.__callback) W.__callback(cbIdx); }; if (typeof requestIdleCallback !== 'undefined') requestIdleCallback(fn_); else setTimeout(fn_, 50); },
 }};
 const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v=' + Date.now()), imports);
 const W = instance.exports;
