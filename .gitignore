@@ -11,3 +11,6 @@ Nectar.lock
 tarpaulin-report.json
 key.txt
 server/target/
+
+# Agent isolation worktrees (Claude Code) — never track
+.claude/worktrees/
