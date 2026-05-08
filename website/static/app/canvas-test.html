@@ -25,7 +25,7 @@ nav .links a.ext:hover{color:#8b949e}
   <a href="/" class="logo">Nectar</a>
   <div class="links">
     <a href="/app/canvas" id="nav-ecom">Nectar Demo</a>
-    <a href="/app/canvas#data-table" id="nav-dt" class="active">Data Table</a>
+    <a href="/app/data-table" id="nav-dt" class="active">Data Table</a>
     <a href="/app/trading" id="nav-trading">Trading</a>
     <a href="/app/svelte" id="nav-svelte">Svelte 5</a>
     <a href="/docs/getting-started" id="nav-docs">Docs</a>
@@ -132,6 +132,10 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v
 const W = instance.exports;
 const t1 = performance.now();
 
+// /app/data-table is the data-table-only page; lock the initial mode to 1
+// before app_init so the WASM boots straight into the data-table view.
+if (W.app_set_initial_mode) W.app_set_initial_mode(1);
+
 // Init app (builds 10K products in WASM — timing is self-measured)
 console.time('app_init');
 W.app_init(window.innerWidth, window.innerHeight - 48, t1 - t0);
@@ -162,19 +166,8 @@ W.app_render();
 console.timeEnd('first_render');
 console.log(`[TIMING] total JS from WASM load to first render: ${(performance.now() - t0).toFixed(1)}ms`);
 
-// Data table link — switch mode via hash
-document.getElementById('nav-dt')?.addEventListener('click', e => {
-  e.preventDefault();
-  location.hash = 'data-table';
-  setMode('#data-table');
-});
-document.getElementById('nav-ecom')?.addEventListener('click', e => {
-  e.preventDefault();
-  location.hash = '';
-  setMode('');
-});
-
-window.addEventListener('hashchange', () => setMode(location.hash));
+// Nav links are now plain anchors — let the browser do a full page
+// navigation so each demo's app_set_initial_mode runs cleanly.
 
 console.log('%c[Honeycomb DevTools]%c Cmd+Shift+I to toggle inspector | W.app_dump_tree() to dump element tree', 'color:#3b82f6;font-weight:bold', 'color:inherit');
 
