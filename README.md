@@ -63,7 +63,7 @@ nectar check app.nectar
 
 ### Use in your app
 
-`nectar build` outputs `app.wasm` and bundles `core.js` (~3 KB gzip). Include both in your HTML:
+`nectar build` outputs `app.wasm` and bundles `core.js` (~10 KB gzip). Include both in your HTML:
 
 ```html
 <!DOCTYPE html>
@@ -168,7 +168,7 @@ See [Providers](docs/providers.md) for the integration model and how to add a ne
   |- Codegen -> WAT
   '- Binary emit -> .wasm
        |
-  Browser loads .wasm + single JS syscall file (~3 KB gzip)
+  Browser loads .wasm + single JS syscall file (~10 KB gzip)
        |
   mount() -> innerHTML from WASM-built string (1 call)
   flush() -> batched DOM ops from command buffer (1 call/frame)
@@ -180,7 +180,7 @@ Initial renders use `innerHTML` from a WASM-built HTML string. Updates write opc
 
 | | React | Nectar |
 |---|---|---|
-| Runtime (gzip) | ~42 KB | ~2.8 KB |
+| Runtime (gzip) | ~42 KB | ~10 KB |
 | Re-render (1K items) | ~4 ms (VDOM diff) | ~0.3 ms (signal) |
 | GC pauses | Yes | None (WASM linear memory) |
 | Update complexity | O(n) tree walk | O(1) per binding |

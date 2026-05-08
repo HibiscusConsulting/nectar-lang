@@ -12,7 +12,7 @@ This is not a guideline. This is the entire point of the language.
 
 ## Project Overview
 
-- Users write `.nectar` files; the Rust compiler produces `.wasm` + a single JS syscall file (`core.js`, ~3 KB gzip)
+- Users write `.nectar` files; the Rust compiler produces `.wasm` + a single JS syscall file (`core.js`, ~10 KB gzip)
 - No garbage collector, no virtual DOM, no JavaScript dependencies, no node_modules
 - One Rust binary (`nectar`) handles everything: compile, format, lint, test, dev server, LSP, package management, SSR
 - Ownership model inspired by Rust — borrow checking, lifetimes, move semantics
@@ -127,7 +127,7 @@ Codegen → WAT (WebAssembly Text Format)
      │
 wasm_binary → .wasm
      │
-Browser loads .wasm + core.js (~3 KB gzip)
+Browser loads .wasm + core.js (~10 KB gzip)
      │
 mount() → innerHTML from WASM-built string (1 call)
 flush() → batched DOM ops from command buffer (1 call/frame)
