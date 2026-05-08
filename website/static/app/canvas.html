@@ -129,14 +129,24 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v
 const W = instance.exports;
 const t1 = performance.now();
 
+// Mode mapping in this build of layout.wasm: 0 = data-table, 1 = ecom.
+function modeFromHash(hash) {
+  return hash === '#data-table' ? 0 : 1;
+}
+
+// Set the initial mode BEFORE app_init so the WASM initializes in the
+// right view. Without this, app_init defaults to data-table and a later
+// app_set_mode(1) call races with init's render — intermittently leaving
+// the data-table on screen.
+const initialMode = modeFromHash(location.hash);
+if (W.app_set_initial_mode) W.app_set_initial_mode(initialMode);
+
 // Init app (builds 10K products in WASM — timing is self-measured)
 W.app_init(window.innerWidth, window.innerHeight - 48, t1 - t0);
 
 // Route-based mode switching
 function setMode(hash) {
-  // Mode mapping in this build of layout.wasm: 0 = data-table, 1 = ecom.
-  if (hash === '#data-table') { W.app_set_mode(0); }
-  else { W.app_set_mode(1); }
+  W.app_set_mode(modeFromHash(hash));
   updateActiveNav(hash);
   W.app_render();
 }
@@ -147,7 +157,7 @@ function updateActiveNav(hash) {
   else document.getElementById('nav-ecom')?.classList.add('active');
 }
 
-// Init mode from URL hash
+// Reaffirm mode from URL hash (in case initial_mode wasn't honored)
 setMode(location.hash);
 W.app_render();
 
