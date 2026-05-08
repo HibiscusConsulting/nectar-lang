@@ -129,9 +129,9 @@ const { instance } = await WebAssembly.instantiateStreaming(fetch('layout.wasm?v
 const W = instance.exports;
 const t1 = performance.now();
 
-// Mode mapping in this build of layout.wasm: 0 = data-table, 1 = ecom.
+// Mode mapping per canvas.html convention: 0 = ecom, 1 = data-table.
 function modeFromHash(hash) {
-  return hash === '#data-table' ? 0 : 1;
+  return hash === '#data-table' ? 1 : 0;
 }
 
 // Set the initial mode BEFORE app_init so the WASM initializes in the
