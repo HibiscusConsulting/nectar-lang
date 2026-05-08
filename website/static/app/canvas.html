@@ -134,8 +134,9 @@ W.app_init(window.innerWidth, window.innerHeight - 48, t1 - t0);
 
 // Route-based mode switching
 function setMode(hash) {
-  if (hash === '#data-table') { W.app_set_mode(1); }
-  else { W.app_set_mode(0); }
+  // Mode mapping in this build of layout.wasm: 0 = data-table, 1 = ecom.
+  if (hash === '#data-table') { W.app_set_mode(0); }
+  else { W.app_set_mode(1); }
   updateActiveNav(hash);
   W.app_render();
 }
