@@ -8,7 +8,7 @@ March 2026
 
 ## Abstract
 
-We present Nectar, a compiled-to-WebAssembly language designed to prove that modern web applications do not require JavaScript for computation, state management, or rendering logic. Nectar compiles `.nectar` source files to `.wasm` binaries that run in the browser with a 3 KB JavaScript syscall layer (`core.js`) that provides pure bridges to browser APIs. All logic, all computation, all state management, and all rendering decisions execute in Rust-compiled WebAssembly.
+We present Nectar, a compiled-to-WebAssembly language designed to prove that modern web applications do not require JavaScript for computation, state management, or rendering logic. Nectar compiles `.nectar` source files to `.wasm` binaries that run in the browser with a 10 KB JavaScript syscall layer (`core.js`) that provides pure bridges to browser APIs. All logic, all computation, all state management, and all rendering decisions execute in Rust-compiled WebAssembly.
 
 We benchmark Nectar against React 18 and Svelte 5 on an identical 10,000-product e-commerce application with unique images, reactive state, category filtering, and sorting. Nectar renders 10,000 products in **4ms** (cached) vs React's **1,268ms** and Svelte's **325ms**. Category filtering completes in **0.10ms** vs React's **44.90ms** and Svelte's **5,000ms**. The total application bundle is **48 KB** with zero npm dependencies, zero node_modules, and zero garbage collection pauses.
 
@@ -26,7 +26,7 @@ Nectar asks a different question: **what if the web framework was the WebAssembl
 
 Nectar exists to prove that the web does not need JavaScript. It is a compiled-to-WASM language where all logic, all computation, all state management, and all rendering decisions run in Rust/WASM. JavaScript is treated as a thin, unavoidable syscall layer — an impedance mismatch minimized, not a tool reached for.
 
-The only JavaScript in a Nectar application is `core.js` (~3 KB gzipped), which provides pure bridges to browser APIs that WebAssembly physically cannot call: DOM manipulation, `fetch()`, `WebSocket`, `IndexedDB`, `localStorage`, timers, and similar platform interfaces. Each bridge function is 1-3 lines with zero logic — no `if` statements, no loops, no string operations.
+The only JavaScript in a Nectar application is `core.js` (~10 KB gzipped), which provides pure bridges to browser APIs that WebAssembly physically cannot call: DOM manipulation, `fetch()`, `WebSocket`, `IndexedDB`, `localStorage`, timers, and similar platform interfaces. Each bridge function is 1-3 lines with zero logic — no `if` statements, no loops, no string operations.
 
 ### 1.2 Contributions
 
@@ -63,7 +63,7 @@ This paper makes the following contributions:
      |
   wat2wasm / built-in binary emitter --> .wasm
      |
-  Browser loads .wasm + core.js (~3 KB gzip)
+  Browser loads .wasm + core.js (~10 KB gzip)
 ```
 
 The entire toolchain is a single Rust binary (`nectar`). There is no npm, no node_modules, no webpack, no Babel, no PostCSS, no package.json. The compiler handles compilation, formatting, linting, testing, dev server with hot reload, LSP for editor integration, server-side rendering, and package management.
@@ -160,7 +160,7 @@ All three implementations render an identical e-commerce application:
 
 **Nectar (WASM):**
 - Single `.nectar` source file compiled to `.wasm` (48 KB)
-- Runtime: `core.js` (3 KB gzipped)
+- Runtime: `core.js` (10 KB gzipped)
 - Rendering: `innerHTML` mount for initial batch + `requestAnimationFrame` drain for remaining items
 - **Initial render strategy**: `lazy for` renders the first 20 items synchronously during mount, then schedules the remaining 9,980 items via rAF in batches of 50. The timing measurement captures the mount function (20 items), not the full 10K render.
 - Reactive updates: signal-subscribed `dom_setAttr` / `dom_setText` for targeted DOM mutations
@@ -253,12 +253,12 @@ This is the fairest comparison in the benchmark. All three frameworks have alrea
 | | Nectar | React 18 | Svelte 5 |
 |---|---|---|---|
 | Application binary | 48 KB | — | — |
-| Framework runtime | 3 KB (core.js) | ~130 KB (react + react-dom) | 0 KB (compiled away) |
+| Framework runtime | 10 KB (core.js) | ~130 KB (react + react-dom) | 0 KB (compiled away) |
 | npm dependencies | 0 | 2+ | 0 |
 | node_modules | 0 | thousands | hundreds |
 | Build pipeline | `nectar build` | webpack + babel + ... | vite + svelte-plugin + ... |
 
-Nectar's total wire size is **51 KB** (48 KB WASM + 3 KB core.js). Estimated gzip: **~20 KB**.
+Nectar's total wire size is **58 KB** (48 KB WASM + 10 KB core.js). Estimated gzip: **~20 KB**.
 
 ---
 

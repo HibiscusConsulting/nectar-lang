@@ -132,7 +132,7 @@ footer a{color:var(--accent)}
 
 <section class="hero">
   <h1>The web <span class="strike">needs JavaScript</span><br><span class="accent">doesn't.</span></h1>
-  <p class="sub">Nectar compiles to WebAssembly. One language, one binary, zero dependencies. Your entire app — logic, state, rendering — runs in WASM. JavaScript is reduced to a 3 KB syscall layer.</p>
+  <p class="sub">Nectar compiles to WebAssembly. One language, one binary, zero dependencies. Your entire app — logic, state, rendering — runs in WASM. JavaScript is reduced to a 10 KB syscall layer.</p>
   <div class="hero-buttons">
     <a href="/app/canvas" class="btn-primary">Nectar Demo (10K products) &rarr;</a>
     <a href="/app/svelte" class="btn-secondary">Svelte 5 Comparison</a>
@@ -142,8 +142,8 @@ footer a{color:var(--accent)}
 
 <section class="stats">
   <div class="stat"><div class="stat-value">0</div><div class="stat-label">JS Dependencies</div></div>
-  <div class="stat"><div class="stat-value">~3KB</div><div class="stat-label">Runtime (gzip)</div></div>
-  <div class="stat"><div class="stat-value">2248+</div><div class="stat-label">Compiler Tests</div></div>
+  <div class="stat"><div class="stat-value">~10KB</div><div class="stat-label">Runtime (gzip)</div></div>
+  <div class="stat"><div class="stat-value">2586</div><div class="stat-label">Compiler Tests</div></div>
   <div class="stat"><div class="stat-value">0</div><div class="stat-label">Virtual DOM</div></div>
   <div class="stat"><div class="stat-value">O(1)</div><div class="stat-label">Signal Updates</div></div>
 </section>
@@ -171,7 +171,7 @@ footer a{color:var(--accent)}
 }</div>
     </div>
     <div class="code-card">
-      <div class="code-header"><span class="lang">Nectar</span><span class="tag tag-new">~3 KB</span></div>
+      <div class="code-header"><span class="lang">Nectar</span><span class="tag tag-new">~10 KB</span></div>
       <div class="code-body"><span class="cm">// No package.json. No node_modules.</span>
 <span class="cm">// One file. Compiles to WASM.</span>
 
@@ -231,7 +231,7 @@ footer a{color:var(--accent)}
 
 <section class="arch">
   <h2>How <span class="accent">Nectar</span> works</h2>
-  <p class="sub">Your .nectar source compiles to WebAssembly. The browser loads the .wasm and a 3 KB syscall layer. Everything else is WASM.</p>
+  <p class="sub">Your .nectar source compiles to WebAssembly. The browser loads the .wasm and a 10 KB syscall layer. Everything else is WASM.</p>
   <div class="pipeline">
     <div class="pipe-box"><span class="pipe-label">Source</span><span class="pipe-value">.nectar</span></div>
     <span class="pipe-arrow">&rarr;</span>
@@ -242,7 +242,7 @@ footer a{color:var(--accent)}
     <div class="pipe-box"><span class="pipe-label">Runtime</span><span class="pipe-value">Browser</span></div>
   </div>
   <table class="arch-table">
-    <tr><td>JavaScript Runtime</td><td class="g">3 KB (DOM syscalls only)</td></tr>
+    <tr><td>JavaScript Runtime</td><td class="g">10 KB (DOM syscalls only)</td></tr>
     <tr><td>Virtual DOM</td><td class="r">None — command buffer</td></tr>
     <tr><td>State Management</td><td class="g">WASM signals — O(1)</td></tr>
     <tr><td>Borrow Checker</td><td class="g">Compile-time safety</td></tr>

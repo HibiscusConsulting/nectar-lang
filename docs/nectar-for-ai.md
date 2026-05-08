@@ -4,7 +4,7 @@ This is the definitive reference for AI assistants generating Nectar code. Every
 
 ## Core Thesis
 
-Nectar compiles to WebAssembly. All logic, state, rendering, and computation run in WASM. The only JavaScript is `core.js` (~3 KB gzip) -- a thin syscall layer for browser APIs that WASM physically cannot call (DOM, fetch, WebSocket, IndexedDB, etc.). There is no `node_modules`, no `package.json`, no bundler.
+Nectar compiles to WebAssembly. All logic, state, rendering, and computation run in WASM. The only JavaScript is `core.js` (~10 KB gzip) -- a thin syscall layer for browser APIs that WASM physically cannot call (DOM, fetch, WebSocket, IndexedDB, etc.). There is no `node_modules`, no `package.json`, no bundler.
 
 The compiler is a single Rust binary called `nectar`.
 
@@ -1274,7 +1274,7 @@ Codegen -> WAT (WebAssembly Text Format)
      |
 wasm_binary -> .wasm binary
      |
-Browser loads .wasm + core.js (~3 KB gzip)
+Browser loads .wasm + core.js (~10 KB gzip)
 ```
 
 ### Signal System:
@@ -1558,6 +1558,6 @@ Build: `nectar build app.nectar --emit-wasm`
 Output:
 ```
   app.wasm            # Compiled WebAssembly binary
-  core.js             # Runtime syscall layer (~3 KB gzip)
+  core.js             # Runtime syscall layer (~10 KB gzip)
   index.html          # Generated HTML shell
 ```
