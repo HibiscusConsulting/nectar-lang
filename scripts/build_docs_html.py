@@ -138,10 +138,15 @@ def render_sidebar(current_slug: str) -> str:
 
 
 def render_top_nav(current_section: str = "docs") -> str:
+    # Mirrors the homepage / demo nav so users keep the same chrome.
     items = [
-        ("/", "Home", "home"),
+        ("/app/canvas", "Nectar Demo", "canvas"),
+        ("/app/data-table", "Data Table", "data-table"),
+        ("/app/trading", "Trading", "trading"),
+        ("/app/svelte", "Svelte 5", "svelte"),
         ("/docs/getting-started", "Docs", "docs"),
         ("https://github.com/HibiscusConsulting/nectar-lang", "GitHub", "github"),
+        ("/", "Home", "home"),
     ]
     links = []
     for href, label, key in items:
