@@ -106,12 +106,14 @@ async fn moov_post(
 ) -> Result<serde_json::Value, String> {
     let token = get_oauth_token(config, scope, http).await?;
     let url = format!("{}{}", config.base_url, path);
+    let idempotency_key = uuid::Uuid::new_v4().to_string();
     let response = http
         .post(&url)
         .bearer_auth(&token)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("Origin", "https://buildnectar.com")
+        .header("X-Idempotency-Key", &idempotency_key)
         .json(&body)
         .send()
         .await
@@ -146,19 +148,23 @@ pub async fn handle(req: PaymentRequest, http: &reqwest::Client) -> PaymentRespo
                 .description
                 .unwrap_or_else(|| "Nectar payment".to_string());
 
-            let destination_id = req
-                .params
-                .get("destination_account_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
+            // Source: Jerry Miller (individual) — ACH debit collect
+            let source_account = env::var("MOOV_SOURCE_ACCOUNT")
+                .unwrap_or_else(|_| "1eac252c-1ded-47b3-9b5f-0f304142ef24".to_string());
+            let source_pm = env::var("MOOV_SOURCE_PM")
+                .unwrap_or_else(|_| "6587587c-8f33-46a5-91fa-8a576cfa2684".to_string());
+            // Destination: Hollywood Entertainment (business) — Moov wallet
+            let dest_pm = env::var("MOOV_DEST_PM")
+                .unwrap_or_else(|_| "dc5b5692-3866-45f1-9122-f4aa3e5ec57b".to_string());
 
             let body = json!({
                 "source": {
-                    "accountID": config.account_id,
+                    "accountID": source_account,
+                    "paymentMethodID": source_pm,
                 },
                 "destination": {
-                    "accountID": destination_id,
+                    "accountID": config.account_id,
+                    "paymentMethodID": dest_pm,
                 },
                 "amount": {
                     "value": req.amount_cents,

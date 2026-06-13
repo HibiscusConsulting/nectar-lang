@@ -433,6 +433,18 @@ export const wasmImports = {
         R.__cbData(cbIdx, s.ptr);
       });
     },
+    // Binary fetch: fetch → arrayBuffer → write raw bytes into WASM memory.
+    // Calls back with (destPtr, byteLength). WASM allocates the destination.
+    fetchBinary(urlPtr, urlLen, cbIdx) {
+      const o = { method: this._m || 'GET', headers: this._h || undefined, body: this._b || undefined };
+      this._m = null; this._b = null; this._h = null;
+      fetch(R.__getString(urlPtr, urlLen), o).then(r => r.arrayBuffer()).then(ab => {
+        const bytes = new Uint8Array(ab);
+        const ptr = R.__instance.exports.alloc(bytes.length);
+        new Uint8Array(R.__memory.buffer, ptr, bytes.length).set(bytes);
+        R.__cbData2(cbIdx, ptr, bytes.length);
+      });
+    },
   },
 
   // ── Observer — IntersectionObserver, matchMedia ────────────────────────
@@ -817,19 +829,140 @@ export const wasmImports = {
       createShaderModule(deviceId, codePtr, codeLen) {
         return __gpuStore(__gpuGet(deviceId).createShaderModule({ code: R.__getString(codePtr, codeLen) }));
       },
-      createRenderPipeline(deviceId, descPtr) {
-        return __gpuStore(__gpuGet(deviceId).createRenderPipeline(R.__readOpts(descPtr)));
+      // Render pipeline: explicit typed params — JS builds the nested WebGPU descriptor.
+      // shaderModuleId used for both vertex and fragment stages.
+      // topology: "triangle-list", "triangle-strip", "line-list", "point-list"
+      // format: "bgra8unorm", "rgba8unorm", etc. (canvas preferred format)
+      createRenderPipeline(deviceId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen) {
+        const module = __gpuGet(shaderModuleId);
+        return __gpuStore(__gpuGet(deviceId).createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: R.__getString(vsEntryPtr, vsEntryLen) },
+          fragment: { module, entryPoint: R.__getString(fsEntryPtr, fsEntryLen), targets: [{ format: R.__getString(fmtPtr, fmtLen) }] },
+          primitive: { topology: R.__getString(topoPtr, topoLen) },
+        }));
       },
-      createTexture(deviceId, descPtr) {
-        return __gpuStore(__gpuGet(deviceId).createTexture(R.__readOpts(descPtr)));
+      // Render pipeline with explicit layout (non-auto). layoutId = pipeline layout handle.
+      createRenderPipelineWithLayout(deviceId, layoutId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen) {
+        const module = __gpuGet(shaderModuleId);
+        return __gpuStore(__gpuGet(deviceId).createRenderPipeline({
+          layout: __gpuGet(layoutId),
+          vertex: { module, entryPoint: R.__getString(vsEntryPtr, vsEntryLen) },
+          fragment: { module, entryPoint: R.__getString(fsEntryPtr, fsEntryLen), targets: [{ format: R.__getString(fmtPtr, fmtLen) }] },
+          primitive: { topology: R.__getString(topoPtr, topoLen) },
+        }));
+      },
+      // Render pipeline with vertex buffer layout. descPtr is a binary descriptor:
+      // [arrayStride:u32, attrCount:u32, then per attr: format:u32, offset:u32, shaderLocation:u32]
+      // format: 0=float32x2, 1=float32x3, 2=float32x4, 3=float32, 4=uint32x4, 5=unorm8x4
+      createRenderPipelineWithVertexLayout(deviceId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen, descPtr) {
+        const module = __gpuGet(shaderModuleId);
+        const dv = new DataView(R.__memory.buffer);
+        const stride = dv.getUint32(descPtr, true);
+        const attrCount = dv.getUint32(descPtr + 4, true);
+        const fmts = ['float32x2','float32x3','float32x4','float32','uint32x4','unorm8x4'];
+        const attributes = [];
+        for (let i = 0; i < attrCount; i++) {
+          const off = descPtr + 8 + i * 12;
+          attributes.push({ format: fmts[dv.getUint32(off, true)] || 'float32x4', offset: dv.getUint32(off + 4, true), shaderLocation: dv.getUint32(off + 8, true) });
+        }
+        return __gpuStore(__gpuGet(deviceId).createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: R.__getString(vsEntryPtr, vsEntryLen), buffers: [{ arrayStride: stride, attributes }] },
+          fragment: { module, entryPoint: R.__getString(fsEntryPtr, fsEntryLen), targets: [{ format: R.__getString(fmtPtr, fmtLen) }] },
+          primitive: { topology: R.__getString(topoPtr, topoLen) },
+        }));
+      },
+      // Texture: explicit typed params — no nested objects needed.
+      createTexture(deviceId, width, height, fmtPtr, fmtLen, usage) {
+        return __gpuStore(__gpuGet(deviceId).createTexture({
+          size: { width, height },
+          format: R.__getString(fmtPtr, fmtLen),
+          usage,
+        }));
+      },
+      // Compute pipeline: WASM writes [shaderModuleId:u32, entryPointPtr:u32, entryPointLen:u32]
+      // followed by optional pipelineLayoutId (0 = auto). Flat binary — no nested objects.
+      createComputePipeline(deviceId, shaderModuleId, entryPtr, entryLen, layoutId) {
+        const desc = { compute: { module: __gpuGet(shaderModuleId), entryPoint: R.__getString(entryPtr, entryLen) } };
+        if (layoutId) desc.layout = __gpuGet(layoutId);
+        else desc.layout = 'auto';
+        return __gpuStore(__gpuGet(deviceId).createComputePipeline(desc));
+      },
+      // Pipeline layout: WASM passes up to 4 bind group layout IDs (0 = unused).
+      createPipelineLayout(deviceId, bgl0, bgl1, bgl2, bgl3) {
+        const bgls = [bgl0, bgl1, bgl2, bgl3].filter(id => id).map(id => __gpuGet(id));
+        return __gpuStore(__gpuGet(deviceId).createPipelineLayout({ bindGroupLayouts: bgls }));
+      },
+      // Bind group layout: WASM writes entries as flat tuples at descPtr.
+      // [entryCount:u32, then per entry: binding:u32, visibility:u32, bufferType:u32]
+      // bufferType: 0=uniform, 1=storage, 2=read-only-storage, 3=sampler, 4=texture
+      createBindGroupLayout(deviceId, descPtr) {
+        const dv = new DataView(R.__memory.buffer);
+        const count = dv.getUint32(descPtr, true);
+        const entries = [];
+        for (let i = 0; i < count; i++) {
+          const off = descPtr + 4 + i * 12;
+          const binding = dv.getUint32(off, true);
+          const visibility = dv.getUint32(off + 4, true);
+          const btype = dv.getUint32(off + 8, true);
+          const entry = { binding, visibility };
+          if (btype <= 2) entry.buffer = { type: ['uniform','storage','read-only-storage'][btype] };
+          else if (btype === 3) entry.sampler = { type: 'filtering' };
+          else if (btype === 4) entry.texture = { sampleType: 'float' };
+          entries.push(entry);
+        }
+        return __gpuStore(__gpuGet(deviceId).createBindGroupLayout({ entries }));
+      },
+      // Bind group: WASM writes [layoutId:u32, entryCount:u32, then per entry:
+      //   binding:u32, resourceType:u32, resourceId:u32, offset:u32, size:u32]
+      // resourceType: 0=buffer(whole), 1=buffer(range), 2=sampler, 3=textureView
+      createBindGroup(deviceId, descPtr) {
+        const dv = new DataView(R.__memory.buffer);
+        const layoutId = dv.getUint32(descPtr, true);
+        const count = dv.getUint32(descPtr + 4, true);
+        const entries = [];
+        for (let i = 0; i < count; i++) {
+          const off = descPtr + 8 + i * 20;
+          const binding = dv.getUint32(off, true);
+          const rtype = dv.getUint32(off + 4, true);
+          const rid = dv.getUint32(off + 8, true);
+          const roff = dv.getUint32(off + 12, true);
+          const rsize = dv.getUint32(off + 16, true);
+          let resource;
+          if (rtype === 0) resource = { buffer: __gpuGet(rid) };
+          else if (rtype === 1) resource = { buffer: __gpuGet(rid), offset: roff, size: rsize };
+          else if (rtype === 2) resource = __gpuGet(rid); // sampler
+          else resource = __gpuGet(rid); // textureView
+          entries.push({ binding, resource });
+        }
+        return __gpuStore(__gpuGet(deviceId).createBindGroup({ layout: __gpuGet(layoutId), entries }));
       },
 
       // ── Rendering ──
-      beginRenderPass(deviceId, descPtr) {
+      // Begin render pass with explicit params. Builds colorAttachments and optional depth.
+      // clearR/G/B/A are f32 clear color values. depthViewId = 0 means no depth attachment.
+      beginRenderPass(deviceId, textureViewId, clearR, clearG, clearB, clearA, depthViewId) {
         const encoder = __gpuGet(deviceId).createCommandEncoder();
-        const pass = encoder.beginRenderPass(R.__readOpts(descPtr));
+        const desc = {
+          colorAttachments: [{
+            view: __gpuGet(textureViewId),
+            loadOp: 'clear',
+            storeOp: 'store',
+            clearValue: { r: clearR, g: clearG, b: clearB, a: clearA },
+          }],
+        };
+        if (depthViewId) {
+          desc.depthStencilAttachment = {
+            view: __gpuGet(depthViewId),
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+          };
+        }
+        const pass = encoder.beginRenderPass(desc);
         const eid = __gpuStore(encoder);
-        __gpuObjects.set(eid + 0.5, pass); // store pass alongside encoder
+        __gpuObjects.set(eid + 0.5, pass);
         return eid;
       },
       setPipeline(encoderId, pipelineId) {
@@ -838,10 +971,38 @@ export const wasmImports = {
       setVertexBuffer(encoderId, slot, bufferId) {
         __gpuObjects.get(encoderId + 0.5).setVertexBuffer(slot, __gpuGet(bufferId));
       },
+      setBindGroup(encoderId, index, bindGroupId) {
+        __gpuObjects.get(encoderId + 0.5).setBindGroup(index, __gpuGet(bindGroupId));
+      },
+      setIndexBuffer(encoderId, bufferId, fmtPtr, fmtLen) {
+        __gpuObjects.get(encoderId + 0.5).setIndexBuffer(__gpuGet(bufferId), R.__getString(fmtPtr, fmtLen));
+      },
       draw(encoderId, vertexCount, instanceCount, firstVertex, firstInstance) {
         __gpuObjects.get(encoderId + 0.5).draw(vertexCount, instanceCount, firstVertex, firstInstance);
       },
+      drawIndexed(encoderId, indexCount, instanceCount, firstIndex, baseVertex, firstInstance) {
+        __gpuObjects.get(encoderId + 0.5).drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
+      },
       submitRenderPass(encoderId, deviceId) {
+        __gpuObjects.get(encoderId + 0.5).end();
+        const cmdBuf = __gpuGet(encoderId).finish();
+        __gpuGet(deviceId).queue.submit([cmdBuf]);
+        __gpuDelete(encoderId + 0.5);
+        __gpuDelete(encoderId);
+      },
+
+      // ── Compute ──
+      beginComputePass(deviceId) {
+        const encoder = __gpuGet(deviceId).createCommandEncoder();
+        const pass = encoder.beginComputePass();
+        const eid = __gpuStore(encoder);
+        __gpuObjects.set(eid + 0.5, pass);
+        return eid;
+      },
+      dispatchWorkgroups(encoderId, x, y, z) {
+        __gpuObjects.get(encoderId + 0.5).dispatchWorkgroups(x, y || 1, z || 1);
+      },
+      submitComputePass(encoderId, deviceId) {
         __gpuObjects.get(encoderId + 0.5).end();
         const cmdBuf = __gpuGet(encoderId).finish();
         __gpuGet(deviceId).queue.submit([cmdBuf]);

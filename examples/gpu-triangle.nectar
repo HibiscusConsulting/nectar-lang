@@ -1,0 +1,28 @@
+// GPU Triangle — end-to-end WebGPU integration test
+// Exercises: canvas element, shader module, render pipeline, buffer, render pass, draw
+// Compile: nectar build examples/gpu-triangle.nectar --emit-wasm
+
+component GpuTriangle() {
+    let mut status: String = "Click Initialize to start WebGPU";
+    let mut device_id: i32 = 0;
+    let mut pipeline_id: i32 = 0;
+    let mut ctx_id: i32 = 0;
+
+    fn init_gpu(&mut self) {
+        self.status = "Requesting GPU adapter...";
+        // 0 = no options ptr, 1 = callback index for on_adapter
+        gpu::request_adapter("high-performance", 1);
+    }
+
+    render {
+        <div style="font-family: system-ui, -apple-system, sans-serif; padding: 24px; color: #fafafa; background: #09090b; min-height: 100vh">
+            <h2>"WebGPU Triangle"</h2>
+            <p style="color: #71717a">"End-to-end GPU syscall integration test"</p>
+            <p>{self.status}</p>
+            <div style="margin-top: 16px">
+                <button on:click={self.init_gpu} style="padding: 8px 16px; background: #f97316; color: #000; border-radius: 6px; cursor: pointer">"Initialize GPU"</button>
+            </div>
+            <canvas width="800" height="600" style="margin-top: 16px; border: 1px solid #27272a; border-radius: 8px"> </canvas>
+        </div>
+    }
+}

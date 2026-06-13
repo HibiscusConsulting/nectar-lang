@@ -1,0 +1,378 @@
+// Spatial Document Model — 3D/4D layout demo
+// Same .nectar source renders in 2D (Honeycomb) and 3D (Sykla)
+// depth collapses to 0 in 2D mode — zero cost when unused
+
+struct Project {
+    name: String,
+    category: String,
+    status: String,
+    progress: i32,
+    color: String,
+    depth_offset: i32,
+}
+
+component SpatialShowroom() {
+    let mut active_view: String = "grid";
+    let mut active_cat: String = "All";
+    let mut selected_idx: i32 = -1;
+    let mut camera_z: i32 = 600;
+    let mut last_op_ms: String = "—";
+
+    let mut projects: [Project] = [
+        Project { name: "Nectar Compiler",   category: "Core",     status: "Active",   progress: 78, color: "#f97316", depth_offset: 0 },
+        Project { name: "Honeycomb Engine",   category: "Core",     status: "Active",   progress: 65, color: "#eab308", depth_offset: 40 },
+        Project { name: "Pollen Runtime",     category: "Core",     status: "Active",   progress: 42, color: "#22c55e", depth_offset: 80 },
+        Project { name: "Sykla 3D Engine",    category: "Core",     status: "Active",   progress: 31, color: "#06b6d4", depth_offset: 120 },
+        Project { name: "PayHive",            category: "App",      status: "Shipped",  progress: 100, color: "#a855f7", depth_offset: 0 },
+        Project { name: "Hive Listings",      category: "App",      status: "Active",   progress: 85, color: "#ec4899", depth_offset: 40 },
+        Project { name: "Deploy Platform",    category: "Infra",    status: "Planning", progress: 15, color: "#64748b", depth_offset: 0 },
+        Project { name: "Edge Runtime",       category: "Infra",    status: "Active",   progress: 55, color: "#0ea5e9", depth_offset: 40 },
+        Project { name: "Package Registry",   category: "Infra",    status: "Planning", progress: 8,  color: "#78716c", depth_offset: 80 },
+        Project { name: "Component Library",  category: "Lib",      status: "Active",   progress: 38, color: "#f43f5e", depth_offset: 0 },
+        Project { name: "Canvas Widgets",     category: "Lib",      status: "Active",   progress: 52, color: "#fb923c", depth_offset: 40 },
+        Project { name: "Alipay Bridge",      category: "Provider", status: "Active",   progress: 70, color: "#14b8a6", depth_offset: 0 },
+        Project { name: "Moov Payments",      category: "Provider", status: "Active",   progress: 60, color: "#8b5cf6", depth_offset: 40 },
+        Project { name: "Bloom IDE",          category: "Tool",     status: "Planning", progress: 5,  color: "#6366f1", depth_offset: 0 },
+        Project { name: "LSP Server",         category: "Tool",     status: "Active",   progress: 72, color: "#2dd4bf", depth_offset: 40 },
+        Project { name: "WASM Browser",       category: "Vision",   status: "Design",   progress: 3,  color: "#e11d48", depth_offset: 0 },
+    ];
+
+    fn view_grid(&mut self) {
+        self.active_view = "grid";
+    }
+
+    fn view_stack(&mut self) {
+        self.active_view = "stack";
+    }
+
+    fn view_orbit(&mut self) {
+        self.active_view = "orbit";
+    }
+
+    fn view_timeline(&mut self) {
+        self.active_view = "timeline";
+    }
+
+    fn filter_all(&mut self) {
+        self.active_cat = "All";
+    }
+
+    fn filter_core(&mut self) {
+        self.active_cat = "Core";
+    }
+
+    fn filter_app(&mut self) {
+        self.active_cat = "App";
+    }
+
+    fn filter_infra(&mut self) {
+        self.active_cat = "Infra";
+    }
+
+    fn filter_lib(&mut self) {
+        self.active_cat = "Lib";
+    }
+
+    fn filter_provider(&mut self) {
+        self.active_cat = "Provider";
+    }
+
+    fn filter_tool(&mut self) {
+        self.active_cat = "Tool";
+    }
+
+    fn filter_vision(&mut self) {
+        self.active_cat = "Vision";
+    }
+
+    fn zoom_in(&mut self) {
+        self.camera_z = self.camera_z - 100;
+        if self.camera_z < 200 {
+            self.camera_z = 200;
+        }
+    }
+
+    fn zoom_out(&mut self) {
+        self.camera_z = self.camera_z + 100;
+        if self.camera_z > 1200 {
+            self.camera_z = 1200;
+        }
+    }
+
+    fn select_0(&mut self) { self.selected_idx = 0; }
+    fn select_1(&mut self) { self.selected_idx = 1; }
+    fn select_2(&mut self) { self.selected_idx = 2; }
+    fn select_3(&mut self) { self.selected_idx = 3; }
+    fn select_4(&mut self) { self.selected_idx = 4; }
+    fn select_5(&mut self) { self.selected_idx = 5; }
+    fn select_6(&mut self) { self.selected_idx = 6; }
+    fn select_7(&mut self) { self.selected_idx = 7; }
+    fn select_8(&mut self) { self.selected_idx = 8; }
+    fn select_9(&mut self) { self.selected_idx = 9; }
+    fn select_10(&mut self) { self.selected_idx = 10; }
+    fn select_11(&mut self) { self.selected_idx = 11; }
+    fn select_12(&mut self) { self.selected_idx = 12; }
+    fn select_13(&mut self) { self.selected_idx = 13; }
+    fn select_14(&mut self) { self.selected_idx = 14; }
+    fn select_15(&mut self) { self.selected_idx = 15; }
+
+    fn deselect(&mut self) {
+        self.selected_idx = -1;
+    }
+
+    fn sort_progress_high(&mut self) {
+        self.projects.sort_desc("progress");
+    }
+
+    fn sort_progress_low(&mut self) {
+        self.projects.sort_asc("progress");
+    }
+
+    fn sort_name(&mut self) {
+        self.projects.sort_asc("name");
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: hug; background-color: #09090b; gap: 0">
+
+            // ── Header ──
+            <div style="direction: horizontal; width: fill; height: 64px; background-color: #0f0f12; padding: 0 32; align: center; justify: space-between; border-color: #1e1e24; border-width: 0 0 1 0">
+                <div style="direction: horizontal; gap: 12; align: center; height: hug">
+                    <div style="font-size: 22px; font-weight: 700; color: #fafafa; width: hug; height: hug">"Spatial"</div>
+                    <div style="font-size: 11px; font-weight: 500; color: #09090b; background-color: #f97316; padding: 2 8; border-radius: 4; width: hug; height: hug">"4D"</div>
+                    <div style="font-size: 13px; color: #52525b; width: hug; height: hug">"Document Model"</div>
+                </div>
+
+                // Camera depth indicator
+                <div style="direction: horizontal; gap: 16; align: center; height: hug">
+                    <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                        <div style="font-size: 11px; color: #52525b; width: hug; height: hug">"CAMERA Z"</div>
+                        <div style="font-size: 15px; font-weight: 600; color: #a1a1aa; width: hug; height: hug">{self.camera_z}</div>
+                    </div>
+                    <div style="direction: horizontal; gap: 4; height: hug">
+                        <button on:click={self.zoom_in} style="font-size: 16px; font-weight: 700; color: #a1a1aa; background-color: #18181b; width: 36px; height: 36px; border-radius: 8; border-color: #27272a; border-width: 1; cursor: pointer; align: center; justify: center">"+"</button>
+                        <button on:click={self.zoom_out} style="font-size: 16px; font-weight: 700; color: #a1a1aa; background-color: #18181b; width: 36px; height: 36px; border-radius: 8; border-color: #27272a; border-width: 1; cursor: pointer; align: center; justify: center">"-"</button>
+                    </div>
+                </div>
+            </div>
+
+            // ── View Mode Tabs ──
+            <div style="direction: horizontal; width: fill; height: 48px; background-color: #0f0f12; padding: 0 32; align: center; gap: 2; border-color: #1e1e24; border-width: 0 0 1 0">
+                <button on:click={self.view_grid} style="font-size: 13px; font-weight: 500; color: #a1a1aa; background-color: #18181b; padding: 6 16; height: 34px; border-radius: 6; cursor: pointer; width: hug">"Grid (2D)"</button>
+                <button on:click={self.view_stack} style="font-size: 13px; font-weight: 500; color: #a1a1aa; background-color: #18181b; padding: 6 16; height: 34px; border-radius: 6; cursor: pointer; width: hug">"Stack (Z-axis)"</button>
+                <button on:click={self.view_orbit} style="font-size: 13px; font-weight: 500; color: #a1a1aa; background-color: #18181b; padding: 6 16; height: 34px; border-radius: 6; cursor: pointer; width: hug">"Orbit (3D)"</button>
+                <button on:click={self.view_timeline} style="font-size: 13px; font-weight: 500; color: #a1a1aa; background-color: #18181b; padding: 6 16; height: 34px; border-radius: 6; cursor: pointer; width: hug">"Timeline (4D)"</button>
+
+                <div style="width: fill; height: 1px"> </div>
+
+                // Sort controls
+                <div style="direction: horizontal; gap: 4; height: hug; align: center">
+                    <div style="font-size: 11px; color: #52525b; width: hug; height: hug; padding: 0 8">"SORT"</div>
+                    <button on:click={self.sort_progress_high} style="font-size: 12px; color: #71717a; background-color: #18181b; padding: 4 10; height: 28px; border-radius: 4; cursor: pointer; width: hug">"Progress"</button>
+                    <button on:click={self.sort_name} style="font-size: 12px; color: #71717a; background-color: #18181b; padding: 4 10; height: 28px; border-radius: 4; cursor: pointer; width: hug">"Name"</button>
+                </div>
+            </div>
+
+            // ── Filter Pills ──
+            <div style="direction: horizontal; width: fill; height: 44px; background-color: #0c0c0f; padding: 0 32; align: center; gap: 6">
+                <div style="font-size: 11px; color: #52525b; width: hug; height: hug; padding: 0 4">"FILTER"</div>
+                <button on:click={self.filter_all} style="font-size: 12px; font-weight: 500; color: #d4d4d8; background-color: #27272a; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"All"</button>
+                <button on:click={self.filter_core} style="font-size: 12px; font-weight: 500; color: #f97316; background-color: #1c1410; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Core"</button>
+                <button on:click={self.filter_app} style="font-size: 12px; font-weight: 500; color: #a855f7; background-color: #1a1025; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"App"</button>
+                <button on:click={self.filter_infra} style="font-size: 12px; font-weight: 500; color: #0ea5e9; background-color: #0c1a24; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Infra"</button>
+                <button on:click={self.filter_lib} style="font-size: 12px; font-weight: 500; color: #f43f5e; background-color: #1c0f14; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Lib"</button>
+                <button on:click={self.filter_provider} style="font-size: 12px; font-weight: 500; color: #14b8a6; background-color: #0c1c1a; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Provider"</button>
+                <button on:click={self.filter_tool} style="font-size: 12px; font-weight: 500; color: #2dd4bf; background-color: #0c1c1a; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Tool"</button>
+                <button on:click={self.filter_vision} style="font-size: 12px; font-weight: 500; color: #e11d48; background-color: #1c0c14; padding: 4 12; height: 26px; border-radius: 13; cursor: pointer; width: hug">"Vision"</button>
+
+                <div style="width: fill; height: 1px"> </div>
+
+                // Active view indicator
+                <div style="direction: horizontal; gap: 8; align: center; height: hug">
+                    <div style="font-size: 11px; color: #52525b; width: hug; height: hug">"VIEW"</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #f97316; width: hug; height: hug">{self.active_view}</div>
+                </div>
+            </div>
+
+            // ── Main Content: Project Cards ──
+            <div style="direction: vertical; width: fill; height: hug; padding: 24 32; gap: 16">
+
+                // Concept banner
+                <div style="direction: horizontal; width: fill; height: hug; background-color: #111116; border-radius: 12; padding: 20 24; gap: 24; align: center; border-color: #1e1e24; border-width: 1">
+                    <div style="direction: vertical; gap: 4; width: fill; height: hug">
+                        <div style="font-size: 15px; font-weight: 600; color: #fafafa; width: hug; height: hug">"One source. Four projections."</div>
+                        <div style="font-size: 13px; color: #71717a; width: fill; height: hug">"These cards are spatial cells. In 2D they render as a grid. In 3D they stack along the z-axis with real depth. In 4D, time becomes a navigable dimension. The compiler projects the same document model into each target."</div>
+                    </div>
+                    <div style="direction: vertical; gap: 2; width: hug; height: hug; padding: 0 16">
+                        <div style="font-size: 11px; color: #52525b; width: hug; height: hug">"PROJECTIONS"</div>
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug">"1D — Screen reader"</div>
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug">"2D — Honeycomb canvas"</div>
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug">"3D — Sykla engine"</div>
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug">"4D — Temporal navigation"</div>
+                    </div>
+                </div>
+
+                // ── GRID VIEW (2D) ──
+                {if self.active_view == "grid" {
+                    <div style="direction: horizontal; width: fill; height: hug; gap: 12; wrap: true">
+                        {for project in self.projects {
+                            {if self.active_cat == "All" || project.category == self.active_cat {
+                                <div style="direction: vertical; width: 280px; height: hug; background-color: #111116; border-radius: 10; padding: 16; gap: 10; border-color: #1e1e24; border-width: 1">
+                                    <div style="direction: horizontal; width: fill; height: hug; align: center; justify: space-between">
+                                        <div style="font-size: 14px; font-weight: 600; color: #fafafa; width: hug; height: hug">{project.name}</div>
+                                        <div style="width: 8px; height: 8px; border-radius: 4; background-color: {project.color}"> </div>
+                                    </div>
+                                    <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                        <div style="font-size: 11px; font-weight: 500; color: {project.color}; background-color: #18181b; padding: 2 8; border-radius: 4; width: hug; height: hug">{project.category}</div>
+                                        <div style="font-size: 11px; color: #52525b; width: hug; height: hug">{project.status}</div>
+                                    </div>
+                                    <div style="direction: vertical; width: fill; height: hug; gap: 4">
+                                        <div style="direction: horizontal; width: fill; height: hug; justify: space-between">
+                                            <div style="font-size: 11px; color: #52525b; width: hug; height: hug">"Progress"</div>
+                                            <div style="font-size: 11px; color: #71717a; width: hug; height: hug">{project.progress}</div>
+                                        </div>
+                                        <div style="width: fill; height: 4px; background-color: #1e1e24; border-radius: 2">
+                                            <div style="width: fill; height: 4px; background-color: {project.color}; border-radius: 2; opacity: 0.6"> </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }}
+                        }}
+                    </div>
+                }}
+
+                // ── STACK VIEW (Z-axis) — cards stacked vertically with depth offset as left padding ──
+                {if self.active_view == "stack" {
+                    <div style="direction: vertical; width: fill; height: hug; gap: 4">
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug; padding: 0 0 8 0">"Z-axis projection — depth offset shown as horizontal indent. Cards with greater depth are further from the viewer."</div>
+                        {for project in self.projects {
+                            {if self.active_cat == "All" || project.category == self.active_cat {
+                                <div style="direction: horizontal; width: fill; height: 48px; background-color: #111116; border-radius: 6; padding: 0 16; align: center; gap: 16; border-color: #1e1e24; border-width: 1">
+                                    <div style="width: 8px; height: 8px; border-radius: 4; background-color: {project.color}"> </div>
+                                    <div style="font-size: 13px; font-weight: 600; color: #fafafa; width: 180px; height: hug">{project.name}</div>
+                                    <div style="font-size: 11px; color: {project.color}; width: 80px; height: hug">{project.category}</div>
+                                    <div style="font-size: 11px; color: #52525b; width: 60px; height: hug">{project.status}</div>
+                                    <div style="width: fill; height: 4px; background-color: #1e1e24; border-radius: 2">
+                                        <div style="width: fill; height: 4px; background-color: {project.color}; border-radius: 2; opacity: 0.5"> </div>
+                                    </div>
+                                    <div style="font-size: 12px; color: #71717a; width: 40px; height: hug">{project.progress}</div>
+                                    <div style="direction: horizontal; gap: 4; width: hug; height: hug; align: center">
+                                        <div style="font-size: 9px; color: #3f3f46; width: hug; height: hug">"z:"</div>
+                                        <div style="font-size: 11px; color: #52525b; width: hug; height: hug">{project.depth_offset}</div>
+                                    </div>
+                                </div>
+                            }}
+                        }}
+                    </div>
+                }}
+
+                // ── ORBIT VIEW (3D) — centered column simulating perspective/focus ──
+                {if self.active_view == "orbit" {
+                    <div style="direction: vertical; width: fill; height: hug; gap: 8; align: center">
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug; padding: 0 0 8 0">"3D orbit projection — cards arranged by depth layer. Camera Z controls perspective distance."</div>
+                        {for project in self.projects {
+                            {if self.active_cat == "All" || project.category == self.active_cat {
+                                <div style="direction: horizontal; width: fill; max-width: 600px; height: hug; background-color: #111116; border-radius: 10; padding: 20 24; gap: 20; align: center; border-color: {project.color}; border-width: 1">
+                                    <div style="direction: vertical; gap: 4; width: fill; height: hug">
+                                        <div style="font-size: 16px; font-weight: 700; color: #fafafa; width: hug; height: hug">{project.name}</div>
+                                        <div style="direction: horizontal; gap: 8; height: hug; align: center">
+                                            <div style="font-size: 11px; font-weight: 500; color: {project.color}; background-color: #18181b; padding: 2 8; border-radius: 4; width: hug; height: hug">{project.category}</div>
+                                            <div style="font-size: 11px; color: #52525b; width: hug; height: hug">{project.status}</div>
+                                        </div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; width: hug; height: hug; align: center">
+                                        <div style="font-size: 28px; font-weight: 700; color: {project.color}; width: hug; height: hug">{project.progress}</div>
+                                        <div style="font-size: 9px; color: #3f3f46; width: hug; height: hug">"PROGRESS"</div>
+                                    </div>
+                                    <div style="direction: vertical; gap: 2; width: hug; height: hug; align: center">
+                                        <div style="font-size: 14px; font-weight: 600; color: #52525b; width: hug; height: hug">{project.depth_offset}</div>
+                                        <div style="font-size: 9px; color: #3f3f46; width: hug; height: hug">"DEPTH"</div>
+                                    </div>
+                                </div>
+                            }}
+                        }}
+                    </div>
+                }}
+
+                // ── TIMELINE VIEW (4D) — horizontal bars representing temporal extent ──
+                {if self.active_view == "timeline" {
+                    <div style="direction: vertical; width: fill; height: hug; gap: 6">
+                        <div style="font-size: 11px; color: #3f3f46; width: hug; height: hug; padding: 0 0 8 0">"4D temporal projection — progress as position on the time axis. Width represents temporal extent (active duration)."</div>
+                        // Time axis header
+                        <div style="direction: horizontal; width: fill; height: 20px; padding: 0 120 0 0; justify: space-between">
+                            <div style="font-size: 9px; color: #27272a; width: hug; height: hug">"t₀"</div>
+                            <div style="font-size: 9px; color: #27272a; width: hug; height: hug">"25%"</div>
+                            <div style="font-size: 9px; color: #27272a; width: hug; height: hug">"50%"</div>
+                            <div style="font-size: 9px; color: #27272a; width: hug; height: hug">"75%"</div>
+                            <div style="font-size: 9px; color: #27272a; width: hug; height: hug">"t₁"</div>
+                        </div>
+                        {for project in self.projects {
+                            {if self.active_cat == "All" || project.category == self.active_cat {
+                                <div style="direction: horizontal; width: fill; height: 36px; align: center; gap: 0">
+                                    <div style="font-size: 11px; color: #71717a; width: 120px; height: hug">{project.name}</div>
+                                    <div style="width: fill; height: 20px; background-color: #0c0c0f; border-radius: 3">
+                                        <div style="width: fill; height: 20px; background-color: {project.color}; border-radius: 3; opacity: 0.3"> </div>
+                                    </div>
+                                </div>
+                            }}
+                        }}
+                    </div>
+                }}
+
+                // ── Projection Comparison ──
+                <div style="direction: vertical; width: fill; height: hug; gap: 12; padding: 16 0 0 0">
+                    <div style="font-size: 13px; font-weight: 600; color: #71717a; width: hug; height: hug">"PROJECTION COMPARISON"</div>
+
+                    <div style="direction: horizontal; width: fill; height: hug; gap: 12; wrap: true">
+                        // 1D projection card
+                        <div style="direction: vertical; width: 220px; height: hug; background-color: #111116; border-radius: 8; padding: 14; gap: 8; border-color: #1e1e24; border-width: 1">
+                            <div style="direction: horizontal; gap: 6; align: center; height: hug">
+                                <div style="font-size: 18px; font-weight: 700; color: #52525b; width: hug; height: hug">"1D"</div>
+                                <div style="font-size: 12px; color: #3f3f46; width: hug; height: hug">"Screen Reader"</div>
+                            </div>
+                            <div style="font-size: 11px; color: #3f3f46; width: fill; height: hug">"Linearized content order. Depth and position collapse. Pure semantic tree."</div>
+                            <div style="font-size: 10px; color: #27272a; width: hug; height: hug">"aria-label, role, tabindex"</div>
+                        </div>
+
+                        // 2D projection card
+                        <div style="direction: vertical; width: 220px; height: hug; background-color: #111116; border-radius: 8; padding: 14; gap: 8; border-color: #f97316; border-width: 1">
+                            <div style="direction: horizontal; gap: 6; align: center; height: hug">
+                                <div style="font-size: 18px; font-weight: 700; color: #f97316; width: hug; height: hug">"2D"</div>
+                                <div style="font-size: 12px; color: #a1a1aa; width: hug; height: hug">"Honeycomb Canvas"</div>
+                            </div>
+                            <div style="font-size: 11px; color: #71717a; width: fill; height: hug">"Current view. Depth collapses to z-index ordering. Camera locked orthographic."</div>
+                            <div style="font-size: 10px; color: #f97316; width: hug; height: hug">"← you are here"</div>
+                        </div>
+
+                        // 3D projection card
+                        <div style="direction: vertical; width: 220px; height: hug; background-color: #111116; border-radius: 8; padding: 14; gap: 8; border-color: #1e1e24; border-width: 1">
+                            <div style="direction: horizontal; gap: 6; align: center; height: hug">
+                                <div style="font-size: 18px; font-weight: 700; color: #52525b; width: hug; height: hug">"3D"</div>
+                                <div style="font-size: 12px; color: #3f3f46; width: hug; height: hug">"Sykla Engine"</div>
+                            </div>
+                            <div style="font-size: 11px; color: #3f3f46; width: fill; height: hug">"Full spatial layout. Real depth, occlusion, perspective. Free camera orbit."</div>
+                            <div style="font-size: 10px; color: #27272a; width: hug; height: hug">"wgpu + WGSL shaders"</div>
+                        </div>
+
+                        // 4D projection card
+                        <div style="direction: vertical; width: 220px; height: hug; background-color: #111116; border-radius: 8; padding: 14; gap: 8; border-color: #1e1e24; border-width: 1">
+                            <div style="direction: horizontal; gap: 6; align: center; height: hug">
+                                <div style="font-size: 18px; font-weight: 700; color: #52525b; width: hug; height: hug">"4D"</div>
+                                <div style="font-size: 12px; color: #3f3f46; width: hug; height: hug">"Temporal Navigation"</div>
+                            </div>
+                            <div style="font-size: 11px; color: #3f3f46; width: fill; height: hug">"3D + time axis. Scrub state history spatially. Undo is camera movement."</div>
+                            <div style="font-size: 10px; color: #27272a; width: hug; height: hug">"t₀ → t₁ interpolation"</div>
+                        </div>
+                    </div>
+                </div>
+
+                // ── Architecture Note ──
+                <div style="direction: vertical; width: fill; height: hug; background-color: #0c0c0f; border-radius: 8; padding: 16; gap: 6; border-color: #1e1e24; border-width: 1">
+                    <div style="font-size: 12px; font-weight: 600; color: #52525b; width: hug; height: hug">"ZERO-COST WHEN UNUSED"</div>
+                    <div style="font-size: 12px; color: #3f3f46; width: fill; height: hug">"depth defaults to 0. A cell with zero depth IS a rectangle. The compiler emits identical WASM to the current 2D path — no added bytes, no added instructions. Spatial is an opt-in codegen branch, like generics and monomorphization."</div>
+                </div>
+
+            </div>
+        </div>
+    }
+}

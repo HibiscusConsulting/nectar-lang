@@ -44,6 +44,9 @@ pub struct RustCodegen {
     proto_counter: u32, // counter for prototype variable names
     proto_use_idx: u32, // which prototype to use next (reset per loop iteration)
     proto_base: u32, // first prototype index for current for-loop
+    struct_field_types: std::collections::HashMap<String, std::collections::HashMap<String, String>>, // struct_name → field_name → rust_type
+    for_loop_struct_type: Option<String>, // struct type of current for-loop items (e.g. "Project")
+    comp_field_types: std::collections::HashMap<String, crate::ast::Type>, // component state field name → type
 }
 
 impl RustCodegen {
@@ -65,6 +68,9 @@ impl RustCodegen {
             proto_counter: 0,
             proto_use_idx: 0,
             proto_base: 0,
+            struct_field_types: std::collections::HashMap::new(),
+            for_loop_struct_type: None,
+            comp_field_types: std::collections::HashMap::new(),
         }
     }
 
@@ -81,6 +87,18 @@ impl RustCodegen {
     }
 
     pub fn generate(&mut self, program: &Program) -> String {
+        // Build struct field type map before emitting anything — needed for
+        // correct text_borrowed handling (i32 vs &str) and sort dispatch.
+        for item in &program.items {
+            if let Item::Struct(s) = item {
+                let mut fields = std::collections::HashMap::new();
+                for field in &s.fields {
+                    fields.insert(field.name.clone(), self.type_to_rust(&field.ty));
+                }
+                self.struct_field_types.insert(s.name.clone(), fields);
+            }
+        }
+
         self.emit_prelude();
 
         for item in &program.items {
@@ -697,6 +715,14 @@ impl RustCodegen {
         let name = &comp.name;
         self.current_comp = name.clone();
 
+        // Build component field type map for for-loop struct type resolution
+        self.comp_field_types.clear();
+        for field in &comp.state {
+            if let Some(ref ty) = field.ty {
+                self.comp_field_types.insert(field.name.clone(), ty.clone());
+            }
+        }
+
         // Component state struct
         self.line(&format!("struct {}State {{", name));
         self.indent += 1;
@@ -945,7 +971,14 @@ impl RustCodegen {
                             let is_borrowed = self.in_for_loop && matches!(&**expr,
                                 Expr::FieldAccess { object, .. } if !matches!(**object, Expr::SelfExpr));
                             if is_borrowed {
-                                self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}", var, rust_expr));
+                                // Check field type: &str fields use text_borrowed, numeric fields need formatting
+                                let field_name = if let Expr::FieldAccess { field, .. } = &**expr { Some(field.as_str()) } else { None };
+                                let is_numeric = field_name.map_or(false, |f| self.is_numeric_field(f));
+                                if is_numeric {
+                                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(format!(\"{{}}\", {})); }}", var, rust_expr));
+                                } else {
+                                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}", var, rust_expr));
+                                }
                             } else {
                                 self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
                             }
@@ -1013,7 +1046,14 @@ impl RustCodegen {
                 let is_borrowed = self.in_for_loop && matches!(&**expr,
                     Expr::FieldAccess { object, .. } if !matches!(**object, Expr::SelfExpr));
                 if is_borrowed {
-                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}", var, rust_expr));
+                    // Check field type: &str fields use text_borrowed, numeric fields need formatting
+                    let field_name = if let Expr::FieldAccess { field, .. } = &**expr { Some(field.as_str()) } else { None };
+                    let is_numeric = field_name.map_or(false, |f| self.is_numeric_field(f));
+                    if is_numeric {
+                        self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(format!(\"{{}}\", {})); }}", var, rust_expr));
+                    } else {
+                        self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}", var, rust_expr));
+                    }
                 } else {
                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
                 }
@@ -1056,6 +1096,19 @@ impl RustCodegen {
             }
             TemplateNode::TemplateFor { binding, iterator, children, .. } => {
                 let iter_rust = self.expr_to_rust(iterator, comp_name);
+
+                // Resolve the struct type for items in this for-loop.
+                // e.g. `for project in self.projects` where projects: [Project] → struct type "Project"
+                let prev_for_struct = self.for_loop_struct_type.take();
+                if let Expr::FieldAccess { field, .. } = &**iterator {
+                    if let Some(ty) = self.comp_field_types.get(field) {
+                        if let crate::ast::Type::Array(inner) = ty {
+                            if let crate::ast::Type::Named(struct_name) = &**inner {
+                                self.for_loop_struct_type = Some(struct_name.clone());
+                            }
+                        }
+                    }
+                }
 
                 // Prototype optimization: create prototype Elements BEFORE the loop.
                 // Each static element's styles are parsed once into a prototype,
@@ -1129,6 +1182,7 @@ impl RustCodegen {
                 self.indent -= 1;
                 self.line("}");
                 self.in_for_loop = false; // reset after loop
+                self.for_loop_struct_type = prev_for_struct; // restore parent context
             }
             TemplateNode::TemplateIf { condition, then_children, else_children } => {
                 // Check if this is a standalone conditional (not inside a for-loop)
@@ -1595,10 +1649,22 @@ impl RustCodegen {
                     format!("{{ let _s = &{}; let _start = ({}) as usize; let _end = ({}) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or(\"\").to_string() }}", obj, a[0], a[1])
                 } else if method == "sort_asc" && a.len() == 1 {
                     let field = a[0].trim_matches('"');
-                    format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}", obj=obj, field=field)
+                    // Auto-detect field type from the struct definition.
+                    // Resolve struct type from the collection object (e.g. self.projects → [Project] → Project)
+                    let is_str = self.resolve_sort_field_is_string(object, field);
+                    if is_str {
+                        format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.to_string()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    } else {
+                        format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}", obj=obj, field=field)
+                    }
                 } else if method == "sort_desc" && a.len() == 1 {
                     let field = a[0].trim_matches('"');
-                    format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}", obj=obj, field=field)
+                    let is_str = self.resolve_sort_field_is_string(object, field);
+                    if is_str {
+                        format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.to_string())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    } else {
+                        format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}", obj=obj, field=field)
+                    }
                 } else if method == "sort_str_asc" && a.len() == 1 {
                     // Argsort by string field — sort_by_cached_key caches cloned keys, avoids repeated field lookups
                     let field = a[0].trim_matches('"');
@@ -1645,10 +1711,15 @@ impl RustCodegen {
                 format!("{} = {}", t, v)
             }
             Expr::StructInit { name, fields } => {
+                // Check if this struct has String fields — if so, they're emitted as &'static str
+                // and string literals should NOT get .to_string()
+                let struct_has_str_fields = self.struct_field_types.get(name.as_str())
+                    .map_or(false, |f| f.values().any(|t| t == "String"));
                 let field_strs: Vec<String> = fields.iter().map(|(fname, fval)| {
                     let v = self.expr_to_rust(fval, comp_name);
-                    // String literal values in struct init need .to_string() for String fields
-                    if v.starts_with('"') {
+                    // String literal values: if struct uses &'static str, keep as literal;
+                    // otherwise add .to_string() for owned String fields
+                    if v.starts_with('"') && !struct_has_str_fields {
                         format!("{}: {}.to_string()", fname, v)
                     } else {
                         format!("{}: {}", fname, v)
@@ -1854,6 +1925,45 @@ impl RustCodegen {
         }
     }
 
+    /// Resolve whether a sort field is a string type by examining the collection's struct type.
+    /// e.g. for `self.projects.sort_asc("name")`, resolves Project.name → String → true.
+    fn resolve_sort_field_is_string(&self, collection_expr: &Expr, sort_field: &str) -> bool {
+        // Extract the component state field name from the collection expression
+        // e.g. Expr::FieldAccess { object: SelfExpr, field: "projects" }
+        if let Expr::FieldAccess { field: state_field, .. } = collection_expr {
+            if let Some(ty) = self.comp_field_types.get(state_field.as_str()) {
+                if let crate::ast::Type::Array(inner) = ty {
+                    if let crate::ast::Type::Named(struct_name) = &**inner {
+                        if let Some(fields) = self.struct_field_types.get(struct_name) {
+                            return fields.get(sort_field).map_or(false, |t| t == "String");
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Look up the Rust type of a struct field. Returns None if unknown.
+    fn struct_field_rust_type(&self, field_name: &str) -> Option<&str> {
+        if let Some(struct_name) = &self.for_loop_struct_type {
+            if let Some(fields) = self.struct_field_types.get(struct_name) {
+                return fields.get(field_name).map(|s| s.as_str());
+            }
+        }
+        None
+    }
+
+    /// Check if a struct field is a string type (String → &'static str in codegen)
+    fn is_string_field(&self, field_name: &str) -> bool {
+        matches!(self.struct_field_rust_type(field_name), Some("String"))
+    }
+
+    /// Check if a struct field is a numeric type (i32, i64, f32, f64)
+    fn is_numeric_field(&self, field_name: &str) -> bool {
+        matches!(self.struct_field_rust_type(field_name), Some("i32" | "i64" | "f32" | "f64"))
+    }
+
     fn type_to_rust(&self, ty: &Type) -> String {
         match ty {
             Type::Named(name) => {
@@ -1983,6 +2093,98 @@ mod tests {
         let out = cg.expr_to_rust(&expr, "Shop");
         assert!(out.contains(".category.clone()"), "should reference the correct field, got: {}", out);
         assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
+    }
+
+    // ── Struct field type resolution + sort auto-dispatch ──
+
+    #[test]
+    fn test_sort_asc_auto_dispatches_string_field() {
+        let mut cg = RustCodegen::new();
+        // Register a struct with a String field
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("name".to_string(), "String".to_string());
+        fields.insert("price".to_string(), "i32".to_string());
+        cg.struct_field_types.insert("Product".to_string(), fields);
+        // Register component field type: products: [Product]
+        cg.comp_field_types.insert("products".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))));
+
+        let expr = make_sort_call("products", "sort_asc", "name");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("sort_by_cached_key"), "sort_asc on String field should auto-dispatch to string sort, got: {}", out);
+        assert!(!out.contains("as i32"), "sort_asc on String field should NOT cast to i32, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_asc_keeps_i32_for_numeric_field() {
+        let mut cg = RustCodegen::new();
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("name".to_string(), "String".to_string());
+        fields.insert("price".to_string(), "i32".to_string());
+        cg.struct_field_types.insert("Product".to_string(), fields);
+        cg.comp_field_types.insert("products".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))));
+
+        let expr = make_sort_call("products", "sort_asc", "price");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("Vec<i32>"), "sort_asc on i32 field should use Vec<i32>, got: {}", out);
+        assert!(out.contains("as i32"), "sort_asc on i32 field should cast to i32, got: {}", out);
+    }
+
+    #[test]
+    fn test_sort_desc_auto_dispatches_string_field() {
+        let mut cg = RustCodegen::new();
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("category".to_string(), "String".to_string());
+        cg.struct_field_types.insert("Item".to_string(), fields);
+        cg.comp_field_types.insert("items".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Item".to_string()))));
+
+        let expr = make_sort_call("items", "sort_desc", "category");
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        assert!(out.contains("Reverse"), "sort_desc on String field should use Reverse, got: {}", out);
+        assert!(out.contains("sort_by_cached_key"), "sort_desc on String field should use cached key sort, got: {}", out);
+    }
+
+    #[test]
+    fn test_struct_field_type_lookup() {
+        let mut cg = RustCodegen::new();
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("name".to_string(), "String".to_string());
+        fields.insert("count".to_string(), "i32".to_string());
+        fields.insert("ratio".to_string(), "f64".to_string());
+        cg.struct_field_types.insert("Data".to_string(), fields);
+        cg.for_loop_struct_type = Some("Data".to_string());
+
+        assert!(cg.is_string_field("name"), "name should be detected as string field");
+        assert!(cg.is_numeric_field("count"), "count should be detected as numeric field");
+        assert!(cg.is_numeric_field("ratio"), "ratio should be detected as numeric field");
+        assert!(!cg.is_string_field("count"), "count should NOT be detected as string field");
+        assert!(!cg.is_numeric_field("name"), "name should NOT be detected as numeric field");
+    }
+
+    // ── Struct init string handling ──
+
+    #[test]
+    fn test_struct_init_static_str_fields() {
+        let mut cg = RustCodegen::new();
+        // Register struct with String fields → &'static str in codegen
+        let mut fields = std::collections::HashMap::new();
+        fields.insert("name".to_string(), "String".to_string());
+        fields.insert("value".to_string(), "i32".to_string());
+        cg.struct_field_types.insert("Item".to_string(), fields);
+
+        let expr = Expr::StructInit {
+            name: "Item".to_string(),
+            fields: vec![
+                ("name".to_string(), Expr::StringLit("hello".to_string())),
+                ("value".to_string(), Expr::Integer(42)),
+            ],
+        };
+        let out = cg.expr_to_rust(&expr, "TestComp");
+        // String fields should NOT have .to_string() when struct has &'static str
+        assert!(!out.contains(".to_string()"), "struct init with &'static str fields should not add .to_string(), got: {}", out);
+        assert!(out.contains("name: \"hello\""), "should have bare string literal, got: {}", out);
     }
 
     // ── Conditional pattern detection tests ──

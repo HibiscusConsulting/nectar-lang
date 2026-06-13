@@ -956,6 +956,156 @@ impl TypeChecker {
             });
         }
 
+        // Register GPU (WebGPU) namespace functions
+        {
+            // Initialization
+            self.fn_sigs.insert("gpu::request_adapter".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::I32], // power_preference, cbIdx
+                ret: Box::new(Ty::Unit), // async — calls back with adapter ID
+            });
+            self.fn_sigs.insert("gpu::request_device".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32], // adapterId, optsPtr, cbIdx
+                ret: Box::new(Ty::Unit), // async — calls back with device ID
+            });
+            self.fn_sigs.insert("gpu::configure_canvas".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::String_], // canvasElId, deviceId, format
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::get_preferred_format".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            // Resource creation
+            self.fn_sigs.insert("gpu::create_buffer".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32], // deviceId, size, usage
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::write_buffer".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bufferId, dataPtr, dataLen, offset
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::create_shader_module".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::String_], // deviceId, code
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_render_pipeline".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::String_, Ty::String_, Ty::String_, Ty::String_], // deviceId, shaderModuleId, vsEntry, fsEntry, topology, format
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_texture".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, width, height, format, usage
+                ret: Box::new(Ty::I32),
+            });
+            // Rendering
+            self.fn_sigs.insert("gpu::begin_render_pass".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::F32, Ty::F32, Ty::F32, Ty::F32, Ty::I32], // deviceId, viewId, r, g, b, a, depthViewId
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::set_pipeline".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::set_vertex_buffer".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::draw".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::submit_render_pass".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::get_current_texture".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_texture_view".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::destroy_buffer".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::destroy_texture".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            // Phase 3: compute, bind groups, indexed draw
+            self.fn_sigs.insert("gpu::create_compute_pipeline".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, shaderModuleId, entryPoint, layoutId
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_pipeline_layout".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bgl0, bgl1, bgl2, bgl3
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_bind_group_layout".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::create_bind_group".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::set_bind_group".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::set_index_buffer".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::String_],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::draw_indexed".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::begin_compute_pass".to_string(), Ty::Function {
+                params: vec![Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::dispatch_workgroups".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            self.fn_sigs.insert("gpu::submit_compute_pass".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+            // Usage flag constants
+            self.fn_sigs.insert("gpu::buffer_usage_vertex".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::buffer_usage_index".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::buffer_usage_uniform".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::buffer_usage_copy_dst".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::buffer_usage_storage".to_string(), Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I32),
+            });
+            self.fn_sigs.insert("gpu::buffer_usage".to_string(), Ty::Function {
+                params: vec![Ty::I32, Ty::I32],
+                ret: Box::new(Ty::I32),
+            });
+            // Binary fetch
+            self.fn_sigs.insert("http::fetch_binary".to_string(), Ty::Function {
+                params: vec![Ty::String_, Ty::I32],
+                ret: Box::new(Ty::Unit),
+            });
+        }
+
         // Register BigDecimal type and methods
         {
             // BigDecimal — arbitrary precision decimal

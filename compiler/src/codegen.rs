@@ -472,6 +472,7 @@ impl WasmCodegen {
             self.line("(import \"env\" \"set_text\" (func $http_addHeader (param i32 i32 i32 i32)))");
             self.line("(import \"env\" \"get_element_by_id\" (func $http_fetch (param i32 i32) (result i32)))");
             self.line("(import \"env\" \"set_text\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+            self.line("(import \"env\" \"set_text\" (func $http_fetchBinary (param i32 i32 i32)))");
         }
 
         // Time — routed to performance_now
@@ -625,6 +626,7 @@ impl WasmCodegen {
         self.line("(import \"env\" \"http_add_header\" (func $http_addHeader (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"http_fetch\" (func $http_fetch (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"http_fetch_with_callback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+        self.line("(import \"env\" \"http_fetch_binary\" (func $http_fetchBinary (param i32 i32 i32)))");
         // DB
         self.line("(import \"env\" \"db_open\" (func $db_open (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"db_put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
@@ -1233,6 +1235,7 @@ impl WasmCodegen {
         self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
         self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))");
         self.line("(import \"http\" \"fetchWithCallback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+        self.line("(import \"http\" \"fetchBinary\" (func $http_fetchBinary (param i32 i32 i32)))");
         }
 
         // ── Observe — IntersectionObserver + matchMedia ──────────────────────
@@ -1423,15 +1426,23 @@ impl WasmCodegen {
         if self.needs_gpu {
         self.line("");
         self.line(";; GPU — browser WebGPU APIs (adapter, device, buffers, pipelines, rendering)");
-        self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"requestDevice\" (func $gpu_requestDevice (param i32) (result i32)))");
+        // requestAdapter: (optsPtr, cbIdx) → void (async, calls back with adapter ID)
+        self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32)))");
+        // requestDevice: (adapterId, optsPtr, cbIdx) → void (async, calls back with device ID)
+        self.line("(import \"gpu\" \"requestDevice\" (func $gpu_requestDevice (param i32 i32 i32)))");
         self.line("(import \"gpu\" \"configureCanvas\" (func $gpu_configureCanvas (param i32 i32 i32 i32) (result i32)))");
         self.line("(import \"gpu\" \"createBuffer\" (func $gpu_createBuffer (param i32 i32 i32) (result i32)))");
         self.line("(import \"gpu\" \"writeBuffer\" (func $gpu_writeBuffer (param i32 i32 i32 i32 i32)))");
         self.line("(import \"gpu\" \"createShaderModule\" (func $gpu_createShaderModule (param i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createRenderPipeline\" (func $gpu_createRenderPipeline (param i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createTexture\" (func $gpu_createTexture (param i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"beginRenderPass\" (func $gpu_beginRenderPass (param i32 i32) (result i32)))");
+        // createRenderPipeline: deviceId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen
+        self.line("(import \"gpu\" \"createRenderPipeline\" (func $gpu_createRenderPipeline (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createRenderPipelineWithLayout\" (func $gpu_createRenderPipelineWithLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+        // createRenderPipelineWithVertexLayout: same as above + descPtr for vertex buffer layout
+        self.line("(import \"gpu\" \"createRenderPipelineWithVertexLayout\" (func $gpu_createRenderPipelineWithVertexLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+        // createTexture: deviceId, width, height, fmtPtr, fmtLen, usage
+        self.line("(import \"gpu\" \"createTexture\" (func $gpu_createTexture (param i32 i32 i32 i32 i32 i32) (result i32)))");
+        // beginRenderPass: deviceId, textureViewId, clearR, clearG, clearB, clearA, depthViewId
+        self.line("(import \"gpu\" \"beginRenderPass\" (func $gpu_beginRenderPass (param i32 i32 f32 f32 f32 f32 i32) (result i32)))");
         self.line("(import \"gpu\" \"setPipeline\" (func $gpu_setPipeline (param i32 i32)))");
         self.line("(import \"gpu\" \"setVertexBuffer\" (func $gpu_setVertexBuffer (param i32 i32 i32)))");
         self.line("(import \"gpu\" \"draw\" (func $gpu_draw (param i32 i32 i32 i32 i32)))");
@@ -1442,6 +1453,17 @@ impl WasmCodegen {
         self.line("(import \"gpu\" \"destroyTexture\" (func $gpu_destroyTexture (param i32)))");
         self.line("(import \"gpu\" \"getPreferredFormat\" (func $gpu_getPreferredFormat (result i32)))");
         self.line("(import \"gpu\" \"getAdapterInfo\" (func $gpu_getAdapterInfo (param i32) (result i32)))");
+        // Phase 3: compute pipeline, bind groups, indexed draw, compute pass
+        self.line("(import \"gpu\" \"createComputePipeline\" (func $gpu_createComputePipeline (param i32 i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createPipelineLayout\" (func $gpu_createPipelineLayout (param i32 i32 i32 i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createBindGroupLayout\" (func $gpu_createBindGroupLayout (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"createBindGroup\" (func $gpu_createBindGroup (param i32 i32) (result i32)))");
+        self.line("(import \"gpu\" \"setBindGroup\" (func $gpu_setBindGroup (param i32 i32 i32)))");
+        self.line("(import \"gpu\" \"setIndexBuffer\" (func $gpu_setIndexBuffer (param i32 i32 i32 i32)))");
+        self.line("(import \"gpu\" \"drawIndexed\" (func $gpu_drawIndexed (param i32 i32 i32 i32 i32 i32)))");
+        self.line("(import \"gpu\" \"beginComputePass\" (func $gpu_beginComputePass (param i32) (result i32)))");
+        self.line("(import \"gpu\" \"dispatchWorkgroups\" (func $gpu_dispatchWorkgroups (param i32 i32 i32 i32)))");
+        self.line("(import \"gpu\" \"submitComputePass\" (func $gpu_submitComputePass (param i32 i32)))");
         }
 
         // ── Test runtime — imported for test { } blocks ──────────────────────
@@ -15065,6 +15087,41 @@ impl WasmCodegen {
             "rtc_data_channel_send" | "rtc::data_channel_send" | "rtc::dataChannelSend" => "$rtc_dataChannelSend".into(),
             "rtc_data_channel_close" | "rtc::data_channel_close" | "rtc::dataChannelClose" => "$rtc_dataChannelClose".into(),
             "rtc_get_stats" | "rtc::get_stats" | "rtc::getStats" => "$rtc_getStats".into(),
+            // GPU — WebGPU syscall bridges (snake_case stdlib → camelCase WAT imports)
+            "gpu_request_adapter" | "gpu::request_adapter" => "$gpu_requestAdapter".into(),
+            "gpu_request_device" | "gpu::request_device" => "$gpu_requestDevice".into(),
+            "gpu_configure_canvas" | "gpu::configure_canvas" => "$gpu_configureCanvas".into(),
+            "gpu_create_buffer" | "gpu::create_buffer" => "$gpu_createBuffer".into(),
+            "gpu_write_buffer" | "gpu::write_buffer" => "$gpu_writeBuffer".into(),
+            "gpu_create_shader_module" | "gpu::create_shader_module" => "$gpu_createShaderModule".into(),
+            "gpu_create_render_pipeline" | "gpu::create_render_pipeline" => "$gpu_createRenderPipeline".into(),
+            "gpu_create_render_pipeline_with_layout" | "gpu::create_render_pipeline_with_layout" => "$gpu_createRenderPipelineWithLayout".into(),
+            "gpu_create_render_pipeline_with_vertex_layout" | "gpu::create_render_pipeline_with_vertex_layout" => "$gpu_createRenderPipelineWithVertexLayout".into(),
+            "gpu_create_texture" | "gpu::create_texture" => "$gpu_createTexture".into(),
+            "gpu_begin_render_pass" | "gpu::begin_render_pass" => "$gpu_beginRenderPass".into(),
+            "gpu_set_pipeline" | "gpu::set_pipeline" => "$gpu_setPipeline".into(),
+            "gpu_set_vertex_buffer" | "gpu::set_vertex_buffer" => "$gpu_setVertexBuffer".into(),
+            "gpu_draw" | "gpu::draw" => "$gpu_draw".into(),
+            "gpu_submit_render_pass" | "gpu::submit_render_pass" => "$gpu_submitRenderPass".into(),
+            "gpu_get_current_texture" | "gpu::get_current_texture" => "$gpu_getCurrentTexture".into(),
+            "gpu_create_texture_view" | "gpu::create_texture_view" => "$gpu_createTextureView".into(),
+            "gpu_destroy_buffer" | "gpu::destroy_buffer" => "$gpu_destroyBuffer".into(),
+            "gpu_destroy_texture" | "gpu::destroy_texture" => "$gpu_destroyTexture".into(),
+            "gpu_get_preferred_format" | "gpu::get_preferred_format" => "$gpu_getPreferredFormat".into(),
+            "gpu_get_adapter_info" | "gpu::get_adapter_info" => "$gpu_getAdapterInfo".into(),
+            // GPU Phase 3: compute, bind groups, indexed draw
+            "gpu_create_compute_pipeline" | "gpu::create_compute_pipeline" => "$gpu_createComputePipeline".into(),
+            "gpu_create_pipeline_layout" | "gpu::create_pipeline_layout" => "$gpu_createPipelineLayout".into(),
+            "gpu_create_bind_group_layout" | "gpu::create_bind_group_layout" => "$gpu_createBindGroupLayout".into(),
+            "gpu_create_bind_group" | "gpu::create_bind_group" => "$gpu_createBindGroup".into(),
+            "gpu_set_bind_group" | "gpu::set_bind_group" => "$gpu_setBindGroup".into(),
+            "gpu_set_index_buffer" | "gpu::set_index_buffer" => "$gpu_setIndexBuffer".into(),
+            "gpu_draw_indexed" | "gpu::draw_indexed" => "$gpu_drawIndexed".into(),
+            "gpu_begin_compute_pass" | "gpu::begin_compute_pass" => "$gpu_beginComputePass".into(),
+            "gpu_dispatch_workgroups" | "gpu::dispatch_workgroups" => "$gpu_dispatchWorkgroups".into(),
+            "gpu_submit_compute_pass" | "gpu::submit_compute_pass" => "$gpu_submitComputePass".into(),
+            // Binary fetch
+            "fetch_binary" | "http::fetch_binary" => "$http_fetchBinary".into(),
             _ => {
                 let wasm_name = qualified.replace("::", "_");
                 format!("${}", wasm_name)
@@ -24406,6 +24463,55 @@ mod coverage_codegen_tests {
     fn gpu_cleanup_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
         assert!(!wat.contains("$gpu_destroyBuffer"), "GPU cleanup imports should be pruned when unused");
+    }
+
+    // -----------------------------------------------------------------------
+    // GPU Phase 3 imports (compute, bind groups, indexed draw)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gpu_phase3_compute_imports_pruned_when_unused() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        assert!(!wat.contains("$gpu_createComputePipeline"), "GPU compute imports should be pruned when unused");
+        assert!(!wat.contains("$gpu_beginComputePass"), "GPU compute pass imports should be pruned when unused");
+    }
+
+    #[test]
+    fn gpu_phase3_bind_group_imports_pruned_when_unused() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        assert!(!wat.contains("$gpu_createBindGroupLayout"), "GPU bind group layout imports should be pruned when unused");
+        assert!(!wat.contains("$gpu_createBindGroup"), "GPU bind group imports should be pruned when unused");
+    }
+
+    #[test]
+    fn gpu_phase3_indexed_draw_imports_pruned_when_unused() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        assert!(!wat.contains("$gpu_setIndexBuffer"), "GPU indexed draw imports should be pruned when unused");
+        assert!(!wat.contains("$gpu_drawIndexed"), "GPU drawIndexed imports should be pruned when unused");
+    }
+
+    #[test]
+    fn fetch_binary_import_pruned_when_unused() {
+        let wat = compile("pub fn f() -> i32 { return 0; }");
+        assert!(!wat.contains("$http_fetchBinary"), "fetchBinary import should be pruned when unused");
+    }
+
+    // -----------------------------------------------------------------------
+    // Canvas element in template
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn canvas_element_creates_dom_element() {
+        let wat = compile(r#"
+            component App() {
+                render {
+                    <canvas width="800" height="600"> </canvas>
+                }
+            }
+        "#);
+        // Canvas tag should be stored as string and passed to createElement
+        assert!(wat.contains("canvas"), "canvas tag should appear in WAT output");
+        assert!(wat.contains("$dom_createElement"), "should call createElement for canvas element");
     }
 
     // -----------------------------------------------------------------------

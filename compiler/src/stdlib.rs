@@ -3342,14 +3342,21 @@ impl StdLib {
             // -- JS syscall bridges (19 functions) --
             BuiltinFn {
                 name: "gpu_request_adapter".into(),
-                params: vec![BuiltinParam { name: "power_preference".into(), ty: string_ty.clone() }],
-                return_type: i32_ty.clone(),
+                params: vec![
+                    BuiltinParam { name: "power_preference".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
                 takes_self: false, self_mutable: false,
-                description: "Request a GPU adapter. Returns adapter ID. JS syscall: navigator.gpu.requestAdapter().".into(),
+                description: "Request a GPU adapter (async). Calls back with adapter ID via __callback_with_data.".into(),
             },
             BuiltinFn {
                 name: "gpu_request_device".into(),
-                params: vec![BuiltinParam { name: "adapter_id".into(), ty: i32_ty.clone() }],
+                params: vec![
+                    BuiltinParam { name: "adapter_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "opts_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
                 return_type: i32_ty.clone(),
                 takes_self: false, self_mutable: false,
                 description: "Request a GPU device from adapter. Returns device ID. JS syscall: adapter.requestDevice().".into(),
@@ -3403,17 +3410,24 @@ impl StdLib {
                 name: "gpu_create_render_pipeline".into(),
                 params: vec![
                     BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
-                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "shader_module_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "vs_entry".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "fs_entry".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "topology".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
                 ],
                 return_type: i32_ty.clone(),
                 takes_self: false, self_mutable: false,
-                description: "Create a render pipeline. Returns pipeline ID. JS syscall: device.createRenderPipeline().".into(),
+                description: "Create a render pipeline with auto layout. Returns pipeline ID.".into(),
             },
             BuiltinFn {
                 name: "gpu_create_texture".into(),
                 params: vec![
                     BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
-                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "width".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "height".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "usage".into(), ty: i32_ty.clone() },
                 ],
                 return_type: i32_ty.clone(),
                 takes_self: false, self_mutable: false,
@@ -3423,11 +3437,16 @@ impl StdLib {
                 name: "gpu_begin_render_pass".into(),
                 params: vec![
                     BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
-                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "texture_view_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "clear_r".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "clear_g".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "clear_b".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "clear_a".into(), ty: f32_ty.clone() },
+                    BuiltinParam { name: "depth_view_id".into(), ty: i32_ty.clone() },
                 ],
                 return_type: i32_ty.clone(),
                 takes_self: false, self_mutable: false,
-                description: "Begin a render pass. Returns encoder ID. JS syscall: commandEncoder.beginRenderPass().".into(),
+                description: "Begin a render pass with clear color. Returns encoder ID.".into(),
             },
             BuiltinFn {
                 name: "gpu_set_pipeline".into(),
@@ -3673,6 +3692,152 @@ impl StdLib {
                 return_type: f32_ty.clone(),
                 takes_self: false, self_mutable: false,
                 description: "Dot product of two Vec3s. Returns f32. Pure WASM — no JS bridge.".into(),
+            },
+            // ── Phase 3: compute pipeline, bind groups, indexed draw ──
+            BuiltinFn {
+                name: "gpu_create_compute_pipeline".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "shader_module_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "entry_point".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "layout_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a compute pipeline. layout_id=0 for auto. Returns pipeline ID.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_pipeline_layout".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "bgl0".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "bgl1".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "bgl2".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "bgl3".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a pipeline layout from up to 4 bind group layouts. 0 = unused slot.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_bind_group_layout".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a bind group layout. desc_ptr: binary [count, then per entry: binding, visibility, bufferType].".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_bind_group".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a bind group. desc_ptr: binary [layoutId, count, then per entry: binding, resourceType, resourceId, offset, size].".into(),
+            },
+            BuiltinFn {
+                name: "gpu_set_bind_group".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "index".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "bind_group_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set a bind group on a render/compute pass encoder.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_set_index_buffer".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "buffer_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Set an index buffer on a render pass. format: 'uint16' or 'uint32'.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_draw_indexed".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "index_count".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "instance_count".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "first_index".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "base_vertex".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "first_instance".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Issue an indexed draw call.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_begin_compute_pass".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Begin a compute pass. Returns encoder ID.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_dispatch_workgroups".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "x".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "y".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "z".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Dispatch compute workgroups.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_submit_compute_pass".into(),
+                params: vec![
+                    BuiltinParam { name: "encoder_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "End and submit a compute pass.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_buffer_usage_storage".into(),
+                params: vec![],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Return STORAGE buffer usage constant (0x0080). Pure WASM — no JS bridge.".into(),
+            },
+            BuiltinFn {
+                name: "gpu_create_render_pipeline_with_vertex_layout".into(),
+                params: vec![
+                    BuiltinParam { name: "device_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "shader_module_id".into(), ty: i32_ty.clone() },
+                    BuiltinParam { name: "vs_entry".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "fs_entry".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "topology".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "format".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "vertex_desc_ptr".into(), ty: i32_ty.clone() },
+                ],
+                return_type: i32_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Create a render pipeline with vertex buffer layout. vertex_desc_ptr: binary [stride, attrCount, then per attr: format, offset, shaderLocation].".into(),
+            },
+            // ── Binary fetch ──
+            BuiltinFn {
+                name: "fetch_binary".into(),
+                params: vec![
+                    BuiltinParam { name: "url".into(), ty: string_ty.clone() },
+                    BuiltinParam { name: "cb_idx".into(), ty: i32_ty.clone() },
+                ],
+                return_type: unit_ty.clone(),
+                takes_self: false, self_mutable: false,
+                description: "Fetch binary data. Calls back with (ptr, len) via __callback_with_data2.".into(),
             },
         ];
 
@@ -4517,15 +4682,12 @@ mod tests {
     fn gpu_request_adapter_takes_string_returns_i32() {
         let lib = stdlib();
         let f = lib.lookup_fn("gpu_request_adapter").unwrap();
-        assert_eq!(f.params.len(), 1);
+        assert_eq!(f.params.len(), 2);
         assert_eq!(f.params[0].name, "power_preference");
+        assert_eq!(f.params[1].name, "cb_idx");
         match &f.params[0].ty {
             Type::Named(n) => assert_eq!(n, "String"),
             other => panic!("expected String param type, got {:?}", other),
-        }
-        match &f.return_type {
-            Type::Named(n) => assert_eq!(n, "i32"),
-            other => panic!("expected i32 return type, got {:?}", other),
         }
     }
 
@@ -4568,6 +4730,61 @@ mod tests {
             assert!(!f.takes_self, "{} should not take self", name);
             assert!(!f.self_mutable, "{} should not be self_mutable", name);
         }
+    }
+
+    // -- GPU Phase 3 functions ------------------------------------------------
+
+    #[test]
+    fn gpu_phase3_functions_are_registered() {
+        let lib = stdlib();
+        let expected = [
+            "gpu_create_compute_pipeline",
+            "gpu_create_pipeline_layout",
+            "gpu_create_bind_group_layout",
+            "gpu_create_bind_group",
+            "gpu_set_bind_group",
+            "gpu_set_index_buffer",
+            "gpu_draw_indexed",
+            "gpu_begin_compute_pass",
+            "gpu_dispatch_workgroups",
+            "gpu_submit_compute_pass",
+            "gpu_buffer_usage_storage",
+            "gpu_create_render_pipeline_with_vertex_layout",
+            "fetch_binary",
+        ];
+        for name in &expected {
+            assert!(
+                lib.lookup_fn(name).is_some(),
+                "expected GPU Phase 3 function `{}` to be registered",
+                name,
+            );
+        }
+    }
+
+    #[test]
+    fn gpu_create_render_pipeline_updated_signature() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_create_render_pipeline").unwrap();
+        assert_eq!(f.params.len(), 6, "createRenderPipeline should have 6 params (device, shader, vs_entry, fs_entry, topology, format)");
+        assert_eq!(f.params[1].name, "shader_module_id");
+    }
+
+    #[test]
+    fn gpu_begin_render_pass_updated_signature() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_begin_render_pass").unwrap();
+        assert_eq!(f.params.len(), 7, "beginRenderPass should have 7 params (device, view, r, g, b, a, depth)");
+        assert_eq!(f.params[1].name, "texture_view_id");
+        assert_eq!(f.params[2].name, "clear_r");
+    }
+
+    #[test]
+    fn gpu_draw_indexed_takes_six_params() {
+        let lib = stdlib();
+        let f = lib.lookup_fn("gpu_draw_indexed").unwrap();
+        assert_eq!(f.params.len(), 6);
+        assert_eq!(f.params[0].name, "encoder_id");
+        assert_eq!(f.params[1].name, "index_count");
     }
 
     // -- MiniProgram functions ------------------------------------------------
