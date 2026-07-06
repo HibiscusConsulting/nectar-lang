@@ -124,6 +124,7 @@ footer a{color:var(--accent)}
     <a href="/app/trading">Trading</a>
     <a href="/app/svelte">Svelte 5</a>
     <a href="/docs/getting-started">Docs</a>
+    <a href="#contact">Contact</a>
     <a href="https://github.com/HibiscusConsulting/nectar-lang" target="_blank" class="ext">GitHub</a>
     <a href="/" class="active">Home</a>
   </div>
@@ -260,6 +261,55 @@ footer a{color:var(--accent)}
     <a href="/app/canvas" class="btn-primary">Nectar Demo &rarr;</a>
     <a href="/app/svelte" class="btn-secondary">Svelte 5 Comparison</a>
   </div>
+</section>
+
+<style>
+.contact{text-align:center;padding:64px 24px 56px;max-width:560px;margin:0 auto;border-top:1px solid var(--border)}
+.contact h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;margin-bottom:12px}
+.contact p{color:var(--text2);margin:0 auto 28px;max-width:470px;line-height:1.5}
+.contact-form{display:flex;flex-direction:column;gap:12px;text-align:left}
+.contact-form input,.contact-form textarea{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-size:15px;font-family:inherit;width:100%}
+.contact-form input::placeholder,.contact-form textarea::placeholder{color:var(--text3)}
+.contact-form input:focus,.contact-form textarea:focus{outline:none;border-color:var(--accent)}
+.contact-form textarea{resize:vertical;min-height:88px}
+.contact-form button{margin-top:4px;background:var(--accent);color:#0b0e14;border:none;border-radius:8px;padding:12px 20px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:background 150ms}
+.contact-form button:hover{background:var(--accent2)}
+.contact-note{margin-top:16px;font-size:0.85rem;color:var(--text3)}
+.contact-note a{color:var(--accent)}
+</style>
+<section class="contact" id="contact">
+  <h2>Building something with <span class="accent">Nectar</span>?</h2>
+  <p>Kicking the tires, want early access, or just have thoughts? Drop your email and I'll reach out. It's one person building this, so it comes straight to me.</p>
+  <form class="contact-form" id="nectar-contact">
+    <input type="text" name="name" placeholder="Name" autocomplete="name">
+    <input type="email" name="email" placeholder="you@email.com" required autocomplete="email">
+    <textarea name="message" placeholder="What are you building, or what do you want to know?"></textarea>
+    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;opacity:0;height:0;width:0">
+    <button type="submit">Get in touch &rarr;</button>
+  </form>
+  <div id="nectar-contact-msg" class="contact-note" style="display:none"></div>
+  <script>
+  (function(){
+    var f=document.getElementById('nectar-contact'); if(!f) return;
+    var loaded=Date.now();
+    var v=function(n){var el=f.elements[n];return el?el.value:'';};
+    var msg=document.getElementById('nectar-contact-msg');
+    f.addEventListener('submit',function(e){
+      e.preventDefault();
+      var btn=f.querySelector('button'); btn.disabled=true; btn.textContent='Sending...';
+      fetch('https://nectar-lead-api-217864549016.us-east1.run.app/lead',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:v('name'),email:v('email'),message:v('message'),website:v('website'),t:Date.now()-loaded})
+      }).then(function(){
+        f.style.display='none';
+        msg.textContent="Thanks. I got it and I'll be in touch."; msg.style.color='var(--green)'; msg.style.display='block';
+      }).catch(function(){
+        btn.disabled=false; btn.textContent='Get in touch →';
+        msg.innerHTML='Something went wrong. Email me directly at <a href="mailto:blake@hibiscus.buzz">blake@hibiscus.buzz</a>'; msg.style.display='block';
+      });
+    });
+  })();
+  </script>
 </section>
 
 <footer>
