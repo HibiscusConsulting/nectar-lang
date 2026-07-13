@@ -54,6 +54,8 @@ html = html.replace(
 )
 html = re.sub(r'(<div id="a11y"[^>]*style="position:fixed;top:)48px', r'\g<1>0', html)
 html = html.replace('const navH = 48;', 'const navH = 0;')
+# expose the wasm exports for test harnesses (W is script-scoped otherwise)
+html = html.replace('W = instance.exports;', 'W = instance.exports;\nwindow.W = W; // exposed for external test harnesses')
 # shareable page title (the compiler emits the source filename)
 html = html.replace('<title>tree_bench_v4</title>', '<title>PLM/ALM Tree Navigator — Nectar/Honeycomb demo</title>')
 # light theme: page body must match the app's light background

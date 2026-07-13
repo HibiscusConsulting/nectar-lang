@@ -500,6 +500,7 @@ try {
 const t0 = performance.now();
 const { instance } = await WebAssembly.instantiateStreaming(fetch('app.wasm?v='+Date.now()), imports);
 W = instance.exports;
+window.W = W; // exposed for external test harnesses
 const t1 = performance.now();
 
 if (hasGPU && W.app_set_gpu_mode) W.app_set_gpu_mode(1);
