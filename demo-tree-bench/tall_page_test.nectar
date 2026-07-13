@@ -1,0 +1,18 @@
+// Engine scroll regression test: a hug-height page much taller than the
+// viewport — the shape of a normal content page (like other Nectar apps).
+// Expect: proportional scrollbar thumb, wheel pans content 1:1, clamps at
+// bottom, thumb tracks position and never vanishes.
+component TallPage {
+    render {
+        <div style="direction: vertical; width: fill; height: hug; background-color: #0b0e14; padding: 24; gap: 12">
+            <div style="font-size: 22px; color: #f0c869; font-weight: 700">"Tall page scroll test"</div>
+            <div style="height: 300px; background-color: #1a2233; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 1 (y=60)"</div></div>
+            <div style="height: 300px; background-color: #22303f; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 2 (y=372)"</div></div>
+            <div style="height: 300px; background-color: #2a3b4d; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 3 (y=684)"</div></div>
+            <div style="height: 300px; background-color: #33475e; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 4 (y=996)"</div></div>
+            <div style="height: 300px; background-color: #3d546e; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 5 (y=1308)"</div></div>
+            <div style="height: 300px; background-color: #47617f; border-radius: 8; padding: 16"><div style="color: #e6edf3">"Section 6 (y=1620)"</div></div>
+            <div style="height: 100px; background-color: #3fb950; border-radius: 8; padding: 16"><div style="color: #06110a; font-weight: 700">"THE END — if you can scroll to me and stop here, scrolling works"</div></div>
+        </div>
+    }
+}

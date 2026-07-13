@@ -1,0 +1,1826 @@
+// PLM/ALM tree navigation demo — real Windchill/Codebeamer-style BOM tree.
+// 100% Nectar + Honeycomb: canvas render mode, no bespoke JS, no DOM.
+//
+// Tree is a uniform 6-ary tree computed arithmetically from node index (no per-node
+// struct/pointer storage) — child c of node n lives at index n*6 + c + 1. Only stored
+// state is `expanded: [bool]`, one entry per node.
+//
+// Per-row click handlers: this compiler does not support component methods with
+// parameters or methods calling other methods (every method compiles to a standalone
+// handler), so per-row expand/collapse uses toggle_row_0..toggle_row_19 — one handler
+// per visible row slot, each reading self.window_ids[N] for whichever node currently
+// occupies that slot. This mirrors the same convention Nectar's own shipped example
+// app (alipay-miniprogram-demo.nectar) uses for per-item actions in a fixed-size list
+// (remove_item_0, remove_item_1, ...) — not a workaround invented for this app.
+//
+// Real native mouse-wheel virtualized scrolling is NOT used here: Honeycomb's engine
+// has a low-level virtual-range primitive, but there is no working Nectar-level
+// construct to bind a multi-million-row array to it in canvas mode today (confirmed:
+// the documented `virtual` keyword doesn't parse in canvas mode, and its DOM-mode
+// codegen calls an undefined function). So navigation is button-driven windowing,
+// which is the honest representation of what's actually built and working.
+
+component TreeBench() {
+    let mut branching: i32 = 6;
+    let mut max_depth: i32 = 7;
+    let mut total_nodes: i32 = 0;
+
+    let mut expanded: [bool] = [];
+    let mut visible: [i32] = [];
+    let mut scroll_row: i32 = 0;
+    let mut viewport_rows: i32 = 20;
+    let mut window_ids: [i32] = [];
+    let mut window_depths: [i32] = [];
+
+    let mut status: String = "not initialized — click Setup to build the tree";
+
+    fn setup(&mut self) {
+        let mut total: i32 = 0;
+        let mut level_count: i32 = 1;
+        let mut d: i32 = 0;
+        while d <= self.max_depth {
+            total = total + level_count;
+            level_count = level_count * self.branching;
+            d = d + 1;
+        }
+        self.total_nodes = total;
+
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded.push(false);
+            i = i + 1;
+        }
+        self.expanded[0] = true;
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("ready: {} total nodes (branching={}, depth={})", self.total_nodes, self.branching, self.max_depth);
+    }
+    fn expand_all(&mut self) {
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded[i] = true;
+            i = i + 1;
+        }
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("EXPAND ALL: {} of {} nodes now visible", self.visible.len(), self.total_nodes);
+    }
+    fn collapse_all(&mut self) {
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded[i] = false;
+            i = i + 1;
+        }
+        self.expanded[0] = true;
+        self.scroll_row = 0;
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("collapsed all: {} rows visible", self.visible.len());
+    }
+    fn scroll_to_top(&mut self) {
+        self.scroll_row = 0;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("top (row 0 of {})", self.visible.len());
+    }
+    fn scroll_jump_back(&mut self) {
+        self.scroll_row = self.scroll_row - 1000;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("row {} of {}", self.scroll_row, self.visible.len());
+    }
+    fn scroll_page_up(&mut self) {
+        self.scroll_row = self.scroll_row - self.viewport_rows;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("row {} of {}", self.scroll_row, self.visible.len());
+    }
+    fn scroll_page_down(&mut self) {
+        self.scroll_row = self.scroll_row + self.viewport_rows;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("row {} of {}", self.scroll_row, self.visible.len());
+    }
+    fn scroll_jump_fwd(&mut self) {
+        self.scroll_row = self.scroll_row + 1000;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("row {} of {}", self.scroll_row, self.visible.len());
+    }
+    fn scroll_to_middle(&mut self) {
+        self.scroll_row = self.visible.len() / 2;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("middle (row {} of {})", self.scroll_row, self.visible.len());
+    }
+    fn scroll_to_bottom(&mut self) {
+        self.scroll_row = self.visible.len() - self.viewport_rows;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("bottom (row {} of {})", self.scroll_row, self.visible.len());
+    }
+    fn toggle_row_0(&mut self) {
+        let idx: i32 = self.window_ids[0];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_1(&mut self) {
+        let idx: i32 = self.window_ids[1];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_2(&mut self) {
+        let idx: i32 = self.window_ids[2];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_3(&mut self) {
+        let idx: i32 = self.window_ids[3];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_4(&mut self) {
+        let idx: i32 = self.window_ids[4];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_5(&mut self) {
+        let idx: i32 = self.window_ids[5];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_6(&mut self) {
+        let idx: i32 = self.window_ids[6];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_7(&mut self) {
+        let idx: i32 = self.window_ids[7];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_8(&mut self) {
+        let idx: i32 = self.window_ids[8];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_9(&mut self) {
+        let idx: i32 = self.window_ids[9];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_10(&mut self) {
+        let idx: i32 = self.window_ids[10];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_11(&mut self) {
+        let idx: i32 = self.window_ids[11];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_12(&mut self) {
+        let idx: i32 = self.window_ids[12];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_13(&mut self) {
+        let idx: i32 = self.window_ids[13];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_14(&mut self) {
+        let idx: i32 = self.window_ids[14];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_15(&mut self) {
+        let idx: i32 = self.window_ids[15];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_16(&mut self) {
+        let idx: i32 = self.window_ids[16];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_17(&mut self) {
+        let idx: i32 = self.window_ids[17];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_18(&mut self) {
+        let idx: i32 = self.window_ids[18];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    fn toggle_row_19(&mut self) {
+        let idx: i32 = self.window_ids[19];
+        self.expanded[idx] = !self.expanded[idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+        self.status = format("toggled node {}: {} rows visible", idx, self.visible.len());
+    }
+    render {
+        <div style="direction: vertical; width: fill; height: fill; background-color: #0b0e14; padding: 16; gap: 10">
+            <div style="direction: vertical; gap: 2">
+                <div style="font-size: 19px; font-weight: 700; color: #f0c869">"PLM/ALM Tree Navigator"</div>
+                <div style="font-size: 12px; color: #545d68">"Synthetic BOM tree · demonstrates canvas-mode expand/collapse + windowed navigation at scale · not a live Windchill/Codebeamer connection"</div>
+            </div>
+            <div style="font-size: 13px; color: #8b949e">{self.status}</div>
+
+            <div style="direction: horizontal; gap: 6; height: 32px">
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.setup}>"Setup"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.expand_all}>"Expand all (stress)"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.collapse_all}>"Collapse all"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_to_top}>"Top"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_jump_back}>"Jump -1000"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_page_up}>"Page up"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_page_down}>"Page down"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_jump_fwd}>"Jump +1000"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_to_middle}>"Middle"</div>
+                <div style="height: 30px; padding: 0 10; background-color: #1c2128; border: 1px solid #2a323c; border-radius: 5; color: #c9d1d9; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.scroll_to_bottom}>"Bottom"</div>
+            </div>
+
+            <div style="direction: vertical; width: fill; height: fill; background-color: #10141a; border: 1px solid #1e242c; border-radius: 6">
+                {if self.window_ids.len() > 0 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_0}>
+                        {if self.window_depths[0] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[0] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[0] < self.max_depth { {if self.expanded[self.window_ids[0]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[0] == 0 { "Top Assembly" } else { {if self.window_depths[0] == 1 { "Major Assembly" } else { {if self.window_depths[0] == 2 { "Sub-Assembly" } else { {if self.window_depths[0] == 3 { "Component" } else { {if self.window_depths[0] == 4 { "Sub-Component" } else { {if self.window_depths[0] == 5 { "Detail Part" } else { {if self.window_depths[0] == 6 { "Fastener Group" } else { {if self.window_depths[0] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[0])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 1 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_1}>
+                        {if self.window_depths[1] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[1] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[1] < self.max_depth { {if self.expanded[self.window_ids[1]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[1] == 0 { "Top Assembly" } else { {if self.window_depths[1] == 1 { "Major Assembly" } else { {if self.window_depths[1] == 2 { "Sub-Assembly" } else { {if self.window_depths[1] == 3 { "Component" } else { {if self.window_depths[1] == 4 { "Sub-Component" } else { {if self.window_depths[1] == 5 { "Detail Part" } else { {if self.window_depths[1] == 6 { "Fastener Group" } else { {if self.window_depths[1] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[1])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 2 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_2}>
+                        {if self.window_depths[2] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[2] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[2] < self.max_depth { {if self.expanded[self.window_ids[2]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[2] == 0 { "Top Assembly" } else { {if self.window_depths[2] == 1 { "Major Assembly" } else { {if self.window_depths[2] == 2 { "Sub-Assembly" } else { {if self.window_depths[2] == 3 { "Component" } else { {if self.window_depths[2] == 4 { "Sub-Component" } else { {if self.window_depths[2] == 5 { "Detail Part" } else { {if self.window_depths[2] == 6 { "Fastener Group" } else { {if self.window_depths[2] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[2])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 3 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_3}>
+                        {if self.window_depths[3] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[3] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[3] < self.max_depth { {if self.expanded[self.window_ids[3]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[3] == 0 { "Top Assembly" } else { {if self.window_depths[3] == 1 { "Major Assembly" } else { {if self.window_depths[3] == 2 { "Sub-Assembly" } else { {if self.window_depths[3] == 3 { "Component" } else { {if self.window_depths[3] == 4 { "Sub-Component" } else { {if self.window_depths[3] == 5 { "Detail Part" } else { {if self.window_depths[3] == 6 { "Fastener Group" } else { {if self.window_depths[3] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[3])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 4 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_4}>
+                        {if self.window_depths[4] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[4] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[4] < self.max_depth { {if self.expanded[self.window_ids[4]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[4] == 0 { "Top Assembly" } else { {if self.window_depths[4] == 1 { "Major Assembly" } else { {if self.window_depths[4] == 2 { "Sub-Assembly" } else { {if self.window_depths[4] == 3 { "Component" } else { {if self.window_depths[4] == 4 { "Sub-Component" } else { {if self.window_depths[4] == 5 { "Detail Part" } else { {if self.window_depths[4] == 6 { "Fastener Group" } else { {if self.window_depths[4] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[4])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 5 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_5}>
+                        {if self.window_depths[5] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[5] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[5] < self.max_depth { {if self.expanded[self.window_ids[5]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[5] == 0 { "Top Assembly" } else { {if self.window_depths[5] == 1 { "Major Assembly" } else { {if self.window_depths[5] == 2 { "Sub-Assembly" } else { {if self.window_depths[5] == 3 { "Component" } else { {if self.window_depths[5] == 4 { "Sub-Component" } else { {if self.window_depths[5] == 5 { "Detail Part" } else { {if self.window_depths[5] == 6 { "Fastener Group" } else { {if self.window_depths[5] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[5])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 6 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_6}>
+                        {if self.window_depths[6] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[6] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[6] < self.max_depth { {if self.expanded[self.window_ids[6]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[6] == 0 { "Top Assembly" } else { {if self.window_depths[6] == 1 { "Major Assembly" } else { {if self.window_depths[6] == 2 { "Sub-Assembly" } else { {if self.window_depths[6] == 3 { "Component" } else { {if self.window_depths[6] == 4 { "Sub-Component" } else { {if self.window_depths[6] == 5 { "Detail Part" } else { {if self.window_depths[6] == 6 { "Fastener Group" } else { {if self.window_depths[6] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[6])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 7 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_7}>
+                        {if self.window_depths[7] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[7] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[7] < self.max_depth { {if self.expanded[self.window_ids[7]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[7] == 0 { "Top Assembly" } else { {if self.window_depths[7] == 1 { "Major Assembly" } else { {if self.window_depths[7] == 2 { "Sub-Assembly" } else { {if self.window_depths[7] == 3 { "Component" } else { {if self.window_depths[7] == 4 { "Sub-Component" } else { {if self.window_depths[7] == 5 { "Detail Part" } else { {if self.window_depths[7] == 6 { "Fastener Group" } else { {if self.window_depths[7] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[7])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 8 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_8}>
+                        {if self.window_depths[8] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[8] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[8] < self.max_depth { {if self.expanded[self.window_ids[8]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[8] == 0 { "Top Assembly" } else { {if self.window_depths[8] == 1 { "Major Assembly" } else { {if self.window_depths[8] == 2 { "Sub-Assembly" } else { {if self.window_depths[8] == 3 { "Component" } else { {if self.window_depths[8] == 4 { "Sub-Component" } else { {if self.window_depths[8] == 5 { "Detail Part" } else { {if self.window_depths[8] == 6 { "Fastener Group" } else { {if self.window_depths[8] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[8])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 9 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_9}>
+                        {if self.window_depths[9] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[9] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[9] < self.max_depth { {if self.expanded[self.window_ids[9]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[9] == 0 { "Top Assembly" } else { {if self.window_depths[9] == 1 { "Major Assembly" } else { {if self.window_depths[9] == 2 { "Sub-Assembly" } else { {if self.window_depths[9] == 3 { "Component" } else { {if self.window_depths[9] == 4 { "Sub-Component" } else { {if self.window_depths[9] == 5 { "Detail Part" } else { {if self.window_depths[9] == 6 { "Fastener Group" } else { {if self.window_depths[9] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[9])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 10 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_10}>
+                        {if self.window_depths[10] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[10] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[10] < self.max_depth { {if self.expanded[self.window_ids[10]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[10] == 0 { "Top Assembly" } else { {if self.window_depths[10] == 1 { "Major Assembly" } else { {if self.window_depths[10] == 2 { "Sub-Assembly" } else { {if self.window_depths[10] == 3 { "Component" } else { {if self.window_depths[10] == 4 { "Sub-Component" } else { {if self.window_depths[10] == 5 { "Detail Part" } else { {if self.window_depths[10] == 6 { "Fastener Group" } else { {if self.window_depths[10] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[10])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 11 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_11}>
+                        {if self.window_depths[11] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[11] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[11] < self.max_depth { {if self.expanded[self.window_ids[11]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[11] == 0 { "Top Assembly" } else { {if self.window_depths[11] == 1 { "Major Assembly" } else { {if self.window_depths[11] == 2 { "Sub-Assembly" } else { {if self.window_depths[11] == 3 { "Component" } else { {if self.window_depths[11] == 4 { "Sub-Component" } else { {if self.window_depths[11] == 5 { "Detail Part" } else { {if self.window_depths[11] == 6 { "Fastener Group" } else { {if self.window_depths[11] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[11])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 12 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_12}>
+                        {if self.window_depths[12] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[12] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[12] < self.max_depth { {if self.expanded[self.window_ids[12]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[12] == 0 { "Top Assembly" } else { {if self.window_depths[12] == 1 { "Major Assembly" } else { {if self.window_depths[12] == 2 { "Sub-Assembly" } else { {if self.window_depths[12] == 3 { "Component" } else { {if self.window_depths[12] == 4 { "Sub-Component" } else { {if self.window_depths[12] == 5 { "Detail Part" } else { {if self.window_depths[12] == 6 { "Fastener Group" } else { {if self.window_depths[12] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[12])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 13 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_13}>
+                        {if self.window_depths[13] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[13] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[13] < self.max_depth { {if self.expanded[self.window_ids[13]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[13] == 0 { "Top Assembly" } else { {if self.window_depths[13] == 1 { "Major Assembly" } else { {if self.window_depths[13] == 2 { "Sub-Assembly" } else { {if self.window_depths[13] == 3 { "Component" } else { {if self.window_depths[13] == 4 { "Sub-Component" } else { {if self.window_depths[13] == 5 { "Detail Part" } else { {if self.window_depths[13] == 6 { "Fastener Group" } else { {if self.window_depths[13] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[13])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 14 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_14}>
+                        {if self.window_depths[14] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[14] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[14] < self.max_depth { {if self.expanded[self.window_ids[14]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[14] == 0 { "Top Assembly" } else { {if self.window_depths[14] == 1 { "Major Assembly" } else { {if self.window_depths[14] == 2 { "Sub-Assembly" } else { {if self.window_depths[14] == 3 { "Component" } else { {if self.window_depths[14] == 4 { "Sub-Component" } else { {if self.window_depths[14] == 5 { "Detail Part" } else { {if self.window_depths[14] == 6 { "Fastener Group" } else { {if self.window_depths[14] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[14])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 15 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_15}>
+                        {if self.window_depths[15] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[15] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[15] < self.max_depth { {if self.expanded[self.window_ids[15]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[15] == 0 { "Top Assembly" } else { {if self.window_depths[15] == 1 { "Major Assembly" } else { {if self.window_depths[15] == 2 { "Sub-Assembly" } else { {if self.window_depths[15] == 3 { "Component" } else { {if self.window_depths[15] == 4 { "Sub-Component" } else { {if self.window_depths[15] == 5 { "Detail Part" } else { {if self.window_depths[15] == 6 { "Fastener Group" } else { {if self.window_depths[15] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[15])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 16 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_16}>
+                        {if self.window_depths[16] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[16] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[16] < self.max_depth { {if self.expanded[self.window_ids[16]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[16] == 0 { "Top Assembly" } else { {if self.window_depths[16] == 1 { "Major Assembly" } else { {if self.window_depths[16] == 2 { "Sub-Assembly" } else { {if self.window_depths[16] == 3 { "Component" } else { {if self.window_depths[16] == 4 { "Sub-Component" } else { {if self.window_depths[16] == 5 { "Detail Part" } else { {if self.window_depths[16] == 6 { "Fastener Group" } else { {if self.window_depths[16] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[16])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 17 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_17}>
+                        {if self.window_depths[17] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[17] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[17] < self.max_depth { {if self.expanded[self.window_ids[17]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[17] == 0 { "Top Assembly" } else { {if self.window_depths[17] == 1 { "Major Assembly" } else { {if self.window_depths[17] == 2 { "Sub-Assembly" } else { {if self.window_depths[17] == 3 { "Component" } else { {if self.window_depths[17] == 4 { "Sub-Component" } else { {if self.window_depths[17] == 5 { "Detail Part" } else { {if self.window_depths[17] == 6 { "Fastener Group" } else { {if self.window_depths[17] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[17])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 18 {
+                    <div style="direction: horizontal; height: 28px; background-color: #10141a; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_18}>
+                        {if self.window_depths[18] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[18] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[18] < self.max_depth { {if self.expanded[self.window_ids[18]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[18] == 0 { "Top Assembly" } else { {if self.window_depths[18] == 1 { "Major Assembly" } else { {if self.window_depths[18] == 2 { "Sub-Assembly" } else { {if self.window_depths[18] == 3 { "Component" } else { {if self.window_depths[18] == 4 { "Sub-Component" } else { {if self.window_depths[18] == 5 { "Detail Part" } else { {if self.window_depths[18] == 6 { "Fastener Group" } else { {if self.window_depths[18] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[18])}</div>
+                    </div>
+                }}
+                {if self.window_ids.len() > 19 {
+                    <div style="direction: horizontal; height: 28px; background-color: #12171e; border-bottom: 1px solid #1a1f27; align: center; padding-left: 10; cursor: pointer" on:click={self.toggle_row_19}>
+                        {if self.window_depths[19] >= 1 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 2 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 3 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 4 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 5 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 6 { <div style="width: 18px"></div> }}
+                        {if self.window_depths[19] >= 7 { <div style="width: 18px"></div> }}
+                        <div style="width: 26px; font-size: 12px; color: #f0c869">{if self.window_depths[19] < self.max_depth { {if self.expanded[self.window_ids[19]] { "▾" } else { "▸" }} } else { "·" }}</div>
+                        <div style="width: 190px; font-size: 12px; color: #6e828f">{if self.window_depths[19] == 0 { "Top Assembly" } else { {if self.window_depths[19] == 1 { "Major Assembly" } else { {if self.window_depths[19] == 2 { "Sub-Assembly" } else { {if self.window_depths[19] == 3 { "Component" } else { {if self.window_depths[19] == 4 { "Sub-Component" } else { {if self.window_depths[19] == 5 { "Detail Part" } else { {if self.window_depths[19] == 6 { "Fastener Group" } else { {if self.window_depths[19] == 7 { "Fastener" } else { "Fastener" }} }} }} }} }} }} }} }}</div>
+                        <div style="font-size: 13px; color: #e6edf3; font-weight: 600">{format("PN-{}", self.window_ids[19])}</div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}

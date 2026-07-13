@@ -1,0 +1,306 @@
+// Tree navigation benchmark — simulates a PLM/ALM BOM tree (Windchill/Codebeamer style):
+// deep nested parent/child structure, hundreds of thousands of nodes, expand/collapse navigation.
+// Canvas render mode (WASM + <canvas>, no DOM) — this is the mode with the real perf differentiation.
+//
+// Tree is a uniform 6-ary tree, depth 7 => 335,923 nodes, stored WITHOUT any per-node struct —
+// parent/child relationships are computed arithmetically from the node index (heap-array style:
+// child c of node n is at n*6 + c + 1). The only stored state is `expanded: [bool]`.
+//
+// NOTE ON STRUCTURE: this component compiler does not support calling one component method from
+// another (each method compiles to a standalone handler with no way to invoke a sibling method or
+// receive extra parameters), so all tree-walk logic below is inlined per-handler rather than
+// factored into helpers. Verbose, but every handler is self-contained and runs standalone.
+
+component TreeBench() {
+    let mut branching: i32 = 6;
+    let mut max_depth: i32 = 8;
+    let mut total_nodes: i32 = 0;
+
+    let mut expanded: [bool] = [];
+    let mut visible: [i32] = [];
+    let mut scroll_row: i32 = 0;
+    let mut viewport_rows: i32 = 28;
+    let mut window_ids: [i32] = [];
+
+    let mut status: String = "not initialized";
+
+    fn setup(&mut self) {
+        let mut total: i32 = 0;
+        let mut level_count: i32 = 1;
+        let mut d: i32 = 0;
+        while d <= self.max_depth {
+            total = total + level_count;
+            level_count = level_count * self.branching;
+            d = d + 1;
+        }
+        self.total_nodes = total;
+
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded.push(false);
+            i = i + 1;
+        }
+        self.expanded[0] = true;
+
+        // inline recompute_visible (iterative DFS, stack via Vec, remove-from-tail = O(1))
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+
+        // inline rebuild_window
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("ready: {} total nodes (branching={}, depth={})", self.total_nodes, self.branching, self.max_depth);
+    }
+
+    fn toggle_deep_node(&mut self) {
+        // node index 43 = first_child(first_child(first_child(0))) -- depth-3 branch, ~50K descendants
+        let deep_idx: i32 = 43;
+        self.expanded[deep_idx] = !self.expanded[deep_idx];
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("toggled node {}: visible rows now {}", deep_idx, self.visible.len());
+    }
+
+    fn expand_all(&mut self) {
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded[i] = true;
+            i = i + 1;
+        }
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("EXPAND ALL: visible rows now {} (of {} total nodes)", self.visible.len(), self.total_nodes);
+    }
+
+    fn collapse_all(&mut self) {
+        let mut i: i32 = 0;
+        while i < self.total_nodes {
+            self.expanded[i] = false;
+            i = i + 1;
+        }
+        self.expanded[0] = true;
+        self.scroll_row = 0;
+
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                let mut dd: i32 = idx;
+                let mut depth: i32 = 0;
+                while dd > 0 {
+                    dd = (dd - 1) / self.branching;
+                    depth = depth + 1;
+                }
+                if depth < self.max_depth {
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = self.branching - 1;
+                    while c >= 0 {
+                        let child: i32 = fc + c;
+                        if child < self.total_nodes {
+                            stack.push(child);
+                        }
+                        c = c - 1;
+                    }
+                }
+            }
+        }
+
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("collapsed all: visible rows now {}", self.visible.len());
+    }
+
+    fn scroll_to_bottom(&mut self) {
+        self.scroll_row = self.visible.len() - self.viewport_rows;
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("scrolled to bottom (row {} of {})", self.scroll_row, self.visible.len());
+    }
+
+    fn scroll_to_middle(&mut self) {
+        self.scroll_row = self.visible.len() / 2;
+
+        self.window_ids = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let v: i32 = self.visible[r];
+                    self.window_ids.push(v);
+                }
+            }
+            r = r + 1;
+        }
+
+        self.status = format("scrolled to middle (row {} of {})", self.scroll_row, self.visible.len());
+    }
+
+    render {
+        <div style="direction: vertical; width: fill; height: fill; background-color: #0b0e14; padding: 12; gap: 8">
+            <div style="font-size: 18px; font-weight: 700; color: #f0c869">"PLM/ALM Tree Bench — Nectar/Honeycomb canvas mode"</div>
+            <div style="font-size: 13px; color: #8b949e">{self.status}</div>
+
+            <div style="direction: horizontal; gap: 8; height: 36px">
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.setup}>"Setup / init tree"</div>
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.toggle_deep_node}>"Toggle deep node"</div>
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.expand_all}>"EXPAND ALL (stress)"</div>
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.collapse_all}>"Collapse all"</div>
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.scroll_to_bottom}>"Scroll to bottom"</div>
+                <div style="width: 160px; height: 32px; background-color: #21262d; color: #e6edf3; font-size: 12px; padding: 6 8; cursor: pointer" on:click={self.scroll_to_middle}>"Scroll to middle"</div>
+            </div>
+
+            <div style="direction: vertical; width: fill; height: fill; background-color: #0d1117; border: 1px solid #1a1f2e">
+                {for i in self.window_ids {
+                    <div style="direction: horizontal; height: 26px; border-bottom: 1px solid #161b22">
+                        <div style="width: 400px; padding: 4 8; font-size: 12px; color: #e6edf3">{format("node {}", i)}</div>
+                    </div>
+                }}
+            </div>
+        </div>
+    }
+}
