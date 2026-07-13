@@ -1114,6 +1114,13 @@ impl StdLib {
                 description: "High-resolution timestamp from performance.now().".into(),
             },
             BuiltinFn {
+                name: "input_text".into(),
+                params: vec![],
+                return_type: Type::Named("String".into()),
+                takes_self: false, self_mutable: false,
+                description: "Current value of the focused/last-edited input element (canvas mode). Pair with on:input.".into(),
+            },
+            BuiltinFn {
                 name: "request_animation_frame".into(),
                 params: vec![BuiltinParam { name: "callback_idx".into(), ty: i32_ty.clone() }],
                 return_type: i32_ty.clone(),

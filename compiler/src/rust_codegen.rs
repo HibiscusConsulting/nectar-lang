@@ -132,7 +132,7 @@ impl RustCodegen {
         // No serde — lightweight JSON parser generated per-struct
         self.line("");
         self.line("/// Scratch buffer for fetch responses, storage reads, hash reads");
-        self.line("const SCRATCH_SIZE: usize = 4 * 1024 * 1024; // 4MB — handles 10K+ product API responses");
+        self.line("const SCRATCH_SIZE: usize = 16 * 1024 * 1024; // 16MB — a 100K-node BOM JSON payload is ~6MB; 4MB silently truncated large fetch responses");
         self.line("static mut SCRATCH: [u8; SCRATCH_SIZE] = [0u8; SCRATCH_SIZE];");
         self.line("");
         self.line("/// Helper: read a string from WASM memory via syscall that writes into a buffer");
@@ -941,6 +941,17 @@ impl RustCodegen {
                                     // Clickable elements get pointer cursor + focusable (hover/active states)
                                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.visual.cursor = 1; el.focusable = true; }}", var));
                                 }
+                            } else if event == "input" {
+                                // on:input — the engine fires this after every
+                                // keystroke that changes the element's value
+                                // (see honeycomb app_keydown). The handler reads
+                                // the value via the input_text() builtin.
+                                if let Some(method_name) = self.extract_handler_name(handler) {
+                                    let idx = self.handler_indices.get(&method_name).copied().unwrap_or(0);
+                                    self.line(&format!("// on:input -> {} (cb_idx={})", method_name, idx));
+                                    self.line(&format!("tree.add_event({}, \"input\", {});", var, idx));
+                                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.visual.cursor = 2; el.focusable = true; }}", var));
+                                }
                             }
                         }
                         Attribute::Bind { property, signal } => {
@@ -1393,7 +1404,10 @@ impl RustCodegen {
                 self.line("with_tree(|tree| {");
                 self.indent += 1;
                 self.line("let root = tree.root_id();");
-                self.line("if let Some(el) = tree.get_mut(root) { el.children.clear(); }");
+                // remove_children_recursive recycles the old subtree's pool
+                // slots; a bare children.clear() leaked one full UI copy per
+                // handler invocation (pool grew every click/scroll).
+                self.line("tree.remove_children_recursive(root);");
                 self.indent -= 1;
                 self.line("});");
                 self.line(&format!("{}_mount();", comp_name.to_lowercase()));
@@ -1568,7 +1582,13 @@ impl RustCodegen {
             }
             Expr::FnCall { callee, args } => {
                 let callee_str = self.expr_to_rust(callee, comp_name);
-                if callee_str == "format" && !args.is_empty() {
+                if callee_str == "performance_now" && args.is_empty() {
+                    // route to the safe wrapper — the raw syscall is unsafe
+                    "perf_now()".to_string()
+                } else if callee_str == "input_text" && args.is_empty() {
+                    // current value of the focused/last-edited input element
+                    "honeycomb::canvas_app::last_input_text()".to_string()
+                } else if callee_str == "format" && !args.is_empty() {
                     // format("...", arg1, arg2) → format!("...", arg1, arg2)
                     let fmt = self.expr_to_rust(&args[0], comp_name);
                     let rest: Vec<String> = args[1..].iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
@@ -1797,7 +1817,13 @@ impl RustCodegen {
         self.line("let mut measurer = EstimateMeasurer;");
         self.line("let vw = unsafe { canvas_get_width() };");
         self.line("let vh = unsafe { canvas_get_height() };");
-        self.line("layout::compute(&mut tree, vw, 999999.0, &mut measurer);");
+        // Lay out against the REAL viewport height. The old hardcoded 999999.0
+        // made the engine believe every app was ~1M px tall: it painted a
+        // near-invisible "infinite" scrollbar thumb and let root-level scroll
+        // slide the whole UI into empty void. Apps with content taller than
+        // the viewport should use an overflow:scroll container, which still
+        // scrolls internally.
+        self.line("layout::compute(&mut tree, vw, vh, &mut measurer);");
         self.indent -= 1;
         self.line("});");
         self.indent -= 1;
