@@ -35,8 +35,47 @@ def child_count(idx: int) -> int:
     # 4..6 children, deterministic per node
     return 4 + ((idx * 2654435761) >> 7) % 3
 
+# Realistic, deterministic part names (pure ASCII — canvas text measuring and
+# the zero-copy WASM JSON parser both assume single-byte chars). Pool pick and
+# qualifier are hashed from the node id, so names are stable across restarts
+# and the lazy-load path returns the same name the bulk path does.
+NAME_POOLS = [
+    ["Turbofan Engine HBT-9000"],
+    ["Fan Module", "LP Compressor Module", "HP Compressor Module",
+     "Combustor Module", "HP Turbine Module", "LP Turbine Module",
+     "Accessory Gearbox", "Fuel System", "Hydraulic System",
+     "Nacelle Assembly", "Thrust Reverser", "Engine Control System"],
+    ["Rotor Assembly", "Stator Assembly", "Case Assembly",
+     "Bearing Support Assembly", "Manifold Assembly", "Pump Assembly",
+     "Actuator Assembly", "Drive Shaft Assembly", "Heat Exchanger",
+     "Valve Block Assembly", "Duct Assembly", "Harness Assembly"],
+    ["Impeller", "Blade Set", "Vane Segment", "Housing", "Cover Plate",
+     "Support Bracket", "Drive Shaft", "Coupling", "Seal Carrier",
+     "Bearing Housing", "Spur Gear", "Diffuser"],
+    ["Bushing", "Sleeve", "Spacer", "Retainer Ring", "Shim Pack", "Gasket",
+     "Liner", "Insert", "Seal Ring", "Thrust Washer", "Bearing Race",
+     "Oil Nozzle"],
+    ["Locating Pin", "Dowel Pin", "Woodruff Key", "Drain Plug",
+     "Union Fitting", "Retaining Clip", "Grommet", "Lock Plate",
+     "Tab Washer", "Orifice Plate", "Banjo Bolt", "Breather Cap"],
+    ["Bolt Kit", "Screw Set", "Rivet Group", "Clamp Set", "Nut Plate Set",
+     "Washer Kit", "Stud Kit", "Pin Kit"],
+    ["M6x20 Hex Bolt", "M8x25 Socket Head Cap Screw", "M5 Self-Locking Nut",
+     "M4x10 Torx Screw", "4x12 Solid Rivet", "M10x30 Flange Bolt",
+     "M6 Plain Washer", "M8 Castle Nut", "M3x8 Pan Head Screw",
+     "6x16 Blind Rivet", "M12x40 Stud", "M5x12 Countersunk Screw"],
+]
+QUALIFIERS = ["Fwd", "Aft", "Upper", "Lower", "LH", "RH", "Inner", "Outer",
+              "Stage 1", "Stage 2", "Stage 3", "No. 1", "No. 2", "No. 3"]
+
 def node_name(idx: int, d: int) -> str:
-    return f"{LEVELS[d].lower().replace(' ', '_')}_{idx}"
+    if d == 0:
+        return NAME_POOLS[0][0]
+    h = (idx * 2654435761) & 0xFFFFFFFF
+    base = NAME_POOLS[d][(h >> 8) % len(NAME_POOLS[d])]
+    if d == MAX_DEPTH:
+        return base  # fastener specs don't take positional qualifiers
+    return f"{base} - {QUALIFIERS[(h >> 16) % len(QUALIFIERS)]}"
 
 def children_of(node: int):
     d = depth_of(node)

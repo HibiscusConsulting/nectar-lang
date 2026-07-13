@@ -153,6 +153,7 @@ component TreeBench {
 
     let mut fetched: [BomNode] = [];
     let mut names: [String] = [];
+    let mut hay: [String] = [];
     let mut loaded: [bool] = [];
     let mut children_count: [i32] = [];
     let mut expanded: [bool] = [];
@@ -197,6 +198,7 @@ on_response_body = """        let t0: f64 = performance_now();
             while i < count {
                 let node_id: i32 = self.fetched[i].id;
                 self.names[node_id] = format("{}", self.fetched[i].name);
+                self.hay[node_id] = format("pn-{} {}", node_id, self.fetched[i].name.to_lowercase());
                 self.loaded[node_id] = true;
                 self.expanded[node_id] = true;
                 if node_id > 0 {
@@ -215,6 +217,7 @@ on_response_body = """        let t0: f64 = performance_now();
             while i < count {
                 let child_id: i32 = self.fetched[i].id;
                 self.names[child_id] = format("{}", self.fetched[i].name);
+                self.hay[child_id] = format("pn-{} {}", child_id, self.fetched[i].name.to_lowercase());
                 i = i + 1;
             }
         }
@@ -247,9 +250,11 @@ parts.append("""    fn setup(&mut self) {
             self.loaded.push(false);
             self.children_count.push(0);
             self.names.push(format(""));
+            self.hay.push(format(""));
             i = i + 1;
         }
-        self.names[0] = "top_assembly_0";
+        self.names[0] = "Turbofan Engine HBT-9000";
+        self.hay[0] = format("pn-0 turbofan engine hbt-9000");
         self.loaded_count = 1;
         self.selected_id = 0;
         self.pending_parent = 0;
@@ -372,31 +377,47 @@ def filter_handler(name, label, predicate):
 """
 
 # live search: fires on EVERY keystroke via the new on:input language feature.
+# Fuzzy: case-insensitive, space-separated tokens ALL must match (AND), each
+# token checked against a precomputed lowercase "pn-{id} {name}" haystack —
+# so "aft bearing", "BEARING", and "PN-12" all find what a user expects.
 parts.append("""    fn on_search(&mut self) {
         self.query = input_text();
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
             return;
         }
-        let mut needle: String = format("{}", self.query);
-        if needle.len() > 3 {
-            let head: String = needle.slice(0, 3);
-            if head == "PN-" {
-                needle = needle.slice(3, needle.len());
-            }
-            if head == "pn-" {
-                needle = needle.slice(3, needle.len());
+        let ql: String = self.query.to_lowercase();
+        let mut toks: [String] = [];
+        let mut rest: String = format("{}", ql);
+        while rest.len() > 0 {
+            let sp: i32 = rest.index_of(" ");
+            if sp < 0 {
+                toks.push(format("{}", rest));
+                rest = format("");
+            } else {
+                if sp > 0 {
+                    toks.push(rest.slice(0, sp));
+                }
+                rest = rest.slice(sp + 1, rest.len());
             }
         }
         let t0: f64 = performance_now();
-        if self.query.len() == 0 {
+        if toks.len() == 0 {
 """ + DFS_BLOCK + """            self.filter_label = "full structure";
         } else {
             self.visible = [];
             let mut i: i32 = 0;
             while i < self.capacity {
                 if self.names[i].len() > 0 {
-                    if self.names[i].contains(needle) {
+                    let mut hit: i32 = 0;
+                    let mut t: i32 = 0;
+                    while t < toks.len() {
+                        if self.hay[i].contains(toks[t]) {
+                            hit = hit + 1;
+                        }
+                        t = t + 1;
+                    }
+                    if hit == toks.len() {
                         self.visible.push(i);
                     }
                 }
@@ -406,7 +427,11 @@ parts.append("""    fn on_search(&mut self) {
         }
         let scan_ms: f64 = performance_now() - t0;
         self.scroll_row = 0;
-""" + CLAMP_BLOCK + WINDOW_BLOCK + """        self.status = format("search \\"{}\\": scanned {} nodes → {} matches in {:.2}ms", self.query, self.loaded_count, self.visible.len(), scan_ms);
+""" + CLAMP_BLOCK + WINDOW_BLOCK + """        if self.loaded_count < 70000 {
+            self.status = format("search \\"{}\\": {} matches in {:.2}ms — searched {} loaded nodes only (Import full BOM to search all 71,284)", self.query, self.visible.len(), scan_ms, self.loaded_count);
+        } else {
+            self.status = format("search \\"{}\\": scanned {} nodes → {} matches in {:.2}ms", self.query, self.loaded_count, self.visible.len(), scan_ms);
+        }
     }
 """)
 
@@ -697,7 +722,8 @@ parts.append("\n".join(render_lines) + "\n")
 out = "".join(parts)
 assert out.count('{') == out.count('}'), f"unbalanced braces: {out.count(chr(123))} vs {out.count(chr(125))}"
 
-with open('/private/tmp/claude-501/-Users-blakeburnette-repos-payhive/f996ea63-ac4a-4cb9-9cc7-60a3d04a65c8/scratchpad/nectar-tree-test/tree_bench_v4.nectar', 'w') as f:
+import os
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tree_bench_v4.nectar'), 'w') as f:
     f.write(out)
 
 print("generated, chars:", len(out), "lines:", out.count(chr(10)))

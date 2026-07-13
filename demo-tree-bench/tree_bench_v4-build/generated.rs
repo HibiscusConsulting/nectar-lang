@@ -189,6 +189,7 @@ struct TreeBenchState {
     capacity: i32,
     fetched: Vec<BomNode>,
     names: Vec<String>,
+    hay: Vec<String>,
     loaded: Vec<bool>,
     children_count: Vec<i32>,
     expanded: Vec<bool>,
@@ -224,6 +225,7 @@ thread_local! {
         capacity: 0,
         fetched: vec![],
         names: vec![],
+        hay: vec![],
         loaded: vec![],
         children_count: vec![],
         expanded: vec![],
@@ -261,6 +263,7 @@ fn treebench_mount() {
         let capacity = _state_ref.capacity;
         let fetched = &_state_ref.fetched;
         let names = &_state_ref.names;
+        let hay = &_state_ref.hay;
         let loaded = &_state_ref.loaded;
         let children_count = &_state_ref.children_count;
         let expanded = &_state_ref.expanded;
@@ -5370,6 +5373,7 @@ fn treebench_on_response() {
                 while (i < count) {
                     let node_id = state.fetched[i as usize].id;
                     state.names[node_id as usize] = format!("{}", state.fetched[i as usize].name);
+                    state.hay[node_id as usize] = format!("pn-{} {}", node_id, state.fetched[i as usize].name.to_lowercase());
                     state.loaded[node_id as usize] = true;
                     state.expanded[node_id as usize] = true;
                     if (node_id > 0) {
@@ -5388,6 +5392,7 @@ fn treebench_on_response() {
                 while (i < count) {
                     let child_id = state.fetched[i as usize].id;
                     state.names[child_id as usize] = format!("{}", state.fetched[i as usize].name);
+                    state.hay[child_id as usize] = format!("pn-{} {}", child_id, state.fetched[i as usize].name.to_lowercase());
                     i = (i + 1);
                 }
             }
@@ -5508,9 +5513,11 @@ fn treebench_setup() {
             state.loaded.push(false);
             state.children_count.push(0);
             state.names.push(format!(""));
+            state.hay.push(format!(""));
             i = (i + 1);
         }
-        state.names[0 as usize] = "top_assembly_0".to_string();
+        state.names[0 as usize] = "Turbofan Engine HBT-9000".to_string();
+        state.hay[0 as usize] = format!("pn-0 turbofan engine hbt-9000");
         state.loaded_count = 1;
         state.selected_id = 0;
         state.pending_parent = 0;
@@ -9061,18 +9068,23 @@ fn treebench_on_search() {
             state.status = "not connected — click Connect first".to_string();
             return;
         }
-        let mut needle = format!("{}", state.query);
-        if (needle.len() as i32 > 3) {
-            let head = { let _s = &needle; let _start = (0) as usize; let _end = (3) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or("").to_string() };
-            if (head == "PN-") {
-                needle = { let _s = &needle; let _start = (3) as usize; let _end = (needle.len() as i32) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or("").to_string() };
-            }
-            if (head == "pn-") {
-                needle = { let _s = &needle; let _start = (3) as usize; let _end = (needle.len() as i32) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or("").to_string() };
+        let ql = state.query.to_lowercase().clone();
+        let mut toks = vec![];
+        let mut rest = format!("{}", ql);
+        while (rest.len() as i32 > 0) {
+            let sp = rest.find(" ").map(|i| i as i32).unwrap_or(-1);
+            if (sp < 0) {
+                toks.push(format!("{}", rest));
+                rest = format!("");
+            } else {
+                if (sp > 0) {
+                    toks.push({ let _s = &rest; let _start = (0) as usize; let _end = (sp) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or("").to_string() });
+                }
+                rest = { let _s = &rest; let _start = ((sp + 1)) as usize; let _end = (rest.len() as i32) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or("").to_string() };
             }
         }
         let t0 = perf_now();
-        if (state.query.len() as i32 == 0) {
+        if (toks.len() as i32 == 0) {
             state.visible = vec![];
             let mut stack = vec![0];
             while (stack.len() as i32 > 0) {
@@ -9096,7 +9108,15 @@ fn treebench_on_search() {
             let mut i = 0;
             while (i < state.capacity) {
                 if (state.names[i as usize].len() as i32 > 0) {
-                    if state.names[i as usize].contains(&needle) {
+                    let mut hit = 0;
+                    let mut t = 0;
+                    while (t < toks.len() as i32) {
+                        if state.hay[i as usize].contains(&toks[t as usize]) {
+                            hit = (hit + 1);
+                        }
+                        t = (t + 1);
+                    }
+                    if (hit == toks.len() as i32) {
                         state.visible.push(i);
                     }
                 }
@@ -9140,7 +9160,11 @@ fn treebench_on_search() {
             }
             r = (r + 1);
         }
-        state.status = format!("search \"{}\": scanned {} nodes → {} matches in {:.2}ms", state.query, state.loaded_count, state.visible.len() as i32, scan_ms);
+        if (state.loaded_count < 70000) {
+            state.status = format!("search \"{}\": {} matches in {:.2}ms — searched {} loaded nodes only (Import full BOM to search all 71,284)", state.query, state.visible.len() as i32, scan_ms, state.loaded_count);
+        } else {
+            state.status = format!("search \"{}\": scanned {} nodes → {} matches in {:.2}ms", state.query, state.loaded_count, state.visible.len() as i32, scan_ms);
+        }
     });
     // Re-render after state change
     let _t_rebuild = perf_now();

@@ -38,6 +38,7 @@ component TreeBench {
 
     let mut fetched: [BomNode] = [];
     let mut names: [String] = [];
+    let mut hay: [String] = [];
     let mut loaded: [bool] = [];
     let mut children_count: [i32] = [];
     let mut expanded: [bool] = [];
@@ -81,6 +82,7 @@ component TreeBench {
             while i < count {
                 let node_id: i32 = self.fetched[i].id;
                 self.names[node_id] = format("{}", self.fetched[i].name);
+                self.hay[node_id] = format("pn-{} {}", node_id, self.fetched[i].name.to_lowercase());
                 self.loaded[node_id] = true;
                 self.expanded[node_id] = true;
                 if node_id > 0 {
@@ -99,6 +101,7 @@ component TreeBench {
             while i < count {
                 let child_id: i32 = self.fetched[i].id;
                 self.names[child_id] = format("{}", self.fetched[i].name);
+                self.hay[child_id] = format("pn-{} {}", child_id, self.fetched[i].name.to_lowercase());
                 i = i + 1;
             }
         }
@@ -195,9 +198,11 @@ component TreeBench {
             self.loaded.push(false);
             self.children_count.push(0);
             self.names.push(format(""));
+            self.hay.push(format(""));
             i = i + 1;
         }
-        self.names[0] = "top_assembly_0";
+        self.names[0] = "Turbofan Engine HBT-9000";
+        self.hay[0] = format("pn-0 turbofan engine hbt-9000");
         self.loaded_count = 1;
         self.selected_id = 0;
         self.pending_parent = 0;
@@ -2597,18 +2602,23 @@ component TreeBench {
             self.status = "not connected — click Connect first";
             return;
         }
-        let mut needle: String = format("{}", self.query);
-        if needle.len() > 3 {
-            let head: String = needle.slice(0, 3);
-            if head == "PN-" {
-                needle = needle.slice(3, needle.len());
-            }
-            if head == "pn-" {
-                needle = needle.slice(3, needle.len());
+        let ql: String = self.query.to_lowercase();
+        let mut toks: [String] = [];
+        let mut rest: String = format("{}", ql);
+        while rest.len() > 0 {
+            let sp: i32 = rest.index_of(" ");
+            if sp < 0 {
+                toks.push(format("{}", rest));
+                rest = format("");
+            } else {
+                if sp > 0 {
+                    toks.push(rest.slice(0, sp));
+                }
+                rest = rest.slice(sp + 1, rest.len());
             }
         }
         let t0: f64 = performance_now();
-        if self.query.len() == 0 {
+        if toks.len() == 0 {
         self.visible = [];
         let mut stack: [i32] = [0];
         while stack.len() > 0 {
@@ -2632,7 +2642,15 @@ component TreeBench {
             let mut i: i32 = 0;
             while i < self.capacity {
                 if self.names[i].len() > 0 {
-                    if self.names[i].contains(needle) {
+                    let mut hit: i32 = 0;
+                    let mut t: i32 = 0;
+                    while t < toks.len() {
+                        if self.hay[i].contains(toks[t]) {
+                            hit = hit + 1;
+                        }
+                        t = t + 1;
+                    }
+                    if hit == toks.len() {
                         self.visible.push(i);
                     }
                 }
@@ -2676,7 +2694,11 @@ component TreeBench {
             }
             r = r + 1;
         }
-        self.status = format("search \"{}\": scanned {} nodes → {} matches in {:.2}ms", self.query, self.loaded_count, self.visible.len(), scan_ms);
+        if self.loaded_count < 70000 {
+            self.status = format("search \"{}\": {} matches in {:.2}ms — searched {} loaded nodes only (Import full BOM to search all 71,284)", self.query, self.visible.len(), scan_ms, self.loaded_count);
+        } else {
+            self.status = format("search \"{}\": scanned {} nodes → {} matches in {:.2}ms", self.query, self.loaded_count, self.visible.len(), scan_ms);
+        }
     }
     fn filter_released(&mut self) {
         if self.capacity == 0 {
