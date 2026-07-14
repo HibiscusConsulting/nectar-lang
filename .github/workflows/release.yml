@@ -36,6 +36,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: nectar-lang
+      - uses: actions/checkout@v4
+        with:
+          repository: HibiscusConsulting/honeycomb
+          ssh-key: ${{ secrets.HONEYCOMB_DEPLOY_KEY }}
+          path: honeycomb
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -52,22 +59,24 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nectar-lang
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
+        working-directory: nectar-lang
 
       - name: Package (Unix)
         if: matrix.archive == 'tar.gz'
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf ../../../nectar-${{ github.ref_name }}-${{ matrix.target }}.tar.gz nectar
-          cd ../../..
+          cd nectar-lang/target/${{ matrix.target }}/release
+          tar czf "$GITHUB_WORKSPACE/nectar-${{ github.ref_name }}-${{ matrix.target }}.tar.gz" nectar
 
       - name: Package (Windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          Compress-Archive -Path "target/${{ matrix.target }}/release/nectar.exe" -DestinationPath "nectar-${{ env:GITHUB_REF_NAME }}-${{ matrix.target }}.zip"
+          Compress-Archive -Path "nectar-lang/target/${{ matrix.target }}/release/nectar.exe" -DestinationPath "nectar-${{ env:GITHUB_REF_NAME }}-${{ matrix.target }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

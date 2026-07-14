@@ -9,42 +9,86 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# The compiler depends on honeycomb by relative path (../../honeycomb — a
+# sibling of the repo). CI reproduces that layout: both repos are checked out
+# side by side inside the workspace, and all cargo commands run from the
+# nectar-lang subdirectory. Honeycomb is fetched read-only via a deploy key
+# (secret HONEYCOMB_DEPLOY_KEY; public half registered on the honeycomb repo).
+
 jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: nectar-lang
+      - uses: actions/checkout@v4
+        with:
+          repository: HibiscusConsulting/honeycomb
+          ssh-key: ${{ secrets.HONEYCOMB_DEPLOY_KEY }}
+          path: honeycomb
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nectar-lang
       - run: cargo check
+        working-directory: nectar-lang
 
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: nectar-lang
+      - uses: actions/checkout@v4
+        with:
+          repository: HibiscusConsulting/honeycomb
+          ssh-key: ${{ secrets.HONEYCOMB_DEPLOY_KEY }}
+          path: honeycomb
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nectar-lang
       - run: cargo test
+        working-directory: nectar-lang
 
   fmt:
     name: Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: nectar-lang
+      - uses: actions/checkout@v4
+        with:
+          repository: HibiscusConsulting/honeycomb
+          ssh-key: ${{ secrets.HONEYCOMB_DEPLOY_KEY }}
+          path: honeycomb
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+        working-directory: nectar-lang
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: nectar-lang
+      - uses: actions/checkout@v4
+        with:
+          repository: HibiscusConsulting/honeycomb
+          ssh-key: ${{ secrets.HONEYCOMB_DEPLOY_KEY }}
+          path: honeycomb
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nectar-lang
       - run: cargo clippy -- -D warnings
+        working-directory: nectar-lang
