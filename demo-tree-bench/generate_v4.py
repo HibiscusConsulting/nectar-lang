@@ -144,6 +144,8 @@ struct BomNode {
     id: i32,
     name: String,
     leaf: i32,
+    state: i32,
+    qty: i32,
 }
 
 component TreeBench {
@@ -154,6 +156,8 @@ component TreeBench {
     let mut fetched: [BomNode] = [];
     let mut names: [String] = [];
     let mut hay: [String] = [];
+    let mut eff_state: [i32] = [];
+    let mut qty: [i32] = [];
     let mut loaded: [bool] = [];
     let mut children_count: [i32] = [];
     let mut expanded: [bool] = [];
@@ -188,6 +192,21 @@ on_response_body = """        let t0: f64 = performance_now();
         let parent: i32 = self.pending_parent;
         let count: i32 = self.fetched.len();
         self.api_calls = self.api_calls + 1;
+        let mut is_ack: i32 = 0;
+        let mut ack_id: i32 = 0;
+        let mut st_label: String = format("");
+        if parent == 0 - 3 {
+            if count > 0 {
+                ack_id = self.fetched[0].id;
+                self.eff_state[ack_id] = self.fetched[0].state;
+                self.qty[ack_id] = self.fetched[0].qty;
+                is_ack = 1;
+                if self.eff_state[ack_id] == 0 { st_label = format("Released"); }
+                if self.eff_state[ack_id] == 1 { st_label = format("In Work"); }
+                if self.eff_state[ack_id] == 2 { st_label = format("Under Review"); }
+                if self.eff_state[ack_id] == 3 { st_label = format("Obsolete"); }
+            }
+        } else {
         if parent == 0 - 2 {
             let mut i: i32 = 0;
             while i < self.capacity {
@@ -199,6 +218,8 @@ on_response_body = """        let t0: f64 = performance_now();
                 let node_id: i32 = self.fetched[i].id;
                 self.names[node_id] = format("{}", self.fetched[i].name);
                 self.hay[node_id] = format("pn-{} {}", node_id, self.fetched[i].name.to_lowercase());
+                self.eff_state[node_id] = self.fetched[i].state;
+                self.qty[node_id] = self.fetched[i].qty;
                 self.loaded[node_id] = true;
                 self.expanded[node_id] = true;
                 if node_id > 0 {
@@ -218,14 +239,21 @@ on_response_body = """        let t0: f64 = performance_now();
                 let child_id: i32 = self.fetched[i].id;
                 self.names[child_id] = format("{}", self.fetched[i].name);
                 self.hay[child_id] = format("pn-{} {}", child_id, self.fetched[i].name.to_lowercase());
+                self.eff_state[child_id] = self.fetched[i].state;
+                self.qty[child_id] = self.fetched[i].qty;
                 i = i + 1;
             }
         }
+        }
         let merge_ms: f64 = performance_now() - t0;
-""" + SELECT_DERIVE_BLOCK
+""" + SELECT_DERIVE_BLOCK + """        let mut status_msg: String = format("API: {} nodes merged in {:.1}ms — {} rows visible, {} calls total", count, merge_ms, self.visible.len(), self.api_calls);
+        if is_ack == 1 {
+            status_msg = format("server committed update: PN-{} → state {}, qty {} (ack merged in {:.1}ms)", ack_id, st_label, self.qty[ack_id], merge_ms);
+        }
+"""
 parts.append(handler(
     "on_response", on_response_body,
-    'format("API: {} nodes merged in {:.1}ms — {} rows visible, {} calls total", count, merge_ms, self.visible.len(), self.api_calls)'
+    'format("{}", status_msg)'
 ))
 
 # --- init_connect: LANGUAGE LIFECYCLE HOOK. Any method named init* runs
@@ -250,6 +278,8 @@ parts.append("""    fn init_connect(&mut self) {
             self.children_count.push(0);
             self.names.push(format(""));
             self.hay.push(format(""));
+            self.eff_state.push(0);
+            self.qty.push(1);
             i = i + 1;
         }
         self.names[0] = "Turbofan Engine HBT-9000";
@@ -286,6 +316,8 @@ parts.append("""    fn setup(&mut self) {
             self.children_count.push(0);
             self.names.push(format(""));
             self.hay.push(format(""));
+            self.eff_state.push(0);
+            self.qty.push(1);
             i = i + 1;
         }
         self.names[0] = "Turbofan Engine HBT-9000";
@@ -470,10 +502,46 @@ parts.append("""    fn on_search(&mut self) {
     }
 """)
 
-parts.append(filter_handler("filter_released", "state = Released", "if i % 4 == 0 { self.visible.push(i); }"))
-parts.append(filter_handler("filter_inwork", "state = In Work", "if i % 4 == 1 { self.visible.push(i); }"))
-parts.append(filter_handler("filter_review", "state = Under Review", "if i % 4 == 2 { self.visible.push(i); }"))
-parts.append(filter_handler("filter_obsolete", "state = Obsolete", "if i % 4 == 3 { self.visible.push(i); }"))
+parts.append(filter_handler("filter_released", "state = Released", "if self.eff_state[i] == 0 { self.visible.push(i); }"))
+parts.append(filter_handler("filter_inwork", "state = In Work", "if self.eff_state[i] == 1 { self.visible.push(i); }"))
+parts.append(filter_handler("filter_review", "state = Under Review", "if self.eff_state[i] == 2 { self.visible.push(i); }"))
+parts.append(filter_handler("filter_obsolete", "state = Obsolete", "if self.eff_state[i] == 3 { self.visible.push(i); }"))
+
+# --- WRITE PATH: edit lifecycle state / quantity on the selected part.  ---
+# POSTs to the mock API; the server commits and responds with the updated
+# record (same BomNode shape as every read), which on_response merges back
+# via the pending_parent == -3 ack branch. Numbered handlers, one per state.
+for sval, sname in [(0, "Released"), (1, "In Work"), (2, "Under Review"), (3, "Obsolete")]:
+    parts.append("""    fn set_state_""" + str(sval) + """(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\\"id\\":{},\\"state\\":""" + str(sval) + """}} … (set """ + sname + """)", sid);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\\"id\\":{},\\"state\\":""" + str(sval) + """}}", sid), 0);
+    }
+""")
+
+for hname, delta in [("qty_inc", 1), ("qty_dec", -1)]:
+    parts.append("""    fn """ + hname + """(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        let mut q: i32 = self.qty[sid] + """ + str(delta) + """;
+        if q < 1 {
+            q = 1;
+        }
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\\"id\\":{},\\"qty\\":{}}} …", sid, q);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\\"id\\":{},\\"qty\\":{}}}", sid, q), 0);
+    }
+""")
 parts.append(filter_handler("filter_fasteners", "type = Fastener (leaf parts)", """let mut dd: i32 = i;
                 let mut depth: i32 = 0;
                 while dd > 0 {
@@ -641,7 +709,7 @@ for n in range(VIEWPORT_ROWS):
     status_dots = []
     for sval, (sname, scolor) in enumerate(STATUSES):
         status_dots.append((sval, f'<div style="width: 7px; height: 7px; border-radius: 4; background-color: {scolor}"></div>'))
-    status_expr = build_chain(status_dots, f'(self.window_ids[{n}] % 4)')
+    status_expr = build_chain(status_dots, f'(self.eff_state[self.window_ids[{n}]])')
     assert status_expr.count('{') == status_expr.count('}')
 
     row_bg = "#ffffff" if n % 2 == 0 else "#f9fafb"
@@ -663,10 +731,10 @@ render_lines.append('                </div>')
 
 # --- right: Attributes pane ---
 sel_type_expr = build_chain([(i, f'"{name}"') for i, name in enumerate(LEVEL_NAMES)], 'self.selected_depth')
-sel_status_expr = build_chain([(i, f'"{s[0]}"') for i, s in enumerate(STATUSES)], '(self.selected_id % 4)')
+sel_status_expr = build_chain([(i, f'"{s[0]}"') for i, s in enumerate(STATUSES)], '(self.eff_state[self.selected_id])')
 sel_status_dot = build_chain(
     [(i, f'<div style="width: 8px; height: 8px; border-radius: 4; background-color: {s[1]}"></div>') for i, s in enumerate(STATUSES)],
-    '(self.selected_id % 4)')
+    '(self.eff_state[self.selected_id])')
 sel_ext_expr = 'if self.selected_depth < self.max_depth { ".asm" } else { ".prt" }'
 sel_children_inner = 'if self.loaded[self.selected_id] { {format("{}", self.uses_ids.len())} } else { "not loaded — expand to fetch" }'
 sel_children_expr = f'if self.loaded.len() > 0 {{ {{{sel_children_inner}}} }} else {{ "—" }}'
@@ -683,12 +751,26 @@ attr_rows = [
     ("Lifecycle state", None),
     ("Direct children", f'{{{sel_children_expr}}}'),
     ("Depth in structure", '{format("Level {}", self.selected_depth)}'),
+    ("Set lifecycle state", "EDIT_STATE"),
+    ("Quantity (this usage)", "EDIT_QTY"),
 ]
 for label, value in attr_rows:
     render_lines.append('                        <div style="direction: horizontal; height: 18px; align: center">')
     render_lines.append(f'                            <div style="width: 150px; font-size: 12px; color: #6e7781">"{label}"</div>')
     if label == "Lifecycle state":
         render_lines.append(f'                            <div style="direction: horizontal; gap: 6; align: center"><div style="width: 10px; height: 20px; align: center; justify: center">{{{sel_status_dot}}}</div><div style="font-size: 12px; color: #24292f; height: 20px">{{{sel_status_expr}}}</div></div>')
+    elif value == "EDIT_STATE":
+        render_lines.append('                            <div style="direction: horizontal; gap: 5; align: center">')
+        for sval, (sname, _) in enumerate(STATUSES):
+            render_lines.append(f'                                <div style="height: 18px; padding: 0 7; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 10px; align: center; justify: center; cursor: pointer" on:click={{self.set_state_{sval}}}>"{sname}"</div>')
+        render_lines.append('                            </div>')
+    elif value == "EDIT_QTY":
+        render_lines.append('                            <div style="direction: horizontal; gap: 6; align: center">')
+        render_lines.append('                                <div style="width: 18px; height: 18px; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.qty_dec}>"−"</div>')
+        render_lines.append('                                <div style="width: 26px; font-size: 12px; color: #1f2328; align: center; justify: center">{format("{}", self.qty[self.selected_id])}</div>')
+        render_lines.append('                                <div style="width: 18px; height: 18px; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.qty_inc}>"+"</div>')
+        render_lines.append('                                <div style="font-size: 11px; color: #6e7781">"each · POSTs to /api/part/update"</div>')
+        render_lines.append('                            </div>')
     else:
         render_lines.append(f'                            <div style="font-size: 12px; color: #24292f">{value}</div>')
     render_lines.append('                        </div>')
@@ -698,7 +780,7 @@ render_lines.append('                            <div style="width: 100px; font-
 for hname, lbl in [("view_iso", "Iso"), ("view_front", "Front"), ("view_top", "Top"), ("rot_left", "⟲"), ("rot_right", "⟳"), ("zoom_out", "−"), ("zoom_in", "+")]:
     render_lines.append(f'                            <div style="height: 22px; padding: 0 9; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 11px; align: center; justify: center; cursor: pointer" on:click={{self.{hname}}}>"{lbl}"</div>')
 render_lines.append('                        </div>')
-render_lines.append('                        <img src={format("/api/part/thumb-{}-v{}-r{}-z{}.svg", self.selected_id, self.view_name, self.view_rot, self.view_zoom)} style="width: 400px; height: 278px; border: 1px solid #d0d7de; border-radius: 4" />')
+render_lines.append('                        <img src={format("/api/part/thumb-{}-v{}-r{}-z{}.svg", self.selected_id, self.view_name, self.view_rot, self.view_zoom)} style="width: 400px; height: 236px; border: 1px solid #d0d7de; border-radius: 4" />')
 render_lines.append('                    </div>')
 render_lines.append('                </div>')
 
@@ -715,17 +797,17 @@ render_lines.append('                </div>')
 
 for k in range(BRANCHING):
     row_bg = "#ffffff" if k % 2 == 0 else "#f9fafb"
-    child_status_expr = build_chain([(i, f'"{s[0]}"') for i, s in enumerate(STATUSES)], f'(self.uses_ids[{k}] % 4)')
+    child_status_expr = build_chain([(i, f'"{s[0]}"') for i, s in enumerate(STATUSES)], f'(self.eff_state[self.uses_ids[{k}]])')
     child_dot = build_chain(
         [(i, f'<div style="width: 7px; height: 7px; border-radius: 4; background-color: {s[1]}"></div>') for i, s in enumerate(STATUSES)],
-        f'(self.uses_ids[{k}] % 4)')
+        f'(self.eff_state[self.uses_ids[{k}]])')
     render_lines.append(f'                {{if self.uses_ids.len() > {k} {{')
     render_lines.append(f'                    <div style="direction: horizontal; height: 24px; background-color: {row_bg}; border-bottom: 1px solid #e6e8eb; align: center; padding-left: 10">')
     render_lines.append(f'                        <div style="width: 120px; font-size: 12px; color: #1f2328">{{format("PN-{{}}", self.uses_ids[{k}])}}</div>')
     render_lines.append(f'                        <div style="width: 220px; font-size: 12px; color: #57606a">{{format("{{}}", self.names[self.uses_ids[{k}]])}}</div>')
     render_lines.append(f'                        <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>')
     render_lines.append(f'                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{{{child_dot}}}</div><div style="font-size: 12px; color: #57606a">{{{child_status_expr}}}</div></div>')
-    render_lines.append(f'                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>')
+    render_lines.append(f'                        <div style="width: 80px; font-size: 12px; color: #57606a">{{format("{{}}", self.qty[self.uses_ids[{k}]])}}</div>')
     render_lines.append(f'                        <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>')
     render_lines.append('                    </div>')
     render_lines.append('                }}')
@@ -738,7 +820,7 @@ render_lines.append('                <div style="direction: vertical; padding: 8
 render_lines.append('                    <div style="font-size: 11px; color: #6e7781">"["</div>')
 for k in range(5):
     render_lines.append(f'                    {{if self.fetched.len() > {k} {{')
-    render_lines.append(f'                        <div style="font-size: 11px; color: #24292f">{{format("  {{{{\\"id\\": {{}}, \\"name\\": \\"{{}}\\", \\"leaf\\": {{}}}}}},", self.fetched[{k}].id, self.fetched[{k}].name, self.fetched[{k}].leaf)}}</div>')
+    render_lines.append(f'                        <div style="font-size: 11px; color: #24292f">{{format("  {{{{\\"id\\": {{}}, \\"name\\": \\"{{}}\\", \\"leaf\\": {{}}, \\"state\\": {{}}, \\"qty\\": {{}}}}}},", self.fetched[{k}].id, self.fetched[{k}].name, self.fetched[{k}].leaf, self.fetched[{k}].state, self.fetched[{k}].qty)}}</div>')
     render_lines.append('                    }}')
 render_lines.append('                    {if self.fetched.len() > 5 {')
 render_lines.append('                        <div style="font-size: 11px; color: #6e7781">{format("  … {} more nodes in this response", self.fetched.len() - 5)}</div>')

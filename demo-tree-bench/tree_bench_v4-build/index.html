@@ -538,7 +538,7 @@ eventTarget.addEventListener('wheel', e => {
 }, { passive: false });
 
 // windowed-list scrolling: wheel/drag -> app scroll handlers (indexes resolved from generated.rs)
-const SCROLL_UP_CB = 65, SCROLL_DOWN_CB = 66;
+const SCROLL_UP_CB = 71, SCROLL_DOWN_CB = 72;
 let _wheelAcc = 0;
 function __treeScroll(delta) {
   _wheelAcc += delta;

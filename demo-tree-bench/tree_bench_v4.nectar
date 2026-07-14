@@ -29,6 +29,8 @@ struct BomNode {
     id: i32,
     name: String,
     leaf: i32,
+    state: i32,
+    qty: i32,
 }
 
 component TreeBench {
@@ -39,6 +41,8 @@ component TreeBench {
     let mut fetched: [BomNode] = [];
     let mut names: [String] = [];
     let mut hay: [String] = [];
+    let mut eff_state: [i32] = [];
+    let mut qty: [i32] = [];
     let mut loaded: [bool] = [];
     let mut children_count: [i32] = [];
     let mut expanded: [bool] = [];
@@ -72,6 +76,21 @@ component TreeBench {
         let parent: i32 = self.pending_parent;
         let count: i32 = self.fetched.len();
         self.api_calls = self.api_calls + 1;
+        let mut is_ack: i32 = 0;
+        let mut ack_id: i32 = 0;
+        let mut st_label: String = format("");
+        if parent == 0 - 3 {
+            if count > 0 {
+                ack_id = self.fetched[0].id;
+                self.eff_state[ack_id] = self.fetched[0].state;
+                self.qty[ack_id] = self.fetched[0].qty;
+                is_ack = 1;
+                if self.eff_state[ack_id] == 0 { st_label = format("Released"); }
+                if self.eff_state[ack_id] == 1 { st_label = format("In Work"); }
+                if self.eff_state[ack_id] == 2 { st_label = format("Under Review"); }
+                if self.eff_state[ack_id] == 3 { st_label = format("Obsolete"); }
+            }
+        } else {
         if parent == 0 - 2 {
             let mut i: i32 = 0;
             while i < self.capacity {
@@ -83,6 +102,8 @@ component TreeBench {
                 let node_id: i32 = self.fetched[i].id;
                 self.names[node_id] = format("{}", self.fetched[i].name);
                 self.hay[node_id] = format("pn-{} {}", node_id, self.fetched[i].name.to_lowercase());
+                self.eff_state[node_id] = self.fetched[i].state;
+                self.qty[node_id] = self.fetched[i].qty;
                 self.loaded[node_id] = true;
                 self.expanded[node_id] = true;
                 if node_id > 0 {
@@ -102,8 +123,11 @@ component TreeBench {
                 let child_id: i32 = self.fetched[i].id;
                 self.names[child_id] = format("{}", self.fetched[i].name);
                 self.hay[child_id] = format("pn-{} {}", child_id, self.fetched[i].name.to_lowercase());
+                self.eff_state[child_id] = self.fetched[i].state;
+                self.qty[child_id] = self.fetched[i].qty;
                 i = i + 1;
             }
+        }
         }
         let merge_ms: f64 = performance_now() - t0;
         let mut sd: i32 = self.selected_id;
@@ -122,6 +146,10 @@ component TreeBench {
                 self.uses_ids.push(fc + c);
                 c = c + 1;
             }
+        }
+        let mut status_msg: String = format("API: {} nodes merged in {:.1}ms — {} rows visible, {} calls total", count, merge_ms, self.visible.len(), self.api_calls);
+        if is_ack == 1 {
+            status_msg = format("server committed update: PN-{} → state {}, qty {} (ack merged in {:.1}ms)", ack_id, st_label, self.qty[ack_id], merge_ms);
         }
         self.visible = [];
         let mut stack: [i32] = [0];
@@ -174,7 +202,7 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("API: {} nodes merged in {:.1}ms — {} rows visible, {} calls total", count, merge_ms, self.visible.len(), self.api_calls);
+            self.status = format("{}", status_msg);
         }
     }
     fn init_connect(&mut self) {
@@ -194,6 +222,8 @@ component TreeBench {
             self.children_count.push(0);
             self.names.push(format(""));
             self.hay.push(format(""));
+            self.eff_state.push(0);
+            self.qty.push(1);
             i = i + 1;
         }
         self.names[0] = "Turbofan Engine HBT-9000";
@@ -227,6 +257,8 @@ component TreeBench {
             self.children_count.push(0);
             self.names.push(format(""));
             self.hay.push(format(""));
+            self.eff_state.push(0);
+            self.qty.push(1);
             i = i + 1;
         }
         self.names[0] = "Turbofan Engine HBT-9000";
@@ -2738,7 +2770,7 @@ component TreeBench {
         let mut i: i32 = 0;
         while i < self.capacity {
             if self.names[i].len() > 0 {
-                if i % 4 == 0 { self.visible.push(i); }
+                if self.eff_state[i] == 0 { self.visible.push(i); }
             }
             i = i + 1;
         }
@@ -2791,7 +2823,7 @@ component TreeBench {
         let mut i: i32 = 0;
         while i < self.capacity {
             if self.names[i].len() > 0 {
-                if i % 4 == 1 { self.visible.push(i); }
+                if self.eff_state[i] == 1 { self.visible.push(i); }
             }
             i = i + 1;
         }
@@ -2844,7 +2876,7 @@ component TreeBench {
         let mut i: i32 = 0;
         while i < self.capacity {
             if self.names[i].len() > 0 {
-                if i % 4 == 2 { self.visible.push(i); }
+                if self.eff_state[i] == 2 { self.visible.push(i); }
             }
             i = i + 1;
         }
@@ -2897,7 +2929,7 @@ component TreeBench {
         let mut i: i32 = 0;
         while i < self.capacity {
             if self.names[i].len() > 0 {
-                if i % 4 == 3 { self.visible.push(i); }
+                if self.eff_state[i] == 3 { self.visible.push(i); }
             }
             i = i + 1;
         }
@@ -2939,6 +2971,80 @@ component TreeBench {
             r = r + 1;
         }
         self.status = format("filter [state = Obsolete]: scanned {} nodes → {} matches in {:.2}ms", self.loaded_count, self.visible.len(), scan_ms);
+    }
+    fn set_state_0(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"state\":0}} … (set Released)", sid);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"state\":0}}", sid), 0);
+    }
+    fn set_state_1(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"state\":1}} … (set In Work)", sid);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"state\":1}}", sid), 0);
+    }
+    fn set_state_2(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"state\":2}} … (set Under Review)", sid);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"state\":2}}", sid), 0);
+    }
+    fn set_state_3(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"state\":3}} … (set Obsolete)", sid);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"state\":3}}", sid), 0);
+    }
+    fn qty_inc(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        let mut q: i32 = self.qty[sid] + 1;
+        if q < 1 {
+            q = 1;
+        }
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"qty\":{}}} …", sid, q);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"qty\":{}}}", sid, q), 0);
+    }
+    fn qty_dec(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected yet";
+            return;
+        }
+        let sid: i32 = self.selected_id;
+        let mut q: i32 = self.qty[sid] + -1;
+        if q < 1 {
+            q = 1;
+        }
+        self.pending_parent = 0 - 3;
+        self.status = format("POST /api/part/update {{\"id\":{},\"qty\":{}}} …", sid, q);
+        self.last_url = format("POST /api/part/update (PN-{})", sid);
+        mp::request(format("/api/part/update{}", ""), "POST", format("{{\"id\":{},\"qty\":{}}}", sid, q), 0);
     }
     fn filter_fasteners(&mut self) {
         if self.capacity == 0 {
@@ -3956,7 +4062,7 @@ component TreeBench {
                             {if self.window_depths[0] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[0] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_0}>{if self.window_depths[0] < self.max_depth { {if self.loaded[self.window_ids[0]] { {if self.expanded[self.window_ids[0]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_0}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[0] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[0] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[0] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[0]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[0]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[0]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[0])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[0]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[0] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -3968,7 +4074,7 @@ component TreeBench {
                             {if self.window_depths[1] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[1] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_1}>{if self.window_depths[1] < self.max_depth { {if self.loaded[self.window_ids[1]] { {if self.expanded[self.window_ids[1]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_1}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[1] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[1] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[1] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[1]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[1]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[1]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[1])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[1]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[1] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -3980,7 +4086,7 @@ component TreeBench {
                             {if self.window_depths[2] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[2] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_2}>{if self.window_depths[2] < self.max_depth { {if self.loaded[self.window_ids[2]] { {if self.expanded[self.window_ids[2]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_2}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[2] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[2] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[2] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[2]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[2]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[2]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[2])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[2]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[2] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -3992,7 +4098,7 @@ component TreeBench {
                             {if self.window_depths[3] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[3] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_3}>{if self.window_depths[3] < self.max_depth { {if self.loaded[self.window_ids[3]] { {if self.expanded[self.window_ids[3]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_3}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[3] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[3] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[3] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[3]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[3]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[3]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[3])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[3]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[3] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4004,7 +4110,7 @@ component TreeBench {
                             {if self.window_depths[4] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[4] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_4}>{if self.window_depths[4] < self.max_depth { {if self.loaded[self.window_ids[4]] { {if self.expanded[self.window_ids[4]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_4}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[4] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[4] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[4] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[4]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[4]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[4]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[4])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[4]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[4] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4016,7 +4122,7 @@ component TreeBench {
                             {if self.window_depths[5] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[5] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_5}>{if self.window_depths[5] < self.max_depth { {if self.loaded[self.window_ids[5]] { {if self.expanded[self.window_ids[5]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_5}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[5] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[5] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[5] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[5]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[5]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[5]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[5])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[5]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[5] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4028,7 +4134,7 @@ component TreeBench {
                             {if self.window_depths[6] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[6] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_6}>{if self.window_depths[6] < self.max_depth { {if self.loaded[self.window_ids[6]] { {if self.expanded[self.window_ids[6]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_6}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[6] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[6] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[6] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[6]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[6]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[6]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[6])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[6]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[6] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4040,7 +4146,7 @@ component TreeBench {
                             {if self.window_depths[7] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[7] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_7}>{if self.window_depths[7] < self.max_depth { {if self.loaded[self.window_ids[7]] { {if self.expanded[self.window_ids[7]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_7}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[7] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[7] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[7] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[7]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[7]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[7]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[7])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[7]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[7] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4052,7 +4158,7 @@ component TreeBench {
                             {if self.window_depths[8] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[8] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_8}>{if self.window_depths[8] < self.max_depth { {if self.loaded[self.window_ids[8]] { {if self.expanded[self.window_ids[8]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_8}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[8] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[8] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[8] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[8]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[8]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[8]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[8])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[8]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[8] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4064,7 +4170,7 @@ component TreeBench {
                             {if self.window_depths[9] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[9] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_9}>{if self.window_depths[9] < self.max_depth { {if self.loaded[self.window_ids[9]] { {if self.expanded[self.window_ids[9]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_9}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[9] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[9] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[9] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[9]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[9]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[9]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[9])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[9]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[9] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4076,7 +4182,7 @@ component TreeBench {
                             {if self.window_depths[10] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[10] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_10}>{if self.window_depths[10] < self.max_depth { {if self.loaded[self.window_ids[10]] { {if self.expanded[self.window_ids[10]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_10}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[10] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[10] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[10] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[10]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[10]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[10]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[10])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[10]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[10] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4088,7 +4194,7 @@ component TreeBench {
                             {if self.window_depths[11] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[11] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_11}>{if self.window_depths[11] < self.max_depth { {if self.loaded[self.window_ids[11]] { {if self.expanded[self.window_ids[11]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_11}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[11] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[11] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[11] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[11]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[11]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[11]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[11])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[11]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[11] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4100,7 +4206,7 @@ component TreeBench {
                             {if self.window_depths[12] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[12] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_12}>{if self.window_depths[12] < self.max_depth { {if self.loaded[self.window_ids[12]] { {if self.expanded[self.window_ids[12]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_12}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[12] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[12] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[12] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[12]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[12]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[12]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[12])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[12]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[12] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4112,7 +4218,7 @@ component TreeBench {
                             {if self.window_depths[13] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[13] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_13}>{if self.window_depths[13] < self.max_depth { {if self.loaded[self.window_ids[13]] { {if self.expanded[self.window_ids[13]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_13}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[13] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[13] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[13] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[13]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[13]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[13]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[13])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[13]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[13] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4124,7 +4230,7 @@ component TreeBench {
                             {if self.window_depths[14] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[14] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_14}>{if self.window_depths[14] < self.max_depth { {if self.loaded[self.window_ids[14]] { {if self.expanded[self.window_ids[14]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_14}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[14] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[14] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[14] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[14]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[14]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[14]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[14])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[14]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[14] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4136,7 +4242,7 @@ component TreeBench {
                             {if self.window_depths[15] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[15] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_15}>{if self.window_depths[15] < self.max_depth { {if self.loaded[self.window_ids[15]] { {if self.expanded[self.window_ids[15]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_15}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[15] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[15] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[15] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[15]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[15]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[15]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[15])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[15]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[15] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4148,7 +4254,7 @@ component TreeBench {
                             {if self.window_depths[16] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[16] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_16}>{if self.window_depths[16] < self.max_depth { {if self.loaded[self.window_ids[16]] { {if self.expanded[self.window_ids[16]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_16}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[16] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[16] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[16] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[16]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[16]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[16]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[16])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[16]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[16] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4160,7 +4266,7 @@ component TreeBench {
                             {if self.window_depths[17] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[17] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_17}>{if self.window_depths[17] < self.max_depth { {if self.loaded[self.window_ids[17]] { {if self.expanded[self.window_ids[17]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_17}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[17] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[17] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[17] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[17]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[17]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[17]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[17])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[17]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[17] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4172,7 +4278,7 @@ component TreeBench {
                             {if self.window_depths[18] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[18] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_18}>{if self.window_depths[18] < self.max_depth { {if self.loaded[self.window_ids[18]] { {if self.expanded[self.window_ids[18]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_18}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[18] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[18] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[18] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[18]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[18]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[18]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[18])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[18]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[18] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4184,7 +4290,7 @@ component TreeBench {
                             {if self.window_depths[19] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[19] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_19}>{if self.window_depths[19] < self.max_depth { {if self.loaded[self.window_ids[19]] { {if self.expanded[self.window_ids[19]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_19}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[19] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[19] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[19] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[19]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[19]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[19]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[19])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[19]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[19] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4196,7 +4302,7 @@ component TreeBench {
                             {if self.window_depths[20] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[20] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_20}>{if self.window_depths[20] < self.max_depth { {if self.loaded[self.window_ids[20]] { {if self.expanded[self.window_ids[20]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_20}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[20] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[20] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[20] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[20]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[20]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[20]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[20])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[20]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[20] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4208,7 +4314,7 @@ component TreeBench {
                             {if self.window_depths[21] >= 1 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 2 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 3 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 4 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 5 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 6 { <div style="width: 14px"></div> }}{if self.window_depths[21] >= 7 { <div style="width: 14px"></div> }}
                             <div style="width: 18px; height: 24px; align: center; justify: center; font-size: 10px; color: #9a6700; cursor: pointer" on:click={self.toggle_row_21}>{if self.window_depths[21] < self.max_depth { {if self.loaded[self.window_ids[21]] { {if self.expanded[self.window_ids[21]] { "▾" } else { "▸" }} } else { "+" }} } else { "·" }}</div>
                             <div style="direction: horizontal; width: fill; height: 24px; align: center; gap: 5; cursor: pointer" on:click={self.select_row_21}>
-                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.window_ids[21] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.window_ids[21] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.window_ids[21] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
+                                <div style="width: 12px; height: 24px; align: center; justify: center">{if (self.eff_state[self.window_ids[21]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.window_ids[21]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.window_ids[21]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div>
                                 <div style="font-size: 12px; color: #1f2328">{format("PN-{}", self.window_ids[21])}</div>
                                 <div style="font-size: 12px; color: #57606a">{format("{}", self.names[self.window_ids[21]])}</div>
                                 <div style="font-size: 11px; color: #6e7781">{if self.window_depths[21] < self.max_depth { ".asm, A.1 (Design)" } else { ".prt, A.1 (Design)" }}</div>
@@ -4238,7 +4344,7 @@ component TreeBench {
                         </div>
                         <div style="direction: horizontal; height: 18px; align: center">
                             <div style="width: 150px; font-size: 12px; color: #6e7781">"Lifecycle state"</div>
-                            <div style="direction: horizontal; gap: 6; align: center"><div style="width: 10px; height: 20px; align: center; justify: center">{if (self.selected_id % 4) == 0 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.selected_id % 4) == 1 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.selected_id % 4) == 2 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #24292f; height: 20px">{if (self.selected_id % 4) == 0 { "Released" } else { {if (self.selected_id % 4) == 1 { "In Work" } else { {if (self.selected_id % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                            <div style="direction: horizontal; gap: 6; align: center"><div style="width: 10px; height: 20px; align: center; justify: center">{if (self.eff_state[self.selected_id]) == 0 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.selected_id]) == 1 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.selected_id]) == 2 { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 8px; height: 8px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #24292f; height: 20px">{if (self.eff_state[self.selected_id]) == 0 { "Released" } else { {if (self.eff_state[self.selected_id]) == 1 { "In Work" } else { {if (self.eff_state[self.selected_id]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
                         </div>
                         <div style="direction: horizontal; height: 18px; align: center">
                             <div style="width: 150px; font-size: 12px; color: #6e7781">"Direct children"</div>
@@ -4247,6 +4353,24 @@ component TreeBench {
                         <div style="direction: horizontal; height: 18px; align: center">
                             <div style="width: 150px; font-size: 12px; color: #6e7781">"Depth in structure"</div>
                             <div style="font-size: 12px; color: #24292f">{format("Level {}", self.selected_depth)}</div>
+                        </div>
+                        <div style="direction: horizontal; height: 18px; align: center">
+                            <div style="width: 150px; font-size: 12px; color: #6e7781">"Set lifecycle state"</div>
+                            <div style="direction: horizontal; gap: 5; align: center">
+                                <div style="height: 18px; padding: 0 7; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 10px; align: center; justify: center; cursor: pointer" on:click={self.set_state_0}>"Released"</div>
+                                <div style="height: 18px; padding: 0 7; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 10px; align: center; justify: center; cursor: pointer" on:click={self.set_state_1}>"In Work"</div>
+                                <div style="height: 18px; padding: 0 7; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 10px; align: center; justify: center; cursor: pointer" on:click={self.set_state_2}>"Under Review"</div>
+                                <div style="height: 18px; padding: 0 7; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 10px; align: center; justify: center; cursor: pointer" on:click={self.set_state_3}>"Obsolete"</div>
+                            </div>
+                        </div>
+                        <div style="direction: horizontal; height: 18px; align: center">
+                            <div style="width: 150px; font-size: 12px; color: #6e7781">"Quantity (this usage)"</div>
+                            <div style="direction: horizontal; gap: 6; align: center">
+                                <div style="width: 18px; height: 18px; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.qty_dec}>"−"</div>
+                                <div style="width: 26px; font-size: 12px; color: #1f2328; align: center; justify: center">{format("{}", self.qty[self.selected_id])}</div>
+                                <div style="width: 18px; height: 18px; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 12px; align: center; justify: center; cursor: pointer" on:click={self.qty_inc}>"+"</div>
+                                <div style="font-size: 11px; color: #6e7781">"each · POSTs to /api/part/update"</div>
+                            </div>
                         </div>
                         <div style="height: 6px"></div>
                         <div style="direction: horizontal; gap: 10; align: center; height: 24px">
@@ -4259,7 +4383,7 @@ component TreeBench {
                             <div style="height: 22px; padding: 0 9; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 11px; align: center; justify: center; cursor: pointer" on:click={self.zoom_out}>"−"</div>
                             <div style="height: 22px; padding: 0 9; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4; color: #24292f; font-size: 11px; align: center; justify: center; cursor: pointer" on:click={self.zoom_in}>"+"</div>
                         </div>
-                        <img src={format("/api/part/thumb-{}-v{}-r{}-z{}.svg", self.selected_id, self.view_name, self.view_rot, self.view_zoom)} style="width: 400px; height: 278px; border: 1px solid #d0d7de; border-radius: 4" />
+                        <img src={format("/api/part/thumb-{}-v{}-r{}-z{}.svg", self.selected_id, self.view_name, self.view_rot, self.view_zoom)} style="width: 400px; height: 236px; border: 1px solid #d0d7de; border-radius: 4" />
                     </div>
                 </div>
             </div>
@@ -4279,8 +4403,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[0])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[0]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[0] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[0] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[0] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[0] % 4) == 0 { "Released" } else { {if (self.uses_ids[0] % 4) == 1 { "In Work" } else { {if (self.uses_ids[0] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[0]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[0]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[0]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[0]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[0]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[0]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[0]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4289,8 +4413,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[1])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[1]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[1] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[1] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[1] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[1] % 4) == 0 { "Released" } else { {if (self.uses_ids[1] % 4) == 1 { "In Work" } else { {if (self.uses_ids[1] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[1]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[1]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[1]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[1]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[1]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[1]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[1]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4299,8 +4423,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[2])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[2]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[2] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[2] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[2] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[2] % 4) == 0 { "Released" } else { {if (self.uses_ids[2] % 4) == 1 { "In Work" } else { {if (self.uses_ids[2] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[2]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[2]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[2]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[2]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[2]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[2]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[2]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4309,8 +4433,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[3])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[3]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[3] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[3] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[3] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[3] % 4) == 0 { "Released" } else { {if (self.uses_ids[3] % 4) == 1 { "In Work" } else { {if (self.uses_ids[3] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[3]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[3]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[3]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[3]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[3]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[3]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[3]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4319,8 +4443,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[4])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[4]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[4] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[4] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[4] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[4] % 4) == 0 { "Released" } else { {if (self.uses_ids[4] % 4) == 1 { "In Work" } else { {if (self.uses_ids[4] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[4]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[4]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[4]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[4]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[4]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[4]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[4]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4329,8 +4453,8 @@ component TreeBench {
                         <div style="width: 120px; font-size: 12px; color: #1f2328">{format("PN-{}", self.uses_ids[5])}</div>
                         <div style="width: 220px; font-size: 12px; color: #57606a">{format("{}", self.names[self.uses_ids[5]])}</div>
                         <div style="width: 110px; font-size: 12px; color: #57606a">"A.1 (Design)"</div>
-                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.uses_ids[5] % 4) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.uses_ids[5] % 4) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.uses_ids[5] % 4) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.uses_ids[5] % 4) == 0 { "Released" } else { {if (self.uses_ids[5] % 4) == 1 { "In Work" } else { {if (self.uses_ids[5] % 4) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
-                        <div style="width: 80px; font-size: 12px; color: #57606a">"1"</div>
+                        <div style="width: 130px; direction: horizontal; gap: 5; align: center"><div style="width: 9px; height: 24px; align: center; justify: center">{if (self.eff_state[self.uses_ids[5]]) == 0 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #1a7f37"></div> } else { {if (self.eff_state[self.uses_ids[5]]) == 1 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #0969da"></div> } else { {if (self.eff_state[self.uses_ids[5]]) == 2 { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #9a6700"></div> } else { <div style="width: 7px; height: 7px; border-radius: 4; background-color: #6e7781"></div> }} }} }}</div><div style="font-size: 12px; color: #57606a">{if (self.eff_state[self.uses_ids[5]]) == 0 { "Released" } else { {if (self.eff_state[self.uses_ids[5]]) == 1 { "In Work" } else { {if (self.eff_state[self.uses_ids[5]]) == 2 { "Under Review" } else { "Obsolete" }} }} }}</div></div>
+                        <div style="width: 80px; font-size: 12px; color: #57606a">{format("{}", self.qty[self.uses_ids[5]])}</div>
                         <div style="width: 60px; font-size: 12px; color: #57606a">"each"</div>
                     </div>
                 }}
@@ -4340,19 +4464,19 @@ component TreeBench {
                 <div style="direction: vertical; padding: 8 10; gap: 1">
                     <div style="font-size: 11px; color: #6e7781">"["</div>
                     {if self.fetched.len() > 0 {
-                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}}},", self.fetched[0].id, self.fetched[0].name, self.fetched[0].leaf)}</div>
+                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", self.fetched[0].id, self.fetched[0].name, self.fetched[0].leaf, self.fetched[0].state, self.fetched[0].qty)}</div>
                     }}
                     {if self.fetched.len() > 1 {
-                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}}},", self.fetched[1].id, self.fetched[1].name, self.fetched[1].leaf)}</div>
+                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", self.fetched[1].id, self.fetched[1].name, self.fetched[1].leaf, self.fetched[1].state, self.fetched[1].qty)}</div>
                     }}
                     {if self.fetched.len() > 2 {
-                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}}},", self.fetched[2].id, self.fetched[2].name, self.fetched[2].leaf)}</div>
+                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", self.fetched[2].id, self.fetched[2].name, self.fetched[2].leaf, self.fetched[2].state, self.fetched[2].qty)}</div>
                     }}
                     {if self.fetched.len() > 3 {
-                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}}},", self.fetched[3].id, self.fetched[3].name, self.fetched[3].leaf)}</div>
+                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", self.fetched[3].id, self.fetched[3].name, self.fetched[3].leaf, self.fetched[3].state, self.fetched[3].qty)}</div>
                     }}
                     {if self.fetched.len() > 4 {
-                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}}},", self.fetched[4].id, self.fetched[4].name, self.fetched[4].leaf)}</div>
+                        <div style="font-size: 11px; color: #24292f">{format("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", self.fetched[4].id, self.fetched[4].name, self.fetched[4].leaf, self.fetched[4].state, self.fetched[4].qty)}</div>
                     }}
                     {if self.fetched.len() > 5 {
                         <div style="font-size: 11px; color: #6e7781">{format("  … {} more nodes in this response", self.fetched.len() - 5)}</div>

@@ -77,19 +77,38 @@ def node_name(idx: int, d: int) -> str:
         return base  # fastener specs don't take positional qualifiers
     return f"{base} - {QUALIFIERS[(h >> 16) % len(QUALIFIERS)]}"
 
+# ── Editable attributes: the server is the system of record ──────────────────
+# Lifecycle state (0=Released 1=In Work 2=Under Review 3=Obsolete) and per-usage
+# quantity have deterministic defaults; POST /api/part/update stores overrides
+# (in-memory — Cloud Run scale-to-zero forgets them, fine for a mock).
+OVERRIDES = {}          # id -> {"state": int, "qty": int}
+_tree_dirty = False     # bulk-tree JSON cache invalid after an edit
+
+def default_state(idx: int) -> int:
+    return idx % 4
+
+def default_qty(idx: int) -> int:
+    return 1 + ((idx * 2654435761) >> 9) % 4
+
+def record(idx: int, d: int) -> dict:
+    ov = OVERRIDES.get(idx, {})
+    return {"id": idx, "name": node_name(idx, d),
+            "leaf": 1 if d >= MAX_DEPTH else 0,
+            "state": ov.get("state", default_state(idx)),
+            "qty": ov.get("qty", default_qty(idx))}
+
 def children_of(node: int):
     d = depth_of(node)
     out = []
     if d < MAX_DEPTH:
         cd = d + 1
         for c in range(child_count(node)):
-            cid = node * 6 + c + 1
-            out.append({"id": cid, "name": node_name(cid, cd), "leaf": 1 if cd >= MAX_DEPTH else 0})
+            out.append(record(node * 6 + c + 1, cd))
     return out
 
 # ── Precompute the full tree JSON once (BFS over actual variable-arity tree) ──
 def build_full_tree():
-    nodes = [{"id": 0, "name": node_name(0, 0), "leaf": 0}]
+    nodes = [record(0, 0)]
     frontier = [0]
     while frontier:
         nxt = []
@@ -264,6 +283,10 @@ class Handler(SimpleHTTPRequestHandler):
 
         if self.path == '/api/bom/tree':
             time.sleep(LATENCY_S)  # one round-trip's worth; payload transfer is the real cost
+            global FULL_TREE_JSON, _tree_dirty
+            if _tree_dirty:  # rare (only after an edit); rebuild so reloads see committed edits
+                FULL_TREE_JSON = json.dumps(build_full_tree()).encode()
+                _tree_dirty = False
             return self._send(FULL_TREE_JSON, "application/json")
 
         m = re.match(r'^/api/part/thumb-(\d+)-v(iso|front|top)-r(\d)-z(\d)\.svg$', self.path)
@@ -274,6 +297,33 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send(part_svg(int(m.group(1))), "image/svg+xml")
 
         return super().do_GET()
+
+    def do_POST(self):
+        # PATCH-style attribute update: {"id": N, "state": 0-3} and/or {"id": N, "qty": >=1}.
+        # Responds with the committed record as a one-element array — the same
+        # BomNode shape every other endpoint returns, so the client parses the
+        # ack through the exact same zero-copy path as a BOM payload.
+        if self.path == '/api/part/update':
+            global _tree_dirty
+            time.sleep(LATENCY_S)
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                req = json.loads(self.rfile.read(n))
+                idx = int(req["id"])
+                ov = OVERRIDES.setdefault(idx, {})
+                if "state" in req:
+                    ov["state"] = max(0, min(3, int(req["state"])))
+                if "qty" in req:
+                    ov["qty"] = max(1, int(req["qty"]))
+                _tree_dirty = True
+                return self._send(json.dumps([record(idx, depth_of(idx))]).encode(),
+                                  "application/json")
+            except (ValueError, KeyError, json.JSONDecodeError):
+                self.send_response(400)
+                self.end_headers()
+                return
+        self.send_response(404)
+        self.end_headers()
 
     def log_message(self, fmt, *args):
         pass
