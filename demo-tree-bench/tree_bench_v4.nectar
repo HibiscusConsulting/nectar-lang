@@ -4073,22 +4073,39 @@ component TreeBench {
                 <div style="height: 24px; padding: 0 10; background-color: #eef1f4; border: 1px solid #d0d7de; border-radius: 12; color: #24292f; font-size: 11px; align: center; justify: center; cursor: pointer" on:click={self.filter_assemblies}>"Assemblies"</div>
                 <div style="font-size: 11px; color: #6e7781; padding: 0 6">{format("→ {}", self.filter_label)}</div>
             </div>
-            <div style="direction: horizontal; gap: 3; height: 22px; align: center">
-                <div style="width: 96px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_0}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 0 { "▸ Top Assembly" } else { "Top Assembly" }} } else { "Top Assembly" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_1}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 1 { "▸ Major Assembly" } else { "Major Assembly" }} } else { "Major Assembly" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 100px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_2}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 2 { "▸ Sub-Assembly" } else { "Sub-Assembly" }} } else { "Sub-Assembly" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 90px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_3}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 3 { "▸ Component" } else { "Component" }} } else { "Component" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_4}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 4 { "▸ Sub-Component" } else { "Sub-Component" }} } else { "Sub-Component" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 90px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_5}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 5 { "▸ Detail Part" } else { "Detail Part" }} } else { "Detail Part" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_6}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 6 { "▸ Fastener Group" } else { "Fastener Group" }} } else { "Fastener Group" }}</div>
-                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
-                <div style="width: 78px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_7}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 7 { "▸ Fastener" } else { "Fastener" }} } else { "Fastener" }}</div>
+            <div style="direction: horizontal; gap: 8; height: 22px; align: center">
+                <div style="direction: horizontal; width: 104px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_0}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 0 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Top Assembly"</div>
+                </div>
+                <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_1}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 1 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Major Assembly"</div>
+                </div>
+                <div style="direction: horizontal; width: 108px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_2}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 2 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Sub-Assembly"</div>
+                </div>
+                <div style="direction: horizontal; width: 98px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_3}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 3 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Component"</div>
+                </div>
+                <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_4}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 4 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Sub-Component"</div>
+                </div>
+                <div style="direction: horizontal; width: 98px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_5}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 5 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Detail Part"</div>
+                </div>
+                <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_6}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 6 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Fastener Group"</div>
+                </div>
+                <div style="direction: horizontal; width: 86px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_7}>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 7 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="font-size: 11px; color: #57606a">"Fastener"</div>
+                </div>
             </div>
             <div style="direction: horizontal; width: fill; height: 556px; gap: 8">
                 <div style="direction: vertical; width: 620px; height: 556px; background-color: #ffffff; border: 1px solid #d0d7de; border-radius: 4">

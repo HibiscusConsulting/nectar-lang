@@ -677,13 +677,14 @@ for handler_name, label in filters:
 render_lines.append('                <div style="font-size: 11px; color: #6e7781; padding: 0 6">{format("→ {}", self.filter_label)}</div>')
 render_lines.append('            </div>')
 
-render_lines.append('            <div style="direction: horizontal; gap: 3; height: 22px; align: center">')
-CRUMB_W = {0: 96, 1: 108, 2: 100, 3: 90, 4: 108, 5: 90, 6: 108, 7: 78}
+render_lines.append('            <div style="direction: horizontal; gap: 8; height: 22px; align: center">')
+CRUMB_W = {0: 104, 1: 116, 2: 108, 3: 98, 4: 116, 5: 98, 6: 116, 7: 86}
 for k in range(MAX_DEPTH + 1):
-    if k > 0:
-        render_lines.append('                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>')
-    marker = f'if self.window_depths.len() > 0 {{ {{if self.window_depths[0] == {k} {{ "▸ {LEVEL_NAMES[k]}" }} else {{ "{LEVEL_NAMES[k]}" }}}} }} else {{ "{LEVEL_NAMES[k]}" }}'
-    render_lines.append(f'                <div style="width: {CRUMB_W[k]}px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={{self.breadcrumb_jump_{k}}}>{{{marker}}}</div>')
+    marker = f'if self.window_depths.len() > 0 {{ {{if self.window_depths[0] == {k} {{ "▸" }} else {{ " " }}}} }} else {{ " " }}'
+    render_lines.append(f'                <div style="direction: horizontal; width: {CRUMB_W[k]}px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={{self.breadcrumb_jump_{k}}}>')
+    render_lines.append(f'                    <div style="width: 12px; font-size: 11px; color: #9a6700">{{{marker}}}</div>')
+    render_lines.append(f'                    <div style="font-size: 11px; color: #57606a">"{LEVEL_NAMES[k]}"</div>')
+    render_lines.append('                </div>')
 render_lines.append('            </div>')
 
 # ===== main: tree pane + attributes pane =====

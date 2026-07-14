@@ -2002,7 +2002,7 @@ const imports = {{ env: {{
   canvas_measure_text: (id,p,l,sz) => {{ ctx.font=`${{sz}}px -apple-system,sans-serif`; return ctx.measureText(dec.decode(new Uint8Array(W.memory.buffer,p,l))).width; }},
   canvas_highlight_rect: (id,x,y,w,h,r,g,b,a) => {{ ctx.fillStyle=`rgba(${{r}},${{g}},${{b}},${{a/255}})`; ctx.fillRect(x,y,w,h); }},
   canvas_clear: (id) => ctx.clearRect(0,0,vw,vh),
-  canvas_request_frame: () => requestAnimationFrame(() => W.app_render()),
+  canvas_request_frame: () => requestAnimationFrame(() => {{ if (W.app_clear_color) window.__nectarClearColor = W.app_clear_color(); W.app_render(); }}),
   canvas_get_width: () => vw, canvas_get_height: () => vh,
   // Canvas 2D syscalls — real in 2D mode, no-ops in GPU mode (GPU handles rects)
   canvas_init: hasGPU ? (w,h) => {{ resizeCanvases(w,h); return 1; }} : (w,h) => {{ vw=w; vh=h; cvs.width=w*dpr; cvs.height=h*dpr; cvs.style.width=w+'px'; cvs.style.height=h+'px'; ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr); return 1; }},
@@ -2041,12 +2041,18 @@ const imports = {{ env: {{
     if (elementCount === 0 && shadowCount === 0) return;
     const texture = gpuCtx.getCurrentTexture();
     const encoder = gpuDevice.createCommandEncoder();
+    // Clear to the app root's own background so regions beyond the painted
+    // content — overscroll, short pages — match the app instead of flashing
+    // the dark default. Uses the JS-side cache: gpu_render runs INSIDE the
+    // wasm render (engine state already borrowed), so calling back into
+    // W.app_clear_color here would re-borrow and panic.
+    const _cc = (window.__nectarClearColor ?? 0x0b0e14ff) >>> 0;
     const pass = encoder.beginRenderPass({{
       colorAttachments: [{{
         view: texture.createView(),
         loadOp: 'clear',
         storeOp: 'store',
-        clearValue: {{ r: 0.043, g: 0.055, b: 0.078, a: 1.0 }},
+        clearValue: {{ r: ((_cc>>>24)&255)/255, g: ((_cc>>>16)&255)/255, b: ((_cc>>>8)&255)/255, a: (_cc&255)/255 }},
       }}],
     }});
     if (shadowCount > 0) {{
@@ -2178,6 +2184,7 @@ const t1 = performance.now();
 if (hasGPU && W.app_set_gpu_mode) W.app_set_gpu_mode(1);
 if (W.nectar_init) W.nectar_init(vw, vh);
 W.app_init(vw, vh, t1 - t0);
+window.__nectarClearColor = (W.app_clear_color ? W.app_clear_color() : 0x0b0e14ff) >>> 0;
 
 if (hasGPU) {{
   gpuDevice.queue.writeBuffer(uniformBuffer, 0, new Float32Array([vw, vh, 0, 0]));
