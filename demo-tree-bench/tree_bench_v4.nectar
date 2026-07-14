@@ -3984,6 +3984,68 @@ component TreeBench {
             self.status = format("jumped to Fastener Group (row {} of {})", self.scroll_row + 1, self.visible.len());
         }
     }
+    fn breadcrumb_jump_7(&mut self) {
+        if self.capacity == 0 {
+            self.status = "not connected — click Connect first";
+        } else {
+                    if self.window_ids.len() == 0 {
+            self.status = "not connected — click Connect first";
+            return;
+        }
+        let mut cur: i32 = self.window_ids[0];
+        let mut cur_depth: i32 = self.window_depths[0];
+        while cur_depth > 7 {
+            cur = (cur - 1) / self.branching;
+            cur_depth = cur_depth - 1;
+        }
+        let mut found_row: i32 = -1;
+        let mut i: i32 = 0;
+        while i < self.visible.len() {
+            if self.visible[i] == cur {
+                found_row = i;
+            }
+            i = i + 1;
+        }
+        if found_row >= 0 {
+            self.scroll_row = found_row;
+        }
+        if self.scroll_row < 0 {
+            self.scroll_row = 0;
+        }
+        let max_scroll: i32 = self.visible.len() - self.viewport_rows;
+        if max_scroll < 0 {
+            if self.scroll_row > 0 {
+                self.scroll_row = 0;
+            }
+        } else {
+            if self.scroll_row > max_scroll {
+                self.scroll_row = max_scroll;
+            }
+        }
+        self.window_ids = [];
+        self.window_depths = [];
+        let total_visible: i32 = self.visible.len();
+        let mut r: i32 = self.scroll_row;
+        let end: i32 = r + self.viewport_rows;
+        while r < end {
+            if r >= 0 {
+                if r < total_visible {
+                    let id: i32 = self.visible[r];
+                    let mut dd2: i32 = id;
+                    let mut depth2: i32 = 0;
+                    while dd2 > 0 {
+                        dd2 = (dd2 - 1) / self.branching;
+                        depth2 = depth2 + 1;
+                    }
+                    self.window_ids.push(id);
+                    self.window_depths.push(depth2);
+                }
+            }
+            r = r + 1;
+        }
+            self.status = format("jumped to Fastener (row {} of {})", self.scroll_row + 1, self.visible.len());
+        }
+    }
     render {
         <div style="direction: vertical; width: fill; height: fill; background-color: #f6f8fa; padding: 14; gap: 8">
             <div style="direction: horizontal; gap: 12; align: center; height: 26px">
@@ -4012,47 +4074,21 @@ component TreeBench {
                 <div style="font-size: 11px; color: #6e7781; padding: 0 6">{format("→ {}", self.filter_label)}</div>
             </div>
             <div style="direction: horizontal; gap: 3; height: 22px; align: center">
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 0 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_0}>"Top Assembly"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 1 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 1 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_1}>"Major Assembly"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 2 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 2 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_2}>"Sub-Assembly"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 3 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 3 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_3}>"Component"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 4 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 4 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_4}>"Sub-Component"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 5 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 5 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_5}>"Detail Part"</div>
-                    }}
-                }}
-                {if self.window_depths.len() > 0 {
-                    {if self.window_depths[0] >= 6 { <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div> }}
-                    {if self.window_depths[0] >= 6 {
-                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={self.breadcrumb_jump_6}>"Fastener Group"</div>
-                    }}
-                }}
+                <div style="width: 96px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_0}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 0 { "▸ Top Assembly" } else { "Top Assembly" }} } else { "Top Assembly" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_1}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 1 { "▸ Major Assembly" } else { "Major Assembly" }} } else { "Major Assembly" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 100px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_2}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 2 { "▸ Sub-Assembly" } else { "Sub-Assembly" }} } else { "Sub-Assembly" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 90px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_3}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 3 { "▸ Component" } else { "Component" }} } else { "Component" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_4}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 4 { "▸ Sub-Component" } else { "Sub-Component" }} } else { "Sub-Component" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 90px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_5}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 5 { "▸ Detail Part" } else { "Detail Part" }} } else { "Detail Part" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 108px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_6}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 6 { "▸ Fastener Group" } else { "Fastener Group" }} } else { "Fastener Group" }}</div>
+                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>
+                <div style="width: 78px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={self.breadcrumb_jump_7}>{if self.window_depths.len() > 0 { {if self.window_depths[0] == 7 { "▸ Fastener" } else { "Fastener" }} } else { "Fastener" }}</div>
             </div>
             <div style="direction: horizontal; width: fill; height: 556px; gap: 8">
                 <div style="direction: vertical; width: 620px; height: 556px; background-color: #ffffff; border: 1px solid #d0d7de; border-radius: 4">

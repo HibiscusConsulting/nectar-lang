@@ -599,7 +599,7 @@ parts.append(scroll_handler("scroll_to_bottom", "self.scroll_row = self.visible.
     'format("row {} of {}", self.scroll_row + 1, self.visible.len())'))
 
 # --- breadcrumb_jump_K ---
-for k in range(MAX_DEPTH):
+for k in range(MAX_DEPTH + 1):
     before = f"""        if self.window_ids.len() == 0 {{
             self.status = "not connected — click Connect first";
             return;
@@ -678,15 +678,12 @@ render_lines.append('                <div style="font-size: 11px; color: #6e7781
 render_lines.append('            </div>')
 
 render_lines.append('            <div style="direction: horizontal; gap: 3; height: 22px; align: center">')
-for k in range(MAX_DEPTH):
-    sep = '<div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>' if k > 0 else ''
-    render_lines.append(f'                {{if self.window_depths.len() > 0 {{')
-    if sep:
-        render_lines.append(f'                    {{if self.window_depths[0] >= {k} {{ {sep} }}}}')
-    render_lines.append(f'                    {{if self.window_depths[0] >= {k} {{')
-    render_lines.append(f'                        <div style="font-size: 11px; color: #57606a; padding: 2 7; background-color: #eef1f4; border-radius: 3; cursor: pointer" on:click={{self.breadcrumb_jump_{k}}}>"{LEVEL_NAMES[k]}"</div>')
-    render_lines.append('                    }}')
-    render_lines.append('                }}')
+CRUMB_W = {0: 96, 1: 108, 2: 100, 3: 90, 4: 108, 5: 90, 6: 108, 7: 78}
+for k in range(MAX_DEPTH + 1):
+    if k > 0:
+        render_lines.append('                <div style="color: #8c959f; font-size: 11px; padding: 0 2">"›"</div>')
+    marker = f'if self.window_depths.len() > 0 {{ {{if self.window_depths[0] == {k} {{ "▸ {LEVEL_NAMES[k]}" }} else {{ "{LEVEL_NAMES[k]}" }}}} }} else {{ "{LEVEL_NAMES[k]}" }}'
+    render_lines.append(f'                <div style="width: {CRUMB_W[k]}px; height: 18px; font-size: 11px; color: #57606a; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center" on:click={{self.breadcrumb_jump_{k}}}>{{{marker}}}</div>')
 render_lines.append('            </div>')
 
 # ===== main: tree pane + attributes pane =====
