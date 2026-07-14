@@ -590,3815 +590,3631 @@ fn treebench_mount() {
             tree.set_style(el_23, "align", "center");
             let el_24 = tree.create("div");
             tree.append_child(el_23, el_24);
-            tree.set_style(el_24, "direction", "horizontal");
-            tree.set_style(el_24, "width", "104px");
             tree.set_style(el_24, "height", "18px");
+            tree.set_style(el_24, "padding", "0 10");
             tree.set_style(el_24, "background-color", "#eef1f4");
             tree.set_style(el_24, "border-radius", "3");
             tree.set_style(el_24, "cursor", "pointer");
             tree.set_style(el_24, "align", "center");
-            tree.set_style(el_24, "padding-left", "6");
+            tree.set_style(el_24, "justify", "center");
+            tree.set_style(el_24, "font-size", "11px");
+            tree.set_style(el_24, "color", "#57606a");
             // on:click -> breadcrumb_jump_0 (cb_idx=77)
             tree.add_event(el_24, "click", 77);
             if let Some(el) = tree.get_mut(el_24) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_24) { el.text = Some("Top Assembly".into()); }
             let el_25 = tree.create("div");
-            tree.append_child(el_24, el_25);
-            tree.set_style(el_25, "width", "12px");
+            tree.append_child(el_23, el_25);
+            tree.set_style(el_25, "height", "18px");
+            tree.set_style(el_25, "padding", "0 10");
+            tree.set_style(el_25, "background-color", "#eef1f4");
+            tree.set_style(el_25, "border-radius", "3");
+            tree.set_style(el_25, "cursor", "pointer");
+            tree.set_style(el_25, "align", "center");
+            tree.set_style(el_25, "justify", "center");
             tree.set_style(el_25, "font-size", "11px");
-            tree.set_style(el_25, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 0) {
-                    let txt_26 = tree.create("#text");
-                    tree.append_child(el_25, txt_26);
-                    if let Some(el) = tree.get_mut(txt_26) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_27 = tree.create("#text");
-                    tree.append_child(el_25, txt_27);
-                    if let Some(el) = tree.get_mut(txt_27) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_28 = tree.create("#text");
-                tree.append_child(el_25, txt_28);
-                if let Some(el) = tree.get_mut(txt_28) { el.text = Some("".into()); }
-            }
+            tree.set_style(el_25, "color", "#57606a");
+            // on:click -> breadcrumb_jump_1 (cb_idx=78)
+            tree.add_event(el_25, "click", 78);
+            if let Some(el) = tree.get_mut(el_25) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_25) { el.text = Some("Major Assembly".into()); }
+            let el_26 = tree.create("div");
+            tree.append_child(el_23, el_26);
+            tree.set_style(el_26, "height", "18px");
+            tree.set_style(el_26, "padding", "0 10");
+            tree.set_style(el_26, "background-color", "#eef1f4");
+            tree.set_style(el_26, "border-radius", "3");
+            tree.set_style(el_26, "cursor", "pointer");
+            tree.set_style(el_26, "align", "center");
+            tree.set_style(el_26, "justify", "center");
+            tree.set_style(el_26, "font-size", "11px");
+            tree.set_style(el_26, "color", "#57606a");
+            // on:click -> breadcrumb_jump_2 (cb_idx=79)
+            tree.add_event(el_26, "click", 79);
+            if let Some(el) = tree.get_mut(el_26) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_26) { el.text = Some("Sub-Assembly".into()); }
+            let el_27 = tree.create("div");
+            tree.append_child(el_23, el_27);
+            tree.set_style(el_27, "height", "18px");
+            tree.set_style(el_27, "padding", "0 10");
+            tree.set_style(el_27, "background-color", "#eef1f4");
+            tree.set_style(el_27, "border-radius", "3");
+            tree.set_style(el_27, "cursor", "pointer");
+            tree.set_style(el_27, "align", "center");
+            tree.set_style(el_27, "justify", "center");
+            tree.set_style(el_27, "font-size", "11px");
+            tree.set_style(el_27, "color", "#57606a");
+            // on:click -> breadcrumb_jump_3 (cb_idx=80)
+            tree.add_event(el_27, "click", 80);
+            if let Some(el) = tree.get_mut(el_27) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_27) { el.text = Some("Component".into()); }
+            let el_28 = tree.create("div");
+            tree.append_child(el_23, el_28);
+            tree.set_style(el_28, "height", "18px");
+            tree.set_style(el_28, "padding", "0 10");
+            tree.set_style(el_28, "background-color", "#eef1f4");
+            tree.set_style(el_28, "border-radius", "3");
+            tree.set_style(el_28, "cursor", "pointer");
+            tree.set_style(el_28, "align", "center");
+            tree.set_style(el_28, "justify", "center");
+            tree.set_style(el_28, "font-size", "11px");
+            tree.set_style(el_28, "color", "#57606a");
+            // on:click -> breadcrumb_jump_4 (cb_idx=81)
+            tree.add_event(el_28, "click", 81);
+            if let Some(el) = tree.get_mut(el_28) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_28) { el.text = Some("Sub-Component".into()); }
             let el_29 = tree.create("div");
-            tree.append_child(el_24, el_29);
+            tree.append_child(el_23, el_29);
+            tree.set_style(el_29, "height", "18px");
+            tree.set_style(el_29, "padding", "0 10");
+            tree.set_style(el_29, "background-color", "#eef1f4");
+            tree.set_style(el_29, "border-radius", "3");
+            tree.set_style(el_29, "cursor", "pointer");
+            tree.set_style(el_29, "align", "center");
+            tree.set_style(el_29, "justify", "center");
             tree.set_style(el_29, "font-size", "11px");
             tree.set_style(el_29, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_29) { el.text = Some("Top Assembly".into()); }
+            // on:click -> breadcrumb_jump_5 (cb_idx=82)
+            tree.add_event(el_29, "click", 82);
+            if let Some(el) = tree.get_mut(el_29) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_29) { el.text = Some("Detail Part".into()); }
             let el_30 = tree.create("div");
             tree.append_child(el_23, el_30);
-            tree.set_style(el_30, "direction", "horizontal");
-            tree.set_style(el_30, "width", "116px");
             tree.set_style(el_30, "height", "18px");
+            tree.set_style(el_30, "padding", "0 10");
             tree.set_style(el_30, "background-color", "#eef1f4");
             tree.set_style(el_30, "border-radius", "3");
             tree.set_style(el_30, "cursor", "pointer");
             tree.set_style(el_30, "align", "center");
-            tree.set_style(el_30, "padding-left", "6");
-            // on:click -> breadcrumb_jump_1 (cb_idx=78)
-            tree.add_event(el_30, "click", 78);
-            if let Some(el) = tree.get_mut(el_30) { el.visual.cursor = 1; el.focusable = true; }
-            let el_31 = tree.create("div");
-            tree.append_child(el_30, el_31);
-            tree.set_style(el_31, "width", "12px");
-            tree.set_style(el_31, "font-size", "11px");
-            tree.set_style(el_31, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 1) {
-                    let txt_32 = tree.create("#text");
-                    tree.append_child(el_31, txt_32);
-                    if let Some(el) = tree.get_mut(txt_32) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_33 = tree.create("#text");
-                    tree.append_child(el_31, txt_33);
-                    if let Some(el) = tree.get_mut(txt_33) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_34 = tree.create("#text");
-                tree.append_child(el_31, txt_34);
-                if let Some(el) = tree.get_mut(txt_34) { el.text = Some("".into()); }
-            }
-            let el_35 = tree.create("div");
-            tree.append_child(el_30, el_35);
-            tree.set_style(el_35, "font-size", "11px");
-            tree.set_style(el_35, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_35) { el.text = Some("Major Assembly".into()); }
-            let el_36 = tree.create("div");
-            tree.append_child(el_23, el_36);
-            tree.set_style(el_36, "direction", "horizontal");
-            tree.set_style(el_36, "width", "108px");
-            tree.set_style(el_36, "height", "18px");
-            tree.set_style(el_36, "background-color", "#eef1f4");
-            tree.set_style(el_36, "border-radius", "3");
-            tree.set_style(el_36, "cursor", "pointer");
-            tree.set_style(el_36, "align", "center");
-            tree.set_style(el_36, "padding-left", "6");
-            // on:click -> breadcrumb_jump_2 (cb_idx=79)
-            tree.add_event(el_36, "click", 79);
-            if let Some(el) = tree.get_mut(el_36) { el.visual.cursor = 1; el.focusable = true; }
-            let el_37 = tree.create("div");
-            tree.append_child(el_36, el_37);
-            tree.set_style(el_37, "width", "12px");
-            tree.set_style(el_37, "font-size", "11px");
-            tree.set_style(el_37, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 2) {
-                    let txt_38 = tree.create("#text");
-                    tree.append_child(el_37, txt_38);
-                    if let Some(el) = tree.get_mut(txt_38) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_39 = tree.create("#text");
-                    tree.append_child(el_37, txt_39);
-                    if let Some(el) = tree.get_mut(txt_39) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_40 = tree.create("#text");
-                tree.append_child(el_37, txt_40);
-                if let Some(el) = tree.get_mut(txt_40) { el.text = Some("".into()); }
-            }
-            let el_41 = tree.create("div");
-            tree.append_child(el_36, el_41);
-            tree.set_style(el_41, "font-size", "11px");
-            tree.set_style(el_41, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_41) { el.text = Some("Sub-Assembly".into()); }
-            let el_42 = tree.create("div");
-            tree.append_child(el_23, el_42);
-            tree.set_style(el_42, "direction", "horizontal");
-            tree.set_style(el_42, "width", "98px");
-            tree.set_style(el_42, "height", "18px");
-            tree.set_style(el_42, "background-color", "#eef1f4");
-            tree.set_style(el_42, "border-radius", "3");
-            tree.set_style(el_42, "cursor", "pointer");
-            tree.set_style(el_42, "align", "center");
-            tree.set_style(el_42, "padding-left", "6");
-            // on:click -> breadcrumb_jump_3 (cb_idx=80)
-            tree.add_event(el_42, "click", 80);
-            if let Some(el) = tree.get_mut(el_42) { el.visual.cursor = 1; el.focusable = true; }
-            let el_43 = tree.create("div");
-            tree.append_child(el_42, el_43);
-            tree.set_style(el_43, "width", "12px");
-            tree.set_style(el_43, "font-size", "11px");
-            tree.set_style(el_43, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 3) {
-                    let txt_44 = tree.create("#text");
-                    tree.append_child(el_43, txt_44);
-                    if let Some(el) = tree.get_mut(txt_44) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_45 = tree.create("#text");
-                    tree.append_child(el_43, txt_45);
-                    if let Some(el) = tree.get_mut(txt_45) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_46 = tree.create("#text");
-                tree.append_child(el_43, txt_46);
-                if let Some(el) = tree.get_mut(txt_46) { el.text = Some("".into()); }
-            }
-            let el_47 = tree.create("div");
-            tree.append_child(el_42, el_47);
-            tree.set_style(el_47, "font-size", "11px");
-            tree.set_style(el_47, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_47) { el.text = Some("Component".into()); }
-            let el_48 = tree.create("div");
-            tree.append_child(el_23, el_48);
-            tree.set_style(el_48, "direction", "horizontal");
-            tree.set_style(el_48, "width", "116px");
-            tree.set_style(el_48, "height", "18px");
-            tree.set_style(el_48, "background-color", "#eef1f4");
-            tree.set_style(el_48, "border-radius", "3");
-            tree.set_style(el_48, "cursor", "pointer");
-            tree.set_style(el_48, "align", "center");
-            tree.set_style(el_48, "padding-left", "6");
-            // on:click -> breadcrumb_jump_4 (cb_idx=81)
-            tree.add_event(el_48, "click", 81);
-            if let Some(el) = tree.get_mut(el_48) { el.visual.cursor = 1; el.focusable = true; }
-            let el_49 = tree.create("div");
-            tree.append_child(el_48, el_49);
-            tree.set_style(el_49, "width", "12px");
-            tree.set_style(el_49, "font-size", "11px");
-            tree.set_style(el_49, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 4) {
-                    let txt_50 = tree.create("#text");
-                    tree.append_child(el_49, txt_50);
-                    if let Some(el) = tree.get_mut(txt_50) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_51 = tree.create("#text");
-                    tree.append_child(el_49, txt_51);
-                    if let Some(el) = tree.get_mut(txt_51) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_52 = tree.create("#text");
-                tree.append_child(el_49, txt_52);
-                if let Some(el) = tree.get_mut(txt_52) { el.text = Some("".into()); }
-            }
-            let el_53 = tree.create("div");
-            tree.append_child(el_48, el_53);
-            tree.set_style(el_53, "font-size", "11px");
-            tree.set_style(el_53, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_53) { el.text = Some("Sub-Component".into()); }
-            let el_54 = tree.create("div");
-            tree.append_child(el_23, el_54);
-            tree.set_style(el_54, "direction", "horizontal");
-            tree.set_style(el_54, "width", "98px");
-            tree.set_style(el_54, "height", "18px");
-            tree.set_style(el_54, "background-color", "#eef1f4");
-            tree.set_style(el_54, "border-radius", "3");
-            tree.set_style(el_54, "cursor", "pointer");
-            tree.set_style(el_54, "align", "center");
-            tree.set_style(el_54, "padding-left", "6");
-            // on:click -> breadcrumb_jump_5 (cb_idx=82)
-            tree.add_event(el_54, "click", 82);
-            if let Some(el) = tree.get_mut(el_54) { el.visual.cursor = 1; el.focusable = true; }
-            let el_55 = tree.create("div");
-            tree.append_child(el_54, el_55);
-            tree.set_style(el_55, "width", "12px");
-            tree.set_style(el_55, "font-size", "11px");
-            tree.set_style(el_55, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 5) {
-                    let txt_56 = tree.create("#text");
-                    tree.append_child(el_55, txt_56);
-                    if let Some(el) = tree.get_mut(txt_56) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_57 = tree.create("#text");
-                    tree.append_child(el_55, txt_57);
-                    if let Some(el) = tree.get_mut(txt_57) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_58 = tree.create("#text");
-                tree.append_child(el_55, txt_58);
-                if let Some(el) = tree.get_mut(txt_58) { el.text = Some("".into()); }
-            }
-            let el_59 = tree.create("div");
-            tree.append_child(el_54, el_59);
-            tree.set_style(el_59, "font-size", "11px");
-            tree.set_style(el_59, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_59) { el.text = Some("Detail Part".into()); }
-            let el_60 = tree.create("div");
-            tree.append_child(el_23, el_60);
-            tree.set_style(el_60, "direction", "horizontal");
-            tree.set_style(el_60, "width", "116px");
-            tree.set_style(el_60, "height", "18px");
-            tree.set_style(el_60, "background-color", "#eef1f4");
-            tree.set_style(el_60, "border-radius", "3");
-            tree.set_style(el_60, "cursor", "pointer");
-            tree.set_style(el_60, "align", "center");
-            tree.set_style(el_60, "padding-left", "6");
+            tree.set_style(el_30, "justify", "center");
+            tree.set_style(el_30, "font-size", "11px");
+            tree.set_style(el_30, "color", "#57606a");
             // on:click -> breadcrumb_jump_6 (cb_idx=83)
-            tree.add_event(el_60, "click", 83);
-            if let Some(el) = tree.get_mut(el_60) { el.visual.cursor = 1; el.focusable = true; }
-            let el_61 = tree.create("div");
-            tree.append_child(el_60, el_61);
-            tree.set_style(el_61, "width", "12px");
-            tree.set_style(el_61, "font-size", "11px");
-            tree.set_style(el_61, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 6) {
-                    let txt_62 = tree.create("#text");
-                    tree.append_child(el_61, txt_62);
-                    if let Some(el) = tree.get_mut(txt_62) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_63 = tree.create("#text");
-                    tree.append_child(el_61, txt_63);
-                    if let Some(el) = tree.get_mut(txt_63) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_64 = tree.create("#text");
-                tree.append_child(el_61, txt_64);
-                if let Some(el) = tree.get_mut(txt_64) { el.text = Some("".into()); }
-            }
-            let el_65 = tree.create("div");
-            tree.append_child(el_60, el_65);
-            tree.set_style(el_65, "font-size", "11px");
-            tree.set_style(el_65, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_65) { el.text = Some("Fastener Group".into()); }
-            let el_66 = tree.create("div");
-            tree.append_child(el_23, el_66);
-            tree.set_style(el_66, "direction", "horizontal");
-            tree.set_style(el_66, "width", "86px");
-            tree.set_style(el_66, "height", "18px");
-            tree.set_style(el_66, "background-color", "#eef1f4");
-            tree.set_style(el_66, "border-radius", "3");
-            tree.set_style(el_66, "cursor", "pointer");
-            tree.set_style(el_66, "align", "center");
-            tree.set_style(el_66, "padding-left", "6");
+            tree.add_event(el_30, "click", 83);
+            if let Some(el) = tree.get_mut(el_30) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_30) { el.text = Some("Fastener Group".into()); }
+            let el_31 = tree.create("div");
+            tree.append_child(el_23, el_31);
+            tree.set_style(el_31, "height", "18px");
+            tree.set_style(el_31, "padding", "0 10");
+            tree.set_style(el_31, "background-color", "#eef1f4");
+            tree.set_style(el_31, "border-radius", "3");
+            tree.set_style(el_31, "cursor", "pointer");
+            tree.set_style(el_31, "align", "center");
+            tree.set_style(el_31, "justify", "center");
+            tree.set_style(el_31, "font-size", "11px");
+            tree.set_style(el_31, "color", "#57606a");
             // on:click -> breadcrumb_jump_7 (cb_idx=84)
-            tree.add_event(el_66, "click", 84);
-            if let Some(el) = tree.get_mut(el_66) { el.visual.cursor = 1; el.focusable = true; }
-            let el_67 = tree.create("div");
-            tree.append_child(el_66, el_67);
-            tree.set_style(el_67, "width", "12px");
-            tree.set_style(el_67, "font-size", "11px");
-            tree.set_style(el_67, "color", "#9a6700");
-            if (window_depths.len() as i32 > 0) {
-                if (window_depths[0 as usize] == 7) {
-                    let txt_68 = tree.create("#text");
-                    tree.append_child(el_67, txt_68);
-                    if let Some(el) = tree.get_mut(txt_68) { el.text = Some("▸".into()); }
-                } else {
-                    let txt_69 = tree.create("#text");
-                    tree.append_child(el_67, txt_69);
-                    if let Some(el) = tree.get_mut(txt_69) { el.text = Some("".into()); }
-                }
-            } else {
-                let txt_70 = tree.create("#text");
-                tree.append_child(el_67, txt_70);
-                if let Some(el) = tree.get_mut(txt_70) { el.text = Some("".into()); }
-            }
-            let el_71 = tree.create("div");
-            tree.append_child(el_66, el_71);
-            tree.set_style(el_71, "font-size", "11px");
-            tree.set_style(el_71, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_71) { el.text = Some("Fastener".into()); }
-            let el_72 = tree.create("div");
-            tree.append_child(el_0, el_72);
-            tree.set_style(el_72, "direction", "horizontal");
-            tree.set_style(el_72, "width", "fill");
-            tree.set_style(el_72, "height", "556px");
-            tree.set_style(el_72, "gap", "8");
-            let el_73 = tree.create("div");
-            tree.append_child(el_72, el_73);
-            tree.set_style(el_73, "direction", "vertical");
-            tree.set_style(el_73, "width", "620px");
-            tree.set_style(el_73, "height", "556px");
-            tree.set_style(el_73, "background-color", "#ffffff");
-            tree.set_style(el_73, "border", "1px solid #d0d7de");
-            tree.set_style(el_73, "border-radius", "4");
-            let el_74 = tree.create("div");
-            tree.append_child(el_73, el_74);
-            tree.set_style(el_74, "height", "26px");
-            tree.set_style(el_74, "background-color", "#f6f8fa");
-            tree.set_style(el_74, "border-bottom", "1px solid #d0d7de");
-            tree.set_style(el_74, "padding", "0 10");
-            tree.set_style(el_74, "align", "center");
-            tree.set_style(el_74, "direction", "horizontal");
-            tree.set_style(el_74, "gap", "10");
-            let el_75 = tree.create("div");
-            tree.append_child(el_74, el_75);
-            tree.set_style(el_75, "font-size", "11px");
-            tree.set_style(el_75, "font-weight", "700");
-            tree.set_style(el_75, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_75) { el.text = Some("STRUCTURE".into()); }
-            let el_76 = tree.create("div");
-            tree.append_child(el_74, el_76);
-            tree.set_style(el_76, "font-size", "11px");
-            tree.set_style(el_76, "color", "#9a6700");
-            if let Some(el) = tree.get_mut(el_76) { el.text = Some(format!("{} rows", visible.len() as i32).to_string()); }
-            let el_77 = tree.create("div");
-            tree.append_child(el_74, el_77);
-            tree.set_style(el_77, "font-size", "11px");
-            tree.set_style(el_77, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_77) { el.text = Some(format!("{} nodes loaded · {} API calls", loaded_count, api_calls).to_string()); }
+            tree.add_event(el_31, "click", 84);
+            if let Some(el) = tree.get_mut(el_31) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_31) { el.text = Some("Fastener".into()); }
+            let el_32 = tree.create("div");
+            tree.append_child(el_0, el_32);
+            tree.set_style(el_32, "direction", "horizontal");
+            tree.set_style(el_32, "width", "fill");
+            tree.set_style(el_32, "height", "556px");
+            tree.set_style(el_32, "gap", "8");
+            let el_33 = tree.create("div");
+            tree.append_child(el_32, el_33);
+            tree.set_style(el_33, "direction", "vertical");
+            tree.set_style(el_33, "width", "620px");
+            tree.set_style(el_33, "height", "556px");
+            tree.set_style(el_33, "background-color", "#ffffff");
+            tree.set_style(el_33, "border", "1px solid #d0d7de");
+            tree.set_style(el_33, "border-radius", "4");
+            let el_34 = tree.create("div");
+            tree.append_child(el_33, el_34);
+            tree.set_style(el_34, "height", "26px");
+            tree.set_style(el_34, "background-color", "#f6f8fa");
+            tree.set_style(el_34, "border-bottom", "1px solid #d0d7de");
+            tree.set_style(el_34, "padding", "0 10");
+            tree.set_style(el_34, "align", "center");
+            tree.set_style(el_34, "direction", "horizontal");
+            tree.set_style(el_34, "gap", "10");
+            let el_35 = tree.create("div");
+            tree.append_child(el_34, el_35);
+            tree.set_style(el_35, "font-size", "11px");
+            tree.set_style(el_35, "font-weight", "700");
+            tree.set_style(el_35, "color", "#57606a");
+            if let Some(el) = tree.get_mut(el_35) { el.text = Some("STRUCTURE".into()); }
+            let el_36 = tree.create("div");
+            tree.append_child(el_34, el_36);
+            tree.set_style(el_36, "font-size", "11px");
+            tree.set_style(el_36, "color", "#9a6700");
+            if let Some(el) = tree.get_mut(el_36) { el.text = Some(format!("{} rows", visible.len() as i32).to_string()); }
+            let el_37 = tree.create("div");
+            tree.append_child(el_34, el_37);
+            tree.set_style(el_37, "font-size", "11px");
+            tree.set_style(el_37, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_37) { el.text = Some(format!("{} nodes loaded · {} API calls", loaded_count, api_calls).to_string()); }
             if (window_ids.len() as i32 > 0) {
-                let el_78 = tree.create("div");
-                tree.append_child(el_73, el_78);
-                tree.set_style(el_78, "direction", "horizontal");
-                tree.set_style(el_78, "height", "24px");
-                tree.set_style(el_78, "background-color", "#ffffff");
-                tree.set_style(el_78, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_78, "align", "center");
-                tree.set_style(el_78, "padding-left", "6");
+                let el_38 = tree.create("div");
+                tree.append_child(el_33, el_38);
+                tree.set_style(el_38, "direction", "horizontal");
+                tree.set_style(el_38, "height", "24px");
+                tree.set_style(el_38, "background-color", "#ffffff");
+                tree.set_style(el_38, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_38, "align", "center");
+                tree.set_style(el_38, "padding-left", "6");
                 if (window_depths[0 as usize] >= 1) {
-                    let el_79 = tree.create("div");
-                    tree.append_child(el_78, el_79);
-                    tree.set_style(el_79, "width", "14px");
+                    let el_39 = tree.create("div");
+                    tree.append_child(el_38, el_39);
+                    tree.set_style(el_39, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 2) {
-                    let el_80 = tree.create("div");
-                    tree.append_child(el_78, el_80);
-                    tree.set_style(el_80, "width", "14px");
+                    let el_40 = tree.create("div");
+                    tree.append_child(el_38, el_40);
+                    tree.set_style(el_40, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 3) {
-                    let el_81 = tree.create("div");
-                    tree.append_child(el_78, el_81);
-                    tree.set_style(el_81, "width", "14px");
+                    let el_41 = tree.create("div");
+                    tree.append_child(el_38, el_41);
+                    tree.set_style(el_41, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 4) {
-                    let el_82 = tree.create("div");
-                    tree.append_child(el_78, el_82);
-                    tree.set_style(el_82, "width", "14px");
+                    let el_42 = tree.create("div");
+                    tree.append_child(el_38, el_42);
+                    tree.set_style(el_42, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 5) {
-                    let el_83 = tree.create("div");
-                    tree.append_child(el_78, el_83);
-                    tree.set_style(el_83, "width", "14px");
+                    let el_43 = tree.create("div");
+                    tree.append_child(el_38, el_43);
+                    tree.set_style(el_43, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 6) {
-                    let el_84 = tree.create("div");
-                    tree.append_child(el_78, el_84);
-                    tree.set_style(el_84, "width", "14px");
+                    let el_44 = tree.create("div");
+                    tree.append_child(el_38, el_44);
+                    tree.set_style(el_44, "width", "14px");
                 }
                 if (window_depths[0 as usize] >= 7) {
-                    let el_85 = tree.create("div");
-                    tree.append_child(el_78, el_85);
-                    tree.set_style(el_85, "width", "14px");
+                    let el_45 = tree.create("div");
+                    tree.append_child(el_38, el_45);
+                    tree.set_style(el_45, "width", "14px");
                 }
-                let el_86 = tree.create("div");
-                tree.append_child(el_78, el_86);
-                tree.set_style(el_86, "width", "18px");
-                tree.set_style(el_86, "height", "24px");
-                tree.set_style(el_86, "align", "center");
-                tree.set_style(el_86, "justify", "center");
-                tree.set_style(el_86, "font-size", "10px");
-                tree.set_style(el_86, "color", "#9a6700");
-                tree.set_style(el_86, "cursor", "pointer");
+                let el_46 = tree.create("div");
+                tree.append_child(el_38, el_46);
+                tree.set_style(el_46, "width", "18px");
+                tree.set_style(el_46, "height", "24px");
+                tree.set_style(el_46, "align", "center");
+                tree.set_style(el_46, "justify", "center");
+                tree.set_style(el_46, "font-size", "10px");
+                tree.set_style(el_46, "color", "#9a6700");
+                tree.set_style(el_46, "cursor", "pointer");
                 // on:click -> toggle_row_0 (cb_idx=5)
-                tree.add_event(el_86, "click", 5);
-                if let Some(el) = tree.get_mut(el_86) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_46, "click", 5);
+                if let Some(el) = tree.get_mut(el_46) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[0 as usize] < max_depth) {
                     if loaded[window_ids[0 as usize] as usize] {
                         if expanded[window_ids[0 as usize] as usize] {
-                            let txt_87 = tree.create("#text");
-                            tree.append_child(el_86, txt_87);
-                            if let Some(el) = tree.get_mut(txt_87) { el.text = Some("▾".into()); }
+                            let txt_47 = tree.create("#text");
+                            tree.append_child(el_46, txt_47);
+                            if let Some(el) = tree.get_mut(txt_47) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_88 = tree.create("#text");
-                            tree.append_child(el_86, txt_88);
-                            if let Some(el) = tree.get_mut(txt_88) { el.text = Some("▸".into()); }
+                            let txt_48 = tree.create("#text");
+                            tree.append_child(el_46, txt_48);
+                            if let Some(el) = tree.get_mut(txt_48) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_89 = tree.create("#text");
-                        tree.append_child(el_86, txt_89);
-                        if let Some(el) = tree.get_mut(txt_89) { el.text = Some("+".into()); }
+                        let txt_49 = tree.create("#text");
+                        tree.append_child(el_46, txt_49);
+                        if let Some(el) = tree.get_mut(txt_49) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_90 = tree.create("#text");
-                    tree.append_child(el_86, txt_90);
-                    if let Some(el) = tree.get_mut(txt_90) { el.text = Some("·".into()); }
+                    let txt_50 = tree.create("#text");
+                    tree.append_child(el_46, txt_50);
+                    if let Some(el) = tree.get_mut(txt_50) { el.text = Some("·".into()); }
                 }
-                let el_91 = tree.create("div");
-                tree.append_child(el_78, el_91);
-                tree.set_style(el_91, "direction", "horizontal");
-                tree.set_style(el_91, "width", "fill");
-                tree.set_style(el_91, "height", "24px");
-                tree.set_style(el_91, "align", "center");
-                tree.set_style(el_91, "gap", "5");
-                tree.set_style(el_91, "cursor", "pointer");
+                let el_51 = tree.create("div");
+                tree.append_child(el_38, el_51);
+                tree.set_style(el_51, "direction", "horizontal");
+                tree.set_style(el_51, "width", "fill");
+                tree.set_style(el_51, "height", "24px");
+                tree.set_style(el_51, "align", "center");
+                tree.set_style(el_51, "gap", "5");
+                tree.set_style(el_51, "cursor", "pointer");
                 // on:click -> select_row_0 (cb_idx=27)
-                tree.add_event(el_91, "click", 27);
-                if let Some(el) = tree.get_mut(el_91) { el.visual.cursor = 1; el.focusable = true; }
-                let el_92 = tree.create("div");
-                tree.append_child(el_91, el_92);
-                tree.set_style(el_92, "width", "12px");
-                tree.set_style(el_92, "height", "24px");
-                tree.set_style(el_92, "align", "center");
-                tree.set_style(el_92, "justify", "center");
+                tree.add_event(el_51, "click", 27);
+                if let Some(el) = tree.get_mut(el_51) { el.visual.cursor = 1; el.focusable = true; }
+                let el_52 = tree.create("div");
+                tree.append_child(el_51, el_52);
+                tree.set_style(el_52, "width", "12px");
+                tree.set_style(el_52, "height", "24px");
+                tree.set_style(el_52, "align", "center");
+                tree.set_style(el_52, "justify", "center");
                 if (eff_state[window_ids[0 as usize] as usize] == 0) {
-                    let el_93 = tree.create("div");
-                    tree.append_child(el_92, el_93);
-                    tree.set_style(el_93, "width", "7px");
-                    tree.set_style(el_93, "height", "7px");
-                    tree.set_style(el_93, "border-radius", "4");
-                    tree.set_style(el_93, "background-color", "#1a7f37");
+                    let el_53 = tree.create("div");
+                    tree.append_child(el_52, el_53);
+                    tree.set_style(el_53, "width", "7px");
+                    tree.set_style(el_53, "height", "7px");
+                    tree.set_style(el_53, "border-radius", "4");
+                    tree.set_style(el_53, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[0 as usize] as usize] == 1) {
-                        let el_94 = tree.create("div");
-                        tree.append_child(el_92, el_94);
-                        tree.set_style(el_94, "width", "7px");
-                        tree.set_style(el_94, "height", "7px");
-                        tree.set_style(el_94, "border-radius", "4");
-                        tree.set_style(el_94, "background-color", "#0969da");
+                        let el_54 = tree.create("div");
+                        tree.append_child(el_52, el_54);
+                        tree.set_style(el_54, "width", "7px");
+                        tree.set_style(el_54, "height", "7px");
+                        tree.set_style(el_54, "border-radius", "4");
+                        tree.set_style(el_54, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[0 as usize] as usize] == 2) {
-                            let el_95 = tree.create("div");
-                            tree.append_child(el_92, el_95);
-                            tree.set_style(el_95, "width", "7px");
-                            tree.set_style(el_95, "height", "7px");
-                            tree.set_style(el_95, "border-radius", "4");
-                            tree.set_style(el_95, "background-color", "#9a6700");
+                            let el_55 = tree.create("div");
+                            tree.append_child(el_52, el_55);
+                            tree.set_style(el_55, "width", "7px");
+                            tree.set_style(el_55, "height", "7px");
+                            tree.set_style(el_55, "border-radius", "4");
+                            tree.set_style(el_55, "background-color", "#9a6700");
                         } else {
-                            let el_96 = tree.create("div");
-                            tree.append_child(el_92, el_96);
-                            tree.set_style(el_96, "width", "7px");
-                            tree.set_style(el_96, "height", "7px");
-                            tree.set_style(el_96, "border-radius", "4");
-                            tree.set_style(el_96, "background-color", "#6e7781");
+                            let el_56 = tree.create("div");
+                            tree.append_child(el_52, el_56);
+                            tree.set_style(el_56, "width", "7px");
+                            tree.set_style(el_56, "height", "7px");
+                            tree.set_style(el_56, "border-radius", "4");
+                            tree.set_style(el_56, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_97 = tree.create("div");
-                tree.append_child(el_91, el_97);
-                tree.set_style(el_97, "font-size", "12px");
-                tree.set_style(el_97, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_97) { el.text = Some(format!("PN-{}", window_ids[0 as usize]).to_string()); }
-                let el_98 = tree.create("div");
-                tree.append_child(el_91, el_98);
-                tree.set_style(el_98, "font-size", "12px");
-                tree.set_style(el_98, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_98) { el.text = Some(format!("{}", names[window_ids[0 as usize] as usize]).to_string()); }
-                let el_99 = tree.create("div");
-                tree.append_child(el_91, el_99);
-                tree.set_style(el_99, "font-size", "11px");
-                tree.set_style(el_99, "color", "#6e7781");
+                let el_57 = tree.create("div");
+                tree.append_child(el_51, el_57);
+                tree.set_style(el_57, "font-size", "12px");
+                tree.set_style(el_57, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_57) { el.text = Some(format!("PN-{}", window_ids[0 as usize]).to_string()); }
+                let el_58 = tree.create("div");
+                tree.append_child(el_51, el_58);
+                tree.set_style(el_58, "font-size", "12px");
+                tree.set_style(el_58, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_58) { el.text = Some(format!("{}", names[window_ids[0 as usize] as usize]).to_string()); }
+                let el_59 = tree.create("div");
+                tree.append_child(el_51, el_59);
+                tree.set_style(el_59, "font-size", "11px");
+                tree.set_style(el_59, "color", "#6e7781");
                 if (window_depths[0 as usize] < max_depth) {
-                    let txt_100 = tree.create("#text");
-                    tree.append_child(el_99, txt_100);
-                    if let Some(el) = tree.get_mut(txt_100) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_60 = tree.create("#text");
+                    tree.append_child(el_59, txt_60);
+                    if let Some(el) = tree.get_mut(txt_60) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_101 = tree.create("#text");
-                    tree.append_child(el_99, txt_101);
-                    if let Some(el) = tree.get_mut(txt_101) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_61 = tree.create("#text");
+                    tree.append_child(el_59, txt_61);
+                    if let Some(el) = tree.get_mut(txt_61) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 1) {
-                let el_102 = tree.create("div");
-                tree.append_child(el_73, el_102);
-                tree.set_style(el_102, "direction", "horizontal");
-                tree.set_style(el_102, "height", "24px");
-                tree.set_style(el_102, "background-color", "#f9fafb");
-                tree.set_style(el_102, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_102, "align", "center");
-                tree.set_style(el_102, "padding-left", "6");
+                let el_62 = tree.create("div");
+                tree.append_child(el_33, el_62);
+                tree.set_style(el_62, "direction", "horizontal");
+                tree.set_style(el_62, "height", "24px");
+                tree.set_style(el_62, "background-color", "#f9fafb");
+                tree.set_style(el_62, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_62, "align", "center");
+                tree.set_style(el_62, "padding-left", "6");
                 if (window_depths[1 as usize] >= 1) {
-                    let el_103 = tree.create("div");
-                    tree.append_child(el_102, el_103);
-                    tree.set_style(el_103, "width", "14px");
+                    let el_63 = tree.create("div");
+                    tree.append_child(el_62, el_63);
+                    tree.set_style(el_63, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 2) {
-                    let el_104 = tree.create("div");
-                    tree.append_child(el_102, el_104);
-                    tree.set_style(el_104, "width", "14px");
+                    let el_64 = tree.create("div");
+                    tree.append_child(el_62, el_64);
+                    tree.set_style(el_64, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 3) {
-                    let el_105 = tree.create("div");
-                    tree.append_child(el_102, el_105);
-                    tree.set_style(el_105, "width", "14px");
+                    let el_65 = tree.create("div");
+                    tree.append_child(el_62, el_65);
+                    tree.set_style(el_65, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 4) {
-                    let el_106 = tree.create("div");
-                    tree.append_child(el_102, el_106);
-                    tree.set_style(el_106, "width", "14px");
+                    let el_66 = tree.create("div");
+                    tree.append_child(el_62, el_66);
+                    tree.set_style(el_66, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 5) {
-                    let el_107 = tree.create("div");
-                    tree.append_child(el_102, el_107);
-                    tree.set_style(el_107, "width", "14px");
+                    let el_67 = tree.create("div");
+                    tree.append_child(el_62, el_67);
+                    tree.set_style(el_67, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 6) {
-                    let el_108 = tree.create("div");
-                    tree.append_child(el_102, el_108);
-                    tree.set_style(el_108, "width", "14px");
+                    let el_68 = tree.create("div");
+                    tree.append_child(el_62, el_68);
+                    tree.set_style(el_68, "width", "14px");
                 }
                 if (window_depths[1 as usize] >= 7) {
-                    let el_109 = tree.create("div");
-                    tree.append_child(el_102, el_109);
-                    tree.set_style(el_109, "width", "14px");
+                    let el_69 = tree.create("div");
+                    tree.append_child(el_62, el_69);
+                    tree.set_style(el_69, "width", "14px");
                 }
-                let el_110 = tree.create("div");
-                tree.append_child(el_102, el_110);
-                tree.set_style(el_110, "width", "18px");
-                tree.set_style(el_110, "height", "24px");
-                tree.set_style(el_110, "align", "center");
-                tree.set_style(el_110, "justify", "center");
-                tree.set_style(el_110, "font-size", "10px");
-                tree.set_style(el_110, "color", "#9a6700");
-                tree.set_style(el_110, "cursor", "pointer");
+                let el_70 = tree.create("div");
+                tree.append_child(el_62, el_70);
+                tree.set_style(el_70, "width", "18px");
+                tree.set_style(el_70, "height", "24px");
+                tree.set_style(el_70, "align", "center");
+                tree.set_style(el_70, "justify", "center");
+                tree.set_style(el_70, "font-size", "10px");
+                tree.set_style(el_70, "color", "#9a6700");
+                tree.set_style(el_70, "cursor", "pointer");
                 // on:click -> toggle_row_1 (cb_idx=6)
-                tree.add_event(el_110, "click", 6);
-                if let Some(el) = tree.get_mut(el_110) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_70, "click", 6);
+                if let Some(el) = tree.get_mut(el_70) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[1 as usize] < max_depth) {
                     if loaded[window_ids[1 as usize] as usize] {
                         if expanded[window_ids[1 as usize] as usize] {
-                            let txt_111 = tree.create("#text");
-                            tree.append_child(el_110, txt_111);
-                            if let Some(el) = tree.get_mut(txt_111) { el.text = Some("▾".into()); }
+                            let txt_71 = tree.create("#text");
+                            tree.append_child(el_70, txt_71);
+                            if let Some(el) = tree.get_mut(txt_71) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_112 = tree.create("#text");
-                            tree.append_child(el_110, txt_112);
-                            if let Some(el) = tree.get_mut(txt_112) { el.text = Some("▸".into()); }
+                            let txt_72 = tree.create("#text");
+                            tree.append_child(el_70, txt_72);
+                            if let Some(el) = tree.get_mut(txt_72) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_113 = tree.create("#text");
-                        tree.append_child(el_110, txt_113);
-                        if let Some(el) = tree.get_mut(txt_113) { el.text = Some("+".into()); }
+                        let txt_73 = tree.create("#text");
+                        tree.append_child(el_70, txt_73);
+                        if let Some(el) = tree.get_mut(txt_73) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_114 = tree.create("#text");
-                    tree.append_child(el_110, txt_114);
-                    if let Some(el) = tree.get_mut(txt_114) { el.text = Some("·".into()); }
+                    let txt_74 = tree.create("#text");
+                    tree.append_child(el_70, txt_74);
+                    if let Some(el) = tree.get_mut(txt_74) { el.text = Some("·".into()); }
                 }
-                let el_115 = tree.create("div");
-                tree.append_child(el_102, el_115);
-                tree.set_style(el_115, "direction", "horizontal");
-                tree.set_style(el_115, "width", "fill");
-                tree.set_style(el_115, "height", "24px");
-                tree.set_style(el_115, "align", "center");
-                tree.set_style(el_115, "gap", "5");
-                tree.set_style(el_115, "cursor", "pointer");
+                let el_75 = tree.create("div");
+                tree.append_child(el_62, el_75);
+                tree.set_style(el_75, "direction", "horizontal");
+                tree.set_style(el_75, "width", "fill");
+                tree.set_style(el_75, "height", "24px");
+                tree.set_style(el_75, "align", "center");
+                tree.set_style(el_75, "gap", "5");
+                tree.set_style(el_75, "cursor", "pointer");
                 // on:click -> select_row_1 (cb_idx=28)
-                tree.add_event(el_115, "click", 28);
-                if let Some(el) = tree.get_mut(el_115) { el.visual.cursor = 1; el.focusable = true; }
-                let el_116 = tree.create("div");
-                tree.append_child(el_115, el_116);
-                tree.set_style(el_116, "width", "12px");
-                tree.set_style(el_116, "height", "24px");
-                tree.set_style(el_116, "align", "center");
-                tree.set_style(el_116, "justify", "center");
+                tree.add_event(el_75, "click", 28);
+                if let Some(el) = tree.get_mut(el_75) { el.visual.cursor = 1; el.focusable = true; }
+                let el_76 = tree.create("div");
+                tree.append_child(el_75, el_76);
+                tree.set_style(el_76, "width", "12px");
+                tree.set_style(el_76, "height", "24px");
+                tree.set_style(el_76, "align", "center");
+                tree.set_style(el_76, "justify", "center");
                 if (eff_state[window_ids[1 as usize] as usize] == 0) {
-                    let el_117 = tree.create("div");
-                    tree.append_child(el_116, el_117);
-                    tree.set_style(el_117, "width", "7px");
-                    tree.set_style(el_117, "height", "7px");
-                    tree.set_style(el_117, "border-radius", "4");
-                    tree.set_style(el_117, "background-color", "#1a7f37");
+                    let el_77 = tree.create("div");
+                    tree.append_child(el_76, el_77);
+                    tree.set_style(el_77, "width", "7px");
+                    tree.set_style(el_77, "height", "7px");
+                    tree.set_style(el_77, "border-radius", "4");
+                    tree.set_style(el_77, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[1 as usize] as usize] == 1) {
-                        let el_118 = tree.create("div");
-                        tree.append_child(el_116, el_118);
-                        tree.set_style(el_118, "width", "7px");
-                        tree.set_style(el_118, "height", "7px");
-                        tree.set_style(el_118, "border-radius", "4");
-                        tree.set_style(el_118, "background-color", "#0969da");
+                        let el_78 = tree.create("div");
+                        tree.append_child(el_76, el_78);
+                        tree.set_style(el_78, "width", "7px");
+                        tree.set_style(el_78, "height", "7px");
+                        tree.set_style(el_78, "border-radius", "4");
+                        tree.set_style(el_78, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[1 as usize] as usize] == 2) {
-                            let el_119 = tree.create("div");
-                            tree.append_child(el_116, el_119);
-                            tree.set_style(el_119, "width", "7px");
-                            tree.set_style(el_119, "height", "7px");
-                            tree.set_style(el_119, "border-radius", "4");
-                            tree.set_style(el_119, "background-color", "#9a6700");
+                            let el_79 = tree.create("div");
+                            tree.append_child(el_76, el_79);
+                            tree.set_style(el_79, "width", "7px");
+                            tree.set_style(el_79, "height", "7px");
+                            tree.set_style(el_79, "border-radius", "4");
+                            tree.set_style(el_79, "background-color", "#9a6700");
                         } else {
-                            let el_120 = tree.create("div");
-                            tree.append_child(el_116, el_120);
-                            tree.set_style(el_120, "width", "7px");
-                            tree.set_style(el_120, "height", "7px");
-                            tree.set_style(el_120, "border-radius", "4");
-                            tree.set_style(el_120, "background-color", "#6e7781");
+                            let el_80 = tree.create("div");
+                            tree.append_child(el_76, el_80);
+                            tree.set_style(el_80, "width", "7px");
+                            tree.set_style(el_80, "height", "7px");
+                            tree.set_style(el_80, "border-radius", "4");
+                            tree.set_style(el_80, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_121 = tree.create("div");
-                tree.append_child(el_115, el_121);
-                tree.set_style(el_121, "font-size", "12px");
-                tree.set_style(el_121, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_121) { el.text = Some(format!("PN-{}", window_ids[1 as usize]).to_string()); }
-                let el_122 = tree.create("div");
-                tree.append_child(el_115, el_122);
-                tree.set_style(el_122, "font-size", "12px");
-                tree.set_style(el_122, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_122) { el.text = Some(format!("{}", names[window_ids[1 as usize] as usize]).to_string()); }
-                let el_123 = tree.create("div");
-                tree.append_child(el_115, el_123);
-                tree.set_style(el_123, "font-size", "11px");
-                tree.set_style(el_123, "color", "#6e7781");
+                let el_81 = tree.create("div");
+                tree.append_child(el_75, el_81);
+                tree.set_style(el_81, "font-size", "12px");
+                tree.set_style(el_81, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_81) { el.text = Some(format!("PN-{}", window_ids[1 as usize]).to_string()); }
+                let el_82 = tree.create("div");
+                tree.append_child(el_75, el_82);
+                tree.set_style(el_82, "font-size", "12px");
+                tree.set_style(el_82, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_82) { el.text = Some(format!("{}", names[window_ids[1 as usize] as usize]).to_string()); }
+                let el_83 = tree.create("div");
+                tree.append_child(el_75, el_83);
+                tree.set_style(el_83, "font-size", "11px");
+                tree.set_style(el_83, "color", "#6e7781");
                 if (window_depths[1 as usize] < max_depth) {
-                    let txt_124 = tree.create("#text");
-                    tree.append_child(el_123, txt_124);
-                    if let Some(el) = tree.get_mut(txt_124) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_84 = tree.create("#text");
+                    tree.append_child(el_83, txt_84);
+                    if let Some(el) = tree.get_mut(txt_84) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_125 = tree.create("#text");
-                    tree.append_child(el_123, txt_125);
-                    if let Some(el) = tree.get_mut(txt_125) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_85 = tree.create("#text");
+                    tree.append_child(el_83, txt_85);
+                    if let Some(el) = tree.get_mut(txt_85) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 2) {
-                let el_126 = tree.create("div");
-                tree.append_child(el_73, el_126);
-                tree.set_style(el_126, "direction", "horizontal");
-                tree.set_style(el_126, "height", "24px");
-                tree.set_style(el_126, "background-color", "#ffffff");
-                tree.set_style(el_126, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_126, "align", "center");
-                tree.set_style(el_126, "padding-left", "6");
+                let el_86 = tree.create("div");
+                tree.append_child(el_33, el_86);
+                tree.set_style(el_86, "direction", "horizontal");
+                tree.set_style(el_86, "height", "24px");
+                tree.set_style(el_86, "background-color", "#ffffff");
+                tree.set_style(el_86, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_86, "align", "center");
+                tree.set_style(el_86, "padding-left", "6");
                 if (window_depths[2 as usize] >= 1) {
-                    let el_127 = tree.create("div");
-                    tree.append_child(el_126, el_127);
-                    tree.set_style(el_127, "width", "14px");
+                    let el_87 = tree.create("div");
+                    tree.append_child(el_86, el_87);
+                    tree.set_style(el_87, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 2) {
-                    let el_128 = tree.create("div");
-                    tree.append_child(el_126, el_128);
-                    tree.set_style(el_128, "width", "14px");
+                    let el_88 = tree.create("div");
+                    tree.append_child(el_86, el_88);
+                    tree.set_style(el_88, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 3) {
-                    let el_129 = tree.create("div");
-                    tree.append_child(el_126, el_129);
-                    tree.set_style(el_129, "width", "14px");
+                    let el_89 = tree.create("div");
+                    tree.append_child(el_86, el_89);
+                    tree.set_style(el_89, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 4) {
-                    let el_130 = tree.create("div");
-                    tree.append_child(el_126, el_130);
-                    tree.set_style(el_130, "width", "14px");
+                    let el_90 = tree.create("div");
+                    tree.append_child(el_86, el_90);
+                    tree.set_style(el_90, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 5) {
-                    let el_131 = tree.create("div");
-                    tree.append_child(el_126, el_131);
-                    tree.set_style(el_131, "width", "14px");
+                    let el_91 = tree.create("div");
+                    tree.append_child(el_86, el_91);
+                    tree.set_style(el_91, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 6) {
-                    let el_132 = tree.create("div");
-                    tree.append_child(el_126, el_132);
-                    tree.set_style(el_132, "width", "14px");
+                    let el_92 = tree.create("div");
+                    tree.append_child(el_86, el_92);
+                    tree.set_style(el_92, "width", "14px");
                 }
                 if (window_depths[2 as usize] >= 7) {
-                    let el_133 = tree.create("div");
-                    tree.append_child(el_126, el_133);
-                    tree.set_style(el_133, "width", "14px");
+                    let el_93 = tree.create("div");
+                    tree.append_child(el_86, el_93);
+                    tree.set_style(el_93, "width", "14px");
                 }
-                let el_134 = tree.create("div");
-                tree.append_child(el_126, el_134);
-                tree.set_style(el_134, "width", "18px");
-                tree.set_style(el_134, "height", "24px");
-                tree.set_style(el_134, "align", "center");
-                tree.set_style(el_134, "justify", "center");
-                tree.set_style(el_134, "font-size", "10px");
-                tree.set_style(el_134, "color", "#9a6700");
-                tree.set_style(el_134, "cursor", "pointer");
+                let el_94 = tree.create("div");
+                tree.append_child(el_86, el_94);
+                tree.set_style(el_94, "width", "18px");
+                tree.set_style(el_94, "height", "24px");
+                tree.set_style(el_94, "align", "center");
+                tree.set_style(el_94, "justify", "center");
+                tree.set_style(el_94, "font-size", "10px");
+                tree.set_style(el_94, "color", "#9a6700");
+                tree.set_style(el_94, "cursor", "pointer");
                 // on:click -> toggle_row_2 (cb_idx=7)
-                tree.add_event(el_134, "click", 7);
-                if let Some(el) = tree.get_mut(el_134) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_94, "click", 7);
+                if let Some(el) = tree.get_mut(el_94) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[2 as usize] < max_depth) {
                     if loaded[window_ids[2 as usize] as usize] {
                         if expanded[window_ids[2 as usize] as usize] {
-                            let txt_135 = tree.create("#text");
-                            tree.append_child(el_134, txt_135);
-                            if let Some(el) = tree.get_mut(txt_135) { el.text = Some("▾".into()); }
+                            let txt_95 = tree.create("#text");
+                            tree.append_child(el_94, txt_95);
+                            if let Some(el) = tree.get_mut(txt_95) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_136 = tree.create("#text");
-                            tree.append_child(el_134, txt_136);
-                            if let Some(el) = tree.get_mut(txt_136) { el.text = Some("▸".into()); }
+                            let txt_96 = tree.create("#text");
+                            tree.append_child(el_94, txt_96);
+                            if let Some(el) = tree.get_mut(txt_96) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_137 = tree.create("#text");
-                        tree.append_child(el_134, txt_137);
-                        if let Some(el) = tree.get_mut(txt_137) { el.text = Some("+".into()); }
+                        let txt_97 = tree.create("#text");
+                        tree.append_child(el_94, txt_97);
+                        if let Some(el) = tree.get_mut(txt_97) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_138 = tree.create("#text");
-                    tree.append_child(el_134, txt_138);
-                    if let Some(el) = tree.get_mut(txt_138) { el.text = Some("·".into()); }
+                    let txt_98 = tree.create("#text");
+                    tree.append_child(el_94, txt_98);
+                    if let Some(el) = tree.get_mut(txt_98) { el.text = Some("·".into()); }
                 }
-                let el_139 = tree.create("div");
-                tree.append_child(el_126, el_139);
-                tree.set_style(el_139, "direction", "horizontal");
-                tree.set_style(el_139, "width", "fill");
-                tree.set_style(el_139, "height", "24px");
-                tree.set_style(el_139, "align", "center");
-                tree.set_style(el_139, "gap", "5");
-                tree.set_style(el_139, "cursor", "pointer");
+                let el_99 = tree.create("div");
+                tree.append_child(el_86, el_99);
+                tree.set_style(el_99, "direction", "horizontal");
+                tree.set_style(el_99, "width", "fill");
+                tree.set_style(el_99, "height", "24px");
+                tree.set_style(el_99, "align", "center");
+                tree.set_style(el_99, "gap", "5");
+                tree.set_style(el_99, "cursor", "pointer");
                 // on:click -> select_row_2 (cb_idx=29)
-                tree.add_event(el_139, "click", 29);
-                if let Some(el) = tree.get_mut(el_139) { el.visual.cursor = 1; el.focusable = true; }
-                let el_140 = tree.create("div");
-                tree.append_child(el_139, el_140);
-                tree.set_style(el_140, "width", "12px");
-                tree.set_style(el_140, "height", "24px");
-                tree.set_style(el_140, "align", "center");
-                tree.set_style(el_140, "justify", "center");
+                tree.add_event(el_99, "click", 29);
+                if let Some(el) = tree.get_mut(el_99) { el.visual.cursor = 1; el.focusable = true; }
+                let el_100 = tree.create("div");
+                tree.append_child(el_99, el_100);
+                tree.set_style(el_100, "width", "12px");
+                tree.set_style(el_100, "height", "24px");
+                tree.set_style(el_100, "align", "center");
+                tree.set_style(el_100, "justify", "center");
                 if (eff_state[window_ids[2 as usize] as usize] == 0) {
-                    let el_141 = tree.create("div");
-                    tree.append_child(el_140, el_141);
-                    tree.set_style(el_141, "width", "7px");
-                    tree.set_style(el_141, "height", "7px");
-                    tree.set_style(el_141, "border-radius", "4");
-                    tree.set_style(el_141, "background-color", "#1a7f37");
+                    let el_101 = tree.create("div");
+                    tree.append_child(el_100, el_101);
+                    tree.set_style(el_101, "width", "7px");
+                    tree.set_style(el_101, "height", "7px");
+                    tree.set_style(el_101, "border-radius", "4");
+                    tree.set_style(el_101, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[2 as usize] as usize] == 1) {
-                        let el_142 = tree.create("div");
-                        tree.append_child(el_140, el_142);
-                        tree.set_style(el_142, "width", "7px");
-                        tree.set_style(el_142, "height", "7px");
-                        tree.set_style(el_142, "border-radius", "4");
-                        tree.set_style(el_142, "background-color", "#0969da");
+                        let el_102 = tree.create("div");
+                        tree.append_child(el_100, el_102);
+                        tree.set_style(el_102, "width", "7px");
+                        tree.set_style(el_102, "height", "7px");
+                        tree.set_style(el_102, "border-radius", "4");
+                        tree.set_style(el_102, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[2 as usize] as usize] == 2) {
-                            let el_143 = tree.create("div");
-                            tree.append_child(el_140, el_143);
-                            tree.set_style(el_143, "width", "7px");
-                            tree.set_style(el_143, "height", "7px");
-                            tree.set_style(el_143, "border-radius", "4");
-                            tree.set_style(el_143, "background-color", "#9a6700");
+                            let el_103 = tree.create("div");
+                            tree.append_child(el_100, el_103);
+                            tree.set_style(el_103, "width", "7px");
+                            tree.set_style(el_103, "height", "7px");
+                            tree.set_style(el_103, "border-radius", "4");
+                            tree.set_style(el_103, "background-color", "#9a6700");
                         } else {
-                            let el_144 = tree.create("div");
-                            tree.append_child(el_140, el_144);
-                            tree.set_style(el_144, "width", "7px");
-                            tree.set_style(el_144, "height", "7px");
-                            tree.set_style(el_144, "border-radius", "4");
-                            tree.set_style(el_144, "background-color", "#6e7781");
+                            let el_104 = tree.create("div");
+                            tree.append_child(el_100, el_104);
+                            tree.set_style(el_104, "width", "7px");
+                            tree.set_style(el_104, "height", "7px");
+                            tree.set_style(el_104, "border-radius", "4");
+                            tree.set_style(el_104, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_145 = tree.create("div");
-                tree.append_child(el_139, el_145);
-                tree.set_style(el_145, "font-size", "12px");
-                tree.set_style(el_145, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_145) { el.text = Some(format!("PN-{}", window_ids[2 as usize]).to_string()); }
-                let el_146 = tree.create("div");
-                tree.append_child(el_139, el_146);
-                tree.set_style(el_146, "font-size", "12px");
-                tree.set_style(el_146, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_146) { el.text = Some(format!("{}", names[window_ids[2 as usize] as usize]).to_string()); }
-                let el_147 = tree.create("div");
-                tree.append_child(el_139, el_147);
-                tree.set_style(el_147, "font-size", "11px");
-                tree.set_style(el_147, "color", "#6e7781");
+                let el_105 = tree.create("div");
+                tree.append_child(el_99, el_105);
+                tree.set_style(el_105, "font-size", "12px");
+                tree.set_style(el_105, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_105) { el.text = Some(format!("PN-{}", window_ids[2 as usize]).to_string()); }
+                let el_106 = tree.create("div");
+                tree.append_child(el_99, el_106);
+                tree.set_style(el_106, "font-size", "12px");
+                tree.set_style(el_106, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_106) { el.text = Some(format!("{}", names[window_ids[2 as usize] as usize]).to_string()); }
+                let el_107 = tree.create("div");
+                tree.append_child(el_99, el_107);
+                tree.set_style(el_107, "font-size", "11px");
+                tree.set_style(el_107, "color", "#6e7781");
                 if (window_depths[2 as usize] < max_depth) {
-                    let txt_148 = tree.create("#text");
-                    tree.append_child(el_147, txt_148);
-                    if let Some(el) = tree.get_mut(txt_148) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_108 = tree.create("#text");
+                    tree.append_child(el_107, txt_108);
+                    if let Some(el) = tree.get_mut(txt_108) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_149 = tree.create("#text");
-                    tree.append_child(el_147, txt_149);
-                    if let Some(el) = tree.get_mut(txt_149) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_109 = tree.create("#text");
+                    tree.append_child(el_107, txt_109);
+                    if let Some(el) = tree.get_mut(txt_109) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 3) {
-                let el_150 = tree.create("div");
-                tree.append_child(el_73, el_150);
-                tree.set_style(el_150, "direction", "horizontal");
-                tree.set_style(el_150, "height", "24px");
-                tree.set_style(el_150, "background-color", "#f9fafb");
-                tree.set_style(el_150, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_150, "align", "center");
-                tree.set_style(el_150, "padding-left", "6");
+                let el_110 = tree.create("div");
+                tree.append_child(el_33, el_110);
+                tree.set_style(el_110, "direction", "horizontal");
+                tree.set_style(el_110, "height", "24px");
+                tree.set_style(el_110, "background-color", "#f9fafb");
+                tree.set_style(el_110, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_110, "align", "center");
+                tree.set_style(el_110, "padding-left", "6");
                 if (window_depths[3 as usize] >= 1) {
-                    let el_151 = tree.create("div");
-                    tree.append_child(el_150, el_151);
-                    tree.set_style(el_151, "width", "14px");
+                    let el_111 = tree.create("div");
+                    tree.append_child(el_110, el_111);
+                    tree.set_style(el_111, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 2) {
-                    let el_152 = tree.create("div");
-                    tree.append_child(el_150, el_152);
-                    tree.set_style(el_152, "width", "14px");
+                    let el_112 = tree.create("div");
+                    tree.append_child(el_110, el_112);
+                    tree.set_style(el_112, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 3) {
-                    let el_153 = tree.create("div");
-                    tree.append_child(el_150, el_153);
-                    tree.set_style(el_153, "width", "14px");
+                    let el_113 = tree.create("div");
+                    tree.append_child(el_110, el_113);
+                    tree.set_style(el_113, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 4) {
-                    let el_154 = tree.create("div");
-                    tree.append_child(el_150, el_154);
-                    tree.set_style(el_154, "width", "14px");
+                    let el_114 = tree.create("div");
+                    tree.append_child(el_110, el_114);
+                    tree.set_style(el_114, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 5) {
-                    let el_155 = tree.create("div");
-                    tree.append_child(el_150, el_155);
-                    tree.set_style(el_155, "width", "14px");
+                    let el_115 = tree.create("div");
+                    tree.append_child(el_110, el_115);
+                    tree.set_style(el_115, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 6) {
-                    let el_156 = tree.create("div");
-                    tree.append_child(el_150, el_156);
-                    tree.set_style(el_156, "width", "14px");
+                    let el_116 = tree.create("div");
+                    tree.append_child(el_110, el_116);
+                    tree.set_style(el_116, "width", "14px");
                 }
                 if (window_depths[3 as usize] >= 7) {
-                    let el_157 = tree.create("div");
-                    tree.append_child(el_150, el_157);
-                    tree.set_style(el_157, "width", "14px");
+                    let el_117 = tree.create("div");
+                    tree.append_child(el_110, el_117);
+                    tree.set_style(el_117, "width", "14px");
                 }
-                let el_158 = tree.create("div");
-                tree.append_child(el_150, el_158);
-                tree.set_style(el_158, "width", "18px");
-                tree.set_style(el_158, "height", "24px");
-                tree.set_style(el_158, "align", "center");
-                tree.set_style(el_158, "justify", "center");
-                tree.set_style(el_158, "font-size", "10px");
-                tree.set_style(el_158, "color", "#9a6700");
-                tree.set_style(el_158, "cursor", "pointer");
+                let el_118 = tree.create("div");
+                tree.append_child(el_110, el_118);
+                tree.set_style(el_118, "width", "18px");
+                tree.set_style(el_118, "height", "24px");
+                tree.set_style(el_118, "align", "center");
+                tree.set_style(el_118, "justify", "center");
+                tree.set_style(el_118, "font-size", "10px");
+                tree.set_style(el_118, "color", "#9a6700");
+                tree.set_style(el_118, "cursor", "pointer");
                 // on:click -> toggle_row_3 (cb_idx=8)
-                tree.add_event(el_158, "click", 8);
-                if let Some(el) = tree.get_mut(el_158) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_118, "click", 8);
+                if let Some(el) = tree.get_mut(el_118) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[3 as usize] < max_depth) {
                     if loaded[window_ids[3 as usize] as usize] {
                         if expanded[window_ids[3 as usize] as usize] {
-                            let txt_159 = tree.create("#text");
-                            tree.append_child(el_158, txt_159);
-                            if let Some(el) = tree.get_mut(txt_159) { el.text = Some("▾".into()); }
+                            let txt_119 = tree.create("#text");
+                            tree.append_child(el_118, txt_119);
+                            if let Some(el) = tree.get_mut(txt_119) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_160 = tree.create("#text");
-                            tree.append_child(el_158, txt_160);
-                            if let Some(el) = tree.get_mut(txt_160) { el.text = Some("▸".into()); }
+                            let txt_120 = tree.create("#text");
+                            tree.append_child(el_118, txt_120);
+                            if let Some(el) = tree.get_mut(txt_120) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_161 = tree.create("#text");
-                        tree.append_child(el_158, txt_161);
-                        if let Some(el) = tree.get_mut(txt_161) { el.text = Some("+".into()); }
+                        let txt_121 = tree.create("#text");
+                        tree.append_child(el_118, txt_121);
+                        if let Some(el) = tree.get_mut(txt_121) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_162 = tree.create("#text");
-                    tree.append_child(el_158, txt_162);
-                    if let Some(el) = tree.get_mut(txt_162) { el.text = Some("·".into()); }
+                    let txt_122 = tree.create("#text");
+                    tree.append_child(el_118, txt_122);
+                    if let Some(el) = tree.get_mut(txt_122) { el.text = Some("·".into()); }
                 }
-                let el_163 = tree.create("div");
-                tree.append_child(el_150, el_163);
-                tree.set_style(el_163, "direction", "horizontal");
-                tree.set_style(el_163, "width", "fill");
-                tree.set_style(el_163, "height", "24px");
-                tree.set_style(el_163, "align", "center");
-                tree.set_style(el_163, "gap", "5");
-                tree.set_style(el_163, "cursor", "pointer");
+                let el_123 = tree.create("div");
+                tree.append_child(el_110, el_123);
+                tree.set_style(el_123, "direction", "horizontal");
+                tree.set_style(el_123, "width", "fill");
+                tree.set_style(el_123, "height", "24px");
+                tree.set_style(el_123, "align", "center");
+                tree.set_style(el_123, "gap", "5");
+                tree.set_style(el_123, "cursor", "pointer");
                 // on:click -> select_row_3 (cb_idx=30)
-                tree.add_event(el_163, "click", 30);
-                if let Some(el) = tree.get_mut(el_163) { el.visual.cursor = 1; el.focusable = true; }
-                let el_164 = tree.create("div");
-                tree.append_child(el_163, el_164);
-                tree.set_style(el_164, "width", "12px");
-                tree.set_style(el_164, "height", "24px");
-                tree.set_style(el_164, "align", "center");
-                tree.set_style(el_164, "justify", "center");
+                tree.add_event(el_123, "click", 30);
+                if let Some(el) = tree.get_mut(el_123) { el.visual.cursor = 1; el.focusable = true; }
+                let el_124 = tree.create("div");
+                tree.append_child(el_123, el_124);
+                tree.set_style(el_124, "width", "12px");
+                tree.set_style(el_124, "height", "24px");
+                tree.set_style(el_124, "align", "center");
+                tree.set_style(el_124, "justify", "center");
                 if (eff_state[window_ids[3 as usize] as usize] == 0) {
-                    let el_165 = tree.create("div");
-                    tree.append_child(el_164, el_165);
-                    tree.set_style(el_165, "width", "7px");
-                    tree.set_style(el_165, "height", "7px");
-                    tree.set_style(el_165, "border-radius", "4");
-                    tree.set_style(el_165, "background-color", "#1a7f37");
+                    let el_125 = tree.create("div");
+                    tree.append_child(el_124, el_125);
+                    tree.set_style(el_125, "width", "7px");
+                    tree.set_style(el_125, "height", "7px");
+                    tree.set_style(el_125, "border-radius", "4");
+                    tree.set_style(el_125, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[3 as usize] as usize] == 1) {
-                        let el_166 = tree.create("div");
-                        tree.append_child(el_164, el_166);
-                        tree.set_style(el_166, "width", "7px");
-                        tree.set_style(el_166, "height", "7px");
-                        tree.set_style(el_166, "border-radius", "4");
-                        tree.set_style(el_166, "background-color", "#0969da");
+                        let el_126 = tree.create("div");
+                        tree.append_child(el_124, el_126);
+                        tree.set_style(el_126, "width", "7px");
+                        tree.set_style(el_126, "height", "7px");
+                        tree.set_style(el_126, "border-radius", "4");
+                        tree.set_style(el_126, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[3 as usize] as usize] == 2) {
-                            let el_167 = tree.create("div");
-                            tree.append_child(el_164, el_167);
-                            tree.set_style(el_167, "width", "7px");
-                            tree.set_style(el_167, "height", "7px");
-                            tree.set_style(el_167, "border-radius", "4");
-                            tree.set_style(el_167, "background-color", "#9a6700");
+                            let el_127 = tree.create("div");
+                            tree.append_child(el_124, el_127);
+                            tree.set_style(el_127, "width", "7px");
+                            tree.set_style(el_127, "height", "7px");
+                            tree.set_style(el_127, "border-radius", "4");
+                            tree.set_style(el_127, "background-color", "#9a6700");
                         } else {
-                            let el_168 = tree.create("div");
-                            tree.append_child(el_164, el_168);
-                            tree.set_style(el_168, "width", "7px");
-                            tree.set_style(el_168, "height", "7px");
-                            tree.set_style(el_168, "border-radius", "4");
-                            tree.set_style(el_168, "background-color", "#6e7781");
+                            let el_128 = tree.create("div");
+                            tree.append_child(el_124, el_128);
+                            tree.set_style(el_128, "width", "7px");
+                            tree.set_style(el_128, "height", "7px");
+                            tree.set_style(el_128, "border-radius", "4");
+                            tree.set_style(el_128, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_169 = tree.create("div");
-                tree.append_child(el_163, el_169);
-                tree.set_style(el_169, "font-size", "12px");
-                tree.set_style(el_169, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_169) { el.text = Some(format!("PN-{}", window_ids[3 as usize]).to_string()); }
-                let el_170 = tree.create("div");
-                tree.append_child(el_163, el_170);
-                tree.set_style(el_170, "font-size", "12px");
-                tree.set_style(el_170, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_170) { el.text = Some(format!("{}", names[window_ids[3 as usize] as usize]).to_string()); }
-                let el_171 = tree.create("div");
-                tree.append_child(el_163, el_171);
-                tree.set_style(el_171, "font-size", "11px");
-                tree.set_style(el_171, "color", "#6e7781");
+                let el_129 = tree.create("div");
+                tree.append_child(el_123, el_129);
+                tree.set_style(el_129, "font-size", "12px");
+                tree.set_style(el_129, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_129) { el.text = Some(format!("PN-{}", window_ids[3 as usize]).to_string()); }
+                let el_130 = tree.create("div");
+                tree.append_child(el_123, el_130);
+                tree.set_style(el_130, "font-size", "12px");
+                tree.set_style(el_130, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_130) { el.text = Some(format!("{}", names[window_ids[3 as usize] as usize]).to_string()); }
+                let el_131 = tree.create("div");
+                tree.append_child(el_123, el_131);
+                tree.set_style(el_131, "font-size", "11px");
+                tree.set_style(el_131, "color", "#6e7781");
                 if (window_depths[3 as usize] < max_depth) {
-                    let txt_172 = tree.create("#text");
-                    tree.append_child(el_171, txt_172);
-                    if let Some(el) = tree.get_mut(txt_172) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_132 = tree.create("#text");
+                    tree.append_child(el_131, txt_132);
+                    if let Some(el) = tree.get_mut(txt_132) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_173 = tree.create("#text");
-                    tree.append_child(el_171, txt_173);
-                    if let Some(el) = tree.get_mut(txt_173) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_133 = tree.create("#text");
+                    tree.append_child(el_131, txt_133);
+                    if let Some(el) = tree.get_mut(txt_133) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 4) {
-                let el_174 = tree.create("div");
-                tree.append_child(el_73, el_174);
-                tree.set_style(el_174, "direction", "horizontal");
-                tree.set_style(el_174, "height", "24px");
-                tree.set_style(el_174, "background-color", "#ffffff");
-                tree.set_style(el_174, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_174, "align", "center");
-                tree.set_style(el_174, "padding-left", "6");
+                let el_134 = tree.create("div");
+                tree.append_child(el_33, el_134);
+                tree.set_style(el_134, "direction", "horizontal");
+                tree.set_style(el_134, "height", "24px");
+                tree.set_style(el_134, "background-color", "#ffffff");
+                tree.set_style(el_134, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_134, "align", "center");
+                tree.set_style(el_134, "padding-left", "6");
                 if (window_depths[4 as usize] >= 1) {
-                    let el_175 = tree.create("div");
-                    tree.append_child(el_174, el_175);
-                    tree.set_style(el_175, "width", "14px");
+                    let el_135 = tree.create("div");
+                    tree.append_child(el_134, el_135);
+                    tree.set_style(el_135, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 2) {
-                    let el_176 = tree.create("div");
-                    tree.append_child(el_174, el_176);
-                    tree.set_style(el_176, "width", "14px");
+                    let el_136 = tree.create("div");
+                    tree.append_child(el_134, el_136);
+                    tree.set_style(el_136, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 3) {
-                    let el_177 = tree.create("div");
-                    tree.append_child(el_174, el_177);
-                    tree.set_style(el_177, "width", "14px");
+                    let el_137 = tree.create("div");
+                    tree.append_child(el_134, el_137);
+                    tree.set_style(el_137, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 4) {
-                    let el_178 = tree.create("div");
-                    tree.append_child(el_174, el_178);
-                    tree.set_style(el_178, "width", "14px");
+                    let el_138 = tree.create("div");
+                    tree.append_child(el_134, el_138);
+                    tree.set_style(el_138, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 5) {
-                    let el_179 = tree.create("div");
-                    tree.append_child(el_174, el_179);
-                    tree.set_style(el_179, "width", "14px");
+                    let el_139 = tree.create("div");
+                    tree.append_child(el_134, el_139);
+                    tree.set_style(el_139, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 6) {
-                    let el_180 = tree.create("div");
-                    tree.append_child(el_174, el_180);
-                    tree.set_style(el_180, "width", "14px");
+                    let el_140 = tree.create("div");
+                    tree.append_child(el_134, el_140);
+                    tree.set_style(el_140, "width", "14px");
                 }
                 if (window_depths[4 as usize] >= 7) {
-                    let el_181 = tree.create("div");
-                    tree.append_child(el_174, el_181);
-                    tree.set_style(el_181, "width", "14px");
+                    let el_141 = tree.create("div");
+                    tree.append_child(el_134, el_141);
+                    tree.set_style(el_141, "width", "14px");
                 }
-                let el_182 = tree.create("div");
-                tree.append_child(el_174, el_182);
-                tree.set_style(el_182, "width", "18px");
-                tree.set_style(el_182, "height", "24px");
-                tree.set_style(el_182, "align", "center");
-                tree.set_style(el_182, "justify", "center");
-                tree.set_style(el_182, "font-size", "10px");
-                tree.set_style(el_182, "color", "#9a6700");
-                tree.set_style(el_182, "cursor", "pointer");
+                let el_142 = tree.create("div");
+                tree.append_child(el_134, el_142);
+                tree.set_style(el_142, "width", "18px");
+                tree.set_style(el_142, "height", "24px");
+                tree.set_style(el_142, "align", "center");
+                tree.set_style(el_142, "justify", "center");
+                tree.set_style(el_142, "font-size", "10px");
+                tree.set_style(el_142, "color", "#9a6700");
+                tree.set_style(el_142, "cursor", "pointer");
                 // on:click -> toggle_row_4 (cb_idx=9)
-                tree.add_event(el_182, "click", 9);
-                if let Some(el) = tree.get_mut(el_182) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_142, "click", 9);
+                if let Some(el) = tree.get_mut(el_142) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[4 as usize] < max_depth) {
                     if loaded[window_ids[4 as usize] as usize] {
                         if expanded[window_ids[4 as usize] as usize] {
-                            let txt_183 = tree.create("#text");
-                            tree.append_child(el_182, txt_183);
-                            if let Some(el) = tree.get_mut(txt_183) { el.text = Some("▾".into()); }
+                            let txt_143 = tree.create("#text");
+                            tree.append_child(el_142, txt_143);
+                            if let Some(el) = tree.get_mut(txt_143) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_184 = tree.create("#text");
-                            tree.append_child(el_182, txt_184);
-                            if let Some(el) = tree.get_mut(txt_184) { el.text = Some("▸".into()); }
+                            let txt_144 = tree.create("#text");
+                            tree.append_child(el_142, txt_144);
+                            if let Some(el) = tree.get_mut(txt_144) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_185 = tree.create("#text");
-                        tree.append_child(el_182, txt_185);
-                        if let Some(el) = tree.get_mut(txt_185) { el.text = Some("+".into()); }
+                        let txt_145 = tree.create("#text");
+                        tree.append_child(el_142, txt_145);
+                        if let Some(el) = tree.get_mut(txt_145) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_186 = tree.create("#text");
-                    tree.append_child(el_182, txt_186);
-                    if let Some(el) = tree.get_mut(txt_186) { el.text = Some("·".into()); }
+                    let txt_146 = tree.create("#text");
+                    tree.append_child(el_142, txt_146);
+                    if let Some(el) = tree.get_mut(txt_146) { el.text = Some("·".into()); }
                 }
-                let el_187 = tree.create("div");
-                tree.append_child(el_174, el_187);
-                tree.set_style(el_187, "direction", "horizontal");
-                tree.set_style(el_187, "width", "fill");
-                tree.set_style(el_187, "height", "24px");
-                tree.set_style(el_187, "align", "center");
-                tree.set_style(el_187, "gap", "5");
-                tree.set_style(el_187, "cursor", "pointer");
+                let el_147 = tree.create("div");
+                tree.append_child(el_134, el_147);
+                tree.set_style(el_147, "direction", "horizontal");
+                tree.set_style(el_147, "width", "fill");
+                tree.set_style(el_147, "height", "24px");
+                tree.set_style(el_147, "align", "center");
+                tree.set_style(el_147, "gap", "5");
+                tree.set_style(el_147, "cursor", "pointer");
                 // on:click -> select_row_4 (cb_idx=31)
-                tree.add_event(el_187, "click", 31);
-                if let Some(el) = tree.get_mut(el_187) { el.visual.cursor = 1; el.focusable = true; }
-                let el_188 = tree.create("div");
-                tree.append_child(el_187, el_188);
-                tree.set_style(el_188, "width", "12px");
-                tree.set_style(el_188, "height", "24px");
-                tree.set_style(el_188, "align", "center");
-                tree.set_style(el_188, "justify", "center");
+                tree.add_event(el_147, "click", 31);
+                if let Some(el) = tree.get_mut(el_147) { el.visual.cursor = 1; el.focusable = true; }
+                let el_148 = tree.create("div");
+                tree.append_child(el_147, el_148);
+                tree.set_style(el_148, "width", "12px");
+                tree.set_style(el_148, "height", "24px");
+                tree.set_style(el_148, "align", "center");
+                tree.set_style(el_148, "justify", "center");
                 if (eff_state[window_ids[4 as usize] as usize] == 0) {
-                    let el_189 = tree.create("div");
-                    tree.append_child(el_188, el_189);
-                    tree.set_style(el_189, "width", "7px");
-                    tree.set_style(el_189, "height", "7px");
-                    tree.set_style(el_189, "border-radius", "4");
-                    tree.set_style(el_189, "background-color", "#1a7f37");
+                    let el_149 = tree.create("div");
+                    tree.append_child(el_148, el_149);
+                    tree.set_style(el_149, "width", "7px");
+                    tree.set_style(el_149, "height", "7px");
+                    tree.set_style(el_149, "border-radius", "4");
+                    tree.set_style(el_149, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[4 as usize] as usize] == 1) {
-                        let el_190 = tree.create("div");
-                        tree.append_child(el_188, el_190);
-                        tree.set_style(el_190, "width", "7px");
-                        tree.set_style(el_190, "height", "7px");
-                        tree.set_style(el_190, "border-radius", "4");
-                        tree.set_style(el_190, "background-color", "#0969da");
+                        let el_150 = tree.create("div");
+                        tree.append_child(el_148, el_150);
+                        tree.set_style(el_150, "width", "7px");
+                        tree.set_style(el_150, "height", "7px");
+                        tree.set_style(el_150, "border-radius", "4");
+                        tree.set_style(el_150, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[4 as usize] as usize] == 2) {
-                            let el_191 = tree.create("div");
-                            tree.append_child(el_188, el_191);
-                            tree.set_style(el_191, "width", "7px");
-                            tree.set_style(el_191, "height", "7px");
-                            tree.set_style(el_191, "border-radius", "4");
-                            tree.set_style(el_191, "background-color", "#9a6700");
+                            let el_151 = tree.create("div");
+                            tree.append_child(el_148, el_151);
+                            tree.set_style(el_151, "width", "7px");
+                            tree.set_style(el_151, "height", "7px");
+                            tree.set_style(el_151, "border-radius", "4");
+                            tree.set_style(el_151, "background-color", "#9a6700");
                         } else {
-                            let el_192 = tree.create("div");
-                            tree.append_child(el_188, el_192);
-                            tree.set_style(el_192, "width", "7px");
-                            tree.set_style(el_192, "height", "7px");
-                            tree.set_style(el_192, "border-radius", "4");
-                            tree.set_style(el_192, "background-color", "#6e7781");
+                            let el_152 = tree.create("div");
+                            tree.append_child(el_148, el_152);
+                            tree.set_style(el_152, "width", "7px");
+                            tree.set_style(el_152, "height", "7px");
+                            tree.set_style(el_152, "border-radius", "4");
+                            tree.set_style(el_152, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_193 = tree.create("div");
-                tree.append_child(el_187, el_193);
-                tree.set_style(el_193, "font-size", "12px");
-                tree.set_style(el_193, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_193) { el.text = Some(format!("PN-{}", window_ids[4 as usize]).to_string()); }
-                let el_194 = tree.create("div");
-                tree.append_child(el_187, el_194);
-                tree.set_style(el_194, "font-size", "12px");
-                tree.set_style(el_194, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_194) { el.text = Some(format!("{}", names[window_ids[4 as usize] as usize]).to_string()); }
-                let el_195 = tree.create("div");
-                tree.append_child(el_187, el_195);
-                tree.set_style(el_195, "font-size", "11px");
-                tree.set_style(el_195, "color", "#6e7781");
+                let el_153 = tree.create("div");
+                tree.append_child(el_147, el_153);
+                tree.set_style(el_153, "font-size", "12px");
+                tree.set_style(el_153, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_153) { el.text = Some(format!("PN-{}", window_ids[4 as usize]).to_string()); }
+                let el_154 = tree.create("div");
+                tree.append_child(el_147, el_154);
+                tree.set_style(el_154, "font-size", "12px");
+                tree.set_style(el_154, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_154) { el.text = Some(format!("{}", names[window_ids[4 as usize] as usize]).to_string()); }
+                let el_155 = tree.create("div");
+                tree.append_child(el_147, el_155);
+                tree.set_style(el_155, "font-size", "11px");
+                tree.set_style(el_155, "color", "#6e7781");
                 if (window_depths[4 as usize] < max_depth) {
-                    let txt_196 = tree.create("#text");
-                    tree.append_child(el_195, txt_196);
-                    if let Some(el) = tree.get_mut(txt_196) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_156 = tree.create("#text");
+                    tree.append_child(el_155, txt_156);
+                    if let Some(el) = tree.get_mut(txt_156) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_197 = tree.create("#text");
-                    tree.append_child(el_195, txt_197);
-                    if let Some(el) = tree.get_mut(txt_197) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_157 = tree.create("#text");
+                    tree.append_child(el_155, txt_157);
+                    if let Some(el) = tree.get_mut(txt_157) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 5) {
-                let el_198 = tree.create("div");
-                tree.append_child(el_73, el_198);
-                tree.set_style(el_198, "direction", "horizontal");
-                tree.set_style(el_198, "height", "24px");
-                tree.set_style(el_198, "background-color", "#f9fafb");
-                tree.set_style(el_198, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_198, "align", "center");
-                tree.set_style(el_198, "padding-left", "6");
+                let el_158 = tree.create("div");
+                tree.append_child(el_33, el_158);
+                tree.set_style(el_158, "direction", "horizontal");
+                tree.set_style(el_158, "height", "24px");
+                tree.set_style(el_158, "background-color", "#f9fafb");
+                tree.set_style(el_158, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_158, "align", "center");
+                tree.set_style(el_158, "padding-left", "6");
                 if (window_depths[5 as usize] >= 1) {
-                    let el_199 = tree.create("div");
-                    tree.append_child(el_198, el_199);
-                    tree.set_style(el_199, "width", "14px");
+                    let el_159 = tree.create("div");
+                    tree.append_child(el_158, el_159);
+                    tree.set_style(el_159, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 2) {
-                    let el_200 = tree.create("div");
-                    tree.append_child(el_198, el_200);
-                    tree.set_style(el_200, "width", "14px");
+                    let el_160 = tree.create("div");
+                    tree.append_child(el_158, el_160);
+                    tree.set_style(el_160, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 3) {
-                    let el_201 = tree.create("div");
-                    tree.append_child(el_198, el_201);
-                    tree.set_style(el_201, "width", "14px");
+                    let el_161 = tree.create("div");
+                    tree.append_child(el_158, el_161);
+                    tree.set_style(el_161, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 4) {
-                    let el_202 = tree.create("div");
-                    tree.append_child(el_198, el_202);
-                    tree.set_style(el_202, "width", "14px");
+                    let el_162 = tree.create("div");
+                    tree.append_child(el_158, el_162);
+                    tree.set_style(el_162, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 5) {
-                    let el_203 = tree.create("div");
-                    tree.append_child(el_198, el_203);
-                    tree.set_style(el_203, "width", "14px");
+                    let el_163 = tree.create("div");
+                    tree.append_child(el_158, el_163);
+                    tree.set_style(el_163, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 6) {
-                    let el_204 = tree.create("div");
-                    tree.append_child(el_198, el_204);
-                    tree.set_style(el_204, "width", "14px");
+                    let el_164 = tree.create("div");
+                    tree.append_child(el_158, el_164);
+                    tree.set_style(el_164, "width", "14px");
                 }
                 if (window_depths[5 as usize] >= 7) {
-                    let el_205 = tree.create("div");
-                    tree.append_child(el_198, el_205);
-                    tree.set_style(el_205, "width", "14px");
+                    let el_165 = tree.create("div");
+                    tree.append_child(el_158, el_165);
+                    tree.set_style(el_165, "width", "14px");
                 }
-                let el_206 = tree.create("div");
-                tree.append_child(el_198, el_206);
-                tree.set_style(el_206, "width", "18px");
-                tree.set_style(el_206, "height", "24px");
-                tree.set_style(el_206, "align", "center");
-                tree.set_style(el_206, "justify", "center");
-                tree.set_style(el_206, "font-size", "10px");
-                tree.set_style(el_206, "color", "#9a6700");
-                tree.set_style(el_206, "cursor", "pointer");
+                let el_166 = tree.create("div");
+                tree.append_child(el_158, el_166);
+                tree.set_style(el_166, "width", "18px");
+                tree.set_style(el_166, "height", "24px");
+                tree.set_style(el_166, "align", "center");
+                tree.set_style(el_166, "justify", "center");
+                tree.set_style(el_166, "font-size", "10px");
+                tree.set_style(el_166, "color", "#9a6700");
+                tree.set_style(el_166, "cursor", "pointer");
                 // on:click -> toggle_row_5 (cb_idx=10)
-                tree.add_event(el_206, "click", 10);
-                if let Some(el) = tree.get_mut(el_206) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_166, "click", 10);
+                if let Some(el) = tree.get_mut(el_166) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[5 as usize] < max_depth) {
                     if loaded[window_ids[5 as usize] as usize] {
                         if expanded[window_ids[5 as usize] as usize] {
-                            let txt_207 = tree.create("#text");
-                            tree.append_child(el_206, txt_207);
-                            if let Some(el) = tree.get_mut(txt_207) { el.text = Some("▾".into()); }
+                            let txt_167 = tree.create("#text");
+                            tree.append_child(el_166, txt_167);
+                            if let Some(el) = tree.get_mut(txt_167) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_208 = tree.create("#text");
-                            tree.append_child(el_206, txt_208);
-                            if let Some(el) = tree.get_mut(txt_208) { el.text = Some("▸".into()); }
+                            let txt_168 = tree.create("#text");
+                            tree.append_child(el_166, txt_168);
+                            if let Some(el) = tree.get_mut(txt_168) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_209 = tree.create("#text");
-                        tree.append_child(el_206, txt_209);
-                        if let Some(el) = tree.get_mut(txt_209) { el.text = Some("+".into()); }
+                        let txt_169 = tree.create("#text");
+                        tree.append_child(el_166, txt_169);
+                        if let Some(el) = tree.get_mut(txt_169) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_210 = tree.create("#text");
-                    tree.append_child(el_206, txt_210);
-                    if let Some(el) = tree.get_mut(txt_210) { el.text = Some("·".into()); }
+                    let txt_170 = tree.create("#text");
+                    tree.append_child(el_166, txt_170);
+                    if let Some(el) = tree.get_mut(txt_170) { el.text = Some("·".into()); }
                 }
-                let el_211 = tree.create("div");
-                tree.append_child(el_198, el_211);
-                tree.set_style(el_211, "direction", "horizontal");
-                tree.set_style(el_211, "width", "fill");
-                tree.set_style(el_211, "height", "24px");
-                tree.set_style(el_211, "align", "center");
-                tree.set_style(el_211, "gap", "5");
-                tree.set_style(el_211, "cursor", "pointer");
+                let el_171 = tree.create("div");
+                tree.append_child(el_158, el_171);
+                tree.set_style(el_171, "direction", "horizontal");
+                tree.set_style(el_171, "width", "fill");
+                tree.set_style(el_171, "height", "24px");
+                tree.set_style(el_171, "align", "center");
+                tree.set_style(el_171, "gap", "5");
+                tree.set_style(el_171, "cursor", "pointer");
                 // on:click -> select_row_5 (cb_idx=32)
-                tree.add_event(el_211, "click", 32);
-                if let Some(el) = tree.get_mut(el_211) { el.visual.cursor = 1; el.focusable = true; }
-                let el_212 = tree.create("div");
-                tree.append_child(el_211, el_212);
-                tree.set_style(el_212, "width", "12px");
-                tree.set_style(el_212, "height", "24px");
-                tree.set_style(el_212, "align", "center");
-                tree.set_style(el_212, "justify", "center");
+                tree.add_event(el_171, "click", 32);
+                if let Some(el) = tree.get_mut(el_171) { el.visual.cursor = 1; el.focusable = true; }
+                let el_172 = tree.create("div");
+                tree.append_child(el_171, el_172);
+                tree.set_style(el_172, "width", "12px");
+                tree.set_style(el_172, "height", "24px");
+                tree.set_style(el_172, "align", "center");
+                tree.set_style(el_172, "justify", "center");
                 if (eff_state[window_ids[5 as usize] as usize] == 0) {
-                    let el_213 = tree.create("div");
-                    tree.append_child(el_212, el_213);
-                    tree.set_style(el_213, "width", "7px");
-                    tree.set_style(el_213, "height", "7px");
-                    tree.set_style(el_213, "border-radius", "4");
-                    tree.set_style(el_213, "background-color", "#1a7f37");
+                    let el_173 = tree.create("div");
+                    tree.append_child(el_172, el_173);
+                    tree.set_style(el_173, "width", "7px");
+                    tree.set_style(el_173, "height", "7px");
+                    tree.set_style(el_173, "border-radius", "4");
+                    tree.set_style(el_173, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[5 as usize] as usize] == 1) {
-                        let el_214 = tree.create("div");
-                        tree.append_child(el_212, el_214);
-                        tree.set_style(el_214, "width", "7px");
-                        tree.set_style(el_214, "height", "7px");
-                        tree.set_style(el_214, "border-radius", "4");
-                        tree.set_style(el_214, "background-color", "#0969da");
+                        let el_174 = tree.create("div");
+                        tree.append_child(el_172, el_174);
+                        tree.set_style(el_174, "width", "7px");
+                        tree.set_style(el_174, "height", "7px");
+                        tree.set_style(el_174, "border-radius", "4");
+                        tree.set_style(el_174, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[5 as usize] as usize] == 2) {
-                            let el_215 = tree.create("div");
-                            tree.append_child(el_212, el_215);
-                            tree.set_style(el_215, "width", "7px");
-                            tree.set_style(el_215, "height", "7px");
-                            tree.set_style(el_215, "border-radius", "4");
-                            tree.set_style(el_215, "background-color", "#9a6700");
+                            let el_175 = tree.create("div");
+                            tree.append_child(el_172, el_175);
+                            tree.set_style(el_175, "width", "7px");
+                            tree.set_style(el_175, "height", "7px");
+                            tree.set_style(el_175, "border-radius", "4");
+                            tree.set_style(el_175, "background-color", "#9a6700");
                         } else {
-                            let el_216 = tree.create("div");
-                            tree.append_child(el_212, el_216);
-                            tree.set_style(el_216, "width", "7px");
-                            tree.set_style(el_216, "height", "7px");
-                            tree.set_style(el_216, "border-radius", "4");
-                            tree.set_style(el_216, "background-color", "#6e7781");
+                            let el_176 = tree.create("div");
+                            tree.append_child(el_172, el_176);
+                            tree.set_style(el_176, "width", "7px");
+                            tree.set_style(el_176, "height", "7px");
+                            tree.set_style(el_176, "border-radius", "4");
+                            tree.set_style(el_176, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_217 = tree.create("div");
-                tree.append_child(el_211, el_217);
-                tree.set_style(el_217, "font-size", "12px");
-                tree.set_style(el_217, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_217) { el.text = Some(format!("PN-{}", window_ids[5 as usize]).to_string()); }
-                let el_218 = tree.create("div");
-                tree.append_child(el_211, el_218);
-                tree.set_style(el_218, "font-size", "12px");
-                tree.set_style(el_218, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_218) { el.text = Some(format!("{}", names[window_ids[5 as usize] as usize]).to_string()); }
-                let el_219 = tree.create("div");
-                tree.append_child(el_211, el_219);
-                tree.set_style(el_219, "font-size", "11px");
-                tree.set_style(el_219, "color", "#6e7781");
+                let el_177 = tree.create("div");
+                tree.append_child(el_171, el_177);
+                tree.set_style(el_177, "font-size", "12px");
+                tree.set_style(el_177, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_177) { el.text = Some(format!("PN-{}", window_ids[5 as usize]).to_string()); }
+                let el_178 = tree.create("div");
+                tree.append_child(el_171, el_178);
+                tree.set_style(el_178, "font-size", "12px");
+                tree.set_style(el_178, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_178) { el.text = Some(format!("{}", names[window_ids[5 as usize] as usize]).to_string()); }
+                let el_179 = tree.create("div");
+                tree.append_child(el_171, el_179);
+                tree.set_style(el_179, "font-size", "11px");
+                tree.set_style(el_179, "color", "#6e7781");
                 if (window_depths[5 as usize] < max_depth) {
-                    let txt_220 = tree.create("#text");
-                    tree.append_child(el_219, txt_220);
-                    if let Some(el) = tree.get_mut(txt_220) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_180 = tree.create("#text");
+                    tree.append_child(el_179, txt_180);
+                    if let Some(el) = tree.get_mut(txt_180) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_221 = tree.create("#text");
-                    tree.append_child(el_219, txt_221);
-                    if let Some(el) = tree.get_mut(txt_221) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_181 = tree.create("#text");
+                    tree.append_child(el_179, txt_181);
+                    if let Some(el) = tree.get_mut(txt_181) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 6) {
-                let el_222 = tree.create("div");
-                tree.append_child(el_73, el_222);
-                tree.set_style(el_222, "direction", "horizontal");
-                tree.set_style(el_222, "height", "24px");
-                tree.set_style(el_222, "background-color", "#ffffff");
-                tree.set_style(el_222, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_222, "align", "center");
-                tree.set_style(el_222, "padding-left", "6");
+                let el_182 = tree.create("div");
+                tree.append_child(el_33, el_182);
+                tree.set_style(el_182, "direction", "horizontal");
+                tree.set_style(el_182, "height", "24px");
+                tree.set_style(el_182, "background-color", "#ffffff");
+                tree.set_style(el_182, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_182, "align", "center");
+                tree.set_style(el_182, "padding-left", "6");
                 if (window_depths[6 as usize] >= 1) {
-                    let el_223 = tree.create("div");
-                    tree.append_child(el_222, el_223);
-                    tree.set_style(el_223, "width", "14px");
+                    let el_183 = tree.create("div");
+                    tree.append_child(el_182, el_183);
+                    tree.set_style(el_183, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 2) {
-                    let el_224 = tree.create("div");
-                    tree.append_child(el_222, el_224);
-                    tree.set_style(el_224, "width", "14px");
+                    let el_184 = tree.create("div");
+                    tree.append_child(el_182, el_184);
+                    tree.set_style(el_184, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 3) {
-                    let el_225 = tree.create("div");
-                    tree.append_child(el_222, el_225);
-                    tree.set_style(el_225, "width", "14px");
+                    let el_185 = tree.create("div");
+                    tree.append_child(el_182, el_185);
+                    tree.set_style(el_185, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 4) {
-                    let el_226 = tree.create("div");
-                    tree.append_child(el_222, el_226);
-                    tree.set_style(el_226, "width", "14px");
+                    let el_186 = tree.create("div");
+                    tree.append_child(el_182, el_186);
+                    tree.set_style(el_186, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 5) {
-                    let el_227 = tree.create("div");
-                    tree.append_child(el_222, el_227);
-                    tree.set_style(el_227, "width", "14px");
+                    let el_187 = tree.create("div");
+                    tree.append_child(el_182, el_187);
+                    tree.set_style(el_187, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 6) {
-                    let el_228 = tree.create("div");
-                    tree.append_child(el_222, el_228);
-                    tree.set_style(el_228, "width", "14px");
+                    let el_188 = tree.create("div");
+                    tree.append_child(el_182, el_188);
+                    tree.set_style(el_188, "width", "14px");
                 }
                 if (window_depths[6 as usize] >= 7) {
-                    let el_229 = tree.create("div");
-                    tree.append_child(el_222, el_229);
-                    tree.set_style(el_229, "width", "14px");
+                    let el_189 = tree.create("div");
+                    tree.append_child(el_182, el_189);
+                    tree.set_style(el_189, "width", "14px");
                 }
-                let el_230 = tree.create("div");
-                tree.append_child(el_222, el_230);
-                tree.set_style(el_230, "width", "18px");
-                tree.set_style(el_230, "height", "24px");
-                tree.set_style(el_230, "align", "center");
-                tree.set_style(el_230, "justify", "center");
-                tree.set_style(el_230, "font-size", "10px");
-                tree.set_style(el_230, "color", "#9a6700");
-                tree.set_style(el_230, "cursor", "pointer");
+                let el_190 = tree.create("div");
+                tree.append_child(el_182, el_190);
+                tree.set_style(el_190, "width", "18px");
+                tree.set_style(el_190, "height", "24px");
+                tree.set_style(el_190, "align", "center");
+                tree.set_style(el_190, "justify", "center");
+                tree.set_style(el_190, "font-size", "10px");
+                tree.set_style(el_190, "color", "#9a6700");
+                tree.set_style(el_190, "cursor", "pointer");
                 // on:click -> toggle_row_6 (cb_idx=11)
-                tree.add_event(el_230, "click", 11);
-                if let Some(el) = tree.get_mut(el_230) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_190, "click", 11);
+                if let Some(el) = tree.get_mut(el_190) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[6 as usize] < max_depth) {
                     if loaded[window_ids[6 as usize] as usize] {
                         if expanded[window_ids[6 as usize] as usize] {
-                            let txt_231 = tree.create("#text");
-                            tree.append_child(el_230, txt_231);
-                            if let Some(el) = tree.get_mut(txt_231) { el.text = Some("▾".into()); }
+                            let txt_191 = tree.create("#text");
+                            tree.append_child(el_190, txt_191);
+                            if let Some(el) = tree.get_mut(txt_191) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_232 = tree.create("#text");
-                            tree.append_child(el_230, txt_232);
-                            if let Some(el) = tree.get_mut(txt_232) { el.text = Some("▸".into()); }
+                            let txt_192 = tree.create("#text");
+                            tree.append_child(el_190, txt_192);
+                            if let Some(el) = tree.get_mut(txt_192) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_233 = tree.create("#text");
-                        tree.append_child(el_230, txt_233);
-                        if let Some(el) = tree.get_mut(txt_233) { el.text = Some("+".into()); }
+                        let txt_193 = tree.create("#text");
+                        tree.append_child(el_190, txt_193);
+                        if let Some(el) = tree.get_mut(txt_193) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_234 = tree.create("#text");
-                    tree.append_child(el_230, txt_234);
-                    if let Some(el) = tree.get_mut(txt_234) { el.text = Some("·".into()); }
+                    let txt_194 = tree.create("#text");
+                    tree.append_child(el_190, txt_194);
+                    if let Some(el) = tree.get_mut(txt_194) { el.text = Some("·".into()); }
                 }
-                let el_235 = tree.create("div");
-                tree.append_child(el_222, el_235);
-                tree.set_style(el_235, "direction", "horizontal");
-                tree.set_style(el_235, "width", "fill");
-                tree.set_style(el_235, "height", "24px");
-                tree.set_style(el_235, "align", "center");
-                tree.set_style(el_235, "gap", "5");
-                tree.set_style(el_235, "cursor", "pointer");
+                let el_195 = tree.create("div");
+                tree.append_child(el_182, el_195);
+                tree.set_style(el_195, "direction", "horizontal");
+                tree.set_style(el_195, "width", "fill");
+                tree.set_style(el_195, "height", "24px");
+                tree.set_style(el_195, "align", "center");
+                tree.set_style(el_195, "gap", "5");
+                tree.set_style(el_195, "cursor", "pointer");
                 // on:click -> select_row_6 (cb_idx=33)
-                tree.add_event(el_235, "click", 33);
-                if let Some(el) = tree.get_mut(el_235) { el.visual.cursor = 1; el.focusable = true; }
-                let el_236 = tree.create("div");
-                tree.append_child(el_235, el_236);
-                tree.set_style(el_236, "width", "12px");
-                tree.set_style(el_236, "height", "24px");
-                tree.set_style(el_236, "align", "center");
-                tree.set_style(el_236, "justify", "center");
+                tree.add_event(el_195, "click", 33);
+                if let Some(el) = tree.get_mut(el_195) { el.visual.cursor = 1; el.focusable = true; }
+                let el_196 = tree.create("div");
+                tree.append_child(el_195, el_196);
+                tree.set_style(el_196, "width", "12px");
+                tree.set_style(el_196, "height", "24px");
+                tree.set_style(el_196, "align", "center");
+                tree.set_style(el_196, "justify", "center");
                 if (eff_state[window_ids[6 as usize] as usize] == 0) {
-                    let el_237 = tree.create("div");
-                    tree.append_child(el_236, el_237);
-                    tree.set_style(el_237, "width", "7px");
-                    tree.set_style(el_237, "height", "7px");
-                    tree.set_style(el_237, "border-radius", "4");
-                    tree.set_style(el_237, "background-color", "#1a7f37");
+                    let el_197 = tree.create("div");
+                    tree.append_child(el_196, el_197);
+                    tree.set_style(el_197, "width", "7px");
+                    tree.set_style(el_197, "height", "7px");
+                    tree.set_style(el_197, "border-radius", "4");
+                    tree.set_style(el_197, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[6 as usize] as usize] == 1) {
-                        let el_238 = tree.create("div");
-                        tree.append_child(el_236, el_238);
-                        tree.set_style(el_238, "width", "7px");
-                        tree.set_style(el_238, "height", "7px");
-                        tree.set_style(el_238, "border-radius", "4");
-                        tree.set_style(el_238, "background-color", "#0969da");
+                        let el_198 = tree.create("div");
+                        tree.append_child(el_196, el_198);
+                        tree.set_style(el_198, "width", "7px");
+                        tree.set_style(el_198, "height", "7px");
+                        tree.set_style(el_198, "border-radius", "4");
+                        tree.set_style(el_198, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[6 as usize] as usize] == 2) {
-                            let el_239 = tree.create("div");
-                            tree.append_child(el_236, el_239);
-                            tree.set_style(el_239, "width", "7px");
-                            tree.set_style(el_239, "height", "7px");
-                            tree.set_style(el_239, "border-radius", "4");
-                            tree.set_style(el_239, "background-color", "#9a6700");
+                            let el_199 = tree.create("div");
+                            tree.append_child(el_196, el_199);
+                            tree.set_style(el_199, "width", "7px");
+                            tree.set_style(el_199, "height", "7px");
+                            tree.set_style(el_199, "border-radius", "4");
+                            tree.set_style(el_199, "background-color", "#9a6700");
                         } else {
-                            let el_240 = tree.create("div");
-                            tree.append_child(el_236, el_240);
-                            tree.set_style(el_240, "width", "7px");
-                            tree.set_style(el_240, "height", "7px");
-                            tree.set_style(el_240, "border-radius", "4");
-                            tree.set_style(el_240, "background-color", "#6e7781");
+                            let el_200 = tree.create("div");
+                            tree.append_child(el_196, el_200);
+                            tree.set_style(el_200, "width", "7px");
+                            tree.set_style(el_200, "height", "7px");
+                            tree.set_style(el_200, "border-radius", "4");
+                            tree.set_style(el_200, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_241 = tree.create("div");
-                tree.append_child(el_235, el_241);
-                tree.set_style(el_241, "font-size", "12px");
-                tree.set_style(el_241, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_241) { el.text = Some(format!("PN-{}", window_ids[6 as usize]).to_string()); }
-                let el_242 = tree.create("div");
-                tree.append_child(el_235, el_242);
-                tree.set_style(el_242, "font-size", "12px");
-                tree.set_style(el_242, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_242) { el.text = Some(format!("{}", names[window_ids[6 as usize] as usize]).to_string()); }
-                let el_243 = tree.create("div");
-                tree.append_child(el_235, el_243);
-                tree.set_style(el_243, "font-size", "11px");
-                tree.set_style(el_243, "color", "#6e7781");
+                let el_201 = tree.create("div");
+                tree.append_child(el_195, el_201);
+                tree.set_style(el_201, "font-size", "12px");
+                tree.set_style(el_201, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_201) { el.text = Some(format!("PN-{}", window_ids[6 as usize]).to_string()); }
+                let el_202 = tree.create("div");
+                tree.append_child(el_195, el_202);
+                tree.set_style(el_202, "font-size", "12px");
+                tree.set_style(el_202, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_202) { el.text = Some(format!("{}", names[window_ids[6 as usize] as usize]).to_string()); }
+                let el_203 = tree.create("div");
+                tree.append_child(el_195, el_203);
+                tree.set_style(el_203, "font-size", "11px");
+                tree.set_style(el_203, "color", "#6e7781");
                 if (window_depths[6 as usize] < max_depth) {
-                    let txt_244 = tree.create("#text");
-                    tree.append_child(el_243, txt_244);
-                    if let Some(el) = tree.get_mut(txt_244) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_204 = tree.create("#text");
+                    tree.append_child(el_203, txt_204);
+                    if let Some(el) = tree.get_mut(txt_204) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_245 = tree.create("#text");
-                    tree.append_child(el_243, txt_245);
-                    if let Some(el) = tree.get_mut(txt_245) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_205 = tree.create("#text");
+                    tree.append_child(el_203, txt_205);
+                    if let Some(el) = tree.get_mut(txt_205) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 7) {
-                let el_246 = tree.create("div");
-                tree.append_child(el_73, el_246);
-                tree.set_style(el_246, "direction", "horizontal");
-                tree.set_style(el_246, "height", "24px");
-                tree.set_style(el_246, "background-color", "#f9fafb");
-                tree.set_style(el_246, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_246, "align", "center");
-                tree.set_style(el_246, "padding-left", "6");
+                let el_206 = tree.create("div");
+                tree.append_child(el_33, el_206);
+                tree.set_style(el_206, "direction", "horizontal");
+                tree.set_style(el_206, "height", "24px");
+                tree.set_style(el_206, "background-color", "#f9fafb");
+                tree.set_style(el_206, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_206, "align", "center");
+                tree.set_style(el_206, "padding-left", "6");
                 if (window_depths[7 as usize] >= 1) {
-                    let el_247 = tree.create("div");
-                    tree.append_child(el_246, el_247);
-                    tree.set_style(el_247, "width", "14px");
+                    let el_207 = tree.create("div");
+                    tree.append_child(el_206, el_207);
+                    tree.set_style(el_207, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 2) {
-                    let el_248 = tree.create("div");
-                    tree.append_child(el_246, el_248);
-                    tree.set_style(el_248, "width", "14px");
+                    let el_208 = tree.create("div");
+                    tree.append_child(el_206, el_208);
+                    tree.set_style(el_208, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 3) {
-                    let el_249 = tree.create("div");
-                    tree.append_child(el_246, el_249);
-                    tree.set_style(el_249, "width", "14px");
+                    let el_209 = tree.create("div");
+                    tree.append_child(el_206, el_209);
+                    tree.set_style(el_209, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 4) {
-                    let el_250 = tree.create("div");
-                    tree.append_child(el_246, el_250);
-                    tree.set_style(el_250, "width", "14px");
+                    let el_210 = tree.create("div");
+                    tree.append_child(el_206, el_210);
+                    tree.set_style(el_210, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 5) {
-                    let el_251 = tree.create("div");
-                    tree.append_child(el_246, el_251);
-                    tree.set_style(el_251, "width", "14px");
+                    let el_211 = tree.create("div");
+                    tree.append_child(el_206, el_211);
+                    tree.set_style(el_211, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 6) {
-                    let el_252 = tree.create("div");
-                    tree.append_child(el_246, el_252);
-                    tree.set_style(el_252, "width", "14px");
+                    let el_212 = tree.create("div");
+                    tree.append_child(el_206, el_212);
+                    tree.set_style(el_212, "width", "14px");
                 }
                 if (window_depths[7 as usize] >= 7) {
-                    let el_253 = tree.create("div");
-                    tree.append_child(el_246, el_253);
-                    tree.set_style(el_253, "width", "14px");
+                    let el_213 = tree.create("div");
+                    tree.append_child(el_206, el_213);
+                    tree.set_style(el_213, "width", "14px");
                 }
-                let el_254 = tree.create("div");
-                tree.append_child(el_246, el_254);
-                tree.set_style(el_254, "width", "18px");
-                tree.set_style(el_254, "height", "24px");
-                tree.set_style(el_254, "align", "center");
-                tree.set_style(el_254, "justify", "center");
-                tree.set_style(el_254, "font-size", "10px");
-                tree.set_style(el_254, "color", "#9a6700");
-                tree.set_style(el_254, "cursor", "pointer");
+                let el_214 = tree.create("div");
+                tree.append_child(el_206, el_214);
+                tree.set_style(el_214, "width", "18px");
+                tree.set_style(el_214, "height", "24px");
+                tree.set_style(el_214, "align", "center");
+                tree.set_style(el_214, "justify", "center");
+                tree.set_style(el_214, "font-size", "10px");
+                tree.set_style(el_214, "color", "#9a6700");
+                tree.set_style(el_214, "cursor", "pointer");
                 // on:click -> toggle_row_7 (cb_idx=12)
-                tree.add_event(el_254, "click", 12);
-                if let Some(el) = tree.get_mut(el_254) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_214, "click", 12);
+                if let Some(el) = tree.get_mut(el_214) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[7 as usize] < max_depth) {
                     if loaded[window_ids[7 as usize] as usize] {
                         if expanded[window_ids[7 as usize] as usize] {
-                            let txt_255 = tree.create("#text");
-                            tree.append_child(el_254, txt_255);
-                            if let Some(el) = tree.get_mut(txt_255) { el.text = Some("▾".into()); }
+                            let txt_215 = tree.create("#text");
+                            tree.append_child(el_214, txt_215);
+                            if let Some(el) = tree.get_mut(txt_215) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_256 = tree.create("#text");
-                            tree.append_child(el_254, txt_256);
-                            if let Some(el) = tree.get_mut(txt_256) { el.text = Some("▸".into()); }
+                            let txt_216 = tree.create("#text");
+                            tree.append_child(el_214, txt_216);
+                            if let Some(el) = tree.get_mut(txt_216) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_257 = tree.create("#text");
-                        tree.append_child(el_254, txt_257);
-                        if let Some(el) = tree.get_mut(txt_257) { el.text = Some("+".into()); }
+                        let txt_217 = tree.create("#text");
+                        tree.append_child(el_214, txt_217);
+                        if let Some(el) = tree.get_mut(txt_217) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_258 = tree.create("#text");
-                    tree.append_child(el_254, txt_258);
-                    if let Some(el) = tree.get_mut(txt_258) { el.text = Some("·".into()); }
+                    let txt_218 = tree.create("#text");
+                    tree.append_child(el_214, txt_218);
+                    if let Some(el) = tree.get_mut(txt_218) { el.text = Some("·".into()); }
                 }
-                let el_259 = tree.create("div");
-                tree.append_child(el_246, el_259);
-                tree.set_style(el_259, "direction", "horizontal");
-                tree.set_style(el_259, "width", "fill");
-                tree.set_style(el_259, "height", "24px");
-                tree.set_style(el_259, "align", "center");
-                tree.set_style(el_259, "gap", "5");
-                tree.set_style(el_259, "cursor", "pointer");
+                let el_219 = tree.create("div");
+                tree.append_child(el_206, el_219);
+                tree.set_style(el_219, "direction", "horizontal");
+                tree.set_style(el_219, "width", "fill");
+                tree.set_style(el_219, "height", "24px");
+                tree.set_style(el_219, "align", "center");
+                tree.set_style(el_219, "gap", "5");
+                tree.set_style(el_219, "cursor", "pointer");
                 // on:click -> select_row_7 (cb_idx=34)
-                tree.add_event(el_259, "click", 34);
-                if let Some(el) = tree.get_mut(el_259) { el.visual.cursor = 1; el.focusable = true; }
-                let el_260 = tree.create("div");
-                tree.append_child(el_259, el_260);
-                tree.set_style(el_260, "width", "12px");
-                tree.set_style(el_260, "height", "24px");
-                tree.set_style(el_260, "align", "center");
-                tree.set_style(el_260, "justify", "center");
+                tree.add_event(el_219, "click", 34);
+                if let Some(el) = tree.get_mut(el_219) { el.visual.cursor = 1; el.focusable = true; }
+                let el_220 = tree.create("div");
+                tree.append_child(el_219, el_220);
+                tree.set_style(el_220, "width", "12px");
+                tree.set_style(el_220, "height", "24px");
+                tree.set_style(el_220, "align", "center");
+                tree.set_style(el_220, "justify", "center");
                 if (eff_state[window_ids[7 as usize] as usize] == 0) {
-                    let el_261 = tree.create("div");
-                    tree.append_child(el_260, el_261);
-                    tree.set_style(el_261, "width", "7px");
-                    tree.set_style(el_261, "height", "7px");
-                    tree.set_style(el_261, "border-radius", "4");
-                    tree.set_style(el_261, "background-color", "#1a7f37");
+                    let el_221 = tree.create("div");
+                    tree.append_child(el_220, el_221);
+                    tree.set_style(el_221, "width", "7px");
+                    tree.set_style(el_221, "height", "7px");
+                    tree.set_style(el_221, "border-radius", "4");
+                    tree.set_style(el_221, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[7 as usize] as usize] == 1) {
-                        let el_262 = tree.create("div");
-                        tree.append_child(el_260, el_262);
-                        tree.set_style(el_262, "width", "7px");
-                        tree.set_style(el_262, "height", "7px");
-                        tree.set_style(el_262, "border-radius", "4");
-                        tree.set_style(el_262, "background-color", "#0969da");
+                        let el_222 = tree.create("div");
+                        tree.append_child(el_220, el_222);
+                        tree.set_style(el_222, "width", "7px");
+                        tree.set_style(el_222, "height", "7px");
+                        tree.set_style(el_222, "border-radius", "4");
+                        tree.set_style(el_222, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[7 as usize] as usize] == 2) {
-                            let el_263 = tree.create("div");
-                            tree.append_child(el_260, el_263);
-                            tree.set_style(el_263, "width", "7px");
-                            tree.set_style(el_263, "height", "7px");
-                            tree.set_style(el_263, "border-radius", "4");
-                            tree.set_style(el_263, "background-color", "#9a6700");
+                            let el_223 = tree.create("div");
+                            tree.append_child(el_220, el_223);
+                            tree.set_style(el_223, "width", "7px");
+                            tree.set_style(el_223, "height", "7px");
+                            tree.set_style(el_223, "border-radius", "4");
+                            tree.set_style(el_223, "background-color", "#9a6700");
                         } else {
-                            let el_264 = tree.create("div");
-                            tree.append_child(el_260, el_264);
-                            tree.set_style(el_264, "width", "7px");
-                            tree.set_style(el_264, "height", "7px");
-                            tree.set_style(el_264, "border-radius", "4");
-                            tree.set_style(el_264, "background-color", "#6e7781");
+                            let el_224 = tree.create("div");
+                            tree.append_child(el_220, el_224);
+                            tree.set_style(el_224, "width", "7px");
+                            tree.set_style(el_224, "height", "7px");
+                            tree.set_style(el_224, "border-radius", "4");
+                            tree.set_style(el_224, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_265 = tree.create("div");
-                tree.append_child(el_259, el_265);
-                tree.set_style(el_265, "font-size", "12px");
-                tree.set_style(el_265, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_265) { el.text = Some(format!("PN-{}", window_ids[7 as usize]).to_string()); }
-                let el_266 = tree.create("div");
-                tree.append_child(el_259, el_266);
-                tree.set_style(el_266, "font-size", "12px");
-                tree.set_style(el_266, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_266) { el.text = Some(format!("{}", names[window_ids[7 as usize] as usize]).to_string()); }
-                let el_267 = tree.create("div");
-                tree.append_child(el_259, el_267);
-                tree.set_style(el_267, "font-size", "11px");
-                tree.set_style(el_267, "color", "#6e7781");
+                let el_225 = tree.create("div");
+                tree.append_child(el_219, el_225);
+                tree.set_style(el_225, "font-size", "12px");
+                tree.set_style(el_225, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_225) { el.text = Some(format!("PN-{}", window_ids[7 as usize]).to_string()); }
+                let el_226 = tree.create("div");
+                tree.append_child(el_219, el_226);
+                tree.set_style(el_226, "font-size", "12px");
+                tree.set_style(el_226, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_226) { el.text = Some(format!("{}", names[window_ids[7 as usize] as usize]).to_string()); }
+                let el_227 = tree.create("div");
+                tree.append_child(el_219, el_227);
+                tree.set_style(el_227, "font-size", "11px");
+                tree.set_style(el_227, "color", "#6e7781");
                 if (window_depths[7 as usize] < max_depth) {
-                    let txt_268 = tree.create("#text");
-                    tree.append_child(el_267, txt_268);
-                    if let Some(el) = tree.get_mut(txt_268) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_228 = tree.create("#text");
+                    tree.append_child(el_227, txt_228);
+                    if let Some(el) = tree.get_mut(txt_228) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_269 = tree.create("#text");
-                    tree.append_child(el_267, txt_269);
-                    if let Some(el) = tree.get_mut(txt_269) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_229 = tree.create("#text");
+                    tree.append_child(el_227, txt_229);
+                    if let Some(el) = tree.get_mut(txt_229) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 8) {
-                let el_270 = tree.create("div");
-                tree.append_child(el_73, el_270);
-                tree.set_style(el_270, "direction", "horizontal");
-                tree.set_style(el_270, "height", "24px");
-                tree.set_style(el_270, "background-color", "#ffffff");
-                tree.set_style(el_270, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_270, "align", "center");
-                tree.set_style(el_270, "padding-left", "6");
+                let el_230 = tree.create("div");
+                tree.append_child(el_33, el_230);
+                tree.set_style(el_230, "direction", "horizontal");
+                tree.set_style(el_230, "height", "24px");
+                tree.set_style(el_230, "background-color", "#ffffff");
+                tree.set_style(el_230, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_230, "align", "center");
+                tree.set_style(el_230, "padding-left", "6");
                 if (window_depths[8 as usize] >= 1) {
-                    let el_271 = tree.create("div");
-                    tree.append_child(el_270, el_271);
-                    tree.set_style(el_271, "width", "14px");
+                    let el_231 = tree.create("div");
+                    tree.append_child(el_230, el_231);
+                    tree.set_style(el_231, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 2) {
-                    let el_272 = tree.create("div");
-                    tree.append_child(el_270, el_272);
-                    tree.set_style(el_272, "width", "14px");
+                    let el_232 = tree.create("div");
+                    tree.append_child(el_230, el_232);
+                    tree.set_style(el_232, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 3) {
-                    let el_273 = tree.create("div");
-                    tree.append_child(el_270, el_273);
-                    tree.set_style(el_273, "width", "14px");
+                    let el_233 = tree.create("div");
+                    tree.append_child(el_230, el_233);
+                    tree.set_style(el_233, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 4) {
-                    let el_274 = tree.create("div");
-                    tree.append_child(el_270, el_274);
-                    tree.set_style(el_274, "width", "14px");
+                    let el_234 = tree.create("div");
+                    tree.append_child(el_230, el_234);
+                    tree.set_style(el_234, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 5) {
-                    let el_275 = tree.create("div");
-                    tree.append_child(el_270, el_275);
-                    tree.set_style(el_275, "width", "14px");
+                    let el_235 = tree.create("div");
+                    tree.append_child(el_230, el_235);
+                    tree.set_style(el_235, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 6) {
-                    let el_276 = tree.create("div");
-                    tree.append_child(el_270, el_276);
-                    tree.set_style(el_276, "width", "14px");
+                    let el_236 = tree.create("div");
+                    tree.append_child(el_230, el_236);
+                    tree.set_style(el_236, "width", "14px");
                 }
                 if (window_depths[8 as usize] >= 7) {
-                    let el_277 = tree.create("div");
-                    tree.append_child(el_270, el_277);
-                    tree.set_style(el_277, "width", "14px");
+                    let el_237 = tree.create("div");
+                    tree.append_child(el_230, el_237);
+                    tree.set_style(el_237, "width", "14px");
                 }
-                let el_278 = tree.create("div");
-                tree.append_child(el_270, el_278);
-                tree.set_style(el_278, "width", "18px");
-                tree.set_style(el_278, "height", "24px");
-                tree.set_style(el_278, "align", "center");
-                tree.set_style(el_278, "justify", "center");
-                tree.set_style(el_278, "font-size", "10px");
-                tree.set_style(el_278, "color", "#9a6700");
-                tree.set_style(el_278, "cursor", "pointer");
+                let el_238 = tree.create("div");
+                tree.append_child(el_230, el_238);
+                tree.set_style(el_238, "width", "18px");
+                tree.set_style(el_238, "height", "24px");
+                tree.set_style(el_238, "align", "center");
+                tree.set_style(el_238, "justify", "center");
+                tree.set_style(el_238, "font-size", "10px");
+                tree.set_style(el_238, "color", "#9a6700");
+                tree.set_style(el_238, "cursor", "pointer");
                 // on:click -> toggle_row_8 (cb_idx=13)
-                tree.add_event(el_278, "click", 13);
-                if let Some(el) = tree.get_mut(el_278) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_238, "click", 13);
+                if let Some(el) = tree.get_mut(el_238) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[8 as usize] < max_depth) {
                     if loaded[window_ids[8 as usize] as usize] {
                         if expanded[window_ids[8 as usize] as usize] {
-                            let txt_279 = tree.create("#text");
-                            tree.append_child(el_278, txt_279);
-                            if let Some(el) = tree.get_mut(txt_279) { el.text = Some("▾".into()); }
+                            let txt_239 = tree.create("#text");
+                            tree.append_child(el_238, txt_239);
+                            if let Some(el) = tree.get_mut(txt_239) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_280 = tree.create("#text");
-                            tree.append_child(el_278, txt_280);
-                            if let Some(el) = tree.get_mut(txt_280) { el.text = Some("▸".into()); }
+                            let txt_240 = tree.create("#text");
+                            tree.append_child(el_238, txt_240);
+                            if let Some(el) = tree.get_mut(txt_240) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_281 = tree.create("#text");
-                        tree.append_child(el_278, txt_281);
-                        if let Some(el) = tree.get_mut(txt_281) { el.text = Some("+".into()); }
+                        let txt_241 = tree.create("#text");
+                        tree.append_child(el_238, txt_241);
+                        if let Some(el) = tree.get_mut(txt_241) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_282 = tree.create("#text");
-                    tree.append_child(el_278, txt_282);
-                    if let Some(el) = tree.get_mut(txt_282) { el.text = Some("·".into()); }
+                    let txt_242 = tree.create("#text");
+                    tree.append_child(el_238, txt_242);
+                    if let Some(el) = tree.get_mut(txt_242) { el.text = Some("·".into()); }
                 }
-                let el_283 = tree.create("div");
-                tree.append_child(el_270, el_283);
-                tree.set_style(el_283, "direction", "horizontal");
-                tree.set_style(el_283, "width", "fill");
-                tree.set_style(el_283, "height", "24px");
-                tree.set_style(el_283, "align", "center");
-                tree.set_style(el_283, "gap", "5");
-                tree.set_style(el_283, "cursor", "pointer");
+                let el_243 = tree.create("div");
+                tree.append_child(el_230, el_243);
+                tree.set_style(el_243, "direction", "horizontal");
+                tree.set_style(el_243, "width", "fill");
+                tree.set_style(el_243, "height", "24px");
+                tree.set_style(el_243, "align", "center");
+                tree.set_style(el_243, "gap", "5");
+                tree.set_style(el_243, "cursor", "pointer");
                 // on:click -> select_row_8 (cb_idx=35)
-                tree.add_event(el_283, "click", 35);
-                if let Some(el) = tree.get_mut(el_283) { el.visual.cursor = 1; el.focusable = true; }
-                let el_284 = tree.create("div");
-                tree.append_child(el_283, el_284);
-                tree.set_style(el_284, "width", "12px");
-                tree.set_style(el_284, "height", "24px");
-                tree.set_style(el_284, "align", "center");
-                tree.set_style(el_284, "justify", "center");
+                tree.add_event(el_243, "click", 35);
+                if let Some(el) = tree.get_mut(el_243) { el.visual.cursor = 1; el.focusable = true; }
+                let el_244 = tree.create("div");
+                tree.append_child(el_243, el_244);
+                tree.set_style(el_244, "width", "12px");
+                tree.set_style(el_244, "height", "24px");
+                tree.set_style(el_244, "align", "center");
+                tree.set_style(el_244, "justify", "center");
                 if (eff_state[window_ids[8 as usize] as usize] == 0) {
-                    let el_285 = tree.create("div");
-                    tree.append_child(el_284, el_285);
-                    tree.set_style(el_285, "width", "7px");
-                    tree.set_style(el_285, "height", "7px");
-                    tree.set_style(el_285, "border-radius", "4");
-                    tree.set_style(el_285, "background-color", "#1a7f37");
+                    let el_245 = tree.create("div");
+                    tree.append_child(el_244, el_245);
+                    tree.set_style(el_245, "width", "7px");
+                    tree.set_style(el_245, "height", "7px");
+                    tree.set_style(el_245, "border-radius", "4");
+                    tree.set_style(el_245, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[8 as usize] as usize] == 1) {
-                        let el_286 = tree.create("div");
-                        tree.append_child(el_284, el_286);
-                        tree.set_style(el_286, "width", "7px");
-                        tree.set_style(el_286, "height", "7px");
-                        tree.set_style(el_286, "border-radius", "4");
-                        tree.set_style(el_286, "background-color", "#0969da");
+                        let el_246 = tree.create("div");
+                        tree.append_child(el_244, el_246);
+                        tree.set_style(el_246, "width", "7px");
+                        tree.set_style(el_246, "height", "7px");
+                        tree.set_style(el_246, "border-radius", "4");
+                        tree.set_style(el_246, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[8 as usize] as usize] == 2) {
-                            let el_287 = tree.create("div");
-                            tree.append_child(el_284, el_287);
-                            tree.set_style(el_287, "width", "7px");
-                            tree.set_style(el_287, "height", "7px");
-                            tree.set_style(el_287, "border-radius", "4");
-                            tree.set_style(el_287, "background-color", "#9a6700");
+                            let el_247 = tree.create("div");
+                            tree.append_child(el_244, el_247);
+                            tree.set_style(el_247, "width", "7px");
+                            tree.set_style(el_247, "height", "7px");
+                            tree.set_style(el_247, "border-radius", "4");
+                            tree.set_style(el_247, "background-color", "#9a6700");
                         } else {
-                            let el_288 = tree.create("div");
-                            tree.append_child(el_284, el_288);
-                            tree.set_style(el_288, "width", "7px");
-                            tree.set_style(el_288, "height", "7px");
-                            tree.set_style(el_288, "border-radius", "4");
-                            tree.set_style(el_288, "background-color", "#6e7781");
+                            let el_248 = tree.create("div");
+                            tree.append_child(el_244, el_248);
+                            tree.set_style(el_248, "width", "7px");
+                            tree.set_style(el_248, "height", "7px");
+                            tree.set_style(el_248, "border-radius", "4");
+                            tree.set_style(el_248, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_289 = tree.create("div");
-                tree.append_child(el_283, el_289);
-                tree.set_style(el_289, "font-size", "12px");
-                tree.set_style(el_289, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_289) { el.text = Some(format!("PN-{}", window_ids[8 as usize]).to_string()); }
-                let el_290 = tree.create("div");
-                tree.append_child(el_283, el_290);
-                tree.set_style(el_290, "font-size", "12px");
-                tree.set_style(el_290, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_290) { el.text = Some(format!("{}", names[window_ids[8 as usize] as usize]).to_string()); }
-                let el_291 = tree.create("div");
-                tree.append_child(el_283, el_291);
-                tree.set_style(el_291, "font-size", "11px");
-                tree.set_style(el_291, "color", "#6e7781");
+                let el_249 = tree.create("div");
+                tree.append_child(el_243, el_249);
+                tree.set_style(el_249, "font-size", "12px");
+                tree.set_style(el_249, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_249) { el.text = Some(format!("PN-{}", window_ids[8 as usize]).to_string()); }
+                let el_250 = tree.create("div");
+                tree.append_child(el_243, el_250);
+                tree.set_style(el_250, "font-size", "12px");
+                tree.set_style(el_250, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_250) { el.text = Some(format!("{}", names[window_ids[8 as usize] as usize]).to_string()); }
+                let el_251 = tree.create("div");
+                tree.append_child(el_243, el_251);
+                tree.set_style(el_251, "font-size", "11px");
+                tree.set_style(el_251, "color", "#6e7781");
                 if (window_depths[8 as usize] < max_depth) {
-                    let txt_292 = tree.create("#text");
-                    tree.append_child(el_291, txt_292);
-                    if let Some(el) = tree.get_mut(txt_292) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_252 = tree.create("#text");
+                    tree.append_child(el_251, txt_252);
+                    if let Some(el) = tree.get_mut(txt_252) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_293 = tree.create("#text");
-                    tree.append_child(el_291, txt_293);
-                    if let Some(el) = tree.get_mut(txt_293) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_253 = tree.create("#text");
+                    tree.append_child(el_251, txt_253);
+                    if let Some(el) = tree.get_mut(txt_253) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 9) {
-                let el_294 = tree.create("div");
-                tree.append_child(el_73, el_294);
-                tree.set_style(el_294, "direction", "horizontal");
-                tree.set_style(el_294, "height", "24px");
-                tree.set_style(el_294, "background-color", "#f9fafb");
-                tree.set_style(el_294, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_294, "align", "center");
-                tree.set_style(el_294, "padding-left", "6");
+                let el_254 = tree.create("div");
+                tree.append_child(el_33, el_254);
+                tree.set_style(el_254, "direction", "horizontal");
+                tree.set_style(el_254, "height", "24px");
+                tree.set_style(el_254, "background-color", "#f9fafb");
+                tree.set_style(el_254, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_254, "align", "center");
+                tree.set_style(el_254, "padding-left", "6");
                 if (window_depths[9 as usize] >= 1) {
-                    let el_295 = tree.create("div");
-                    tree.append_child(el_294, el_295);
-                    tree.set_style(el_295, "width", "14px");
+                    let el_255 = tree.create("div");
+                    tree.append_child(el_254, el_255);
+                    tree.set_style(el_255, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 2) {
-                    let el_296 = tree.create("div");
-                    tree.append_child(el_294, el_296);
-                    tree.set_style(el_296, "width", "14px");
+                    let el_256 = tree.create("div");
+                    tree.append_child(el_254, el_256);
+                    tree.set_style(el_256, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 3) {
-                    let el_297 = tree.create("div");
-                    tree.append_child(el_294, el_297);
-                    tree.set_style(el_297, "width", "14px");
+                    let el_257 = tree.create("div");
+                    tree.append_child(el_254, el_257);
+                    tree.set_style(el_257, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 4) {
-                    let el_298 = tree.create("div");
-                    tree.append_child(el_294, el_298);
-                    tree.set_style(el_298, "width", "14px");
+                    let el_258 = tree.create("div");
+                    tree.append_child(el_254, el_258);
+                    tree.set_style(el_258, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 5) {
-                    let el_299 = tree.create("div");
-                    tree.append_child(el_294, el_299);
-                    tree.set_style(el_299, "width", "14px");
+                    let el_259 = tree.create("div");
+                    tree.append_child(el_254, el_259);
+                    tree.set_style(el_259, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 6) {
-                    let el_300 = tree.create("div");
-                    tree.append_child(el_294, el_300);
-                    tree.set_style(el_300, "width", "14px");
+                    let el_260 = tree.create("div");
+                    tree.append_child(el_254, el_260);
+                    tree.set_style(el_260, "width", "14px");
                 }
                 if (window_depths[9 as usize] >= 7) {
-                    let el_301 = tree.create("div");
-                    tree.append_child(el_294, el_301);
-                    tree.set_style(el_301, "width", "14px");
+                    let el_261 = tree.create("div");
+                    tree.append_child(el_254, el_261);
+                    tree.set_style(el_261, "width", "14px");
                 }
-                let el_302 = tree.create("div");
-                tree.append_child(el_294, el_302);
-                tree.set_style(el_302, "width", "18px");
-                tree.set_style(el_302, "height", "24px");
-                tree.set_style(el_302, "align", "center");
-                tree.set_style(el_302, "justify", "center");
-                tree.set_style(el_302, "font-size", "10px");
-                tree.set_style(el_302, "color", "#9a6700");
-                tree.set_style(el_302, "cursor", "pointer");
+                let el_262 = tree.create("div");
+                tree.append_child(el_254, el_262);
+                tree.set_style(el_262, "width", "18px");
+                tree.set_style(el_262, "height", "24px");
+                tree.set_style(el_262, "align", "center");
+                tree.set_style(el_262, "justify", "center");
+                tree.set_style(el_262, "font-size", "10px");
+                tree.set_style(el_262, "color", "#9a6700");
+                tree.set_style(el_262, "cursor", "pointer");
                 // on:click -> toggle_row_9 (cb_idx=14)
-                tree.add_event(el_302, "click", 14);
-                if let Some(el) = tree.get_mut(el_302) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_262, "click", 14);
+                if let Some(el) = tree.get_mut(el_262) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[9 as usize] < max_depth) {
                     if loaded[window_ids[9 as usize] as usize] {
                         if expanded[window_ids[9 as usize] as usize] {
-                            let txt_303 = tree.create("#text");
-                            tree.append_child(el_302, txt_303);
-                            if let Some(el) = tree.get_mut(txt_303) { el.text = Some("▾".into()); }
+                            let txt_263 = tree.create("#text");
+                            tree.append_child(el_262, txt_263);
+                            if let Some(el) = tree.get_mut(txt_263) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_304 = tree.create("#text");
-                            tree.append_child(el_302, txt_304);
-                            if let Some(el) = tree.get_mut(txt_304) { el.text = Some("▸".into()); }
+                            let txt_264 = tree.create("#text");
+                            tree.append_child(el_262, txt_264);
+                            if let Some(el) = tree.get_mut(txt_264) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_305 = tree.create("#text");
-                        tree.append_child(el_302, txt_305);
-                        if let Some(el) = tree.get_mut(txt_305) { el.text = Some("+".into()); }
+                        let txt_265 = tree.create("#text");
+                        tree.append_child(el_262, txt_265);
+                        if let Some(el) = tree.get_mut(txt_265) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_306 = tree.create("#text");
-                    tree.append_child(el_302, txt_306);
-                    if let Some(el) = tree.get_mut(txt_306) { el.text = Some("·".into()); }
+                    let txt_266 = tree.create("#text");
+                    tree.append_child(el_262, txt_266);
+                    if let Some(el) = tree.get_mut(txt_266) { el.text = Some("·".into()); }
                 }
-                let el_307 = tree.create("div");
-                tree.append_child(el_294, el_307);
-                tree.set_style(el_307, "direction", "horizontal");
-                tree.set_style(el_307, "width", "fill");
-                tree.set_style(el_307, "height", "24px");
-                tree.set_style(el_307, "align", "center");
-                tree.set_style(el_307, "gap", "5");
-                tree.set_style(el_307, "cursor", "pointer");
+                let el_267 = tree.create("div");
+                tree.append_child(el_254, el_267);
+                tree.set_style(el_267, "direction", "horizontal");
+                tree.set_style(el_267, "width", "fill");
+                tree.set_style(el_267, "height", "24px");
+                tree.set_style(el_267, "align", "center");
+                tree.set_style(el_267, "gap", "5");
+                tree.set_style(el_267, "cursor", "pointer");
                 // on:click -> select_row_9 (cb_idx=36)
-                tree.add_event(el_307, "click", 36);
-                if let Some(el) = tree.get_mut(el_307) { el.visual.cursor = 1; el.focusable = true; }
-                let el_308 = tree.create("div");
-                tree.append_child(el_307, el_308);
-                tree.set_style(el_308, "width", "12px");
-                tree.set_style(el_308, "height", "24px");
-                tree.set_style(el_308, "align", "center");
-                tree.set_style(el_308, "justify", "center");
+                tree.add_event(el_267, "click", 36);
+                if let Some(el) = tree.get_mut(el_267) { el.visual.cursor = 1; el.focusable = true; }
+                let el_268 = tree.create("div");
+                tree.append_child(el_267, el_268);
+                tree.set_style(el_268, "width", "12px");
+                tree.set_style(el_268, "height", "24px");
+                tree.set_style(el_268, "align", "center");
+                tree.set_style(el_268, "justify", "center");
                 if (eff_state[window_ids[9 as usize] as usize] == 0) {
-                    let el_309 = tree.create("div");
-                    tree.append_child(el_308, el_309);
-                    tree.set_style(el_309, "width", "7px");
-                    tree.set_style(el_309, "height", "7px");
-                    tree.set_style(el_309, "border-radius", "4");
-                    tree.set_style(el_309, "background-color", "#1a7f37");
+                    let el_269 = tree.create("div");
+                    tree.append_child(el_268, el_269);
+                    tree.set_style(el_269, "width", "7px");
+                    tree.set_style(el_269, "height", "7px");
+                    tree.set_style(el_269, "border-radius", "4");
+                    tree.set_style(el_269, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[9 as usize] as usize] == 1) {
-                        let el_310 = tree.create("div");
-                        tree.append_child(el_308, el_310);
-                        tree.set_style(el_310, "width", "7px");
-                        tree.set_style(el_310, "height", "7px");
-                        tree.set_style(el_310, "border-radius", "4");
-                        tree.set_style(el_310, "background-color", "#0969da");
+                        let el_270 = tree.create("div");
+                        tree.append_child(el_268, el_270);
+                        tree.set_style(el_270, "width", "7px");
+                        tree.set_style(el_270, "height", "7px");
+                        tree.set_style(el_270, "border-radius", "4");
+                        tree.set_style(el_270, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[9 as usize] as usize] == 2) {
-                            let el_311 = tree.create("div");
-                            tree.append_child(el_308, el_311);
-                            tree.set_style(el_311, "width", "7px");
-                            tree.set_style(el_311, "height", "7px");
-                            tree.set_style(el_311, "border-radius", "4");
-                            tree.set_style(el_311, "background-color", "#9a6700");
+                            let el_271 = tree.create("div");
+                            tree.append_child(el_268, el_271);
+                            tree.set_style(el_271, "width", "7px");
+                            tree.set_style(el_271, "height", "7px");
+                            tree.set_style(el_271, "border-radius", "4");
+                            tree.set_style(el_271, "background-color", "#9a6700");
                         } else {
-                            let el_312 = tree.create("div");
-                            tree.append_child(el_308, el_312);
-                            tree.set_style(el_312, "width", "7px");
-                            tree.set_style(el_312, "height", "7px");
-                            tree.set_style(el_312, "border-radius", "4");
-                            tree.set_style(el_312, "background-color", "#6e7781");
+                            let el_272 = tree.create("div");
+                            tree.append_child(el_268, el_272);
+                            tree.set_style(el_272, "width", "7px");
+                            tree.set_style(el_272, "height", "7px");
+                            tree.set_style(el_272, "border-radius", "4");
+                            tree.set_style(el_272, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_313 = tree.create("div");
-                tree.append_child(el_307, el_313);
-                tree.set_style(el_313, "font-size", "12px");
-                tree.set_style(el_313, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_313) { el.text = Some(format!("PN-{}", window_ids[9 as usize]).to_string()); }
-                let el_314 = tree.create("div");
-                tree.append_child(el_307, el_314);
-                tree.set_style(el_314, "font-size", "12px");
-                tree.set_style(el_314, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_314) { el.text = Some(format!("{}", names[window_ids[9 as usize] as usize]).to_string()); }
-                let el_315 = tree.create("div");
-                tree.append_child(el_307, el_315);
-                tree.set_style(el_315, "font-size", "11px");
-                tree.set_style(el_315, "color", "#6e7781");
+                let el_273 = tree.create("div");
+                tree.append_child(el_267, el_273);
+                tree.set_style(el_273, "font-size", "12px");
+                tree.set_style(el_273, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_273) { el.text = Some(format!("PN-{}", window_ids[9 as usize]).to_string()); }
+                let el_274 = tree.create("div");
+                tree.append_child(el_267, el_274);
+                tree.set_style(el_274, "font-size", "12px");
+                tree.set_style(el_274, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_274) { el.text = Some(format!("{}", names[window_ids[9 as usize] as usize]).to_string()); }
+                let el_275 = tree.create("div");
+                tree.append_child(el_267, el_275);
+                tree.set_style(el_275, "font-size", "11px");
+                tree.set_style(el_275, "color", "#6e7781");
                 if (window_depths[9 as usize] < max_depth) {
-                    let txt_316 = tree.create("#text");
-                    tree.append_child(el_315, txt_316);
-                    if let Some(el) = tree.get_mut(txt_316) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_276 = tree.create("#text");
+                    tree.append_child(el_275, txt_276);
+                    if let Some(el) = tree.get_mut(txt_276) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_317 = tree.create("#text");
-                    tree.append_child(el_315, txt_317);
-                    if let Some(el) = tree.get_mut(txt_317) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_277 = tree.create("#text");
+                    tree.append_child(el_275, txt_277);
+                    if let Some(el) = tree.get_mut(txt_277) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 10) {
-                let el_318 = tree.create("div");
-                tree.append_child(el_73, el_318);
-                tree.set_style(el_318, "direction", "horizontal");
-                tree.set_style(el_318, "height", "24px");
-                tree.set_style(el_318, "background-color", "#ffffff");
-                tree.set_style(el_318, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_318, "align", "center");
-                tree.set_style(el_318, "padding-left", "6");
+                let el_278 = tree.create("div");
+                tree.append_child(el_33, el_278);
+                tree.set_style(el_278, "direction", "horizontal");
+                tree.set_style(el_278, "height", "24px");
+                tree.set_style(el_278, "background-color", "#ffffff");
+                tree.set_style(el_278, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_278, "align", "center");
+                tree.set_style(el_278, "padding-left", "6");
                 if (window_depths[10 as usize] >= 1) {
-                    let el_319 = tree.create("div");
-                    tree.append_child(el_318, el_319);
-                    tree.set_style(el_319, "width", "14px");
+                    let el_279 = tree.create("div");
+                    tree.append_child(el_278, el_279);
+                    tree.set_style(el_279, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 2) {
-                    let el_320 = tree.create("div");
-                    tree.append_child(el_318, el_320);
-                    tree.set_style(el_320, "width", "14px");
+                    let el_280 = tree.create("div");
+                    tree.append_child(el_278, el_280);
+                    tree.set_style(el_280, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 3) {
-                    let el_321 = tree.create("div");
-                    tree.append_child(el_318, el_321);
-                    tree.set_style(el_321, "width", "14px");
+                    let el_281 = tree.create("div");
+                    tree.append_child(el_278, el_281);
+                    tree.set_style(el_281, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 4) {
-                    let el_322 = tree.create("div");
-                    tree.append_child(el_318, el_322);
-                    tree.set_style(el_322, "width", "14px");
+                    let el_282 = tree.create("div");
+                    tree.append_child(el_278, el_282);
+                    tree.set_style(el_282, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 5) {
-                    let el_323 = tree.create("div");
-                    tree.append_child(el_318, el_323);
-                    tree.set_style(el_323, "width", "14px");
+                    let el_283 = tree.create("div");
+                    tree.append_child(el_278, el_283);
+                    tree.set_style(el_283, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 6) {
-                    let el_324 = tree.create("div");
-                    tree.append_child(el_318, el_324);
-                    tree.set_style(el_324, "width", "14px");
+                    let el_284 = tree.create("div");
+                    tree.append_child(el_278, el_284);
+                    tree.set_style(el_284, "width", "14px");
                 }
                 if (window_depths[10 as usize] >= 7) {
-                    let el_325 = tree.create("div");
-                    tree.append_child(el_318, el_325);
-                    tree.set_style(el_325, "width", "14px");
+                    let el_285 = tree.create("div");
+                    tree.append_child(el_278, el_285);
+                    tree.set_style(el_285, "width", "14px");
                 }
-                let el_326 = tree.create("div");
-                tree.append_child(el_318, el_326);
-                tree.set_style(el_326, "width", "18px");
-                tree.set_style(el_326, "height", "24px");
-                tree.set_style(el_326, "align", "center");
-                tree.set_style(el_326, "justify", "center");
-                tree.set_style(el_326, "font-size", "10px");
-                tree.set_style(el_326, "color", "#9a6700");
-                tree.set_style(el_326, "cursor", "pointer");
+                let el_286 = tree.create("div");
+                tree.append_child(el_278, el_286);
+                tree.set_style(el_286, "width", "18px");
+                tree.set_style(el_286, "height", "24px");
+                tree.set_style(el_286, "align", "center");
+                tree.set_style(el_286, "justify", "center");
+                tree.set_style(el_286, "font-size", "10px");
+                tree.set_style(el_286, "color", "#9a6700");
+                tree.set_style(el_286, "cursor", "pointer");
                 // on:click -> toggle_row_10 (cb_idx=15)
-                tree.add_event(el_326, "click", 15);
-                if let Some(el) = tree.get_mut(el_326) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_286, "click", 15);
+                if let Some(el) = tree.get_mut(el_286) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[10 as usize] < max_depth) {
                     if loaded[window_ids[10 as usize] as usize] {
                         if expanded[window_ids[10 as usize] as usize] {
-                            let txt_327 = tree.create("#text");
-                            tree.append_child(el_326, txt_327);
-                            if let Some(el) = tree.get_mut(txt_327) { el.text = Some("▾".into()); }
+                            let txt_287 = tree.create("#text");
+                            tree.append_child(el_286, txt_287);
+                            if let Some(el) = tree.get_mut(txt_287) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_328 = tree.create("#text");
-                            tree.append_child(el_326, txt_328);
-                            if let Some(el) = tree.get_mut(txt_328) { el.text = Some("▸".into()); }
+                            let txt_288 = tree.create("#text");
+                            tree.append_child(el_286, txt_288);
+                            if let Some(el) = tree.get_mut(txt_288) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_329 = tree.create("#text");
-                        tree.append_child(el_326, txt_329);
-                        if let Some(el) = tree.get_mut(txt_329) { el.text = Some("+".into()); }
+                        let txt_289 = tree.create("#text");
+                        tree.append_child(el_286, txt_289);
+                        if let Some(el) = tree.get_mut(txt_289) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_330 = tree.create("#text");
-                    tree.append_child(el_326, txt_330);
-                    if let Some(el) = tree.get_mut(txt_330) { el.text = Some("·".into()); }
+                    let txt_290 = tree.create("#text");
+                    tree.append_child(el_286, txt_290);
+                    if let Some(el) = tree.get_mut(txt_290) { el.text = Some("·".into()); }
                 }
-                let el_331 = tree.create("div");
-                tree.append_child(el_318, el_331);
-                tree.set_style(el_331, "direction", "horizontal");
-                tree.set_style(el_331, "width", "fill");
-                tree.set_style(el_331, "height", "24px");
-                tree.set_style(el_331, "align", "center");
-                tree.set_style(el_331, "gap", "5");
-                tree.set_style(el_331, "cursor", "pointer");
+                let el_291 = tree.create("div");
+                tree.append_child(el_278, el_291);
+                tree.set_style(el_291, "direction", "horizontal");
+                tree.set_style(el_291, "width", "fill");
+                tree.set_style(el_291, "height", "24px");
+                tree.set_style(el_291, "align", "center");
+                tree.set_style(el_291, "gap", "5");
+                tree.set_style(el_291, "cursor", "pointer");
                 // on:click -> select_row_10 (cb_idx=37)
-                tree.add_event(el_331, "click", 37);
-                if let Some(el) = tree.get_mut(el_331) { el.visual.cursor = 1; el.focusable = true; }
-                let el_332 = tree.create("div");
-                tree.append_child(el_331, el_332);
-                tree.set_style(el_332, "width", "12px");
-                tree.set_style(el_332, "height", "24px");
-                tree.set_style(el_332, "align", "center");
-                tree.set_style(el_332, "justify", "center");
+                tree.add_event(el_291, "click", 37);
+                if let Some(el) = tree.get_mut(el_291) { el.visual.cursor = 1; el.focusable = true; }
+                let el_292 = tree.create("div");
+                tree.append_child(el_291, el_292);
+                tree.set_style(el_292, "width", "12px");
+                tree.set_style(el_292, "height", "24px");
+                tree.set_style(el_292, "align", "center");
+                tree.set_style(el_292, "justify", "center");
                 if (eff_state[window_ids[10 as usize] as usize] == 0) {
-                    let el_333 = tree.create("div");
-                    tree.append_child(el_332, el_333);
-                    tree.set_style(el_333, "width", "7px");
-                    tree.set_style(el_333, "height", "7px");
-                    tree.set_style(el_333, "border-radius", "4");
-                    tree.set_style(el_333, "background-color", "#1a7f37");
+                    let el_293 = tree.create("div");
+                    tree.append_child(el_292, el_293);
+                    tree.set_style(el_293, "width", "7px");
+                    tree.set_style(el_293, "height", "7px");
+                    tree.set_style(el_293, "border-radius", "4");
+                    tree.set_style(el_293, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[10 as usize] as usize] == 1) {
-                        let el_334 = tree.create("div");
-                        tree.append_child(el_332, el_334);
-                        tree.set_style(el_334, "width", "7px");
-                        tree.set_style(el_334, "height", "7px");
-                        tree.set_style(el_334, "border-radius", "4");
-                        tree.set_style(el_334, "background-color", "#0969da");
+                        let el_294 = tree.create("div");
+                        tree.append_child(el_292, el_294);
+                        tree.set_style(el_294, "width", "7px");
+                        tree.set_style(el_294, "height", "7px");
+                        tree.set_style(el_294, "border-radius", "4");
+                        tree.set_style(el_294, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[10 as usize] as usize] == 2) {
-                            let el_335 = tree.create("div");
-                            tree.append_child(el_332, el_335);
-                            tree.set_style(el_335, "width", "7px");
-                            tree.set_style(el_335, "height", "7px");
-                            tree.set_style(el_335, "border-radius", "4");
-                            tree.set_style(el_335, "background-color", "#9a6700");
+                            let el_295 = tree.create("div");
+                            tree.append_child(el_292, el_295);
+                            tree.set_style(el_295, "width", "7px");
+                            tree.set_style(el_295, "height", "7px");
+                            tree.set_style(el_295, "border-radius", "4");
+                            tree.set_style(el_295, "background-color", "#9a6700");
                         } else {
-                            let el_336 = tree.create("div");
-                            tree.append_child(el_332, el_336);
-                            tree.set_style(el_336, "width", "7px");
-                            tree.set_style(el_336, "height", "7px");
-                            tree.set_style(el_336, "border-radius", "4");
-                            tree.set_style(el_336, "background-color", "#6e7781");
+                            let el_296 = tree.create("div");
+                            tree.append_child(el_292, el_296);
+                            tree.set_style(el_296, "width", "7px");
+                            tree.set_style(el_296, "height", "7px");
+                            tree.set_style(el_296, "border-radius", "4");
+                            tree.set_style(el_296, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_337 = tree.create("div");
-                tree.append_child(el_331, el_337);
-                tree.set_style(el_337, "font-size", "12px");
-                tree.set_style(el_337, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_337) { el.text = Some(format!("PN-{}", window_ids[10 as usize]).to_string()); }
-                let el_338 = tree.create("div");
-                tree.append_child(el_331, el_338);
-                tree.set_style(el_338, "font-size", "12px");
-                tree.set_style(el_338, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_338) { el.text = Some(format!("{}", names[window_ids[10 as usize] as usize]).to_string()); }
-                let el_339 = tree.create("div");
-                tree.append_child(el_331, el_339);
-                tree.set_style(el_339, "font-size", "11px");
-                tree.set_style(el_339, "color", "#6e7781");
+                let el_297 = tree.create("div");
+                tree.append_child(el_291, el_297);
+                tree.set_style(el_297, "font-size", "12px");
+                tree.set_style(el_297, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_297) { el.text = Some(format!("PN-{}", window_ids[10 as usize]).to_string()); }
+                let el_298 = tree.create("div");
+                tree.append_child(el_291, el_298);
+                tree.set_style(el_298, "font-size", "12px");
+                tree.set_style(el_298, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_298) { el.text = Some(format!("{}", names[window_ids[10 as usize] as usize]).to_string()); }
+                let el_299 = tree.create("div");
+                tree.append_child(el_291, el_299);
+                tree.set_style(el_299, "font-size", "11px");
+                tree.set_style(el_299, "color", "#6e7781");
                 if (window_depths[10 as usize] < max_depth) {
-                    let txt_340 = tree.create("#text");
-                    tree.append_child(el_339, txt_340);
-                    if let Some(el) = tree.get_mut(txt_340) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_300 = tree.create("#text");
+                    tree.append_child(el_299, txt_300);
+                    if let Some(el) = tree.get_mut(txt_300) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_341 = tree.create("#text");
-                    tree.append_child(el_339, txt_341);
-                    if let Some(el) = tree.get_mut(txt_341) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_301 = tree.create("#text");
+                    tree.append_child(el_299, txt_301);
+                    if let Some(el) = tree.get_mut(txt_301) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 11) {
-                let el_342 = tree.create("div");
-                tree.append_child(el_73, el_342);
-                tree.set_style(el_342, "direction", "horizontal");
-                tree.set_style(el_342, "height", "24px");
-                tree.set_style(el_342, "background-color", "#f9fafb");
-                tree.set_style(el_342, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_342, "align", "center");
-                tree.set_style(el_342, "padding-left", "6");
+                let el_302 = tree.create("div");
+                tree.append_child(el_33, el_302);
+                tree.set_style(el_302, "direction", "horizontal");
+                tree.set_style(el_302, "height", "24px");
+                tree.set_style(el_302, "background-color", "#f9fafb");
+                tree.set_style(el_302, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_302, "align", "center");
+                tree.set_style(el_302, "padding-left", "6");
                 if (window_depths[11 as usize] >= 1) {
-                    let el_343 = tree.create("div");
-                    tree.append_child(el_342, el_343);
-                    tree.set_style(el_343, "width", "14px");
+                    let el_303 = tree.create("div");
+                    tree.append_child(el_302, el_303);
+                    tree.set_style(el_303, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 2) {
-                    let el_344 = tree.create("div");
-                    tree.append_child(el_342, el_344);
-                    tree.set_style(el_344, "width", "14px");
+                    let el_304 = tree.create("div");
+                    tree.append_child(el_302, el_304);
+                    tree.set_style(el_304, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 3) {
-                    let el_345 = tree.create("div");
-                    tree.append_child(el_342, el_345);
-                    tree.set_style(el_345, "width", "14px");
+                    let el_305 = tree.create("div");
+                    tree.append_child(el_302, el_305);
+                    tree.set_style(el_305, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 4) {
-                    let el_346 = tree.create("div");
-                    tree.append_child(el_342, el_346);
-                    tree.set_style(el_346, "width", "14px");
+                    let el_306 = tree.create("div");
+                    tree.append_child(el_302, el_306);
+                    tree.set_style(el_306, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 5) {
-                    let el_347 = tree.create("div");
-                    tree.append_child(el_342, el_347);
-                    tree.set_style(el_347, "width", "14px");
+                    let el_307 = tree.create("div");
+                    tree.append_child(el_302, el_307);
+                    tree.set_style(el_307, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 6) {
-                    let el_348 = tree.create("div");
-                    tree.append_child(el_342, el_348);
-                    tree.set_style(el_348, "width", "14px");
+                    let el_308 = tree.create("div");
+                    tree.append_child(el_302, el_308);
+                    tree.set_style(el_308, "width", "14px");
                 }
                 if (window_depths[11 as usize] >= 7) {
-                    let el_349 = tree.create("div");
-                    tree.append_child(el_342, el_349);
-                    tree.set_style(el_349, "width", "14px");
+                    let el_309 = tree.create("div");
+                    tree.append_child(el_302, el_309);
+                    tree.set_style(el_309, "width", "14px");
                 }
-                let el_350 = tree.create("div");
-                tree.append_child(el_342, el_350);
-                tree.set_style(el_350, "width", "18px");
-                tree.set_style(el_350, "height", "24px");
-                tree.set_style(el_350, "align", "center");
-                tree.set_style(el_350, "justify", "center");
-                tree.set_style(el_350, "font-size", "10px");
-                tree.set_style(el_350, "color", "#9a6700");
-                tree.set_style(el_350, "cursor", "pointer");
+                let el_310 = tree.create("div");
+                tree.append_child(el_302, el_310);
+                tree.set_style(el_310, "width", "18px");
+                tree.set_style(el_310, "height", "24px");
+                tree.set_style(el_310, "align", "center");
+                tree.set_style(el_310, "justify", "center");
+                tree.set_style(el_310, "font-size", "10px");
+                tree.set_style(el_310, "color", "#9a6700");
+                tree.set_style(el_310, "cursor", "pointer");
                 // on:click -> toggle_row_11 (cb_idx=16)
-                tree.add_event(el_350, "click", 16);
-                if let Some(el) = tree.get_mut(el_350) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_310, "click", 16);
+                if let Some(el) = tree.get_mut(el_310) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[11 as usize] < max_depth) {
                     if loaded[window_ids[11 as usize] as usize] {
                         if expanded[window_ids[11 as usize] as usize] {
-                            let txt_351 = tree.create("#text");
-                            tree.append_child(el_350, txt_351);
-                            if let Some(el) = tree.get_mut(txt_351) { el.text = Some("▾".into()); }
+                            let txt_311 = tree.create("#text");
+                            tree.append_child(el_310, txt_311);
+                            if let Some(el) = tree.get_mut(txt_311) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_352 = tree.create("#text");
-                            tree.append_child(el_350, txt_352);
-                            if let Some(el) = tree.get_mut(txt_352) { el.text = Some("▸".into()); }
+                            let txt_312 = tree.create("#text");
+                            tree.append_child(el_310, txt_312);
+                            if let Some(el) = tree.get_mut(txt_312) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_353 = tree.create("#text");
-                        tree.append_child(el_350, txt_353);
-                        if let Some(el) = tree.get_mut(txt_353) { el.text = Some("+".into()); }
+                        let txt_313 = tree.create("#text");
+                        tree.append_child(el_310, txt_313);
+                        if let Some(el) = tree.get_mut(txt_313) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_354 = tree.create("#text");
-                    tree.append_child(el_350, txt_354);
-                    if let Some(el) = tree.get_mut(txt_354) { el.text = Some("·".into()); }
+                    let txt_314 = tree.create("#text");
+                    tree.append_child(el_310, txt_314);
+                    if let Some(el) = tree.get_mut(txt_314) { el.text = Some("·".into()); }
                 }
-                let el_355 = tree.create("div");
-                tree.append_child(el_342, el_355);
-                tree.set_style(el_355, "direction", "horizontal");
-                tree.set_style(el_355, "width", "fill");
-                tree.set_style(el_355, "height", "24px");
-                tree.set_style(el_355, "align", "center");
-                tree.set_style(el_355, "gap", "5");
-                tree.set_style(el_355, "cursor", "pointer");
+                let el_315 = tree.create("div");
+                tree.append_child(el_302, el_315);
+                tree.set_style(el_315, "direction", "horizontal");
+                tree.set_style(el_315, "width", "fill");
+                tree.set_style(el_315, "height", "24px");
+                tree.set_style(el_315, "align", "center");
+                tree.set_style(el_315, "gap", "5");
+                tree.set_style(el_315, "cursor", "pointer");
                 // on:click -> select_row_11 (cb_idx=38)
-                tree.add_event(el_355, "click", 38);
-                if let Some(el) = tree.get_mut(el_355) { el.visual.cursor = 1; el.focusable = true; }
-                let el_356 = tree.create("div");
-                tree.append_child(el_355, el_356);
-                tree.set_style(el_356, "width", "12px");
-                tree.set_style(el_356, "height", "24px");
-                tree.set_style(el_356, "align", "center");
-                tree.set_style(el_356, "justify", "center");
+                tree.add_event(el_315, "click", 38);
+                if let Some(el) = tree.get_mut(el_315) { el.visual.cursor = 1; el.focusable = true; }
+                let el_316 = tree.create("div");
+                tree.append_child(el_315, el_316);
+                tree.set_style(el_316, "width", "12px");
+                tree.set_style(el_316, "height", "24px");
+                tree.set_style(el_316, "align", "center");
+                tree.set_style(el_316, "justify", "center");
                 if (eff_state[window_ids[11 as usize] as usize] == 0) {
-                    let el_357 = tree.create("div");
-                    tree.append_child(el_356, el_357);
-                    tree.set_style(el_357, "width", "7px");
-                    tree.set_style(el_357, "height", "7px");
-                    tree.set_style(el_357, "border-radius", "4");
-                    tree.set_style(el_357, "background-color", "#1a7f37");
+                    let el_317 = tree.create("div");
+                    tree.append_child(el_316, el_317);
+                    tree.set_style(el_317, "width", "7px");
+                    tree.set_style(el_317, "height", "7px");
+                    tree.set_style(el_317, "border-radius", "4");
+                    tree.set_style(el_317, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[11 as usize] as usize] == 1) {
-                        let el_358 = tree.create("div");
-                        tree.append_child(el_356, el_358);
-                        tree.set_style(el_358, "width", "7px");
-                        tree.set_style(el_358, "height", "7px");
-                        tree.set_style(el_358, "border-radius", "4");
-                        tree.set_style(el_358, "background-color", "#0969da");
+                        let el_318 = tree.create("div");
+                        tree.append_child(el_316, el_318);
+                        tree.set_style(el_318, "width", "7px");
+                        tree.set_style(el_318, "height", "7px");
+                        tree.set_style(el_318, "border-radius", "4");
+                        tree.set_style(el_318, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[11 as usize] as usize] == 2) {
-                            let el_359 = tree.create("div");
-                            tree.append_child(el_356, el_359);
-                            tree.set_style(el_359, "width", "7px");
-                            tree.set_style(el_359, "height", "7px");
-                            tree.set_style(el_359, "border-radius", "4");
-                            tree.set_style(el_359, "background-color", "#9a6700");
+                            let el_319 = tree.create("div");
+                            tree.append_child(el_316, el_319);
+                            tree.set_style(el_319, "width", "7px");
+                            tree.set_style(el_319, "height", "7px");
+                            tree.set_style(el_319, "border-radius", "4");
+                            tree.set_style(el_319, "background-color", "#9a6700");
                         } else {
-                            let el_360 = tree.create("div");
-                            tree.append_child(el_356, el_360);
-                            tree.set_style(el_360, "width", "7px");
-                            tree.set_style(el_360, "height", "7px");
-                            tree.set_style(el_360, "border-radius", "4");
-                            tree.set_style(el_360, "background-color", "#6e7781");
+                            let el_320 = tree.create("div");
+                            tree.append_child(el_316, el_320);
+                            tree.set_style(el_320, "width", "7px");
+                            tree.set_style(el_320, "height", "7px");
+                            tree.set_style(el_320, "border-radius", "4");
+                            tree.set_style(el_320, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_361 = tree.create("div");
-                tree.append_child(el_355, el_361);
-                tree.set_style(el_361, "font-size", "12px");
-                tree.set_style(el_361, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_361) { el.text = Some(format!("PN-{}", window_ids[11 as usize]).to_string()); }
-                let el_362 = tree.create("div");
-                tree.append_child(el_355, el_362);
-                tree.set_style(el_362, "font-size", "12px");
-                tree.set_style(el_362, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_362) { el.text = Some(format!("{}", names[window_ids[11 as usize] as usize]).to_string()); }
-                let el_363 = tree.create("div");
-                tree.append_child(el_355, el_363);
-                tree.set_style(el_363, "font-size", "11px");
-                tree.set_style(el_363, "color", "#6e7781");
+                let el_321 = tree.create("div");
+                tree.append_child(el_315, el_321);
+                tree.set_style(el_321, "font-size", "12px");
+                tree.set_style(el_321, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_321) { el.text = Some(format!("PN-{}", window_ids[11 as usize]).to_string()); }
+                let el_322 = tree.create("div");
+                tree.append_child(el_315, el_322);
+                tree.set_style(el_322, "font-size", "12px");
+                tree.set_style(el_322, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_322) { el.text = Some(format!("{}", names[window_ids[11 as usize] as usize]).to_string()); }
+                let el_323 = tree.create("div");
+                tree.append_child(el_315, el_323);
+                tree.set_style(el_323, "font-size", "11px");
+                tree.set_style(el_323, "color", "#6e7781");
                 if (window_depths[11 as usize] < max_depth) {
-                    let txt_364 = tree.create("#text");
-                    tree.append_child(el_363, txt_364);
-                    if let Some(el) = tree.get_mut(txt_364) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_324 = tree.create("#text");
+                    tree.append_child(el_323, txt_324);
+                    if let Some(el) = tree.get_mut(txt_324) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_365 = tree.create("#text");
-                    tree.append_child(el_363, txt_365);
-                    if let Some(el) = tree.get_mut(txt_365) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_325 = tree.create("#text");
+                    tree.append_child(el_323, txt_325);
+                    if let Some(el) = tree.get_mut(txt_325) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 12) {
-                let el_366 = tree.create("div");
-                tree.append_child(el_73, el_366);
-                tree.set_style(el_366, "direction", "horizontal");
-                tree.set_style(el_366, "height", "24px");
-                tree.set_style(el_366, "background-color", "#ffffff");
-                tree.set_style(el_366, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_366, "align", "center");
-                tree.set_style(el_366, "padding-left", "6");
+                let el_326 = tree.create("div");
+                tree.append_child(el_33, el_326);
+                tree.set_style(el_326, "direction", "horizontal");
+                tree.set_style(el_326, "height", "24px");
+                tree.set_style(el_326, "background-color", "#ffffff");
+                tree.set_style(el_326, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_326, "align", "center");
+                tree.set_style(el_326, "padding-left", "6");
                 if (window_depths[12 as usize] >= 1) {
-                    let el_367 = tree.create("div");
-                    tree.append_child(el_366, el_367);
-                    tree.set_style(el_367, "width", "14px");
+                    let el_327 = tree.create("div");
+                    tree.append_child(el_326, el_327);
+                    tree.set_style(el_327, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 2) {
-                    let el_368 = tree.create("div");
-                    tree.append_child(el_366, el_368);
-                    tree.set_style(el_368, "width", "14px");
+                    let el_328 = tree.create("div");
+                    tree.append_child(el_326, el_328);
+                    tree.set_style(el_328, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 3) {
-                    let el_369 = tree.create("div");
-                    tree.append_child(el_366, el_369);
-                    tree.set_style(el_369, "width", "14px");
+                    let el_329 = tree.create("div");
+                    tree.append_child(el_326, el_329);
+                    tree.set_style(el_329, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 4) {
-                    let el_370 = tree.create("div");
-                    tree.append_child(el_366, el_370);
-                    tree.set_style(el_370, "width", "14px");
+                    let el_330 = tree.create("div");
+                    tree.append_child(el_326, el_330);
+                    tree.set_style(el_330, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 5) {
-                    let el_371 = tree.create("div");
-                    tree.append_child(el_366, el_371);
-                    tree.set_style(el_371, "width", "14px");
+                    let el_331 = tree.create("div");
+                    tree.append_child(el_326, el_331);
+                    tree.set_style(el_331, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 6) {
-                    let el_372 = tree.create("div");
-                    tree.append_child(el_366, el_372);
-                    tree.set_style(el_372, "width", "14px");
+                    let el_332 = tree.create("div");
+                    tree.append_child(el_326, el_332);
+                    tree.set_style(el_332, "width", "14px");
                 }
                 if (window_depths[12 as usize] >= 7) {
-                    let el_373 = tree.create("div");
-                    tree.append_child(el_366, el_373);
-                    tree.set_style(el_373, "width", "14px");
+                    let el_333 = tree.create("div");
+                    tree.append_child(el_326, el_333);
+                    tree.set_style(el_333, "width", "14px");
                 }
-                let el_374 = tree.create("div");
-                tree.append_child(el_366, el_374);
-                tree.set_style(el_374, "width", "18px");
-                tree.set_style(el_374, "height", "24px");
-                tree.set_style(el_374, "align", "center");
-                tree.set_style(el_374, "justify", "center");
-                tree.set_style(el_374, "font-size", "10px");
-                tree.set_style(el_374, "color", "#9a6700");
-                tree.set_style(el_374, "cursor", "pointer");
+                let el_334 = tree.create("div");
+                tree.append_child(el_326, el_334);
+                tree.set_style(el_334, "width", "18px");
+                tree.set_style(el_334, "height", "24px");
+                tree.set_style(el_334, "align", "center");
+                tree.set_style(el_334, "justify", "center");
+                tree.set_style(el_334, "font-size", "10px");
+                tree.set_style(el_334, "color", "#9a6700");
+                tree.set_style(el_334, "cursor", "pointer");
                 // on:click -> toggle_row_12 (cb_idx=17)
-                tree.add_event(el_374, "click", 17);
-                if let Some(el) = tree.get_mut(el_374) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_334, "click", 17);
+                if let Some(el) = tree.get_mut(el_334) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[12 as usize] < max_depth) {
                     if loaded[window_ids[12 as usize] as usize] {
                         if expanded[window_ids[12 as usize] as usize] {
-                            let txt_375 = tree.create("#text");
-                            tree.append_child(el_374, txt_375);
-                            if let Some(el) = tree.get_mut(txt_375) { el.text = Some("▾".into()); }
+                            let txt_335 = tree.create("#text");
+                            tree.append_child(el_334, txt_335);
+                            if let Some(el) = tree.get_mut(txt_335) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_376 = tree.create("#text");
-                            tree.append_child(el_374, txt_376);
-                            if let Some(el) = tree.get_mut(txt_376) { el.text = Some("▸".into()); }
+                            let txt_336 = tree.create("#text");
+                            tree.append_child(el_334, txt_336);
+                            if let Some(el) = tree.get_mut(txt_336) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_377 = tree.create("#text");
-                        tree.append_child(el_374, txt_377);
-                        if let Some(el) = tree.get_mut(txt_377) { el.text = Some("+".into()); }
+                        let txt_337 = tree.create("#text");
+                        tree.append_child(el_334, txt_337);
+                        if let Some(el) = tree.get_mut(txt_337) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_378 = tree.create("#text");
-                    tree.append_child(el_374, txt_378);
-                    if let Some(el) = tree.get_mut(txt_378) { el.text = Some("·".into()); }
+                    let txt_338 = tree.create("#text");
+                    tree.append_child(el_334, txt_338);
+                    if let Some(el) = tree.get_mut(txt_338) { el.text = Some("·".into()); }
                 }
-                let el_379 = tree.create("div");
-                tree.append_child(el_366, el_379);
-                tree.set_style(el_379, "direction", "horizontal");
-                tree.set_style(el_379, "width", "fill");
-                tree.set_style(el_379, "height", "24px");
-                tree.set_style(el_379, "align", "center");
-                tree.set_style(el_379, "gap", "5");
-                tree.set_style(el_379, "cursor", "pointer");
+                let el_339 = tree.create("div");
+                tree.append_child(el_326, el_339);
+                tree.set_style(el_339, "direction", "horizontal");
+                tree.set_style(el_339, "width", "fill");
+                tree.set_style(el_339, "height", "24px");
+                tree.set_style(el_339, "align", "center");
+                tree.set_style(el_339, "gap", "5");
+                tree.set_style(el_339, "cursor", "pointer");
                 // on:click -> select_row_12 (cb_idx=39)
-                tree.add_event(el_379, "click", 39);
-                if let Some(el) = tree.get_mut(el_379) { el.visual.cursor = 1; el.focusable = true; }
-                let el_380 = tree.create("div");
-                tree.append_child(el_379, el_380);
-                tree.set_style(el_380, "width", "12px");
-                tree.set_style(el_380, "height", "24px");
-                tree.set_style(el_380, "align", "center");
-                tree.set_style(el_380, "justify", "center");
+                tree.add_event(el_339, "click", 39);
+                if let Some(el) = tree.get_mut(el_339) { el.visual.cursor = 1; el.focusable = true; }
+                let el_340 = tree.create("div");
+                tree.append_child(el_339, el_340);
+                tree.set_style(el_340, "width", "12px");
+                tree.set_style(el_340, "height", "24px");
+                tree.set_style(el_340, "align", "center");
+                tree.set_style(el_340, "justify", "center");
                 if (eff_state[window_ids[12 as usize] as usize] == 0) {
-                    let el_381 = tree.create("div");
-                    tree.append_child(el_380, el_381);
-                    tree.set_style(el_381, "width", "7px");
-                    tree.set_style(el_381, "height", "7px");
-                    tree.set_style(el_381, "border-radius", "4");
-                    tree.set_style(el_381, "background-color", "#1a7f37");
+                    let el_341 = tree.create("div");
+                    tree.append_child(el_340, el_341);
+                    tree.set_style(el_341, "width", "7px");
+                    tree.set_style(el_341, "height", "7px");
+                    tree.set_style(el_341, "border-radius", "4");
+                    tree.set_style(el_341, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[12 as usize] as usize] == 1) {
-                        let el_382 = tree.create("div");
-                        tree.append_child(el_380, el_382);
-                        tree.set_style(el_382, "width", "7px");
-                        tree.set_style(el_382, "height", "7px");
-                        tree.set_style(el_382, "border-radius", "4");
-                        tree.set_style(el_382, "background-color", "#0969da");
+                        let el_342 = tree.create("div");
+                        tree.append_child(el_340, el_342);
+                        tree.set_style(el_342, "width", "7px");
+                        tree.set_style(el_342, "height", "7px");
+                        tree.set_style(el_342, "border-radius", "4");
+                        tree.set_style(el_342, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[12 as usize] as usize] == 2) {
-                            let el_383 = tree.create("div");
-                            tree.append_child(el_380, el_383);
-                            tree.set_style(el_383, "width", "7px");
-                            tree.set_style(el_383, "height", "7px");
-                            tree.set_style(el_383, "border-radius", "4");
-                            tree.set_style(el_383, "background-color", "#9a6700");
+                            let el_343 = tree.create("div");
+                            tree.append_child(el_340, el_343);
+                            tree.set_style(el_343, "width", "7px");
+                            tree.set_style(el_343, "height", "7px");
+                            tree.set_style(el_343, "border-radius", "4");
+                            tree.set_style(el_343, "background-color", "#9a6700");
                         } else {
-                            let el_384 = tree.create("div");
-                            tree.append_child(el_380, el_384);
-                            tree.set_style(el_384, "width", "7px");
-                            tree.set_style(el_384, "height", "7px");
-                            tree.set_style(el_384, "border-radius", "4");
-                            tree.set_style(el_384, "background-color", "#6e7781");
+                            let el_344 = tree.create("div");
+                            tree.append_child(el_340, el_344);
+                            tree.set_style(el_344, "width", "7px");
+                            tree.set_style(el_344, "height", "7px");
+                            tree.set_style(el_344, "border-radius", "4");
+                            tree.set_style(el_344, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_385 = tree.create("div");
-                tree.append_child(el_379, el_385);
-                tree.set_style(el_385, "font-size", "12px");
-                tree.set_style(el_385, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_385) { el.text = Some(format!("PN-{}", window_ids[12 as usize]).to_string()); }
-                let el_386 = tree.create("div");
-                tree.append_child(el_379, el_386);
-                tree.set_style(el_386, "font-size", "12px");
-                tree.set_style(el_386, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_386) { el.text = Some(format!("{}", names[window_ids[12 as usize] as usize]).to_string()); }
-                let el_387 = tree.create("div");
-                tree.append_child(el_379, el_387);
-                tree.set_style(el_387, "font-size", "11px");
-                tree.set_style(el_387, "color", "#6e7781");
+                let el_345 = tree.create("div");
+                tree.append_child(el_339, el_345);
+                tree.set_style(el_345, "font-size", "12px");
+                tree.set_style(el_345, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_345) { el.text = Some(format!("PN-{}", window_ids[12 as usize]).to_string()); }
+                let el_346 = tree.create("div");
+                tree.append_child(el_339, el_346);
+                tree.set_style(el_346, "font-size", "12px");
+                tree.set_style(el_346, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_346) { el.text = Some(format!("{}", names[window_ids[12 as usize] as usize]).to_string()); }
+                let el_347 = tree.create("div");
+                tree.append_child(el_339, el_347);
+                tree.set_style(el_347, "font-size", "11px");
+                tree.set_style(el_347, "color", "#6e7781");
                 if (window_depths[12 as usize] < max_depth) {
-                    let txt_388 = tree.create("#text");
-                    tree.append_child(el_387, txt_388);
-                    if let Some(el) = tree.get_mut(txt_388) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_348 = tree.create("#text");
+                    tree.append_child(el_347, txt_348);
+                    if let Some(el) = tree.get_mut(txt_348) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_389 = tree.create("#text");
-                    tree.append_child(el_387, txt_389);
-                    if let Some(el) = tree.get_mut(txt_389) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_349 = tree.create("#text");
+                    tree.append_child(el_347, txt_349);
+                    if let Some(el) = tree.get_mut(txt_349) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 13) {
-                let el_390 = tree.create("div");
-                tree.append_child(el_73, el_390);
-                tree.set_style(el_390, "direction", "horizontal");
-                tree.set_style(el_390, "height", "24px");
-                tree.set_style(el_390, "background-color", "#f9fafb");
-                tree.set_style(el_390, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_390, "align", "center");
-                tree.set_style(el_390, "padding-left", "6");
+                let el_350 = tree.create("div");
+                tree.append_child(el_33, el_350);
+                tree.set_style(el_350, "direction", "horizontal");
+                tree.set_style(el_350, "height", "24px");
+                tree.set_style(el_350, "background-color", "#f9fafb");
+                tree.set_style(el_350, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_350, "align", "center");
+                tree.set_style(el_350, "padding-left", "6");
                 if (window_depths[13 as usize] >= 1) {
-                    let el_391 = tree.create("div");
-                    tree.append_child(el_390, el_391);
-                    tree.set_style(el_391, "width", "14px");
+                    let el_351 = tree.create("div");
+                    tree.append_child(el_350, el_351);
+                    tree.set_style(el_351, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 2) {
-                    let el_392 = tree.create("div");
-                    tree.append_child(el_390, el_392);
-                    tree.set_style(el_392, "width", "14px");
+                    let el_352 = tree.create("div");
+                    tree.append_child(el_350, el_352);
+                    tree.set_style(el_352, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 3) {
-                    let el_393 = tree.create("div");
-                    tree.append_child(el_390, el_393);
-                    tree.set_style(el_393, "width", "14px");
+                    let el_353 = tree.create("div");
+                    tree.append_child(el_350, el_353);
+                    tree.set_style(el_353, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 4) {
-                    let el_394 = tree.create("div");
-                    tree.append_child(el_390, el_394);
-                    tree.set_style(el_394, "width", "14px");
+                    let el_354 = tree.create("div");
+                    tree.append_child(el_350, el_354);
+                    tree.set_style(el_354, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 5) {
-                    let el_395 = tree.create("div");
-                    tree.append_child(el_390, el_395);
-                    tree.set_style(el_395, "width", "14px");
+                    let el_355 = tree.create("div");
+                    tree.append_child(el_350, el_355);
+                    tree.set_style(el_355, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 6) {
-                    let el_396 = tree.create("div");
-                    tree.append_child(el_390, el_396);
-                    tree.set_style(el_396, "width", "14px");
+                    let el_356 = tree.create("div");
+                    tree.append_child(el_350, el_356);
+                    tree.set_style(el_356, "width", "14px");
                 }
                 if (window_depths[13 as usize] >= 7) {
-                    let el_397 = tree.create("div");
-                    tree.append_child(el_390, el_397);
-                    tree.set_style(el_397, "width", "14px");
+                    let el_357 = tree.create("div");
+                    tree.append_child(el_350, el_357);
+                    tree.set_style(el_357, "width", "14px");
                 }
-                let el_398 = tree.create("div");
-                tree.append_child(el_390, el_398);
-                tree.set_style(el_398, "width", "18px");
-                tree.set_style(el_398, "height", "24px");
-                tree.set_style(el_398, "align", "center");
-                tree.set_style(el_398, "justify", "center");
-                tree.set_style(el_398, "font-size", "10px");
-                tree.set_style(el_398, "color", "#9a6700");
-                tree.set_style(el_398, "cursor", "pointer");
+                let el_358 = tree.create("div");
+                tree.append_child(el_350, el_358);
+                tree.set_style(el_358, "width", "18px");
+                tree.set_style(el_358, "height", "24px");
+                tree.set_style(el_358, "align", "center");
+                tree.set_style(el_358, "justify", "center");
+                tree.set_style(el_358, "font-size", "10px");
+                tree.set_style(el_358, "color", "#9a6700");
+                tree.set_style(el_358, "cursor", "pointer");
                 // on:click -> toggle_row_13 (cb_idx=18)
-                tree.add_event(el_398, "click", 18);
-                if let Some(el) = tree.get_mut(el_398) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_358, "click", 18);
+                if let Some(el) = tree.get_mut(el_358) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[13 as usize] < max_depth) {
                     if loaded[window_ids[13 as usize] as usize] {
                         if expanded[window_ids[13 as usize] as usize] {
-                            let txt_399 = tree.create("#text");
-                            tree.append_child(el_398, txt_399);
-                            if let Some(el) = tree.get_mut(txt_399) { el.text = Some("▾".into()); }
+                            let txt_359 = tree.create("#text");
+                            tree.append_child(el_358, txt_359);
+                            if let Some(el) = tree.get_mut(txt_359) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_400 = tree.create("#text");
-                            tree.append_child(el_398, txt_400);
-                            if let Some(el) = tree.get_mut(txt_400) { el.text = Some("▸".into()); }
+                            let txt_360 = tree.create("#text");
+                            tree.append_child(el_358, txt_360);
+                            if let Some(el) = tree.get_mut(txt_360) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_401 = tree.create("#text");
-                        tree.append_child(el_398, txt_401);
-                        if let Some(el) = tree.get_mut(txt_401) { el.text = Some("+".into()); }
+                        let txt_361 = tree.create("#text");
+                        tree.append_child(el_358, txt_361);
+                        if let Some(el) = tree.get_mut(txt_361) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_402 = tree.create("#text");
-                    tree.append_child(el_398, txt_402);
-                    if let Some(el) = tree.get_mut(txt_402) { el.text = Some("·".into()); }
+                    let txt_362 = tree.create("#text");
+                    tree.append_child(el_358, txt_362);
+                    if let Some(el) = tree.get_mut(txt_362) { el.text = Some("·".into()); }
                 }
-                let el_403 = tree.create("div");
-                tree.append_child(el_390, el_403);
-                tree.set_style(el_403, "direction", "horizontal");
-                tree.set_style(el_403, "width", "fill");
-                tree.set_style(el_403, "height", "24px");
-                tree.set_style(el_403, "align", "center");
-                tree.set_style(el_403, "gap", "5");
-                tree.set_style(el_403, "cursor", "pointer");
+                let el_363 = tree.create("div");
+                tree.append_child(el_350, el_363);
+                tree.set_style(el_363, "direction", "horizontal");
+                tree.set_style(el_363, "width", "fill");
+                tree.set_style(el_363, "height", "24px");
+                tree.set_style(el_363, "align", "center");
+                tree.set_style(el_363, "gap", "5");
+                tree.set_style(el_363, "cursor", "pointer");
                 // on:click -> select_row_13 (cb_idx=40)
-                tree.add_event(el_403, "click", 40);
-                if let Some(el) = tree.get_mut(el_403) { el.visual.cursor = 1; el.focusable = true; }
-                let el_404 = tree.create("div");
-                tree.append_child(el_403, el_404);
-                tree.set_style(el_404, "width", "12px");
-                tree.set_style(el_404, "height", "24px");
-                tree.set_style(el_404, "align", "center");
-                tree.set_style(el_404, "justify", "center");
+                tree.add_event(el_363, "click", 40);
+                if let Some(el) = tree.get_mut(el_363) { el.visual.cursor = 1; el.focusable = true; }
+                let el_364 = tree.create("div");
+                tree.append_child(el_363, el_364);
+                tree.set_style(el_364, "width", "12px");
+                tree.set_style(el_364, "height", "24px");
+                tree.set_style(el_364, "align", "center");
+                tree.set_style(el_364, "justify", "center");
                 if (eff_state[window_ids[13 as usize] as usize] == 0) {
-                    let el_405 = tree.create("div");
-                    tree.append_child(el_404, el_405);
-                    tree.set_style(el_405, "width", "7px");
-                    tree.set_style(el_405, "height", "7px");
-                    tree.set_style(el_405, "border-radius", "4");
-                    tree.set_style(el_405, "background-color", "#1a7f37");
+                    let el_365 = tree.create("div");
+                    tree.append_child(el_364, el_365);
+                    tree.set_style(el_365, "width", "7px");
+                    tree.set_style(el_365, "height", "7px");
+                    tree.set_style(el_365, "border-radius", "4");
+                    tree.set_style(el_365, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[13 as usize] as usize] == 1) {
-                        let el_406 = tree.create("div");
-                        tree.append_child(el_404, el_406);
-                        tree.set_style(el_406, "width", "7px");
-                        tree.set_style(el_406, "height", "7px");
-                        tree.set_style(el_406, "border-radius", "4");
-                        tree.set_style(el_406, "background-color", "#0969da");
+                        let el_366 = tree.create("div");
+                        tree.append_child(el_364, el_366);
+                        tree.set_style(el_366, "width", "7px");
+                        tree.set_style(el_366, "height", "7px");
+                        tree.set_style(el_366, "border-radius", "4");
+                        tree.set_style(el_366, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[13 as usize] as usize] == 2) {
-                            let el_407 = tree.create("div");
-                            tree.append_child(el_404, el_407);
-                            tree.set_style(el_407, "width", "7px");
-                            tree.set_style(el_407, "height", "7px");
-                            tree.set_style(el_407, "border-radius", "4");
-                            tree.set_style(el_407, "background-color", "#9a6700");
+                            let el_367 = tree.create("div");
+                            tree.append_child(el_364, el_367);
+                            tree.set_style(el_367, "width", "7px");
+                            tree.set_style(el_367, "height", "7px");
+                            tree.set_style(el_367, "border-radius", "4");
+                            tree.set_style(el_367, "background-color", "#9a6700");
                         } else {
-                            let el_408 = tree.create("div");
-                            tree.append_child(el_404, el_408);
-                            tree.set_style(el_408, "width", "7px");
-                            tree.set_style(el_408, "height", "7px");
-                            tree.set_style(el_408, "border-radius", "4");
-                            tree.set_style(el_408, "background-color", "#6e7781");
+                            let el_368 = tree.create("div");
+                            tree.append_child(el_364, el_368);
+                            tree.set_style(el_368, "width", "7px");
+                            tree.set_style(el_368, "height", "7px");
+                            tree.set_style(el_368, "border-radius", "4");
+                            tree.set_style(el_368, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_409 = tree.create("div");
-                tree.append_child(el_403, el_409);
-                tree.set_style(el_409, "font-size", "12px");
-                tree.set_style(el_409, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_409) { el.text = Some(format!("PN-{}", window_ids[13 as usize]).to_string()); }
-                let el_410 = tree.create("div");
-                tree.append_child(el_403, el_410);
-                tree.set_style(el_410, "font-size", "12px");
-                tree.set_style(el_410, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_410) { el.text = Some(format!("{}", names[window_ids[13 as usize] as usize]).to_string()); }
-                let el_411 = tree.create("div");
-                tree.append_child(el_403, el_411);
-                tree.set_style(el_411, "font-size", "11px");
-                tree.set_style(el_411, "color", "#6e7781");
+                let el_369 = tree.create("div");
+                tree.append_child(el_363, el_369);
+                tree.set_style(el_369, "font-size", "12px");
+                tree.set_style(el_369, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_369) { el.text = Some(format!("PN-{}", window_ids[13 as usize]).to_string()); }
+                let el_370 = tree.create("div");
+                tree.append_child(el_363, el_370);
+                tree.set_style(el_370, "font-size", "12px");
+                tree.set_style(el_370, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_370) { el.text = Some(format!("{}", names[window_ids[13 as usize] as usize]).to_string()); }
+                let el_371 = tree.create("div");
+                tree.append_child(el_363, el_371);
+                tree.set_style(el_371, "font-size", "11px");
+                tree.set_style(el_371, "color", "#6e7781");
                 if (window_depths[13 as usize] < max_depth) {
-                    let txt_412 = tree.create("#text");
-                    tree.append_child(el_411, txt_412);
-                    if let Some(el) = tree.get_mut(txt_412) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_372 = tree.create("#text");
+                    tree.append_child(el_371, txt_372);
+                    if let Some(el) = tree.get_mut(txt_372) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_413 = tree.create("#text");
-                    tree.append_child(el_411, txt_413);
-                    if let Some(el) = tree.get_mut(txt_413) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_373 = tree.create("#text");
+                    tree.append_child(el_371, txt_373);
+                    if let Some(el) = tree.get_mut(txt_373) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 14) {
-                let el_414 = tree.create("div");
-                tree.append_child(el_73, el_414);
-                tree.set_style(el_414, "direction", "horizontal");
-                tree.set_style(el_414, "height", "24px");
-                tree.set_style(el_414, "background-color", "#ffffff");
-                tree.set_style(el_414, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_414, "align", "center");
-                tree.set_style(el_414, "padding-left", "6");
+                let el_374 = tree.create("div");
+                tree.append_child(el_33, el_374);
+                tree.set_style(el_374, "direction", "horizontal");
+                tree.set_style(el_374, "height", "24px");
+                tree.set_style(el_374, "background-color", "#ffffff");
+                tree.set_style(el_374, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_374, "align", "center");
+                tree.set_style(el_374, "padding-left", "6");
                 if (window_depths[14 as usize] >= 1) {
-                    let el_415 = tree.create("div");
-                    tree.append_child(el_414, el_415);
-                    tree.set_style(el_415, "width", "14px");
+                    let el_375 = tree.create("div");
+                    tree.append_child(el_374, el_375);
+                    tree.set_style(el_375, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 2) {
-                    let el_416 = tree.create("div");
-                    tree.append_child(el_414, el_416);
-                    tree.set_style(el_416, "width", "14px");
+                    let el_376 = tree.create("div");
+                    tree.append_child(el_374, el_376);
+                    tree.set_style(el_376, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 3) {
-                    let el_417 = tree.create("div");
-                    tree.append_child(el_414, el_417);
-                    tree.set_style(el_417, "width", "14px");
+                    let el_377 = tree.create("div");
+                    tree.append_child(el_374, el_377);
+                    tree.set_style(el_377, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 4) {
-                    let el_418 = tree.create("div");
-                    tree.append_child(el_414, el_418);
-                    tree.set_style(el_418, "width", "14px");
+                    let el_378 = tree.create("div");
+                    tree.append_child(el_374, el_378);
+                    tree.set_style(el_378, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 5) {
-                    let el_419 = tree.create("div");
-                    tree.append_child(el_414, el_419);
-                    tree.set_style(el_419, "width", "14px");
+                    let el_379 = tree.create("div");
+                    tree.append_child(el_374, el_379);
+                    tree.set_style(el_379, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 6) {
-                    let el_420 = tree.create("div");
-                    tree.append_child(el_414, el_420);
-                    tree.set_style(el_420, "width", "14px");
+                    let el_380 = tree.create("div");
+                    tree.append_child(el_374, el_380);
+                    tree.set_style(el_380, "width", "14px");
                 }
                 if (window_depths[14 as usize] >= 7) {
-                    let el_421 = tree.create("div");
-                    tree.append_child(el_414, el_421);
-                    tree.set_style(el_421, "width", "14px");
+                    let el_381 = tree.create("div");
+                    tree.append_child(el_374, el_381);
+                    tree.set_style(el_381, "width", "14px");
                 }
-                let el_422 = tree.create("div");
-                tree.append_child(el_414, el_422);
-                tree.set_style(el_422, "width", "18px");
-                tree.set_style(el_422, "height", "24px");
-                tree.set_style(el_422, "align", "center");
-                tree.set_style(el_422, "justify", "center");
-                tree.set_style(el_422, "font-size", "10px");
-                tree.set_style(el_422, "color", "#9a6700");
-                tree.set_style(el_422, "cursor", "pointer");
+                let el_382 = tree.create("div");
+                tree.append_child(el_374, el_382);
+                tree.set_style(el_382, "width", "18px");
+                tree.set_style(el_382, "height", "24px");
+                tree.set_style(el_382, "align", "center");
+                tree.set_style(el_382, "justify", "center");
+                tree.set_style(el_382, "font-size", "10px");
+                tree.set_style(el_382, "color", "#9a6700");
+                tree.set_style(el_382, "cursor", "pointer");
                 // on:click -> toggle_row_14 (cb_idx=19)
-                tree.add_event(el_422, "click", 19);
-                if let Some(el) = tree.get_mut(el_422) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_382, "click", 19);
+                if let Some(el) = tree.get_mut(el_382) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[14 as usize] < max_depth) {
                     if loaded[window_ids[14 as usize] as usize] {
                         if expanded[window_ids[14 as usize] as usize] {
-                            let txt_423 = tree.create("#text");
-                            tree.append_child(el_422, txt_423);
-                            if let Some(el) = tree.get_mut(txt_423) { el.text = Some("▾".into()); }
+                            let txt_383 = tree.create("#text");
+                            tree.append_child(el_382, txt_383);
+                            if let Some(el) = tree.get_mut(txt_383) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_424 = tree.create("#text");
-                            tree.append_child(el_422, txt_424);
-                            if let Some(el) = tree.get_mut(txt_424) { el.text = Some("▸".into()); }
+                            let txt_384 = tree.create("#text");
+                            tree.append_child(el_382, txt_384);
+                            if let Some(el) = tree.get_mut(txt_384) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_425 = tree.create("#text");
-                        tree.append_child(el_422, txt_425);
-                        if let Some(el) = tree.get_mut(txt_425) { el.text = Some("+".into()); }
+                        let txt_385 = tree.create("#text");
+                        tree.append_child(el_382, txt_385);
+                        if let Some(el) = tree.get_mut(txt_385) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_426 = tree.create("#text");
-                    tree.append_child(el_422, txt_426);
-                    if let Some(el) = tree.get_mut(txt_426) { el.text = Some("·".into()); }
+                    let txt_386 = tree.create("#text");
+                    tree.append_child(el_382, txt_386);
+                    if let Some(el) = tree.get_mut(txt_386) { el.text = Some("·".into()); }
                 }
-                let el_427 = tree.create("div");
-                tree.append_child(el_414, el_427);
-                tree.set_style(el_427, "direction", "horizontal");
-                tree.set_style(el_427, "width", "fill");
-                tree.set_style(el_427, "height", "24px");
-                tree.set_style(el_427, "align", "center");
-                tree.set_style(el_427, "gap", "5");
-                tree.set_style(el_427, "cursor", "pointer");
+                let el_387 = tree.create("div");
+                tree.append_child(el_374, el_387);
+                tree.set_style(el_387, "direction", "horizontal");
+                tree.set_style(el_387, "width", "fill");
+                tree.set_style(el_387, "height", "24px");
+                tree.set_style(el_387, "align", "center");
+                tree.set_style(el_387, "gap", "5");
+                tree.set_style(el_387, "cursor", "pointer");
                 // on:click -> select_row_14 (cb_idx=41)
-                tree.add_event(el_427, "click", 41);
-                if let Some(el) = tree.get_mut(el_427) { el.visual.cursor = 1; el.focusable = true; }
-                let el_428 = tree.create("div");
-                tree.append_child(el_427, el_428);
-                tree.set_style(el_428, "width", "12px");
-                tree.set_style(el_428, "height", "24px");
-                tree.set_style(el_428, "align", "center");
-                tree.set_style(el_428, "justify", "center");
+                tree.add_event(el_387, "click", 41);
+                if let Some(el) = tree.get_mut(el_387) { el.visual.cursor = 1; el.focusable = true; }
+                let el_388 = tree.create("div");
+                tree.append_child(el_387, el_388);
+                tree.set_style(el_388, "width", "12px");
+                tree.set_style(el_388, "height", "24px");
+                tree.set_style(el_388, "align", "center");
+                tree.set_style(el_388, "justify", "center");
                 if (eff_state[window_ids[14 as usize] as usize] == 0) {
-                    let el_429 = tree.create("div");
-                    tree.append_child(el_428, el_429);
-                    tree.set_style(el_429, "width", "7px");
-                    tree.set_style(el_429, "height", "7px");
-                    tree.set_style(el_429, "border-radius", "4");
-                    tree.set_style(el_429, "background-color", "#1a7f37");
+                    let el_389 = tree.create("div");
+                    tree.append_child(el_388, el_389);
+                    tree.set_style(el_389, "width", "7px");
+                    tree.set_style(el_389, "height", "7px");
+                    tree.set_style(el_389, "border-radius", "4");
+                    tree.set_style(el_389, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[14 as usize] as usize] == 1) {
-                        let el_430 = tree.create("div");
-                        tree.append_child(el_428, el_430);
-                        tree.set_style(el_430, "width", "7px");
-                        tree.set_style(el_430, "height", "7px");
-                        tree.set_style(el_430, "border-radius", "4");
-                        tree.set_style(el_430, "background-color", "#0969da");
+                        let el_390 = tree.create("div");
+                        tree.append_child(el_388, el_390);
+                        tree.set_style(el_390, "width", "7px");
+                        tree.set_style(el_390, "height", "7px");
+                        tree.set_style(el_390, "border-radius", "4");
+                        tree.set_style(el_390, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[14 as usize] as usize] == 2) {
-                            let el_431 = tree.create("div");
-                            tree.append_child(el_428, el_431);
-                            tree.set_style(el_431, "width", "7px");
-                            tree.set_style(el_431, "height", "7px");
-                            tree.set_style(el_431, "border-radius", "4");
-                            tree.set_style(el_431, "background-color", "#9a6700");
+                            let el_391 = tree.create("div");
+                            tree.append_child(el_388, el_391);
+                            tree.set_style(el_391, "width", "7px");
+                            tree.set_style(el_391, "height", "7px");
+                            tree.set_style(el_391, "border-radius", "4");
+                            tree.set_style(el_391, "background-color", "#9a6700");
                         } else {
-                            let el_432 = tree.create("div");
-                            tree.append_child(el_428, el_432);
-                            tree.set_style(el_432, "width", "7px");
-                            tree.set_style(el_432, "height", "7px");
-                            tree.set_style(el_432, "border-radius", "4");
-                            tree.set_style(el_432, "background-color", "#6e7781");
+                            let el_392 = tree.create("div");
+                            tree.append_child(el_388, el_392);
+                            tree.set_style(el_392, "width", "7px");
+                            tree.set_style(el_392, "height", "7px");
+                            tree.set_style(el_392, "border-radius", "4");
+                            tree.set_style(el_392, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_433 = tree.create("div");
-                tree.append_child(el_427, el_433);
-                tree.set_style(el_433, "font-size", "12px");
-                tree.set_style(el_433, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_433) { el.text = Some(format!("PN-{}", window_ids[14 as usize]).to_string()); }
-                let el_434 = tree.create("div");
-                tree.append_child(el_427, el_434);
-                tree.set_style(el_434, "font-size", "12px");
-                tree.set_style(el_434, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_434) { el.text = Some(format!("{}", names[window_ids[14 as usize] as usize]).to_string()); }
-                let el_435 = tree.create("div");
-                tree.append_child(el_427, el_435);
-                tree.set_style(el_435, "font-size", "11px");
-                tree.set_style(el_435, "color", "#6e7781");
+                let el_393 = tree.create("div");
+                tree.append_child(el_387, el_393);
+                tree.set_style(el_393, "font-size", "12px");
+                tree.set_style(el_393, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_393) { el.text = Some(format!("PN-{}", window_ids[14 as usize]).to_string()); }
+                let el_394 = tree.create("div");
+                tree.append_child(el_387, el_394);
+                tree.set_style(el_394, "font-size", "12px");
+                tree.set_style(el_394, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_394) { el.text = Some(format!("{}", names[window_ids[14 as usize] as usize]).to_string()); }
+                let el_395 = tree.create("div");
+                tree.append_child(el_387, el_395);
+                tree.set_style(el_395, "font-size", "11px");
+                tree.set_style(el_395, "color", "#6e7781");
                 if (window_depths[14 as usize] < max_depth) {
-                    let txt_436 = tree.create("#text");
-                    tree.append_child(el_435, txt_436);
-                    if let Some(el) = tree.get_mut(txt_436) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_396 = tree.create("#text");
+                    tree.append_child(el_395, txt_396);
+                    if let Some(el) = tree.get_mut(txt_396) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_437 = tree.create("#text");
-                    tree.append_child(el_435, txt_437);
-                    if let Some(el) = tree.get_mut(txt_437) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_397 = tree.create("#text");
+                    tree.append_child(el_395, txt_397);
+                    if let Some(el) = tree.get_mut(txt_397) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 15) {
-                let el_438 = tree.create("div");
-                tree.append_child(el_73, el_438);
-                tree.set_style(el_438, "direction", "horizontal");
-                tree.set_style(el_438, "height", "24px");
-                tree.set_style(el_438, "background-color", "#f9fafb");
-                tree.set_style(el_438, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_438, "align", "center");
-                tree.set_style(el_438, "padding-left", "6");
+                let el_398 = tree.create("div");
+                tree.append_child(el_33, el_398);
+                tree.set_style(el_398, "direction", "horizontal");
+                tree.set_style(el_398, "height", "24px");
+                tree.set_style(el_398, "background-color", "#f9fafb");
+                tree.set_style(el_398, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_398, "align", "center");
+                tree.set_style(el_398, "padding-left", "6");
                 if (window_depths[15 as usize] >= 1) {
-                    let el_439 = tree.create("div");
-                    tree.append_child(el_438, el_439);
-                    tree.set_style(el_439, "width", "14px");
+                    let el_399 = tree.create("div");
+                    tree.append_child(el_398, el_399);
+                    tree.set_style(el_399, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 2) {
-                    let el_440 = tree.create("div");
-                    tree.append_child(el_438, el_440);
-                    tree.set_style(el_440, "width", "14px");
+                    let el_400 = tree.create("div");
+                    tree.append_child(el_398, el_400);
+                    tree.set_style(el_400, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 3) {
-                    let el_441 = tree.create("div");
-                    tree.append_child(el_438, el_441);
-                    tree.set_style(el_441, "width", "14px");
+                    let el_401 = tree.create("div");
+                    tree.append_child(el_398, el_401);
+                    tree.set_style(el_401, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 4) {
-                    let el_442 = tree.create("div");
-                    tree.append_child(el_438, el_442);
-                    tree.set_style(el_442, "width", "14px");
+                    let el_402 = tree.create("div");
+                    tree.append_child(el_398, el_402);
+                    tree.set_style(el_402, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 5) {
-                    let el_443 = tree.create("div");
-                    tree.append_child(el_438, el_443);
-                    tree.set_style(el_443, "width", "14px");
+                    let el_403 = tree.create("div");
+                    tree.append_child(el_398, el_403);
+                    tree.set_style(el_403, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 6) {
-                    let el_444 = tree.create("div");
-                    tree.append_child(el_438, el_444);
-                    tree.set_style(el_444, "width", "14px");
+                    let el_404 = tree.create("div");
+                    tree.append_child(el_398, el_404);
+                    tree.set_style(el_404, "width", "14px");
                 }
                 if (window_depths[15 as usize] >= 7) {
-                    let el_445 = tree.create("div");
-                    tree.append_child(el_438, el_445);
-                    tree.set_style(el_445, "width", "14px");
+                    let el_405 = tree.create("div");
+                    tree.append_child(el_398, el_405);
+                    tree.set_style(el_405, "width", "14px");
                 }
-                let el_446 = tree.create("div");
-                tree.append_child(el_438, el_446);
-                tree.set_style(el_446, "width", "18px");
-                tree.set_style(el_446, "height", "24px");
-                tree.set_style(el_446, "align", "center");
-                tree.set_style(el_446, "justify", "center");
-                tree.set_style(el_446, "font-size", "10px");
-                tree.set_style(el_446, "color", "#9a6700");
-                tree.set_style(el_446, "cursor", "pointer");
+                let el_406 = tree.create("div");
+                tree.append_child(el_398, el_406);
+                tree.set_style(el_406, "width", "18px");
+                tree.set_style(el_406, "height", "24px");
+                tree.set_style(el_406, "align", "center");
+                tree.set_style(el_406, "justify", "center");
+                tree.set_style(el_406, "font-size", "10px");
+                tree.set_style(el_406, "color", "#9a6700");
+                tree.set_style(el_406, "cursor", "pointer");
                 // on:click -> toggle_row_15 (cb_idx=20)
-                tree.add_event(el_446, "click", 20);
-                if let Some(el) = tree.get_mut(el_446) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_406, "click", 20);
+                if let Some(el) = tree.get_mut(el_406) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[15 as usize] < max_depth) {
                     if loaded[window_ids[15 as usize] as usize] {
                         if expanded[window_ids[15 as usize] as usize] {
-                            let txt_447 = tree.create("#text");
-                            tree.append_child(el_446, txt_447);
-                            if let Some(el) = tree.get_mut(txt_447) { el.text = Some("▾".into()); }
+                            let txt_407 = tree.create("#text");
+                            tree.append_child(el_406, txt_407);
+                            if let Some(el) = tree.get_mut(txt_407) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_448 = tree.create("#text");
-                            tree.append_child(el_446, txt_448);
-                            if let Some(el) = tree.get_mut(txt_448) { el.text = Some("▸".into()); }
+                            let txt_408 = tree.create("#text");
+                            tree.append_child(el_406, txt_408);
+                            if let Some(el) = tree.get_mut(txt_408) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_449 = tree.create("#text");
-                        tree.append_child(el_446, txt_449);
-                        if let Some(el) = tree.get_mut(txt_449) { el.text = Some("+".into()); }
+                        let txt_409 = tree.create("#text");
+                        tree.append_child(el_406, txt_409);
+                        if let Some(el) = tree.get_mut(txt_409) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_450 = tree.create("#text");
-                    tree.append_child(el_446, txt_450);
-                    if let Some(el) = tree.get_mut(txt_450) { el.text = Some("·".into()); }
+                    let txt_410 = tree.create("#text");
+                    tree.append_child(el_406, txt_410);
+                    if let Some(el) = tree.get_mut(txt_410) { el.text = Some("·".into()); }
                 }
-                let el_451 = tree.create("div");
-                tree.append_child(el_438, el_451);
-                tree.set_style(el_451, "direction", "horizontal");
-                tree.set_style(el_451, "width", "fill");
-                tree.set_style(el_451, "height", "24px");
-                tree.set_style(el_451, "align", "center");
-                tree.set_style(el_451, "gap", "5");
-                tree.set_style(el_451, "cursor", "pointer");
+                let el_411 = tree.create("div");
+                tree.append_child(el_398, el_411);
+                tree.set_style(el_411, "direction", "horizontal");
+                tree.set_style(el_411, "width", "fill");
+                tree.set_style(el_411, "height", "24px");
+                tree.set_style(el_411, "align", "center");
+                tree.set_style(el_411, "gap", "5");
+                tree.set_style(el_411, "cursor", "pointer");
                 // on:click -> select_row_15 (cb_idx=42)
-                tree.add_event(el_451, "click", 42);
-                if let Some(el) = tree.get_mut(el_451) { el.visual.cursor = 1; el.focusable = true; }
-                let el_452 = tree.create("div");
-                tree.append_child(el_451, el_452);
-                tree.set_style(el_452, "width", "12px");
-                tree.set_style(el_452, "height", "24px");
-                tree.set_style(el_452, "align", "center");
-                tree.set_style(el_452, "justify", "center");
+                tree.add_event(el_411, "click", 42);
+                if let Some(el) = tree.get_mut(el_411) { el.visual.cursor = 1; el.focusable = true; }
+                let el_412 = tree.create("div");
+                tree.append_child(el_411, el_412);
+                tree.set_style(el_412, "width", "12px");
+                tree.set_style(el_412, "height", "24px");
+                tree.set_style(el_412, "align", "center");
+                tree.set_style(el_412, "justify", "center");
                 if (eff_state[window_ids[15 as usize] as usize] == 0) {
-                    let el_453 = tree.create("div");
-                    tree.append_child(el_452, el_453);
-                    tree.set_style(el_453, "width", "7px");
-                    tree.set_style(el_453, "height", "7px");
-                    tree.set_style(el_453, "border-radius", "4");
-                    tree.set_style(el_453, "background-color", "#1a7f37");
+                    let el_413 = tree.create("div");
+                    tree.append_child(el_412, el_413);
+                    tree.set_style(el_413, "width", "7px");
+                    tree.set_style(el_413, "height", "7px");
+                    tree.set_style(el_413, "border-radius", "4");
+                    tree.set_style(el_413, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[15 as usize] as usize] == 1) {
-                        let el_454 = tree.create("div");
-                        tree.append_child(el_452, el_454);
-                        tree.set_style(el_454, "width", "7px");
-                        tree.set_style(el_454, "height", "7px");
-                        tree.set_style(el_454, "border-radius", "4");
-                        tree.set_style(el_454, "background-color", "#0969da");
+                        let el_414 = tree.create("div");
+                        tree.append_child(el_412, el_414);
+                        tree.set_style(el_414, "width", "7px");
+                        tree.set_style(el_414, "height", "7px");
+                        tree.set_style(el_414, "border-radius", "4");
+                        tree.set_style(el_414, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[15 as usize] as usize] == 2) {
-                            let el_455 = tree.create("div");
-                            tree.append_child(el_452, el_455);
-                            tree.set_style(el_455, "width", "7px");
-                            tree.set_style(el_455, "height", "7px");
-                            tree.set_style(el_455, "border-radius", "4");
-                            tree.set_style(el_455, "background-color", "#9a6700");
+                            let el_415 = tree.create("div");
+                            tree.append_child(el_412, el_415);
+                            tree.set_style(el_415, "width", "7px");
+                            tree.set_style(el_415, "height", "7px");
+                            tree.set_style(el_415, "border-radius", "4");
+                            tree.set_style(el_415, "background-color", "#9a6700");
                         } else {
-                            let el_456 = tree.create("div");
-                            tree.append_child(el_452, el_456);
-                            tree.set_style(el_456, "width", "7px");
-                            tree.set_style(el_456, "height", "7px");
-                            tree.set_style(el_456, "border-radius", "4");
-                            tree.set_style(el_456, "background-color", "#6e7781");
+                            let el_416 = tree.create("div");
+                            tree.append_child(el_412, el_416);
+                            tree.set_style(el_416, "width", "7px");
+                            tree.set_style(el_416, "height", "7px");
+                            tree.set_style(el_416, "border-radius", "4");
+                            tree.set_style(el_416, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_457 = tree.create("div");
-                tree.append_child(el_451, el_457);
-                tree.set_style(el_457, "font-size", "12px");
-                tree.set_style(el_457, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_457) { el.text = Some(format!("PN-{}", window_ids[15 as usize]).to_string()); }
-                let el_458 = tree.create("div");
-                tree.append_child(el_451, el_458);
-                tree.set_style(el_458, "font-size", "12px");
-                tree.set_style(el_458, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_458) { el.text = Some(format!("{}", names[window_ids[15 as usize] as usize]).to_string()); }
-                let el_459 = tree.create("div");
-                tree.append_child(el_451, el_459);
-                tree.set_style(el_459, "font-size", "11px");
-                tree.set_style(el_459, "color", "#6e7781");
+                let el_417 = tree.create("div");
+                tree.append_child(el_411, el_417);
+                tree.set_style(el_417, "font-size", "12px");
+                tree.set_style(el_417, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_417) { el.text = Some(format!("PN-{}", window_ids[15 as usize]).to_string()); }
+                let el_418 = tree.create("div");
+                tree.append_child(el_411, el_418);
+                tree.set_style(el_418, "font-size", "12px");
+                tree.set_style(el_418, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_418) { el.text = Some(format!("{}", names[window_ids[15 as usize] as usize]).to_string()); }
+                let el_419 = tree.create("div");
+                tree.append_child(el_411, el_419);
+                tree.set_style(el_419, "font-size", "11px");
+                tree.set_style(el_419, "color", "#6e7781");
                 if (window_depths[15 as usize] < max_depth) {
-                    let txt_460 = tree.create("#text");
-                    tree.append_child(el_459, txt_460);
-                    if let Some(el) = tree.get_mut(txt_460) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_420 = tree.create("#text");
+                    tree.append_child(el_419, txt_420);
+                    if let Some(el) = tree.get_mut(txt_420) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_461 = tree.create("#text");
-                    tree.append_child(el_459, txt_461);
-                    if let Some(el) = tree.get_mut(txt_461) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_421 = tree.create("#text");
+                    tree.append_child(el_419, txt_421);
+                    if let Some(el) = tree.get_mut(txt_421) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 16) {
-                let el_462 = tree.create("div");
-                tree.append_child(el_73, el_462);
-                tree.set_style(el_462, "direction", "horizontal");
-                tree.set_style(el_462, "height", "24px");
-                tree.set_style(el_462, "background-color", "#ffffff");
-                tree.set_style(el_462, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_462, "align", "center");
-                tree.set_style(el_462, "padding-left", "6");
+                let el_422 = tree.create("div");
+                tree.append_child(el_33, el_422);
+                tree.set_style(el_422, "direction", "horizontal");
+                tree.set_style(el_422, "height", "24px");
+                tree.set_style(el_422, "background-color", "#ffffff");
+                tree.set_style(el_422, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_422, "align", "center");
+                tree.set_style(el_422, "padding-left", "6");
                 if (window_depths[16 as usize] >= 1) {
-                    let el_463 = tree.create("div");
-                    tree.append_child(el_462, el_463);
-                    tree.set_style(el_463, "width", "14px");
+                    let el_423 = tree.create("div");
+                    tree.append_child(el_422, el_423);
+                    tree.set_style(el_423, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 2) {
-                    let el_464 = tree.create("div");
-                    tree.append_child(el_462, el_464);
-                    tree.set_style(el_464, "width", "14px");
+                    let el_424 = tree.create("div");
+                    tree.append_child(el_422, el_424);
+                    tree.set_style(el_424, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 3) {
-                    let el_465 = tree.create("div");
-                    tree.append_child(el_462, el_465);
-                    tree.set_style(el_465, "width", "14px");
+                    let el_425 = tree.create("div");
+                    tree.append_child(el_422, el_425);
+                    tree.set_style(el_425, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 4) {
-                    let el_466 = tree.create("div");
-                    tree.append_child(el_462, el_466);
-                    tree.set_style(el_466, "width", "14px");
+                    let el_426 = tree.create("div");
+                    tree.append_child(el_422, el_426);
+                    tree.set_style(el_426, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 5) {
-                    let el_467 = tree.create("div");
-                    tree.append_child(el_462, el_467);
-                    tree.set_style(el_467, "width", "14px");
+                    let el_427 = tree.create("div");
+                    tree.append_child(el_422, el_427);
+                    tree.set_style(el_427, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 6) {
-                    let el_468 = tree.create("div");
-                    tree.append_child(el_462, el_468);
-                    tree.set_style(el_468, "width", "14px");
+                    let el_428 = tree.create("div");
+                    tree.append_child(el_422, el_428);
+                    tree.set_style(el_428, "width", "14px");
                 }
                 if (window_depths[16 as usize] >= 7) {
-                    let el_469 = tree.create("div");
-                    tree.append_child(el_462, el_469);
-                    tree.set_style(el_469, "width", "14px");
+                    let el_429 = tree.create("div");
+                    tree.append_child(el_422, el_429);
+                    tree.set_style(el_429, "width", "14px");
                 }
-                let el_470 = tree.create("div");
-                tree.append_child(el_462, el_470);
-                tree.set_style(el_470, "width", "18px");
-                tree.set_style(el_470, "height", "24px");
-                tree.set_style(el_470, "align", "center");
-                tree.set_style(el_470, "justify", "center");
-                tree.set_style(el_470, "font-size", "10px");
-                tree.set_style(el_470, "color", "#9a6700");
-                tree.set_style(el_470, "cursor", "pointer");
+                let el_430 = tree.create("div");
+                tree.append_child(el_422, el_430);
+                tree.set_style(el_430, "width", "18px");
+                tree.set_style(el_430, "height", "24px");
+                tree.set_style(el_430, "align", "center");
+                tree.set_style(el_430, "justify", "center");
+                tree.set_style(el_430, "font-size", "10px");
+                tree.set_style(el_430, "color", "#9a6700");
+                tree.set_style(el_430, "cursor", "pointer");
                 // on:click -> toggle_row_16 (cb_idx=21)
-                tree.add_event(el_470, "click", 21);
-                if let Some(el) = tree.get_mut(el_470) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_430, "click", 21);
+                if let Some(el) = tree.get_mut(el_430) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[16 as usize] < max_depth) {
                     if loaded[window_ids[16 as usize] as usize] {
                         if expanded[window_ids[16 as usize] as usize] {
-                            let txt_471 = tree.create("#text");
-                            tree.append_child(el_470, txt_471);
-                            if let Some(el) = tree.get_mut(txt_471) { el.text = Some("▾".into()); }
+                            let txt_431 = tree.create("#text");
+                            tree.append_child(el_430, txt_431);
+                            if let Some(el) = tree.get_mut(txt_431) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_472 = tree.create("#text");
-                            tree.append_child(el_470, txt_472);
-                            if let Some(el) = tree.get_mut(txt_472) { el.text = Some("▸".into()); }
+                            let txt_432 = tree.create("#text");
+                            tree.append_child(el_430, txt_432);
+                            if let Some(el) = tree.get_mut(txt_432) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_473 = tree.create("#text");
-                        tree.append_child(el_470, txt_473);
-                        if let Some(el) = tree.get_mut(txt_473) { el.text = Some("+".into()); }
+                        let txt_433 = tree.create("#text");
+                        tree.append_child(el_430, txt_433);
+                        if let Some(el) = tree.get_mut(txt_433) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_474 = tree.create("#text");
-                    tree.append_child(el_470, txt_474);
-                    if let Some(el) = tree.get_mut(txt_474) { el.text = Some("·".into()); }
+                    let txt_434 = tree.create("#text");
+                    tree.append_child(el_430, txt_434);
+                    if let Some(el) = tree.get_mut(txt_434) { el.text = Some("·".into()); }
                 }
-                let el_475 = tree.create("div");
-                tree.append_child(el_462, el_475);
-                tree.set_style(el_475, "direction", "horizontal");
-                tree.set_style(el_475, "width", "fill");
-                tree.set_style(el_475, "height", "24px");
-                tree.set_style(el_475, "align", "center");
-                tree.set_style(el_475, "gap", "5");
-                tree.set_style(el_475, "cursor", "pointer");
+                let el_435 = tree.create("div");
+                tree.append_child(el_422, el_435);
+                tree.set_style(el_435, "direction", "horizontal");
+                tree.set_style(el_435, "width", "fill");
+                tree.set_style(el_435, "height", "24px");
+                tree.set_style(el_435, "align", "center");
+                tree.set_style(el_435, "gap", "5");
+                tree.set_style(el_435, "cursor", "pointer");
                 // on:click -> select_row_16 (cb_idx=43)
-                tree.add_event(el_475, "click", 43);
-                if let Some(el) = tree.get_mut(el_475) { el.visual.cursor = 1; el.focusable = true; }
-                let el_476 = tree.create("div");
-                tree.append_child(el_475, el_476);
-                tree.set_style(el_476, "width", "12px");
-                tree.set_style(el_476, "height", "24px");
-                tree.set_style(el_476, "align", "center");
-                tree.set_style(el_476, "justify", "center");
+                tree.add_event(el_435, "click", 43);
+                if let Some(el) = tree.get_mut(el_435) { el.visual.cursor = 1; el.focusable = true; }
+                let el_436 = tree.create("div");
+                tree.append_child(el_435, el_436);
+                tree.set_style(el_436, "width", "12px");
+                tree.set_style(el_436, "height", "24px");
+                tree.set_style(el_436, "align", "center");
+                tree.set_style(el_436, "justify", "center");
                 if (eff_state[window_ids[16 as usize] as usize] == 0) {
-                    let el_477 = tree.create("div");
-                    tree.append_child(el_476, el_477);
-                    tree.set_style(el_477, "width", "7px");
-                    tree.set_style(el_477, "height", "7px");
-                    tree.set_style(el_477, "border-radius", "4");
-                    tree.set_style(el_477, "background-color", "#1a7f37");
+                    let el_437 = tree.create("div");
+                    tree.append_child(el_436, el_437);
+                    tree.set_style(el_437, "width", "7px");
+                    tree.set_style(el_437, "height", "7px");
+                    tree.set_style(el_437, "border-radius", "4");
+                    tree.set_style(el_437, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[16 as usize] as usize] == 1) {
-                        let el_478 = tree.create("div");
-                        tree.append_child(el_476, el_478);
-                        tree.set_style(el_478, "width", "7px");
-                        tree.set_style(el_478, "height", "7px");
-                        tree.set_style(el_478, "border-radius", "4");
-                        tree.set_style(el_478, "background-color", "#0969da");
+                        let el_438 = tree.create("div");
+                        tree.append_child(el_436, el_438);
+                        tree.set_style(el_438, "width", "7px");
+                        tree.set_style(el_438, "height", "7px");
+                        tree.set_style(el_438, "border-radius", "4");
+                        tree.set_style(el_438, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[16 as usize] as usize] == 2) {
-                            let el_479 = tree.create("div");
-                            tree.append_child(el_476, el_479);
-                            tree.set_style(el_479, "width", "7px");
-                            tree.set_style(el_479, "height", "7px");
-                            tree.set_style(el_479, "border-radius", "4");
-                            tree.set_style(el_479, "background-color", "#9a6700");
+                            let el_439 = tree.create("div");
+                            tree.append_child(el_436, el_439);
+                            tree.set_style(el_439, "width", "7px");
+                            tree.set_style(el_439, "height", "7px");
+                            tree.set_style(el_439, "border-radius", "4");
+                            tree.set_style(el_439, "background-color", "#9a6700");
                         } else {
-                            let el_480 = tree.create("div");
-                            tree.append_child(el_476, el_480);
-                            tree.set_style(el_480, "width", "7px");
-                            tree.set_style(el_480, "height", "7px");
-                            tree.set_style(el_480, "border-radius", "4");
-                            tree.set_style(el_480, "background-color", "#6e7781");
+                            let el_440 = tree.create("div");
+                            tree.append_child(el_436, el_440);
+                            tree.set_style(el_440, "width", "7px");
+                            tree.set_style(el_440, "height", "7px");
+                            tree.set_style(el_440, "border-radius", "4");
+                            tree.set_style(el_440, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_481 = tree.create("div");
-                tree.append_child(el_475, el_481);
-                tree.set_style(el_481, "font-size", "12px");
-                tree.set_style(el_481, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_481) { el.text = Some(format!("PN-{}", window_ids[16 as usize]).to_string()); }
-                let el_482 = tree.create("div");
-                tree.append_child(el_475, el_482);
-                tree.set_style(el_482, "font-size", "12px");
-                tree.set_style(el_482, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_482) { el.text = Some(format!("{}", names[window_ids[16 as usize] as usize]).to_string()); }
-                let el_483 = tree.create("div");
-                tree.append_child(el_475, el_483);
-                tree.set_style(el_483, "font-size", "11px");
-                tree.set_style(el_483, "color", "#6e7781");
+                let el_441 = tree.create("div");
+                tree.append_child(el_435, el_441);
+                tree.set_style(el_441, "font-size", "12px");
+                tree.set_style(el_441, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_441) { el.text = Some(format!("PN-{}", window_ids[16 as usize]).to_string()); }
+                let el_442 = tree.create("div");
+                tree.append_child(el_435, el_442);
+                tree.set_style(el_442, "font-size", "12px");
+                tree.set_style(el_442, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_442) { el.text = Some(format!("{}", names[window_ids[16 as usize] as usize]).to_string()); }
+                let el_443 = tree.create("div");
+                tree.append_child(el_435, el_443);
+                tree.set_style(el_443, "font-size", "11px");
+                tree.set_style(el_443, "color", "#6e7781");
                 if (window_depths[16 as usize] < max_depth) {
-                    let txt_484 = tree.create("#text");
-                    tree.append_child(el_483, txt_484);
-                    if let Some(el) = tree.get_mut(txt_484) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_444 = tree.create("#text");
+                    tree.append_child(el_443, txt_444);
+                    if let Some(el) = tree.get_mut(txt_444) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_485 = tree.create("#text");
-                    tree.append_child(el_483, txt_485);
-                    if let Some(el) = tree.get_mut(txt_485) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_445 = tree.create("#text");
+                    tree.append_child(el_443, txt_445);
+                    if let Some(el) = tree.get_mut(txt_445) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 17) {
-                let el_486 = tree.create("div");
-                tree.append_child(el_73, el_486);
-                tree.set_style(el_486, "direction", "horizontal");
-                tree.set_style(el_486, "height", "24px");
-                tree.set_style(el_486, "background-color", "#f9fafb");
-                tree.set_style(el_486, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_486, "align", "center");
-                tree.set_style(el_486, "padding-left", "6");
+                let el_446 = tree.create("div");
+                tree.append_child(el_33, el_446);
+                tree.set_style(el_446, "direction", "horizontal");
+                tree.set_style(el_446, "height", "24px");
+                tree.set_style(el_446, "background-color", "#f9fafb");
+                tree.set_style(el_446, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_446, "align", "center");
+                tree.set_style(el_446, "padding-left", "6");
                 if (window_depths[17 as usize] >= 1) {
-                    let el_487 = tree.create("div");
-                    tree.append_child(el_486, el_487);
-                    tree.set_style(el_487, "width", "14px");
+                    let el_447 = tree.create("div");
+                    tree.append_child(el_446, el_447);
+                    tree.set_style(el_447, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 2) {
-                    let el_488 = tree.create("div");
-                    tree.append_child(el_486, el_488);
-                    tree.set_style(el_488, "width", "14px");
+                    let el_448 = tree.create("div");
+                    tree.append_child(el_446, el_448);
+                    tree.set_style(el_448, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 3) {
-                    let el_489 = tree.create("div");
-                    tree.append_child(el_486, el_489);
-                    tree.set_style(el_489, "width", "14px");
+                    let el_449 = tree.create("div");
+                    tree.append_child(el_446, el_449);
+                    tree.set_style(el_449, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 4) {
-                    let el_490 = tree.create("div");
-                    tree.append_child(el_486, el_490);
-                    tree.set_style(el_490, "width", "14px");
+                    let el_450 = tree.create("div");
+                    tree.append_child(el_446, el_450);
+                    tree.set_style(el_450, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 5) {
-                    let el_491 = tree.create("div");
-                    tree.append_child(el_486, el_491);
-                    tree.set_style(el_491, "width", "14px");
+                    let el_451 = tree.create("div");
+                    tree.append_child(el_446, el_451);
+                    tree.set_style(el_451, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 6) {
-                    let el_492 = tree.create("div");
-                    tree.append_child(el_486, el_492);
-                    tree.set_style(el_492, "width", "14px");
+                    let el_452 = tree.create("div");
+                    tree.append_child(el_446, el_452);
+                    tree.set_style(el_452, "width", "14px");
                 }
                 if (window_depths[17 as usize] >= 7) {
-                    let el_493 = tree.create("div");
-                    tree.append_child(el_486, el_493);
-                    tree.set_style(el_493, "width", "14px");
+                    let el_453 = tree.create("div");
+                    tree.append_child(el_446, el_453);
+                    tree.set_style(el_453, "width", "14px");
                 }
-                let el_494 = tree.create("div");
-                tree.append_child(el_486, el_494);
-                tree.set_style(el_494, "width", "18px");
-                tree.set_style(el_494, "height", "24px");
-                tree.set_style(el_494, "align", "center");
-                tree.set_style(el_494, "justify", "center");
-                tree.set_style(el_494, "font-size", "10px");
-                tree.set_style(el_494, "color", "#9a6700");
-                tree.set_style(el_494, "cursor", "pointer");
+                let el_454 = tree.create("div");
+                tree.append_child(el_446, el_454);
+                tree.set_style(el_454, "width", "18px");
+                tree.set_style(el_454, "height", "24px");
+                tree.set_style(el_454, "align", "center");
+                tree.set_style(el_454, "justify", "center");
+                tree.set_style(el_454, "font-size", "10px");
+                tree.set_style(el_454, "color", "#9a6700");
+                tree.set_style(el_454, "cursor", "pointer");
                 // on:click -> toggle_row_17 (cb_idx=22)
-                tree.add_event(el_494, "click", 22);
-                if let Some(el) = tree.get_mut(el_494) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_454, "click", 22);
+                if let Some(el) = tree.get_mut(el_454) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[17 as usize] < max_depth) {
                     if loaded[window_ids[17 as usize] as usize] {
                         if expanded[window_ids[17 as usize] as usize] {
-                            let txt_495 = tree.create("#text");
-                            tree.append_child(el_494, txt_495);
-                            if let Some(el) = tree.get_mut(txt_495) { el.text = Some("▾".into()); }
+                            let txt_455 = tree.create("#text");
+                            tree.append_child(el_454, txt_455);
+                            if let Some(el) = tree.get_mut(txt_455) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_496 = tree.create("#text");
-                            tree.append_child(el_494, txt_496);
-                            if let Some(el) = tree.get_mut(txt_496) { el.text = Some("▸".into()); }
+                            let txt_456 = tree.create("#text");
+                            tree.append_child(el_454, txt_456);
+                            if let Some(el) = tree.get_mut(txt_456) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_497 = tree.create("#text");
-                        tree.append_child(el_494, txt_497);
-                        if let Some(el) = tree.get_mut(txt_497) { el.text = Some("+".into()); }
+                        let txt_457 = tree.create("#text");
+                        tree.append_child(el_454, txt_457);
+                        if let Some(el) = tree.get_mut(txt_457) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_498 = tree.create("#text");
-                    tree.append_child(el_494, txt_498);
-                    if let Some(el) = tree.get_mut(txt_498) { el.text = Some("·".into()); }
+                    let txt_458 = tree.create("#text");
+                    tree.append_child(el_454, txt_458);
+                    if let Some(el) = tree.get_mut(txt_458) { el.text = Some("·".into()); }
                 }
-                let el_499 = tree.create("div");
-                tree.append_child(el_486, el_499);
-                tree.set_style(el_499, "direction", "horizontal");
-                tree.set_style(el_499, "width", "fill");
-                tree.set_style(el_499, "height", "24px");
-                tree.set_style(el_499, "align", "center");
-                tree.set_style(el_499, "gap", "5");
-                tree.set_style(el_499, "cursor", "pointer");
+                let el_459 = tree.create("div");
+                tree.append_child(el_446, el_459);
+                tree.set_style(el_459, "direction", "horizontal");
+                tree.set_style(el_459, "width", "fill");
+                tree.set_style(el_459, "height", "24px");
+                tree.set_style(el_459, "align", "center");
+                tree.set_style(el_459, "gap", "5");
+                tree.set_style(el_459, "cursor", "pointer");
                 // on:click -> select_row_17 (cb_idx=44)
-                tree.add_event(el_499, "click", 44);
-                if let Some(el) = tree.get_mut(el_499) { el.visual.cursor = 1; el.focusable = true; }
-                let el_500 = tree.create("div");
-                tree.append_child(el_499, el_500);
-                tree.set_style(el_500, "width", "12px");
-                tree.set_style(el_500, "height", "24px");
-                tree.set_style(el_500, "align", "center");
-                tree.set_style(el_500, "justify", "center");
+                tree.add_event(el_459, "click", 44);
+                if let Some(el) = tree.get_mut(el_459) { el.visual.cursor = 1; el.focusable = true; }
+                let el_460 = tree.create("div");
+                tree.append_child(el_459, el_460);
+                tree.set_style(el_460, "width", "12px");
+                tree.set_style(el_460, "height", "24px");
+                tree.set_style(el_460, "align", "center");
+                tree.set_style(el_460, "justify", "center");
                 if (eff_state[window_ids[17 as usize] as usize] == 0) {
-                    let el_501 = tree.create("div");
-                    tree.append_child(el_500, el_501);
-                    tree.set_style(el_501, "width", "7px");
-                    tree.set_style(el_501, "height", "7px");
-                    tree.set_style(el_501, "border-radius", "4");
-                    tree.set_style(el_501, "background-color", "#1a7f37");
+                    let el_461 = tree.create("div");
+                    tree.append_child(el_460, el_461);
+                    tree.set_style(el_461, "width", "7px");
+                    tree.set_style(el_461, "height", "7px");
+                    tree.set_style(el_461, "border-radius", "4");
+                    tree.set_style(el_461, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[17 as usize] as usize] == 1) {
-                        let el_502 = tree.create("div");
-                        tree.append_child(el_500, el_502);
-                        tree.set_style(el_502, "width", "7px");
-                        tree.set_style(el_502, "height", "7px");
-                        tree.set_style(el_502, "border-radius", "4");
-                        tree.set_style(el_502, "background-color", "#0969da");
+                        let el_462 = tree.create("div");
+                        tree.append_child(el_460, el_462);
+                        tree.set_style(el_462, "width", "7px");
+                        tree.set_style(el_462, "height", "7px");
+                        tree.set_style(el_462, "border-radius", "4");
+                        tree.set_style(el_462, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[17 as usize] as usize] == 2) {
-                            let el_503 = tree.create("div");
-                            tree.append_child(el_500, el_503);
-                            tree.set_style(el_503, "width", "7px");
-                            tree.set_style(el_503, "height", "7px");
-                            tree.set_style(el_503, "border-radius", "4");
-                            tree.set_style(el_503, "background-color", "#9a6700");
+                            let el_463 = tree.create("div");
+                            tree.append_child(el_460, el_463);
+                            tree.set_style(el_463, "width", "7px");
+                            tree.set_style(el_463, "height", "7px");
+                            tree.set_style(el_463, "border-radius", "4");
+                            tree.set_style(el_463, "background-color", "#9a6700");
                         } else {
-                            let el_504 = tree.create("div");
-                            tree.append_child(el_500, el_504);
-                            tree.set_style(el_504, "width", "7px");
-                            tree.set_style(el_504, "height", "7px");
-                            tree.set_style(el_504, "border-radius", "4");
-                            tree.set_style(el_504, "background-color", "#6e7781");
+                            let el_464 = tree.create("div");
+                            tree.append_child(el_460, el_464);
+                            tree.set_style(el_464, "width", "7px");
+                            tree.set_style(el_464, "height", "7px");
+                            tree.set_style(el_464, "border-radius", "4");
+                            tree.set_style(el_464, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_505 = tree.create("div");
-                tree.append_child(el_499, el_505);
-                tree.set_style(el_505, "font-size", "12px");
-                tree.set_style(el_505, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_505) { el.text = Some(format!("PN-{}", window_ids[17 as usize]).to_string()); }
-                let el_506 = tree.create("div");
-                tree.append_child(el_499, el_506);
-                tree.set_style(el_506, "font-size", "12px");
-                tree.set_style(el_506, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_506) { el.text = Some(format!("{}", names[window_ids[17 as usize] as usize]).to_string()); }
-                let el_507 = tree.create("div");
-                tree.append_child(el_499, el_507);
-                tree.set_style(el_507, "font-size", "11px");
-                tree.set_style(el_507, "color", "#6e7781");
+                let el_465 = tree.create("div");
+                tree.append_child(el_459, el_465);
+                tree.set_style(el_465, "font-size", "12px");
+                tree.set_style(el_465, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_465) { el.text = Some(format!("PN-{}", window_ids[17 as usize]).to_string()); }
+                let el_466 = tree.create("div");
+                tree.append_child(el_459, el_466);
+                tree.set_style(el_466, "font-size", "12px");
+                tree.set_style(el_466, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_466) { el.text = Some(format!("{}", names[window_ids[17 as usize] as usize]).to_string()); }
+                let el_467 = tree.create("div");
+                tree.append_child(el_459, el_467);
+                tree.set_style(el_467, "font-size", "11px");
+                tree.set_style(el_467, "color", "#6e7781");
                 if (window_depths[17 as usize] < max_depth) {
-                    let txt_508 = tree.create("#text");
-                    tree.append_child(el_507, txt_508);
-                    if let Some(el) = tree.get_mut(txt_508) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_468 = tree.create("#text");
+                    tree.append_child(el_467, txt_468);
+                    if let Some(el) = tree.get_mut(txt_468) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_509 = tree.create("#text");
-                    tree.append_child(el_507, txt_509);
-                    if let Some(el) = tree.get_mut(txt_509) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_469 = tree.create("#text");
+                    tree.append_child(el_467, txt_469);
+                    if let Some(el) = tree.get_mut(txt_469) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 18) {
-                let el_510 = tree.create("div");
-                tree.append_child(el_73, el_510);
-                tree.set_style(el_510, "direction", "horizontal");
-                tree.set_style(el_510, "height", "24px");
-                tree.set_style(el_510, "background-color", "#ffffff");
-                tree.set_style(el_510, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_510, "align", "center");
-                tree.set_style(el_510, "padding-left", "6");
+                let el_470 = tree.create("div");
+                tree.append_child(el_33, el_470);
+                tree.set_style(el_470, "direction", "horizontal");
+                tree.set_style(el_470, "height", "24px");
+                tree.set_style(el_470, "background-color", "#ffffff");
+                tree.set_style(el_470, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_470, "align", "center");
+                tree.set_style(el_470, "padding-left", "6");
                 if (window_depths[18 as usize] >= 1) {
-                    let el_511 = tree.create("div");
-                    tree.append_child(el_510, el_511);
-                    tree.set_style(el_511, "width", "14px");
+                    let el_471 = tree.create("div");
+                    tree.append_child(el_470, el_471);
+                    tree.set_style(el_471, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 2) {
-                    let el_512 = tree.create("div");
-                    tree.append_child(el_510, el_512);
-                    tree.set_style(el_512, "width", "14px");
+                    let el_472 = tree.create("div");
+                    tree.append_child(el_470, el_472);
+                    tree.set_style(el_472, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 3) {
-                    let el_513 = tree.create("div");
-                    tree.append_child(el_510, el_513);
-                    tree.set_style(el_513, "width", "14px");
+                    let el_473 = tree.create("div");
+                    tree.append_child(el_470, el_473);
+                    tree.set_style(el_473, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 4) {
-                    let el_514 = tree.create("div");
-                    tree.append_child(el_510, el_514);
-                    tree.set_style(el_514, "width", "14px");
+                    let el_474 = tree.create("div");
+                    tree.append_child(el_470, el_474);
+                    tree.set_style(el_474, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 5) {
-                    let el_515 = tree.create("div");
-                    tree.append_child(el_510, el_515);
-                    tree.set_style(el_515, "width", "14px");
+                    let el_475 = tree.create("div");
+                    tree.append_child(el_470, el_475);
+                    tree.set_style(el_475, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 6) {
-                    let el_516 = tree.create("div");
-                    tree.append_child(el_510, el_516);
-                    tree.set_style(el_516, "width", "14px");
+                    let el_476 = tree.create("div");
+                    tree.append_child(el_470, el_476);
+                    tree.set_style(el_476, "width", "14px");
                 }
                 if (window_depths[18 as usize] >= 7) {
-                    let el_517 = tree.create("div");
-                    tree.append_child(el_510, el_517);
-                    tree.set_style(el_517, "width", "14px");
+                    let el_477 = tree.create("div");
+                    tree.append_child(el_470, el_477);
+                    tree.set_style(el_477, "width", "14px");
                 }
-                let el_518 = tree.create("div");
-                tree.append_child(el_510, el_518);
-                tree.set_style(el_518, "width", "18px");
-                tree.set_style(el_518, "height", "24px");
-                tree.set_style(el_518, "align", "center");
-                tree.set_style(el_518, "justify", "center");
-                tree.set_style(el_518, "font-size", "10px");
-                tree.set_style(el_518, "color", "#9a6700");
-                tree.set_style(el_518, "cursor", "pointer");
+                let el_478 = tree.create("div");
+                tree.append_child(el_470, el_478);
+                tree.set_style(el_478, "width", "18px");
+                tree.set_style(el_478, "height", "24px");
+                tree.set_style(el_478, "align", "center");
+                tree.set_style(el_478, "justify", "center");
+                tree.set_style(el_478, "font-size", "10px");
+                tree.set_style(el_478, "color", "#9a6700");
+                tree.set_style(el_478, "cursor", "pointer");
                 // on:click -> toggle_row_18 (cb_idx=23)
-                tree.add_event(el_518, "click", 23);
-                if let Some(el) = tree.get_mut(el_518) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_478, "click", 23);
+                if let Some(el) = tree.get_mut(el_478) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[18 as usize] < max_depth) {
                     if loaded[window_ids[18 as usize] as usize] {
                         if expanded[window_ids[18 as usize] as usize] {
-                            let txt_519 = tree.create("#text");
-                            tree.append_child(el_518, txt_519);
-                            if let Some(el) = tree.get_mut(txt_519) { el.text = Some("▾".into()); }
+                            let txt_479 = tree.create("#text");
+                            tree.append_child(el_478, txt_479);
+                            if let Some(el) = tree.get_mut(txt_479) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_520 = tree.create("#text");
-                            tree.append_child(el_518, txt_520);
-                            if let Some(el) = tree.get_mut(txt_520) { el.text = Some("▸".into()); }
+                            let txt_480 = tree.create("#text");
+                            tree.append_child(el_478, txt_480);
+                            if let Some(el) = tree.get_mut(txt_480) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_521 = tree.create("#text");
-                        tree.append_child(el_518, txt_521);
-                        if let Some(el) = tree.get_mut(txt_521) { el.text = Some("+".into()); }
+                        let txt_481 = tree.create("#text");
+                        tree.append_child(el_478, txt_481);
+                        if let Some(el) = tree.get_mut(txt_481) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_522 = tree.create("#text");
-                    tree.append_child(el_518, txt_522);
-                    if let Some(el) = tree.get_mut(txt_522) { el.text = Some("·".into()); }
+                    let txt_482 = tree.create("#text");
+                    tree.append_child(el_478, txt_482);
+                    if let Some(el) = tree.get_mut(txt_482) { el.text = Some("·".into()); }
                 }
-                let el_523 = tree.create("div");
-                tree.append_child(el_510, el_523);
-                tree.set_style(el_523, "direction", "horizontal");
-                tree.set_style(el_523, "width", "fill");
-                tree.set_style(el_523, "height", "24px");
-                tree.set_style(el_523, "align", "center");
-                tree.set_style(el_523, "gap", "5");
-                tree.set_style(el_523, "cursor", "pointer");
+                let el_483 = tree.create("div");
+                tree.append_child(el_470, el_483);
+                tree.set_style(el_483, "direction", "horizontal");
+                tree.set_style(el_483, "width", "fill");
+                tree.set_style(el_483, "height", "24px");
+                tree.set_style(el_483, "align", "center");
+                tree.set_style(el_483, "gap", "5");
+                tree.set_style(el_483, "cursor", "pointer");
                 // on:click -> select_row_18 (cb_idx=45)
-                tree.add_event(el_523, "click", 45);
-                if let Some(el) = tree.get_mut(el_523) { el.visual.cursor = 1; el.focusable = true; }
-                let el_524 = tree.create("div");
-                tree.append_child(el_523, el_524);
-                tree.set_style(el_524, "width", "12px");
-                tree.set_style(el_524, "height", "24px");
-                tree.set_style(el_524, "align", "center");
-                tree.set_style(el_524, "justify", "center");
+                tree.add_event(el_483, "click", 45);
+                if let Some(el) = tree.get_mut(el_483) { el.visual.cursor = 1; el.focusable = true; }
+                let el_484 = tree.create("div");
+                tree.append_child(el_483, el_484);
+                tree.set_style(el_484, "width", "12px");
+                tree.set_style(el_484, "height", "24px");
+                tree.set_style(el_484, "align", "center");
+                tree.set_style(el_484, "justify", "center");
                 if (eff_state[window_ids[18 as usize] as usize] == 0) {
-                    let el_525 = tree.create("div");
-                    tree.append_child(el_524, el_525);
-                    tree.set_style(el_525, "width", "7px");
-                    tree.set_style(el_525, "height", "7px");
-                    tree.set_style(el_525, "border-radius", "4");
-                    tree.set_style(el_525, "background-color", "#1a7f37");
+                    let el_485 = tree.create("div");
+                    tree.append_child(el_484, el_485);
+                    tree.set_style(el_485, "width", "7px");
+                    tree.set_style(el_485, "height", "7px");
+                    tree.set_style(el_485, "border-radius", "4");
+                    tree.set_style(el_485, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[18 as usize] as usize] == 1) {
-                        let el_526 = tree.create("div");
-                        tree.append_child(el_524, el_526);
-                        tree.set_style(el_526, "width", "7px");
-                        tree.set_style(el_526, "height", "7px");
-                        tree.set_style(el_526, "border-radius", "4");
-                        tree.set_style(el_526, "background-color", "#0969da");
+                        let el_486 = tree.create("div");
+                        tree.append_child(el_484, el_486);
+                        tree.set_style(el_486, "width", "7px");
+                        tree.set_style(el_486, "height", "7px");
+                        tree.set_style(el_486, "border-radius", "4");
+                        tree.set_style(el_486, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[18 as usize] as usize] == 2) {
-                            let el_527 = tree.create("div");
-                            tree.append_child(el_524, el_527);
-                            tree.set_style(el_527, "width", "7px");
-                            tree.set_style(el_527, "height", "7px");
-                            tree.set_style(el_527, "border-radius", "4");
-                            tree.set_style(el_527, "background-color", "#9a6700");
+                            let el_487 = tree.create("div");
+                            tree.append_child(el_484, el_487);
+                            tree.set_style(el_487, "width", "7px");
+                            tree.set_style(el_487, "height", "7px");
+                            tree.set_style(el_487, "border-radius", "4");
+                            tree.set_style(el_487, "background-color", "#9a6700");
                         } else {
-                            let el_528 = tree.create("div");
-                            tree.append_child(el_524, el_528);
-                            tree.set_style(el_528, "width", "7px");
-                            tree.set_style(el_528, "height", "7px");
-                            tree.set_style(el_528, "border-radius", "4");
-                            tree.set_style(el_528, "background-color", "#6e7781");
+                            let el_488 = tree.create("div");
+                            tree.append_child(el_484, el_488);
+                            tree.set_style(el_488, "width", "7px");
+                            tree.set_style(el_488, "height", "7px");
+                            tree.set_style(el_488, "border-radius", "4");
+                            tree.set_style(el_488, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_529 = tree.create("div");
-                tree.append_child(el_523, el_529);
-                tree.set_style(el_529, "font-size", "12px");
-                tree.set_style(el_529, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_529) { el.text = Some(format!("PN-{}", window_ids[18 as usize]).to_string()); }
-                let el_530 = tree.create("div");
-                tree.append_child(el_523, el_530);
-                tree.set_style(el_530, "font-size", "12px");
-                tree.set_style(el_530, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_530) { el.text = Some(format!("{}", names[window_ids[18 as usize] as usize]).to_string()); }
-                let el_531 = tree.create("div");
-                tree.append_child(el_523, el_531);
-                tree.set_style(el_531, "font-size", "11px");
-                tree.set_style(el_531, "color", "#6e7781");
+                let el_489 = tree.create("div");
+                tree.append_child(el_483, el_489);
+                tree.set_style(el_489, "font-size", "12px");
+                tree.set_style(el_489, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_489) { el.text = Some(format!("PN-{}", window_ids[18 as usize]).to_string()); }
+                let el_490 = tree.create("div");
+                tree.append_child(el_483, el_490);
+                tree.set_style(el_490, "font-size", "12px");
+                tree.set_style(el_490, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_490) { el.text = Some(format!("{}", names[window_ids[18 as usize] as usize]).to_string()); }
+                let el_491 = tree.create("div");
+                tree.append_child(el_483, el_491);
+                tree.set_style(el_491, "font-size", "11px");
+                tree.set_style(el_491, "color", "#6e7781");
                 if (window_depths[18 as usize] < max_depth) {
-                    let txt_532 = tree.create("#text");
-                    tree.append_child(el_531, txt_532);
-                    if let Some(el) = tree.get_mut(txt_532) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_492 = tree.create("#text");
+                    tree.append_child(el_491, txt_492);
+                    if let Some(el) = tree.get_mut(txt_492) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_533 = tree.create("#text");
-                    tree.append_child(el_531, txt_533);
-                    if let Some(el) = tree.get_mut(txt_533) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_493 = tree.create("#text");
+                    tree.append_child(el_491, txt_493);
+                    if let Some(el) = tree.get_mut(txt_493) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 19) {
-                let el_534 = tree.create("div");
-                tree.append_child(el_73, el_534);
-                tree.set_style(el_534, "direction", "horizontal");
-                tree.set_style(el_534, "height", "24px");
-                tree.set_style(el_534, "background-color", "#f9fafb");
-                tree.set_style(el_534, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_534, "align", "center");
-                tree.set_style(el_534, "padding-left", "6");
+                let el_494 = tree.create("div");
+                tree.append_child(el_33, el_494);
+                tree.set_style(el_494, "direction", "horizontal");
+                tree.set_style(el_494, "height", "24px");
+                tree.set_style(el_494, "background-color", "#f9fafb");
+                tree.set_style(el_494, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_494, "align", "center");
+                tree.set_style(el_494, "padding-left", "6");
                 if (window_depths[19 as usize] >= 1) {
-                    let el_535 = tree.create("div");
-                    tree.append_child(el_534, el_535);
-                    tree.set_style(el_535, "width", "14px");
+                    let el_495 = tree.create("div");
+                    tree.append_child(el_494, el_495);
+                    tree.set_style(el_495, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 2) {
-                    let el_536 = tree.create("div");
-                    tree.append_child(el_534, el_536);
-                    tree.set_style(el_536, "width", "14px");
+                    let el_496 = tree.create("div");
+                    tree.append_child(el_494, el_496);
+                    tree.set_style(el_496, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 3) {
-                    let el_537 = tree.create("div");
-                    tree.append_child(el_534, el_537);
-                    tree.set_style(el_537, "width", "14px");
+                    let el_497 = tree.create("div");
+                    tree.append_child(el_494, el_497);
+                    tree.set_style(el_497, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 4) {
-                    let el_538 = tree.create("div");
-                    tree.append_child(el_534, el_538);
-                    tree.set_style(el_538, "width", "14px");
+                    let el_498 = tree.create("div");
+                    tree.append_child(el_494, el_498);
+                    tree.set_style(el_498, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 5) {
-                    let el_539 = tree.create("div");
-                    tree.append_child(el_534, el_539);
-                    tree.set_style(el_539, "width", "14px");
+                    let el_499 = tree.create("div");
+                    tree.append_child(el_494, el_499);
+                    tree.set_style(el_499, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 6) {
-                    let el_540 = tree.create("div");
-                    tree.append_child(el_534, el_540);
-                    tree.set_style(el_540, "width", "14px");
+                    let el_500 = tree.create("div");
+                    tree.append_child(el_494, el_500);
+                    tree.set_style(el_500, "width", "14px");
                 }
                 if (window_depths[19 as usize] >= 7) {
-                    let el_541 = tree.create("div");
-                    tree.append_child(el_534, el_541);
-                    tree.set_style(el_541, "width", "14px");
+                    let el_501 = tree.create("div");
+                    tree.append_child(el_494, el_501);
+                    tree.set_style(el_501, "width", "14px");
                 }
-                let el_542 = tree.create("div");
-                tree.append_child(el_534, el_542);
-                tree.set_style(el_542, "width", "18px");
-                tree.set_style(el_542, "height", "24px");
-                tree.set_style(el_542, "align", "center");
-                tree.set_style(el_542, "justify", "center");
-                tree.set_style(el_542, "font-size", "10px");
-                tree.set_style(el_542, "color", "#9a6700");
-                tree.set_style(el_542, "cursor", "pointer");
+                let el_502 = tree.create("div");
+                tree.append_child(el_494, el_502);
+                tree.set_style(el_502, "width", "18px");
+                tree.set_style(el_502, "height", "24px");
+                tree.set_style(el_502, "align", "center");
+                tree.set_style(el_502, "justify", "center");
+                tree.set_style(el_502, "font-size", "10px");
+                tree.set_style(el_502, "color", "#9a6700");
+                tree.set_style(el_502, "cursor", "pointer");
                 // on:click -> toggle_row_19 (cb_idx=24)
-                tree.add_event(el_542, "click", 24);
-                if let Some(el) = tree.get_mut(el_542) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_502, "click", 24);
+                if let Some(el) = tree.get_mut(el_502) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[19 as usize] < max_depth) {
                     if loaded[window_ids[19 as usize] as usize] {
                         if expanded[window_ids[19 as usize] as usize] {
-                            let txt_543 = tree.create("#text");
-                            tree.append_child(el_542, txt_543);
-                            if let Some(el) = tree.get_mut(txt_543) { el.text = Some("▾".into()); }
+                            let txt_503 = tree.create("#text");
+                            tree.append_child(el_502, txt_503);
+                            if let Some(el) = tree.get_mut(txt_503) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_544 = tree.create("#text");
-                            tree.append_child(el_542, txt_544);
-                            if let Some(el) = tree.get_mut(txt_544) { el.text = Some("▸".into()); }
+                            let txt_504 = tree.create("#text");
+                            tree.append_child(el_502, txt_504);
+                            if let Some(el) = tree.get_mut(txt_504) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_545 = tree.create("#text");
-                        tree.append_child(el_542, txt_545);
-                        if let Some(el) = tree.get_mut(txt_545) { el.text = Some("+".into()); }
+                        let txt_505 = tree.create("#text");
+                        tree.append_child(el_502, txt_505);
+                        if let Some(el) = tree.get_mut(txt_505) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_546 = tree.create("#text");
-                    tree.append_child(el_542, txt_546);
-                    if let Some(el) = tree.get_mut(txt_546) { el.text = Some("·".into()); }
+                    let txt_506 = tree.create("#text");
+                    tree.append_child(el_502, txt_506);
+                    if let Some(el) = tree.get_mut(txt_506) { el.text = Some("·".into()); }
                 }
-                let el_547 = tree.create("div");
-                tree.append_child(el_534, el_547);
-                tree.set_style(el_547, "direction", "horizontal");
-                tree.set_style(el_547, "width", "fill");
-                tree.set_style(el_547, "height", "24px");
-                tree.set_style(el_547, "align", "center");
-                tree.set_style(el_547, "gap", "5");
-                tree.set_style(el_547, "cursor", "pointer");
+                let el_507 = tree.create("div");
+                tree.append_child(el_494, el_507);
+                tree.set_style(el_507, "direction", "horizontal");
+                tree.set_style(el_507, "width", "fill");
+                tree.set_style(el_507, "height", "24px");
+                tree.set_style(el_507, "align", "center");
+                tree.set_style(el_507, "gap", "5");
+                tree.set_style(el_507, "cursor", "pointer");
                 // on:click -> select_row_19 (cb_idx=46)
-                tree.add_event(el_547, "click", 46);
-                if let Some(el) = tree.get_mut(el_547) { el.visual.cursor = 1; el.focusable = true; }
-                let el_548 = tree.create("div");
-                tree.append_child(el_547, el_548);
-                tree.set_style(el_548, "width", "12px");
-                tree.set_style(el_548, "height", "24px");
-                tree.set_style(el_548, "align", "center");
-                tree.set_style(el_548, "justify", "center");
+                tree.add_event(el_507, "click", 46);
+                if let Some(el) = tree.get_mut(el_507) { el.visual.cursor = 1; el.focusable = true; }
+                let el_508 = tree.create("div");
+                tree.append_child(el_507, el_508);
+                tree.set_style(el_508, "width", "12px");
+                tree.set_style(el_508, "height", "24px");
+                tree.set_style(el_508, "align", "center");
+                tree.set_style(el_508, "justify", "center");
                 if (eff_state[window_ids[19 as usize] as usize] == 0) {
-                    let el_549 = tree.create("div");
-                    tree.append_child(el_548, el_549);
-                    tree.set_style(el_549, "width", "7px");
-                    tree.set_style(el_549, "height", "7px");
-                    tree.set_style(el_549, "border-radius", "4");
-                    tree.set_style(el_549, "background-color", "#1a7f37");
+                    let el_509 = tree.create("div");
+                    tree.append_child(el_508, el_509);
+                    tree.set_style(el_509, "width", "7px");
+                    tree.set_style(el_509, "height", "7px");
+                    tree.set_style(el_509, "border-radius", "4");
+                    tree.set_style(el_509, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[19 as usize] as usize] == 1) {
-                        let el_550 = tree.create("div");
-                        tree.append_child(el_548, el_550);
-                        tree.set_style(el_550, "width", "7px");
-                        tree.set_style(el_550, "height", "7px");
-                        tree.set_style(el_550, "border-radius", "4");
-                        tree.set_style(el_550, "background-color", "#0969da");
+                        let el_510 = tree.create("div");
+                        tree.append_child(el_508, el_510);
+                        tree.set_style(el_510, "width", "7px");
+                        tree.set_style(el_510, "height", "7px");
+                        tree.set_style(el_510, "border-radius", "4");
+                        tree.set_style(el_510, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[19 as usize] as usize] == 2) {
-                            let el_551 = tree.create("div");
-                            tree.append_child(el_548, el_551);
-                            tree.set_style(el_551, "width", "7px");
-                            tree.set_style(el_551, "height", "7px");
-                            tree.set_style(el_551, "border-radius", "4");
-                            tree.set_style(el_551, "background-color", "#9a6700");
+                            let el_511 = tree.create("div");
+                            tree.append_child(el_508, el_511);
+                            tree.set_style(el_511, "width", "7px");
+                            tree.set_style(el_511, "height", "7px");
+                            tree.set_style(el_511, "border-radius", "4");
+                            tree.set_style(el_511, "background-color", "#9a6700");
                         } else {
-                            let el_552 = tree.create("div");
-                            tree.append_child(el_548, el_552);
-                            tree.set_style(el_552, "width", "7px");
-                            tree.set_style(el_552, "height", "7px");
-                            tree.set_style(el_552, "border-radius", "4");
-                            tree.set_style(el_552, "background-color", "#6e7781");
+                            let el_512 = tree.create("div");
+                            tree.append_child(el_508, el_512);
+                            tree.set_style(el_512, "width", "7px");
+                            tree.set_style(el_512, "height", "7px");
+                            tree.set_style(el_512, "border-radius", "4");
+                            tree.set_style(el_512, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_553 = tree.create("div");
-                tree.append_child(el_547, el_553);
-                tree.set_style(el_553, "font-size", "12px");
-                tree.set_style(el_553, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_553) { el.text = Some(format!("PN-{}", window_ids[19 as usize]).to_string()); }
-                let el_554 = tree.create("div");
-                tree.append_child(el_547, el_554);
-                tree.set_style(el_554, "font-size", "12px");
-                tree.set_style(el_554, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_554) { el.text = Some(format!("{}", names[window_ids[19 as usize] as usize]).to_string()); }
-                let el_555 = tree.create("div");
-                tree.append_child(el_547, el_555);
-                tree.set_style(el_555, "font-size", "11px");
-                tree.set_style(el_555, "color", "#6e7781");
+                let el_513 = tree.create("div");
+                tree.append_child(el_507, el_513);
+                tree.set_style(el_513, "font-size", "12px");
+                tree.set_style(el_513, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_513) { el.text = Some(format!("PN-{}", window_ids[19 as usize]).to_string()); }
+                let el_514 = tree.create("div");
+                tree.append_child(el_507, el_514);
+                tree.set_style(el_514, "font-size", "12px");
+                tree.set_style(el_514, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_514) { el.text = Some(format!("{}", names[window_ids[19 as usize] as usize]).to_string()); }
+                let el_515 = tree.create("div");
+                tree.append_child(el_507, el_515);
+                tree.set_style(el_515, "font-size", "11px");
+                tree.set_style(el_515, "color", "#6e7781");
                 if (window_depths[19 as usize] < max_depth) {
-                    let txt_556 = tree.create("#text");
-                    tree.append_child(el_555, txt_556);
-                    if let Some(el) = tree.get_mut(txt_556) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_516 = tree.create("#text");
+                    tree.append_child(el_515, txt_516);
+                    if let Some(el) = tree.get_mut(txt_516) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_557 = tree.create("#text");
-                    tree.append_child(el_555, txt_557);
-                    if let Some(el) = tree.get_mut(txt_557) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_517 = tree.create("#text");
+                    tree.append_child(el_515, txt_517);
+                    if let Some(el) = tree.get_mut(txt_517) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 20) {
-                let el_558 = tree.create("div");
-                tree.append_child(el_73, el_558);
-                tree.set_style(el_558, "direction", "horizontal");
-                tree.set_style(el_558, "height", "24px");
-                tree.set_style(el_558, "background-color", "#ffffff");
-                tree.set_style(el_558, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_558, "align", "center");
-                tree.set_style(el_558, "padding-left", "6");
+                let el_518 = tree.create("div");
+                tree.append_child(el_33, el_518);
+                tree.set_style(el_518, "direction", "horizontal");
+                tree.set_style(el_518, "height", "24px");
+                tree.set_style(el_518, "background-color", "#ffffff");
+                tree.set_style(el_518, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_518, "align", "center");
+                tree.set_style(el_518, "padding-left", "6");
                 if (window_depths[20 as usize] >= 1) {
-                    let el_559 = tree.create("div");
-                    tree.append_child(el_558, el_559);
-                    tree.set_style(el_559, "width", "14px");
+                    let el_519 = tree.create("div");
+                    tree.append_child(el_518, el_519);
+                    tree.set_style(el_519, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 2) {
-                    let el_560 = tree.create("div");
-                    tree.append_child(el_558, el_560);
-                    tree.set_style(el_560, "width", "14px");
+                    let el_520 = tree.create("div");
+                    tree.append_child(el_518, el_520);
+                    tree.set_style(el_520, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 3) {
-                    let el_561 = tree.create("div");
-                    tree.append_child(el_558, el_561);
-                    tree.set_style(el_561, "width", "14px");
+                    let el_521 = tree.create("div");
+                    tree.append_child(el_518, el_521);
+                    tree.set_style(el_521, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 4) {
-                    let el_562 = tree.create("div");
-                    tree.append_child(el_558, el_562);
-                    tree.set_style(el_562, "width", "14px");
+                    let el_522 = tree.create("div");
+                    tree.append_child(el_518, el_522);
+                    tree.set_style(el_522, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 5) {
-                    let el_563 = tree.create("div");
-                    tree.append_child(el_558, el_563);
-                    tree.set_style(el_563, "width", "14px");
+                    let el_523 = tree.create("div");
+                    tree.append_child(el_518, el_523);
+                    tree.set_style(el_523, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 6) {
-                    let el_564 = tree.create("div");
-                    tree.append_child(el_558, el_564);
-                    tree.set_style(el_564, "width", "14px");
+                    let el_524 = tree.create("div");
+                    tree.append_child(el_518, el_524);
+                    tree.set_style(el_524, "width", "14px");
                 }
                 if (window_depths[20 as usize] >= 7) {
-                    let el_565 = tree.create("div");
-                    tree.append_child(el_558, el_565);
-                    tree.set_style(el_565, "width", "14px");
+                    let el_525 = tree.create("div");
+                    tree.append_child(el_518, el_525);
+                    tree.set_style(el_525, "width", "14px");
                 }
-                let el_566 = tree.create("div");
-                tree.append_child(el_558, el_566);
-                tree.set_style(el_566, "width", "18px");
-                tree.set_style(el_566, "height", "24px");
-                tree.set_style(el_566, "align", "center");
-                tree.set_style(el_566, "justify", "center");
-                tree.set_style(el_566, "font-size", "10px");
-                tree.set_style(el_566, "color", "#9a6700");
-                tree.set_style(el_566, "cursor", "pointer");
+                let el_526 = tree.create("div");
+                tree.append_child(el_518, el_526);
+                tree.set_style(el_526, "width", "18px");
+                tree.set_style(el_526, "height", "24px");
+                tree.set_style(el_526, "align", "center");
+                tree.set_style(el_526, "justify", "center");
+                tree.set_style(el_526, "font-size", "10px");
+                tree.set_style(el_526, "color", "#9a6700");
+                tree.set_style(el_526, "cursor", "pointer");
                 // on:click -> toggle_row_20 (cb_idx=25)
-                tree.add_event(el_566, "click", 25);
-                if let Some(el) = tree.get_mut(el_566) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_526, "click", 25);
+                if let Some(el) = tree.get_mut(el_526) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[20 as usize] < max_depth) {
                     if loaded[window_ids[20 as usize] as usize] {
                         if expanded[window_ids[20 as usize] as usize] {
-                            let txt_567 = tree.create("#text");
-                            tree.append_child(el_566, txt_567);
-                            if let Some(el) = tree.get_mut(txt_567) { el.text = Some("▾".into()); }
+                            let txt_527 = tree.create("#text");
+                            tree.append_child(el_526, txt_527);
+                            if let Some(el) = tree.get_mut(txt_527) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_568 = tree.create("#text");
-                            tree.append_child(el_566, txt_568);
-                            if let Some(el) = tree.get_mut(txt_568) { el.text = Some("▸".into()); }
+                            let txt_528 = tree.create("#text");
+                            tree.append_child(el_526, txt_528);
+                            if let Some(el) = tree.get_mut(txt_528) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_569 = tree.create("#text");
-                        tree.append_child(el_566, txt_569);
-                        if let Some(el) = tree.get_mut(txt_569) { el.text = Some("+".into()); }
+                        let txt_529 = tree.create("#text");
+                        tree.append_child(el_526, txt_529);
+                        if let Some(el) = tree.get_mut(txt_529) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_570 = tree.create("#text");
-                    tree.append_child(el_566, txt_570);
-                    if let Some(el) = tree.get_mut(txt_570) { el.text = Some("·".into()); }
+                    let txt_530 = tree.create("#text");
+                    tree.append_child(el_526, txt_530);
+                    if let Some(el) = tree.get_mut(txt_530) { el.text = Some("·".into()); }
                 }
-                let el_571 = tree.create("div");
-                tree.append_child(el_558, el_571);
-                tree.set_style(el_571, "direction", "horizontal");
-                tree.set_style(el_571, "width", "fill");
-                tree.set_style(el_571, "height", "24px");
-                tree.set_style(el_571, "align", "center");
-                tree.set_style(el_571, "gap", "5");
-                tree.set_style(el_571, "cursor", "pointer");
+                let el_531 = tree.create("div");
+                tree.append_child(el_518, el_531);
+                tree.set_style(el_531, "direction", "horizontal");
+                tree.set_style(el_531, "width", "fill");
+                tree.set_style(el_531, "height", "24px");
+                tree.set_style(el_531, "align", "center");
+                tree.set_style(el_531, "gap", "5");
+                tree.set_style(el_531, "cursor", "pointer");
                 // on:click -> select_row_20 (cb_idx=47)
-                tree.add_event(el_571, "click", 47);
-                if let Some(el) = tree.get_mut(el_571) { el.visual.cursor = 1; el.focusable = true; }
-                let el_572 = tree.create("div");
-                tree.append_child(el_571, el_572);
-                tree.set_style(el_572, "width", "12px");
-                tree.set_style(el_572, "height", "24px");
-                tree.set_style(el_572, "align", "center");
-                tree.set_style(el_572, "justify", "center");
+                tree.add_event(el_531, "click", 47);
+                if let Some(el) = tree.get_mut(el_531) { el.visual.cursor = 1; el.focusable = true; }
+                let el_532 = tree.create("div");
+                tree.append_child(el_531, el_532);
+                tree.set_style(el_532, "width", "12px");
+                tree.set_style(el_532, "height", "24px");
+                tree.set_style(el_532, "align", "center");
+                tree.set_style(el_532, "justify", "center");
                 if (eff_state[window_ids[20 as usize] as usize] == 0) {
-                    let el_573 = tree.create("div");
-                    tree.append_child(el_572, el_573);
-                    tree.set_style(el_573, "width", "7px");
-                    tree.set_style(el_573, "height", "7px");
-                    tree.set_style(el_573, "border-radius", "4");
-                    tree.set_style(el_573, "background-color", "#1a7f37");
+                    let el_533 = tree.create("div");
+                    tree.append_child(el_532, el_533);
+                    tree.set_style(el_533, "width", "7px");
+                    tree.set_style(el_533, "height", "7px");
+                    tree.set_style(el_533, "border-radius", "4");
+                    tree.set_style(el_533, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[20 as usize] as usize] == 1) {
-                        let el_574 = tree.create("div");
-                        tree.append_child(el_572, el_574);
-                        tree.set_style(el_574, "width", "7px");
-                        tree.set_style(el_574, "height", "7px");
-                        tree.set_style(el_574, "border-radius", "4");
-                        tree.set_style(el_574, "background-color", "#0969da");
+                        let el_534 = tree.create("div");
+                        tree.append_child(el_532, el_534);
+                        tree.set_style(el_534, "width", "7px");
+                        tree.set_style(el_534, "height", "7px");
+                        tree.set_style(el_534, "border-radius", "4");
+                        tree.set_style(el_534, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[20 as usize] as usize] == 2) {
-                            let el_575 = tree.create("div");
-                            tree.append_child(el_572, el_575);
-                            tree.set_style(el_575, "width", "7px");
-                            tree.set_style(el_575, "height", "7px");
-                            tree.set_style(el_575, "border-radius", "4");
-                            tree.set_style(el_575, "background-color", "#9a6700");
+                            let el_535 = tree.create("div");
+                            tree.append_child(el_532, el_535);
+                            tree.set_style(el_535, "width", "7px");
+                            tree.set_style(el_535, "height", "7px");
+                            tree.set_style(el_535, "border-radius", "4");
+                            tree.set_style(el_535, "background-color", "#9a6700");
                         } else {
-                            let el_576 = tree.create("div");
-                            tree.append_child(el_572, el_576);
-                            tree.set_style(el_576, "width", "7px");
-                            tree.set_style(el_576, "height", "7px");
-                            tree.set_style(el_576, "border-radius", "4");
-                            tree.set_style(el_576, "background-color", "#6e7781");
+                            let el_536 = tree.create("div");
+                            tree.append_child(el_532, el_536);
+                            tree.set_style(el_536, "width", "7px");
+                            tree.set_style(el_536, "height", "7px");
+                            tree.set_style(el_536, "border-radius", "4");
+                            tree.set_style(el_536, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_577 = tree.create("div");
-                tree.append_child(el_571, el_577);
-                tree.set_style(el_577, "font-size", "12px");
-                tree.set_style(el_577, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_577) { el.text = Some(format!("PN-{}", window_ids[20 as usize]).to_string()); }
-                let el_578 = tree.create("div");
-                tree.append_child(el_571, el_578);
-                tree.set_style(el_578, "font-size", "12px");
-                tree.set_style(el_578, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_578) { el.text = Some(format!("{}", names[window_ids[20 as usize] as usize]).to_string()); }
-                let el_579 = tree.create("div");
-                tree.append_child(el_571, el_579);
-                tree.set_style(el_579, "font-size", "11px");
-                tree.set_style(el_579, "color", "#6e7781");
+                let el_537 = tree.create("div");
+                tree.append_child(el_531, el_537);
+                tree.set_style(el_537, "font-size", "12px");
+                tree.set_style(el_537, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_537) { el.text = Some(format!("PN-{}", window_ids[20 as usize]).to_string()); }
+                let el_538 = tree.create("div");
+                tree.append_child(el_531, el_538);
+                tree.set_style(el_538, "font-size", "12px");
+                tree.set_style(el_538, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_538) { el.text = Some(format!("{}", names[window_ids[20 as usize] as usize]).to_string()); }
+                let el_539 = tree.create("div");
+                tree.append_child(el_531, el_539);
+                tree.set_style(el_539, "font-size", "11px");
+                tree.set_style(el_539, "color", "#6e7781");
                 if (window_depths[20 as usize] < max_depth) {
-                    let txt_580 = tree.create("#text");
-                    tree.append_child(el_579, txt_580);
-                    if let Some(el) = tree.get_mut(txt_580) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_540 = tree.create("#text");
+                    tree.append_child(el_539, txt_540);
+                    if let Some(el) = tree.get_mut(txt_540) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_581 = tree.create("#text");
-                    tree.append_child(el_579, txt_581);
-                    if let Some(el) = tree.get_mut(txt_581) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_541 = tree.create("#text");
+                    tree.append_child(el_539, txt_541);
+                    if let Some(el) = tree.get_mut(txt_541) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
             if (window_ids.len() as i32 > 21) {
-                let el_582 = tree.create("div");
-                tree.append_child(el_73, el_582);
-                tree.set_style(el_582, "direction", "horizontal");
-                tree.set_style(el_582, "height", "24px");
-                tree.set_style(el_582, "background-color", "#f9fafb");
-                tree.set_style(el_582, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_582, "align", "center");
-                tree.set_style(el_582, "padding-left", "6");
+                let el_542 = tree.create("div");
+                tree.append_child(el_33, el_542);
+                tree.set_style(el_542, "direction", "horizontal");
+                tree.set_style(el_542, "height", "24px");
+                tree.set_style(el_542, "background-color", "#f9fafb");
+                tree.set_style(el_542, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_542, "align", "center");
+                tree.set_style(el_542, "padding-left", "6");
                 if (window_depths[21 as usize] >= 1) {
-                    let el_583 = tree.create("div");
-                    tree.append_child(el_582, el_583);
-                    tree.set_style(el_583, "width", "14px");
+                    let el_543 = tree.create("div");
+                    tree.append_child(el_542, el_543);
+                    tree.set_style(el_543, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 2) {
-                    let el_584 = tree.create("div");
-                    tree.append_child(el_582, el_584);
-                    tree.set_style(el_584, "width", "14px");
+                    let el_544 = tree.create("div");
+                    tree.append_child(el_542, el_544);
+                    tree.set_style(el_544, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 3) {
-                    let el_585 = tree.create("div");
-                    tree.append_child(el_582, el_585);
-                    tree.set_style(el_585, "width", "14px");
+                    let el_545 = tree.create("div");
+                    tree.append_child(el_542, el_545);
+                    tree.set_style(el_545, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 4) {
-                    let el_586 = tree.create("div");
-                    tree.append_child(el_582, el_586);
-                    tree.set_style(el_586, "width", "14px");
+                    let el_546 = tree.create("div");
+                    tree.append_child(el_542, el_546);
+                    tree.set_style(el_546, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 5) {
-                    let el_587 = tree.create("div");
-                    tree.append_child(el_582, el_587);
-                    tree.set_style(el_587, "width", "14px");
+                    let el_547 = tree.create("div");
+                    tree.append_child(el_542, el_547);
+                    tree.set_style(el_547, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 6) {
-                    let el_588 = tree.create("div");
-                    tree.append_child(el_582, el_588);
-                    tree.set_style(el_588, "width", "14px");
+                    let el_548 = tree.create("div");
+                    tree.append_child(el_542, el_548);
+                    tree.set_style(el_548, "width", "14px");
                 }
                 if (window_depths[21 as usize] >= 7) {
-                    let el_589 = tree.create("div");
-                    tree.append_child(el_582, el_589);
-                    tree.set_style(el_589, "width", "14px");
+                    let el_549 = tree.create("div");
+                    tree.append_child(el_542, el_549);
+                    tree.set_style(el_549, "width", "14px");
                 }
-                let el_590 = tree.create("div");
-                tree.append_child(el_582, el_590);
-                tree.set_style(el_590, "width", "18px");
-                tree.set_style(el_590, "height", "24px");
-                tree.set_style(el_590, "align", "center");
-                tree.set_style(el_590, "justify", "center");
-                tree.set_style(el_590, "font-size", "10px");
-                tree.set_style(el_590, "color", "#9a6700");
-                tree.set_style(el_590, "cursor", "pointer");
+                let el_550 = tree.create("div");
+                tree.append_child(el_542, el_550);
+                tree.set_style(el_550, "width", "18px");
+                tree.set_style(el_550, "height", "24px");
+                tree.set_style(el_550, "align", "center");
+                tree.set_style(el_550, "justify", "center");
+                tree.set_style(el_550, "font-size", "10px");
+                tree.set_style(el_550, "color", "#9a6700");
+                tree.set_style(el_550, "cursor", "pointer");
                 // on:click -> toggle_row_21 (cb_idx=26)
-                tree.add_event(el_590, "click", 26);
-                if let Some(el) = tree.get_mut(el_590) { el.visual.cursor = 1; el.focusable = true; }
+                tree.add_event(el_550, "click", 26);
+                if let Some(el) = tree.get_mut(el_550) { el.visual.cursor = 1; el.focusable = true; }
                 if (window_depths[21 as usize] < max_depth) {
                     if loaded[window_ids[21 as usize] as usize] {
                         if expanded[window_ids[21 as usize] as usize] {
-                            let txt_591 = tree.create("#text");
-                            tree.append_child(el_590, txt_591);
-                            if let Some(el) = tree.get_mut(txt_591) { el.text = Some("▾".into()); }
+                            let txt_551 = tree.create("#text");
+                            tree.append_child(el_550, txt_551);
+                            if let Some(el) = tree.get_mut(txt_551) { el.text = Some("▾".into()); }
                         } else {
-                            let txt_592 = tree.create("#text");
-                            tree.append_child(el_590, txt_592);
-                            if let Some(el) = tree.get_mut(txt_592) { el.text = Some("▸".into()); }
+                            let txt_552 = tree.create("#text");
+                            tree.append_child(el_550, txt_552);
+                            if let Some(el) = tree.get_mut(txt_552) { el.text = Some("▸".into()); }
                         }
                     } else {
-                        let txt_593 = tree.create("#text");
-                        tree.append_child(el_590, txt_593);
-                        if let Some(el) = tree.get_mut(txt_593) { el.text = Some("+".into()); }
+                        let txt_553 = tree.create("#text");
+                        tree.append_child(el_550, txt_553);
+                        if let Some(el) = tree.get_mut(txt_553) { el.text = Some("+".into()); }
                     }
                 } else {
-                    let txt_594 = tree.create("#text");
-                    tree.append_child(el_590, txt_594);
-                    if let Some(el) = tree.get_mut(txt_594) { el.text = Some("·".into()); }
+                    let txt_554 = tree.create("#text");
+                    tree.append_child(el_550, txt_554);
+                    if let Some(el) = tree.get_mut(txt_554) { el.text = Some("·".into()); }
                 }
-                let el_595 = tree.create("div");
-                tree.append_child(el_582, el_595);
-                tree.set_style(el_595, "direction", "horizontal");
-                tree.set_style(el_595, "width", "fill");
-                tree.set_style(el_595, "height", "24px");
-                tree.set_style(el_595, "align", "center");
-                tree.set_style(el_595, "gap", "5");
-                tree.set_style(el_595, "cursor", "pointer");
+                let el_555 = tree.create("div");
+                tree.append_child(el_542, el_555);
+                tree.set_style(el_555, "direction", "horizontal");
+                tree.set_style(el_555, "width", "fill");
+                tree.set_style(el_555, "height", "24px");
+                tree.set_style(el_555, "align", "center");
+                tree.set_style(el_555, "gap", "5");
+                tree.set_style(el_555, "cursor", "pointer");
                 // on:click -> select_row_21 (cb_idx=48)
-                tree.add_event(el_595, "click", 48);
-                if let Some(el) = tree.get_mut(el_595) { el.visual.cursor = 1; el.focusable = true; }
-                let el_596 = tree.create("div");
-                tree.append_child(el_595, el_596);
-                tree.set_style(el_596, "width", "12px");
-                tree.set_style(el_596, "height", "24px");
-                tree.set_style(el_596, "align", "center");
-                tree.set_style(el_596, "justify", "center");
+                tree.add_event(el_555, "click", 48);
+                if let Some(el) = tree.get_mut(el_555) { el.visual.cursor = 1; el.focusable = true; }
+                let el_556 = tree.create("div");
+                tree.append_child(el_555, el_556);
+                tree.set_style(el_556, "width", "12px");
+                tree.set_style(el_556, "height", "24px");
+                tree.set_style(el_556, "align", "center");
+                tree.set_style(el_556, "justify", "center");
                 if (eff_state[window_ids[21 as usize] as usize] == 0) {
-                    let el_597 = tree.create("div");
-                    tree.append_child(el_596, el_597);
-                    tree.set_style(el_597, "width", "7px");
-                    tree.set_style(el_597, "height", "7px");
-                    tree.set_style(el_597, "border-radius", "4");
-                    tree.set_style(el_597, "background-color", "#1a7f37");
+                    let el_557 = tree.create("div");
+                    tree.append_child(el_556, el_557);
+                    tree.set_style(el_557, "width", "7px");
+                    tree.set_style(el_557, "height", "7px");
+                    tree.set_style(el_557, "border-radius", "4");
+                    tree.set_style(el_557, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[window_ids[21 as usize] as usize] == 1) {
-                        let el_598 = tree.create("div");
-                        tree.append_child(el_596, el_598);
-                        tree.set_style(el_598, "width", "7px");
-                        tree.set_style(el_598, "height", "7px");
-                        tree.set_style(el_598, "border-radius", "4");
-                        tree.set_style(el_598, "background-color", "#0969da");
+                        let el_558 = tree.create("div");
+                        tree.append_child(el_556, el_558);
+                        tree.set_style(el_558, "width", "7px");
+                        tree.set_style(el_558, "height", "7px");
+                        tree.set_style(el_558, "border-radius", "4");
+                        tree.set_style(el_558, "background-color", "#0969da");
                     } else {
                         if (eff_state[window_ids[21 as usize] as usize] == 2) {
-                            let el_599 = tree.create("div");
-                            tree.append_child(el_596, el_599);
-                            tree.set_style(el_599, "width", "7px");
-                            tree.set_style(el_599, "height", "7px");
-                            tree.set_style(el_599, "border-radius", "4");
-                            tree.set_style(el_599, "background-color", "#9a6700");
+                            let el_559 = tree.create("div");
+                            tree.append_child(el_556, el_559);
+                            tree.set_style(el_559, "width", "7px");
+                            tree.set_style(el_559, "height", "7px");
+                            tree.set_style(el_559, "border-radius", "4");
+                            tree.set_style(el_559, "background-color", "#9a6700");
                         } else {
-                            let el_600 = tree.create("div");
-                            tree.append_child(el_596, el_600);
-                            tree.set_style(el_600, "width", "7px");
-                            tree.set_style(el_600, "height", "7px");
-                            tree.set_style(el_600, "border-radius", "4");
-                            tree.set_style(el_600, "background-color", "#6e7781");
+                            let el_560 = tree.create("div");
+                            tree.append_child(el_556, el_560);
+                            tree.set_style(el_560, "width", "7px");
+                            tree.set_style(el_560, "height", "7px");
+                            tree.set_style(el_560, "border-radius", "4");
+                            tree.set_style(el_560, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_601 = tree.create("div");
-                tree.append_child(el_595, el_601);
-                tree.set_style(el_601, "font-size", "12px");
-                tree.set_style(el_601, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_601) { el.text = Some(format!("PN-{}", window_ids[21 as usize]).to_string()); }
-                let el_602 = tree.create("div");
-                tree.append_child(el_595, el_602);
-                tree.set_style(el_602, "font-size", "12px");
-                tree.set_style(el_602, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_602) { el.text = Some(format!("{}", names[window_ids[21 as usize] as usize]).to_string()); }
-                let el_603 = tree.create("div");
-                tree.append_child(el_595, el_603);
-                tree.set_style(el_603, "font-size", "11px");
-                tree.set_style(el_603, "color", "#6e7781");
+                let el_561 = tree.create("div");
+                tree.append_child(el_555, el_561);
+                tree.set_style(el_561, "font-size", "12px");
+                tree.set_style(el_561, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_561) { el.text = Some(format!("PN-{}", window_ids[21 as usize]).to_string()); }
+                let el_562 = tree.create("div");
+                tree.append_child(el_555, el_562);
+                tree.set_style(el_562, "font-size", "12px");
+                tree.set_style(el_562, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_562) { el.text = Some(format!("{}", names[window_ids[21 as usize] as usize]).to_string()); }
+                let el_563 = tree.create("div");
+                tree.append_child(el_555, el_563);
+                tree.set_style(el_563, "font-size", "11px");
+                tree.set_style(el_563, "color", "#6e7781");
                 if (window_depths[21 as usize] < max_depth) {
-                    let txt_604 = tree.create("#text");
-                    tree.append_child(el_603, txt_604);
-                    if let Some(el) = tree.get_mut(txt_604) { el.text = Some(".asm, A.1 (Design)".into()); }
+                    let txt_564 = tree.create("#text");
+                    tree.append_child(el_563, txt_564);
+                    if let Some(el) = tree.get_mut(txt_564) { el.text = Some(".asm, A.1 (Design)".into()); }
                 } else {
-                    let txt_605 = tree.create("#text");
-                    tree.append_child(el_603, txt_605);
-                    if let Some(el) = tree.get_mut(txt_605) { el.text = Some(".prt, A.1 (Design)".into()); }
+                    let txt_565 = tree.create("#text");
+                    tree.append_child(el_563, txt_565);
+                    if let Some(el) = tree.get_mut(txt_565) { el.text = Some(".prt, A.1 (Design)".into()); }
                 }
             }
-            let el_606 = tree.create("div");
-            tree.append_child(el_72, el_606);
-            tree.set_style(el_606, "direction", "vertical");
-            tree.set_style(el_606, "width", "fill");
-            tree.set_style(el_606, "height", "556px");
-            tree.set_style(el_606, "background-color", "#ffffff");
-            tree.set_style(el_606, "border", "1px solid #d0d7de");
-            tree.set_style(el_606, "border-radius", "4");
-            let el_607 = tree.create("div");
-            tree.append_child(el_606, el_607);
-            tree.set_style(el_607, "height", "26px");
-            tree.set_style(el_607, "background-color", "#f6f8fa");
-            tree.set_style(el_607, "border-bottom", "1px solid #d0d7de");
-            tree.set_style(el_607, "padding", "0 10");
-            tree.set_style(el_607, "align", "center");
-            tree.set_style(el_607, "direction", "horizontal");
-            let el_608 = tree.create("div");
-            tree.append_child(el_607, el_608);
-            tree.set_style(el_608, "font-size", "11px");
-            tree.set_style(el_608, "font-weight", "700");
-            tree.set_style(el_608, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_608) { el.text = Some("ATTRIBUTES".into()); }
-            let el_609 = tree.create("div");
-            tree.append_child(el_606, el_609);
-            tree.set_style(el_609, "direction", "vertical");
-            tree.set_style(el_609, "padding", "12");
-            tree.set_style(el_609, "gap", "8");
-            let el_610 = tree.create("div");
-            tree.append_child(el_609, el_610);
-            tree.set_style(el_610, "direction", "horizontal");
-            tree.set_style(el_610, "gap", "8");
-            tree.set_style(el_610, "align", "center");
-            let el_611 = tree.create("div");
-            tree.append_child(el_610, el_611);
-            tree.set_style(el_611, "font-size", "15px");
-            tree.set_style(el_611, "font-weight", "700");
-            tree.set_style(el_611, "color", "#1f2328");
-            if let Some(el) = tree.get_mut(el_611) { el.text = Some(format!("PN-{}", selected_id).to_string()); }
-            honeycomb::canvas_app::register_text_binding(el_611, "selected_id".as_ptr(), 11, "PN-{}".as_ptr(), 5);
-            let el_612 = tree.create("div");
-            tree.append_child(el_610, el_612);
-            tree.set_style(el_612, "font-size", "13px");
-            tree.set_style(el_612, "color", "#57606a");
+            let el_566 = tree.create("div");
+            tree.append_child(el_32, el_566);
+            tree.set_style(el_566, "direction", "vertical");
+            tree.set_style(el_566, "width", "fill");
+            tree.set_style(el_566, "height", "556px");
+            tree.set_style(el_566, "background-color", "#ffffff");
+            tree.set_style(el_566, "border", "1px solid #d0d7de");
+            tree.set_style(el_566, "border-radius", "4");
+            let el_567 = tree.create("div");
+            tree.append_child(el_566, el_567);
+            tree.set_style(el_567, "height", "26px");
+            tree.set_style(el_567, "background-color", "#f6f8fa");
+            tree.set_style(el_567, "border-bottom", "1px solid #d0d7de");
+            tree.set_style(el_567, "padding", "0 10");
+            tree.set_style(el_567, "align", "center");
+            tree.set_style(el_567, "direction", "horizontal");
+            let el_568 = tree.create("div");
+            tree.append_child(el_567, el_568);
+            tree.set_style(el_568, "font-size", "11px");
+            tree.set_style(el_568, "font-weight", "700");
+            tree.set_style(el_568, "color", "#57606a");
+            if let Some(el) = tree.get_mut(el_568) { el.text = Some("ATTRIBUTES".into()); }
+            let el_569 = tree.create("div");
+            tree.append_child(el_566, el_569);
+            tree.set_style(el_569, "direction", "vertical");
+            tree.set_style(el_569, "padding", "12");
+            tree.set_style(el_569, "gap", "8");
+            let el_570 = tree.create("div");
+            tree.append_child(el_569, el_570);
+            tree.set_style(el_570, "direction", "horizontal");
+            tree.set_style(el_570, "gap", "8");
+            tree.set_style(el_570, "align", "center");
+            let el_571 = tree.create("div");
+            tree.append_child(el_570, el_571);
+            tree.set_style(el_571, "font-size", "15px");
+            tree.set_style(el_571, "font-weight", "700");
+            tree.set_style(el_571, "color", "#1f2328");
+            if let Some(el) = tree.get_mut(el_571) { el.text = Some(format!("PN-{}", selected_id).to_string()); }
+            honeycomb::canvas_app::register_text_binding(el_571, "selected_id".as_ptr(), 11, "PN-{}".as_ptr(), 5);
+            let el_572 = tree.create("div");
+            tree.append_child(el_570, el_572);
+            tree.set_style(el_572, "font-size", "13px");
+            tree.set_style(el_572, "color", "#57606a");
             if (selected_depth < max_depth) {
-                let txt_613 = tree.create("#text");
-                tree.append_child(el_612, txt_613);
-                if let Some(el) = tree.get_mut(txt_613) { el.text = Some(".asm".into()); }
+                let txt_573 = tree.create("#text");
+                tree.append_child(el_572, txt_573);
+                if let Some(el) = tree.get_mut(txt_573) { el.text = Some(".asm".into()); }
             } else {
-                let txt_614 = tree.create("#text");
-                tree.append_child(el_612, txt_614);
-                if let Some(el) = tree.get_mut(txt_614) { el.text = Some(".prt".into()); }
+                let txt_574 = tree.create("#text");
+                tree.append_child(el_572, txt_574);
+                if let Some(el) = tree.get_mut(txt_574) { el.text = Some(".prt".into()); }
             }
-            let el_615 = tree.create("div");
-            tree.append_child(el_609, el_615);
-            tree.set_style(el_615, "direction", "horizontal");
-            tree.set_style(el_615, "height", "18px");
-            tree.set_style(el_615, "align", "center");
-            let el_616 = tree.create("div");
-            tree.append_child(el_615, el_616);
-            tree.set_style(el_616, "width", "150px");
-            tree.set_style(el_616, "font-size", "12px");
-            tree.set_style(el_616, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_616) { el.text = Some("Number".into()); }
-            let el_617 = tree.create("div");
-            tree.append_child(el_615, el_617);
-            tree.set_style(el_617, "font-size", "12px");
-            tree.set_style(el_617, "color", "#24292f");
-            if let Some(el) = tree.get_mut(el_617) { el.text = Some(format!("PN-{}", selected_id).to_string()); }
-            honeycomb::canvas_app::register_text_binding(el_617, "selected_id".as_ptr(), 11, "PN-{}".as_ptr(), 5);
-            let el_618 = tree.create("div");
-            tree.append_child(el_609, el_618);
-            tree.set_style(el_618, "direction", "horizontal");
-            tree.set_style(el_618, "height", "18px");
-            tree.set_style(el_618, "align", "center");
-            let el_619 = tree.create("div");
-            tree.append_child(el_618, el_619);
-            tree.set_style(el_619, "width", "150px");
-            tree.set_style(el_619, "font-size", "12px");
-            tree.set_style(el_619, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_619) { el.text = Some("Name".into()); }
-            let el_620 = tree.create("div");
-            tree.append_child(el_618, el_620);
-            tree.set_style(el_620, "font-size", "12px");
-            tree.set_style(el_620, "color", "#24292f");
+            let el_575 = tree.create("div");
+            tree.append_child(el_569, el_575);
+            tree.set_style(el_575, "direction", "horizontal");
+            tree.set_style(el_575, "height", "18px");
+            tree.set_style(el_575, "align", "center");
+            let el_576 = tree.create("div");
+            tree.append_child(el_575, el_576);
+            tree.set_style(el_576, "width", "150px");
+            tree.set_style(el_576, "font-size", "12px");
+            tree.set_style(el_576, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_576) { el.text = Some("Number".into()); }
+            let el_577 = tree.create("div");
+            tree.append_child(el_575, el_577);
+            tree.set_style(el_577, "font-size", "12px");
+            tree.set_style(el_577, "color", "#24292f");
+            if let Some(el) = tree.get_mut(el_577) { el.text = Some(format!("PN-{}", selected_id).to_string()); }
+            honeycomb::canvas_app::register_text_binding(el_577, "selected_id".as_ptr(), 11, "PN-{}".as_ptr(), 5);
+            let el_578 = tree.create("div");
+            tree.append_child(el_569, el_578);
+            tree.set_style(el_578, "direction", "horizontal");
+            tree.set_style(el_578, "height", "18px");
+            tree.set_style(el_578, "align", "center");
+            let el_579 = tree.create("div");
+            tree.append_child(el_578, el_579);
+            tree.set_style(el_579, "width", "150px");
+            tree.set_style(el_579, "font-size", "12px");
+            tree.set_style(el_579, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_579) { el.text = Some("Name".into()); }
+            let el_580 = tree.create("div");
+            tree.append_child(el_578, el_580);
+            tree.set_style(el_580, "font-size", "12px");
+            tree.set_style(el_580, "color", "#24292f");
             if (names.len() as i32 > 0) {
-                let dyn_621 = tree.create("#text");
-                tree.append_child(el_620, dyn_621);
-                if let Some(el) = tree.get_mut(dyn_621) { el.text = Some(format!("{}", names[selected_id as usize]).to_string()); }
+                let dyn_581 = tree.create("#text");
+                tree.append_child(el_580, dyn_581);
+                if let Some(el) = tree.get_mut(dyn_581) { el.text = Some(format!("{}", names[selected_id as usize]).to_string()); }
             } else {
-                let txt_622 = tree.create("#text");
-                tree.append_child(el_620, txt_622);
-                if let Some(el) = tree.get_mut(txt_622) { el.text = Some("—".into()); }
+                let txt_582 = tree.create("#text");
+                tree.append_child(el_580, txt_582);
+                if let Some(el) = tree.get_mut(txt_582) { el.text = Some("—".into()); }
             }
-            let el_623 = tree.create("div");
-            tree.append_child(el_609, el_623);
-            tree.set_style(el_623, "direction", "horizontal");
-            tree.set_style(el_623, "height", "18px");
-            tree.set_style(el_623, "align", "center");
-            let el_624 = tree.create("div");
-            tree.append_child(el_623, el_624);
-            tree.set_style(el_624, "width", "150px");
-            tree.set_style(el_624, "font-size", "12px");
-            tree.set_style(el_624, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_624) { el.text = Some("Type".into()); }
-            let el_625 = tree.create("div");
-            tree.append_child(el_623, el_625);
-            tree.set_style(el_625, "font-size", "12px");
-            tree.set_style(el_625, "color", "#24292f");
+            let el_583 = tree.create("div");
+            tree.append_child(el_569, el_583);
+            tree.set_style(el_583, "direction", "horizontal");
+            tree.set_style(el_583, "height", "18px");
+            tree.set_style(el_583, "align", "center");
+            let el_584 = tree.create("div");
+            tree.append_child(el_583, el_584);
+            tree.set_style(el_584, "width", "150px");
+            tree.set_style(el_584, "font-size", "12px");
+            tree.set_style(el_584, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_584) { el.text = Some("Type".into()); }
+            let el_585 = tree.create("div");
+            tree.append_child(el_583, el_585);
+            tree.set_style(el_585, "font-size", "12px");
+            tree.set_style(el_585, "color", "#24292f");
             if (selected_depth == 0) {
-                let txt_626 = tree.create("#text");
-                tree.append_child(el_625, txt_626);
-                if let Some(el) = tree.get_mut(txt_626) { el.text = Some("Top Assembly".into()); }
+                let txt_586 = tree.create("#text");
+                tree.append_child(el_585, txt_586);
+                if let Some(el) = tree.get_mut(txt_586) { el.text = Some("Top Assembly".into()); }
             } else {
                 if (selected_depth == 1) {
-                    let txt_627 = tree.create("#text");
-                    tree.append_child(el_625, txt_627);
-                    if let Some(el) = tree.get_mut(txt_627) { el.text = Some("Major Assembly".into()); }
+                    let txt_587 = tree.create("#text");
+                    tree.append_child(el_585, txt_587);
+                    if let Some(el) = tree.get_mut(txt_587) { el.text = Some("Major Assembly".into()); }
                 } else {
                     if (selected_depth == 2) {
-                        let txt_628 = tree.create("#text");
-                        tree.append_child(el_625, txt_628);
-                        if let Some(el) = tree.get_mut(txt_628) { el.text = Some("Sub-Assembly".into()); }
+                        let txt_588 = tree.create("#text");
+                        tree.append_child(el_585, txt_588);
+                        if let Some(el) = tree.get_mut(txt_588) { el.text = Some("Sub-Assembly".into()); }
                     } else {
                         if (selected_depth == 3) {
-                            let txt_629 = tree.create("#text");
-                            tree.append_child(el_625, txt_629);
-                            if let Some(el) = tree.get_mut(txt_629) { el.text = Some("Component".into()); }
+                            let txt_589 = tree.create("#text");
+                            tree.append_child(el_585, txt_589);
+                            if let Some(el) = tree.get_mut(txt_589) { el.text = Some("Component".into()); }
                         } else {
                             if (selected_depth == 4) {
-                                let txt_630 = tree.create("#text");
-                                tree.append_child(el_625, txt_630);
-                                if let Some(el) = tree.get_mut(txt_630) { el.text = Some("Sub-Component".into()); }
+                                let txt_590 = tree.create("#text");
+                                tree.append_child(el_585, txt_590);
+                                if let Some(el) = tree.get_mut(txt_590) { el.text = Some("Sub-Component".into()); }
                             } else {
                                 if (selected_depth == 5) {
-                                    let txt_631 = tree.create("#text");
-                                    tree.append_child(el_625, txt_631);
-                                    if let Some(el) = tree.get_mut(txt_631) { el.text = Some("Detail Part".into()); }
+                                    let txt_591 = tree.create("#text");
+                                    tree.append_child(el_585, txt_591);
+                                    if let Some(el) = tree.get_mut(txt_591) { el.text = Some("Detail Part".into()); }
                                 } else {
                                     if (selected_depth == 6) {
-                                        let txt_632 = tree.create("#text");
-                                        tree.append_child(el_625, txt_632);
-                                        if let Some(el) = tree.get_mut(txt_632) { el.text = Some("Fastener Group".into()); }
+                                        let txt_592 = tree.create("#text");
+                                        tree.append_child(el_585, txt_592);
+                                        if let Some(el) = tree.get_mut(txt_592) { el.text = Some("Fastener Group".into()); }
                                     } else {
-                                        let txt_633 = tree.create("#text");
-                                        tree.append_child(el_625, txt_633);
-                                        if let Some(el) = tree.get_mut(txt_633) { el.text = Some("Fastener".into()); }
+                                        let txt_593 = tree.create("#text");
+                                        tree.append_child(el_585, txt_593);
+                                        if let Some(el) = tree.get_mut(txt_593) { el.text = Some("Fastener".into()); }
                                     }
                                 }
                             }
@@ -4406,1256 +4222,1256 @@ fn treebench_mount() {
                     }
                 }
             }
-            let el_634 = tree.create("div");
-            tree.append_child(el_609, el_634);
-            tree.set_style(el_634, "direction", "horizontal");
-            tree.set_style(el_634, "height", "18px");
-            tree.set_style(el_634, "align", "center");
-            let el_635 = tree.create("div");
-            tree.append_child(el_634, el_635);
-            tree.set_style(el_635, "width", "150px");
-            tree.set_style(el_635, "font-size", "12px");
-            tree.set_style(el_635, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_635) { el.text = Some("Revision".into()); }
-            let el_636 = tree.create("div");
-            tree.append_child(el_634, el_636);
-            tree.set_style(el_636, "font-size", "12px");
-            tree.set_style(el_636, "color", "#24292f");
-            if let Some(el) = tree.get_mut(el_636) { el.text = Some("A.1 (Design)".into()); }
-            let el_637 = tree.create("div");
-            tree.append_child(el_609, el_637);
-            tree.set_style(el_637, "direction", "horizontal");
-            tree.set_style(el_637, "height", "18px");
-            tree.set_style(el_637, "align", "center");
-            let el_638 = tree.create("div");
-            tree.append_child(el_637, el_638);
-            tree.set_style(el_638, "width", "150px");
-            tree.set_style(el_638, "font-size", "12px");
-            tree.set_style(el_638, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_638) { el.text = Some("Lifecycle state".into()); }
-            let el_639 = tree.create("div");
-            tree.append_child(el_637, el_639);
-            tree.set_style(el_639, "direction", "horizontal");
-            tree.set_style(el_639, "gap", "6");
-            tree.set_style(el_639, "align", "center");
-            let el_640 = tree.create("div");
-            tree.append_child(el_639, el_640);
-            tree.set_style(el_640, "width", "10px");
-            tree.set_style(el_640, "height", "20px");
-            tree.set_style(el_640, "align", "center");
-            tree.set_style(el_640, "justify", "center");
+            let el_594 = tree.create("div");
+            tree.append_child(el_569, el_594);
+            tree.set_style(el_594, "direction", "horizontal");
+            tree.set_style(el_594, "height", "18px");
+            tree.set_style(el_594, "align", "center");
+            let el_595 = tree.create("div");
+            tree.append_child(el_594, el_595);
+            tree.set_style(el_595, "width", "150px");
+            tree.set_style(el_595, "font-size", "12px");
+            tree.set_style(el_595, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_595) { el.text = Some("Revision".into()); }
+            let el_596 = tree.create("div");
+            tree.append_child(el_594, el_596);
+            tree.set_style(el_596, "font-size", "12px");
+            tree.set_style(el_596, "color", "#24292f");
+            if let Some(el) = tree.get_mut(el_596) { el.text = Some("A.1 (Design)".into()); }
+            let el_597 = tree.create("div");
+            tree.append_child(el_569, el_597);
+            tree.set_style(el_597, "direction", "horizontal");
+            tree.set_style(el_597, "height", "18px");
+            tree.set_style(el_597, "align", "center");
+            let el_598 = tree.create("div");
+            tree.append_child(el_597, el_598);
+            tree.set_style(el_598, "width", "150px");
+            tree.set_style(el_598, "font-size", "12px");
+            tree.set_style(el_598, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_598) { el.text = Some("Lifecycle state".into()); }
+            let el_599 = tree.create("div");
+            tree.append_child(el_597, el_599);
+            tree.set_style(el_599, "direction", "horizontal");
+            tree.set_style(el_599, "gap", "6");
+            tree.set_style(el_599, "align", "center");
+            let el_600 = tree.create("div");
+            tree.append_child(el_599, el_600);
+            tree.set_style(el_600, "width", "10px");
+            tree.set_style(el_600, "height", "20px");
+            tree.set_style(el_600, "align", "center");
+            tree.set_style(el_600, "justify", "center");
             if (eff_state[selected_id as usize] == 0) {
-                let el_641 = tree.create("div");
-                tree.append_child(el_640, el_641);
-                tree.set_style(el_641, "width", "8px");
-                tree.set_style(el_641, "height", "8px");
-                tree.set_style(el_641, "border-radius", "4");
-                tree.set_style(el_641, "background-color", "#1a7f37");
+                let el_601 = tree.create("div");
+                tree.append_child(el_600, el_601);
+                tree.set_style(el_601, "width", "8px");
+                tree.set_style(el_601, "height", "8px");
+                tree.set_style(el_601, "border-radius", "4");
+                tree.set_style(el_601, "background-color", "#1a7f37");
             } else {
                 if (eff_state[selected_id as usize] == 1) {
-                    let el_642 = tree.create("div");
-                    tree.append_child(el_640, el_642);
-                    tree.set_style(el_642, "width", "8px");
-                    tree.set_style(el_642, "height", "8px");
-                    tree.set_style(el_642, "border-radius", "4");
-                    tree.set_style(el_642, "background-color", "#0969da");
+                    let el_602 = tree.create("div");
+                    tree.append_child(el_600, el_602);
+                    tree.set_style(el_602, "width", "8px");
+                    tree.set_style(el_602, "height", "8px");
+                    tree.set_style(el_602, "border-radius", "4");
+                    tree.set_style(el_602, "background-color", "#0969da");
                 } else {
                     if (eff_state[selected_id as usize] == 2) {
-                        let el_643 = tree.create("div");
-                        tree.append_child(el_640, el_643);
-                        tree.set_style(el_643, "width", "8px");
-                        tree.set_style(el_643, "height", "8px");
-                        tree.set_style(el_643, "border-radius", "4");
-                        tree.set_style(el_643, "background-color", "#9a6700");
+                        let el_603 = tree.create("div");
+                        tree.append_child(el_600, el_603);
+                        tree.set_style(el_603, "width", "8px");
+                        tree.set_style(el_603, "height", "8px");
+                        tree.set_style(el_603, "border-radius", "4");
+                        tree.set_style(el_603, "background-color", "#9a6700");
                     } else {
-                        let el_644 = tree.create("div");
-                        tree.append_child(el_640, el_644);
-                        tree.set_style(el_644, "width", "8px");
-                        tree.set_style(el_644, "height", "8px");
-                        tree.set_style(el_644, "border-radius", "4");
-                        tree.set_style(el_644, "background-color", "#6e7781");
+                        let el_604 = tree.create("div");
+                        tree.append_child(el_600, el_604);
+                        tree.set_style(el_604, "width", "8px");
+                        tree.set_style(el_604, "height", "8px");
+                        tree.set_style(el_604, "border-radius", "4");
+                        tree.set_style(el_604, "background-color", "#6e7781");
                     }
                 }
             }
-            let el_645 = tree.create("div");
-            tree.append_child(el_639, el_645);
-            tree.set_style(el_645, "font-size", "12px");
-            tree.set_style(el_645, "color", "#24292f");
-            tree.set_style(el_645, "height", "20px");
+            let el_605 = tree.create("div");
+            tree.append_child(el_599, el_605);
+            tree.set_style(el_605, "font-size", "12px");
+            tree.set_style(el_605, "color", "#24292f");
+            tree.set_style(el_605, "height", "20px");
             if (eff_state[selected_id as usize] == 0) {
-                let txt_646 = tree.create("#text");
-                tree.append_child(el_645, txt_646);
-                if let Some(el) = tree.get_mut(txt_646) { el.text = Some("Released".into()); }
+                let txt_606 = tree.create("#text");
+                tree.append_child(el_605, txt_606);
+                if let Some(el) = tree.get_mut(txt_606) { el.text = Some("Released".into()); }
             } else {
                 if (eff_state[selected_id as usize] == 1) {
-                    let txt_647 = tree.create("#text");
-                    tree.append_child(el_645, txt_647);
-                    if let Some(el) = tree.get_mut(txt_647) { el.text = Some("In Work".into()); }
+                    let txt_607 = tree.create("#text");
+                    tree.append_child(el_605, txt_607);
+                    if let Some(el) = tree.get_mut(txt_607) { el.text = Some("In Work".into()); }
                 } else {
                     if (eff_state[selected_id as usize] == 2) {
-                        let txt_648 = tree.create("#text");
-                        tree.append_child(el_645, txt_648);
-                        if let Some(el) = tree.get_mut(txt_648) { el.text = Some("Under Review".into()); }
+                        let txt_608 = tree.create("#text");
+                        tree.append_child(el_605, txt_608);
+                        if let Some(el) = tree.get_mut(txt_608) { el.text = Some("Under Review".into()); }
                     } else {
-                        let txt_649 = tree.create("#text");
-                        tree.append_child(el_645, txt_649);
-                        if let Some(el) = tree.get_mut(txt_649) { el.text = Some("Obsolete".into()); }
+                        let txt_609 = tree.create("#text");
+                        tree.append_child(el_605, txt_609);
+                        if let Some(el) = tree.get_mut(txt_609) { el.text = Some("Obsolete".into()); }
                     }
                 }
             }
-            let el_650 = tree.create("div");
-            tree.append_child(el_609, el_650);
-            tree.set_style(el_650, "direction", "horizontal");
-            tree.set_style(el_650, "height", "18px");
-            tree.set_style(el_650, "align", "center");
-            let el_651 = tree.create("div");
-            tree.append_child(el_650, el_651);
-            tree.set_style(el_651, "width", "150px");
-            tree.set_style(el_651, "font-size", "12px");
-            tree.set_style(el_651, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_651) { el.text = Some("Direct children".into()); }
-            let el_652 = tree.create("div");
-            tree.append_child(el_650, el_652);
-            tree.set_style(el_652, "font-size", "12px");
-            tree.set_style(el_652, "color", "#24292f");
+            let el_610 = tree.create("div");
+            tree.append_child(el_569, el_610);
+            tree.set_style(el_610, "direction", "horizontal");
+            tree.set_style(el_610, "height", "18px");
+            tree.set_style(el_610, "align", "center");
+            let el_611 = tree.create("div");
+            tree.append_child(el_610, el_611);
+            tree.set_style(el_611, "width", "150px");
+            tree.set_style(el_611, "font-size", "12px");
+            tree.set_style(el_611, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_611) { el.text = Some("Direct children".into()); }
+            let el_612 = tree.create("div");
+            tree.append_child(el_610, el_612);
+            tree.set_style(el_612, "font-size", "12px");
+            tree.set_style(el_612, "color", "#24292f");
             if (loaded.len() as i32 > 0) {
                 if loaded[selected_id as usize] {
-                    let dyn_653 = tree.create("#text");
-                    tree.append_child(el_652, dyn_653);
-                    if let Some(el) = tree.get_mut(dyn_653) { el.text = Some(format!("{}", uses_ids.len() as i32).to_string()); }
+                    let dyn_613 = tree.create("#text");
+                    tree.append_child(el_612, dyn_613);
+                    if let Some(el) = tree.get_mut(dyn_613) { el.text = Some(format!("{}", uses_ids.len() as i32).to_string()); }
                 } else {
-                    let txt_654 = tree.create("#text");
-                    tree.append_child(el_652, txt_654);
-                    if let Some(el) = tree.get_mut(txt_654) { el.text = Some("not loaded — expand to fetch".into()); }
+                    let txt_614 = tree.create("#text");
+                    tree.append_child(el_612, txt_614);
+                    if let Some(el) = tree.get_mut(txt_614) { el.text = Some("not loaded — expand to fetch".into()); }
                 }
             } else {
-                let txt_655 = tree.create("#text");
-                tree.append_child(el_652, txt_655);
-                if let Some(el) = tree.get_mut(txt_655) { el.text = Some("—".into()); }
+                let txt_615 = tree.create("#text");
+                tree.append_child(el_612, txt_615);
+                if let Some(el) = tree.get_mut(txt_615) { el.text = Some("—".into()); }
             }
-            let el_656 = tree.create("div");
-            tree.append_child(el_609, el_656);
-            tree.set_style(el_656, "direction", "horizontal");
-            tree.set_style(el_656, "height", "18px");
-            tree.set_style(el_656, "align", "center");
-            let el_657 = tree.create("div");
-            tree.append_child(el_656, el_657);
-            tree.set_style(el_657, "width", "150px");
-            tree.set_style(el_657, "font-size", "12px");
-            tree.set_style(el_657, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_657) { el.text = Some("Depth in structure".into()); }
-            let el_658 = tree.create("div");
-            tree.append_child(el_656, el_658);
-            tree.set_style(el_658, "font-size", "12px");
-            tree.set_style(el_658, "color", "#24292f");
-            if let Some(el) = tree.get_mut(el_658) { el.text = Some(format!("Level {}", selected_depth).to_string()); }
-            honeycomb::canvas_app::register_text_binding(el_658, "selected_depth".as_ptr(), 14, "Level {}".as_ptr(), 8);
-            let el_659 = tree.create("div");
-            tree.append_child(el_609, el_659);
-            tree.set_style(el_659, "direction", "horizontal");
-            tree.set_style(el_659, "height", "18px");
-            tree.set_style(el_659, "align", "center");
-            let el_660 = tree.create("div");
-            tree.append_child(el_659, el_660);
-            tree.set_style(el_660, "width", "150px");
-            tree.set_style(el_660, "font-size", "12px");
-            tree.set_style(el_660, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_660) { el.text = Some("Set lifecycle state".into()); }
-            let el_661 = tree.create("div");
-            tree.append_child(el_659, el_661);
-            tree.set_style(el_661, "direction", "horizontal");
-            tree.set_style(el_661, "gap", "5");
-            tree.set_style(el_661, "align", "center");
-            let el_662 = tree.create("div");
-            tree.append_child(el_661, el_662);
-            tree.set_style(el_662, "height", "18px");
-            tree.set_style(el_662, "padding", "0 7");
-            tree.set_style(el_662, "background-color", "#f6f8fa");
-            tree.set_style(el_662, "border", "1px solid #d0d7de");
-            tree.set_style(el_662, "border-radius", "4");
-            tree.set_style(el_662, "color", "#24292f");
-            tree.set_style(el_662, "font-size", "10px");
-            tree.set_style(el_662, "align", "center");
-            tree.set_style(el_662, "justify", "center");
-            tree.set_style(el_662, "cursor", "pointer");
+            let el_616 = tree.create("div");
+            tree.append_child(el_569, el_616);
+            tree.set_style(el_616, "direction", "horizontal");
+            tree.set_style(el_616, "height", "18px");
+            tree.set_style(el_616, "align", "center");
+            let el_617 = tree.create("div");
+            tree.append_child(el_616, el_617);
+            tree.set_style(el_617, "width", "150px");
+            tree.set_style(el_617, "font-size", "12px");
+            tree.set_style(el_617, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_617) { el.text = Some("Depth in structure".into()); }
+            let el_618 = tree.create("div");
+            tree.append_child(el_616, el_618);
+            tree.set_style(el_618, "font-size", "12px");
+            tree.set_style(el_618, "color", "#24292f");
+            if let Some(el) = tree.get_mut(el_618) { el.text = Some(format!("Level {}", selected_depth).to_string()); }
+            honeycomb::canvas_app::register_text_binding(el_618, "selected_depth".as_ptr(), 14, "Level {}".as_ptr(), 8);
+            let el_619 = tree.create("div");
+            tree.append_child(el_569, el_619);
+            tree.set_style(el_619, "direction", "horizontal");
+            tree.set_style(el_619, "height", "18px");
+            tree.set_style(el_619, "align", "center");
+            let el_620 = tree.create("div");
+            tree.append_child(el_619, el_620);
+            tree.set_style(el_620, "width", "150px");
+            tree.set_style(el_620, "font-size", "12px");
+            tree.set_style(el_620, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_620) { el.text = Some("Set lifecycle state".into()); }
+            let el_621 = tree.create("div");
+            tree.append_child(el_619, el_621);
+            tree.set_style(el_621, "direction", "horizontal");
+            tree.set_style(el_621, "gap", "5");
+            tree.set_style(el_621, "align", "center");
+            let el_622 = tree.create("div");
+            tree.append_child(el_621, el_622);
+            tree.set_style(el_622, "height", "18px");
+            tree.set_style(el_622, "padding", "0 7");
+            tree.set_style(el_622, "background-color", "#f6f8fa");
+            tree.set_style(el_622, "border", "1px solid #d0d7de");
+            tree.set_style(el_622, "border-radius", "4");
+            tree.set_style(el_622, "color", "#24292f");
+            tree.set_style(el_622, "font-size", "10px");
+            tree.set_style(el_622, "align", "center");
+            tree.set_style(el_622, "justify", "center");
+            tree.set_style(el_622, "cursor", "pointer");
             // on:click -> set_state_0 (cb_idx=54)
-            tree.add_event(el_662, "click", 54);
-            if let Some(el) = tree.get_mut(el_662) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_662) { el.text = Some("Released".into()); }
-            let el_663 = tree.create("div");
-            tree.append_child(el_661, el_663);
-            tree.set_style(el_663, "height", "18px");
-            tree.set_style(el_663, "padding", "0 7");
-            tree.set_style(el_663, "background-color", "#f6f8fa");
-            tree.set_style(el_663, "border", "1px solid #d0d7de");
-            tree.set_style(el_663, "border-radius", "4");
-            tree.set_style(el_663, "color", "#24292f");
-            tree.set_style(el_663, "font-size", "10px");
-            tree.set_style(el_663, "align", "center");
-            tree.set_style(el_663, "justify", "center");
-            tree.set_style(el_663, "cursor", "pointer");
+            tree.add_event(el_622, "click", 54);
+            if let Some(el) = tree.get_mut(el_622) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_622) { el.text = Some("Released".into()); }
+            let el_623 = tree.create("div");
+            tree.append_child(el_621, el_623);
+            tree.set_style(el_623, "height", "18px");
+            tree.set_style(el_623, "padding", "0 7");
+            tree.set_style(el_623, "background-color", "#f6f8fa");
+            tree.set_style(el_623, "border", "1px solid #d0d7de");
+            tree.set_style(el_623, "border-radius", "4");
+            tree.set_style(el_623, "color", "#24292f");
+            tree.set_style(el_623, "font-size", "10px");
+            tree.set_style(el_623, "align", "center");
+            tree.set_style(el_623, "justify", "center");
+            tree.set_style(el_623, "cursor", "pointer");
             // on:click -> set_state_1 (cb_idx=55)
-            tree.add_event(el_663, "click", 55);
-            if let Some(el) = tree.get_mut(el_663) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_663) { el.text = Some("In Work".into()); }
-            let el_664 = tree.create("div");
-            tree.append_child(el_661, el_664);
-            tree.set_style(el_664, "height", "18px");
-            tree.set_style(el_664, "padding", "0 7");
-            tree.set_style(el_664, "background-color", "#f6f8fa");
-            tree.set_style(el_664, "border", "1px solid #d0d7de");
-            tree.set_style(el_664, "border-radius", "4");
-            tree.set_style(el_664, "color", "#24292f");
-            tree.set_style(el_664, "font-size", "10px");
-            tree.set_style(el_664, "align", "center");
-            tree.set_style(el_664, "justify", "center");
-            tree.set_style(el_664, "cursor", "pointer");
+            tree.add_event(el_623, "click", 55);
+            if let Some(el) = tree.get_mut(el_623) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_623) { el.text = Some("In Work".into()); }
+            let el_624 = tree.create("div");
+            tree.append_child(el_621, el_624);
+            tree.set_style(el_624, "height", "18px");
+            tree.set_style(el_624, "padding", "0 7");
+            tree.set_style(el_624, "background-color", "#f6f8fa");
+            tree.set_style(el_624, "border", "1px solid #d0d7de");
+            tree.set_style(el_624, "border-radius", "4");
+            tree.set_style(el_624, "color", "#24292f");
+            tree.set_style(el_624, "font-size", "10px");
+            tree.set_style(el_624, "align", "center");
+            tree.set_style(el_624, "justify", "center");
+            tree.set_style(el_624, "cursor", "pointer");
             // on:click -> set_state_2 (cb_idx=56)
-            tree.add_event(el_664, "click", 56);
-            if let Some(el) = tree.get_mut(el_664) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_664) { el.text = Some("Under Review".into()); }
-            let el_665 = tree.create("div");
-            tree.append_child(el_661, el_665);
-            tree.set_style(el_665, "height", "18px");
-            tree.set_style(el_665, "padding", "0 7");
-            tree.set_style(el_665, "background-color", "#f6f8fa");
-            tree.set_style(el_665, "border", "1px solid #d0d7de");
-            tree.set_style(el_665, "border-radius", "4");
-            tree.set_style(el_665, "color", "#24292f");
-            tree.set_style(el_665, "font-size", "10px");
-            tree.set_style(el_665, "align", "center");
-            tree.set_style(el_665, "justify", "center");
-            tree.set_style(el_665, "cursor", "pointer");
+            tree.add_event(el_624, "click", 56);
+            if let Some(el) = tree.get_mut(el_624) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_624) { el.text = Some("Under Review".into()); }
+            let el_625 = tree.create("div");
+            tree.append_child(el_621, el_625);
+            tree.set_style(el_625, "height", "18px");
+            tree.set_style(el_625, "padding", "0 7");
+            tree.set_style(el_625, "background-color", "#f6f8fa");
+            tree.set_style(el_625, "border", "1px solid #d0d7de");
+            tree.set_style(el_625, "border-radius", "4");
+            tree.set_style(el_625, "color", "#24292f");
+            tree.set_style(el_625, "font-size", "10px");
+            tree.set_style(el_625, "align", "center");
+            tree.set_style(el_625, "justify", "center");
+            tree.set_style(el_625, "cursor", "pointer");
             // on:click -> set_state_3 (cb_idx=57)
-            tree.add_event(el_665, "click", 57);
-            if let Some(el) = tree.get_mut(el_665) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_665) { el.text = Some("Obsolete".into()); }
-            let el_666 = tree.create("div");
-            tree.append_child(el_609, el_666);
-            tree.set_style(el_666, "direction", "horizontal");
-            tree.set_style(el_666, "height", "18px");
-            tree.set_style(el_666, "align", "center");
-            let el_667 = tree.create("div");
-            tree.append_child(el_666, el_667);
-            tree.set_style(el_667, "width", "150px");
-            tree.set_style(el_667, "font-size", "12px");
-            tree.set_style(el_667, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_667) { el.text = Some("Quantity (this usage)".into()); }
-            let el_668 = tree.create("div");
-            tree.append_child(el_666, el_668);
-            tree.set_style(el_668, "direction", "horizontal");
-            tree.set_style(el_668, "gap", "6");
-            tree.set_style(el_668, "align", "center");
-            let el_669 = tree.create("div");
-            tree.append_child(el_668, el_669);
-            tree.set_style(el_669, "width", "18px");
-            tree.set_style(el_669, "height", "18px");
-            tree.set_style(el_669, "background-color", "#f6f8fa");
-            tree.set_style(el_669, "border", "1px solid #d0d7de");
-            tree.set_style(el_669, "border-radius", "4");
-            tree.set_style(el_669, "color", "#24292f");
-            tree.set_style(el_669, "font-size", "12px");
-            tree.set_style(el_669, "align", "center");
-            tree.set_style(el_669, "justify", "center");
-            tree.set_style(el_669, "cursor", "pointer");
+            tree.add_event(el_625, "click", 57);
+            if let Some(el) = tree.get_mut(el_625) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_625) { el.text = Some("Obsolete".into()); }
+            let el_626 = tree.create("div");
+            tree.append_child(el_569, el_626);
+            tree.set_style(el_626, "direction", "horizontal");
+            tree.set_style(el_626, "height", "18px");
+            tree.set_style(el_626, "align", "center");
+            let el_627 = tree.create("div");
+            tree.append_child(el_626, el_627);
+            tree.set_style(el_627, "width", "150px");
+            tree.set_style(el_627, "font-size", "12px");
+            tree.set_style(el_627, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_627) { el.text = Some("Quantity (this usage)".into()); }
+            let el_628 = tree.create("div");
+            tree.append_child(el_626, el_628);
+            tree.set_style(el_628, "direction", "horizontal");
+            tree.set_style(el_628, "gap", "6");
+            tree.set_style(el_628, "align", "center");
+            let el_629 = tree.create("div");
+            tree.append_child(el_628, el_629);
+            tree.set_style(el_629, "width", "18px");
+            tree.set_style(el_629, "height", "18px");
+            tree.set_style(el_629, "background-color", "#f6f8fa");
+            tree.set_style(el_629, "border", "1px solid #d0d7de");
+            tree.set_style(el_629, "border-radius", "4");
+            tree.set_style(el_629, "color", "#24292f");
+            tree.set_style(el_629, "font-size", "12px");
+            tree.set_style(el_629, "align", "center");
+            tree.set_style(el_629, "justify", "center");
+            tree.set_style(el_629, "cursor", "pointer");
             // on:click -> qty_dec (cb_idx=59)
-            tree.add_event(el_669, "click", 59);
-            if let Some(el) = tree.get_mut(el_669) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_669) { el.text = Some("−".into()); }
-            let el_670 = tree.create("div");
-            tree.append_child(el_668, el_670);
-            tree.set_style(el_670, "width", "26px");
-            tree.set_style(el_670, "font-size", "12px");
-            tree.set_style(el_670, "color", "#1f2328");
-            tree.set_style(el_670, "align", "center");
-            tree.set_style(el_670, "justify", "center");
-            if let Some(el) = tree.get_mut(el_670) { el.text = Some(format!("{}", qty[selected_id as usize]).to_string()); }
-            let el_671 = tree.create("div");
-            tree.append_child(el_668, el_671);
-            tree.set_style(el_671, "width", "18px");
-            tree.set_style(el_671, "height", "18px");
-            tree.set_style(el_671, "background-color", "#f6f8fa");
-            tree.set_style(el_671, "border", "1px solid #d0d7de");
-            tree.set_style(el_671, "border-radius", "4");
-            tree.set_style(el_671, "color", "#24292f");
-            tree.set_style(el_671, "font-size", "12px");
-            tree.set_style(el_671, "align", "center");
-            tree.set_style(el_671, "justify", "center");
-            tree.set_style(el_671, "cursor", "pointer");
+            tree.add_event(el_629, "click", 59);
+            if let Some(el) = tree.get_mut(el_629) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_629) { el.text = Some("−".into()); }
+            let el_630 = tree.create("div");
+            tree.append_child(el_628, el_630);
+            tree.set_style(el_630, "width", "26px");
+            tree.set_style(el_630, "font-size", "12px");
+            tree.set_style(el_630, "color", "#1f2328");
+            tree.set_style(el_630, "align", "center");
+            tree.set_style(el_630, "justify", "center");
+            if let Some(el) = tree.get_mut(el_630) { el.text = Some(format!("{}", qty[selected_id as usize]).to_string()); }
+            let el_631 = tree.create("div");
+            tree.append_child(el_628, el_631);
+            tree.set_style(el_631, "width", "18px");
+            tree.set_style(el_631, "height", "18px");
+            tree.set_style(el_631, "background-color", "#f6f8fa");
+            tree.set_style(el_631, "border", "1px solid #d0d7de");
+            tree.set_style(el_631, "border-radius", "4");
+            tree.set_style(el_631, "color", "#24292f");
+            tree.set_style(el_631, "font-size", "12px");
+            tree.set_style(el_631, "align", "center");
+            tree.set_style(el_631, "justify", "center");
+            tree.set_style(el_631, "cursor", "pointer");
             // on:click -> qty_inc (cb_idx=58)
-            tree.add_event(el_671, "click", 58);
-            if let Some(el) = tree.get_mut(el_671) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_671) { el.text = Some("+".into()); }
-            let el_672 = tree.create("div");
-            tree.append_child(el_668, el_672);
-            tree.set_style(el_672, "font-size", "11px");
-            tree.set_style(el_672, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_672) { el.text = Some("each · POSTs to /api/part/update".into()); }
-            let el_673 = tree.create("div");
-            tree.append_child(el_609, el_673);
-            tree.set_style(el_673, "height", "6px");
-            let el_674 = tree.create("div");
-            tree.append_child(el_609, el_674);
-            tree.set_style(el_674, "direction", "horizontal");
-            tree.set_style(el_674, "gap", "10");
-            tree.set_style(el_674, "align", "center");
-            tree.set_style(el_674, "height", "24px");
-            let el_675 = tree.create("div");
-            tree.append_child(el_674, el_675);
-            tree.set_style(el_675, "width", "100px");
-            tree.set_style(el_675, "font-size", "11px");
-            tree.set_style(el_675, "font-weight", "700");
-            tree.set_style(el_675, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_675) { el.text = Some("VISUALIZATION".into()); }
-            let el_676 = tree.create("div");
-            tree.append_child(el_674, el_676);
-            tree.set_style(el_676, "height", "22px");
-            tree.set_style(el_676, "padding", "0 9");
-            tree.set_style(el_676, "background-color", "#f6f8fa");
-            tree.set_style(el_676, "border", "1px solid #d0d7de");
-            tree.set_style(el_676, "border-radius", "4");
-            tree.set_style(el_676, "color", "#24292f");
-            tree.set_style(el_676, "font-size", "11px");
-            tree.set_style(el_676, "align", "center");
-            tree.set_style(el_676, "justify", "center");
-            tree.set_style(el_676, "cursor", "pointer");
+            tree.add_event(el_631, "click", 58);
+            if let Some(el) = tree.get_mut(el_631) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_631) { el.text = Some("+".into()); }
+            let el_632 = tree.create("div");
+            tree.append_child(el_628, el_632);
+            tree.set_style(el_632, "font-size", "11px");
+            tree.set_style(el_632, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_632) { el.text = Some("each · POSTs to /api/part/update".into()); }
+            let el_633 = tree.create("div");
+            tree.append_child(el_569, el_633);
+            tree.set_style(el_633, "height", "6px");
+            let el_634 = tree.create("div");
+            tree.append_child(el_569, el_634);
+            tree.set_style(el_634, "direction", "horizontal");
+            tree.set_style(el_634, "gap", "10");
+            tree.set_style(el_634, "align", "center");
+            tree.set_style(el_634, "height", "24px");
+            let el_635 = tree.create("div");
+            tree.append_child(el_634, el_635);
+            tree.set_style(el_635, "width", "100px");
+            tree.set_style(el_635, "font-size", "11px");
+            tree.set_style(el_635, "font-weight", "700");
+            tree.set_style(el_635, "color", "#57606a");
+            if let Some(el) = tree.get_mut(el_635) { el.text = Some("VISUALIZATION".into()); }
+            let el_636 = tree.create("div");
+            tree.append_child(el_634, el_636);
+            tree.set_style(el_636, "height", "22px");
+            tree.set_style(el_636, "padding", "0 9");
+            tree.set_style(el_636, "background-color", "#f6f8fa");
+            tree.set_style(el_636, "border", "1px solid #d0d7de");
+            tree.set_style(el_636, "border-radius", "4");
+            tree.set_style(el_636, "color", "#24292f");
+            tree.set_style(el_636, "font-size", "11px");
+            tree.set_style(el_636, "align", "center");
+            tree.set_style(el_636, "justify", "center");
+            tree.set_style(el_636, "cursor", "pointer");
             // on:click -> view_iso (cb_idx=63)
-            tree.add_event(el_676, "click", 63);
-            if let Some(el) = tree.get_mut(el_676) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_676) { el.text = Some("Iso".into()); }
-            let el_677 = tree.create("div");
-            tree.append_child(el_674, el_677);
-            tree.set_style(el_677, "height", "22px");
-            tree.set_style(el_677, "padding", "0 9");
-            tree.set_style(el_677, "background-color", "#f6f8fa");
-            tree.set_style(el_677, "border", "1px solid #d0d7de");
-            tree.set_style(el_677, "border-radius", "4");
-            tree.set_style(el_677, "color", "#24292f");
-            tree.set_style(el_677, "font-size", "11px");
-            tree.set_style(el_677, "align", "center");
-            tree.set_style(el_677, "justify", "center");
-            tree.set_style(el_677, "cursor", "pointer");
+            tree.add_event(el_636, "click", 63);
+            if let Some(el) = tree.get_mut(el_636) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_636) { el.text = Some("Iso".into()); }
+            let el_637 = tree.create("div");
+            tree.append_child(el_634, el_637);
+            tree.set_style(el_637, "height", "22px");
+            tree.set_style(el_637, "padding", "0 9");
+            tree.set_style(el_637, "background-color", "#f6f8fa");
+            tree.set_style(el_637, "border", "1px solid #d0d7de");
+            tree.set_style(el_637, "border-radius", "4");
+            tree.set_style(el_637, "color", "#24292f");
+            tree.set_style(el_637, "font-size", "11px");
+            tree.set_style(el_637, "align", "center");
+            tree.set_style(el_637, "justify", "center");
+            tree.set_style(el_637, "cursor", "pointer");
             // on:click -> view_front (cb_idx=64)
-            tree.add_event(el_677, "click", 64);
-            if let Some(el) = tree.get_mut(el_677) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_677) { el.text = Some("Front".into()); }
-            let el_678 = tree.create("div");
-            tree.append_child(el_674, el_678);
-            tree.set_style(el_678, "height", "22px");
-            tree.set_style(el_678, "padding", "0 9");
-            tree.set_style(el_678, "background-color", "#f6f8fa");
-            tree.set_style(el_678, "border", "1px solid #d0d7de");
-            tree.set_style(el_678, "border-radius", "4");
-            tree.set_style(el_678, "color", "#24292f");
-            tree.set_style(el_678, "font-size", "11px");
-            tree.set_style(el_678, "align", "center");
-            tree.set_style(el_678, "justify", "center");
-            tree.set_style(el_678, "cursor", "pointer");
+            tree.add_event(el_637, "click", 64);
+            if let Some(el) = tree.get_mut(el_637) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_637) { el.text = Some("Front".into()); }
+            let el_638 = tree.create("div");
+            tree.append_child(el_634, el_638);
+            tree.set_style(el_638, "height", "22px");
+            tree.set_style(el_638, "padding", "0 9");
+            tree.set_style(el_638, "background-color", "#f6f8fa");
+            tree.set_style(el_638, "border", "1px solid #d0d7de");
+            tree.set_style(el_638, "border-radius", "4");
+            tree.set_style(el_638, "color", "#24292f");
+            tree.set_style(el_638, "font-size", "11px");
+            tree.set_style(el_638, "align", "center");
+            tree.set_style(el_638, "justify", "center");
+            tree.set_style(el_638, "cursor", "pointer");
             // on:click -> view_top (cb_idx=65)
-            tree.add_event(el_678, "click", 65);
-            if let Some(el) = tree.get_mut(el_678) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_678) { el.text = Some("Top".into()); }
-            let el_679 = tree.create("div");
-            tree.append_child(el_674, el_679);
-            tree.set_style(el_679, "height", "22px");
-            tree.set_style(el_679, "padding", "0 9");
-            tree.set_style(el_679, "background-color", "#f6f8fa");
-            tree.set_style(el_679, "border", "1px solid #d0d7de");
-            tree.set_style(el_679, "border-radius", "4");
-            tree.set_style(el_679, "color", "#24292f");
-            tree.set_style(el_679, "font-size", "11px");
-            tree.set_style(el_679, "align", "center");
-            tree.set_style(el_679, "justify", "center");
-            tree.set_style(el_679, "cursor", "pointer");
+            tree.add_event(el_638, "click", 65);
+            if let Some(el) = tree.get_mut(el_638) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_638) { el.text = Some("Top".into()); }
+            let el_639 = tree.create("div");
+            tree.append_child(el_634, el_639);
+            tree.set_style(el_639, "height", "22px");
+            tree.set_style(el_639, "padding", "0 9");
+            tree.set_style(el_639, "background-color", "#f6f8fa");
+            tree.set_style(el_639, "border", "1px solid #d0d7de");
+            tree.set_style(el_639, "border-radius", "4");
+            tree.set_style(el_639, "color", "#24292f");
+            tree.set_style(el_639, "font-size", "11px");
+            tree.set_style(el_639, "align", "center");
+            tree.set_style(el_639, "justify", "center");
+            tree.set_style(el_639, "cursor", "pointer");
             // on:click -> rot_left (cb_idx=66)
-            tree.add_event(el_679, "click", 66);
-            if let Some(el) = tree.get_mut(el_679) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_679) { el.text = Some("⟲".into()); }
-            let el_680 = tree.create("div");
-            tree.append_child(el_674, el_680);
-            tree.set_style(el_680, "height", "22px");
-            tree.set_style(el_680, "padding", "0 9");
-            tree.set_style(el_680, "background-color", "#f6f8fa");
-            tree.set_style(el_680, "border", "1px solid #d0d7de");
-            tree.set_style(el_680, "border-radius", "4");
-            tree.set_style(el_680, "color", "#24292f");
-            tree.set_style(el_680, "font-size", "11px");
-            tree.set_style(el_680, "align", "center");
-            tree.set_style(el_680, "justify", "center");
-            tree.set_style(el_680, "cursor", "pointer");
+            tree.add_event(el_639, "click", 66);
+            if let Some(el) = tree.get_mut(el_639) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_639) { el.text = Some("⟲".into()); }
+            let el_640 = tree.create("div");
+            tree.append_child(el_634, el_640);
+            tree.set_style(el_640, "height", "22px");
+            tree.set_style(el_640, "padding", "0 9");
+            tree.set_style(el_640, "background-color", "#f6f8fa");
+            tree.set_style(el_640, "border", "1px solid #d0d7de");
+            tree.set_style(el_640, "border-radius", "4");
+            tree.set_style(el_640, "color", "#24292f");
+            tree.set_style(el_640, "font-size", "11px");
+            tree.set_style(el_640, "align", "center");
+            tree.set_style(el_640, "justify", "center");
+            tree.set_style(el_640, "cursor", "pointer");
             // on:click -> rot_right (cb_idx=67)
-            tree.add_event(el_680, "click", 67);
-            if let Some(el) = tree.get_mut(el_680) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_680) { el.text = Some("⟳".into()); }
-            let el_681 = tree.create("div");
-            tree.append_child(el_674, el_681);
-            tree.set_style(el_681, "height", "22px");
-            tree.set_style(el_681, "padding", "0 9");
-            tree.set_style(el_681, "background-color", "#f6f8fa");
-            tree.set_style(el_681, "border", "1px solid #d0d7de");
-            tree.set_style(el_681, "border-radius", "4");
-            tree.set_style(el_681, "color", "#24292f");
-            tree.set_style(el_681, "font-size", "11px");
-            tree.set_style(el_681, "align", "center");
-            tree.set_style(el_681, "justify", "center");
-            tree.set_style(el_681, "cursor", "pointer");
+            tree.add_event(el_640, "click", 67);
+            if let Some(el) = tree.get_mut(el_640) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_640) { el.text = Some("⟳".into()); }
+            let el_641 = tree.create("div");
+            tree.append_child(el_634, el_641);
+            tree.set_style(el_641, "height", "22px");
+            tree.set_style(el_641, "padding", "0 9");
+            tree.set_style(el_641, "background-color", "#f6f8fa");
+            tree.set_style(el_641, "border", "1px solid #d0d7de");
+            tree.set_style(el_641, "border-radius", "4");
+            tree.set_style(el_641, "color", "#24292f");
+            tree.set_style(el_641, "font-size", "11px");
+            tree.set_style(el_641, "align", "center");
+            tree.set_style(el_641, "justify", "center");
+            tree.set_style(el_641, "cursor", "pointer");
             // on:click -> zoom_out (cb_idx=68)
-            tree.add_event(el_681, "click", 68);
-            if let Some(el) = tree.get_mut(el_681) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_681) { el.text = Some("−".into()); }
-            let el_682 = tree.create("div");
-            tree.append_child(el_674, el_682);
-            tree.set_style(el_682, "height", "22px");
-            tree.set_style(el_682, "padding", "0 9");
-            tree.set_style(el_682, "background-color", "#f6f8fa");
-            tree.set_style(el_682, "border", "1px solid #d0d7de");
-            tree.set_style(el_682, "border-radius", "4");
-            tree.set_style(el_682, "color", "#24292f");
-            tree.set_style(el_682, "font-size", "11px");
-            tree.set_style(el_682, "align", "center");
-            tree.set_style(el_682, "justify", "center");
-            tree.set_style(el_682, "cursor", "pointer");
+            tree.add_event(el_641, "click", 68);
+            if let Some(el) = tree.get_mut(el_641) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_641) { el.text = Some("−".into()); }
+            let el_642 = tree.create("div");
+            tree.append_child(el_634, el_642);
+            tree.set_style(el_642, "height", "22px");
+            tree.set_style(el_642, "padding", "0 9");
+            tree.set_style(el_642, "background-color", "#f6f8fa");
+            tree.set_style(el_642, "border", "1px solid #d0d7de");
+            tree.set_style(el_642, "border-radius", "4");
+            tree.set_style(el_642, "color", "#24292f");
+            tree.set_style(el_642, "font-size", "11px");
+            tree.set_style(el_642, "align", "center");
+            tree.set_style(el_642, "justify", "center");
+            tree.set_style(el_642, "cursor", "pointer");
             // on:click -> zoom_in (cb_idx=69)
-            tree.add_event(el_682, "click", 69);
-            if let Some(el) = tree.get_mut(el_682) { el.visual.cursor = 1; el.focusable = true; }
-            if let Some(el) = tree.get_mut(el_682) { el.text = Some("+".into()); }
-            let el_683 = tree.create("img");
-            tree.append_child(el_609, el_683);
-            tree.set_attribute(el_683, "src", &format!("/api/part/thumb-{}-v{}-r{}-z{}.svg", selected_id, view_name, view_rot, view_zoom));
-            tree.set_style(el_683, "width", "400px");
-            tree.set_style(el_683, "height", "236px");
-            tree.set_style(el_683, "border", "1px solid #d0d7de");
-            tree.set_style(el_683, "border-radius", "4");
-            let el_684 = tree.create("div");
-            tree.append_child(el_0, el_684);
-            tree.set_style(el_684, "direction", "horizontal");
-            tree.set_style(el_684, "width", "fill");
-            tree.set_style(el_684, "height", "170px");
-            tree.set_style(el_684, "gap", "8");
-            let el_685 = tree.create("div");
-            tree.append_child(el_684, el_685);
-            tree.set_style(el_685, "direction", "vertical");
-            tree.set_style(el_685, "width", "760px");
-            tree.set_style(el_685, "height", "170px");
-            tree.set_style(el_685, "background-color", "#ffffff");
-            tree.set_style(el_685, "border", "1px solid #d0d7de");
-            tree.set_style(el_685, "border-radius", "4");
-            let el_686 = tree.create("div");
-            tree.append_child(el_685, el_686);
-            tree.set_style(el_686, "height", "26px");
-            tree.set_style(el_686, "background-color", "#f6f8fa");
-            tree.set_style(el_686, "border-bottom", "1px solid #d0d7de");
-            tree.set_style(el_686, "padding", "0 10");
-            tree.set_style(el_686, "align", "center");
-            tree.set_style(el_686, "direction", "horizontal");
-            tree.set_style(el_686, "gap", "8");
-            let el_687 = tree.create("div");
-            tree.append_child(el_686, el_687);
-            tree.set_style(el_687, "font-size", "11px");
-            tree.set_style(el_687, "font-weight", "700");
-            tree.set_style(el_687, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_687) { el.text = Some("USES".into()); }
-            let el_688 = tree.create("div");
-            tree.append_child(el_686, el_688);
-            tree.set_style(el_688, "font-size", "11px");
-            tree.set_style(el_688, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_688) { el.text = Some(format!("— direct children of PN-{}", selected_id).to_string()); }
-            honeycomb::canvas_app::register_text_binding(el_688, "selected_id".as_ptr(), 11, "— direct children of PN-{}".as_ptr(), 28);
-            let el_689 = tree.create("div");
-            tree.append_child(el_685, el_689);
-            tree.set_style(el_689, "direction", "horizontal");
-            tree.set_style(el_689, "height", "22px");
-            tree.set_style(el_689, "background-color", "#f9fafb");
-            tree.set_style(el_689, "border-bottom", "1px solid #d0d7de");
-            tree.set_style(el_689, "align", "center");
-            tree.set_style(el_689, "padding-left", "10");
-            let el_690 = tree.create("div");
-            tree.append_child(el_689, el_690);
-            tree.set_style(el_690, "width", "120px");
-            tree.set_style(el_690, "font-size", "10px");
-            tree.set_style(el_690, "font-weight", "700");
-            tree.set_style(el_690, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_690) { el.text = Some("NUMBER".into()); }
-            let el_691 = tree.create("div");
-            tree.append_child(el_689, el_691);
-            tree.set_style(el_691, "width", "220px");
-            tree.set_style(el_691, "font-size", "10px");
-            tree.set_style(el_691, "font-weight", "700");
-            tree.set_style(el_691, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_691) { el.text = Some("NAME".into()); }
-            let el_692 = tree.create("div");
-            tree.append_child(el_689, el_692);
-            tree.set_style(el_692, "width", "110px");
-            tree.set_style(el_692, "font-size", "10px");
-            tree.set_style(el_692, "font-weight", "700");
-            tree.set_style(el_692, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_692) { el.text = Some("VERSION".into()); }
-            let el_693 = tree.create("div");
-            tree.append_child(el_689, el_693);
-            tree.set_style(el_693, "width", "130px");
-            tree.set_style(el_693, "font-size", "10px");
-            tree.set_style(el_693, "font-weight", "700");
-            tree.set_style(el_693, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_693) { el.text = Some("STATE".into()); }
-            let el_694 = tree.create("div");
-            tree.append_child(el_689, el_694);
-            tree.set_style(el_694, "width", "80px");
-            tree.set_style(el_694, "font-size", "10px");
-            tree.set_style(el_694, "font-weight", "700");
-            tree.set_style(el_694, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_694) { el.text = Some("QUANTITY".into()); }
-            let el_695 = tree.create("div");
-            tree.append_child(el_689, el_695);
-            tree.set_style(el_695, "width", "60px");
-            tree.set_style(el_695, "font-size", "10px");
-            tree.set_style(el_695, "font-weight", "700");
-            tree.set_style(el_695, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_695) { el.text = Some("UNIT".into()); }
+            tree.add_event(el_642, "click", 69);
+            if let Some(el) = tree.get_mut(el_642) { el.visual.cursor = 1; el.focusable = true; }
+            if let Some(el) = tree.get_mut(el_642) { el.text = Some("+".into()); }
+            let el_643 = tree.create("img");
+            tree.append_child(el_569, el_643);
+            tree.set_attribute(el_643, "src", &format!("/api/part/thumb-{}-v{}-r{}-z{}.svg", selected_id, view_name, view_rot, view_zoom));
+            tree.set_style(el_643, "width", "400px");
+            tree.set_style(el_643, "height", "236px");
+            tree.set_style(el_643, "border", "1px solid #d0d7de");
+            tree.set_style(el_643, "border-radius", "4");
+            let el_644 = tree.create("div");
+            tree.append_child(el_0, el_644);
+            tree.set_style(el_644, "direction", "horizontal");
+            tree.set_style(el_644, "width", "fill");
+            tree.set_style(el_644, "height", "170px");
+            tree.set_style(el_644, "gap", "8");
+            let el_645 = tree.create("div");
+            tree.append_child(el_644, el_645);
+            tree.set_style(el_645, "direction", "vertical");
+            tree.set_style(el_645, "width", "760px");
+            tree.set_style(el_645, "height", "170px");
+            tree.set_style(el_645, "background-color", "#ffffff");
+            tree.set_style(el_645, "border", "1px solid #d0d7de");
+            tree.set_style(el_645, "border-radius", "4");
+            let el_646 = tree.create("div");
+            tree.append_child(el_645, el_646);
+            tree.set_style(el_646, "height", "26px");
+            tree.set_style(el_646, "background-color", "#f6f8fa");
+            tree.set_style(el_646, "border-bottom", "1px solid #d0d7de");
+            tree.set_style(el_646, "padding", "0 10");
+            tree.set_style(el_646, "align", "center");
+            tree.set_style(el_646, "direction", "horizontal");
+            tree.set_style(el_646, "gap", "8");
+            let el_647 = tree.create("div");
+            tree.append_child(el_646, el_647);
+            tree.set_style(el_647, "font-size", "11px");
+            tree.set_style(el_647, "font-weight", "700");
+            tree.set_style(el_647, "color", "#57606a");
+            if let Some(el) = tree.get_mut(el_647) { el.text = Some("USES".into()); }
+            let el_648 = tree.create("div");
+            tree.append_child(el_646, el_648);
+            tree.set_style(el_648, "font-size", "11px");
+            tree.set_style(el_648, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_648) { el.text = Some(format!("— direct children of PN-{}", selected_id).to_string()); }
+            honeycomb::canvas_app::register_text_binding(el_648, "selected_id".as_ptr(), 11, "— direct children of PN-{}".as_ptr(), 28);
+            let el_649 = tree.create("div");
+            tree.append_child(el_645, el_649);
+            tree.set_style(el_649, "direction", "horizontal");
+            tree.set_style(el_649, "height", "22px");
+            tree.set_style(el_649, "background-color", "#f9fafb");
+            tree.set_style(el_649, "border-bottom", "1px solid #d0d7de");
+            tree.set_style(el_649, "align", "center");
+            tree.set_style(el_649, "padding-left", "10");
+            let el_650 = tree.create("div");
+            tree.append_child(el_649, el_650);
+            tree.set_style(el_650, "width", "120px");
+            tree.set_style(el_650, "font-size", "10px");
+            tree.set_style(el_650, "font-weight", "700");
+            tree.set_style(el_650, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_650) { el.text = Some("NUMBER".into()); }
+            let el_651 = tree.create("div");
+            tree.append_child(el_649, el_651);
+            tree.set_style(el_651, "width", "220px");
+            tree.set_style(el_651, "font-size", "10px");
+            tree.set_style(el_651, "font-weight", "700");
+            tree.set_style(el_651, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_651) { el.text = Some("NAME".into()); }
+            let el_652 = tree.create("div");
+            tree.append_child(el_649, el_652);
+            tree.set_style(el_652, "width", "110px");
+            tree.set_style(el_652, "font-size", "10px");
+            tree.set_style(el_652, "font-weight", "700");
+            tree.set_style(el_652, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_652) { el.text = Some("VERSION".into()); }
+            let el_653 = tree.create("div");
+            tree.append_child(el_649, el_653);
+            tree.set_style(el_653, "width", "130px");
+            tree.set_style(el_653, "font-size", "10px");
+            tree.set_style(el_653, "font-weight", "700");
+            tree.set_style(el_653, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_653) { el.text = Some("STATE".into()); }
+            let el_654 = tree.create("div");
+            tree.append_child(el_649, el_654);
+            tree.set_style(el_654, "width", "80px");
+            tree.set_style(el_654, "font-size", "10px");
+            tree.set_style(el_654, "font-weight", "700");
+            tree.set_style(el_654, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_654) { el.text = Some("QUANTITY".into()); }
+            let el_655 = tree.create("div");
+            tree.append_child(el_649, el_655);
+            tree.set_style(el_655, "width", "60px");
+            tree.set_style(el_655, "font-size", "10px");
+            tree.set_style(el_655, "font-weight", "700");
+            tree.set_style(el_655, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_655) { el.text = Some("UNIT".into()); }
             if (uses_ids.len() as i32 > 0) {
-                let el_696 = tree.create("div");
-                tree.append_child(el_685, el_696);
-                tree.set_style(el_696, "direction", "horizontal");
-                tree.set_style(el_696, "height", "24px");
-                tree.set_style(el_696, "background-color", "#ffffff");
-                tree.set_style(el_696, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_696, "align", "center");
-                tree.set_style(el_696, "padding-left", "10");
-                let el_697 = tree.create("div");
-                tree.append_child(el_696, el_697);
-                tree.set_style(el_697, "width", "120px");
-                tree.set_style(el_697, "font-size", "12px");
-                tree.set_style(el_697, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_697) { el.text = Some(format!("PN-{}", uses_ids[0 as usize]).to_string()); }
-                let el_698 = tree.create("div");
-                tree.append_child(el_696, el_698);
-                tree.set_style(el_698, "width", "220px");
-                tree.set_style(el_698, "font-size", "12px");
-                tree.set_style(el_698, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_698) { el.text = Some(format!("{}", names[uses_ids[0 as usize] as usize]).to_string()); }
-                let el_699 = tree.create("div");
-                tree.append_child(el_696, el_699);
-                tree.set_style(el_699, "width", "110px");
-                tree.set_style(el_699, "font-size", "12px");
-                tree.set_style(el_699, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_699) { el.text = Some("A.1 (Design)".into()); }
-                let el_700 = tree.create("div");
-                tree.append_child(el_696, el_700);
-                tree.set_style(el_700, "width", "130px");
-                tree.set_style(el_700, "direction", "horizontal");
-                tree.set_style(el_700, "gap", "5");
-                tree.set_style(el_700, "align", "center");
-                let el_701 = tree.create("div");
-                tree.append_child(el_700, el_701);
-                tree.set_style(el_701, "width", "9px");
-                tree.set_style(el_701, "height", "24px");
-                tree.set_style(el_701, "align", "center");
-                tree.set_style(el_701, "justify", "center");
+                let el_656 = tree.create("div");
+                tree.append_child(el_645, el_656);
+                tree.set_style(el_656, "direction", "horizontal");
+                tree.set_style(el_656, "height", "24px");
+                tree.set_style(el_656, "background-color", "#ffffff");
+                tree.set_style(el_656, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_656, "align", "center");
+                tree.set_style(el_656, "padding-left", "10");
+                let el_657 = tree.create("div");
+                tree.append_child(el_656, el_657);
+                tree.set_style(el_657, "width", "120px");
+                tree.set_style(el_657, "font-size", "12px");
+                tree.set_style(el_657, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_657) { el.text = Some(format!("PN-{}", uses_ids[0 as usize]).to_string()); }
+                let el_658 = tree.create("div");
+                tree.append_child(el_656, el_658);
+                tree.set_style(el_658, "width", "220px");
+                tree.set_style(el_658, "font-size", "12px");
+                tree.set_style(el_658, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_658) { el.text = Some(format!("{}", names[uses_ids[0 as usize] as usize]).to_string()); }
+                let el_659 = tree.create("div");
+                tree.append_child(el_656, el_659);
+                tree.set_style(el_659, "width", "110px");
+                tree.set_style(el_659, "font-size", "12px");
+                tree.set_style(el_659, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_659) { el.text = Some("A.1 (Design)".into()); }
+                let el_660 = tree.create("div");
+                tree.append_child(el_656, el_660);
+                tree.set_style(el_660, "width", "130px");
+                tree.set_style(el_660, "direction", "horizontal");
+                tree.set_style(el_660, "gap", "5");
+                tree.set_style(el_660, "align", "center");
+                let el_661 = tree.create("div");
+                tree.append_child(el_660, el_661);
+                tree.set_style(el_661, "width", "9px");
+                tree.set_style(el_661, "height", "24px");
+                tree.set_style(el_661, "align", "center");
+                tree.set_style(el_661, "justify", "center");
                 if (eff_state[uses_ids[0 as usize] as usize] == 0) {
-                    let el_702 = tree.create("div");
-                    tree.append_child(el_701, el_702);
-                    tree.set_style(el_702, "width", "7px");
-                    tree.set_style(el_702, "height", "7px");
-                    tree.set_style(el_702, "border-radius", "4");
-                    tree.set_style(el_702, "background-color", "#1a7f37");
+                    let el_662 = tree.create("div");
+                    tree.append_child(el_661, el_662);
+                    tree.set_style(el_662, "width", "7px");
+                    tree.set_style(el_662, "height", "7px");
+                    tree.set_style(el_662, "border-radius", "4");
+                    tree.set_style(el_662, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[0 as usize] as usize] == 1) {
-                        let el_703 = tree.create("div");
-                        tree.append_child(el_701, el_703);
-                        tree.set_style(el_703, "width", "7px");
-                        tree.set_style(el_703, "height", "7px");
-                        tree.set_style(el_703, "border-radius", "4");
-                        tree.set_style(el_703, "background-color", "#0969da");
+                        let el_663 = tree.create("div");
+                        tree.append_child(el_661, el_663);
+                        tree.set_style(el_663, "width", "7px");
+                        tree.set_style(el_663, "height", "7px");
+                        tree.set_style(el_663, "border-radius", "4");
+                        tree.set_style(el_663, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[0 as usize] as usize] == 2) {
-                            let el_704 = tree.create("div");
-                            tree.append_child(el_701, el_704);
-                            tree.set_style(el_704, "width", "7px");
-                            tree.set_style(el_704, "height", "7px");
-                            tree.set_style(el_704, "border-radius", "4");
-                            tree.set_style(el_704, "background-color", "#9a6700");
+                            let el_664 = tree.create("div");
+                            tree.append_child(el_661, el_664);
+                            tree.set_style(el_664, "width", "7px");
+                            tree.set_style(el_664, "height", "7px");
+                            tree.set_style(el_664, "border-radius", "4");
+                            tree.set_style(el_664, "background-color", "#9a6700");
                         } else {
-                            let el_705 = tree.create("div");
-                            tree.append_child(el_701, el_705);
-                            tree.set_style(el_705, "width", "7px");
-                            tree.set_style(el_705, "height", "7px");
-                            tree.set_style(el_705, "border-radius", "4");
-                            tree.set_style(el_705, "background-color", "#6e7781");
+                            let el_665 = tree.create("div");
+                            tree.append_child(el_661, el_665);
+                            tree.set_style(el_665, "width", "7px");
+                            tree.set_style(el_665, "height", "7px");
+                            tree.set_style(el_665, "border-radius", "4");
+                            tree.set_style(el_665, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_706 = tree.create("div");
-                tree.append_child(el_700, el_706);
-                tree.set_style(el_706, "font-size", "12px");
-                tree.set_style(el_706, "color", "#57606a");
+                let el_666 = tree.create("div");
+                tree.append_child(el_660, el_666);
+                tree.set_style(el_666, "font-size", "12px");
+                tree.set_style(el_666, "color", "#57606a");
                 if (eff_state[uses_ids[0 as usize] as usize] == 0) {
-                    let txt_707 = tree.create("#text");
-                    tree.append_child(el_706, txt_707);
-                    if let Some(el) = tree.get_mut(txt_707) { el.text = Some("Released".into()); }
+                    let txt_667 = tree.create("#text");
+                    tree.append_child(el_666, txt_667);
+                    if let Some(el) = tree.get_mut(txt_667) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[0 as usize] as usize] == 1) {
-                        let txt_708 = tree.create("#text");
-                        tree.append_child(el_706, txt_708);
-                        if let Some(el) = tree.get_mut(txt_708) { el.text = Some("In Work".into()); }
+                        let txt_668 = tree.create("#text");
+                        tree.append_child(el_666, txt_668);
+                        if let Some(el) = tree.get_mut(txt_668) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[0 as usize] as usize] == 2) {
-                            let txt_709 = tree.create("#text");
-                            tree.append_child(el_706, txt_709);
-                            if let Some(el) = tree.get_mut(txt_709) { el.text = Some("Under Review".into()); }
+                            let txt_669 = tree.create("#text");
+                            tree.append_child(el_666, txt_669);
+                            if let Some(el) = tree.get_mut(txt_669) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_710 = tree.create("#text");
-                            tree.append_child(el_706, txt_710);
-                            if let Some(el) = tree.get_mut(txt_710) { el.text = Some("Obsolete".into()); }
+                            let txt_670 = tree.create("#text");
+                            tree.append_child(el_666, txt_670);
+                            if let Some(el) = tree.get_mut(txt_670) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_711 = tree.create("div");
-                tree.append_child(el_696, el_711);
-                tree.set_style(el_711, "width", "80px");
-                tree.set_style(el_711, "font-size", "12px");
-                tree.set_style(el_711, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_711) { el.text = Some(format!("{}", qty[uses_ids[0 as usize] as usize]).to_string()); }
-                let el_712 = tree.create("div");
-                tree.append_child(el_696, el_712);
-                tree.set_style(el_712, "width", "60px");
-                tree.set_style(el_712, "font-size", "12px");
-                tree.set_style(el_712, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_712) { el.text = Some("each".into()); }
+                let el_671 = tree.create("div");
+                tree.append_child(el_656, el_671);
+                tree.set_style(el_671, "width", "80px");
+                tree.set_style(el_671, "font-size", "12px");
+                tree.set_style(el_671, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_671) { el.text = Some(format!("{}", qty[uses_ids[0 as usize] as usize]).to_string()); }
+                let el_672 = tree.create("div");
+                tree.append_child(el_656, el_672);
+                tree.set_style(el_672, "width", "60px");
+                tree.set_style(el_672, "font-size", "12px");
+                tree.set_style(el_672, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_672) { el.text = Some("each".into()); }
             }
             if (uses_ids.len() as i32 > 1) {
-                let el_713 = tree.create("div");
-                tree.append_child(el_685, el_713);
-                tree.set_style(el_713, "direction", "horizontal");
-                tree.set_style(el_713, "height", "24px");
-                tree.set_style(el_713, "background-color", "#f9fafb");
-                tree.set_style(el_713, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_713, "align", "center");
-                tree.set_style(el_713, "padding-left", "10");
-                let el_714 = tree.create("div");
-                tree.append_child(el_713, el_714);
-                tree.set_style(el_714, "width", "120px");
-                tree.set_style(el_714, "font-size", "12px");
-                tree.set_style(el_714, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_714) { el.text = Some(format!("PN-{}", uses_ids[1 as usize]).to_string()); }
-                let el_715 = tree.create("div");
-                tree.append_child(el_713, el_715);
-                tree.set_style(el_715, "width", "220px");
-                tree.set_style(el_715, "font-size", "12px");
-                tree.set_style(el_715, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_715) { el.text = Some(format!("{}", names[uses_ids[1 as usize] as usize]).to_string()); }
-                let el_716 = tree.create("div");
-                tree.append_child(el_713, el_716);
-                tree.set_style(el_716, "width", "110px");
-                tree.set_style(el_716, "font-size", "12px");
-                tree.set_style(el_716, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_716) { el.text = Some("A.1 (Design)".into()); }
-                let el_717 = tree.create("div");
-                tree.append_child(el_713, el_717);
-                tree.set_style(el_717, "width", "130px");
-                tree.set_style(el_717, "direction", "horizontal");
-                tree.set_style(el_717, "gap", "5");
-                tree.set_style(el_717, "align", "center");
-                let el_718 = tree.create("div");
-                tree.append_child(el_717, el_718);
-                tree.set_style(el_718, "width", "9px");
-                tree.set_style(el_718, "height", "24px");
-                tree.set_style(el_718, "align", "center");
-                tree.set_style(el_718, "justify", "center");
+                let el_673 = tree.create("div");
+                tree.append_child(el_645, el_673);
+                tree.set_style(el_673, "direction", "horizontal");
+                tree.set_style(el_673, "height", "24px");
+                tree.set_style(el_673, "background-color", "#f9fafb");
+                tree.set_style(el_673, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_673, "align", "center");
+                tree.set_style(el_673, "padding-left", "10");
+                let el_674 = tree.create("div");
+                tree.append_child(el_673, el_674);
+                tree.set_style(el_674, "width", "120px");
+                tree.set_style(el_674, "font-size", "12px");
+                tree.set_style(el_674, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_674) { el.text = Some(format!("PN-{}", uses_ids[1 as usize]).to_string()); }
+                let el_675 = tree.create("div");
+                tree.append_child(el_673, el_675);
+                tree.set_style(el_675, "width", "220px");
+                tree.set_style(el_675, "font-size", "12px");
+                tree.set_style(el_675, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_675) { el.text = Some(format!("{}", names[uses_ids[1 as usize] as usize]).to_string()); }
+                let el_676 = tree.create("div");
+                tree.append_child(el_673, el_676);
+                tree.set_style(el_676, "width", "110px");
+                tree.set_style(el_676, "font-size", "12px");
+                tree.set_style(el_676, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_676) { el.text = Some("A.1 (Design)".into()); }
+                let el_677 = tree.create("div");
+                tree.append_child(el_673, el_677);
+                tree.set_style(el_677, "width", "130px");
+                tree.set_style(el_677, "direction", "horizontal");
+                tree.set_style(el_677, "gap", "5");
+                tree.set_style(el_677, "align", "center");
+                let el_678 = tree.create("div");
+                tree.append_child(el_677, el_678);
+                tree.set_style(el_678, "width", "9px");
+                tree.set_style(el_678, "height", "24px");
+                tree.set_style(el_678, "align", "center");
+                tree.set_style(el_678, "justify", "center");
                 if (eff_state[uses_ids[1 as usize] as usize] == 0) {
-                    let el_719 = tree.create("div");
-                    tree.append_child(el_718, el_719);
-                    tree.set_style(el_719, "width", "7px");
-                    tree.set_style(el_719, "height", "7px");
-                    tree.set_style(el_719, "border-radius", "4");
-                    tree.set_style(el_719, "background-color", "#1a7f37");
+                    let el_679 = tree.create("div");
+                    tree.append_child(el_678, el_679);
+                    tree.set_style(el_679, "width", "7px");
+                    tree.set_style(el_679, "height", "7px");
+                    tree.set_style(el_679, "border-radius", "4");
+                    tree.set_style(el_679, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[1 as usize] as usize] == 1) {
-                        let el_720 = tree.create("div");
-                        tree.append_child(el_718, el_720);
-                        tree.set_style(el_720, "width", "7px");
-                        tree.set_style(el_720, "height", "7px");
-                        tree.set_style(el_720, "border-radius", "4");
-                        tree.set_style(el_720, "background-color", "#0969da");
+                        let el_680 = tree.create("div");
+                        tree.append_child(el_678, el_680);
+                        tree.set_style(el_680, "width", "7px");
+                        tree.set_style(el_680, "height", "7px");
+                        tree.set_style(el_680, "border-radius", "4");
+                        tree.set_style(el_680, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[1 as usize] as usize] == 2) {
-                            let el_721 = tree.create("div");
-                            tree.append_child(el_718, el_721);
-                            tree.set_style(el_721, "width", "7px");
-                            tree.set_style(el_721, "height", "7px");
-                            tree.set_style(el_721, "border-radius", "4");
-                            tree.set_style(el_721, "background-color", "#9a6700");
+                            let el_681 = tree.create("div");
+                            tree.append_child(el_678, el_681);
+                            tree.set_style(el_681, "width", "7px");
+                            tree.set_style(el_681, "height", "7px");
+                            tree.set_style(el_681, "border-radius", "4");
+                            tree.set_style(el_681, "background-color", "#9a6700");
                         } else {
-                            let el_722 = tree.create("div");
-                            tree.append_child(el_718, el_722);
-                            tree.set_style(el_722, "width", "7px");
-                            tree.set_style(el_722, "height", "7px");
-                            tree.set_style(el_722, "border-radius", "4");
-                            tree.set_style(el_722, "background-color", "#6e7781");
+                            let el_682 = tree.create("div");
+                            tree.append_child(el_678, el_682);
+                            tree.set_style(el_682, "width", "7px");
+                            tree.set_style(el_682, "height", "7px");
+                            tree.set_style(el_682, "border-radius", "4");
+                            tree.set_style(el_682, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_723 = tree.create("div");
-                tree.append_child(el_717, el_723);
-                tree.set_style(el_723, "font-size", "12px");
-                tree.set_style(el_723, "color", "#57606a");
+                let el_683 = tree.create("div");
+                tree.append_child(el_677, el_683);
+                tree.set_style(el_683, "font-size", "12px");
+                tree.set_style(el_683, "color", "#57606a");
                 if (eff_state[uses_ids[1 as usize] as usize] == 0) {
-                    let txt_724 = tree.create("#text");
-                    tree.append_child(el_723, txt_724);
-                    if let Some(el) = tree.get_mut(txt_724) { el.text = Some("Released".into()); }
+                    let txt_684 = tree.create("#text");
+                    tree.append_child(el_683, txt_684);
+                    if let Some(el) = tree.get_mut(txt_684) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[1 as usize] as usize] == 1) {
-                        let txt_725 = tree.create("#text");
-                        tree.append_child(el_723, txt_725);
-                        if let Some(el) = tree.get_mut(txt_725) { el.text = Some("In Work".into()); }
+                        let txt_685 = tree.create("#text");
+                        tree.append_child(el_683, txt_685);
+                        if let Some(el) = tree.get_mut(txt_685) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[1 as usize] as usize] == 2) {
-                            let txt_726 = tree.create("#text");
-                            tree.append_child(el_723, txt_726);
-                            if let Some(el) = tree.get_mut(txt_726) { el.text = Some("Under Review".into()); }
+                            let txt_686 = tree.create("#text");
+                            tree.append_child(el_683, txt_686);
+                            if let Some(el) = tree.get_mut(txt_686) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_727 = tree.create("#text");
-                            tree.append_child(el_723, txt_727);
-                            if let Some(el) = tree.get_mut(txt_727) { el.text = Some("Obsolete".into()); }
+                            let txt_687 = tree.create("#text");
+                            tree.append_child(el_683, txt_687);
+                            if let Some(el) = tree.get_mut(txt_687) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_728 = tree.create("div");
-                tree.append_child(el_713, el_728);
-                tree.set_style(el_728, "width", "80px");
-                tree.set_style(el_728, "font-size", "12px");
-                tree.set_style(el_728, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_728) { el.text = Some(format!("{}", qty[uses_ids[1 as usize] as usize]).to_string()); }
-                let el_729 = tree.create("div");
-                tree.append_child(el_713, el_729);
-                tree.set_style(el_729, "width", "60px");
-                tree.set_style(el_729, "font-size", "12px");
-                tree.set_style(el_729, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_729) { el.text = Some("each".into()); }
+                let el_688 = tree.create("div");
+                tree.append_child(el_673, el_688);
+                tree.set_style(el_688, "width", "80px");
+                tree.set_style(el_688, "font-size", "12px");
+                tree.set_style(el_688, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_688) { el.text = Some(format!("{}", qty[uses_ids[1 as usize] as usize]).to_string()); }
+                let el_689 = tree.create("div");
+                tree.append_child(el_673, el_689);
+                tree.set_style(el_689, "width", "60px");
+                tree.set_style(el_689, "font-size", "12px");
+                tree.set_style(el_689, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_689) { el.text = Some("each".into()); }
             }
             if (uses_ids.len() as i32 > 2) {
-                let el_730 = tree.create("div");
-                tree.append_child(el_685, el_730);
-                tree.set_style(el_730, "direction", "horizontal");
-                tree.set_style(el_730, "height", "24px");
-                tree.set_style(el_730, "background-color", "#ffffff");
-                tree.set_style(el_730, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_730, "align", "center");
-                tree.set_style(el_730, "padding-left", "10");
-                let el_731 = tree.create("div");
-                tree.append_child(el_730, el_731);
-                tree.set_style(el_731, "width", "120px");
-                tree.set_style(el_731, "font-size", "12px");
-                tree.set_style(el_731, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_731) { el.text = Some(format!("PN-{}", uses_ids[2 as usize]).to_string()); }
-                let el_732 = tree.create("div");
-                tree.append_child(el_730, el_732);
-                tree.set_style(el_732, "width", "220px");
-                tree.set_style(el_732, "font-size", "12px");
-                tree.set_style(el_732, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_732) { el.text = Some(format!("{}", names[uses_ids[2 as usize] as usize]).to_string()); }
-                let el_733 = tree.create("div");
-                tree.append_child(el_730, el_733);
-                tree.set_style(el_733, "width", "110px");
-                tree.set_style(el_733, "font-size", "12px");
-                tree.set_style(el_733, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_733) { el.text = Some("A.1 (Design)".into()); }
-                let el_734 = tree.create("div");
-                tree.append_child(el_730, el_734);
-                tree.set_style(el_734, "width", "130px");
-                tree.set_style(el_734, "direction", "horizontal");
-                tree.set_style(el_734, "gap", "5");
-                tree.set_style(el_734, "align", "center");
-                let el_735 = tree.create("div");
-                tree.append_child(el_734, el_735);
-                tree.set_style(el_735, "width", "9px");
-                tree.set_style(el_735, "height", "24px");
-                tree.set_style(el_735, "align", "center");
-                tree.set_style(el_735, "justify", "center");
+                let el_690 = tree.create("div");
+                tree.append_child(el_645, el_690);
+                tree.set_style(el_690, "direction", "horizontal");
+                tree.set_style(el_690, "height", "24px");
+                tree.set_style(el_690, "background-color", "#ffffff");
+                tree.set_style(el_690, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_690, "align", "center");
+                tree.set_style(el_690, "padding-left", "10");
+                let el_691 = tree.create("div");
+                tree.append_child(el_690, el_691);
+                tree.set_style(el_691, "width", "120px");
+                tree.set_style(el_691, "font-size", "12px");
+                tree.set_style(el_691, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_691) { el.text = Some(format!("PN-{}", uses_ids[2 as usize]).to_string()); }
+                let el_692 = tree.create("div");
+                tree.append_child(el_690, el_692);
+                tree.set_style(el_692, "width", "220px");
+                tree.set_style(el_692, "font-size", "12px");
+                tree.set_style(el_692, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_692) { el.text = Some(format!("{}", names[uses_ids[2 as usize] as usize]).to_string()); }
+                let el_693 = tree.create("div");
+                tree.append_child(el_690, el_693);
+                tree.set_style(el_693, "width", "110px");
+                tree.set_style(el_693, "font-size", "12px");
+                tree.set_style(el_693, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_693) { el.text = Some("A.1 (Design)".into()); }
+                let el_694 = tree.create("div");
+                tree.append_child(el_690, el_694);
+                tree.set_style(el_694, "width", "130px");
+                tree.set_style(el_694, "direction", "horizontal");
+                tree.set_style(el_694, "gap", "5");
+                tree.set_style(el_694, "align", "center");
+                let el_695 = tree.create("div");
+                tree.append_child(el_694, el_695);
+                tree.set_style(el_695, "width", "9px");
+                tree.set_style(el_695, "height", "24px");
+                tree.set_style(el_695, "align", "center");
+                tree.set_style(el_695, "justify", "center");
                 if (eff_state[uses_ids[2 as usize] as usize] == 0) {
-                    let el_736 = tree.create("div");
-                    tree.append_child(el_735, el_736);
-                    tree.set_style(el_736, "width", "7px");
-                    tree.set_style(el_736, "height", "7px");
-                    tree.set_style(el_736, "border-radius", "4");
-                    tree.set_style(el_736, "background-color", "#1a7f37");
+                    let el_696 = tree.create("div");
+                    tree.append_child(el_695, el_696);
+                    tree.set_style(el_696, "width", "7px");
+                    tree.set_style(el_696, "height", "7px");
+                    tree.set_style(el_696, "border-radius", "4");
+                    tree.set_style(el_696, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[2 as usize] as usize] == 1) {
-                        let el_737 = tree.create("div");
-                        tree.append_child(el_735, el_737);
-                        tree.set_style(el_737, "width", "7px");
-                        tree.set_style(el_737, "height", "7px");
-                        tree.set_style(el_737, "border-radius", "4");
-                        tree.set_style(el_737, "background-color", "#0969da");
+                        let el_697 = tree.create("div");
+                        tree.append_child(el_695, el_697);
+                        tree.set_style(el_697, "width", "7px");
+                        tree.set_style(el_697, "height", "7px");
+                        tree.set_style(el_697, "border-radius", "4");
+                        tree.set_style(el_697, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[2 as usize] as usize] == 2) {
-                            let el_738 = tree.create("div");
-                            tree.append_child(el_735, el_738);
-                            tree.set_style(el_738, "width", "7px");
-                            tree.set_style(el_738, "height", "7px");
-                            tree.set_style(el_738, "border-radius", "4");
-                            tree.set_style(el_738, "background-color", "#9a6700");
+                            let el_698 = tree.create("div");
+                            tree.append_child(el_695, el_698);
+                            tree.set_style(el_698, "width", "7px");
+                            tree.set_style(el_698, "height", "7px");
+                            tree.set_style(el_698, "border-radius", "4");
+                            tree.set_style(el_698, "background-color", "#9a6700");
                         } else {
-                            let el_739 = tree.create("div");
-                            tree.append_child(el_735, el_739);
-                            tree.set_style(el_739, "width", "7px");
-                            tree.set_style(el_739, "height", "7px");
-                            tree.set_style(el_739, "border-radius", "4");
-                            tree.set_style(el_739, "background-color", "#6e7781");
+                            let el_699 = tree.create("div");
+                            tree.append_child(el_695, el_699);
+                            tree.set_style(el_699, "width", "7px");
+                            tree.set_style(el_699, "height", "7px");
+                            tree.set_style(el_699, "border-radius", "4");
+                            tree.set_style(el_699, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_740 = tree.create("div");
-                tree.append_child(el_734, el_740);
-                tree.set_style(el_740, "font-size", "12px");
-                tree.set_style(el_740, "color", "#57606a");
+                let el_700 = tree.create("div");
+                tree.append_child(el_694, el_700);
+                tree.set_style(el_700, "font-size", "12px");
+                tree.set_style(el_700, "color", "#57606a");
                 if (eff_state[uses_ids[2 as usize] as usize] == 0) {
-                    let txt_741 = tree.create("#text");
-                    tree.append_child(el_740, txt_741);
-                    if let Some(el) = tree.get_mut(txt_741) { el.text = Some("Released".into()); }
+                    let txt_701 = tree.create("#text");
+                    tree.append_child(el_700, txt_701);
+                    if let Some(el) = tree.get_mut(txt_701) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[2 as usize] as usize] == 1) {
-                        let txt_742 = tree.create("#text");
-                        tree.append_child(el_740, txt_742);
-                        if let Some(el) = tree.get_mut(txt_742) { el.text = Some("In Work".into()); }
+                        let txt_702 = tree.create("#text");
+                        tree.append_child(el_700, txt_702);
+                        if let Some(el) = tree.get_mut(txt_702) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[2 as usize] as usize] == 2) {
-                            let txt_743 = tree.create("#text");
-                            tree.append_child(el_740, txt_743);
-                            if let Some(el) = tree.get_mut(txt_743) { el.text = Some("Under Review".into()); }
+                            let txt_703 = tree.create("#text");
+                            tree.append_child(el_700, txt_703);
+                            if let Some(el) = tree.get_mut(txt_703) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_744 = tree.create("#text");
-                            tree.append_child(el_740, txt_744);
-                            if let Some(el) = tree.get_mut(txt_744) { el.text = Some("Obsolete".into()); }
+                            let txt_704 = tree.create("#text");
+                            tree.append_child(el_700, txt_704);
+                            if let Some(el) = tree.get_mut(txt_704) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_745 = tree.create("div");
-                tree.append_child(el_730, el_745);
-                tree.set_style(el_745, "width", "80px");
-                tree.set_style(el_745, "font-size", "12px");
-                tree.set_style(el_745, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_745) { el.text = Some(format!("{}", qty[uses_ids[2 as usize] as usize]).to_string()); }
-                let el_746 = tree.create("div");
-                tree.append_child(el_730, el_746);
-                tree.set_style(el_746, "width", "60px");
-                tree.set_style(el_746, "font-size", "12px");
-                tree.set_style(el_746, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_746) { el.text = Some("each".into()); }
+                let el_705 = tree.create("div");
+                tree.append_child(el_690, el_705);
+                tree.set_style(el_705, "width", "80px");
+                tree.set_style(el_705, "font-size", "12px");
+                tree.set_style(el_705, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_705) { el.text = Some(format!("{}", qty[uses_ids[2 as usize] as usize]).to_string()); }
+                let el_706 = tree.create("div");
+                tree.append_child(el_690, el_706);
+                tree.set_style(el_706, "width", "60px");
+                tree.set_style(el_706, "font-size", "12px");
+                tree.set_style(el_706, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_706) { el.text = Some("each".into()); }
             }
             if (uses_ids.len() as i32 > 3) {
-                let el_747 = tree.create("div");
-                tree.append_child(el_685, el_747);
-                tree.set_style(el_747, "direction", "horizontal");
-                tree.set_style(el_747, "height", "24px");
-                tree.set_style(el_747, "background-color", "#f9fafb");
-                tree.set_style(el_747, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_747, "align", "center");
-                tree.set_style(el_747, "padding-left", "10");
-                let el_748 = tree.create("div");
-                tree.append_child(el_747, el_748);
-                tree.set_style(el_748, "width", "120px");
-                tree.set_style(el_748, "font-size", "12px");
-                tree.set_style(el_748, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_748) { el.text = Some(format!("PN-{}", uses_ids[3 as usize]).to_string()); }
-                let el_749 = tree.create("div");
-                tree.append_child(el_747, el_749);
-                tree.set_style(el_749, "width", "220px");
-                tree.set_style(el_749, "font-size", "12px");
-                tree.set_style(el_749, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_749) { el.text = Some(format!("{}", names[uses_ids[3 as usize] as usize]).to_string()); }
-                let el_750 = tree.create("div");
-                tree.append_child(el_747, el_750);
-                tree.set_style(el_750, "width", "110px");
-                tree.set_style(el_750, "font-size", "12px");
-                tree.set_style(el_750, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_750) { el.text = Some("A.1 (Design)".into()); }
-                let el_751 = tree.create("div");
-                tree.append_child(el_747, el_751);
-                tree.set_style(el_751, "width", "130px");
-                tree.set_style(el_751, "direction", "horizontal");
-                tree.set_style(el_751, "gap", "5");
-                tree.set_style(el_751, "align", "center");
-                let el_752 = tree.create("div");
-                tree.append_child(el_751, el_752);
-                tree.set_style(el_752, "width", "9px");
-                tree.set_style(el_752, "height", "24px");
-                tree.set_style(el_752, "align", "center");
-                tree.set_style(el_752, "justify", "center");
+                let el_707 = tree.create("div");
+                tree.append_child(el_645, el_707);
+                tree.set_style(el_707, "direction", "horizontal");
+                tree.set_style(el_707, "height", "24px");
+                tree.set_style(el_707, "background-color", "#f9fafb");
+                tree.set_style(el_707, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_707, "align", "center");
+                tree.set_style(el_707, "padding-left", "10");
+                let el_708 = tree.create("div");
+                tree.append_child(el_707, el_708);
+                tree.set_style(el_708, "width", "120px");
+                tree.set_style(el_708, "font-size", "12px");
+                tree.set_style(el_708, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_708) { el.text = Some(format!("PN-{}", uses_ids[3 as usize]).to_string()); }
+                let el_709 = tree.create("div");
+                tree.append_child(el_707, el_709);
+                tree.set_style(el_709, "width", "220px");
+                tree.set_style(el_709, "font-size", "12px");
+                tree.set_style(el_709, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_709) { el.text = Some(format!("{}", names[uses_ids[3 as usize] as usize]).to_string()); }
+                let el_710 = tree.create("div");
+                tree.append_child(el_707, el_710);
+                tree.set_style(el_710, "width", "110px");
+                tree.set_style(el_710, "font-size", "12px");
+                tree.set_style(el_710, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_710) { el.text = Some("A.1 (Design)".into()); }
+                let el_711 = tree.create("div");
+                tree.append_child(el_707, el_711);
+                tree.set_style(el_711, "width", "130px");
+                tree.set_style(el_711, "direction", "horizontal");
+                tree.set_style(el_711, "gap", "5");
+                tree.set_style(el_711, "align", "center");
+                let el_712 = tree.create("div");
+                tree.append_child(el_711, el_712);
+                tree.set_style(el_712, "width", "9px");
+                tree.set_style(el_712, "height", "24px");
+                tree.set_style(el_712, "align", "center");
+                tree.set_style(el_712, "justify", "center");
                 if (eff_state[uses_ids[3 as usize] as usize] == 0) {
-                    let el_753 = tree.create("div");
-                    tree.append_child(el_752, el_753);
-                    tree.set_style(el_753, "width", "7px");
-                    tree.set_style(el_753, "height", "7px");
-                    tree.set_style(el_753, "border-radius", "4");
-                    tree.set_style(el_753, "background-color", "#1a7f37");
+                    let el_713 = tree.create("div");
+                    tree.append_child(el_712, el_713);
+                    tree.set_style(el_713, "width", "7px");
+                    tree.set_style(el_713, "height", "7px");
+                    tree.set_style(el_713, "border-radius", "4");
+                    tree.set_style(el_713, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[3 as usize] as usize] == 1) {
-                        let el_754 = tree.create("div");
-                        tree.append_child(el_752, el_754);
-                        tree.set_style(el_754, "width", "7px");
-                        tree.set_style(el_754, "height", "7px");
-                        tree.set_style(el_754, "border-radius", "4");
-                        tree.set_style(el_754, "background-color", "#0969da");
+                        let el_714 = tree.create("div");
+                        tree.append_child(el_712, el_714);
+                        tree.set_style(el_714, "width", "7px");
+                        tree.set_style(el_714, "height", "7px");
+                        tree.set_style(el_714, "border-radius", "4");
+                        tree.set_style(el_714, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[3 as usize] as usize] == 2) {
-                            let el_755 = tree.create("div");
-                            tree.append_child(el_752, el_755);
-                            tree.set_style(el_755, "width", "7px");
-                            tree.set_style(el_755, "height", "7px");
-                            tree.set_style(el_755, "border-radius", "4");
-                            tree.set_style(el_755, "background-color", "#9a6700");
+                            let el_715 = tree.create("div");
+                            tree.append_child(el_712, el_715);
+                            tree.set_style(el_715, "width", "7px");
+                            tree.set_style(el_715, "height", "7px");
+                            tree.set_style(el_715, "border-radius", "4");
+                            tree.set_style(el_715, "background-color", "#9a6700");
                         } else {
-                            let el_756 = tree.create("div");
-                            tree.append_child(el_752, el_756);
-                            tree.set_style(el_756, "width", "7px");
-                            tree.set_style(el_756, "height", "7px");
-                            tree.set_style(el_756, "border-radius", "4");
-                            tree.set_style(el_756, "background-color", "#6e7781");
+                            let el_716 = tree.create("div");
+                            tree.append_child(el_712, el_716);
+                            tree.set_style(el_716, "width", "7px");
+                            tree.set_style(el_716, "height", "7px");
+                            tree.set_style(el_716, "border-radius", "4");
+                            tree.set_style(el_716, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_757 = tree.create("div");
-                tree.append_child(el_751, el_757);
-                tree.set_style(el_757, "font-size", "12px");
-                tree.set_style(el_757, "color", "#57606a");
+                let el_717 = tree.create("div");
+                tree.append_child(el_711, el_717);
+                tree.set_style(el_717, "font-size", "12px");
+                tree.set_style(el_717, "color", "#57606a");
                 if (eff_state[uses_ids[3 as usize] as usize] == 0) {
-                    let txt_758 = tree.create("#text");
-                    tree.append_child(el_757, txt_758);
-                    if let Some(el) = tree.get_mut(txt_758) { el.text = Some("Released".into()); }
+                    let txt_718 = tree.create("#text");
+                    tree.append_child(el_717, txt_718);
+                    if let Some(el) = tree.get_mut(txt_718) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[3 as usize] as usize] == 1) {
-                        let txt_759 = tree.create("#text");
-                        tree.append_child(el_757, txt_759);
-                        if let Some(el) = tree.get_mut(txt_759) { el.text = Some("In Work".into()); }
+                        let txt_719 = tree.create("#text");
+                        tree.append_child(el_717, txt_719);
+                        if let Some(el) = tree.get_mut(txt_719) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[3 as usize] as usize] == 2) {
-                            let txt_760 = tree.create("#text");
-                            tree.append_child(el_757, txt_760);
-                            if let Some(el) = tree.get_mut(txt_760) { el.text = Some("Under Review".into()); }
+                            let txt_720 = tree.create("#text");
+                            tree.append_child(el_717, txt_720);
+                            if let Some(el) = tree.get_mut(txt_720) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_761 = tree.create("#text");
-                            tree.append_child(el_757, txt_761);
-                            if let Some(el) = tree.get_mut(txt_761) { el.text = Some("Obsolete".into()); }
+                            let txt_721 = tree.create("#text");
+                            tree.append_child(el_717, txt_721);
+                            if let Some(el) = tree.get_mut(txt_721) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_762 = tree.create("div");
-                tree.append_child(el_747, el_762);
-                tree.set_style(el_762, "width", "80px");
-                tree.set_style(el_762, "font-size", "12px");
-                tree.set_style(el_762, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_762) { el.text = Some(format!("{}", qty[uses_ids[3 as usize] as usize]).to_string()); }
-                let el_763 = tree.create("div");
-                tree.append_child(el_747, el_763);
-                tree.set_style(el_763, "width", "60px");
-                tree.set_style(el_763, "font-size", "12px");
-                tree.set_style(el_763, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_763) { el.text = Some("each".into()); }
+                let el_722 = tree.create("div");
+                tree.append_child(el_707, el_722);
+                tree.set_style(el_722, "width", "80px");
+                tree.set_style(el_722, "font-size", "12px");
+                tree.set_style(el_722, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_722) { el.text = Some(format!("{}", qty[uses_ids[3 as usize] as usize]).to_string()); }
+                let el_723 = tree.create("div");
+                tree.append_child(el_707, el_723);
+                tree.set_style(el_723, "width", "60px");
+                tree.set_style(el_723, "font-size", "12px");
+                tree.set_style(el_723, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_723) { el.text = Some("each".into()); }
             }
             if (uses_ids.len() as i32 > 4) {
-                let el_764 = tree.create("div");
-                tree.append_child(el_685, el_764);
-                tree.set_style(el_764, "direction", "horizontal");
-                tree.set_style(el_764, "height", "24px");
-                tree.set_style(el_764, "background-color", "#ffffff");
-                tree.set_style(el_764, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_764, "align", "center");
-                tree.set_style(el_764, "padding-left", "10");
-                let el_765 = tree.create("div");
-                tree.append_child(el_764, el_765);
-                tree.set_style(el_765, "width", "120px");
-                tree.set_style(el_765, "font-size", "12px");
-                tree.set_style(el_765, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_765) { el.text = Some(format!("PN-{}", uses_ids[4 as usize]).to_string()); }
-                let el_766 = tree.create("div");
-                tree.append_child(el_764, el_766);
-                tree.set_style(el_766, "width", "220px");
-                tree.set_style(el_766, "font-size", "12px");
-                tree.set_style(el_766, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_766) { el.text = Some(format!("{}", names[uses_ids[4 as usize] as usize]).to_string()); }
-                let el_767 = tree.create("div");
-                tree.append_child(el_764, el_767);
-                tree.set_style(el_767, "width", "110px");
-                tree.set_style(el_767, "font-size", "12px");
-                tree.set_style(el_767, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_767) { el.text = Some("A.1 (Design)".into()); }
-                let el_768 = tree.create("div");
-                tree.append_child(el_764, el_768);
-                tree.set_style(el_768, "width", "130px");
-                tree.set_style(el_768, "direction", "horizontal");
-                tree.set_style(el_768, "gap", "5");
-                tree.set_style(el_768, "align", "center");
-                let el_769 = tree.create("div");
-                tree.append_child(el_768, el_769);
-                tree.set_style(el_769, "width", "9px");
-                tree.set_style(el_769, "height", "24px");
-                tree.set_style(el_769, "align", "center");
-                tree.set_style(el_769, "justify", "center");
+                let el_724 = tree.create("div");
+                tree.append_child(el_645, el_724);
+                tree.set_style(el_724, "direction", "horizontal");
+                tree.set_style(el_724, "height", "24px");
+                tree.set_style(el_724, "background-color", "#ffffff");
+                tree.set_style(el_724, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_724, "align", "center");
+                tree.set_style(el_724, "padding-left", "10");
+                let el_725 = tree.create("div");
+                tree.append_child(el_724, el_725);
+                tree.set_style(el_725, "width", "120px");
+                tree.set_style(el_725, "font-size", "12px");
+                tree.set_style(el_725, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_725) { el.text = Some(format!("PN-{}", uses_ids[4 as usize]).to_string()); }
+                let el_726 = tree.create("div");
+                tree.append_child(el_724, el_726);
+                tree.set_style(el_726, "width", "220px");
+                tree.set_style(el_726, "font-size", "12px");
+                tree.set_style(el_726, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_726) { el.text = Some(format!("{}", names[uses_ids[4 as usize] as usize]).to_string()); }
+                let el_727 = tree.create("div");
+                tree.append_child(el_724, el_727);
+                tree.set_style(el_727, "width", "110px");
+                tree.set_style(el_727, "font-size", "12px");
+                tree.set_style(el_727, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_727) { el.text = Some("A.1 (Design)".into()); }
+                let el_728 = tree.create("div");
+                tree.append_child(el_724, el_728);
+                tree.set_style(el_728, "width", "130px");
+                tree.set_style(el_728, "direction", "horizontal");
+                tree.set_style(el_728, "gap", "5");
+                tree.set_style(el_728, "align", "center");
+                let el_729 = tree.create("div");
+                tree.append_child(el_728, el_729);
+                tree.set_style(el_729, "width", "9px");
+                tree.set_style(el_729, "height", "24px");
+                tree.set_style(el_729, "align", "center");
+                tree.set_style(el_729, "justify", "center");
                 if (eff_state[uses_ids[4 as usize] as usize] == 0) {
-                    let el_770 = tree.create("div");
-                    tree.append_child(el_769, el_770);
-                    tree.set_style(el_770, "width", "7px");
-                    tree.set_style(el_770, "height", "7px");
-                    tree.set_style(el_770, "border-radius", "4");
-                    tree.set_style(el_770, "background-color", "#1a7f37");
+                    let el_730 = tree.create("div");
+                    tree.append_child(el_729, el_730);
+                    tree.set_style(el_730, "width", "7px");
+                    tree.set_style(el_730, "height", "7px");
+                    tree.set_style(el_730, "border-radius", "4");
+                    tree.set_style(el_730, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[4 as usize] as usize] == 1) {
-                        let el_771 = tree.create("div");
-                        tree.append_child(el_769, el_771);
-                        tree.set_style(el_771, "width", "7px");
-                        tree.set_style(el_771, "height", "7px");
-                        tree.set_style(el_771, "border-radius", "4");
-                        tree.set_style(el_771, "background-color", "#0969da");
+                        let el_731 = tree.create("div");
+                        tree.append_child(el_729, el_731);
+                        tree.set_style(el_731, "width", "7px");
+                        tree.set_style(el_731, "height", "7px");
+                        tree.set_style(el_731, "border-radius", "4");
+                        tree.set_style(el_731, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[4 as usize] as usize] == 2) {
-                            let el_772 = tree.create("div");
-                            tree.append_child(el_769, el_772);
-                            tree.set_style(el_772, "width", "7px");
-                            tree.set_style(el_772, "height", "7px");
-                            tree.set_style(el_772, "border-radius", "4");
-                            tree.set_style(el_772, "background-color", "#9a6700");
+                            let el_732 = tree.create("div");
+                            tree.append_child(el_729, el_732);
+                            tree.set_style(el_732, "width", "7px");
+                            tree.set_style(el_732, "height", "7px");
+                            tree.set_style(el_732, "border-radius", "4");
+                            tree.set_style(el_732, "background-color", "#9a6700");
                         } else {
-                            let el_773 = tree.create("div");
-                            tree.append_child(el_769, el_773);
-                            tree.set_style(el_773, "width", "7px");
-                            tree.set_style(el_773, "height", "7px");
-                            tree.set_style(el_773, "border-radius", "4");
-                            tree.set_style(el_773, "background-color", "#6e7781");
+                            let el_733 = tree.create("div");
+                            tree.append_child(el_729, el_733);
+                            tree.set_style(el_733, "width", "7px");
+                            tree.set_style(el_733, "height", "7px");
+                            tree.set_style(el_733, "border-radius", "4");
+                            tree.set_style(el_733, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_774 = tree.create("div");
-                tree.append_child(el_768, el_774);
-                tree.set_style(el_774, "font-size", "12px");
-                tree.set_style(el_774, "color", "#57606a");
+                let el_734 = tree.create("div");
+                tree.append_child(el_728, el_734);
+                tree.set_style(el_734, "font-size", "12px");
+                tree.set_style(el_734, "color", "#57606a");
                 if (eff_state[uses_ids[4 as usize] as usize] == 0) {
-                    let txt_775 = tree.create("#text");
-                    tree.append_child(el_774, txt_775);
-                    if let Some(el) = tree.get_mut(txt_775) { el.text = Some("Released".into()); }
+                    let txt_735 = tree.create("#text");
+                    tree.append_child(el_734, txt_735);
+                    if let Some(el) = tree.get_mut(txt_735) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[4 as usize] as usize] == 1) {
-                        let txt_776 = tree.create("#text");
-                        tree.append_child(el_774, txt_776);
-                        if let Some(el) = tree.get_mut(txt_776) { el.text = Some("In Work".into()); }
+                        let txt_736 = tree.create("#text");
+                        tree.append_child(el_734, txt_736);
+                        if let Some(el) = tree.get_mut(txt_736) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[4 as usize] as usize] == 2) {
-                            let txt_777 = tree.create("#text");
-                            tree.append_child(el_774, txt_777);
-                            if let Some(el) = tree.get_mut(txt_777) { el.text = Some("Under Review".into()); }
+                            let txt_737 = tree.create("#text");
+                            tree.append_child(el_734, txt_737);
+                            if let Some(el) = tree.get_mut(txt_737) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_778 = tree.create("#text");
-                            tree.append_child(el_774, txt_778);
-                            if let Some(el) = tree.get_mut(txt_778) { el.text = Some("Obsolete".into()); }
+                            let txt_738 = tree.create("#text");
+                            tree.append_child(el_734, txt_738);
+                            if let Some(el) = tree.get_mut(txt_738) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_779 = tree.create("div");
-                tree.append_child(el_764, el_779);
-                tree.set_style(el_779, "width", "80px");
-                tree.set_style(el_779, "font-size", "12px");
-                tree.set_style(el_779, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_779) { el.text = Some(format!("{}", qty[uses_ids[4 as usize] as usize]).to_string()); }
-                let el_780 = tree.create("div");
-                tree.append_child(el_764, el_780);
-                tree.set_style(el_780, "width", "60px");
-                tree.set_style(el_780, "font-size", "12px");
-                tree.set_style(el_780, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_780) { el.text = Some("each".into()); }
+                let el_739 = tree.create("div");
+                tree.append_child(el_724, el_739);
+                tree.set_style(el_739, "width", "80px");
+                tree.set_style(el_739, "font-size", "12px");
+                tree.set_style(el_739, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_739) { el.text = Some(format!("{}", qty[uses_ids[4 as usize] as usize]).to_string()); }
+                let el_740 = tree.create("div");
+                tree.append_child(el_724, el_740);
+                tree.set_style(el_740, "width", "60px");
+                tree.set_style(el_740, "font-size", "12px");
+                tree.set_style(el_740, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_740) { el.text = Some("each".into()); }
             }
             if (uses_ids.len() as i32 > 5) {
-                let el_781 = tree.create("div");
-                tree.append_child(el_685, el_781);
-                tree.set_style(el_781, "direction", "horizontal");
-                tree.set_style(el_781, "height", "24px");
-                tree.set_style(el_781, "background-color", "#f9fafb");
-                tree.set_style(el_781, "border-bottom", "1px solid #e6e8eb");
-                tree.set_style(el_781, "align", "center");
-                tree.set_style(el_781, "padding-left", "10");
-                let el_782 = tree.create("div");
-                tree.append_child(el_781, el_782);
-                tree.set_style(el_782, "width", "120px");
-                tree.set_style(el_782, "font-size", "12px");
-                tree.set_style(el_782, "color", "#1f2328");
-                if let Some(el) = tree.get_mut(el_782) { el.text = Some(format!("PN-{}", uses_ids[5 as usize]).to_string()); }
-                let el_783 = tree.create("div");
-                tree.append_child(el_781, el_783);
-                tree.set_style(el_783, "width", "220px");
-                tree.set_style(el_783, "font-size", "12px");
-                tree.set_style(el_783, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_783) { el.text = Some(format!("{}", names[uses_ids[5 as usize] as usize]).to_string()); }
-                let el_784 = tree.create("div");
-                tree.append_child(el_781, el_784);
-                tree.set_style(el_784, "width", "110px");
-                tree.set_style(el_784, "font-size", "12px");
-                tree.set_style(el_784, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_784) { el.text = Some("A.1 (Design)".into()); }
-                let el_785 = tree.create("div");
-                tree.append_child(el_781, el_785);
-                tree.set_style(el_785, "width", "130px");
-                tree.set_style(el_785, "direction", "horizontal");
-                tree.set_style(el_785, "gap", "5");
-                tree.set_style(el_785, "align", "center");
-                let el_786 = tree.create("div");
-                tree.append_child(el_785, el_786);
-                tree.set_style(el_786, "width", "9px");
-                tree.set_style(el_786, "height", "24px");
-                tree.set_style(el_786, "align", "center");
-                tree.set_style(el_786, "justify", "center");
+                let el_741 = tree.create("div");
+                tree.append_child(el_645, el_741);
+                tree.set_style(el_741, "direction", "horizontal");
+                tree.set_style(el_741, "height", "24px");
+                tree.set_style(el_741, "background-color", "#f9fafb");
+                tree.set_style(el_741, "border-bottom", "1px solid #e6e8eb");
+                tree.set_style(el_741, "align", "center");
+                tree.set_style(el_741, "padding-left", "10");
+                let el_742 = tree.create("div");
+                tree.append_child(el_741, el_742);
+                tree.set_style(el_742, "width", "120px");
+                tree.set_style(el_742, "font-size", "12px");
+                tree.set_style(el_742, "color", "#1f2328");
+                if let Some(el) = tree.get_mut(el_742) { el.text = Some(format!("PN-{}", uses_ids[5 as usize]).to_string()); }
+                let el_743 = tree.create("div");
+                tree.append_child(el_741, el_743);
+                tree.set_style(el_743, "width", "220px");
+                tree.set_style(el_743, "font-size", "12px");
+                tree.set_style(el_743, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_743) { el.text = Some(format!("{}", names[uses_ids[5 as usize] as usize]).to_string()); }
+                let el_744 = tree.create("div");
+                tree.append_child(el_741, el_744);
+                tree.set_style(el_744, "width", "110px");
+                tree.set_style(el_744, "font-size", "12px");
+                tree.set_style(el_744, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_744) { el.text = Some("A.1 (Design)".into()); }
+                let el_745 = tree.create("div");
+                tree.append_child(el_741, el_745);
+                tree.set_style(el_745, "width", "130px");
+                tree.set_style(el_745, "direction", "horizontal");
+                tree.set_style(el_745, "gap", "5");
+                tree.set_style(el_745, "align", "center");
+                let el_746 = tree.create("div");
+                tree.append_child(el_745, el_746);
+                tree.set_style(el_746, "width", "9px");
+                tree.set_style(el_746, "height", "24px");
+                tree.set_style(el_746, "align", "center");
+                tree.set_style(el_746, "justify", "center");
                 if (eff_state[uses_ids[5 as usize] as usize] == 0) {
-                    let el_787 = tree.create("div");
-                    tree.append_child(el_786, el_787);
-                    tree.set_style(el_787, "width", "7px");
-                    tree.set_style(el_787, "height", "7px");
-                    tree.set_style(el_787, "border-radius", "4");
-                    tree.set_style(el_787, "background-color", "#1a7f37");
+                    let el_747 = tree.create("div");
+                    tree.append_child(el_746, el_747);
+                    tree.set_style(el_747, "width", "7px");
+                    tree.set_style(el_747, "height", "7px");
+                    tree.set_style(el_747, "border-radius", "4");
+                    tree.set_style(el_747, "background-color", "#1a7f37");
                 } else {
                     if (eff_state[uses_ids[5 as usize] as usize] == 1) {
-                        let el_788 = tree.create("div");
-                        tree.append_child(el_786, el_788);
-                        tree.set_style(el_788, "width", "7px");
-                        tree.set_style(el_788, "height", "7px");
-                        tree.set_style(el_788, "border-radius", "4");
-                        tree.set_style(el_788, "background-color", "#0969da");
+                        let el_748 = tree.create("div");
+                        tree.append_child(el_746, el_748);
+                        tree.set_style(el_748, "width", "7px");
+                        tree.set_style(el_748, "height", "7px");
+                        tree.set_style(el_748, "border-radius", "4");
+                        tree.set_style(el_748, "background-color", "#0969da");
                     } else {
                         if (eff_state[uses_ids[5 as usize] as usize] == 2) {
-                            let el_789 = tree.create("div");
-                            tree.append_child(el_786, el_789);
-                            tree.set_style(el_789, "width", "7px");
-                            tree.set_style(el_789, "height", "7px");
-                            tree.set_style(el_789, "border-radius", "4");
-                            tree.set_style(el_789, "background-color", "#9a6700");
+                            let el_749 = tree.create("div");
+                            tree.append_child(el_746, el_749);
+                            tree.set_style(el_749, "width", "7px");
+                            tree.set_style(el_749, "height", "7px");
+                            tree.set_style(el_749, "border-radius", "4");
+                            tree.set_style(el_749, "background-color", "#9a6700");
                         } else {
-                            let el_790 = tree.create("div");
-                            tree.append_child(el_786, el_790);
-                            tree.set_style(el_790, "width", "7px");
-                            tree.set_style(el_790, "height", "7px");
-                            tree.set_style(el_790, "border-radius", "4");
-                            tree.set_style(el_790, "background-color", "#6e7781");
+                            let el_750 = tree.create("div");
+                            tree.append_child(el_746, el_750);
+                            tree.set_style(el_750, "width", "7px");
+                            tree.set_style(el_750, "height", "7px");
+                            tree.set_style(el_750, "border-radius", "4");
+                            tree.set_style(el_750, "background-color", "#6e7781");
                         }
                     }
                 }
-                let el_791 = tree.create("div");
-                tree.append_child(el_785, el_791);
-                tree.set_style(el_791, "font-size", "12px");
-                tree.set_style(el_791, "color", "#57606a");
+                let el_751 = tree.create("div");
+                tree.append_child(el_745, el_751);
+                tree.set_style(el_751, "font-size", "12px");
+                tree.set_style(el_751, "color", "#57606a");
                 if (eff_state[uses_ids[5 as usize] as usize] == 0) {
-                    let txt_792 = tree.create("#text");
-                    tree.append_child(el_791, txt_792);
-                    if let Some(el) = tree.get_mut(txt_792) { el.text = Some("Released".into()); }
+                    let txt_752 = tree.create("#text");
+                    tree.append_child(el_751, txt_752);
+                    if let Some(el) = tree.get_mut(txt_752) { el.text = Some("Released".into()); }
                 } else {
                     if (eff_state[uses_ids[5 as usize] as usize] == 1) {
-                        let txt_793 = tree.create("#text");
-                        tree.append_child(el_791, txt_793);
-                        if let Some(el) = tree.get_mut(txt_793) { el.text = Some("In Work".into()); }
+                        let txt_753 = tree.create("#text");
+                        tree.append_child(el_751, txt_753);
+                        if let Some(el) = tree.get_mut(txt_753) { el.text = Some("In Work".into()); }
                     } else {
                         if (eff_state[uses_ids[5 as usize] as usize] == 2) {
-                            let txt_794 = tree.create("#text");
-                            tree.append_child(el_791, txt_794);
-                            if let Some(el) = tree.get_mut(txt_794) { el.text = Some("Under Review".into()); }
+                            let txt_754 = tree.create("#text");
+                            tree.append_child(el_751, txt_754);
+                            if let Some(el) = tree.get_mut(txt_754) { el.text = Some("Under Review".into()); }
                         } else {
-                            let txt_795 = tree.create("#text");
-                            tree.append_child(el_791, txt_795);
-                            if let Some(el) = tree.get_mut(txt_795) { el.text = Some("Obsolete".into()); }
+                            let txt_755 = tree.create("#text");
+                            tree.append_child(el_751, txt_755);
+                            if let Some(el) = tree.get_mut(txt_755) { el.text = Some("Obsolete".into()); }
                         }
                     }
                 }
-                let el_796 = tree.create("div");
-                tree.append_child(el_781, el_796);
-                tree.set_style(el_796, "width", "80px");
-                tree.set_style(el_796, "font-size", "12px");
-                tree.set_style(el_796, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_796) { el.text = Some(format!("{}", qty[uses_ids[5 as usize] as usize]).to_string()); }
-                let el_797 = tree.create("div");
-                tree.append_child(el_781, el_797);
-                tree.set_style(el_797, "width", "60px");
-                tree.set_style(el_797, "font-size", "12px");
-                tree.set_style(el_797, "color", "#57606a");
-                if let Some(el) = tree.get_mut(el_797) { el.text = Some("each".into()); }
+                let el_756 = tree.create("div");
+                tree.append_child(el_741, el_756);
+                tree.set_style(el_756, "width", "80px");
+                tree.set_style(el_756, "font-size", "12px");
+                tree.set_style(el_756, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_756) { el.text = Some(format!("{}", qty[uses_ids[5 as usize] as usize]).to_string()); }
+                let el_757 = tree.create("div");
+                tree.append_child(el_741, el_757);
+                tree.set_style(el_757, "width", "60px");
+                tree.set_style(el_757, "font-size", "12px");
+                tree.set_style(el_757, "color", "#57606a");
+                if let Some(el) = tree.get_mut(el_757) { el.text = Some("each".into()); }
             }
-            let el_798 = tree.create("div");
-            tree.append_child(el_684, el_798);
-            tree.set_style(el_798, "direction", "vertical");
-            tree.set_style(el_798, "width", "fill");
-            tree.set_style(el_798, "height", "170px");
-            tree.set_style(el_798, "background-color", "#ffffff");
-            tree.set_style(el_798, "border", "1px solid #d0d7de");
-            tree.set_style(el_798, "border-radius", "4");
-            let el_799 = tree.create("div");
-            tree.append_child(el_798, el_799);
-            tree.set_style(el_799, "height", "26px");
-            tree.set_style(el_799, "background-color", "#f6f8fa");
-            tree.set_style(el_799, "border-bottom", "1px solid #d0d7de");
-            tree.set_style(el_799, "padding", "0 10");
-            tree.set_style(el_799, "align", "center");
-            tree.set_style(el_799, "direction", "horizontal");
-            tree.set_style(el_799, "gap", "8");
-            let el_800 = tree.create("div");
-            tree.append_child(el_799, el_800);
-            tree.set_style(el_800, "font-size", "11px");
-            tree.set_style(el_800, "font-weight", "700");
-            tree.set_style(el_800, "color", "#57606a");
-            if let Some(el) = tree.get_mut(el_800) { el.text = Some("RAW RESPONSE".into()); }
-            let el_801 = tree.create("div");
-            tree.append_child(el_799, el_801);
-            tree.set_style(el_801, "font-size", "11px");
-            tree.set_style(el_801, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_801) { el.text = Some(format!("{} · {} nodes in last payload", last_url, fetched.len() as i32).to_string()); }
-            let el_802 = tree.create("div");
-            tree.append_child(el_798, el_802);
-            tree.set_style(el_802, "direction", "vertical");
-            tree.set_style(el_802, "padding", "8 10");
-            tree.set_style(el_802, "gap", "1");
-            let el_803 = tree.create("div");
-            tree.append_child(el_802, el_803);
-            tree.set_style(el_803, "font-size", "11px");
-            tree.set_style(el_803, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_803) { el.text = Some("[".into()); }
+            let el_758 = tree.create("div");
+            tree.append_child(el_644, el_758);
+            tree.set_style(el_758, "direction", "vertical");
+            tree.set_style(el_758, "width", "fill");
+            tree.set_style(el_758, "height", "170px");
+            tree.set_style(el_758, "background-color", "#ffffff");
+            tree.set_style(el_758, "border", "1px solid #d0d7de");
+            tree.set_style(el_758, "border-radius", "4");
+            let el_759 = tree.create("div");
+            tree.append_child(el_758, el_759);
+            tree.set_style(el_759, "height", "26px");
+            tree.set_style(el_759, "background-color", "#f6f8fa");
+            tree.set_style(el_759, "border-bottom", "1px solid #d0d7de");
+            tree.set_style(el_759, "padding", "0 10");
+            tree.set_style(el_759, "align", "center");
+            tree.set_style(el_759, "direction", "horizontal");
+            tree.set_style(el_759, "gap", "8");
+            let el_760 = tree.create("div");
+            tree.append_child(el_759, el_760);
+            tree.set_style(el_760, "font-size", "11px");
+            tree.set_style(el_760, "font-weight", "700");
+            tree.set_style(el_760, "color", "#57606a");
+            if let Some(el) = tree.get_mut(el_760) { el.text = Some("RAW RESPONSE".into()); }
+            let el_761 = tree.create("div");
+            tree.append_child(el_759, el_761);
+            tree.set_style(el_761, "font-size", "11px");
+            tree.set_style(el_761, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_761) { el.text = Some(format!("{} · {} nodes in last payload", last_url, fetched.len() as i32).to_string()); }
+            let el_762 = tree.create("div");
+            tree.append_child(el_758, el_762);
+            tree.set_style(el_762, "direction", "vertical");
+            tree.set_style(el_762, "padding", "8 10");
+            tree.set_style(el_762, "gap", "1");
+            let el_763 = tree.create("div");
+            tree.append_child(el_762, el_763);
+            tree.set_style(el_763, "font-size", "11px");
+            tree.set_style(el_763, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_763) { el.text = Some("[".into()); }
             if (fetched.len() as i32 > 0) {
-                let el_804 = tree.create("div");
-                tree.append_child(el_802, el_804);
-                tree.set_style(el_804, "font-size", "11px");
-                tree.set_style(el_804, "color", "#24292f");
-                if let Some(el) = tree.get_mut(el_804) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[0 as usize].id, fetched[0 as usize].name, fetched[0 as usize].leaf, fetched[0 as usize].state, fetched[0 as usize].qty).to_string()); }
+                let el_764 = tree.create("div");
+                tree.append_child(el_762, el_764);
+                tree.set_style(el_764, "font-size", "11px");
+                tree.set_style(el_764, "color", "#24292f");
+                if let Some(el) = tree.get_mut(el_764) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[0 as usize].id, fetched[0 as usize].name, fetched[0 as usize].leaf, fetched[0 as usize].state, fetched[0 as usize].qty).to_string()); }
             }
             if (fetched.len() as i32 > 1) {
-                let el_805 = tree.create("div");
-                tree.append_child(el_802, el_805);
-                tree.set_style(el_805, "font-size", "11px");
-                tree.set_style(el_805, "color", "#24292f");
-                if let Some(el) = tree.get_mut(el_805) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[1 as usize].id, fetched[1 as usize].name, fetched[1 as usize].leaf, fetched[1 as usize].state, fetched[1 as usize].qty).to_string()); }
+                let el_765 = tree.create("div");
+                tree.append_child(el_762, el_765);
+                tree.set_style(el_765, "font-size", "11px");
+                tree.set_style(el_765, "color", "#24292f");
+                if let Some(el) = tree.get_mut(el_765) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[1 as usize].id, fetched[1 as usize].name, fetched[1 as usize].leaf, fetched[1 as usize].state, fetched[1 as usize].qty).to_string()); }
             }
             if (fetched.len() as i32 > 2) {
-                let el_806 = tree.create("div");
-                tree.append_child(el_802, el_806);
-                tree.set_style(el_806, "font-size", "11px");
-                tree.set_style(el_806, "color", "#24292f");
-                if let Some(el) = tree.get_mut(el_806) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[2 as usize].id, fetched[2 as usize].name, fetched[2 as usize].leaf, fetched[2 as usize].state, fetched[2 as usize].qty).to_string()); }
+                let el_766 = tree.create("div");
+                tree.append_child(el_762, el_766);
+                tree.set_style(el_766, "font-size", "11px");
+                tree.set_style(el_766, "color", "#24292f");
+                if let Some(el) = tree.get_mut(el_766) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[2 as usize].id, fetched[2 as usize].name, fetched[2 as usize].leaf, fetched[2 as usize].state, fetched[2 as usize].qty).to_string()); }
             }
             if (fetched.len() as i32 > 3) {
-                let el_807 = tree.create("div");
-                tree.append_child(el_802, el_807);
-                tree.set_style(el_807, "font-size", "11px");
-                tree.set_style(el_807, "color", "#24292f");
-                if let Some(el) = tree.get_mut(el_807) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[3 as usize].id, fetched[3 as usize].name, fetched[3 as usize].leaf, fetched[3 as usize].state, fetched[3 as usize].qty).to_string()); }
+                let el_767 = tree.create("div");
+                tree.append_child(el_762, el_767);
+                tree.set_style(el_767, "font-size", "11px");
+                tree.set_style(el_767, "color", "#24292f");
+                if let Some(el) = tree.get_mut(el_767) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[3 as usize].id, fetched[3 as usize].name, fetched[3 as usize].leaf, fetched[3 as usize].state, fetched[3 as usize].qty).to_string()); }
             }
             if (fetched.len() as i32 > 4) {
-                let el_808 = tree.create("div");
-                tree.append_child(el_802, el_808);
-                tree.set_style(el_808, "font-size", "11px");
-                tree.set_style(el_808, "color", "#24292f");
-                if let Some(el) = tree.get_mut(el_808) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[4 as usize].id, fetched[4 as usize].name, fetched[4 as usize].leaf, fetched[4 as usize].state, fetched[4 as usize].qty).to_string()); }
+                let el_768 = tree.create("div");
+                tree.append_child(el_762, el_768);
+                tree.set_style(el_768, "font-size", "11px");
+                tree.set_style(el_768, "color", "#24292f");
+                if let Some(el) = tree.get_mut(el_768) { el.text = Some(format!("  {{\"id\": {}, \"name\": \"{}\", \"leaf\": {}, \"state\": {}, \"qty\": {}}},", fetched[4 as usize].id, fetched[4 as usize].name, fetched[4 as usize].leaf, fetched[4 as usize].state, fetched[4 as usize].qty).to_string()); }
             }
             if (fetched.len() as i32 > 5) {
-                let el_809 = tree.create("div");
-                tree.append_child(el_802, el_809);
-                tree.set_style(el_809, "font-size", "11px");
-                tree.set_style(el_809, "color", "#6e7781");
-                if let Some(el) = tree.get_mut(el_809) { el.text = Some(format!("  … {} more nodes in this response", (fetched.len() as i32 - 5)).to_string()); }
+                let el_769 = tree.create("div");
+                tree.append_child(el_762, el_769);
+                tree.set_style(el_769, "font-size", "11px");
+                tree.set_style(el_769, "color", "#6e7781");
+                if let Some(el) = tree.get_mut(el_769) { el.text = Some(format!("  … {} more nodes in this response", (fetched.len() as i32 - 5)).to_string()); }
             }
-            let el_810 = tree.create("div");
-            tree.append_child(el_802, el_810);
-            tree.set_style(el_810, "font-size", "11px");
-            tree.set_style(el_810, "color", "#6e7781");
-            if let Some(el) = tree.get_mut(el_810) { el.text = Some("]".into()); }
+            let el_770 = tree.create("div");
+            tree.append_child(el_762, el_770);
+            tree.set_style(el_770, "font-size", "11px");
+            tree.set_style(el_770, "color", "#6e7781");
+            if let Some(el) = tree.get_mut(el_770) { el.text = Some("]".into()); }
         });
     });
 }
