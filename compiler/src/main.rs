@@ -2,6 +2,9 @@
 // warnings (-D warnings); everything listed here is stylistic, not
 // correctness. Remove entries as the corresponding code is cleaned up.
 #![allow(
+    unknown_lints,
+    clippy::question_mark,
+    clippy::manual_pop_if,
     dead_code,
     unused_variables,
     unused_assignments,
