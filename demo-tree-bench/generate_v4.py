@@ -680,7 +680,7 @@ render_lines.append('            </div>')
 render_lines.append('            <div style="direction: horizontal; gap: 8; height: 22px; align: center">')
 CRUMB_W = {0: 104, 1: 116, 2: 108, 3: 98, 4: 116, 5: 98, 6: 116, 7: 86}
 for k in range(MAX_DEPTH + 1):
-    marker = f'if self.window_depths.len() > 0 {{ {{if self.window_depths[0] == {k} {{ "▸" }} else {{ " " }}}} }} else {{ " " }}'
+    marker = f'if self.window_depths.len() > 0 {{ {{if self.window_depths[0] == {k} {{ "▸" }} else {{ "" }}}} }} else {{ "" }}'
     render_lines.append(f'                <div style="direction: horizontal; width: {CRUMB_W[k]}px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={{self.breadcrumb_jump_{k}}}>')
     render_lines.append(f'                    <div style="width: 12px; font-size: 11px; color: #9a6700">{{{marker}}}</div>')
     render_lines.append(f'                    <div style="font-size: 11px; color: #57606a">"{LEVEL_NAMES[k]}"</div>')

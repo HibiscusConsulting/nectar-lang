@@ -4075,35 +4075,35 @@ component TreeBench {
             </div>
             <div style="direction: horizontal; gap: 8; height: 22px; align: center">
                 <div style="direction: horizontal; width: 104px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_0}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 0 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 0 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Top Assembly"</div>
                 </div>
                 <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_1}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 1 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 1 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Major Assembly"</div>
                 </div>
                 <div style="direction: horizontal; width: 108px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_2}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 2 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 2 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Sub-Assembly"</div>
                 </div>
                 <div style="direction: horizontal; width: 98px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_3}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 3 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 3 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Component"</div>
                 </div>
                 <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_4}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 4 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 4 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Sub-Component"</div>
                 </div>
                 <div style="direction: horizontal; width: 98px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_5}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 5 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 5 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Detail Part"</div>
                 </div>
                 <div style="direction: horizontal; width: 116px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_6}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 6 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 6 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Fastener Group"</div>
                 </div>
                 <div style="direction: horizontal; width: 86px; height: 18px; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; padding-left: 6" on:click={self.breadcrumb_jump_7}>
-                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 7 { "▸" } else { " " }} } else { " " }}</div>
+                    <div style="width: 12px; font-size: 11px; color: #9a6700">{if self.window_depths.len() > 0 { {if self.window_depths[0] == 7 { "▸" } else { "" }} } else { "" }}</div>
                     <div style="font-size: 11px; color: #57606a">"Fastener"</div>
                 </div>
             </div>

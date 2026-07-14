@@ -614,12 +614,12 @@ fn treebench_mount() {
                 } else {
                     let txt_27 = tree.create("#text");
                     tree.append_child(el_25, txt_27);
-                    if let Some(el) = tree.get_mut(txt_27) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_27) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_28 = tree.create("#text");
                 tree.append_child(el_25, txt_28);
-                if let Some(el) = tree.get_mut(txt_28) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_28) { el.text = Some("".into()); }
             }
             let el_29 = tree.create("div");
             tree.append_child(el_24, el_29);
@@ -652,12 +652,12 @@ fn treebench_mount() {
                 } else {
                     let txt_33 = tree.create("#text");
                     tree.append_child(el_31, txt_33);
-                    if let Some(el) = tree.get_mut(txt_33) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_33) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_34 = tree.create("#text");
                 tree.append_child(el_31, txt_34);
-                if let Some(el) = tree.get_mut(txt_34) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_34) { el.text = Some("".into()); }
             }
             let el_35 = tree.create("div");
             tree.append_child(el_30, el_35);
@@ -690,12 +690,12 @@ fn treebench_mount() {
                 } else {
                     let txt_39 = tree.create("#text");
                     tree.append_child(el_37, txt_39);
-                    if let Some(el) = tree.get_mut(txt_39) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_39) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_40 = tree.create("#text");
                 tree.append_child(el_37, txt_40);
-                if let Some(el) = tree.get_mut(txt_40) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_40) { el.text = Some("".into()); }
             }
             let el_41 = tree.create("div");
             tree.append_child(el_36, el_41);
@@ -728,12 +728,12 @@ fn treebench_mount() {
                 } else {
                     let txt_45 = tree.create("#text");
                     tree.append_child(el_43, txt_45);
-                    if let Some(el) = tree.get_mut(txt_45) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_45) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_46 = tree.create("#text");
                 tree.append_child(el_43, txt_46);
-                if let Some(el) = tree.get_mut(txt_46) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_46) { el.text = Some("".into()); }
             }
             let el_47 = tree.create("div");
             tree.append_child(el_42, el_47);
@@ -766,12 +766,12 @@ fn treebench_mount() {
                 } else {
                     let txt_51 = tree.create("#text");
                     tree.append_child(el_49, txt_51);
-                    if let Some(el) = tree.get_mut(txt_51) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_51) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_52 = tree.create("#text");
                 tree.append_child(el_49, txt_52);
-                if let Some(el) = tree.get_mut(txt_52) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_52) { el.text = Some("".into()); }
             }
             let el_53 = tree.create("div");
             tree.append_child(el_48, el_53);
@@ -804,12 +804,12 @@ fn treebench_mount() {
                 } else {
                     let txt_57 = tree.create("#text");
                     tree.append_child(el_55, txt_57);
-                    if let Some(el) = tree.get_mut(txt_57) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_57) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_58 = tree.create("#text");
                 tree.append_child(el_55, txt_58);
-                if let Some(el) = tree.get_mut(txt_58) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_58) { el.text = Some("".into()); }
             }
             let el_59 = tree.create("div");
             tree.append_child(el_54, el_59);
@@ -842,12 +842,12 @@ fn treebench_mount() {
                 } else {
                     let txt_63 = tree.create("#text");
                     tree.append_child(el_61, txt_63);
-                    if let Some(el) = tree.get_mut(txt_63) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_63) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_64 = tree.create("#text");
                 tree.append_child(el_61, txt_64);
-                if let Some(el) = tree.get_mut(txt_64) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_64) { el.text = Some("".into()); }
             }
             let el_65 = tree.create("div");
             tree.append_child(el_60, el_65);
@@ -880,12 +880,12 @@ fn treebench_mount() {
                 } else {
                     let txt_69 = tree.create("#text");
                     tree.append_child(el_67, txt_69);
-                    if let Some(el) = tree.get_mut(txt_69) { el.text = Some(" ".into()); }
+                    if let Some(el) = tree.get_mut(txt_69) { el.text = Some("".into()); }
                 }
             } else {
                 let txt_70 = tree.create("#text");
                 tree.append_child(el_67, txt_70);
-                if let Some(el) = tree.get_mut(txt_70) { el.text = Some(" ".into()); }
+                if let Some(el) = tree.get_mut(txt_70) { el.text = Some("".into()); }
             }
             let el_71 = tree.create("div");
             tree.append_child(el_66, el_71);
