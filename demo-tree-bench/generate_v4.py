@@ -228,6 +228,41 @@ parts.append(handler(
     'format("API: {} nodes merged in {:.1}ms — {} rows visible, {} calls total", count, merge_ms, self.visible.len(), self.api_calls)'
 ))
 
+# --- init_connect: LANGUAGE LIFECYCLE HOOK. Any method named init* runs
+# automatically inside nectar_init() before first mount (and is excluded from
+# callback numbering, so on_response stays cb 0). Allocates the id-space
+# arrays and fires the bulk BOM fetch — the app connects itself on page load,
+# no button click needed. Connect/Import buttons stay as guarded no-ops.
+parts.append("""    fn init_connect(&mut self) {
+        let mut total: i32 = 0;
+        let mut level_count: i32 = 1;
+        let mut d: i32 = 0;
+        while d <= self.max_depth {
+            total = total + level_count;
+            level_count = level_count * self.branching;
+            d = d + 1;
+        }
+        self.capacity = total;
+        let mut i: i32 = 0;
+        while i < self.capacity {
+            self.expanded.push(false);
+            self.loaded.push(false);
+            self.children_count.push(0);
+            self.names.push(format(""));
+            self.hay.push(format(""));
+            i = i + 1;
+        }
+        self.names[0] = "Turbofan Engine HBT-9000";
+        self.hay[0] = format("pn-0 turbofan engine hbt-9000");
+        self.loaded_count = 1;
+        self.selected_id = 0;
+        self.pending_parent = 0 - 2;
+        self.status = "auto-loading full BOM: GET /api/bom/tree … (71,284 nodes, ~4MB JSON)";
+        self.last_url = "GET /api/bom/tree";
+        mp::request(format("/api/bom/tree{}", ""), "GET", "", 0);
+    }
+""")
+
 # --- setup: allocate id-space arrays, fetch root children from the API ---
 parts.append("""    fn setup(&mut self) {
         if self.capacity > 0 {

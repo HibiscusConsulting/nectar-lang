@@ -1475,7 +1475,7 @@ path = "src/lib.rs"
 
 [dependencies]
 honeycomb = {{ path = "{}" }}
-lol_alloc = "0.4"
+talc = {{ version = "4", default-features = false, features = ["lock_api"] }}
 
 [profile.release]
 opt-level = {}
