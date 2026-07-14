@@ -40,7 +40,11 @@ impl fmt::Display for BorrowError {
         if let Some(ref line) = self.source_line {
             writeln!(f, "  |")?;
             writeln!(f, "{} | {}", self.span.line, line)?;
-            writeln!(f, "  | {}^", " ".repeat(self.span.col.saturating_sub(1) as usize))?;
+            writeln!(
+                f,
+                "  | {}^",
+                " ".repeat(self.span.col.saturating_sub(1) as usize)
+            )?;
         }
         if let Some(ref suggestion) = self.suggestion {
             writeln!(f, "  = help: {}", suggestion)?;
@@ -249,7 +253,13 @@ impl Checker {
         });
     }
 
-    fn error_with_suggestion(&mut self, kind: BorrowErrorKind, span: Span, message: impl Into<String>, suggestion: impl Into<String>) {
+    fn error_with_suggestion(
+        &mut self,
+        kind: BorrowErrorKind,
+        span: Span,
+        message: impl Into<String>,
+        suggestion: impl Into<String>,
+    ) {
         self.errors.push(BorrowError {
             kind,
             span,
@@ -265,9 +275,8 @@ impl Checker {
         // Pre-scan: collect function signatures for ownership-aware call checking.
         for item in &program.items {
             if let Item::Function(f) = item {
-                let ownerships: Vec<Ownership> = f.params.iter()
-                    .map(|p| p.ownership.clone())
-                    .collect();
+                let ownerships: Vec<Ownership> =
+                    f.params.iter().map(|p| p.ownership.clone()).collect();
                 self.fn_sigs.insert(f.name.clone(), ownerships);
             }
         }
@@ -357,17 +366,25 @@ impl Checker {
     /// - `&self` methods -> output gets lifetime of self (no annotation needed)
     /// - Multiple input references -> output must be explicitly annotated
     fn check_lifetime_elision(&mut self, func: &Function) {
-        let return_has_ref = func.return_type.as_ref().map_or(false, |t| type_has_reference(t));
+        let return_has_ref = func
+            .return_type
+            .as_ref()
+            .map_or(false, |t| type_has_reference(t));
         if !return_has_ref {
             return;
         }
 
-        let return_has_lifetime = func.return_type.as_ref().map_or(false, |t| type_has_named_lifetime(t));
+        let return_has_lifetime = func
+            .return_type
+            .as_ref()
+            .map_or(false, |t| type_has_named_lifetime(t));
         if return_has_lifetime {
             return;
         }
 
-        let ref_param_count = func.params.iter()
+        let ref_param_count = func
+            .params
+            .iter()
             .filter(|p| type_has_reference(&p.ty))
             .count();
 
@@ -521,13 +538,7 @@ impl Checker {
         }
     }
 
-    fn check_let(
-        &mut self,
-        name: &str,
-        value: &Expr,
-        ownership: &Ownership,
-        span: Span,
-    ) {
+    fn check_let(&mut self, name: &str, value: &Expr, ownership: &Ownership, span: Span) {
         // First, evaluate the right-hand side to detect moves/borrows.
         match value {
             Expr::Borrow(inner) => {
@@ -717,7 +728,10 @@ impl Checker {
                     self.assert_not_moved(name, span);
                     // Allow reborrowing: &r where r: &mut T is valid (immutable reborrow).
                     // Only error if the variable is not a mutable borrow holder.
-                    let is_reborrow = self.env.borrow_map.get(name)
+                    let is_reborrow = self
+                        .env
+                        .borrow_map
+                        .get(name)
                         .map(|info| info.mutable)
                         .unwrap_or(false);
                     if !is_reborrow {
@@ -750,7 +764,10 @@ impl Checker {
                             self.error(
                                 BorrowErrorKind::AssignWhileBorrowed,
                                 span,
-                                format!("cannot assign to `{}` because it is currently borrowed", name),
+                                format!(
+                                    "cannot assign to `{}` because it is currently borrowed",
+                                    name
+                                ),
                             );
                         }
                         _ => {}
@@ -790,7 +807,10 @@ impl Checker {
                                 self.error(
                                     BorrowErrorKind::ImmBorrowWhileMutBorrowed,
                                     span,
-                                    format!("closure captures `{}` which is already mutably borrowed", cap),
+                                    format!(
+                                        "closure captures `{}` which is already mutably borrowed",
+                                        cap
+                                    ),
                                 );
                             }
                             _ => {
@@ -841,7 +861,11 @@ impl Checker {
                     self.check_expr(expr, span);
                 }
             }
-            Expr::TryCatch { body, error_binding, catch_body } => {
+            Expr::TryCatch {
+                body,
+                error_binding,
+                catch_body,
+            } => {
                 self.env.push_scope();
                 self.check_expr(body, span);
                 self.env.pop_scope();
@@ -884,7 +908,10 @@ impl Checker {
                 self.check_expr(label, span);
                 for stmt in &body.stmts {
                     match stmt {
-                        Stmt::Expr(e) | Stmt::Let { value: e, .. } | Stmt::Signal { value: e, .. } | Stmt::Yield(e) => {
+                        Stmt::Expr(e)
+                        | Stmt::Let { value: e, .. }
+                        | Stmt::Signal { value: e, .. }
+                        | Stmt::Yield(e) => {
                             self.check_expr(e, span);
                         }
                         Stmt::Return(Some(e)) => self.check_expr(e, span),
@@ -902,7 +929,12 @@ impl Checker {
             Expr::Break | Expr::Continue => {
                 // No ownership effects
             }
-            Expr::VirtualList { items, item_height, template, .. } => {
+            Expr::VirtualList {
+                items,
+                item_height,
+                template,
+                ..
+            } => {
                 self.check_expr(items, span);
                 self.check_expr(item_height, span);
                 self.check_expr(template, span);
@@ -940,9 +972,9 @@ impl Checker {
     fn expr_as_path(&self, expr: &Expr) -> Option<String> {
         match expr {
             Expr::Ident(name) => Some(name.clone()),
-            Expr::FieldAccess { object, field } => {
-                self.expr_as_path(object).map(|base| format!("{}.{}", base, field))
-            }
+            Expr::FieldAccess { object, field } => self
+                .expr_as_path(object)
+                .map(|base| format!("{}.{}", base, field)),
             _ => None,
         }
     }
@@ -985,7 +1017,10 @@ impl Checker {
                 self.error(
                     BorrowErrorKind::DoubleMutBorrow,
                     span,
-                    format!("cannot borrow `{}` as mutable more than once at a time", name),
+                    format!(
+                        "cannot borrow `{}` as mutable more than once at a time",
+                        name
+                    ),
                 );
             }
             Some(VarState::Borrowed { count }) if *count > 0 => {
@@ -1099,7 +1134,12 @@ impl Checker {
         }
     }
 
-    fn check_return_expr_for_local_refs(&mut self, expr: &Expr, param_names: &[String], span: Span) {
+    fn check_return_expr_for_local_refs(
+        &mut self,
+        expr: &Expr,
+        param_names: &[String],
+        span: Span,
+    ) {
         match expr {
             Expr::Borrow(inner) | Expr::BorrowMut(inner) => {
                 if let Some(name) = self.expr_as_ident(inner) {
@@ -1108,7 +1148,8 @@ impl Checker {
                             BorrowErrorKind::BorrowOutlivesScope,
                             span,
                             format!("cannot return reference to local variable `{}`", name),
-                            "consider returning the value directly instead of a reference".to_string(),
+                            "consider returning the value directly instead of a reference"
+                                .to_string(),
                         );
                     }
                 }
@@ -1119,7 +1160,11 @@ impl Checker {
 
     fn check_return_in_expr(&mut self, expr: &Expr, param_names: &[String], span: Span) {
         match expr {
-            Expr::If { then_block, else_block, .. } => {
+            Expr::If {
+                then_block,
+                else_block,
+                ..
+            } => {
                 self.check_return_references(then_block, param_names, span);
                 if let Some(eb) = else_block {
                     self.check_return_references(eb, param_names, span);
@@ -1198,9 +1243,13 @@ impl Checker {
     /// Called during block checking to implement NLL.
     fn release_dead_borrows(&mut self, last_use: &HashMap<String, usize>, current_idx: usize) {
         // Find borrow variables whose last use is before current_idx.
-        let to_release: Vec<(String, BorrowInfo)> = self.env.borrow_map.iter()
+        let to_release: Vec<(String, BorrowInfo)> = self
+            .env
+            .borrow_map
+            .iter()
             .filter(|(var, _info)| {
-                last_use.get(var.as_str())
+                last_use
+                    .get(var.as_str())
                     .map(|&lu| lu < current_idx)
                     .unwrap_or(false)
             })
@@ -1208,7 +1257,8 @@ impl Checker {
             .collect();
 
         for (var, info) in to_release {
-            self.env.release_borrow_on_source(&info.source_var, info.mutable);
+            self.env
+                .release_borrow_on_source(&info.source_var, info.mutable);
             self.env.borrow_map.remove(&var);
         }
     }
@@ -1263,7 +1313,9 @@ fn type_has_reference(ty: &Type) -> bool {
 /// Collect all named lifetime strings from a type into the `out` vector.
 fn collect_lifetimes_from_type(ty: &Type, out: &mut Vec<String>) {
     match ty {
-        Type::Reference { lifetime, inner, .. } => {
+        Type::Reference {
+            lifetime, inner, ..
+        } => {
             if let Some(lt) = lifetime {
                 if !out.contains(lt) {
                     out.push(lt.clone());
@@ -1283,7 +1335,9 @@ fn collect_lifetimes_from_type(ty: &Type, out: &mut Vec<String>) {
             }
         }
         Type::Function { params, ret } => {
-            for p in params { collect_lifetimes_from_type(p, out); }
+            for p in params {
+                collect_lifetimes_from_type(p, out);
+            }
             collect_lifetimes_from_type(ret, out);
         }
         Type::Result { ok, err } => {
@@ -1297,9 +1351,9 @@ fn collect_lifetimes_from_type(ty: &Type, out: &mut Vec<String>) {
 /// Returns true if the AST type contains a named lifetime.
 fn type_has_named_lifetime(ty: &Type) -> bool {
     match ty {
-        Type::Reference { lifetime, inner, .. } => {
-            lifetime.is_some() || type_has_named_lifetime(inner)
-        }
+        Type::Reference {
+            lifetime, inner, ..
+        } => lifetime.is_some() || type_has_named_lifetime(inner),
         Type::Array(inner) | Type::Option(inner) => type_has_named_lifetime(inner),
         Type::Generic { args, .. } => args.iter().any(type_has_named_lifetime),
         _ => false,
@@ -1349,20 +1403,30 @@ fn collect_captures_inner(expr: &Expr, locals: &[String], out: &mut Vec<String>)
                 collect_captures_inner(arg, locals, out);
             }
         }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             collect_captures_inner(condition, locals, out);
             for stmt in &then_block.stmts {
-                if let Stmt::Expr(e) = stmt { collect_captures_inner(e, locals, out); }
+                if let Stmt::Expr(e) = stmt {
+                    collect_captures_inner(e, locals, out);
+                }
             }
             if let Some(blk) = else_block {
                 for stmt in &blk.stmts {
-                    if let Stmt::Expr(e) = stmt { collect_captures_inner(e, locals, out); }
+                    if let Stmt::Expr(e) = stmt {
+                        collect_captures_inner(e, locals, out);
+                    }
                 }
             }
         }
         Expr::Block(block) => {
             for stmt in &block.stmts {
-                if let Stmt::Expr(e) = stmt { collect_captures_inner(e, locals, out); }
+                if let Stmt::Expr(e) = stmt {
+                    collect_captures_inner(e, locals, out);
+                }
             }
         }
         Expr::Assign { target, value } => {
@@ -1386,22 +1450,44 @@ fn body_mutates_var(expr: &Expr, var: &str) -> bool {
     match expr {
         Expr::Assign { target, value } => {
             if let Expr::Ident(name) = target.as_ref() {
-                if name == var { return true; }
+                if name == var {
+                    return true;
+                }
             }
             body_mutates_var(value, var)
         }
         Expr::Binary { left, right, .. } => {
             body_mutates_var(left, var) || body_mutates_var(right, var)
         }
-        Expr::Block(block) => {
-            block.stmts.iter().any(|s| {
-                if let Stmt::Expr(e) = s { body_mutates_var(e, var) } else { false }
-            })
-        }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::Block(block) => block.stmts.iter().any(|s| {
+            if let Stmt::Expr(e) = s {
+                body_mutates_var(e, var)
+            } else {
+                false
+            }
+        }),
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             body_mutates_var(condition, var)
-                || then_block.stmts.iter().any(|s| if let Stmt::Expr(e) = s { body_mutates_var(e, var) } else { false })
-                || else_block.as_ref().is_some_and(|b| b.stmts.iter().any(|s| if let Stmt::Expr(e) = s { body_mutates_var(e, var) } else { false }))
+                || then_block.stmts.iter().any(|s| {
+                    if let Stmt::Expr(e) = s {
+                        body_mutates_var(e, var)
+                    } else {
+                        false
+                    }
+                })
+                || else_block.as_ref().is_some_and(|b| {
+                    b.stmts.iter().any(|s| {
+                        if let Stmt::Expr(e) = s {
+                            body_mutates_var(e, var)
+                        } else {
+                            false
+                        }
+                    })
+                })
         }
         Expr::FnCall { callee, args } => {
             body_mutates_var(callee, var) || args.iter().any(|a| body_mutates_var(a, var))
@@ -1795,7 +1881,7 @@ mod tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                     Param {
                         name: "b".to_string(),
                         ty: Type::Reference {
@@ -1805,7 +1891,7 @@ mod tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -1848,7 +1934,7 @@ mod tests {
                     },
                     ownership: Ownership::Borrowed,
                     secret: false,
-}],
+                }],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: None,
@@ -1889,7 +1975,7 @@ mod tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                     Param {
                         name: "b".to_string(),
                         ty: Type::Reference {
@@ -1899,7 +1985,7 @@ mod tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -1949,7 +2035,10 @@ mod comprehensive_borrow_tests {
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
-                body: Block { stmts, span: span() },
+                body: Block {
+                    stmts,
+                    span: span(),
+                },
                 is_pub: true,
                 is_async: false,
                 must_use: false,
@@ -1968,13 +2057,37 @@ mod comprehensive_borrow_tests {
         // let a = &mut x;
         // let b = &x;  // ERROR
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::ImmBorrowWhileMutBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::ImmBorrowWhileMutBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1987,8 +2100,22 @@ mod comprehensive_borrow_tests {
         // let a = &x;
         // x = 100;  // ERROR: assign while borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Assign {
                 target: Box::new(ident("x")),
                 value: Box::new(int_lit(100)),
@@ -1996,7 +2123,10 @@ mod comprehensive_borrow_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::AssignWhileBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::AssignWhileBorrowed
+        );
     }
 
     #[test]
@@ -2005,8 +2135,22 @@ mod comprehensive_borrow_tests {
         // let a = &mut x;
         // x = 100;  // ERROR: assign while mutably borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Assign {
                 target: Box::new(ident("x")),
                 value: Box::new(int_lit(100)),
@@ -2014,7 +2158,10 @@ mod comprehensive_borrow_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::AssignWhileBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::AssignWhileBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2027,13 +2174,37 @@ mod comprehensive_borrow_tests {
         // let a = &x;
         // let b = x;  // ERROR: cannot move while borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::AssignWhileBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::AssignWhileBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2046,12 +2217,26 @@ mod comprehensive_borrow_tests {
         // foo(x);   // moves x
         // let y = x; // ERROR: use after move
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::FnCall {
                 callee: Box::new(ident("foo")),
                 args: vec![ident("x")],
             }),
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_err());
@@ -2069,20 +2254,37 @@ mod comprehensive_borrow_tests {
         // let b = &mut x;  // OK: borrow in if branch is released
         let if_block = Block {
             stmts: vec![Stmt::Let {
-                name: "a".into(), ty: None, mutable: false, secret: false,
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Borrow(Box::new(ident("x"))),
                 ownership: Ownership::Owned,
             }],
             span: span(),
         };
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::If {
                 condition: Box::new(Expr::Bool(true)),
                 then_block: if_block,
                 else_block: None,
             }),
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "borrow in if should not leak: {:?}", result);
@@ -2098,20 +2300,37 @@ mod comprehensive_borrow_tests {
         // for i in arr { let a = &x; }
         // let b = &mut x;  // OK
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::For {
                 binding: "i".into(),
                 iterator: Box::new(ident("arr")),
                 body: Block {
                     stmts: vec![Stmt::Let {
-                        name: "a".into(), ty: None, mutable: false, secret: false,
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
                         value: Expr::Borrow(Box::new(ident("x"))),
                         ownership: Ownership::Owned,
                     }],
                     span: span(),
                 },
             }),
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "borrow in for loop body: {:?}", result);
@@ -2127,19 +2346,36 @@ mod comprehensive_borrow_tests {
         // while true { let a = &x; }
         // let b = &mut x;  // OK
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::While {
                 condition: Box::new(Expr::Bool(true)),
                 body: Block {
                     stmts: vec![Stmt::Let {
-                        name: "a".into(), ty: None, mutable: false, secret: false,
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
                         value: Expr::Borrow(Box::new(ident("x"))),
                         ownership: Ownership::Owned,
                     }],
                     span: span(),
                 },
             }),
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "borrow in while loop body: {:?}", result);
@@ -2155,7 +2391,14 @@ mod comprehensive_borrow_tests {
         // match y { 1 => { let a = &x; }, _ => {} }
         // let b = &mut x;  // OK
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Match {
                 subject: Box::new(int_lit(1)),
                 arms: vec![
@@ -2164,7 +2407,10 @@ mod comprehensive_borrow_tests {
                         guard: None,
                         body: Expr::Block(Block {
                             stmts: vec![Stmt::Let {
-                                name: "a".into(), ty: None, mutable: false, secret: false,
+                                name: "a".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
                                 value: Expr::Borrow(Box::new(ident("x"))),
                                 ownership: Ownership::Owned,
                             }],
@@ -2178,7 +2424,14 @@ mod comprehensive_borrow_tests {
                     },
                 ],
             }),
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "borrow in match arm: {:?}", result);
@@ -2194,10 +2447,27 @@ mod comprehensive_borrow_tests {
         // let y = x;  // moves x
         // let f = |a: i32| x + a;  // ERROR: closure captures moved variable
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
             Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Closure {
                     params: vec![("a".into(), None)],
                     body: Box::new(Expr::Binary {
@@ -2224,10 +2494,27 @@ mod comprehensive_borrow_tests {
         // let a = &mut x;
         // let f = || x + 1;  // ERROR: captures x which is mutably borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
             Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Closure {
                     params: vec![],
                     body: Box::new(Expr::Binary {
@@ -2241,7 +2528,10 @@ mod comprehensive_borrow_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::ImmBorrowWhileMutBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::ImmBorrowWhileMutBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2253,9 +2543,19 @@ mod comprehensive_borrow_tests {
         // let x = 42;
         // let f = || x + 1;  // OK: x is owned and not moved
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
             Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Closure {
                     params: vec![],
                     body: Box::new(Expr::Binary {
@@ -2278,7 +2578,13 @@ mod comprehensive_borrow_tests {
     #[test]
     fn signal_state_is_owned() {
         let prog = program_with_stmts(vec![
-            Stmt::Signal { name: "count".into(), ty: None, secret: false, atomic: false, value: int_lit(0) },
+            Stmt::Signal {
+                name: "count".into(),
+                ty: None,
+                secret: false,
+                atomic: false,
+                value: int_lit(0),
+            },
             Stmt::Expr(ident("count")), // can use it
         ]);
         let result = check(&prog);
@@ -2295,8 +2601,22 @@ mod comprehensive_borrow_tests {
         // let y = x;  // moves x
         // return x;   // ERROR: use after move
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Return(Some(ident("x"))),
         ]);
         let result = check(&prog);
@@ -2311,8 +2631,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn yield_moved_value_error() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Yield(ident("x")), // ERROR: use after move
         ]);
         let result = check(&prog);
@@ -2328,7 +2662,10 @@ mod comprehensive_borrow_tests {
     fn let_destructure_declares_bindings() {
         let prog = program_with_stmts(vec![
             Stmt::LetDestructure {
-                pattern: Pattern::Tuple(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]),
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Ident("a".into()),
+                    Pattern::Ident("b".into()),
+                ]),
                 ty: None,
                 value: int_lit(0),
             },
@@ -2336,7 +2673,11 @@ mod comprehensive_borrow_tests {
             Stmt::Expr(ident("b")),
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "destructure should declare bindings: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "destructure should declare bindings: {:?}",
+            result
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2349,8 +2690,22 @@ mod comprehensive_borrow_tests {
         // let y = x;  // moves x
         // let s = Point { a: x };  // ERROR: use after move
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::StructInit {
                 name: "Point".into(),
                 fields: vec![("a".into(), ident("x"))],
@@ -2371,8 +2726,22 @@ mod comprehensive_borrow_tests {
         // let y = x;  // moves x
         // let r = x + 1;  // ERROR: use after move
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Binary {
                 op: BinOp::Add,
                 left: Box::new(ident("x")),
@@ -2391,9 +2760,26 @@ mod comprehensive_borrow_tests {
     #[test]
     fn unary_expr_checks_operand() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
-            Stmt::Expr(Expr::Unary { op: UnaryOp::Neg, operand: Box::new(ident("x")) }),
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(ident("x")),
+            }),
         ]);
         let result = check(&prog);
         assert!(result.is_err());
@@ -2407,8 +2793,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn method_call_checks_object() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::MethodCall {
                 object: Box::new(ident("x")),
                 method: "foo".into(),
@@ -2428,13 +2828,27 @@ mod comprehensive_borrow_tests {
     fn try_catch_scoping() {
         // Borrow in try body shouldn't leak to catch
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::TryCatch {
                 body: Box::new(Expr::Borrow(Box::new(ident("x")))),
                 error_binding: "e".into(),
                 catch_body: Box::new(int_lit(0)),
             }),
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "try/catch scoping: {:?}", result);
@@ -2459,9 +2873,30 @@ mod comprehensive_borrow_tests {
                     trait_bounds: vec![],
                     body: Block {
                         stmts: vec![
-                            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
-                            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
-                            Stmt::Let { name: "z".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+                            Stmt::Let {
+                                name: "x".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: int_lit(1),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "y".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "z".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
                         ],
                         span: span(),
                     },
@@ -2499,9 +2934,30 @@ mod comprehensive_borrow_tests {
                     trait_bounds: vec![],
                     body: Block {
                         stmts: vec![
-                            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
-                            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
-                            Stmt::Let { name: "z".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+                            Stmt::Let {
+                                name: "x".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: int_lit(1),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "y".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "z".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
                         ],
                         span: span(),
                     },
@@ -2513,7 +2969,10 @@ mod comprehensive_borrow_tests {
                 styles: vec![],
                 transitions: vec![],
                 trait_bounds: vec![],
-                render: RenderBlock { body: TemplateNode::TextLiteral("hi".into()), span: span() },
+                render: RenderBlock {
+                    body: TemplateNode::TextLiteral("hi".into()),
+                    span: span(),
+                },
                 permissions: None,
                 gestures: vec![],
                 skeleton: None,
@@ -2546,9 +3005,30 @@ mod comprehensive_borrow_tests {
                     return_type: None,
                     default_body: Some(Block {
                         stmts: vec![
-                            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
-                            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
-                            Stmt::Let { name: "z".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+                            Stmt::Let {
+                                name: "x".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: int_lit(1),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "y".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
+                            Stmt::Let {
+                                name: "z".into(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: ident("x"),
+                                ownership: Ownership::Owned,
+                            },
                         ],
                         span: span(),
                     }),
@@ -2573,9 +3053,30 @@ mod comprehensive_borrow_tests {
                 name: "my_test".into(),
                 body: Block {
                     stmts: vec![
-                        Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
-                        Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
-                        Stmt::Let { name: "z".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+                        Stmt::Let {
+                            name: "x".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: int_lit(1),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "y".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: ident("x"),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "z".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: ident("x"),
+                            ownership: Ownership::Owned,
+                        },
                     ],
                     span: span(),
                 },
@@ -2594,8 +3095,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn fetch_checks_url() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "url".into(), ty: None, mutable: false, secret: false, value: Expr::StringLit("https://api.example.com".into()), ownership: Ownership::Owned },
-            Stmt::Let { name: "u2".into(), ty: None, mutable: false, secret: false, value: ident("url"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "url".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::StringLit("https://api.example.com".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "u2".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("url"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Fetch {
                 url: Box::new(ident("url")),
                 options: None,
@@ -2614,8 +3129,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn parallel_checks_tasks() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Parallel {
                 tasks: vec![ident("x")], // ERROR: use after move
                 span: span(),
@@ -2633,8 +3162,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn index_checks_object() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "arr".into(), ty: None, mutable: false, secret: false, value: int_lit(0), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("arr"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "arr".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("arr"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Index {
                 object: Box::new(ident("arr")),
                 index: Box::new(int_lit(0)),
@@ -2652,10 +3195,38 @@ mod comprehensive_borrow_tests {
     #[test]
     fn three_immutable_borrows_ok() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
-            Stmt::Let { name: "c".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "c".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_ok(), "three immutable borrows: {:?}", result);
@@ -2670,8 +3241,22 @@ mod comprehensive_borrow_tests {
         // let x = 42;
         // let ref y = x;  // immutable borrow via ownership annotation
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Borrowed },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Borrowed,
+            },
             Stmt::Expr(ident("x")), // x should still be usable
         ]);
         let result = check(&prog);
@@ -2684,13 +3269,37 @@ mod comprehensive_borrow_tests {
         // let ref mut y = x;  // mutable borrow via ownership annotation
         // let z = &x;  // ERROR: cannot immutably borrow while mutably borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::MutBorrowed },
-            Stmt::Let { name: "z".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::MutBorrowed,
+            },
+            Stmt::Let {
+                name: "z".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::ImmBorrowWhileMutBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::ImmBorrowWhileMutBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2717,8 +3326,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn format_string_checks_expressions() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::FormatString {
                 parts: vec![
                     FormatPart::Literal("val=".into()),
@@ -2738,8 +3361,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn spawn_checks_body() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Spawn {
                 body: Block {
                     stmts: vec![Stmt::Expr(ident("x"))], // ERROR: use after move
@@ -2760,8 +3397,22 @@ mod comprehensive_borrow_tests {
     #[test]
     fn field_access_checks_object() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "p".into(), ty: None, mutable: false, secret: false, value: int_lit(0), ownership: Ownership::Owned },
-            Stmt::Let { name: "q".into(), ty: None, mutable: false, secret: false, value: ident("p"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "p".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "q".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("p"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::FieldAccess {
                 object: Box::new(ident("p")),
                 field: "x".into(),
@@ -2783,25 +3434,26 @@ mod comprehensive_borrow_tests {
                 name: "get".into(),
                 lifetimes: vec![],
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "self".into(),
-                        ty: Type::Reference {
-                            mutable: false,
-                            lifetime: None,
-                            inner: Box::new(Type::Named("Foo".into())),
-                        },
-                        ownership: Ownership::Borrowed,
-                        secret: false,
-},
-                ],
+                params: vec![Param {
+                    name: "self".into(),
+                    ty: Type::Reference {
+                        mutable: false,
+                        lifetime: None,
+                        inner: Box::new(Type::Named("Foo".into())),
+                    },
+                    ownership: Ownership::Borrowed,
+                    secret: false,
+                }],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: None,
                     inner: Box::new(Type::Named("i32".into())),
                 }),
                 trait_bounds: vec![],
-                body: Block { stmts: vec![Stmt::Return(Some(int_lit(0)))], span: span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(int_lit(0)))],
+                    span: span(),
+                },
                 is_pub: false,
                 is_async: false,
                 must_use: false,
@@ -2809,7 +3461,11 @@ mod comprehensive_borrow_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "&self method lifetime elision: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "&self method lifetime elision: {:?}",
+            result
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2826,20 +3482,31 @@ mod comprehensive_borrow_tests {
                 params: vec![
                     Param {
                         name: "a".into(),
-                        ty: Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) },
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: None,
+                            inner: Box::new(Type::Named("i32".into())),
+                        },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                     Param {
                         name: "b".into(),
-                        ty: Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) },
+                        ty: Type::Reference {
+                            mutable: false,
+                            lifetime: None,
+                            inner: Box::new(Type::Named("i32".into())),
+                        },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                 ],
                 return_type: Some(Type::Named("i32".into())), // value, not reference
                 trait_bounds: vec![],
-                body: Block { stmts: vec![Stmt::Return(Some(int_lit(0)))], span: span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(int_lit(0)))],
+                    span: span(),
+                },
                 is_pub: false,
                 is_async: false,
                 must_use: false,
@@ -2877,7 +3544,10 @@ mod coverage_tests {
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
-                body: Block { stmts, span: span() },
+                body: Block {
+                    stmts,
+                    span: span(),
+                },
                 is_pub: true,
                 is_async: false,
                 must_use: false,
@@ -2886,7 +3556,12 @@ mod coverage_tests {
         }
     }
 
-    fn program_with_fn(name: &str, params: Vec<Param>, return_type: Option<Type>, stmts: Vec<Stmt>) -> Program {
+    fn program_with_fn(
+        name: &str,
+        params: Vec<Param>,
+        return_type: Option<Type>,
+        stmts: Vec<Stmt>,
+    ) -> Program {
         Program {
             items: vec![Item::Function(Function {
                 name: name.to_string(),
@@ -2895,7 +3570,10 @@ mod coverage_tests {
                 params,
                 return_type,
                 trait_bounds: vec![],
-                body: Block { stmts, span: span() },
+                body: Block {
+                    stmts,
+                    span: span(),
+                },
                 is_pub: false,
                 is_async: false,
                 must_use: false,
@@ -2935,7 +3613,10 @@ mod coverage_tests {
         let s = format!("{}", err);
         assert!(s.contains("5:8"), "should contain line:col");
         assert!(s.contains("let y = x;"), "should contain source line");
-        assert!(s.contains("consider borrowing"), "should contain suggestion");
+        assert!(
+            s.contains("consider borrowing"),
+            "should contain suggestion"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -3015,13 +3696,13 @@ mod coverage_tests {
                             },
                             ownership: Ownership::Borrowed,
                             secret: false,
-},
+                        },
                         Param {
                             name: "b".into(),
                             ty: Type::Named("i32".into()),
                             ownership: Ownership::MutBorrowed,
                             secret: false,
-},
+                        },
                     ],
                     return_type: None,
                     default_body: Some(Block {
@@ -3078,7 +3759,7 @@ mod coverage_tests {
                     },
                     ownership: Ownership::Borrowed,
                     secret: false,
-}],
+                }],
                 return_type: None,
                 trait_bounds: vec![],
                 body: Block {
@@ -3118,7 +3799,7 @@ mod coverage_tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                     Param {
                         name: "b".into(),
                         ty: Type::Reference {
@@ -3128,7 +3809,7 @@ mod coverage_tests {
                         },
                         ownership: Ownership::Borrowed,
                         secret: false,
-},
+                    },
                 ],
                 return_type: Some(Type::Reference {
                     mutable: false,
@@ -3166,20 +3847,18 @@ mod coverage_tests {
     #[test]
     fn let_borrow_non_ident_expr() {
         // let a = &(1 + 2);  -- borrow of non-ident
-        let prog = program_with_stmts(vec![
-            Stmt::Let {
-                name: "a".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::Borrow(Box::new(Expr::Binary {
-                    op: BinOp::Add,
-                    left: Box::new(int_lit(1)),
-                    right: Box::new(int_lit(2)),
-                })),
-                ownership: Ownership::Owned,
-            },
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Let {
+            name: "a".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Borrow(Box::new(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(int_lit(1)),
+                right: Box::new(int_lit(2)),
+            })),
+            ownership: Ownership::Owned,
+        }]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3187,20 +3866,18 @@ mod coverage_tests {
     #[test]
     fn let_borrow_mut_non_ident_expr() {
         // let a = &mut (1 + 2);  -- borrow_mut of non-ident
-        let prog = program_with_stmts(vec![
-            Stmt::Let {
-                name: "a".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::BorrowMut(Box::new(Expr::Binary {
-                    op: BinOp::Add,
-                    left: Box::new(int_lit(1)),
-                    right: Box::new(int_lit(2)),
-                })),
-                ownership: Ownership::Owned,
-            },
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Let {
+            name: "a".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::BorrowMut(Box::new(Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(int_lit(1)),
+                right: Box::new(int_lit(2)),
+            })),
+            ownership: Ownership::Owned,
+        }]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3211,16 +3888,17 @@ mod coverage_tests {
 
     #[test]
     fn fn_call_non_ident_args() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::FnCall {
-                callee: Box::new(ident("foo")),
-                args: vec![int_lit(42), Expr::Binary {
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::FnCall {
+            callee: Box::new(ident("foo")),
+            args: vec![
+                int_lit(42),
+                Expr::Binary {
                     op: BinOp::Add,
                     left: Box::new(int_lit(1)),
                     right: Box::new(int_lit(2)),
-                }],
-            }),
-        ]);
+                },
+            ],
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3232,7 +3910,14 @@ mod coverage_tests {
     #[test]
     fn if_with_else_block() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::If {
                 condition: Box::new(Expr::Bool(true)),
                 then_block: Block {
@@ -3256,13 +3941,11 @@ mod coverage_tests {
     #[test]
     fn borrow_non_ident_in_expr() {
         // &(1 + 2)
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Borrow(Box::new(Expr::Binary {
-                op: BinOp::Add,
-                left: Box::new(int_lit(1)),
-                right: Box::new(int_lit(2)),
-            }))),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Borrow(Box::new(Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(int_lit(1)),
+            right: Box::new(int_lit(2)),
+        })))]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3270,13 +3953,11 @@ mod coverage_tests {
     #[test]
     fn borrow_mut_non_ident_in_expr() {
         // &mut (1 + 2)
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::BorrowMut(Box::new(Expr::Binary {
-                op: BinOp::Add,
-                left: Box::new(int_lit(1)),
-                right: Box::new(int_lit(2)),
-            }))),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::BorrowMut(Box::new(Expr::Binary {
+            op: BinOp::Add,
+            left: Box::new(int_lit(1)),
+            right: Box::new(int_lit(2)),
+        })))]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3285,26 +3966,60 @@ mod coverage_tests {
     fn borrow_mut_of_already_mut_borrowed_ident() {
         // &mut x where x is already mut borrowed => assert_no_active_borrows fires
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::BorrowMut(Box::new(ident("x")))), // error: double mut borrow
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::DoubleMutBorrow);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::DoubleMutBorrow
+        );
     }
 
     #[test]
     fn borrow_of_already_mut_borrowed_ident() {
         // &x where x is mut borrowed
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Borrow(Box::new(ident("x")))), // error: imm borrow while mut borrowed
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::ImmBorrowWhileMutBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::ImmBorrowWhileMutBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -3314,8 +4029,22 @@ mod coverage_tests {
     #[test]
     fn await_checks_inner() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Await(Box::new(ident("x")))),
         ]);
         let result = check(&prog);
@@ -3329,13 +4058,11 @@ mod coverage_tests {
 
     #[test]
     fn fetch_with_options_checks_both() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Fetch {
-                url: Box::new(Expr::StringLit("https://example.com".into())),
-                options: Some(Box::new(Expr::StringLit("{}".into()))),
-                contract: None,
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Fetch {
+            url: Box::new(Expr::StringLit("https://example.com".into())),
+            options: Some(Box::new(Expr::StringLit("{}".into()))),
+            contract: None,
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3350,10 +4077,27 @@ mod coverage_tests {
         // let a = &x;  -- immutable borrow of x
         // let f = || { x = 10; };  -- closure mutates x, should error
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(ident("x"))), ownership: Ownership::Owned },
             Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Borrow(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Closure {
                     params: vec![],
                     body: Box::new(Expr::Assign {
@@ -3366,7 +4110,10 @@ mod coverage_tests {
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::MutBorrowWhileImmBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::MutBorrowWhileImmBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -3376,8 +4123,22 @@ mod coverage_tests {
     #[test]
     fn prompt_template_checks_interpolations() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "doc".into(), ty: None, mutable: false, secret: false, value: Expr::StringLit("hello".into()), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("doc"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "doc".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::StringLit("hello".into()),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("doc"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::PromptTemplate {
                 template: "Summarize: {document}".into(),
                 interpolations: vec![("document".into(), ident("doc"))],
@@ -3394,11 +4155,9 @@ mod coverage_tests {
 
     #[test]
     fn navigate_checks_path() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Navigate {
-                path: Box::new(Expr::StringLit("/home".into())),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Navigate {
+            path: Box::new(Expr::StringLit("/home".into())),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3410,9 +4169,25 @@ mod coverage_tests {
     #[test]
     fn stream_checks_source() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "s".into(), ty: None, mutable: false, secret: false, value: int_lit(0), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("s"), ownership: Ownership::Owned },
-            Stmt::Expr(Expr::Stream { source: Box::new(ident("s")) }),
+            Stmt::Let {
+                name: "s".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("s"),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Stream {
+                source: Box::new(ident("s")),
+            }),
         ]);
         let result = check(&prog);
         assert!(result.is_err());
@@ -3424,12 +4199,10 @@ mod coverage_tests {
 
     #[test]
     fn suspend_checks_fallback_and_body() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Suspend {
-                fallback: Box::new(Expr::StringLit("loading".into())),
-                body: Box::new(Expr::StringLit("done".into())),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Suspend {
+            fallback: Box::new(Expr::StringLit("loading".into())),
+            body: Box::new(Expr::StringLit("done".into())),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3440,9 +4213,7 @@ mod coverage_tests {
 
     #[test]
     fn channel_expr_ok() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Channel { ty: None }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Channel { ty: None })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3454,7 +4225,14 @@ mod coverage_tests {
     #[test]
     fn send_checks_channel_and_value() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "ch".into(), ty: None, mutable: false, secret: false, value: Expr::Channel { ty: None }, ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "ch".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Channel { ty: None },
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Send {
                 channel: Box::new(ident("ch")),
                 value: Box::new(int_lit(42)),
@@ -3467,8 +4245,17 @@ mod coverage_tests {
     #[test]
     fn receive_checks_channel() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "ch".into(), ty: None, mutable: false, secret: false, value: Expr::Channel { ty: None }, ownership: Ownership::Owned },
-            Stmt::Expr(Expr::Receive { channel: Box::new(ident("ch")) }),
+            Stmt::Let {
+                name: "ch".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Channel { ty: None },
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Receive {
+                channel: Box::new(ident("ch")),
+            }),
         ]);
         let result = check(&prog);
         assert!(result.is_ok());
@@ -3480,25 +4267,21 @@ mod coverage_tests {
 
     #[test]
     fn assert_checks_condition() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Assert {
-                condition: Box::new(Expr::Bool(true)),
-                message: None,
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Assert {
+            condition: Box::new(Expr::Bool(true)),
+            message: None,
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn assert_eq_checks_both() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::AssertEq {
-                left: Box::new(int_lit(1)),
-                right: Box::new(int_lit(1)),
-                message: Some("should be equal".into()),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::AssertEq {
+            left: Box::new(int_lit(1)),
+            right: Box::new(int_lit(1)),
+            message: Some("should be equal".into()),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3509,12 +4292,10 @@ mod coverage_tests {
 
     #[test]
     fn animate_checks_target() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Animate {
-                target: Box::new(Expr::StringLit("element".into())),
-                animation: "fadeIn".into(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Animate {
+            target: Box::new(Expr::StringLit("element".into())),
+            animation: "fadeIn".into(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3525,9 +4306,7 @@ mod coverage_tests {
 
     #[test]
     fn try_checks_inner() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Try(Box::new(int_lit(42)))),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Try(Box::new(int_lit(42))))]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3538,12 +4317,10 @@ mod coverage_tests {
 
     #[test]
     fn dynamic_import_checks_path() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::DynamicImport {
-                path: Box::new(Expr::StringLit("./module".into())),
-                span: span(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::DynamicImport {
+            path: Box::new(Expr::StringLit("./module".into())),
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3554,13 +4331,11 @@ mod coverage_tests {
 
     #[test]
     fn download_checks_data_and_filename() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Download {
-                data: Box::new(Expr::StringLit("content".into())),
-                filename: Box::new(Expr::StringLit("file.txt".into())),
-                span: span(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Download {
+            data: Box::new(Expr::StringLit("content".into())),
+            filename: Box::new(Expr::StringLit("file.txt".into())),
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3571,12 +4346,10 @@ mod coverage_tests {
 
     #[test]
     fn env_checks_name() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Env {
-                name: Box::new(Expr::StringLit("API_KEY".into())),
-                span: span(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Env {
+            name: Box::new(Expr::StringLit("API_KEY".into())),
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3587,23 +4360,34 @@ mod coverage_tests {
 
     #[test]
     fn trace_checks_label_and_body() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Trace {
-                label: Box::new(Expr::StringLit("perf".into())),
-                body: Block {
-                    stmts: vec![
-                        Stmt::Expr(int_lit(1)),
-                        Stmt::Let { name: "t".into(), ty: None, mutable: false, secret: false, value: int_lit(2), ownership: Ownership::Owned },
-                        Stmt::Signal { name: "s".into(), ty: None, secret: false, atomic: false, value: int_lit(3) },
-                        Stmt::Yield(int_lit(4)),
-                        Stmt::Return(Some(int_lit(5))),
-                        Stmt::Return(None),
-                    ],
-                    span: span(),
-                },
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Trace {
+            label: Box::new(Expr::StringLit("perf".into())),
+            body: Block {
+                stmts: vec![
+                    Stmt::Expr(int_lit(1)),
+                    Stmt::Let {
+                        name: "t".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: int_lit(2),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Signal {
+                        name: "s".into(),
+                        ty: None,
+                        secret: false,
+                        atomic: false,
+                        value: int_lit(3),
+                    },
+                    Stmt::Yield(int_lit(4)),
+                    Stmt::Return(Some(int_lit(5))),
+                    Stmt::Return(None),
+                ],
                 span: span(),
-            }),
-        ]);
+            },
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3614,12 +4398,10 @@ mod coverage_tests {
 
     #[test]
     fn flag_checks_name() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Flag {
-                name: Box::new(Expr::StringLit("dark_mode".into())),
-                span: span(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Flag {
+            name: Box::new(Expr::StringLit("dark_mode".into())),
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3630,15 +4412,13 @@ mod coverage_tests {
 
     #[test]
     fn virtual_list_checks_all_fields() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::VirtualList {
-                items: Box::new(Expr::StringLit("[]".into())),
-                item_height: Box::new(int_lit(40)),
-                template: Box::new(Expr::StringLit("item".into())),
-                buffer: Some(5),
-                span: span(),
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::VirtualList {
+            items: Box::new(Expr::StringLit("[]".into())),
+            item_height: Box::new(int_lit(40)),
+            template: Box::new(Expr::StringLit("item".into())),
+            buffer: Some(5),
+            span: span(),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3650,13 +4430,37 @@ mod coverage_tests {
     #[test]
     fn move_while_mut_borrowed() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(ident("x"))), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::BorrowMut(Box::new(ident("x"))),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
         ]);
         let result = check(&prog);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err()[0].kind, BorrowErrorKind::AssignWhileBorrowed);
+        assert_eq!(
+            result.unwrap_err()[0].kind,
+            BorrowErrorKind::AssignWhileBorrowed
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -3714,7 +4518,10 @@ mod coverage_tests {
     fn let_destructure_array_pattern() {
         let prog = program_with_stmts(vec![
             Stmt::LetDestructure {
-                pattern: Pattern::Array(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]),
+                pattern: Pattern::Array(vec![
+                    Pattern::Ident("a".into()),
+                    Pattern::Ident("b".into()),
+                ]),
                 ty: None,
                 value: int_lit(0),
             },
@@ -3730,13 +4537,11 @@ mod coverage_tests {
 
     #[test]
     fn let_destructure_wildcard_literal() {
-        let prog = program_with_stmts(vec![
-            Stmt::LetDestructure {
-                pattern: Pattern::Wildcard,
-                ty: None,
-                value: int_lit(0),
-            },
-        ]);
+        let prog = program_with_stmts(vec![Stmt::LetDestructure {
+            pattern: Pattern::Wildcard,
+            ty: None,
+            value: int_lit(0),
+        }]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -3747,20 +4552,24 @@ mod coverage_tests {
 
     #[test]
     fn type_has_reference_array() {
-        assert!(type_has_reference(&Type::Array(Box::new(Type::Reference {
-            mutable: false,
-            lifetime: None,
-            inner: Box::new(Type::Named("i32".into())),
-        }))));
+        assert!(type_has_reference(&Type::Array(Box::new(
+            Type::Reference {
+                mutable: false,
+                lifetime: None,
+                inner: Box::new(Type::Named("i32".into())),
+            }
+        ))));
     }
 
     #[test]
     fn type_has_reference_option() {
-        assert!(type_has_reference(&Type::Option(Box::new(Type::Reference {
-            mutable: false,
-            lifetime: None,
-            inner: Box::new(Type::Named("i32".into())),
-        }))));
+        assert!(type_has_reference(&Type::Option(Box::new(
+            Type::Reference {
+                mutable: false,
+                lifetime: None,
+                inner: Box::new(Type::Named("i32".into())),
+            }
+        ))));
     }
 
     #[test]
@@ -3819,20 +4628,24 @@ mod coverage_tests {
 
     #[test]
     fn type_has_named_lifetime_array() {
-        assert!(type_has_named_lifetime(&Type::Array(Box::new(Type::Reference {
-            mutable: false,
-            lifetime: Some("a".into()),
-            inner: Box::new(Type::Named("i32".into())),
-        }))));
+        assert!(type_has_named_lifetime(&Type::Array(Box::new(
+            Type::Reference {
+                mutable: false,
+                lifetime: Some("a".into()),
+                inner: Box::new(Type::Named("i32".into())),
+            }
+        ))));
     }
 
     #[test]
     fn type_has_named_lifetime_option() {
-        assert!(type_has_named_lifetime(&Type::Option(Box::new(Type::Reference {
-            mutable: false,
-            lifetime: Some("a".into()),
-            inner: Box::new(Type::Named("i32".into())),
-        }))));
+        assert!(type_has_named_lifetime(&Type::Option(Box::new(
+            Type::Reference {
+                mutable: false,
+                lifetime: Some("a".into()),
+                inner: Box::new(Type::Named("i32".into())),
+            }
+        ))));
     }
 
     #[test]
@@ -3886,7 +4699,10 @@ mod coverage_tests {
     #[test]
     fn collect_captures_unary() {
         let caps = collect_captures(
-            &Expr::Unary { op: UnaryOp::Neg, operand: Box::new(ident("x")) },
+            &Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(ident("x")),
+            },
             &[],
         );
         assert_eq!(caps, vec!["x".to_string()]);
@@ -4097,7 +4913,10 @@ mod coverage_tests {
                     target: Box::new(ident("x")),
                     value: Box::new(int_lit(1)),
                 }),
-                then_block: Block { stmts: vec![], span: span() },
+                then_block: Block {
+                    stmts: vec![],
+                    span: span()
+                },
                 else_block: None,
             },
             "x",
@@ -4121,7 +4940,10 @@ mod coverage_tests {
         assert!(body_mutates_var(
             &Expr::If {
                 condition: Box::new(Expr::Bool(true)),
-                then_block: Block { stmts: vec![], span: span() },
+                then_block: Block {
+                    stmts: vec![],
+                    span: span()
+                },
                 else_block: Some(Block {
                     stmts: vec![Stmt::Expr(Expr::Assign {
                         target: Box::new(ident("x")),
@@ -4136,7 +4958,10 @@ mod coverage_tests {
         assert!(!body_mutates_var(
             &Expr::If {
                 condition: Box::new(Expr::Bool(true)),
-                then_block: Block { stmts: vec![], span: span() },
+                then_block: Block {
+                    stmts: vec![],
+                    span: span()
+                },
                 else_block: None,
             },
             "x",
@@ -4180,11 +5005,39 @@ mod coverage_tests {
     fn multiple_errors_accumulated() {
         // Two independent use-after-move errors
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "a".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: None, mutable: false, secret: false, value: ident("a"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "a".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(1),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("a"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(ident("a")), // error 1
-            Stmt::Let { name: "c".into(), ty: None, mutable: false, secret: false, value: int_lit(2), ownership: Ownership::Owned },
-            Stmt::Let { name: "d".into(), ty: None, mutable: false, secret: false, value: ident("c"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "c".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(2),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "d".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("c"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(ident("c")), // error 2
         ]);
         let result = check(&prog);
@@ -4198,16 +5051,14 @@ mod coverage_tests {
 
     #[test]
     fn match_arm_with_ident_pattern() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Match {
-                subject: Box::new(int_lit(1)),
-                arms: vec![MatchArm {
-                    pattern: Pattern::Ident("val".into()),
-                    guard: None,
-                    body: ident("val"),
-                }],
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Match {
+            subject: Box::new(int_lit(1)),
+            arms: vec![MatchArm {
+                pattern: Pattern::Ident("val".into()),
+                guard: None,
+                body: ident("val"),
+            }],
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -4218,15 +5069,13 @@ mod coverage_tests {
 
     #[test]
     fn assign_to_field_access() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Assign {
-                target: Box::new(Expr::FieldAccess {
-                    object: Box::new(ident("obj")),
-                    field: "x".into(),
-                }),
-                value: Box::new(int_lit(1)),
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Assign {
+            target: Box::new(Expr::FieldAccess {
+                object: Box::new(ident("obj")),
+                field: "x".into(),
             }),
-        ]);
+            value: Box::new(int_lit(1)),
+        })]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -4237,9 +5086,7 @@ mod coverage_tests {
 
     #[test]
     fn return_none() {
-        let prog = program_with_stmts(vec![
-            Stmt::Return(None),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Return(None)]);
         let result = check(&prog);
         assert!(result.is_ok());
     }
@@ -4377,8 +5224,21 @@ mod coverage_tests {
     #[test]
     fn signal_then_move() {
         let prog = program_with_stmts(vec![
-            Stmt::Signal { name: "s".into(), ty: None, secret: false, atomic: false, value: int_lit(0) },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("s"), ownership: Ownership::Owned },
+            Stmt::Signal {
+                name: "s".into(),
+                ty: None,
+                secret: false,
+                atomic: false,
+                value: int_lit(0),
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("s"),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(ident("s")), // ERROR: use after move
         ]);
         let result = check(&prog);
@@ -4393,8 +5253,22 @@ mod coverage_tests {
     #[test]
     fn let_destructure_checks_value() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(42), ownership: Ownership::Owned },
-            Stmt::Let { name: "y".into(), ty: None, mutable: false, secret: false, value: ident("x"), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(42),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "y".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: ident("x"),
+                ownership: Ownership::Owned,
+            },
             Stmt::LetDestructure {
                 pattern: Pattern::Tuple(vec![Pattern::Ident("a".into())]),
                 ty: None,
@@ -4411,94 +5285,117 @@ mod coverage_tests {
     #[test]
     fn array_lit_checks_elements() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(1), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(1),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::ArrayLit(vec![ident("x"), ident("x")])),
         ]);
         // integers are Copy, so using x twice is fine
         let result = check(&prog);
-        assert!(result.is_ok(), "Array with Copy elements should pass: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Array with Copy elements should pass: {:?}",
+            result
+        );
     }
 
     #[test]
     fn array_lit_simple() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::ArrayLit(vec![int_lit(1), int_lit(2), int_lit(3)])),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::ArrayLit(vec![
+            int_lit(1),
+            int_lit(2),
+            int_lit(3),
+        ]))]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Array of literals should pass: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Array of literals should pass: {:?}",
+            result
+        );
     }
 
     // ── ObjectLit borrow checking ───────────────────────────────────────
 
     #[test]
     fn object_lit_checks_fields() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::ObjectLit {
-                fields: vec![
-                    ("a".into(), int_lit(1)),
-                    ("b".into(), int_lit(2)),
-                ],
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::ObjectLit {
+            fields: vec![("a".into(), int_lit(1)), ("b".into(), int_lit(2))],
+        })]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Object literal with literals should pass: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Object literal with literals should pass: {:?}",
+            result
+        );
     }
 
     // ── Match guard borrow checking ─────────────────────────────────────
 
     #[test]
     fn match_guard_borrow_check() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::Match {
-                subject: Box::new(int_lit(1)),
-                arms: vec![
-                    MatchArm {
-                        pattern: Pattern::Ident("n".into()),
-                        guard: Some(Expr::Binary {
-                            op: BinOp::Gt,
-                            left: Box::new(ident("n")),
-                            right: Box::new(int_lit(0)),
-                        }),
-                        body: int_lit(10),
-                    },
-                    MatchArm {
-                        pattern: Pattern::Wildcard,
-                        guard: None,
-                        body: int_lit(0),
-                    },
-                ],
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::Match {
+            subject: Box::new(int_lit(1)),
+            arms: vec![
+                MatchArm {
+                    pattern: Pattern::Ident("n".into()),
+                    guard: Some(Expr::Binary {
+                        op: BinOp::Gt,
+                        left: Box::new(ident("n")),
+                        right: Box::new(int_lit(0)),
+                    }),
+                    body: int_lit(10),
+                },
+                MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: int_lit(0),
+                },
+            ],
+        })]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Match with guard should pass borrow check: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Match with guard should pass borrow check: {:?}",
+            result
+        );
     }
 
     #[test]
     fn object_lit_simple() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::ObjectLit {
-                fields: vec![
-                    ("a".into(), int_lit(1)),
-                ],
-            }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::ObjectLit {
+            fields: vec![("a".into(), int_lit(1))],
+        })]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Single-field ObjectLit should pass: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Single-field ObjectLit should pass: {:?}",
+            result
+        );
     }
 
     #[test]
     fn match_no_guard_borrow_check() {
         let prog = program_with_stmts(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: int_lit(5), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: int_lit(5),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Match {
                 subject: Box::new(ident("x")),
-                arms: vec![
-                    MatchArm {
-                        pattern: Pattern::Wildcard,
-                        guard: None,
-                        body: int_lit(0),
-                    },
-                ],
+                arms: vec![MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: int_lit(0),
+                }],
             }),
         ]);
         let result = check(&prog);
@@ -4507,18 +5404,14 @@ mod coverage_tests {
 
     #[test]
     fn empty_array_lit() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::ArrayLit(vec![])),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::ArrayLit(vec![]))]);
         let result = check(&prog);
         assert!(result.is_ok(), "Empty array should pass: {:?}", result);
     }
 
     #[test]
     fn empty_object_lit() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::ObjectLit { fields: vec![] }),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::ObjectLit { fields: vec![] })]);
         let result = check(&prog);
         assert!(result.is_ok(), "Empty object should pass: {:?}", result);
     }
@@ -4547,7 +5440,11 @@ mod coverage_tests {
             }),
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "None used after binding should not be 'moved': {:?}", result);
+        assert!(
+            result.is_ok(),
+            "None used after binding should not be 'moved': {:?}",
+            result
+        );
     }
 
     /// `Some(x)` constructor is not a variable; it should not be marked moved.
@@ -4572,7 +5469,11 @@ mod coverage_tests {
             },
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "None can be bound multiple times: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "None can be bound multiple times: {:?}",
+            result
+        );
     }
 
     /// `Ok` and `Err` constructors must not be treated as moved variables.
@@ -4600,7 +5501,11 @@ mod coverage_tests {
             Stmt::Expr(Expr::Ident("Err".into())),
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Ok/Err constructors should not be marked moved: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Ok/Err constructors should not be marked moved: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -4628,7 +5533,11 @@ mod coverage_tests {
             }),
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Range expression should pass borrow check: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Range expression should pass borrow check: {:?}",
+            result
+        );
     }
 
     // -- Phase 3: Partial borrows, fn sigs, NLL, return refs, reborrowing -----
@@ -4652,7 +5561,10 @@ mod coverage_tests {
     #[test]
     fn test_expr_as_path_ident() {
         let checker = Checker::new();
-        assert_eq!(checker.expr_as_path(&Expr::Ident("x".into())), Some("x".to_string()));
+        assert_eq!(
+            checker.expr_as_path(&Expr::Ident("x".into())),
+            Some("x".to_string())
+        );
     }
 
     #[test]
@@ -4696,7 +5608,10 @@ mod coverage_tests {
                     }],
                     return_type: None,
                     trait_bounds: vec![],
-                    body: Block { stmts: vec![], span: span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: span(),
+                    },
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -4742,7 +5657,11 @@ mod coverage_tests {
             ],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "Borrowed param should not move: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Borrowed param should not move: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -4769,7 +5688,10 @@ mod coverage_tests {
             ],
         );
         let result = check(&prog);
-        assert!(result.is_err(), "Should reject returning reference to local variable");
+        assert!(
+            result.is_err(),
+            "Should reject returning reference to local variable"
+        );
     }
 
     #[test]
@@ -4797,9 +5719,7 @@ mod coverage_tests {
                 }),
                 trait_bounds: vec![],
                 body: Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Borrow(Box::new(ident("x"))))),
-                    ],
+                    stmts: vec![Stmt::Return(Some(Expr::Borrow(Box::new(ident("x")))))],
                     span: span(),
                 },
                 is_pub: false,
@@ -4809,7 +5729,11 @@ mod coverage_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "Should allow returning reference to param: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Should allow returning reference to param: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -4844,7 +5768,11 @@ mod coverage_tests {
             },
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Immutable reborrow of mut borrow should be ok: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Immutable reborrow of mut borrow should be ok: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -4884,7 +5812,11 @@ mod coverage_tests {
             },
         ]);
         let result = check(&prog);
-        assert!(result.is_ok(), "NLL should allow move after last use of borrow: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "NLL should allow move after last use of borrow: {:?}",
+            result.err()
+        );
     }
 
     // =====================================================================
@@ -4893,15 +5825,17 @@ mod coverage_tests {
 
     #[test]
     fn tuple_literal_borrow_check_ok() {
-        let prog = program_with_stmts(vec![
-            Stmt::Expr(Expr::TupleLit(vec![
-                Expr::Integer(1),
-                Expr::Integer(2),
-                Expr::Integer(3),
-            ])),
-        ]);
+        let prog = program_with_stmts(vec![Stmt::Expr(Expr::TupleLit(vec![
+            Expr::Integer(1),
+            Expr::Integer(2),
+            Expr::Integer(3),
+        ]))]);
         let result = check(&prog);
-        assert!(result.is_ok(), "Tuple literal should pass borrow check: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Tuple literal should pass borrow check: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -4985,7 +5919,11 @@ mod coverage_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "Valid lifetime annotations should compile: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Valid lifetime annotations should compile: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -4996,18 +5934,16 @@ mod coverage_tests {
                 name: "bad".into(),
                 lifetimes: vec!["a".into()],
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "x".into(),
-                        ty: Type::Reference {
-                            mutable: false,
-                            lifetime: Some("b".into()),
-                            inner: Box::new(Type::Named("str".into())),
-                        },
-                        ownership: Ownership::Borrowed,
-                        secret: false,
+                params: vec![Param {
+                    name: "x".into(),
+                    ty: Type::Reference {
+                        mutable: false,
+                        lifetime: Some("b".into()),
+                        inner: Box::new(Type::Named("str".into())),
                     },
-                ],
+                    ownership: Ownership::Borrowed,
+                    secret: false,
+                }],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: Some("a".into()),
@@ -5027,8 +5963,12 @@ mod coverage_tests {
         let result = check(&prog);
         assert!(result.is_err(), "Undeclared lifetime in param should fail");
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
-            "Error should mention undeclared lifetime 'b: {:?}", errs);
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
+            "Error should mention undeclared lifetime 'b: {:?}",
+            errs
+        );
     }
 
     #[test]
@@ -5039,18 +5979,16 @@ mod coverage_tests {
                 name: "bad".into(),
                 lifetimes: vec!["a".into()],
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "x".into(),
-                        ty: Type::Reference {
-                            mutable: false,
-                            lifetime: Some("a".into()),
-                            inner: Box::new(Type::Named("str".into())),
-                        },
-                        ownership: Ownership::Borrowed,
-                        secret: false,
+                params: vec![Param {
+                    name: "x".into(),
+                    ty: Type::Reference {
+                        mutable: false,
+                        lifetime: Some("a".into()),
+                        inner: Box::new(Type::Named("str".into())),
                     },
-                ],
+                    ownership: Ownership::Borrowed,
+                    secret: false,
+                }],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: Some("b".into()),
@@ -5070,8 +6008,12 @@ mod coverage_tests {
         let result = check(&prog);
         assert!(result.is_err(), "Undeclared lifetime in return should fail");
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
-            "Error should mention undeclared lifetime 'b: {:?}", errs);
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("undeclared lifetime") && e.message.contains("'b")),
+            "Error should mention undeclared lifetime 'b: {:?}",
+            errs
+        );
     }
 
     #[test]
@@ -5082,18 +6024,16 @@ mod coverage_tests {
                 name: "bad".into(),
                 lifetimes: vec!["a".into(), "b".into()],
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "x".into(),
-                        ty: Type::Reference {
-                            mutable: false,
-                            lifetime: Some("a".into()),
-                            inner: Box::new(Type::Named("str".into())),
-                        },
-                        ownership: Ownership::Borrowed,
-                        secret: false,
+                params: vec![Param {
+                    name: "x".into(),
+                    ty: Type::Reference {
+                        mutable: false,
+                        lifetime: Some("a".into()),
+                        inner: Box::new(Type::Named("str".into())),
                     },
-                ],
+                    ownership: Ownership::Borrowed,
+                    secret: false,
+                }],
                 return_type: Some(Type::Reference {
                     mutable: false,
                     lifetime: Some("b".into()),
@@ -5111,10 +6051,17 @@ mod coverage_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_err(), "Return lifetime not matching any param should fail");
+        assert!(
+            result.is_err(),
+            "Return lifetime not matching any param should fail"
+        );
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("no parameter has that lifetime")),
-            "Error should mention no param has the return lifetime: {:?}", errs);
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("no parameter has that lifetime")),
+            "Error should mention no param has the return lifetime: {:?}",
+            errs
+        );
     }
 
     #[test]
@@ -5164,7 +6111,11 @@ mod coverage_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "Valid matching lifetimes should compile: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Valid matching lifetimes should compile: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -5175,14 +6126,12 @@ mod coverage_tests {
                 name: "simple".into(),
                 lifetimes: vec![],
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "x".into(),
-                        ty: Type::Named("i32".into()),
-                        ownership: Ownership::Owned,
-                        secret: false,
-                    },
-                ],
+                params: vec![Param {
+                    name: "x".into(),
+                    ty: Type::Named("i32".into()),
+                    ownership: Ownership::Owned,
+                    secret: false,
+                }],
                 return_type: Some(Type::Named("i32".into())),
                 trait_bounds: vec![],
                 body: Block {
@@ -5196,7 +6145,11 @@ mod coverage_tests {
             })],
         };
         let result = check(&prog);
-        assert!(result.is_ok(), "Function without lifetimes should compile: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Function without lifetimes should compile: {:?}",
+            result
+        );
     }
 
     #[test]

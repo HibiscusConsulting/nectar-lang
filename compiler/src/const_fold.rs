@@ -85,28 +85,34 @@ fn fold_item(item: &mut Item, stats: &mut FoldStats) {
                 fold_function(method, stats);
             }
         }
-        Item::Struct(_) | Item::Enum(_) | Item::Use(_)
-        | Item::Router(_) | Item::LazyComponent(_) | Item::Test(_) | Item::Trait(_) | Item::Mod(_) => {}
-            Item::Contract(_) => {}
-            Item::App(_) => {}
-            Item::Embed(_) => {}
-            Item::Pdf(_) => {}
-            Item::Payment(_) => {}
-            Item::MiniProgram(_) => {}
-            Item::Banking(_) => {}
-            Item::Map(_) => {}
-            Item::Auth(_) => {}
-            Item::Upload(_) => {}
-            Item::Db(_) => {}
-            Item::Cache(_) => {}
-            Item::Breakpoints(_) => {}
-            Item::Theme(_) => {}
-            Item::Animation(_) => {}
-            Item::Channel(ch) => {
-                for method in &mut ch.methods {
-                    fold_function(method, stats);
-                }
+        Item::Struct(_)
+        | Item::Enum(_)
+        | Item::Use(_)
+        | Item::Router(_)
+        | Item::LazyComponent(_)
+        | Item::Test(_)
+        | Item::Trait(_)
+        | Item::Mod(_) => {}
+        Item::Contract(_) => {}
+        Item::App(_) => {}
+        Item::Embed(_) => {}
+        Item::Pdf(_) => {}
+        Item::Payment(_) => {}
+        Item::MiniProgram(_) => {}
+        Item::Banking(_) => {}
+        Item::Map(_) => {}
+        Item::Auth(_) => {}
+        Item::Upload(_) => {}
+        Item::Db(_) => {}
+        Item::Cache(_) => {}
+        Item::Breakpoints(_) => {}
+        Item::Theme(_) => {}
+        Item::Animation(_) => {}
+        Item::Channel(ch) => {
+            for method in &mut ch.methods {
+                fold_function(method, stats);
             }
+        }
     }
 }
 
@@ -143,7 +149,12 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
         Expr::Unary { operand, .. } => {
             fold_expr(operand, stats);
         }
-        Expr::If { condition, then_block, else_block, .. } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
             fold_expr(condition, stats);
             fold_block(then_block, stats);
             if let Some(eb) = else_block {
@@ -167,7 +178,9 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
             fold_expr(iterator, stats);
             fold_block(body, stats);
         }
-        Expr::While { condition, body, .. } => {
+        Expr::While {
+            condition, body, ..
+        } => {
             fold_expr(condition, stats);
             fold_block(body, stats);
         }
@@ -199,8 +212,11 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
                 fold_expr(&mut arm.body, stats);
             }
         }
-        Expr::Borrow(inner) | Expr::BorrowMut(inner) | Expr::Await(inner)
-        | Expr::Stream { source: inner } | Expr::Navigate { path: inner }
+        Expr::Borrow(inner)
+        | Expr::BorrowMut(inner)
+        | Expr::Await(inner)
+        | Expr::Stream { source: inner }
+        | Expr::Navigate { path: inner }
         | Expr::Receive { channel: inner } => {
             fold_expr(inner, stats);
         }
@@ -215,7 +231,9 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
             fold_expr(fallback, stats);
             fold_expr(body, stats);
         }
-        Expr::TryCatch { body, catch_body, .. } => {
+        Expr::TryCatch {
+            body, catch_body, ..
+        } => {
             fold_expr(body, stats);
             fold_expr(catch_body, stats);
         }
@@ -267,14 +285,23 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
             fold_expr(name, stats);
         }
         Expr::ArrayLit(elements) => {
-            for e in elements { fold_expr(e, stats); }
+            for e in elements {
+                fold_expr(e, stats);
+            }
         }
         Expr::ObjectLit { fields } => {
-            for (_, v) in fields { fold_expr(v, stats); }
+            for (_, v) in fields {
+                fold_expr(v, stats);
+            }
         }
         // Leaf nodes — nothing to fold further into
-        Expr::Integer(_) | Expr::Float(_) | Expr::StringLit(_) | Expr::Bool(_)
-        | Expr::Ident(_) | Expr::SelfExpr | Expr::Channel { .. } => {}
+        Expr::Integer(_)
+        | Expr::Float(_)
+        | Expr::StringLit(_)
+        | Expr::Bool(_)
+        | Expr::Ident(_)
+        | Expr::SelfExpr
+        | Expr::Channel { .. } => {}
         _ => {}
     }
 
@@ -289,34 +316,34 @@ pub fn fold_expr(expr: &mut Expr, stats: &mut FoldStats) {
 fn try_fold(expr: &Expr) -> Option<Expr> {
     match expr {
         // Binary operations on integer literals
-        Expr::Binary { op, left, right } => {
-            match (left.as_ref(), right.as_ref()) {
-                (Expr::Integer(a), Expr::Integer(b)) => fold_int_binary(*op, *a, *b),
-                (Expr::Float(a), Expr::Float(b)) => fold_float_binary(*op, *a, *b),
-                (Expr::Bool(a), Expr::Bool(b)) => fold_bool_binary(*op, *a, *b),
-                (Expr::StringLit(a), Expr::StringLit(b)) => {
-                    if matches!(op, BinOp::Add) {
-                        Some(Expr::StringLit(format!("{}{}", a, b)))
-                    } else {
-                        None
-                    }
+        Expr::Binary { op, left, right } => match (left.as_ref(), right.as_ref()) {
+            (Expr::Integer(a), Expr::Integer(b)) => fold_int_binary(*op, *a, *b),
+            (Expr::Float(a), Expr::Float(b)) => fold_float_binary(*op, *a, *b),
+            (Expr::Bool(a), Expr::Bool(b)) => fold_bool_binary(*op, *a, *b),
+            (Expr::StringLit(a), Expr::StringLit(b)) => {
+                if matches!(op, BinOp::Add) {
+                    Some(Expr::StringLit(format!("{}{}", a, b)))
+                } else {
+                    None
                 }
-                _ => None,
             }
-        }
+            _ => None,
+        },
 
         // Unary operations
-        Expr::Unary { op, operand } => {
-            match (op, operand.as_ref()) {
-                (UnaryOp::Neg, Expr::Integer(n)) => Some(Expr::Integer(-n)),
-                (UnaryOp::Neg, Expr::Float(f)) => Some(Expr::Float(-f)),
-                (UnaryOp::Not, Expr::Bool(b)) => Some(Expr::Bool(!b)),
-                _ => None,
-            }
-        }
+        Expr::Unary { op, operand } => match (op, operand.as_ref()) {
+            (UnaryOp::Neg, Expr::Integer(n)) => Some(Expr::Integer(-n)),
+            (UnaryOp::Neg, Expr::Float(f)) => Some(Expr::Float(-f)),
+            (UnaryOp::Not, Expr::Bool(b)) => Some(Expr::Bool(!b)),
+            _ => None,
+        },
 
         // If with known condition
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             match condition.as_ref() {
                 Expr::Bool(true) => {
                     // Replace with then-block contents
@@ -344,10 +371,18 @@ fn fold_int_binary(op: BinOp, a: i64, b: i64) -> Option<Expr> {
         BinOp::Sub => Some(Expr::Integer(a.wrapping_sub(b))),
         BinOp::Mul => Some(Expr::Integer(a.wrapping_mul(b))),
         BinOp::Div => {
-            if b == 0 { None } else { Some(Expr::Integer(a / b)) }
+            if b == 0 {
+                None
+            } else {
+                Some(Expr::Integer(a / b))
+            }
         }
         BinOp::Mod => {
-            if b == 0 { None } else { Some(Expr::Integer(a % b)) }
+            if b == 0 {
+                None
+            } else {
+                Some(Expr::Integer(a % b))
+            }
         }
         BinOp::Eq => Some(Expr::Bool(a == b)),
         BinOp::Neq => Some(Expr::Bool(a != b)),
@@ -365,7 +400,11 @@ fn fold_float_binary(op: BinOp, a: f64, b: f64) -> Option<Expr> {
         BinOp::Sub => Some(Expr::Float(a - b)),
         BinOp::Mul => Some(Expr::Float(a * b)),
         BinOp::Div => {
-            if b == 0.0 { None } else { Some(Expr::Float(a / b)) }
+            if b == 0.0 {
+                None
+            } else {
+                Some(Expr::Float(a / b))
+            }
         }
         BinOp::Lt => Some(Expr::Bool(a < b)),
         BinOp::Gt => Some(Expr::Bool(a > b)),
@@ -395,7 +434,12 @@ mod tests {
     use crate::token::Span;
 
     fn dummy_span() -> Span {
-        Span { start: 0, end: 0, line: 0, col: 0 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            col: 0,
+        }
     }
 
     fn make_program(stmts: Vec<Stmt>) -> Program {
@@ -407,7 +451,10 @@ mod tests {
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
-                body: Block { stmts, span: dummy_span() },
+                body: Block {
+                    stmts,
+                    span: dummy_span(),
+                },
                 is_pub: false,
                 is_async: false,
                 must_use: false,
@@ -850,7 +897,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -883,19 +933,28 @@ mod tests {
                 actions: vec![ActionDef {
                     name: "inc".to_string(),
                     params: vec![],
-                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    body: Block {
+                        stmts: vec![Stmt::Expr(foldable_expr())],
+                        span: dummy_span(),
+                    },
                     is_async: false,
                     span: dummy_span(),
                 }],
                 computed: vec![ComputedDef {
                     name: "double".to_string(),
                     return_type: None,
-                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    body: Block {
+                        stmts: vec![Stmt::Expr(foldable_expr())],
+                        span: dummy_span(),
+                    },
                     span: dummy_span(),
                 }],
                 effects: vec![EffectDef {
                     name: "log".to_string(),
-                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    body: Block {
+                        stmts: vec![Stmt::Expr(foldable_expr())],
+                        span: dummy_span(),
+                    },
                     span: dummy_span(),
                 }],
                 selectors: vec![],
@@ -978,7 +1037,10 @@ mod tests {
                     description: None,
                     params: vec![],
                     return_type: None,
-                    body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+                    body: Block {
+                        stmts: vec![Stmt::Expr(foldable_expr())],
+                        span: dummy_span(),
+                    },
                     span: dummy_span(),
                 }],
                 state: vec![],
@@ -1083,7 +1145,10 @@ mod tests {
         let mut expr = Expr::For {
             binding: "i".to_string(),
             iterator: Box::new(foldable_expr()),
-            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            body: Block {
+                stmts: vec![Stmt::Expr(foldable_expr())],
+                span: dummy_span(),
+            },
         };
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
@@ -1094,7 +1159,10 @@ mod tests {
     fn test_fold_inside_while() {
         let mut expr = Expr::While {
             condition: Box::new(foldable_expr()),
-            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            body: Block {
+                stmts: vec![Stmt::Expr(foldable_expr())],
+                span: dummy_span(),
+            },
         };
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
@@ -1182,7 +1250,10 @@ mod tests {
     #[test]
     fn test_fold_inside_spawn() {
         let mut expr = Expr::Spawn {
-            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            body: Block {
+                stmts: vec![Stmt::Expr(foldable_expr())],
+                span: dummy_span(),
+            },
             span: dummy_span(),
         };
         let mut stats = FoldStats::default();
@@ -1332,7 +1403,10 @@ mod tests {
     fn test_fold_inside_trace() {
         let mut expr = Expr::Trace {
             label: Box::new(Expr::StringLit("t".to_string())),
-            body: Block { stmts: vec![Stmt::Expr(foldable_expr())], span: dummy_span() },
+            body: Block {
+                stmts: vec![Stmt::Expr(foldable_expr())],
+                span: dummy_span(),
+            },
             span: dummy_span(),
         };
         let mut stats = FoldStats::default();
@@ -1644,7 +1718,9 @@ mod tests {
 
     #[test]
     fn test_fold_inside_navigate() {
-        let mut expr = Expr::Navigate { path: Box::new(foldable_expr()) };
+        let mut expr = Expr::Navigate {
+            path: Box::new(foldable_expr()),
+        };
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
         assert_eq!(stats.constants_folded, 1);
@@ -1652,7 +1728,9 @@ mod tests {
 
     #[test]
     fn test_fold_inside_receive() {
-        let mut expr = Expr::Receive { channel: Box::new(foldable_expr()) };
+        let mut expr = Expr::Receive {
+            channel: Box::new(foldable_expr()),
+        };
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
         assert_eq!(stats.constants_folded, 1);
@@ -1685,10 +1763,7 @@ mod tests {
     #[test]
     fn test_fold_inside_object_lit() {
         let mut expr = Expr::ObjectLit {
-            fields: vec![
-                ("x".into(), foldable_expr()),
-                ("y".into(), foldable_expr()),
-            ],
+            fields: vec![("x".into(), foldable_expr()), ("y".into(), foldable_expr())],
         };
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
@@ -1735,9 +1810,7 @@ mod tests {
 
     #[test]
     fn test_fold_nested_array_lit() {
-        let mut expr = Expr::ArrayLit(vec![
-            Expr::ArrayLit(vec![foldable_expr()]),
-        ]);
+        let mut expr = Expr::ArrayLit(vec![Expr::ArrayLit(vec![foldable_expr()])]);
         let mut stats = FoldStats::default();
         fold_expr(&mut expr, &mut stats);
         assert_eq!(stats.constants_folded, 1);

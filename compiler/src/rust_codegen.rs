@@ -12,8 +12,8 @@ use crate::ast::*;
 /// A detected filter pattern: {for x in self.items { {if self.state_field == "All" || x.item_field == self.state_field { ... }} }}
 #[derive(Debug, Clone)]
 struct FilterPattern {
-    state_field: String,   // e.g. "active_cat" — the state field that controls filtering
-    item_field: String,    // e.g. "category" — the product field used as filter key
+    state_field: String, // e.g. "active_cat" — the state field that controls filtering
+    item_field: String,  // e.g. "category" — the product field used as filter key
 }
 
 /// A standalone conditional pattern: {if self.field == value { ... }} NOT inside a {for} loop.
@@ -21,10 +21,10 @@ struct FilterPattern {
 /// and initially shown/hidden based on the state field's starting value.
 #[derive(Debug, Clone)]
 struct ConditionalPattern {
-    state_field: String,   // e.g. "cart_open"
-    value: String,         // e.g. "1" — the value that makes elements visible
-    op_is_eq: bool,        // true for ==, false for !=
-    is_string: bool,       // true if the literal value is a string (needs quotes in generated Rust)
+    state_field: String, // e.g. "cart_open"
+    value: String,       // e.g. "1" — the value that makes elements visible
+    op_is_eq: bool,      // true for ==, false for !=
+    is_string: bool,     // true if the literal value is a string (needs quotes in generated Rust)
 }
 
 pub struct RustCodegen {
@@ -35,16 +35,17 @@ pub struct RustCodegen {
     handler_indices: std::collections::HashMap<String, usize>,
     filter_patterns: Vec<FilterPattern>, // detected from template analysis
     conditional_patterns: Vec<ConditionalPattern>, // standalone {if self.field == value} blocks
-    has_inplace_for: bool, // true if any for-loop in the component uses `inplace`
-    last_element_var: String, // last element variable created by emit_template_node
+    has_inplace_for: bool,               // true if any for-loop in the component uses `inplace`
+    last_element_var: String,            // last element variable created by emit_template_node
     root_element_var: String, // root element var of the current emit_template_node call (set at creation, not overwritten by children)
     pending_filter_reg: Option<(String, String)>, // (binding, field) — when set, the next Element created will be registered as a filter card
     pending_conditional_reg: Option<ConditionalPattern>, // when set, the next top-level Element will be registered as a conditional block
     in_for_loop: bool, // true when emitting inside a {for} loop — enables prototype optimization
     proto_counter: u32, // counter for prototype variable names
     proto_use_idx: u32, // which prototype to use next (reset per loop iteration)
-    proto_base: u32, // first prototype index for current for-loop
-    struct_field_types: std::collections::HashMap<String, std::collections::HashMap<String, String>>, // struct_name → field_name → rust_type
+    proto_base: u32,   // first prototype index for current for-loop
+    struct_field_types:
+        std::collections::HashMap<String, std::collections::HashMap<String, String>>, // struct_name → field_name → rust_type
     for_loop_struct_type: Option<String>, // struct type of current for-loop items (e.g. "Project")
     comp_field_types: std::collections::HashMap<String, crate::ast::Type>, // component state field name → type
 }
@@ -120,7 +121,9 @@ impl RustCodegen {
         self.line("");
         self.line("// Fast WASM allocator. NOT a linear free-list (lol_alloc): alloc/free churn");
         self.line("// across ~100K live allocations degraded a 71K-node merge to ~6.3s — every");
-        self.line("// alloc scanned a fragmented free list. talc uses binned free lists (O(1)-ish).");
+        self.line(
+            "// alloc scanned a fragmented free list. talc uses binned free lists (O(1)-ish).",
+        );
         self.line("#[global_allocator]");
         self.line("static ALLOCATOR: talc::TalckWasm = unsafe { talc::TalckWasm::new_global() };");
         self.line("");
@@ -136,7 +139,9 @@ impl RustCodegen {
         self.line("const SCRATCH_SIZE: usize = 16 * 1024 * 1024; // 16MB — a 100K-node BOM JSON payload is ~6MB; 4MB silently truncated large fetch responses");
         self.line("static mut SCRATCH: [u8; SCRATCH_SIZE] = [0u8; SCRATCH_SIZE];");
         self.line("");
-        self.line("/// Helper: read a string from WASM memory via syscall that writes into a buffer");
+        self.line(
+            "/// Helper: read a string from WASM memory via syscall that writes into a buffer",
+        );
         self.line("fn read_storage(key: &str) -> String {");
         self.line("    unsafe {");
         self.line("        let len = storage_get(key.as_ptr(), key.len() as u32, SCRATCH.as_mut_ptr(), SCRATCH_SIZE as u32);");
@@ -155,7 +160,9 @@ impl RustCodegen {
         self.line("");
         self.line("fn get_hash() -> String {");
         self.line("    unsafe {");
-        self.line("        let len = get_location_hash(SCRATCH.as_mut_ptr(), SCRATCH_SIZE as u32);");
+        self.line(
+            "        let len = get_location_hash(SCRATCH.as_mut_ptr(), SCRATCH_SIZE as u32);",
+        );
         self.line("        if len == 0 { return String::new(); }");
         self.line("        String::from_utf8_lossy(&SCRATCH[..len as usize]).to_string()");
         self.line("    }");
@@ -179,7 +186,9 @@ impl RustCodegen {
         self.line("fn read_response() -> (i32, Vec<u8>) {");
         self.line("    unsafe {");
         self.line("        let status = fetch_response_status();");
-        self.line("        let len = fetch_response_body(SCRATCH.as_mut_ptr(), SCRATCH_SIZE as u32);");
+        self.line(
+            "        let len = fetch_response_body(SCRATCH.as_mut_ptr(), SCRATCH_SIZE as u32);",
+        );
         self.line("        (status, SCRATCH[..len as usize].to_vec())");
         self.line("    }");
         self.line("}");
@@ -238,16 +247,28 @@ impl RustCodegen {
     /// Check if any for-loop in the template tree uses the `inplace` keyword.
     fn template_has_inplace(&self, node: &TemplateNode) -> bool {
         match node {
-            TemplateNode::TemplateFor { inplace, children, .. } => {
-                if *inplace { return true; }
+            TemplateNode::TemplateFor {
+                inplace, children, ..
+            } => {
+                if *inplace {
+                    return true;
+                }
                 children.iter().any(|c| self.template_has_inplace(c))
             }
             TemplateNode::Element(el) => el.children.iter().any(|c| self.template_has_inplace(c)),
-            TemplateNode::TemplateIf { then_children, else_children, .. } => {
+            TemplateNode::TemplateIf {
+                then_children,
+                else_children,
+                ..
+            } => {
                 then_children.iter().any(|c| self.template_has_inplace(c))
-                    || else_children.as_ref().map_or(false, |ec| ec.iter().any(|c| self.template_has_inplace(c)))
+                    || else_children
+                        .as_ref()
+                        .map_or(false, |ec| ec.iter().any(|c| self.template_has_inplace(c)))
             }
-            TemplateNode::Fragment(children) => children.iter().any(|c| self.template_has_inplace(c)),
+            TemplateNode::Fragment(children) => {
+                children.iter().any(|c| self.template_has_inplace(c))
+            }
             _ => false,
         }
     }
@@ -255,14 +276,22 @@ impl RustCodegen {
     /// Scan template tree for filter patterns: {for x in self.items { {if self.field == "All" || x.attr == self.field { ... }} }}
     fn detect_filter_patterns(&mut self, node: &TemplateNode, for_binding: Option<&str>) {
         match node {
-            TemplateNode::TemplateFor { binding, children, .. } => {
+            TemplateNode::TemplateFor {
+                binding, children, ..
+            } => {
                 for child in children {
                     self.detect_filter_patterns(child, Some(binding));
                 }
             }
-            TemplateNode::TemplateIf { condition, then_children, .. } if for_binding.is_some() => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                ..
+            } if for_binding.is_some() => {
                 // Inside a {for}, look for condition that references self.X
-                if let Some(pattern) = self.extract_filter_from_condition(condition, for_binding.unwrap()) {
+                if let Some(pattern) =
+                    self.extract_filter_from_condition(condition, for_binding.unwrap())
+                {
                     self.filter_patterns.push(pattern);
                 }
                 for child in then_children {
@@ -287,10 +316,18 @@ impl RustCodegen {
     /// Looks for: self.X == "All" || binding.Y == self.X
     fn extract_filter_from_condition(&self, expr: &Expr, binding: &str) -> Option<FilterPattern> {
         // Handle: self.field == "All" || product.field == self.field
-        if let Expr::Binary { op: BinOp::Or, left, right } = expr {
+        if let Expr::Binary {
+            op: BinOp::Or,
+            left,
+            right,
+        } = expr
+        {
             let state_field = self.find_self_field_in_eq(left)?;
             let item_field = self.find_binding_field_in_eq(right, binding)?;
-            return Some(FilterPattern { state_field, item_field });
+            return Some(FilterPattern {
+                state_field,
+                item_field,
+            });
         }
         // Handle: product.field == self.field (without the "All" check)
         if let Expr::Binary { op: BinOp::Eq, .. } = expr {
@@ -298,7 +335,10 @@ impl RustCodegen {
                 self.find_binding_field_in_eq(expr, binding),
                 self.find_self_field_in_eq(expr),
             ) {
-                return Some(FilterPattern { state_field, item_field });
+                return Some(FilterPattern {
+                    state_field,
+                    item_field,
+                });
             }
         }
         None
@@ -306,12 +346,21 @@ impl RustCodegen {
 
     /// Find self.X in an equality expression
     fn find_self_field_in_eq(&self, expr: &Expr) -> Option<String> {
-        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+        if let Expr::Binary {
+            op: BinOp::Eq,
+            left,
+            right,
+        } = expr
+        {
             if let Expr::FieldAccess { object, field } = &**left {
-                if matches!(**object, Expr::SelfExpr) { return Some(field.clone()); }
+                if matches!(**object, Expr::SelfExpr) {
+                    return Some(field.clone());
+                }
             }
             if let Expr::FieldAccess { object, field } = &**right {
-                if matches!(**object, Expr::SelfExpr) { return Some(field.clone()); }
+                if matches!(**object, Expr::SelfExpr) {
+                    return Some(field.clone());
+                }
             }
         }
         None
@@ -319,15 +368,24 @@ impl RustCodegen {
 
     /// Find binding.Y in an equality expression
     fn find_binding_field_in_eq(&self, expr: &Expr, binding: &str) -> Option<String> {
-        if let Expr::Binary { op: BinOp::Eq, left, right } = expr {
+        if let Expr::Binary {
+            op: BinOp::Eq,
+            left,
+            right,
+        } = expr
+        {
             if let Expr::FieldAccess { object, field } = &**left {
                 if let Expr::Ident(name) = &**object {
-                    if name == binding { return Some(field.clone()); }
+                    if name == binding {
+                        return Some(field.clone());
+                    }
                 }
             }
             if let Expr::FieldAccess { object, field } = &**right {
                 if let Expr::Ident(name) = &**object {
-                    if name == binding { return Some(field.clone()); }
+                    if name == binding {
+                        return Some(field.clone());
+                    }
                 }
             }
         }
@@ -343,7 +401,11 @@ impl RustCodegen {
                     self.detect_conditional_patterns(child, true);
                 }
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } if !in_for => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } if !in_for => {
                 // Extract self.field == literal or self.field != literal
                 if let Some(pat) = self.extract_conditional_pattern(condition) {
                     self.conditional_patterns.push(pat);
@@ -376,7 +438,9 @@ impl RustCodegen {
         if let Expr::Binary { op, left, right } = expr {
             let is_eq = matches!(op, BinOp::Eq);
             let is_neq = matches!(op, BinOp::Neq);
-            if !is_eq && !is_neq { return None; }
+            if !is_eq && !is_neq {
+                return None;
+            }
             // Check for self.field on the left, literal on the right
             if let Expr::FieldAccess { object, field } = &**left {
                 if matches!(**object, Expr::SelfExpr) {
@@ -421,7 +485,9 @@ impl RustCodegen {
 
     /// Check if a handler only assigns to a specific state field
     fn handler_only_sets_field(&self, method: &Function, field_name: &str) -> bool {
-        if method.body.stmts.len() != 1 { return false; }
+        if method.body.stmts.len() != 1 {
+            return false;
+        }
         if let Stmt::Expr(Expr::Assign { target, .. }) = &method.body.stmts[0] {
             if let Expr::FieldAccess { object, field } = &**target {
                 return matches!(**object, Expr::SelfExpr) && field == field_name;
@@ -468,14 +534,19 @@ impl RustCodegen {
                 self.expr_references_self(left) || self.expr_references_self(right)
             }
             Expr::Unary { operand, .. } => self.expr_references_self(operand),
-            Expr::FnCall { args, .. } | Expr::MethodCall { args, .. } => args.iter().any(|a| self.expr_references_self(a)),
+            Expr::FnCall { args, .. } | Expr::MethodCall { args, .. } => {
+                args.iter().any(|a| self.expr_references_self(a))
+            }
             Expr::SelfExpr => true,
             _ => false,
         }
     }
 
     /// Collect prototypes from a flat list of template nodes (one level deep).
-    fn collect_prototypes_flat(&mut self, nodes: &[&TemplateNode]) -> Vec<(String, String, Vec<(String, String)>)> {
+    fn collect_prototypes_flat(
+        &mut self,
+        nodes: &[&TemplateNode],
+    ) -> Vec<(String, String, Vec<(String, String)>)> {
         let mut protos = Vec::new();
         for node in nodes {
             if let TemplateNode::Element(el) = node {
@@ -485,7 +556,11 @@ impl RustCodegen {
         protos
     }
 
-    fn collect_element_protos(&mut self, el: &crate::ast::Element, protos: &mut Vec<(String, String, Vec<(String, String)>)>) {
+    fn collect_element_protos(
+        &mut self,
+        el: &crate::ast::Element,
+        protos: &mut Vec<(String, String, Vec<(String, String)>)>,
+    ) {
         let mut styles = Vec::new();
         for attr in &el.attributes {
             if let Attribute::Static { name, value } = attr {
@@ -513,7 +588,10 @@ impl RustCodegen {
 
     /// Collect all static element prototypes from a template subtree.
     /// Returns (proto_var_name, tag, styles) for each element with only static styles.
-    fn collect_prototypes(&mut self, node: &TemplateNode) -> Vec<(String, String, Vec<(String, String)>)> {
+    fn collect_prototypes(
+        &mut self,
+        node: &TemplateNode,
+    ) -> Vec<(String, String, Vec<(String, String)>)> {
         let mut protos = Vec::new();
         match node {
             TemplateNode::Element(el) => {
@@ -561,7 +639,10 @@ impl RustCodegen {
         for (var, tag, styles) in protos {
             self.line(&format!("let {} = {{", var));
             self.indent += 1;
-            self.line(&format!("let mut _p = honeycomb::element::Element::new(\"{}\");", tag));
+            self.line(&format!(
+                "let mut _p = honeycomb::element::Element::new(\"{}\");",
+                tag
+            ));
             for (prop, val) in styles {
                 // Apply style directly to the prototype element
                 self.line(&format!("honeycomb::element::ElementTree::apply_style_to_element(&mut _p, \"{}\", \"{}\");", prop, val));
@@ -575,7 +656,10 @@ impl RustCodegen {
     fn emit_struct(&mut self, s: &StructDef) {
         // Generate struct with borrowed strings for zero-copy JSON parsing.
         // String fields become &'static str — the response buffer is leaked to 'static.
-        let has_strings = s.fields.iter().any(|f| self.type_to_rust(&f.ty) == "String");
+        let has_strings = s
+            .fields
+            .iter()
+            .any(|f| self.type_to_rust(&f.ty) == "String");
         if has_strings {
             self.line("#[derive(Clone, Default)]");
             self.line(&format!("struct {} {{", s.name));
@@ -611,7 +695,10 @@ impl RustCodegen {
     fn emit_json_parser(&mut self, s: &StructDef) {
         let name = &s.name;
         let fn_name = format!("parse_{}_array", name.to_lowercase());
-        self.line(&format!("fn {}(data: &'static [u8]) -> Vec<{}> {{", fn_name, name));
+        self.line(&format!(
+            "fn {}(data: &'static [u8]) -> Vec<{}> {{",
+            fn_name, name
+        ));
         self.indent += 1;
         self.line("let mut results = Vec::new();");
         self.line("let s = unsafe { std::str::from_utf8_unchecked(data) };");
@@ -671,7 +758,10 @@ impl RustCodegen {
                 self.line("let neg = pos < len && bytes[pos] == b'-';");
                 self.line("if neg { pos += 1; }");
                 self.line("while pos < len && bytes[pos] >= b'0' && bytes[pos] <= b'9' { n = n * 10 + (bytes[pos] - b'0') as i32; pos += 1; }");
-                self.line(&format!("item.{} = if neg {{ -n }} else {{ n }};", field.name));
+                self.line(&format!(
+                    "item.{} = if neg {{ -n }} else {{ n }};",
+                    field.name
+                ));
                 self.indent -= 1;
                 self.line("}");
             } else if rust_type == "f64" || rust_type == "f32" {
@@ -680,7 +770,10 @@ impl RustCodegen {
                 self.indent += 1;
                 self.line("let vs = pos;");
                 self.line("while pos < len && bytes[pos] != b',' && bytes[pos] != b'}' && bytes[pos] != b' ' { pos += 1; }");
-                self.line(&format!("item.{} = s[vs..pos].parse().unwrap_or(0.0);", field.name));
+                self.line(&format!(
+                    "item.{} = s[vs..pos].parse().unwrap_or(0.0);",
+                    field.name
+                ));
                 self.indent -= 1;
                 self.line("}");
             } else {
@@ -697,7 +790,9 @@ impl RustCodegen {
         self.line("_ => {");
         self.indent += 1;
         self.line("if pos < len && bytes[pos] == b'\"' { pos += 1; while pos < len && bytes[pos] != b'\"' { if bytes[pos] == b'\\\\' { pos += 1; } pos += 1; } pos += 1; }");
-        self.line("else { while pos < len && !matches!(bytes[pos], b',' | b'}' | b']') { pos += 1; } }");
+        self.line(
+            "else { while pos < len && !matches!(bytes[pos], b',' | b'}' | b']') { pos += 1; } }",
+        );
         self.indent -= 1;
         self.line("}");
         self.indent -= 1;
@@ -741,22 +836,36 @@ impl RustCodegen {
         self.line("_card_cats: Vec<(u32, String)>,");
         // Devtools metrics (only add if not already declared in component)
         let field_names: Vec<&str> = comp.state.iter().map(|f| f.name.as_str()).collect();
-        if !field_names.contains(&"total_ms") { self.line("total_ms: String,"); }
-        if !field_names.contains(&"heap_ms") { self.line("heap_ms: String,"); }
-        if !field_names.contains(&"last_op_ms") { self.line("last_op_ms: String,"); }
+        if !field_names.contains(&"total_ms") {
+            self.line("total_ms: String,");
+        }
+        if !field_names.contains(&"heap_ms") {
+            self.line("heap_ms: String,");
+        }
+        if !field_names.contains(&"last_op_ms") {
+            self.line("last_op_ms: String,");
+        }
         self.indent -= 1;
         self.line("}");
         self.line("");
 
         // State storage
         self.line("thread_local! {");
-        self.line(&format!("    static {}_STATE: RefCell<{}State> = RefCell::new({}State {{",
-            name.to_uppercase(), name, name));
+        self.line(&format!(
+            "    static {}_STATE: RefCell<{}State> = RefCell::new({}State {{",
+            name.to_uppercase(),
+            name,
+            name
+        ));
         self.indent += 2;
         for field in &comp.state {
             let default = self.expr_to_rust(&field.initializer, "");
             // String fields need .to_string() when initialized from a string literal
-            let ty_str = field.ty.as_ref().map(|t| self.type_to_rust(t)).unwrap_or_default();
+            let ty_str = field
+                .ty
+                .as_ref()
+                .map(|t| self.type_to_rust(t))
+                .unwrap_or_default();
             if ty_str == "String" && default.starts_with('"') {
                 self.line(&format!("{}: {}.to_string(),", field.name, default));
             } else {
@@ -765,9 +874,15 @@ impl RustCodegen {
         }
         self.line("_element_ids: Vec::new(),");
         self.line("_card_cats: Vec::new(),");
-        if !field_names.contains(&"total_ms") { self.line("total_ms: String::new(),"); }
-        if !field_names.contains(&"heap_ms") { self.line("heap_ms: String::new(),"); }
-        if !field_names.contains(&"last_op_ms") { self.line("last_op_ms: String::new(),"); }
+        if !field_names.contains(&"total_ms") {
+            self.line("total_ms: String::new(),");
+        }
+        if !field_names.contains(&"heap_ms") {
+            self.line("heap_ms: String::new(),");
+        }
+        if !field_names.contains(&"last_op_ms") {
+            self.line("last_op_ms: String::new(),");
+        }
         self.indent -= 2;
         self.line("    });");
         self.line("}");
@@ -777,7 +892,10 @@ impl RustCodegen {
         self.line(&format!("fn {}_mount() {{", name.to_lowercase()));
         self.indent += 1;
         // Borrow state for the duration of mount — avoid cloning Vec<Product> (40K String allocs)
-        self.line(&format!("{}_STATE.with(|_state_cell| {{", name.to_uppercase()));
+        self.line(&format!(
+            "{}_STATE.with(|_state_cell| {{",
+            name.to_uppercase()
+        ));
         self.indent += 1;
         self.line("let _state_ref = _state_cell.borrow();");
         // Create local refs/copies for each field
@@ -792,7 +910,10 @@ impl RustCodegen {
                 self.line(&format!("let {} = &_state_ref.{};", field.name, field.name));
             } else if ty == "String" {
                 // Clone strings (small, needed as owned for text nodes)
-                self.line(&format!("let {} = _state_ref.{}.clone();", field.name, field.name));
+                self.line(&format!(
+                    "let {} = _state_ref.{}.clone();",
+                    field.name, field.name
+                ));
             } else {
                 // Copy scalars
                 self.line(&format!("let {} = _state_ref.{};", field.name, field.name));
@@ -859,7 +980,10 @@ impl RustCodegen {
                 if use_proto {
                     let proto_var = format!("_proto_{}", self.proto_use_idx);
                     self.proto_use_idx += 1;
-                    self.line(&format!("let {} = tree.create_from_prototype(&{});", var, proto_var));
+                    self.line(&format!(
+                        "let {} = tree.create_from_prototype(&{});",
+                        var, proto_var
+                    ));
                 } else {
                     self.line(&format!("let {} = tree.create(\"{}\");", var, el.tag));
                 }
@@ -889,7 +1013,10 @@ impl RustCodegen {
                         self.line(&format!("if {} == {} {{", pat.state_field, val_literal));
                     }
                     self.indent += 1;
-                    self.line(&format!("tree.get_mut({}).map(|e| e.style.display_none = true);", var));
+                    self.line(&format!(
+                        "tree.get_mut({}).map(|e| e.style.display_none = true);",
+                        var
+                    ));
                     self.indent -= 1;
                     self.line("}");
                 }
@@ -906,7 +1033,10 @@ impl RustCodegen {
                                         if let Some((prop, val)) = part.split_once(':') {
                                             let prop = prop.trim();
                                             let val = val.trim();
-                                            self.line(&format!("tree.set_style({}, \"{}\", \"{}\");", var, prop, val));
+                                            self.line(&format!(
+                                                "tree.set_style({}, \"{}\", \"{}\");",
+                                                var, prop, val
+                                            ));
                                         }
                                     }
                                 }
@@ -926,7 +1056,10 @@ impl RustCodegen {
                                 self.line(&format!("{{ let _style_val = {}; for _part in _style_val.split(';') {{ let _part = _part.trim(); if let Some((_p, _v)) = _part.split_once(':') {{ tree.set_style({}, _p.trim(), _v.trim()); }} }} }}", val_rust, var));
                             } else {
                                 // Dynamic attribute — set as attribute (borrow to avoid move)
-                                self.line(&format!("tree.set_attribute({}, \"{}\", &{});", var, name, val_rust));
+                                self.line(&format!(
+                                    "tree.set_attribute({}, \"{}\", &{});",
+                                    var, name, val_rust
+                                ));
                                 // Register filterable elements for O(n) filter toggle
                                 if name == "category" {
                                     self.line(&format!("honeycomb::canvas_app::register_filter_card({}, {}.as_ptr(), {}.len() as u32);", var, val_rust, val_rust));
@@ -936,9 +1069,19 @@ impl RustCodegen {
                         Attribute::EventHandler { event, handler } => {
                             if event == "click" {
                                 if let Some(method_name) = self.extract_handler_name(handler) {
-                                    let idx = self.handler_indices.get(&method_name).copied().unwrap_or(0);
-                                    self.line(&format!("// on:click -> {} (cb_idx={})", method_name, idx));
-                                    self.line(&format!("tree.add_event({}, \"click\", {});", var, idx));
+                                    let idx = self
+                                        .handler_indices
+                                        .get(&method_name)
+                                        .copied()
+                                        .unwrap_or(0);
+                                    self.line(&format!(
+                                        "// on:click -> {} (cb_idx={})",
+                                        method_name, idx
+                                    ));
+                                    self.line(&format!(
+                                        "tree.add_event({}, \"click\", {});",
+                                        var, idx
+                                    ));
                                     // Clickable elements get pointer cursor + focusable (hover/active states)
                                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.visual.cursor = 1; el.focusable = true; }}", var));
                                 }
@@ -948,9 +1091,19 @@ impl RustCodegen {
                                 // (see honeycomb app_keydown). The handler reads
                                 // the value via the input_text() builtin.
                                 if let Some(method_name) = self.extract_handler_name(handler) {
-                                    let idx = self.handler_indices.get(&method_name).copied().unwrap_or(0);
-                                    self.line(&format!("// on:input -> {} (cb_idx={})", method_name, idx));
-                                    self.line(&format!("tree.add_event({}, \"input\", {});", var, idx));
+                                    let idx = self
+                                        .handler_indices
+                                        .get(&method_name)
+                                        .copied()
+                                        .unwrap_or(0);
+                                    self.line(&format!(
+                                        "// on:input -> {} (cb_idx={})",
+                                        method_name, idx
+                                    ));
+                                    self.line(&format!(
+                                        "tree.add_event({}, \"input\", {});",
+                                        var, idx
+                                    ));
                                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.visual.cursor = 2; el.focusable = true; }}", var));
                                 }
                             }
@@ -980,12 +1133,18 @@ impl RustCodegen {
                         TemplateNode::Expression(expr) => {
                             let rust_expr = self.expr_to_rust(expr, comp_name);
                             // Use text_borrowed for loop variable field access (zero allocation)
-                            let is_borrowed = self.in_for_loop && matches!(&**expr,
+                            let is_borrowed = self.in_for_loop
+                                && matches!(&**expr,
                                 Expr::FieldAccess { object, .. } if !matches!(**object, Expr::SelfExpr));
                             if is_borrowed {
                                 // Check field type: &str fields use text_borrowed, numeric fields need formatting
-                                let field_name = if let Expr::FieldAccess { field, .. } = &**expr { Some(field.as_str()) } else { None };
-                                let is_numeric = field_name.map_or(false, |f| self.is_numeric_field(f));
+                                let field_name = if let Expr::FieldAccess { field, .. } = &**expr {
+                                    Some(field.as_str())
+                                } else {
+                                    None
+                                };
+                                let is_numeric =
+                                    field_name.map_or(false, |f| self.is_numeric_field(f));
                                 if is_numeric {
                                     self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(format!(\"{{}}\", {})); }}", var, rust_expr));
                                 } else {
@@ -1000,21 +1159,35 @@ impl RustCodegen {
                             //   {format("Cart ({})", self.cart_count)} → ("cart_count", "Cart ({})")
                             //   {format("{}", self.product_count)}     → ("product_count", "{}")
                             let binding_info: Option<(String, String)> = match &**expr {
-                                Expr::FieldAccess { object, field } if matches!(**object, Expr::SelfExpr) => {
+                                Expr::FieldAccess { object, field }
+                                    if matches!(**object, Expr::SelfExpr) =>
+                                {
                                     Some((field.clone(), "{}".to_string()))
                                 }
                                 Expr::FnCall { callee, args } => {
                                     if let Expr::Ident(name) = &**callee {
                                         if name == "format" && args.len() == 2 {
                                             if let Expr::StringLit(fmt_str) = &args[0] {
-                                                if let Expr::FieldAccess { object, field } = &args[1] {
+                                                if let Expr::FieldAccess { object, field } =
+                                                    &args[1]
+                                                {
                                                     if matches!(**object, Expr::SelfExpr) {
                                                         Some((field.clone(), fmt_str.clone()))
-                                                    } else { None }
-                                                } else { None }
-                                            } else { None }
-                                        } else { None }
-                                    } else { None }
+                                                    } else {
+                                                        None
+                                                    }
+                                                } else {
+                                                    None
+                                                }
+                                            } else {
+                                                None
+                                            }
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    }
                                 }
                                 _ => None,
                             };
@@ -1024,7 +1197,8 @@ impl RustCodegen {
                                     self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});", field, field.len(), var));
                                 }
                                 // register_text_binding for ALL text nodes with state field refs
-                                let escaped_fmt = fmt_str.replace('\\', "\\\\").replace('"', "\\\"");
+                                let escaped_fmt =
+                                    fmt_str.replace('\\', "\\\\").replace('"', "\\\"");
                                 self.line(&format!(
                                     "honeycomb::canvas_app::register_text_binding({}, \"{}\".as_ptr(), {}, \"{}\".as_ptr(), {});",
                                     var, field, field.len(), escaped_fmt, fmt_str.len()
@@ -1047,7 +1221,10 @@ impl RustCodegen {
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
                 // Escape quotes in text
                 let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
-                self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(\"{}\".into()); }}", var, escaped));
+                self.line(&format!(
+                    "if let Some(el) = tree.get_mut({}) {{ el.text = Some(\"{}\".into()); }}",
+                    var, escaped
+                ));
             }
             TemplateNode::Expression(expr) => {
                 // Dynamic text — read from component state
@@ -1055,19 +1232,30 @@ impl RustCodegen {
                 self.line(&format!("let {} = tree.create(\"#text\");", var));
                 self.line(&format!("tree.append_child({}, {});", parent_var, var));
                 let rust_expr = self.expr_to_rust(expr, comp_name);
-                let is_borrowed = self.in_for_loop && matches!(&**expr,
+                let is_borrowed = self.in_for_loop
+                    && matches!(&**expr,
                     Expr::FieldAccess { object, .. } if !matches!(**object, Expr::SelfExpr));
                 if is_borrowed {
                     // Check field type: &str fields use text_borrowed, numeric fields need formatting
-                    let field_name = if let Expr::FieldAccess { field, .. } = &**expr { Some(field.as_str()) } else { None };
+                    let field_name = if let Expr::FieldAccess { field, .. } = &**expr {
+                        Some(field.as_str())
+                    } else {
+                        None
+                    };
                     let is_numeric = field_name.map_or(false, |f| self.is_numeric_field(f));
                     if is_numeric {
                         self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some(format!(\"{{}}\", {})); }}", var, rust_expr));
                     } else {
-                        self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}", var, rust_expr));
+                        self.line(&format!(
+                            "if let Some(el) = tree.get_mut({}) {{ el.text_borrowed = Some({}); }}",
+                            var, rust_expr
+                        ));
                     }
                 } else {
-                    self.line(&format!("if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}", var, rust_expr));
+                    self.line(&format!(
+                        "if let Some(el) = tree.get_mut({}) {{ el.text = Some({}.to_string()); }}",
+                        var, rust_expr
+                    ));
                 }
                 // Register text binding for targeted updates without tree rebuild.
                 let binding_info: Option<(String, String)> = match &**expr {
@@ -1081,18 +1269,32 @@ impl RustCodegen {
                                     if let Expr::FieldAccess { object, field } = &args[1] {
                                         if matches!(**object, Expr::SelfExpr) {
                                             Some((field.clone(), fmt_str.clone()))
-                                        } else { None }
-                                    } else { None }
-                                } else { None }
-                            } else { None }
-                        } else { None }
+                                        } else {
+                                            None
+                                        }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
                     }
                     _ => None,
                 };
                 if let Some((field, fmt_str)) = binding_info {
                     if fmt_str == "{}" {
-                        self.line(&format!("honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});",
-                            field, field.len(), var));
+                        self.line(&format!(
+                            "honeycomb::canvas_app::register_metric_text(\"{}\".as_ptr(), {}, {});",
+                            field,
+                            field.len(),
+                            var
+                        ));
                     }
                     let escaped_fmt = fmt_str.replace('\\', "\\\\").replace('"', "\\\"");
                     self.line(&format!(
@@ -1106,7 +1308,12 @@ impl RustCodegen {
                     self.emit_template_node(child, parent_var, comp_name);
                 }
             }
-            TemplateNode::TemplateFor { binding, iterator, children, .. } => {
+            TemplateNode::TemplateFor {
+                binding,
+                iterator,
+                children,
+                ..
+            } => {
                 let iter_rust = self.expr_to_rust(iterator, comp_name);
 
                 // Resolve the struct type for items in this for-loop.
@@ -1160,12 +1367,20 @@ impl RustCodegen {
 
                 // Check if children contain a TemplateIf that matches a filter pattern.
                 // If so, skip the {if} (render all items) and auto-register for filtering.
-                let filter_for_this_loop = self.filter_patterns.iter().find(|fp| {
-                    children.iter().any(|c| matches!(c, TemplateNode::TemplateIf { .. }))
-                }).cloned();
+                let filter_for_this_loop = self
+                    .filter_patterns
+                    .iter()
+                    .find(|fp| {
+                        children
+                            .iter()
+                            .any(|c| matches!(c, TemplateNode::TemplateIf { .. }))
+                    })
+                    .cloned();
 
                 for child in children {
-                    if let (Some(fp), TemplateNode::TemplateIf { then_children, .. }) = (&filter_for_this_loop, child) {
+                    if let (Some(fp), TemplateNode::TemplateIf { then_children, .. }) =
+                        (&filter_for_this_loop, child)
+                    {
                         // Emit all items unconditionally (skip the {if} condition).
                         // Use standard emit_template_node to keep prototype indices aligned.
                         for (ci, tc) in then_children.iter().enumerate() {
@@ -1180,7 +1395,10 @@ impl RustCodegen {
                                     // The card container is the last child appended to the grid (parent_var)
                                     self.line(&format!("if let Some(&card_id) = tree.get({}).and_then(|e| e.children.last()) {{", parent_var));
                                     self.indent += 1;
-                                    self.line(&format!("tree.set_attribute(card_id, \"{}\", &{});", fp.item_field, filter_val));
+                                    self.line(&format!(
+                                        "tree.set_attribute(card_id, \"{}\", &{});",
+                                        fp.item_field, filter_val
+                                    ));
                                     self.line(&format!("honeycomb::canvas_app::register_filter_card(card_id, {}.as_ptr(), {}.len() as u32);", filter_val, filter_val));
                                     self.indent -= 1;
                                     self.line("}");
@@ -1196,7 +1414,11 @@ impl RustCodegen {
                 self.in_for_loop = false; // reset after loop
                 self.for_loop_struct_type = prev_for_struct; // restore parent context
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 // Check if this is a standalone conditional (not inside a for-loop)
                 // that matches a detected conditional pattern. If so, emit elements
                 // unconditionally and register them for O(1) visibility toggling.
@@ -1260,19 +1482,35 @@ impl RustCodegen {
     fn emit_handler(&mut self, comp_name: &str, method: &Function, _idx: usize) {
         let is_init = method.name.starts_with("init");
         let is_data_callback = method.name.contains("loaded") || method.name.contains("response");
-        let is_immutable = method.params.first().map(|p| p.name == "self" && matches!(p.ownership, Ownership::Borrowed)).unwrap_or(false);
+        let is_immutable = method
+            .params
+            .first()
+            .map(|p| p.name == "self" && matches!(p.ownership, Ownership::Borrowed))
+            .unwrap_or(false);
         let has_return = method.return_type.is_some();
 
         // Emit method params (skip &self/&mut self)
-        let params: Vec<String> = method.params.iter()
+        let params: Vec<String> = method
+            .params
+            .iter()
             .filter(|p| p.name != "self")
             .map(|p| format!("{}: {}", p.name, self.type_to_rust(&p.ty)))
             .collect();
-        let ret_type = if let Some(ref rt) = method.return_type { format!(" -> {}", self.type_to_rust(rt)) } else { String::new() };
+        let ret_type = if let Some(ref rt) = method.return_type {
+            format!(" -> {}", self.type_to_rust(rt))
+        } else {
+            String::new()
+        };
 
         // Pure helper methods (&self with params, no state mutation) → emit as standalone functions
         if is_immutable && !params.is_empty() {
-            self.line(&format!("fn {}_{}({}){} {{", comp_name.to_lowercase(), method.name, params.join(", "), ret_type));
+            self.line(&format!(
+                "fn {}_{}({}){} {{",
+                comp_name.to_lowercase(),
+                method.name,
+                params.join(", "),
+                ret_type
+            ));
             self.indent += 1;
             self.in_handler = false;
             for stmt in &method.body.stmts {
@@ -1285,9 +1523,18 @@ impl RustCodegen {
         }
 
         if params.is_empty() {
-            self.line(&format!("fn {}_{}() {{", comp_name.to_lowercase(), method.name));
+            self.line(&format!(
+                "fn {}_{}() {{",
+                comp_name.to_lowercase(),
+                method.name
+            ));
         } else {
-            self.line(&format!("fn {}_{}({}) {{", comp_name.to_lowercase(), method.name, params.join(", ")));
+            self.line(&format!(
+                "fn {}_{}({}) {{",
+                comp_name.to_lowercase(),
+                method.name,
+                params.join(", ")
+            ));
         }
         self.indent += 1;
 
@@ -1312,8 +1559,10 @@ impl RustCodegen {
 
         // For data-loaded callbacks, persist heap_ms into state BEFORE tree rebuild
         if is_data_callback {
-            self.line(&format!("{}_STATE.with(|s| s.borrow_mut().heap_ms = honeycomb::canvas_app::get_heap_ms());",
-                comp_name.to_uppercase()));
+            self.line(&format!(
+                "{}_STATE.with(|s| s.borrow_mut().heap_ms = honeycomb::canvas_app::get_heap_ms());",
+                comp_name.to_uppercase()
+            ));
         }
 
         // Init methods don't re-render — they're called before first mount
@@ -1321,16 +1570,22 @@ impl RustCodegen {
             // Auto-detect filter handlers by matching handler body against template patterns.
             // If a handler only assigns to a state field that controls a {if} inside a {for},
             // use O(n) display_none toggle instead of full tree rebuild.
-            let filter_match = self.filter_patterns.iter().find(|fp| {
-                self.handler_only_sets_field(method, &fp.state_field)
-            }).cloned();
+            let filter_match = self
+                .filter_patterns
+                .iter()
+                .find(|fp| self.handler_only_sets_field(method, &fp.state_field))
+                .cloned();
             let is_sort = method.body.stmts.iter().any(|s| {
                 let dbg = format!("{:?}", s);
                 dbg.contains("sort_asc") || dbg.contains("sort_desc") || dbg.contains("sort_str")
             });
             if let Some(ref fp) = filter_match {
                 self.line("// O(n) filter: auto-detected from template {if} pattern");
-                self.line(&format!("let _fv = {}_STATE.with(|s| s.borrow().{}.clone());", comp_name.to_uppercase(), fp.state_field));
+                self.line(&format!(
+                    "let _fv = {}_STATE.with(|s| s.borrow().{}.clone());",
+                    comp_name.to_uppercase(),
+                    fp.state_field
+                ));
                 self.line("honeycomb::canvas_app::apply_filter(&_fv);");
             } else if is_sort {
                 // Sort already called apply_sort_permutation inline via .sort_asc/.sort_desc
@@ -1340,7 +1595,11 @@ impl RustCodegen {
                 // The for-loop elements persist — only visibility/order changes.
                 self.line("// inplace: skip tree rebuild, apply filter + repaint");
                 if let Some(ref fp) = self.filter_patterns.first().cloned() {
-                    self.line(&format!("let _fv = {}_STATE.with(|s| s.borrow().{}.clone());", comp_name.to_uppercase(), fp.state_field));
+                    self.line(&format!(
+                        "let _fv = {}_STATE.with(|s| s.borrow().{}.clone());",
+                        comp_name.to_uppercase(),
+                        fp.state_field
+                    ));
                     self.line("honeycomb::canvas_app::apply_filter(&_fv);");
                 } else {
                     // No filter pattern — just repaint with existing tree state
@@ -1349,18 +1608,35 @@ impl RustCodegen {
             } else {
                 // Check if this handler only modifies state fields (no sort, no filter, no control flow).
                 // Skip for data callbacks (on_data_loaded, on_response) — they NEED full rebuild.
-                let modified_fields = if is_data_callback { Vec::new() } else { self.handler_modified_fields(method) };
+                let modified_fields = if is_data_callback {
+                    Vec::new()
+                } else {
+                    self.handler_modified_fields(method)
+                };
 
                 // Split modified fields into conditional fields (have registered {if} blocks)
                 // and display-only fields (just update text bindings).
-                let conditional_fields: Vec<String> = modified_fields.iter()
-                    .filter(|f| self.conditional_patterns.iter().any(|cp| cp.state_field == **f))
-                    .cloned().collect();
-                let display_fields: Vec<String> = modified_fields.iter()
+                let conditional_fields: Vec<String> = modified_fields
+                    .iter()
+                    .filter(|f| {
+                        self.conditional_patterns
+                            .iter()
+                            .any(|cp| cp.state_field == **f)
+                    })
+                    .cloned()
+                    .collect();
+                let display_fields: Vec<String> = modified_fields
+                    .iter()
                     .filter(|f| !conditional_fields.contains(f))
-                    .cloned().collect();
+                    .cloned()
+                    .collect();
 
-                if false && !conditional_fields.is_empty() {
+                // Disabled reactive fast paths, kept for re-enablement (see comments
+                // inside each branch). Named consts instead of literal `false &&` so
+                // deny-level clippy (overly_complex_bool_expr, ifs_same_cond) stays green.
+                const REACTIVE_CONDITIONAL_TOGGLE: bool = false;
+                const TARGETED_TEXT_UPDATE: bool = false;
+                if REACTIVE_CONDITIONAL_TOGGLE && !conditional_fields.is_empty() {
                     // Reactive conditional toggle — O(1) visibility, no tree rebuild
                     // DISABLED: nested conditionals inside toggled blocks don't update
                     // correctly. Full tree rebuild is correct; re-enable when nested
@@ -1385,11 +1661,13 @@ impl RustCodegen {
                             field
                         ));
                     }
-                } else if false && !modified_fields.is_empty() {
+                } else if TARGETED_TEXT_UPDATE && !modified_fields.is_empty() {
                     // Simple text-only update — no visibility change, no rebuild
                     // DISABLED: complex format expressions with interdependent fields
                     // can't be replicated by simple {} text replacement.
-                    self.line("// Simple state update — targeted text binding updates (no tree rebuild)");
+                    self.line(
+                        "// Simple state update — targeted text binding updates (no tree rebuild)",
+                    );
                     for field in &modified_fields {
                         self.line(&format!(
                             "{{ let _val = {}_STATE.with(|s| format!(\"{{}}\", s.borrow().{})); honeycomb::canvas_app::update_text_bindings(\"{}\", &_val); }}",
@@ -1398,37 +1676,39 @@ impl RustCodegen {
                     }
                     self.line("honeycomb::canvas_app::mark_gpu_dirty();");
                 } else {
-                self.line("// Re-render after state change");
-                self.line("let _t_rebuild = perf_now();");
-                self.line("// Clear stale registrations before tree rebuild");
-                self.line("honeycomb::canvas_app::clear_registrations();");
-                self.line("with_tree(|tree| {");
-                self.indent += 1;
-                self.line("let root = tree.root_id();");
-                // remove_children_recursive recycles the old subtree's pool
-                // slots; a bare children.clear() leaked one full UI copy per
-                // handler invocation (pool grew every click/scroll).
-                self.line("tree.remove_children_recursive(root);");
-                self.indent -= 1;
-                self.line("});");
-                self.line(&format!("{}_mount();", comp_name.to_lowercase()));
-                self.line("let _t_mounted = perf_now();");
-                self.line("render();");
-                self.line("let _t_laid = perf_now();");
-                self.line("{");
-                self.indent += 1;
-                self.line("let msg = format!(\"REBUILD mount={:.2}ms layout={:.2}ms\", _t_mounted - _t_rebuild, _t_laid - _t_mounted);");
-                self.line("unsafe { console_log(msg.as_ptr(), msg.len() as u32); }");
-                self.indent -= 1;
-                self.line("}");
-            } // end full rebuild else
+                    self.line("// Re-render after state change");
+                    self.line("let _t_rebuild = perf_now();");
+                    self.line("// Clear stale registrations before tree rebuild");
+                    self.line("honeycomb::canvas_app::clear_registrations();");
+                    self.line("with_tree(|tree| {");
+                    self.indent += 1;
+                    self.line("let root = tree.root_id();");
+                    // remove_children_recursive recycles the old subtree's pool
+                    // slots; a bare children.clear() leaked one full UI copy per
+                    // handler invocation (pool grew every click/scroll).
+                    self.line("tree.remove_children_recursive(root);");
+                    self.indent -= 1;
+                    self.line("});");
+                    self.line(&format!("{}_mount();", comp_name.to_lowercase()));
+                    self.line("let _t_mounted = perf_now();");
+                    self.line("render();");
+                    self.line("let _t_laid = perf_now();");
+                    self.line("{");
+                    self.indent += 1;
+                    self.line("let msg = format!(\"REBUILD mount={:.2}ms layout={:.2}ms\", _t_mounted - _t_rebuild, _t_laid - _t_mounted);");
+                    self.line("unsafe { console_log(msg.as_ptr(), msg.len() as u32); }");
+                    self.indent -= 1;
+                    self.line("}");
+                } // end full rebuild else
             } // end simple state update check
             // Record total handler time + update text node
             // Skip LAST OP for data callbacks (on_data_loaded, on_response) — they're init, not user interactions
             if !is_data_callback {
                 self.line("let _op_elapsed = to_ms_string(_op_t0, perf_now());");
-                self.line(&format!("{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
-                    comp_name.to_uppercase()));
+                self.line(&format!(
+                    "{}_STATE.with(|s| s.borrow_mut().last_op_ms = _op_elapsed.clone());",
+                    comp_name.to_uppercase()
+                ));
                 self.line("update_metric_text(\"last_op_ms\", &_op_elapsed);");
             }
 
@@ -1436,8 +1716,10 @@ impl RustCodegen {
             if method.name.contains("loaded") || method.name.contains("response") {
                 // Full pipeline time: init → fetch → parse → render
                 self.line("let _total = to_ms_string(unsafe { INIT_START }, perf_now());");
-                self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _total.clone());",
-                    comp_name.to_uppercase()));
+                self.line(&format!(
+                    "{}_STATE.with(|s| s.borrow_mut().total_ms = _total.clone());",
+                    comp_name.to_uppercase()
+                ));
                 self.line("update_metric_text(\"total_ms\", &_total);");
             }
         }
@@ -1468,7 +1750,11 @@ impl RustCodegen {
                 self.indent -= 1;
                 self.line("}");
             }
-            Stmt::Expr(Expr::For { binding, iterator, body }) => {
+            Stmt::Expr(Expr::For {
+                binding,
+                iterator,
+                body,
+            }) => {
                 let iter = self.expr_to_rust(iterator, comp_name);
                 self.line(&format!("for {} in {} {{", binding, iter));
                 self.indent += 1;
@@ -1478,7 +1764,11 @@ impl RustCodegen {
                 self.indent -= 1;
                 self.line("}");
             }
-            Stmt::Expr(Expr::If { condition, then_block, else_block }) => {
+            Stmt::Expr(Expr::If {
+                condition,
+                then_block,
+                else_block,
+            }) => {
                 let cond = self.expr_to_rust(condition, comp_name);
                 self.line(&format!("if {} {{", cond));
                 self.indent += 1;
@@ -1507,10 +1797,19 @@ impl RustCodegen {
             Stmt::Return(None) => {
                 self.line("return;");
             }
-            Stmt::Let { name, value, mutable, ty, .. } => {
+            Stmt::Let {
+                name,
+                value,
+                mutable,
+                ty,
+                ..
+            } => {
                 let mut val = self.expr_to_rust(value, comp_name);
                 // String fields initialized from string literals need .to_string()
-                let is_string_type = ty.as_ref().map(|t| self.type_to_rust(t) == "String").unwrap_or(false);
+                let is_string_type = ty
+                    .as_ref()
+                    .map(|t| self.type_to_rust(t) == "String")
+                    .unwrap_or(false);
                 if is_string_type && val.starts_with('"') {
                     val = format!("{}.to_string()", val);
                 }
@@ -1538,13 +1837,21 @@ impl RustCodegen {
             Expr::Bool(b) => format!("{}", b),
             Expr::Ident(name) => {
                 if name.starts_with("self.") {
-                    format!("{}_STATE.with(|s| s.borrow().{})", comp_name.to_uppercase(), &name[5..])
+                    format!(
+                        "{}_STATE.with(|s| s.borrow().{})",
+                        comp_name.to_uppercase(),
+                        &name[5..]
+                    )
                 } else {
                     name.clone()
                 }
             }
             Expr::SelfExpr => {
-                if self.in_handler { "state".to_string() } else { "self".to_string() }
+                if self.in_handler {
+                    "state".to_string()
+                } else {
+                    "self".to_string()
+                }
             }
             Expr::FieldAccess { object, field } => {
                 // self.field →
@@ -1592,7 +1899,10 @@ impl RustCodegen {
                 } else if callee_str == "format" && !args.is_empty() {
                     // format("...", arg1, arg2) → format!("...", arg1, arg2)
                     let fmt = self.expr_to_rust(&args[0], comp_name);
-                    let rest: Vec<String> = args[1..].iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
+                    let rest: Vec<String> = args[1..]
+                        .iter()
+                        .map(|a| self.expr_to_rust(a, comp_name))
+                        .collect();
                     if rest.is_empty() {
                         format!("format!({})", fmt)
                     } else {
@@ -1601,11 +1911,17 @@ impl RustCodegen {
                 } else if callee_str.starts_with("mp::") {
                     // mp:: namespace calls → map to canvas-mode stubs
                     let method = &callee_str[4..];
-                    let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
+                    let a: Vec<String> = args
+                        .iter()
+                        .map(|a| self.expr_to_rust(a, comp_name))
+                        .collect();
                     match method {
                         "showToast" | "showLoading" | "hideLoading" | "hideToast" => {
-                            if a.is_empty() { "{ /* mp stub */ }".to_string() }
-                            else { format!("{{ let _msg = {}; /* mp::{} */ }}", a[0], method) }
+                            if a.is_empty() {
+                                "{ /* mp stub */ }".to_string()
+                            } else {
+                                format!("{{ let _msg = {}; /* mp::{} */ }}", a[0], method)
+                            }
                         }
                         "setStorageSync" if a.len() == 2 => {
                             format!("write_storage(&{}, &{})", a[0], a[1])
@@ -1628,14 +1944,23 @@ impl RustCodegen {
                             let url = &a[0];
                             let method_str = &a[1];
                             let body = &a[2];
-                            let cb = if a.len() >= 4 { a[3].clone() } else { "0".to_string() };
-                            format!("{{ let _url: String = {url}.to_string(); let _m = {method_str}; let _b: String = {body}.to_string(); if _m == \"GET\" {{ fetch_get(&_url, {cb}); }} else {{ fetch_post(&_url, _b.as_bytes(), {cb}); }} }}")
+                            let cb = if a.len() >= 4 {
+                                a[3].clone()
+                            } else {
+                                "0".to_string()
+                            };
+                            format!(
+                                "{{ let _url: String = {url}.to_string(); let _m = {method_str}; let _b: String = {body}.to_string(); if _m == \"GET\" {{ fetch_get(&_url, {cb}); }} else {{ fetch_post(&_url, _b.as_bytes(), {cb}); }} }}"
+                            )
                         }
                         "tradePay" if a.len() >= 3 => {
                             // mp::tradePay(order_id, amount, callback_name) → real payment API call
                             let order_id = &a[0];
                             let amount = &a[1];
-                            format!("{{ let _oid = {}; let _amt = {}; let _url = format!(\"/api/moov/action/create_payment?amount={{}}&desc=Order+{{}}\", _amt, _oid); fetch_get(&_url, 0); }}", order_id, amount)
+                            format!(
+                                "{{ let _oid = {}; let _amt = {}; let _url = format!(\"/api/moov/action/create_payment?amount={{}}&desc=Order+{{}}\", _amt, _oid); fetch_get(&_url, 0); }}",
+                                order_id, amount
+                            )
                         }
                         "getAuthCode" | "getUserInfo" => {
                             format!("{{ /* mp::{} — requires provider connection */ }}", method)
@@ -1645,13 +1970,23 @@ impl RustCodegen {
                         }
                     }
                 } else {
-                    let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
+                    let a: Vec<String> = args
+                        .iter()
+                        .map(|a| self.expr_to_rust(a, comp_name))
+                        .collect();
                     format!("{}({})", callee_str, a.join(", "))
                 }
             }
-            Expr::MethodCall { object, method, args } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 let obj = self.expr_to_rust(object, comp_name);
-                let a: Vec<String> = args.iter().map(|a| self.expr_to_rust(a, comp_name)).collect();
+                let a: Vec<String> = args
+                    .iter()
+                    .map(|a| self.expr_to_rust(a, comp_name))
+                    .collect();
                 if method == "cmp" && a.len() == 1 && !a[0].starts_with('&') {
                     format!("{}.cmp(&{})", obj, a[0])
                 } else if method == "len" {
@@ -1667,36 +2002,65 @@ impl RustCodegen {
                     format!("{}.find({}).map(|i| i as i32).unwrap_or(-1)", obj, a[0])
                 } else if method == "slice" && a.len() == 2 {
                     // .slice(start, end) → safe string slicing
-                    format!("{{ let _s = &{}; let _start = ({}) as usize; let _end = ({}) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or(\"\").to_string() }}", obj, a[0], a[1])
+                    format!(
+                        "{{ let _s = &{}; let _start = ({}) as usize; let _end = ({}) as usize; _s.get(_start.._end.min(_s.len())).unwrap_or(\"\").to_string() }}",
+                        obj, a[0], a[1]
+                    )
                 } else if method == "sort_asc" && a.len() == 1 {
                     let field = a[0].trim_matches('"');
                     // Auto-detect field type from the struct definition.
                     // Resolve struct type from the collection object (e.g. self.projects → [Project] → Project)
                     let is_str = self.resolve_sort_field_is_string(object, field);
                     if is_str {
-                        format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.to_string()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                        format!(
+                            "{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.to_string()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}",
+                            obj = obj,
+                            field = field
+                        )
                     } else {
-                        format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}", obj=obj, field=field)
+                        format!(
+                            "{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, true); }}",
+                            obj = obj,
+                            field = field
+                        )
                     }
                 } else if method == "sort_desc" && a.len() == 1 {
                     let field = a[0].trim_matches('"');
                     let is_str = self.resolve_sort_field_is_string(object, field);
                     if is_str {
-                        format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.to_string())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                        format!(
+                            "{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.to_string())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}",
+                            obj = obj,
+                            field = field
+                        )
                     } else {
-                        format!("{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}", obj=obj, field=field)
+                        format!(
+                            "{{ let _k: Vec<i32> = {obj}.iter().map(|p| p.{field} as i32).collect(); honeycomb::canvas_app::apply_sort_by_i32(&_k, false); }}",
+                            obj = obj,
+                            field = field
+                        )
                     }
                 } else if method == "sort_str_asc" && a.len() == 1 {
                     // Argsort by string field — sort_by_cached_key caches cloned keys, avoids repeated field lookups
                     let field = a[0].trim_matches('"');
-                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.clone()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    format!(
+                        "{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| {obj}[i as usize].{field}.clone()); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}",
+                        obj = obj,
+                        field = field
+                    )
                 } else if method == "sort_str_desc" && a.len() == 1 {
                     // Descending string sort — cached key with Reverse wrapper avoids repeated lookups
                     let field = a[0].trim_matches('"');
-                    format!("{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.clone())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}", obj=obj, field=field)
+                    format!(
+                        "{{ let mut _idx: Vec<u32> = (0..{obj}.len() as u32).collect(); _idx.sort_by_cached_key(|&i| std::cmp::Reverse({obj}[i as usize].{field}.clone())); honeycomb::canvas_app::apply_sort_by_indices(&_idx); }}",
+                        obj = obj,
+                        field = field
+                    )
                 } else if method == "reverse" {
                     format!("{}.reverse()", obj)
-                } else if (obj == "state" || obj == "self") && self.handler_indices.contains_key(method.as_str()) {
+                } else if (obj == "state" || obj == "self")
+                    && self.handler_indices.contains_key(method.as_str())
+                {
                     // self.method(args) → comp_method(args) for component methods
                     format!("{}_{}({})", comp_name.to_lowercase(), method, a.join(", "))
                 } else {
@@ -1711,7 +2075,10 @@ impl RustCodegen {
                 format!("{}..{}", s, e)
             }
             Expr::ArrayLit(items) => {
-                let elems: Vec<String> = items.iter().map(|e| self.expr_to_rust(e, comp_name)).collect();
+                let elems: Vec<String> = items
+                    .iter()
+                    .map(|e| self.expr_to_rust(e, comp_name))
+                    .collect();
                 format!("vec![{}]", elems.join(", "))
             }
             Expr::Unary { op, operand } => {
@@ -1734,36 +2101,51 @@ impl RustCodegen {
             Expr::StructInit { name, fields } => {
                 // Check if this struct has String fields — if so, they're emitted as &'static str
                 // and string literals should NOT get .to_string()
-                let struct_has_str_fields = self.struct_field_types.get(name.as_str())
+                let struct_has_str_fields = self
+                    .struct_field_types
+                    .get(name.as_str())
                     .map_or(false, |f| f.values().any(|t| t == "String"));
-                let field_strs: Vec<String> = fields.iter().map(|(fname, fval)| {
-                    let v = self.expr_to_rust(fval, comp_name);
-                    // String literal values: if struct uses &'static str, keep as literal;
-                    // otherwise add .to_string() for owned String fields
-                    if v.starts_with('"') && !struct_has_str_fields {
-                        format!("{}: {}.to_string()", fname, v)
-                    } else {
-                        format!("{}: {}", fname, v)
-                    }
-                }).collect();
+                let field_strs: Vec<String> = fields
+                    .iter()
+                    .map(|(fname, fval)| {
+                        let v = self.expr_to_rust(fval, comp_name);
+                        // String literal values: if struct uses &'static str, keep as literal;
+                        // otherwise add .to_string() for owned String fields
+                        if v.starts_with('"') && !struct_has_str_fields {
+                            format!("{}: {}.to_string()", fname, v)
+                        } else {
+                            format!("{}: {}", fname, v)
+                        }
+                    })
+                    .collect();
                 format!("{} {{ {} }}", name, field_strs.join(", "))
             }
             Expr::Closure { params, body } => {
-                let p: Vec<String> = params.iter().map(|(name, ty)| {
-                    if let Some(t) = ty {
-                        format!("{}: {}", name, self.type_to_rust(t))
-                    } else {
-                        name.clone()
-                    }
-                }).collect();
+                let p: Vec<String> = params
+                    .iter()
+                    .map(|(name, ty)| {
+                        if let Some(t) = ty {
+                            format!("{}: {}", name, self.type_to_rust(t))
+                        } else {
+                            name.clone()
+                        }
+                    })
+                    .collect();
                 let b = self.expr_to_rust(body, comp_name);
                 format!("|{}| {{ {} }}", p.join(", "), b)
             }
             Expr::Block(block) => {
-                let stmts: Vec<String> = block.stmts.iter().map(|s| {
-                    match s {
+                let stmts: Vec<String> = block
+                    .stmts
+                    .iter()
+                    .map(|s| match s {
                         Stmt::Expr(e) => self.expr_to_rust(e, comp_name),
-                        Stmt::Let { name, value, mutable, .. } => {
+                        Stmt::Let {
+                            name,
+                            value,
+                            mutable,
+                            ..
+                        } => {
                             let val = self.expr_to_rust(value, comp_name);
                             if *mutable {
                                 format!("let mut {} = {}", name, val)
@@ -1771,27 +2153,43 @@ impl RustCodegen {
                                 format!("let {} = {}", name, val)
                             }
                         }
-                        Stmt::Return(Some(e)) => format!("return {}", self.expr_to_rust(e, comp_name)),
+                        Stmt::Return(Some(e)) => {
+                            format!("return {}", self.expr_to_rust(e, comp_name))
+                        }
                         Stmt::Return(None) => "return".to_string(),
                         _ => "()".to_string(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 if stmts.len() == 1 {
                     stmts[0].clone()
                 } else {
                     format!("{{ {} }}", stmts.join("; "))
                 }
             }
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 let cond = self.expr_to_rust(condition, comp_name);
-                let then_stmts: Vec<String> = then_block.stmts.iter().map(|s| {
-                    match s { Stmt::Expr(e) => self.expr_to_rust(e, comp_name), _ => "()".into() }
-                }).collect();
+                let then_stmts: Vec<String> = then_block
+                    .stmts
+                    .iter()
+                    .map(|s| match s {
+                        Stmt::Expr(e) => self.expr_to_rust(e, comp_name),
+                        _ => "()".into(),
+                    })
+                    .collect();
                 let then_str = then_stmts.last().cloned().unwrap_or("()".into());
                 if let Some(else_blk) = else_block {
-                    let else_stmts: Vec<String> = else_blk.stmts.iter().map(|s| {
-                        match s { Stmt::Expr(e) => self.expr_to_rust(e, comp_name), _ => "()".into() }
-                    }).collect();
+                    let else_stmts: Vec<String> = else_blk
+                        .stmts
+                        .iter()
+                        .map(|s| match s {
+                            Stmt::Expr(e) => self.expr_to_rust(e, comp_name),
+                            _ => "()".into(),
+                        })
+                        .collect();
                     let else_str = else_stmts.last().cloned().unwrap_or("()".into());
                     format!("if {} {{ {} }} else {{ {} }}", cond, then_str, else_str)
                 } else {
@@ -1804,9 +2202,17 @@ impl RustCodegen {
 
     fn emit_main(&mut self, program: &Program) {
         // Find the first component
-        let comp_name = program.items.iter().find_map(|item| {
-            if let Item::Component(c) = item { Some(c.name.clone()) } else { None }
-        }).unwrap_or_else(|| "App".to_string());
+        let comp_name = program
+            .items
+            .iter()
+            .find_map(|item| {
+                if let Item::Component(c) = item {
+                    Some(c.name.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| "App".to_string());
 
         self.line("// ── Render: layout only (painting done by Honeycomb's app_render) ──");
         self.line("");
@@ -1835,31 +2241,49 @@ impl RustCodegen {
         // Called BEFORE app_init so Honeycomb detects the pre-built tree.
         // Check if the component has init methods (init_*, or just init)
         let comp = program.items.iter().find_map(|item| {
-            if let Item::Component(c) = item { Some(c) } else { None }
+            if let Item::Component(c) = item {
+                Some(c)
+            } else {
+                None
+            }
         });
-        let init_methods: Vec<String> = comp.map(|c| {
-            c.methods.iter()
-                .filter(|m| m.name.starts_with("init"))
-                .map(|m| format!("{}_{}", comp_name.to_lowercase(), m.name))
-                .collect()
-        }).unwrap_or_default();
+        let init_methods: Vec<String> = comp
+            .map(|c| {
+                c.methods
+                    .iter()
+                    .filter(|m| m.name.starts_with("init"))
+                    .map(|m| format!("{}_{}", comp_name.to_lowercase(), m.name))
+                    .collect()
+            })
+            .unwrap_or_default();
 
         // Check if there's an init method that triggers a fetch (init_data, init_load, etc.)
         // and a corresponding on_*_loaded callback
-        let has_fetch_init = comp.as_ref().map(|c| {
-            c.methods.iter().any(|m| m.name.starts_with("init_data") || m.name.starts_with("init_load"))
-        }).unwrap_or(false);
+        let has_fetch_init = comp
+            .as_ref()
+            .map(|c| {
+                c.methods
+                    .iter()
+                    .any(|m| m.name.starts_with("init_data") || m.name.starts_with("init_load"))
+            })
+            .unwrap_or(false);
 
         let fetch_callback_idx = comp.as_ref().and_then(|c| {
-            let non_init: Vec<&str> = c.methods.iter()
+            let non_init: Vec<&str> = c
+                .methods
+                .iter()
                 .filter(|m| !m.name.starts_with("init"))
                 .map(|m| m.name.as_str())
                 .collect();
-            non_init.iter().position(|n| n.contains("loaded") || n.contains("response"))
+            non_init
+                .iter()
+                .position(|n| n.contains("loaded") || n.contains("response"))
         });
 
         self.line("#[no_mangle]");
-        self.line(&format!("pub extern \"C\" fn nectar_init(_vw: f32, _vh: f32) {{"));
+        self.line(&format!(
+            "pub extern \"C\" fn nectar_init(_vw: f32, _vh: f32) {{"
+        ));
         self.indent += 1;
         self.line("let _init_t0 = perf_now();");
         self.line("unsafe { INIT_START = _init_t0; }");
@@ -1869,18 +2293,26 @@ impl RustCodegen {
         self.line(&format!("{}_mount();", comp_name.to_lowercase()));
         // Record total init time (heap + mount) + update text node
         self.line("let _init_elapsed = to_ms_string(_init_t0, perf_now());");
-        self.line(&format!("{}_STATE.with(|s| s.borrow_mut().total_ms = _init_elapsed.clone());",
-            comp_name.to_uppercase()));
+        self.line(&format!(
+            "{}_STATE.with(|s| s.borrow_mut().total_ms = _init_elapsed.clone());",
+            comp_name.to_uppercase()
+        ));
         self.line("update_metric_text(\"total_ms\", &_init_elapsed);");
         // Also update heap_ms text node
-        self.line(&format!("let _heap = {}_STATE.with(|s| s.borrow().heap_ms.clone());", comp_name.to_uppercase()));
+        self.line(&format!(
+            "let _heap = {}_STATE.with(|s| s.borrow().heap_ms.clone());",
+            comp_name.to_uppercase()
+        ));
         self.line("update_metric_text(\"heap_ms\", &_heap);");
 
         // Auto-fetch if init_data/init_load exists with a matching on_*_loaded callback
         if has_fetch_init {
             if let Some(cb_idx) = fetch_callback_idx {
                 self.line("// Auto-fetch: init_data detected, firing fetch with callback");
-                self.line(&format!("fetch_get(\"/api/products?per_page=10000\", {});", cb_idx));
+                self.line(&format!(
+                    "fetch_get(\"/api/products?per_page=10000\", {});",
+                    cb_idx
+                ));
             }
         }
 
@@ -1891,7 +2323,9 @@ impl RustCodegen {
         // Callback dispatcher — called by JS when async operations complete (fetch, timers)
         // Each handler method gets a callback index. The __callback export dispatches by index.
         if let Some(comp) = comp {
-            let handlers: Vec<&str> = comp.methods.iter()
+            let handlers: Vec<&str> = comp
+                .methods
+                .iter()
                 .filter(|m| !m.name.starts_with("init"))
                 .filter(|m| m.params.iter().filter(|p| p.name != "self").count() == 0)
                 .map(|m| m.name.as_str())
@@ -1917,9 +2351,16 @@ impl RustCodegen {
                     for field in &comp.state {
                         if let Some(ref ty) = field.ty {
                             let ty_str = self.type_to_rust(ty);
-                            if ty_str.starts_with("Vec<") && !ty_str.contains("i32") && !ty_str.contains("f32") && !ty_str.contains("bool") && !ty_str.contains("String") {
-                                let struct_name = ty_str.trim_start_matches("Vec<").trim_end_matches('>');
-                                let parser_fn = format!("parse_{}_array", struct_name.to_lowercase());
+                            if ty_str.starts_with("Vec<")
+                                && !ty_str.contains("i32")
+                                && !ty_str.contains("f32")
+                                && !ty_str.contains("bool")
+                                && !ty_str.contains("String")
+                            {
+                                let struct_name =
+                                    ty_str.trim_start_matches("Vec<").trim_end_matches('>');
+                                let parser_fn =
+                                    format!("parse_{}_array", struct_name.to_lowercase());
                                 self.line(&format!("state.{} = {}(body);", field.name, parser_fn));
                             }
                         }
@@ -1941,7 +2382,12 @@ impl RustCodegen {
                 self.line("match idx {");
                 self.indent += 1;
                 for (i, name) in handlers.iter().enumerate() {
-                    self.line(&format!("{} => {}_{}(),", i, comp_name.to_lowercase(), name));
+                    self.line(&format!(
+                        "{} => {}_{}(),",
+                        i,
+                        comp_name.to_lowercase(),
+                        name
+                    ));
                 }
                 self.line("_ => {}");
                 self.indent -= 1;
@@ -1957,7 +2403,10 @@ impl RustCodegen {
     fn resolve_sort_field_is_string(&self, collection_expr: &Expr, sort_field: &str) -> bool {
         // Extract the component state field name from the collection expression
         // e.g. Expr::FieldAccess { object: SelfExpr, field: "projects" }
-        if let Expr::FieldAccess { field: state_field, .. } = collection_expr {
+        if let Expr::FieldAccess {
+            field: state_field, ..
+        } = collection_expr
+        {
             if let Some(ty) = self.comp_field_types.get(state_field.as_str()) {
                 if let crate::ast::Type::Array(inner) = ty {
                     if let crate::ast::Type::Named(struct_name) = &**inner {
@@ -1988,25 +2437,30 @@ impl RustCodegen {
 
     /// Check if a struct field is a numeric type (i32, i64, f32, f64)
     fn is_numeric_field(&self, field_name: &str) -> bool {
-        matches!(self.struct_field_rust_type(field_name), Some("i32" | "i64" | "f32" | "f64"))
+        matches!(
+            self.struct_field_rust_type(field_name),
+            Some("i32" | "i64" | "f32" | "f64")
+        )
     }
 
     fn type_to_rust(&self, ty: &Type) -> String {
         match ty {
-            Type::Named(name) => {
-                match name.as_str() {
-                    "i32" => "i32".into(),
-                    "i64" => "i64".into(),
-                    "f32" => "f32".into(),
-                    "f64" => "f64".into(),
-                    "bool" => "bool".into(),
-                    "String" | "string" => "String".into(),
-                    other => other.to_string(),
-                }
-            }
+            Type::Named(name) => match name.as_str() {
+                "i32" => "i32".into(),
+                "i64" => "i64".into(),
+                "f32" => "f32".into(),
+                "f64" => "f64".into(),
+                "bool" => "bool".into(),
+                "String" | "string" => "String".into(),
+                other => other.to_string(),
+            },
             Type::Array(inner) => format!("Vec<{}>", self.type_to_rust(inner)),
             Type::Option(inner) => format!("Option<{}>", self.type_to_rust(inner)),
-            Type::Result { ok, err } => format!("Result<{}, {}>", self.type_to_rust(ok), self.type_to_rust(err)),
+            Type::Result { ok, err } => format!(
+                "Result<{}, {}>",
+                self.type_to_rust(ok),
+                self.type_to_rust(err)
+            ),
             Type::Tuple(types) => {
                 let parts: Vec<String> = types.iter().map(|t| self.type_to_rust(t)).collect();
                 format!("({})", parts.join(", "))
@@ -2066,9 +2520,21 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("products", "sort_asc", "price");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("Vec<i32>"), "sort_asc should use Vec<i32> keys, got: {}", out);
-        assert!(out.contains("apply_sort_by_i32(&_k, true)"), "sort_asc should call apply_sort_by_i32 ascending, got: {}", out);
-        assert!(out.contains("p.price as i32"), "sort_asc should cast field to i32, got: {}", out);
+        assert!(
+            out.contains("Vec<i32>"),
+            "sort_asc should use Vec<i32> keys, got: {}",
+            out
+        );
+        assert!(
+            out.contains("apply_sort_by_i32(&_k, true)"),
+            "sort_asc should call apply_sort_by_i32 ascending, got: {}",
+            out
+        );
+        assert!(
+            out.contains("p.price as i32"),
+            "sort_asc should cast field to i32, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2076,8 +2542,16 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("products", "sort_desc", "price");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("Vec<i32>"), "sort_desc should use Vec<i32> keys, got: {}", out);
-        assert!(out.contains("apply_sort_by_i32(&_k, false)"), "sort_desc should call apply_sort_by_i32 descending, got: {}", out);
+        assert!(
+            out.contains("Vec<i32>"),
+            "sort_desc should use Vec<i32> keys, got: {}",
+            out
+        );
+        assert!(
+            out.contains("apply_sort_by_i32(&_k, false)"),
+            "sort_desc should call apply_sort_by_i32 descending, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2085,11 +2559,31 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("products", "sort_str_asc", "name");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("sort_by_cached_key"), "sort_str_asc should use sort_by_cached_key, got: {}", out);
-        assert!(out.contains(".name.clone()"), "sort_str_asc should clone the field, got: {}", out);
-        assert!(out.contains("apply_sort_by_indices"), "sort_str_asc should call apply_sort_by_indices, got: {}", out);
-        assert!(!out.contains("sort_unstable_by"), "sort_str_asc should NOT use sort_unstable_by, got: {}", out);
-        assert!(!out.contains("Reverse"), "sort_str_asc should NOT use Reverse, got: {}", out);
+        assert!(
+            out.contains("sort_by_cached_key"),
+            "sort_str_asc should use sort_by_cached_key, got: {}",
+            out
+        );
+        assert!(
+            out.contains(".name.clone()"),
+            "sort_str_asc should clone the field, got: {}",
+            out
+        );
+        assert!(
+            out.contains("apply_sort_by_indices"),
+            "sort_str_asc should call apply_sort_by_indices, got: {}",
+            out
+        );
+        assert!(
+            !out.contains("sort_unstable_by"),
+            "sort_str_asc should NOT use sort_unstable_by, got: {}",
+            out
+        );
+        assert!(
+            !out.contains("Reverse"),
+            "sort_str_asc should NOT use Reverse, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2097,11 +2591,31 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("products", "sort_str_desc", "name");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("sort_by_cached_key"), "sort_str_desc should use sort_by_cached_key, got: {}", out);
-        assert!(out.contains("std::cmp::Reverse"), "sort_str_desc should use std::cmp::Reverse, got: {}", out);
-        assert!(out.contains(".name.clone()"), "sort_str_desc should clone the field, got: {}", out);
-        assert!(out.contains("apply_sort_by_indices"), "sort_str_desc should call apply_sort_by_indices, got: {}", out);
-        assert!(!out.contains("sort_unstable_by"), "sort_str_desc should NOT use sort_unstable_by, got: {}", out);
+        assert!(
+            out.contains("sort_by_cached_key"),
+            "sort_str_desc should use sort_by_cached_key, got: {}",
+            out
+        );
+        assert!(
+            out.contains("std::cmp::Reverse"),
+            "sort_str_desc should use std::cmp::Reverse, got: {}",
+            out
+        );
+        assert!(
+            out.contains(".name.clone()"),
+            "sort_str_desc should clone the field, got: {}",
+            out
+        );
+        assert!(
+            out.contains("apply_sort_by_indices"),
+            "sort_str_desc should call apply_sort_by_indices, got: {}",
+            out
+        );
+        assert!(
+            !out.contains("sort_unstable_by"),
+            "sort_str_desc should NOT use sort_unstable_by, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2109,8 +2623,16 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("items", "sort_asc", "rating");
         let out = cg.expr_to_rust(&expr, "Shop");
-        assert!(out.contains("p.rating as i32"), "should reference the correct field name, got: {}", out);
-        assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
+        assert!(
+            out.contains("p.rating as i32"),
+            "should reference the correct field name, got: {}",
+            out
+        );
+        assert!(
+            out.contains("self.items"),
+            "should reference the correct object, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2118,8 +2640,16 @@ mod tests {
         let cg = RustCodegen::new();
         let expr = make_sort_call("items", "sort_str_asc", "category");
         let out = cg.expr_to_rust(&expr, "Shop");
-        assert!(out.contains(".category.clone()"), "should reference the correct field, got: {}", out);
-        assert!(out.contains("self.items"), "should reference the correct object, got: {}", out);
+        assert!(
+            out.contains(".category.clone()"),
+            "should reference the correct field, got: {}",
+            out
+        );
+        assert!(
+            out.contains("self.items"),
+            "should reference the correct object, got: {}",
+            out
+        );
     }
 
     // ── Struct field type resolution + sort auto-dispatch ──
@@ -2133,13 +2663,23 @@ mod tests {
         fields.insert("price".to_string(), "i32".to_string());
         cg.struct_field_types.insert("Product".to_string(), fields);
         // Register component field type: products: [Product]
-        cg.comp_field_types.insert("products".to_string(),
-            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))));
+        cg.comp_field_types.insert(
+            "products".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))),
+        );
 
         let expr = make_sort_call("products", "sort_asc", "name");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("sort_by_cached_key"), "sort_asc on String field should auto-dispatch to string sort, got: {}", out);
-        assert!(!out.contains("as i32"), "sort_asc on String field should NOT cast to i32, got: {}", out);
+        assert!(
+            out.contains("sort_by_cached_key"),
+            "sort_asc on String field should auto-dispatch to string sort, got: {}",
+            out
+        );
+        assert!(
+            !out.contains("as i32"),
+            "sort_asc on String field should NOT cast to i32, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2149,13 +2689,23 @@ mod tests {
         fields.insert("name".to_string(), "String".to_string());
         fields.insert("price".to_string(), "i32".to_string());
         cg.struct_field_types.insert("Product".to_string(), fields);
-        cg.comp_field_types.insert("products".to_string(),
-            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))));
+        cg.comp_field_types.insert(
+            "products".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Product".to_string()))),
+        );
 
         let expr = make_sort_call("products", "sort_asc", "price");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("Vec<i32>"), "sort_asc on i32 field should use Vec<i32>, got: {}", out);
-        assert!(out.contains("as i32"), "sort_asc on i32 field should cast to i32, got: {}", out);
+        assert!(
+            out.contains("Vec<i32>"),
+            "sort_asc on i32 field should use Vec<i32>, got: {}",
+            out
+        );
+        assert!(
+            out.contains("as i32"),
+            "sort_asc on i32 field should cast to i32, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2164,13 +2714,23 @@ mod tests {
         let mut fields = std::collections::HashMap::new();
         fields.insert("category".to_string(), "String".to_string());
         cg.struct_field_types.insert("Item".to_string(), fields);
-        cg.comp_field_types.insert("items".to_string(),
-            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Item".to_string()))));
+        cg.comp_field_types.insert(
+            "items".to_string(),
+            crate::ast::Type::Array(Box::new(crate::ast::Type::Named("Item".to_string()))),
+        );
 
         let expr = make_sort_call("items", "sort_desc", "category");
         let out = cg.expr_to_rust(&expr, "TestComp");
-        assert!(out.contains("Reverse"), "sort_desc on String field should use Reverse, got: {}", out);
-        assert!(out.contains("sort_by_cached_key"), "sort_desc on String field should use cached key sort, got: {}", out);
+        assert!(
+            out.contains("Reverse"),
+            "sort_desc on String field should use Reverse, got: {}",
+            out
+        );
+        assert!(
+            out.contains("sort_by_cached_key"),
+            "sort_desc on String field should use cached key sort, got: {}",
+            out
+        );
     }
 
     #[test]
@@ -2183,11 +2743,26 @@ mod tests {
         cg.struct_field_types.insert("Data".to_string(), fields);
         cg.for_loop_struct_type = Some("Data".to_string());
 
-        assert!(cg.is_string_field("name"), "name should be detected as string field");
-        assert!(cg.is_numeric_field("count"), "count should be detected as numeric field");
-        assert!(cg.is_numeric_field("ratio"), "ratio should be detected as numeric field");
-        assert!(!cg.is_string_field("count"), "count should NOT be detected as string field");
-        assert!(!cg.is_numeric_field("name"), "name should NOT be detected as numeric field");
+        assert!(
+            cg.is_string_field("name"),
+            "name should be detected as string field"
+        );
+        assert!(
+            cg.is_numeric_field("count"),
+            "count should be detected as numeric field"
+        );
+        assert!(
+            cg.is_numeric_field("ratio"),
+            "ratio should be detected as numeric field"
+        );
+        assert!(
+            !cg.is_string_field("count"),
+            "count should NOT be detected as string field"
+        );
+        assert!(
+            !cg.is_numeric_field("name"),
+            "name should NOT be detected as numeric field"
+        );
     }
 
     // ── Struct init string handling ──
@@ -2210,8 +2785,16 @@ mod tests {
         };
         let out = cg.expr_to_rust(&expr, "TestComp");
         // String fields should NOT have .to_string() when struct has &'static str
-        assert!(!out.contains(".to_string()"), "struct init with &'static str fields should not add .to_string(), got: {}", out);
-        assert!(out.contains("name: \"hello\""), "should have bare string literal, got: {}", out);
+        assert!(
+            !out.contains(".to_string()"),
+            "struct init with &'static str fields should not add .to_string(), got: {}",
+            out
+        );
+        assert!(
+            out.contains("name: \"hello\""),
+            "should have bare string literal, got: {}",
+            out
+        );
     }
 
     // ── Conditional pattern detection tests ──
@@ -2324,7 +2907,12 @@ mod tests {
             tag: "div".to_string(),
             attributes: vec![],
             children: vec![],
-            span: crate::token::Span { start: 0, end: 0, line: 0, col: 0 },
+            span: crate::token::Span {
+                start: 0,
+                end: 0,
+                line: 0,
+                col: 0,
+            },
         }
     }
 
@@ -2377,32 +2965,51 @@ mod tests {
             inplace: false,
         };
         cg.detect_conditional_patterns(&template, false);
-        assert_eq!(cg.conditional_patterns.len(), 0, "Should not detect conditionals inside for loop");
+        assert_eq!(
+            cg.conditional_patterns.len(),
+            0,
+            "Should not detect conditionals inside for loop"
+        );
     }
 
     #[test]
     fn test_expr_to_literal_string_int() {
         let cg = RustCodegen::new();
-        assert_eq!(cg.expr_to_literal_string(&Expr::Integer(42)), Some("42".to_string()));
+        assert_eq!(
+            cg.expr_to_literal_string(&Expr::Integer(42)),
+            Some("42".to_string())
+        );
     }
 
     #[test]
     fn test_expr_to_literal_string_string() {
         let cg = RustCodegen::new();
-        assert_eq!(cg.expr_to_literal_string(&Expr::StringLit("hello".to_string())), Some("hello".to_string()));
+        assert_eq!(
+            cg.expr_to_literal_string(&Expr::StringLit("hello".to_string())),
+            Some("hello".to_string())
+        );
     }
 
     #[test]
     fn test_expr_to_literal_string_bool() {
         let cg = RustCodegen::new();
-        assert_eq!(cg.expr_to_literal_string(&Expr::Bool(true)), Some("true".to_string()));
-        assert_eq!(cg.expr_to_literal_string(&Expr::Bool(false)), Some("false".to_string()));
+        assert_eq!(
+            cg.expr_to_literal_string(&Expr::Bool(true)),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            cg.expr_to_literal_string(&Expr::Bool(false)),
+            Some("false".to_string())
+        );
     }
 
     #[test]
     fn test_expr_to_literal_string_complex_returns_none() {
         let cg = RustCodegen::new();
-        assert_eq!(cg.expr_to_literal_string(&Expr::Ident("x".to_string())), None);
+        assert_eq!(
+            cg.expr_to_literal_string(&Expr::Ident("x".to_string())),
+            None
+        );
     }
 
     // ── JSON parsing codegen tests ──────────────────────────────
@@ -2418,35 +3025,48 @@ mod tests {
 
     #[test]
     fn test_struct_generates_rust_struct() {
-        let output = parse_and_generate(r#"
+        let output = parse_and_generate(
+            r#"
             struct Product {
                 id: i32,
                 name: String,
                 price_cents: i32
             }
-        "#);
-        assert!(output.contains("struct Product"), "should generate Product struct");
+        "#,
+        );
+        assert!(
+            output.contains("struct Product"),
+            "should generate Product struct"
+        );
         assert!(output.contains("name:"), "should have name field");
-        assert!(output.contains("price_cents:"), "should have price_cents field");
+        assert!(
+            output.contains("price_cents:"),
+            "should have price_cents field"
+        );
     }
 
     #[test]
     fn test_struct_with_string_gets_serde_derive() {
-        let output = parse_and_generate(r#"
+        let output = parse_and_generate(
+            r#"
             struct Product {
                 id: i32,
                 name: String,
                 category: String
             }
-        "#);
+        "#,
+        );
         // Uses generated lightweight JSON parser (no serde)
-        assert!(output.contains("parse_product_array"),
-            "should have generated JSON parser function");
+        assert!(
+            output.contains("parse_product_array"),
+            "should have generated JSON parser function"
+        );
     }
 
     #[test]
     fn test_component_with_fetch_has_response_reader() {
-        let output = parse_and_generate(r#"
+        let output = parse_and_generate(
+            r#"
             struct Product {
                 id: i32,
                 name: String
@@ -2460,14 +3080,19 @@ mod tests {
                     <div>"hello"</div>
                 }
             }
-        "#);
-        assert!(output.contains("read_response"), "should have fetch response reader");
+        "#,
+        );
+        assert!(
+            output.contains("read_response"),
+            "should have fetch response reader"
+        );
     }
 
     #[test]
     fn test_generated_code_parses_json_array() {
         // Verify the pattern: JSON bytes → Vec<Product>
-        let output = parse_and_generate(r#"
+        let output = parse_and_generate(
+            r#"
             struct Product {
                 id: i32,
                 name: String
@@ -2478,7 +3103,11 @@ mod tests {
                     <div>"test"</div>
                 }
             }
-        "#);
-        assert!(output.contains("struct Product"), "should have Product struct");
+        "#,
+        );
+        assert!(
+            output.contains("struct Product"),
+            "should have Product struct"
+        );
     }
 }

@@ -10,50 +10,102 @@ use std::collections::HashSet;
 ///   3. Future: conditional compilation of WASM-side feature modules
 pub fn detect_required_namespaces(program: &Program) -> HashSet<String> {
     let mut ns = HashSet::new();
-    ns.insert("dom".to_string());     // always needed
-    ns.insert("mem".to_string());     // always needed
-    ns.insert("string".to_string());  // always needed
+    ns.insert("dom".to_string()); // always needed
+    ns.insert("mem".to_string()); // always needed
+    ns.insert("string".to_string()); // always needed
 
     for item in &program.items {
         match item {
-            Item::Page(_) => { ns.insert("seo".to_string()); }
-            Item::Form(_) => { ns.insert("form".to_string()); }
-            Item::Channel(_) => { ns.insert("channel".to_string()); }
-            Item::Contract(_) => { ns.insert("contract".to_string()); }
+            Item::Page(_) => {
+                ns.insert("seo".to_string());
+            }
+            Item::Form(_) => {
+                ns.insert("form".to_string());
+            }
+            Item::Channel(_) => {
+                ns.insert("channel".to_string());
+            }
+            Item::Contract(_) => {
+                ns.insert("contract".to_string());
+            }
             Item::App(app) => {
                 ns.insert("pwa".to_string());
-                if app.a11y.is_some() { ns.insert("a11y".to_string()); }
+                if app.a11y.is_some() {
+                    ns.insert("a11y".to_string());
+                }
             }
-            Item::Embed(_) => { ns.insert("embed".to_string()); }
-            Item::Pdf(_) => { ns.insert("pdf".to_string()); }
-            Item::Payment(_) => { ns.insert("payment".to_string()); }
-            Item::Banking(_) => { ns.insert("banking".to_string()); }
-            Item::Map(_) => { ns.insert("map".to_string()); }
-            Item::Auth(_) => { ns.insert("auth".to_string()); }
-            Item::Upload(_) => { ns.insert("upload".to_string()); }
-            Item::Db(_) => { ns.insert("db".to_string()); }
-            Item::Breakpoints(_) => { ns.insert("responsive".to_string()); }
-            Item::Animation(_) => { ns.insert("animation".to_string()); }
-            Item::Theme(_) => { ns.insert("theme".to_string()); }
+            Item::Embed(_) => {
+                ns.insert("embed".to_string());
+            }
+            Item::Pdf(_) => {
+                ns.insert("pdf".to_string());
+            }
+            Item::Payment(_) => {
+                ns.insert("payment".to_string());
+            }
+            Item::Banking(_) => {
+                ns.insert("banking".to_string());
+            }
+            Item::Map(_) => {
+                ns.insert("map".to_string());
+            }
+            Item::Auth(_) => {
+                ns.insert("auth".to_string());
+            }
+            Item::Upload(_) => {
+                ns.insert("upload".to_string());
+            }
+            Item::Db(_) => {
+                ns.insert("db".to_string());
+            }
+            Item::Breakpoints(_) => {
+                ns.insert("responsive".to_string());
+            }
+            Item::Animation(_) => {
+                ns.insert("animation".to_string());
+            }
+            Item::Theme(_) => {
+                ns.insert("theme".to_string());
+            }
             Item::Component(c) => {
-                if c.a11y.is_some() { ns.insert("a11y".to_string()); }
-                if !c.shortcuts.is_empty() { ns.insert("shortcuts".to_string()); }
-                if c.permissions.is_some() { ns.insert("permissions".to_string()); }
-                if !c.gestures.is_empty() { ns.insert("gesture".to_string()); }
-                if c.on_destroy.is_some() { ns.insert("lifecycle".to_string()); }
+                if c.a11y.is_some() {
+                    ns.insert("a11y".to_string());
+                }
+                if !c.shortcuts.is_empty() {
+                    ns.insert("shortcuts".to_string());
+                }
+                if c.permissions.is_some() {
+                    ns.insert("permissions".to_string());
+                }
+                if !c.gestures.is_empty() {
+                    ns.insert("gesture".to_string());
+                }
+                if c.on_destroy.is_some() {
+                    ns.insert("lifecycle".to_string());
+                }
                 check_exprs_in_component(c, &mut ns);
             }
             Item::Store(s) => {
-                if !s.selectors.is_empty() { ns.insert("state".to_string()); }
+                if !s.selectors.is_empty() {
+                    ns.insert("state".to_string());
+                }
                 for field in &s.signals {
-                    if field.atomic { ns.insert("state".to_string()); }
+                    if field.atomic {
+                        ns.insert("state".to_string());
+                    }
                 }
             }
             Item::LazyComponent(lazy) => {
                 ns.insert("loader".to_string());
-                if lazy.component.permissions.is_some() { ns.insert("permissions".to_string()); }
-                if !lazy.component.gestures.is_empty() { ns.insert("gesture".to_string()); }
-                if lazy.component.on_destroy.is_some() { ns.insert("lifecycle".to_string()); }
+                if lazy.component.permissions.is_some() {
+                    ns.insert("permissions".to_string());
+                }
+                if !lazy.component.gestures.is_empty() {
+                    ns.insert("gesture".to_string());
+                }
+                if lazy.component.on_destroy.is_some() {
+                    ns.insert("lifecycle".to_string());
+                }
                 check_exprs_in_component(&lazy.component, &mut ns);
             }
             _ => {}
@@ -83,11 +135,21 @@ fn check_exprs_in_block(block: &Block, ns: &mut HashSet<String>) {
 
 fn check_exprs_in_stmt(stmt: &Stmt, ns: &mut HashSet<String>) {
     match stmt {
-        Stmt::Expr(expr) | Stmt::Return(Some(expr)) => { check_expr(expr, ns); }
-        Stmt::Let { value, .. } => { check_expr(value, ns); }
-        Stmt::Signal { value, .. } => { check_expr(value, ns); }
-        Stmt::LetDestructure { value, .. } => { check_expr(value, ns); }
-        Stmt::Yield(expr) => { check_expr(expr, ns); }
+        Stmt::Expr(expr) | Stmt::Return(Some(expr)) => {
+            check_expr(expr, ns);
+        }
+        Stmt::Let { value, .. } => {
+            check_expr(value, ns);
+        }
+        Stmt::Signal { value, .. } => {
+            check_expr(value, ns);
+        }
+        Stmt::LetDestructure { value, .. } => {
+            check_expr(value, ns);
+        }
+        Stmt::Yield(expr) => {
+            check_expr(expr, ns);
+        }
         Stmt::Return(None) => {}
     }
 }
@@ -100,69 +162,135 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
         }
         Expr::Parallel { tasks, .. } => {
             ns.insert("worker".to_string());
-            for task in tasks { check_expr(task, ns); }
+            for task in tasks {
+                check_expr(task, ns);
+            }
         }
-        Expr::Env { .. } => { ns.insert("env".to_string()); }
+        Expr::Env { .. } => {
+            ns.insert("env".to_string());
+        }
         Expr::Trace { body, .. } => {
             ns.insert("trace".to_string());
             check_exprs_in_block(body, ns);
         }
-        Expr::Flag { .. } => { ns.insert("flags".to_string()); }
-        Expr::Download { .. } => { ns.insert("io".to_string()); }
-        Expr::DynamicImport { .. } => { ns.insert("loader".to_string()); }
-        Expr::VirtualList { items, item_height, template, .. } => {
+        Expr::Flag { .. } => {
+            ns.insert("flags".to_string());
+        }
+        Expr::Download { .. } => {
+            ns.insert("io".to_string());
+        }
+        Expr::DynamicImport { .. } => {
+            ns.insert("loader".to_string());
+        }
+        Expr::VirtualList {
+            items,
+            item_height,
+            template,
+            ..
+        } => {
             ns.insert("virtual".to_string());
             check_expr(items, ns);
             check_expr(item_height, ns);
             check_expr(template, ns);
         }
-        Expr::Fetch { .. } => { ns.insert("http".to_string()); }
+        Expr::Fetch { .. } => {
+            ns.insert("http".to_string());
+        }
         Expr::FnCall { callee, args, .. } => {
             if let Expr::FieldAccess { object, .. } = &**callee {
                 if let Expr::Ident(ref name) = **object {
                     match name.as_str() {
-                        "theme" => { ns.insert("theme".to_string()); }
-                        "auth" => { ns.insert("auth".to_string()); }
-                        "upload" => { ns.insert("upload".to_string()); }
-                        "db" => { ns.insert("db".to_string()); }
-                        "animate" => { ns.insert("animate".to_string()); }
-                        "responsive" => { ns.insert("responsive".to_string()); }
-                        "clipboard" => { ns.insert("clipboard".to_string()); }
-                        "share" => { ns.insert("share".to_string()); }
-                        "storage" => { ns.insert("webapi".to_string()); }
-                        "rtc" => { ns.insert("rtc".to_string()); }
-                        "gpu" => { ns.insert("gpu".to_string()); }
+                        "theme" => {
+                            ns.insert("theme".to_string());
+                        }
+                        "auth" => {
+                            ns.insert("auth".to_string());
+                        }
+                        "upload" => {
+                            ns.insert("upload".to_string());
+                        }
+                        "db" => {
+                            ns.insert("db".to_string());
+                        }
+                        "animate" => {
+                            ns.insert("animate".to_string());
+                        }
+                        "responsive" => {
+                            ns.insert("responsive".to_string());
+                        }
+                        "clipboard" => {
+                            ns.insert("clipboard".to_string());
+                        }
+                        "share" => {
+                            ns.insert("share".to_string());
+                        }
+                        "storage" => {
+                            ns.insert("webapi".to_string());
+                        }
+                        "rtc" => {
+                            ns.insert("rtc".to_string());
+                        }
+                        "gpu" => {
+                            ns.insert("gpu".to_string());
+                        }
                         _ => {} // std lib namespaces are pure WASM — no JS imports
                     }
                 }
             }
             // Detect rtc_ prefixed bare function calls
             if let Expr::Ident(ref name) = **callee {
-                if name.starts_with("rtc_") { ns.insert("rtc".to_string()); }
-                if name.starts_with("gpu_") { ns.insert("gpu".to_string()); }
+                if name.starts_with("rtc_") {
+                    ns.insert("rtc".to_string());
+                }
+                if name.starts_with("gpu_") {
+                    ns.insert("gpu".to_string());
+                }
             }
             check_expr(callee, ns);
-            for arg in args { check_expr(arg, ns); }
+            for arg in args {
+                check_expr(arg, ns);
+            }
         }
         Expr::MethodCall { object, args, .. } => {
             if let Expr::Ident(ref name) = **object {
                 match name.as_str() {
-                    "clipboard" => { ns.insert("clipboard".to_string()); }
+                    "clipboard" => {
+                        ns.insert("clipboard".to_string());
+                    }
                     _ => {}
                 }
             }
             check_expr(object, ns);
-            for arg in args { check_expr(arg, ns); }
+            for arg in args {
+                check_expr(arg, ns);
+            }
         }
         // Recurse into sub-expressions
-        Expr::Binary { left, right, .. } => { check_expr(left, ns); check_expr(right, ns); }
-        Expr::Unary { operand, .. } => { check_expr(operand, ns); }
-        Expr::FieldAccess { object, .. } => { check_expr(object, ns); }
-        Expr::Index { object, index, .. } => { check_expr(object, ns); check_expr(index, ns); }
-        Expr::If { condition, then_block, else_block, .. } => {
+        Expr::Binary { left, right, .. } => {
+            check_expr(left, ns);
+            check_expr(right, ns);
+        }
+        Expr::Unary { operand, .. } => {
+            check_expr(operand, ns);
+        }
+        Expr::FieldAccess { object, .. } => {
+            check_expr(object, ns);
+        }
+        Expr::Index { object, index, .. } => {
+            check_expr(object, ns);
+            check_expr(index, ns);
+        }
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
             check_expr(condition, ns);
             check_exprs_in_block(then_block, ns);
-            if let Some(eb) = else_block { check_exprs_in_block(eb, ns); }
+            if let Some(eb) = else_block {
+                check_exprs_in_block(eb, ns);
+            }
         }
         Expr::Match { subject, arms, .. } => {
             check_expr(subject, ns);
@@ -174,31 +302,66 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
             }
         }
         Expr::ArrayLit(elements) => {
-            for e in elements { check_expr(e, ns); }
+            for e in elements {
+                check_expr(e, ns);
+            }
         }
         Expr::ObjectLit { fields } => {
-            for (_, v) in fields { check_expr(v, ns); }
+            for (_, v) in fields {
+                check_expr(v, ns);
+            }
         }
-        Expr::For { iterator, body, .. } => { check_expr(iterator, ns); check_exprs_in_block(body, ns); }
-        Expr::While { condition, body, .. } => { check_expr(condition, ns); check_exprs_in_block(body, ns); }
-        Expr::Block(block) => { check_exprs_in_block(block, ns); }
-        Expr::Assign { target, value, .. } => { check_expr(target, ns); check_expr(value, ns); }
-        Expr::Await(inner) => { check_expr(inner, ns); }
-        Expr::TryCatch { body, catch_body, .. } => { check_expr(body, ns); check_expr(catch_body, ns); }
-        Expr::Closure { body, .. } => { check_expr(body, ns); }
-        Expr::Borrow(inner) | Expr::BorrowMut(inner) | Expr::Try(inner) | Expr::Stream { source: inner } => {
+        Expr::For { iterator, body, .. } => {
+            check_expr(iterator, ns);
+            check_exprs_in_block(body, ns);
+        }
+        Expr::While {
+            condition, body, ..
+        } => {
+            check_expr(condition, ns);
+            check_exprs_in_block(body, ns);
+        }
+        Expr::Block(block) => {
+            check_exprs_in_block(block, ns);
+        }
+        Expr::Assign { target, value, .. } => {
+            check_expr(target, ns);
+            check_expr(value, ns);
+        }
+        Expr::Await(inner) => {
             check_expr(inner, ns);
         }
-        Expr::Suspend { fallback, body, .. } => { check_expr(fallback, ns); check_expr(body, ns); }
+        Expr::TryCatch {
+            body, catch_body, ..
+        } => {
+            check_expr(body, ns);
+            check_expr(catch_body, ns);
+        }
+        Expr::Closure { body, .. } => {
+            check_expr(body, ns);
+        }
+        Expr::Borrow(inner)
+        | Expr::BorrowMut(inner)
+        | Expr::Try(inner)
+        | Expr::Stream { source: inner } => {
+            check_expr(inner, ns);
+        }
+        Expr::Suspend { fallback, body, .. } => {
+            check_expr(fallback, ns);
+            check_expr(body, ns);
+        }
         Expr::Send { channel, value, .. } => {
             ns.insert("worker".to_string());
-            check_expr(channel, ns); check_expr(value, ns);
+            check_expr(channel, ns);
+            check_expr(value, ns);
         }
         Expr::Receive { channel, .. } => {
             ns.insert("worker".to_string());
             check_expr(channel, ns);
         }
-        Expr::Channel { .. } => { ns.insert("worker".to_string()); }
+        Expr::Channel { .. } => {
+            ns.insert("worker".to_string());
+        }
         _ => {}
     }
 }
@@ -207,7 +370,11 @@ fn check_expr(expr: &Expr, ns: &mut HashSet<String>) {
 pub fn modules_to_string(modules: &HashSet<String>) -> String {
     let mut sorted: Vec<&String> = modules.iter().collect();
     sorted.sort();
-    sorted.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",")
+    sorted
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 #[cfg(test)]
@@ -216,7 +383,12 @@ mod tests {
     use crate::token::Span;
 
     fn empty_span() -> Span {
-        Span { start: 0, end: 0, line: 0, col: 0 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            col: 0,
+        }
     }
 
     #[test]
@@ -588,7 +760,9 @@ mod tests {
     fn test_component_with_a11y() {
         let mut c = make_component("C");
         c.a11y = Some(A11yMode::Auto);
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("a11y"));
     }
@@ -598,10 +772,15 @@ mod tests {
         let mut c = make_component("C");
         c.shortcuts = vec![ShortcutDef {
             keys: "ctrl+s".to_string(),
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("shortcuts"));
     }
@@ -615,7 +794,9 @@ mod tests {
             capabilities: vec!["camera".to_string()],
             span: empty_span(),
         });
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("permissions"));
     }
@@ -626,10 +807,15 @@ mod tests {
         c.gestures = vec![GestureDef {
             gesture_type: "swipe_left".to_string(),
             target: None,
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("gesture"));
     }
@@ -644,13 +830,18 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
             span: empty_span(),
         });
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("lifecycle"));
     }
@@ -747,7 +938,10 @@ mod tests {
         c.gestures = vec![GestureDef {
             gesture_type: "pinch".to_string(),
             target: None,
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             span: empty_span(),
         }];
         let program = Program {
@@ -770,7 +964,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -796,7 +993,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts: vec![Stmt::Expr(expr)], span: empty_span() },
+            body: Block {
+                stmts: vec![Stmt::Expr(expr)],
+                span: empty_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -807,13 +1007,18 @@ mod tests {
     fn program_with_component_method(expr: Expr) -> Program {
         let mut c = make_component("C");
         c.methods = vec![make_fn_with_expr(expr)];
-        Program { items: vec![Item::Component(c)] }
+        Program {
+            items: vec![Item::Component(c)],
+        }
     }
 
     #[test]
     fn test_spawn_includes_worker() {
         let program = program_with_component_method(Expr::Spawn {
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             span: empty_span(),
         });
         let ns = detect_required_namespaces(&program);
@@ -844,7 +1049,10 @@ mod tests {
     fn test_trace_includes_trace() {
         let program = program_with_component_method(Expr::Trace {
             label: Box::new(Expr::StringLit("t".to_string())),
-            body: Block { stmts: vec![], span: empty_span() },
+            body: Block {
+                stmts: vec![],
+                span: empty_span(),
+            },
             span: empty_span(),
         });
         let ns = detect_required_namespaces(&program);
@@ -1086,13 +1294,18 @@ mod tests {
                 pattern: Pattern::Wildcard,
                 ty: None,
                 value: Expr::Spawn {
-                    body: Block { stmts: vec![], span: empty_span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: empty_span(),
+                    },
                     span: empty_span(),
                 },
             }],
             span: empty_span(),
         }))];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("worker"));
     }
@@ -1104,7 +1317,10 @@ mod tests {
         let program = program_with_component_method(Expr::Binary {
             op: BinOp::Add,
             left: Box::new(Expr::Spawn {
-                body: Block { stmts: vec![], span: empty_span() },
+                body: Block {
+                    stmts: vec![],
+                    span: empty_span(),
+                },
                 span: empty_span(),
             }),
             right: Box::new(Expr::Integer(1)),
@@ -1158,7 +1374,10 @@ mod tests {
             condition: Box::new(Expr::Bool(true)),
             then_block: Block {
                 stmts: vec![Stmt::Expr(Expr::Spawn {
-                    body: Block { stmts: vec![], span: empty_span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: empty_span(),
+                    },
                     span: empty_span(),
                 })],
                 span: empty_span(),
@@ -1184,7 +1403,10 @@ mod tests {
                 pattern: Pattern::Wildcard,
                 guard: None,
                 body: Expr::Spawn {
-                    body: Block { stmts: vec![], span: empty_span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: empty_span(),
+                    },
                     span: empty_span(),
                 },
             }],
@@ -1198,8 +1420,11 @@ mod tests {
         let mut c = make_component("C");
         c.methods = vec![Function {
             name: "m".to_string(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
             body: Block {
                 stmts: vec![
                     Stmt::Expr(Expr::For {
@@ -1218,7 +1443,10 @@ mod tests {
                         body: Block {
                             stmts: vec![Stmt::Expr(Expr::Trace {
                                 label: Box::new(Expr::StringLit("t".to_string())),
-                                body: Block { stmts: vec![], span: empty_span() },
+                                body: Block {
+                                    stmts: vec![],
+                                    span: empty_span(),
+                                },
                                 span: empty_span(),
                             })],
                             span: empty_span(),
@@ -1242,9 +1470,14 @@ mod tests {
                 ],
                 span: empty_span(),
             },
-            is_pub: false, is_async: false, must_use: false, span: empty_span(),
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("flags"));
         assert!(ns.contains("trace"));
@@ -1256,12 +1489,11 @@ mod tests {
 
     #[test]
     fn test_check_expr_await() {
-        let program = program_with_component_method(Expr::Await(
-            Box::new(Expr::Fetch {
-                url: Box::new(Expr::StringLit("http://x".to_string())),
-                options: None, contract: None,
-            }),
-        ));
+        let program = program_with_component_method(Expr::Await(Box::new(Expr::Fetch {
+            url: Box::new(Expr::StringLit("http://x".to_string())),
+            options: None,
+            contract: None,
+        })));
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("http"));
     }
@@ -1270,7 +1502,10 @@ mod tests {
     fn test_check_expr_try_catch() {
         let program = program_with_component_method(Expr::TryCatch {
             body: Box::new(Expr::Spawn {
-                body: Block { stmts: vec![], span: empty_span() },
+                body: Block {
+                    stmts: vec![],
+                    span: empty_span(),
+                },
                 span: empty_span(),
             }),
             error_binding: "e".to_string(),
@@ -1298,7 +1533,10 @@ mod tests {
         let program = program_with_component_method(Expr::Suspend {
             fallback: Box::new(Expr::Integer(0)),
             body: Box::new(Expr::Spawn {
-                body: Block { stmts: vec![], span: empty_span() },
+                body: Block {
+                    stmts: vec![],
+                    span: empty_span(),
+                },
                 span: empty_span(),
             }),
         });
@@ -1313,8 +1551,11 @@ mod tests {
         let mut c = make_component("C");
         c.methods = vec![Function {
             name: "m".to_string(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
             body: Block {
                 stmts: vec![Stmt::Yield(Expr::Env {
                     name: Box::new(Expr::StringLit("K".to_string())),
@@ -1322,9 +1563,14 @@ mod tests {
                 })],
                 span: empty_span(),
             },
-            is_pub: false, is_async: false, must_use: false, span: empty_span(),
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("env"));
     }
@@ -1336,15 +1582,23 @@ mod tests {
         let mut c = make_component("C");
         c.methods = vec![Function {
             name: "m".to_string(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
             body: Block {
                 stmts: vec![Stmt::Return(None)],
                 span: empty_span(),
             },
-            is_pub: false, is_async: false, must_use: false, span: empty_span(),
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         // Just dom, mem, string — no additional
         assert_eq!(ns.len(), 3);
@@ -1357,11 +1611,17 @@ mod tests {
         let mut c = make_component("C");
         c.methods = vec![Function {
             name: "m".to_string(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
             body: Block {
                 stmts: vec![Stmt::Signal {
-                    name: "s".to_string(), ty: None, secret: false, atomic: false,
+                    name: "s".to_string(),
+                    ty: None,
+                    secret: false,
+                    atomic: false,
                     value: Expr::Env {
                         name: Box::new(Expr::StringLit("K".to_string())),
                         span: empty_span(),
@@ -1369,9 +1629,14 @@ mod tests {
                 }],
                 span: empty_span(),
             },
-            is_pub: false, is_async: false, must_use: false, span: empty_span(),
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: empty_span(),
         }];
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("env"));
     }
@@ -1399,7 +1664,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("rtc"), "rtc_create_peer should trigger rtc namespace");
+        assert!(
+            ns.contains("rtc"),
+            "rtc_create_peer should trigger rtc namespace"
+        );
     }
 
     #[test]
@@ -1409,7 +1677,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("rtc"), "rtc_create_data_channel should trigger rtc namespace");
+        assert!(
+            ns.contains("rtc"),
+            "rtc_create_data_channel should trigger rtc namespace"
+        );
     }
 
     #[test]
@@ -1419,7 +1690,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("rtc"), "rtc_get_user_media should trigger rtc namespace");
+        assert!(
+            ns.contains("rtc"),
+            "rtc_get_user_media should trigger rtc namespace"
+        );
     }
 
     #[test]
@@ -1432,7 +1706,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("rtc"), "rtc.create_peer should trigger rtc namespace");
+        assert!(
+            ns.contains("rtc"),
+            "rtc.create_peer should trigger rtc namespace"
+        );
     }
 
     // --- GPU / WebGPU namespace detection ---
@@ -1444,7 +1721,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("gpu"), "gpu_request_adapter should trigger gpu namespace");
+        assert!(
+            ns.contains("gpu"),
+            "gpu_request_adapter should trigger gpu namespace"
+        );
     }
 
     #[test]
@@ -1454,7 +1734,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("gpu"), "gpu_begin_render_pass should trigger gpu namespace");
+        assert!(
+            ns.contains("gpu"),
+            "gpu_begin_render_pass should trigger gpu namespace"
+        );
     }
 
     #[test]
@@ -1464,7 +1747,10 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("gpu"), "gpu_mat4_perspective should trigger gpu namespace");
+        assert!(
+            ns.contains("gpu"),
+            "gpu_mat4_perspective should trigger gpu namespace"
+        );
     }
 
     #[test]
@@ -1477,17 +1763,21 @@ mod tests {
             args: vec![],
         });
         let ns = detect_required_namespaces(&program);
-        assert!(ns.contains("gpu"), "gpu.request_adapter should trigger gpu namespace");
+        assert!(
+            ns.contains("gpu"),
+            "gpu.request_adapter should trigger gpu namespace"
+        );
     }
 
     #[test]
     fn test_check_expr_array_lit() {
-        let program = program_with_component_method(Expr::ArrayLit(vec![
-            Expr::Spawn {
-                body: Block { stmts: vec![], span: empty_span() },
+        let program = program_with_component_method(Expr::ArrayLit(vec![Expr::Spawn {
+            body: Block {
+                stmts: vec![],
                 span: empty_span(),
             },
-        ]));
+            span: empty_span(),
+        }]));
         let ns = detect_required_namespaces(&program);
         assert!(ns.contains("worker"));
     }
@@ -1499,7 +1789,10 @@ mod tests {
             arms: vec![MatchArm {
                 pattern: Pattern::Wildcard,
                 guard: Some(Expr::Spawn {
-                    body: Block { stmts: vec![], span: empty_span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: empty_span(),
+                    },
                     span: empty_span(),
                 }),
                 body: Expr::Integer(0),

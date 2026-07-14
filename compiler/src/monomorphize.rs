@@ -1,3 +1,4 @@
+use crate::ast::*;
 /// Monomorphization pass: specializes generic functions for each concrete type
 /// they are called with.
 ///
@@ -10,9 +11,7 @@
 ///
 /// After this pass, no `Type::Generic` should remain in function bodies
 /// (generic structs still use existing Vec/HashMap paths).
-
 use std::collections::{HashMap, HashSet};
-use crate::ast::*;
 
 /// A unique instantiation of a generic function.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -156,7 +155,9 @@ fn collect_instantiations_in_expr(
             if let Expr::Ident(name) = callee.as_ref() {
                 if let Some(generic_fn) = generic_fns.get(name) {
                     // Infer concrete types from argument expressions
-                    let concrete_types: Vec<String> = generic_fn.type_params.iter()
+                    let concrete_types: Vec<String> = generic_fn
+                        .type_params
+                        .iter()
                         .enumerate()
                         .map(|(i, _tp)| {
                             if i < args.len() {
@@ -185,7 +186,11 @@ fn collect_instantiations_in_expr(
         Expr::Unary { operand, .. } => {
             collect_instantiations_in_expr(operand, generic_fns, out);
         }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             collect_instantiations_in_expr(condition, generic_fns, out);
             collect_instantiations_in_block(then_block, generic_fns, out);
             if let Some(eb) = else_block {
@@ -248,7 +253,9 @@ fn infer_concrete_type(expr: &Expr) -> String {
 
 /// Clone a generic function and substitute type parameters with concrete types.
 fn specialize_function(func: &Function, concrete_types: &[String]) -> Function {
-    let type_map: HashMap<String, String> = func.type_params.iter()
+    let type_map: HashMap<String, String> = func
+        .type_params
+        .iter()
         .zip(concrete_types.iter())
         .map(|(tp, ct)| (tp.clone(), ct.clone()))
         .collect();
@@ -288,28 +295,33 @@ fn substitute_type(ty: &Type, type_map: &HashMap<String, String>) -> Type {
                 ty.clone()
             }
         }
-        Type::Generic { name, args } => {
-            Type::Generic {
-                name: name.clone(),
-                args: args.iter().map(|a| substitute_type(a, type_map)).collect(),
-            }
-        }
-        Type::Reference { mutable, lifetime, inner } => {
-            Type::Reference {
-                mutable: *mutable,
-                lifetime: lifetime.clone(),
-                inner: Box::new(substitute_type(inner, type_map)),
-            }
-        }
+        Type::Generic { name, args } => Type::Generic {
+            name: name.clone(),
+            args: args.iter().map(|a| substitute_type(a, type_map)).collect(),
+        },
+        Type::Reference {
+            mutable,
+            lifetime,
+            inner,
+        } => Type::Reference {
+            mutable: *mutable,
+            lifetime: lifetime.clone(),
+            inner: Box::new(substitute_type(inner, type_map)),
+        },
         Type::Array(inner) => Type::Array(Box::new(substitute_type(inner, type_map))),
         Type::Option(inner) => Type::Option(Box::new(substitute_type(inner, type_map))),
         Type::Result { ok, err } => Type::Result {
             ok: Box::new(substitute_type(ok, type_map)),
             err: Box::new(substitute_type(err, type_map)),
         },
-        Type::Tuple(elems) => Type::Tuple(elems.iter().map(|e| substitute_type(e, type_map)).collect()),
+        Type::Tuple(elems) => {
+            Type::Tuple(elems.iter().map(|e| substitute_type(e, type_map)).collect())
+        }
         Type::Function { params, ret } => Type::Function {
-            params: params.iter().map(|p| substitute_type(p, type_map)).collect(),
+            params: params
+                .iter()
+                .map(|p| substitute_type(p, type_map))
+                .collect(),
             ret: Box::new(substitute_type(ret, type_map)),
         },
     }
@@ -351,7 +363,11 @@ fn substitute_types_in_expr(expr: &mut Expr, type_map: &HashMap<String, String>)
             substitute_types_in_expr(left, type_map);
             substitute_types_in_expr(right, type_map);
         }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             substitute_types_in_expr(condition, type_map);
             substitute_types_in_block(then_block, type_map);
             if let Some(eb) = else_block {
@@ -454,7 +470,9 @@ fn rewrite_calls_in_expr(
             // Then check if this is a call to a generic function
             if let Expr::Ident(name) = callee.as_ref() {
                 if let Some(generic_fn) = generic_fns.get(name) {
-                    let concrete_types: Vec<String> = generic_fn.type_params.iter()
+                    let concrete_types: Vec<String> = generic_fn
+                        .type_params
+                        .iter()
                         .enumerate()
                         .map(|(i, _)| {
                             if i < args.len() {
@@ -480,7 +498,11 @@ fn rewrite_calls_in_expr(
             rewrite_calls_in_expr(left, generic_fns, instantiations);
             rewrite_calls_in_expr(right, generic_fns, instantiations);
         }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             rewrite_calls_in_expr(condition, generic_fns, instantiations);
             rewrite_calls_in_block(then_block, generic_fns, instantiations);
             if let Some(eb) = else_block {
@@ -528,7 +550,9 @@ pub fn resolve_trait_method(concrete_type: &str, method_name: &str) -> String {
 
 /// Build a map of (trait_name, method_name) -> Vec<(concrete_type, Function)>
 /// from all `impl TraitName for Type` blocks in the program.
-pub fn build_trait_impl_map(program: &Program) -> HashMap<(String, String), Vec<(String, Function)>> {
+pub fn build_trait_impl_map(
+    program: &Program,
+) -> HashMap<(String, String), Vec<(String, Function)>> {
     let mut map: HashMap<(String, String), Vec<(String, Function)>> = HashMap::new();
     for item in &program.items {
         if let Item::Impl(imp) = item {
@@ -559,7 +583,10 @@ mod tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     #[test]
@@ -580,9 +607,7 @@ mod tests {
                     }],
                     return_type: Some(Type::Named("T".into())),
                     trait_bounds: vec![],
-                    body: block(vec![
-                        Stmt::Return(Some(Expr::Ident("x".into()))),
-                    ]),
+                    body: block(vec![Stmt::Return(Some(Expr::Ident("x".into())))]),
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -595,19 +620,17 @@ mod tests {
                     params: vec![],
                     return_type: None,
                     trait_bounds: vec![],
-                    body: block(vec![
-                        Stmt::Let {
-                            name: "a".to_string(),
-                            ty: None,
-                            value: Expr::FnCall {
-                                callee: Box::new(Expr::Ident("identity".into())),
-                                args: vec![Expr::Integer(42)],
-                            },
-                            mutable: false,
-                            secret: false,
-                            ownership: Ownership::Owned,
+                    body: block(vec![Stmt::Let {
+                        name: "a".to_string(),
+                        ty: None,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("identity".into())),
+                            args: vec![Expr::Integer(42)],
                         },
-                    ]),
+                        mutable: false,
+                        secret: false,
+                        ownership: Ownership::Owned,
+                    }]),
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -657,9 +680,7 @@ mod tests {
                     }],
                     return_type: Some(Type::Named("T".into())),
                     trait_bounds: vec![],
-                    body: block(vec![
-                        Stmt::Return(Some(Expr::Ident("x".into()))),
-                    ]),
+                    body: block(vec![Stmt::Return(Some(Expr::Ident("x".into())))]),
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -672,19 +693,17 @@ mod tests {
                     params: vec![],
                     return_type: None,
                     trait_bounds: vec![],
-                    body: block(vec![
-                        Stmt::Let {
-                            name: "a".to_string(),
-                            ty: None,
-                            value: Expr::FnCall {
-                                callee: Box::new(Expr::Ident("identity".into())),
-                                args: vec![Expr::StringLit("hello".into())],
-                            },
-                            mutable: false,
-                            secret: false,
-                            ownership: Ownership::Owned,
+                    body: block(vec![Stmt::Let {
+                        name: "a".to_string(),
+                        ty: None,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("identity".into())),
+                            args: vec![Expr::StringLit("hello".into())],
                         },
-                    ]),
+                        mutable: false,
+                        secret: false,
+                        ownership: Ownership::Owned,
+                    }]),
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -697,7 +716,11 @@ mod tests {
         assert_eq!(count, 1);
 
         let has_specialized = prog.items.iter().any(|item| {
-            if let Item::Function(f) = item { f.name == "identity__String" } else { false }
+            if let Item::Function(f) = item {
+                f.name == "identity__String"
+            } else {
+                false
+            }
         });
         assert!(has_specialized, "Should have identity__String function");
     }
@@ -718,9 +741,7 @@ mod tests {
                     }],
                     return_type: Some(Type::Named("T".into())),
                     trait_bounds: vec![],
-                    body: block(vec![
-                        Stmt::Return(Some(Expr::Ident("x".into()))),
-                    ]),
+                    body: block(vec![Stmt::Return(Some(Expr::Ident("x".into())))]),
                     is_pub: false,
                     is_async: false,
                     must_use: false,
@@ -766,31 +787,35 @@ mod tests {
         };
 
         let count = monomorphize(&mut prog);
-        assert_eq!(count, 2, "Should generate 2 instantiations (i32 and String)");
+        assert_eq!(
+            count, 2,
+            "Should generate 2 instantiations (i32 and String)"
+        );
     }
 
     #[test]
     fn test_monomorphize_no_generics() {
         let mut prog = Program {
-            items: vec![
-                Item::Function(Function {
-                    name: "add".to_string(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    params: vec![],
-                    return_type: None,
-                    trait_bounds: vec![],
-                    body: block(vec![]),
-                    is_pub: false,
-                    is_async: false,
-                    must_use: false,
-                    span: span(),
-                }),
-            ],
+            items: vec![Item::Function(Function {
+                name: "add".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: block(vec![]),
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: span(),
+            })],
         };
 
         let count = monomorphize(&mut prog);
-        assert_eq!(count, 0, "Should not generate anything for non-generic functions");
+        assert_eq!(
+            count, 0,
+            "Should not generate anything for non-generic functions"
+        );
     }
 
     #[test]
@@ -837,28 +862,24 @@ mod tests {
     #[test]
     fn test_build_trait_impl_map() {
         let prog = Program {
-            items: vec![
-                Item::Impl(ImplBlock {
-                    target: "Point".to_string(),
-                    trait_impls: vec!["Display".to_string()],
-                    methods: vec![
-                        Function {
-                            name: "display".to_string(),
-                            lifetimes: vec![],
-                            type_params: vec![],
-                            params: vec![],
-                            return_type: Some(Type::Named("String".into())),
-                            trait_bounds: vec![],
-                            body: block(vec![]),
-                            is_pub: false,
-                            is_async: false,
-                            must_use: false,
-                            span: span(),
-                        },
-                    ],
+            items: vec![Item::Impl(ImplBlock {
+                target: "Point".to_string(),
+                trait_impls: vec!["Display".to_string()],
+                methods: vec![Function {
+                    name: "display".to_string(),
+                    lifetimes: vec![],
+                    type_params: vec![],
+                    params: vec![],
+                    return_type: Some(Type::Named("String".into())),
+                    trait_bounds: vec![],
+                    body: block(vec![]),
+                    is_pub: false,
+                    is_async: false,
+                    must_use: false,
                     span: span(),
-                }),
-            ],
+                }],
+                span: span(),
+            })],
         };
 
         let map = build_trait_impl_map(&prog);

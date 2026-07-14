@@ -133,8 +133,8 @@ pub struct LockedPackage {
 
 /// Parse an `Nectar.toml` manifest from a file path.
 pub fn parse_manifest(path: &str) -> Result<NectarManifest> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("failed to read manifest at {}", path))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("failed to read manifest at {}", path))?;
     let manifest: NectarManifest =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path))?;
     Ok(manifest)
@@ -147,8 +147,8 @@ pub fn parse_lockfile(path: &str) -> Result<Option<NectarLockfile>> {
     if !p.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(p)
-        .with_context(|| format!("failed to read lockfile at {}", path))?;
+    let content =
+        fs::read_to_string(p).with_context(|| format!("failed to read lockfile at {}", path))?;
     let lockfile: NectarLockfile =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path))?;
     Ok(Some(lockfile))
@@ -156,8 +156,7 @@ pub fn parse_lockfile(path: &str) -> Result<Option<NectarLockfile>> {
 
 /// Serialize an `NectarLockfile` and write it to disk.
 pub fn write_lockfile(path: &str, lockfile: &NectarLockfile) -> Result<()> {
-    let content =
-        toml::to_string_pretty(lockfile).context("failed to serialize lockfile")?;
+    let content = toml::to_string_pretty(lockfile).context("failed to serialize lockfile")?;
     fs::write(path, content).with_context(|| format!("failed to write lockfile to {}", path))?;
     Ok(())
 }

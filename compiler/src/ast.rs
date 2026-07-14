@@ -106,9 +106,9 @@ pub struct ContractField {
 /// Accessibility mode for components and apps
 #[derive(Debug, Clone, PartialEq)]
 pub enum A11yMode {
-    Auto,    // compiler generates full a11y layer
-    Hybrid,  // developer overrides specific attrs, compiler fills the rest
-    Manual,  // developer handles everything
+    Auto,   // compiler generates full a11y layer
+    Hybrid, // developer overrides specific attrs, compiler fills the rest
+    Manual, // developer handles everything
 }
 
 /// App definition — root-level PWA application with manifest, offline support, push
@@ -127,7 +127,7 @@ pub struct AppDef {
 
 #[derive(Debug)]
 pub struct ManifestDef {
-    pub entries: Vec<(String, Expr)>,  // name-value pairs
+    pub entries: Vec<(String, Expr)>, // name-value pairs
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -137,7 +137,7 @@ pub struct OfflineDef {
     pub precache: Vec<String>,
     pub strategy: String,
     #[allow(dead_code)]
-    pub fallback: Option<String>,  // component name
+    pub fallback: Option<String>, // component name
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -146,7 +146,7 @@ pub struct OfflineDef {
 pub struct PushDef {
     pub vapid_key: Option<Expr>,
     #[allow(dead_code)]
-    pub on_message: Option<String>,  // handler function name
+    pub on_message: Option<String>, // handler function name
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -175,7 +175,7 @@ pub struct MetaDef {
     pub canonical: Option<Expr>,
     pub og_image: Option<Expr>,
     pub structured_data: Vec<StructuredDataDef>,
-    pub extra: Vec<(String, Expr)>,  // arbitrary meta key-value pairs
+    pub extra: Vec<(String, Expr)>, // arbitrary meta key-value pairs
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -183,7 +183,7 @@ pub struct MetaDef {
 /// Structured data definition (JSON-LD) within a meta block
 #[derive(Debug)]
 pub struct StructuredDataDef {
-    pub schema_type: String,   // e.g. "Article", "Organization", "Product"
+    pub schema_type: String, // e.g. "Article", "Organization", "Product"
     pub fields: Vec<(String, Expr)>,
     #[allow(dead_code)]
     pub span: Span,
@@ -194,9 +194,9 @@ pub struct StructuredDataDef {
 pub struct FormDef {
     pub name: String,
     pub fields: Vec<FormFieldDef>,
-    pub on_submit: Option<String>,  // handler function name
+    pub on_submit: Option<String>, // handler function name
     #[allow(dead_code)]
-    pub steps: Vec<FormStep>,       // for multi-step forms, empty if single-step
+    pub steps: Vec<FormStep>, // for multi-step forms, empty if single-step
     pub methods: Vec<Function>,
     #[allow(dead_code)]
     pub styles: Vec<StyleBlock>,
@@ -236,7 +236,7 @@ pub enum ValidatorKind {
     Url,
     Min(i64),
     Max(i64),
-    Custom(String),  // function name
+    Custom(String), // function name
 }
 
 #[derive(Debug, Clone)]
@@ -244,7 +244,7 @@ pub struct FormStep {
     #[allow(dead_code)]
     pub name: String,
     #[allow(dead_code)]
-    pub fields: Vec<String>,  // field names in this step
+    pub fields: Vec<String>, // field names in this step
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -268,7 +268,7 @@ pub struct FormStep {
 pub struct ChannelDef {
     pub name: String,
     pub url: Expr,
-    pub provider: Option<String>,  // "ws" (default) or "sse"
+    pub provider: Option<String>, // "ws" (default) or "sse"
     pub contract: Option<String>,
     pub on_message: Option<Function>,
     pub on_connect: Option<Function>,
@@ -295,9 +295,9 @@ pub struct ChannelDef {
 pub struct EmbedDef {
     pub name: String,
     pub src: Expr,
-    pub loading: Option<String>,     // "defer", "async", "lazy", "idle"
+    pub loading: Option<String>, // "defer", "async", "lazy", "idle"
     pub sandbox: bool,
-    pub integrity: Option<Expr>,     // SRI hash
+    pub integrity: Option<Expr>, // SRI hash
     #[allow(dead_code)]
     pub permissions: Option<PermissionsDef>,
     pub is_pub: bool,
@@ -334,9 +334,9 @@ pub struct PdfDef {
 #[derive(Debug, Clone)]
 pub struct PaymentDef {
     pub name: String,
-    pub provider: Option<Expr>,        // "stripe", "paypal", etc.
+    pub provider: Option<Expr>, // "stripe", "paypal", etc.
     pub public_key: Option<Expr>,
-    pub sandbox_mode: bool,            // PCI-compliant isolation
+    pub sandbox_mode: bool, // PCI-compliant isolation
     pub on_success: Option<Function>,
     pub on_error: Option<Function>,
     pub methods: Vec<Function>,
@@ -357,7 +357,7 @@ pub struct PaymentDef {
 #[derive(Debug, Clone)]
 pub struct BankingDef {
     pub name: String,
-    pub provider: Option<Expr>,        // "plaid", "mx", etc.
+    pub provider: Option<Expr>, // "plaid", "mx", etc.
     pub on_success: Option<Function>,
     pub on_exit: Option<Function>,
     pub on_error: Option<Function>,
@@ -380,10 +380,10 @@ pub struct BankingDef {
 #[derive(Debug, Clone)]
 pub struct MapDef {
     pub name: String,
-    pub provider: Option<Expr>,        // "mapbox", "google", etc.
-    pub center: Option<(f64, f64)>,    // (lat, lng)
+    pub provider: Option<Expr>,     // "mapbox", "google", etc.
+    pub center: Option<(f64, f64)>, // (lat, lng)
     pub zoom: Option<f64>,
-    pub style: Option<Expr>,           // map style URL
+    pub style: Option<Expr>, // map style URL
     pub on_ready: Option<Function>,
     pub on_click: Option<Function>,
     pub methods: Vec<Function>,
@@ -396,7 +396,7 @@ pub struct MapDef {
 #[derive(Debug, Clone)]
 pub struct AuthDef {
     pub name: String,
-    pub provider: Option<Expr>,         // "oauth", "jwt", "session"
+    pub provider: Option<Expr>, // "oauth", "jwt", "session"
     pub providers: Vec<AuthProvider>,
     pub on_login: Option<Function>,
     pub on_logout: Option<Function>,
@@ -411,7 +411,7 @@ pub struct AuthDef {
 /// An individual auth provider configuration (e.g. Google, GitHub, email)
 #[derive(Debug, Clone)]
 pub struct AuthProvider {
-    pub name: String,      // "google", "github", "email"
+    pub name: String, // "google", "github", "email"
     #[allow(dead_code)]
     pub client_id: Option<Expr>,
     pub scopes: Vec<String>,
@@ -424,9 +424,9 @@ pub struct AuthProvider {
 pub struct UploadDef {
     pub name: String,
     pub endpoint: Expr,
-    pub max_size: Option<Expr>,        // bytes
-    pub accept: Vec<String>,           // MIME types: ["image/*", "application/pdf"]
-    pub chunked: bool,                 // resumable chunked upload
+    pub max_size: Option<Expr>, // bytes
+    pub accept: Vec<String>,    // MIME types: ["image/*", "application/pdf"]
+    pub chunked: bool,          // resumable chunked upload
     pub on_progress: Option<Function>,
     pub on_complete: Option<Function>,
     pub on_error: Option<Function>,
@@ -456,7 +456,7 @@ pub struct DbStoreDef {
     #[allow(dead_code)]
     pub key: String,
     #[allow(dead_code)]
-    pub indexes: Vec<(String, String)>,  // (name, key_path)
+    pub indexes: Vec<(String, String)>, // (name, key_path)
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -465,9 +465,9 @@ pub struct DbStoreDef {
 #[derive(Debug, Clone)]
 pub struct CacheDef {
     pub name: String,
-    pub strategy: Option<String>,        // "stale-while-revalidate", "cache-first", "network-first"
-    pub default_ttl: Option<u64>,        // seconds
-    pub persist: bool,                    // use IndexedDB for persistence
+    pub strategy: Option<String>, // "stale-while-revalidate", "cache-first", "network-first"
+    pub default_ttl: Option<u64>, // seconds
+    pub persist: bool,            // use IndexedDB for persistence
     pub max_entries: Option<u64>,
     pub queries: Vec<CacheQueryDef>,
     pub mutations: Vec<CacheMutationDef>,
@@ -481,11 +481,11 @@ pub struct CacheQueryDef {
     pub name: String,
     #[allow(dead_code)]
     pub params: Vec<Param>,
-    pub fetch_expr: Expr,                // the fetch(...) expression
-    pub contract: Option<String>,        // -> ContractName
+    pub fetch_expr: Expr,         // the fetch(...) expression
+    pub contract: Option<String>, // -> ContractName
     pub ttl: Option<u64>,
-    pub stale: Option<u64>,              // stale-while-revalidate window
-    pub invalidate_on: Vec<String>,      // event names
+    pub stale: Option<u64>,         // stale-while-revalidate window
+    pub invalidate_on: Vec<String>, // event names
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -499,7 +499,7 @@ pub struct CacheMutationDef {
     pub fetch_expr: Expr,
     pub optimistic: bool,
     pub rollback_on_error: bool,
-    pub invalidate: Vec<String>,         // query names to invalidate
+    pub invalidate: Vec<String>, // query names to invalidate
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -507,7 +507,7 @@ pub struct CacheMutationDef {
 /// Responsive breakpoints definition
 #[derive(Debug, Clone)]
 pub struct BreakpointsDef {
-    pub breakpoints: Vec<(String, u32)>,  // name -> pixels
+    pub breakpoints: Vec<(String, u32)>, // name -> pixels
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -518,8 +518,8 @@ pub struct ThemeDef {
     pub name: String,
     pub light: Option<Vec<(String, Expr)>>,
     pub dark: Option<Vec<(String, Expr)>>,
-    pub dark_auto: bool,              // dark: auto
-    pub primary: Option<Expr>,        // for full auto mode
+    pub dark_auto: bool,       // dark: auto
+    pub primary: Option<Expr>, // for full auto mode
     pub is_pub: bool,
     #[allow(dead_code)]
     pub span: Span,
@@ -600,7 +600,7 @@ pub struct ShortcutDef {
 /// Gesture definition inside a component
 #[derive(Debug, Clone)]
 pub struct GestureDef {
-    pub gesture_type: String,   // swipe_left, swipe_right, long_press, pinch, etc.
+    pub gesture_type: String, // swipe_left, swipe_right, long_press, pinch, etc.
     pub target: Option<String>, // on:element_name, or None for the component root
     #[allow(dead_code)]
     pub body: Block,
@@ -767,7 +767,11 @@ pub enum TemplateNode {
     Expression(Box<Expr>),
     Fragment(Vec<TemplateNode>),
     /// <Link to="/about" class="btn">About</Link>
-    Link { to: Expr, attributes: Vec<Attribute>, children: Vec<TemplateNode> },
+    Link {
+        to: Expr,
+        attributes: Vec<Attribute>,
+        children: Vec<TemplateNode>,
+    },
     /// <Outlet /> — marks where routed content renders inside a layout
     Outlet,
     /// Layout primitives — compile-time sugar for semantic HTML + CSS
@@ -822,34 +826,83 @@ pub struct Element {
 #[allow(dead_code)]
 pub enum LayoutNode {
     /// `<Stack gap="16">` → column flexbox
-    Stack { gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Stack {
+        gap: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Row gap="8" align="center">` → row flexbox
-    Row { gap: Option<String>, align: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Row {
+        gap: Option<String>,
+        align: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Grid cols="3" gap="16">` → CSS Grid
-    Grid { cols: Option<String>, rows: Option<String>, gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Grid {
+        cols: Option<String>,
+        rows: Option<String>,
+        gap: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Center max_width="800">` → flex centering
-    Center { max_width: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Center {
+        max_width: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Cluster gap="8">` → flex-wrap row
-    Cluster { gap: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Cluster {
+        gap: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Sidebar side="left" width="300">` → CSS Grid sidebar
-    Sidebar { side: Option<String>, width: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Sidebar {
+        side: Option<String>,
+        width: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
     /// `<Switcher threshold="600">` → flexbox that wraps based on container
-    Switcher { threshold: Option<String>, children: Vec<TemplateNode>, span: Span },
+    Switcher {
+        threshold: Option<String>,
+        children: Vec<TemplateNode>,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum Attribute {
-    Static { name: String, value: String },
-    Dynamic { name: String, value: Expr },
-    EventHandler { event: String, handler: Expr },
+    Static {
+        name: String,
+        value: String,
+    },
+    Dynamic {
+        name: String,
+        value: Expr,
+    },
+    EventHandler {
+        event: String,
+        handler: Expr,
+    },
     /// ARIA attribute — `aria-label={expr}`, `aria-hidden="true"`, etc.
-    Aria { name: String, value: Expr },
+    Aria {
+        name: String,
+        value: Expr,
+    },
     /// Role attribute — `role="button"`, `role="navigation"`, etc.
-    Role { value: String },
+    Role {
+        value: String,
+    },
     /// Two-way form binding — `bind:value={count}`, `bind:checked={is_active}`, etc.
     /// Sets the initial property from the signal, creates an effect to keep DOM
     /// in sync, and adds an input/change listener to push user edits back.
-    Bind { property: String, signal: String },
+    Bind {
+        property: String,
+        signal: String,
+    },
 }
 
 /// Struct definition
@@ -940,8 +993,8 @@ pub struct StoreDef {
 pub struct SelectorDef {
     pub name: String,
     #[allow(dead_code)]
-    pub deps: Vec<String>,     // store/signal names this derives from
-    pub body: Expr,            // computation expression
+    pub deps: Vec<String>, // store/signal names this derives from
+    pub body: Expr, // computation expression
     #[allow(dead_code)]
     pub span: Span,
 }
@@ -1052,9 +1105,9 @@ pub struct RouterDef {
 #[derive(Debug)]
 pub struct RouteDef {
     pub path: String,
-    pub params: Vec<String>,      // extracted from :param segments in path
-    pub component: String,        // component to render
-    pub guard: Option<Expr>,      // optional auth/permission guard
+    pub params: Vec<String>, // extracted from :param segments in path
+    pub component: String,   // component to render
+    pub guard: Option<Expr>, // optional auth/permission guard
     /// Per-route transition override: "fade", "slide-left", "slide-right", "none"
     #[allow(dead_code)]
     pub transition: Option<String>,
@@ -1151,13 +1204,26 @@ pub struct UseGroupItem {
 pub enum Type {
     Named(String),
     /// A generic type application, e.g. `Vec<i32>`, `HashMap<String, User>`
-    Generic { name: String, args: Vec<Type> },
-    Reference { mutable: bool, lifetime: Option<String>, inner: Box<Type> },
+    Generic {
+        name: String,
+        args: Vec<Type>,
+    },
+    Reference {
+        mutable: bool,
+        lifetime: Option<String>,
+        inner: Box<Type>,
+    },
     Array(Box<Type>),
     Option(Box<Type>),
-    Result { ok: Box<Type>, err: Box<Type> },
+    Result {
+        ok: Box<Type>,
+        err: Box<Type>,
+    },
     Tuple(Vec<Type>),
-    Function { params: Vec<Type>, ret: Box<Type> },
+    Function {
+        params: Vec<Type>,
+        ret: Box<Type>,
+    },
 }
 
 /// Function/method parameter
@@ -1332,24 +1398,44 @@ pub enum Expr {
 
     // Programmatic navigation
     // navigate("/user/42")
-    Navigate { path: Box<Expr> },
+    Navigate {
+        path: Box<Expr>,
+    },
 
     // Streaming — iterate over async data as it arrives
     // for chunk in stream fetch("https://api.openai.com/chat") { ... }
-    Stream { source: Box<Expr> },
+    Stream {
+        source: Box<Expr>,
+    },
 
     // Suspend with fallback — show fallback while loading
     // suspend(<LoadingSpinner />) { <HeavyComponent /> }
-    Suspend { fallback: Box<Expr>, body: Box<Expr> },
+    Suspend {
+        fallback: Box<Expr>,
+        body: Box<Expr>,
+    },
 
     // Concurrency primitives
     /// spawn { ... } — runs block in Web Worker
-    Spawn { body: Block, span: Span },
-    Channel { ty: Option<Type> },
-    Send { channel: Box<Expr>, value: Box<Expr> },
-    Receive { channel: Box<Expr> },
+    Spawn {
+        body: Block,
+        span: Span,
+    },
+    Channel {
+        ty: Option<Type>,
+    },
+    Send {
+        channel: Box<Expr>,
+        value: Box<Expr>,
+    },
+    Receive {
+        channel: Box<Expr>,
+    },
     /// parallel { a, b, c } — runs multiple expressions concurrently
-    Parallel { tasks: Vec<Expr>, span: Span },
+    Parallel {
+        tasks: Vec<Expr>,
+        span: Span,
+    },
 
     // Error handling
     TryCatch {
@@ -1359,16 +1445,28 @@ pub enum Expr {
     },
 
     // Testing assertions
-    Assert { condition: Box<Expr>, message: Option<String> },
-    AssertEq { left: Box<Expr>, right: Box<Expr>, message: Option<String> },
+    Assert {
+        condition: Box<Expr>,
+        message: Option<String>,
+    },
+    AssertEq {
+        left: Box<Expr>,
+        right: Box<Expr>,
+        message: Option<String>,
+    },
 
     // Animation — trigger a named animation on a target element
     // animate(target, "animationName")
-    Animate { target: Box<Expr>, animation: String },
+    Animate {
+        target: Box<Expr>,
+        animation: String,
+    },
 
     // Format string interpolation — general-purpose string building
     // f"hello {name}, you are {age} years old"
-    FormatString { parts: Vec<FormatPart> },
+    FormatString {
+        parts: Vec<FormatPart>,
+    },
 
     /// `?` error propagation operator — `expr?`
     /// Unwraps Result<T,E> or Option<T>, propagating the error/None on failure.
@@ -1443,9 +1541,19 @@ pub enum FormatPart {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
-    Add, Sub, Mul, Div, Mod,
-    Eq, Neq, Lt, Gt, Lte, Gte,
-    And, Or,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Eq,
+    Neq,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+    And,
+    Or,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1466,11 +1574,18 @@ pub enum Pattern {
     Wildcard,
     Ident(String),
     Literal(Expr),
-    Variant { name: String, fields: Vec<Pattern> },
+    Variant {
+        name: String,
+        fields: Vec<Pattern>,
+    },
     /// Tuple destructuring — `(a, b, c)`
     Tuple(Vec<Pattern>),
     /// Struct destructuring — `User { name, age, .. }`
-    Struct { name: String, fields: Vec<(String, Pattern)>, rest: bool },
+    Struct {
+        name: String,
+        fields: Vec<(String, Pattern)>,
+        rest: bool,
+    },
     /// Array destructuring — `[first, second, ..]`
     Array(Vec<Pattern>),
 }

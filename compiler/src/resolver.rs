@@ -6,10 +6,10 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use semver::{Version, VersionReq};
 
-use crate::package::{NectarManifest, Dependency, collect_dependencies};
+use crate::package::{Dependency, NectarManifest, collect_dependencies};
 use crate::registry::RegistryClient;
 
 // ---------------------------------------------------------------------------
@@ -166,18 +166,15 @@ impl<'a> Resolver<'a> {
         let req = parse_version_req(&dep.version_req)?;
 
         // Pick the highest version that satisfies the requirement.
-        let best = pick_best_version(&metadata.versions, &req)
-            .with_context(|| {
-                format!(
-                    "no version of `{}` satisfies requirement `{}`",
-                    dep.name, dep.version_req
-                )
-            })?;
+        let best = pick_best_version(&metadata.versions, &req).with_context(|| {
+            format!(
+                "no version of `{}` satisfies requirement `{}`",
+                dep.name, dep.version_req
+            )
+        })?;
 
         // Download / ensure cached.
-        let cache_path = self
-            .client
-            .download_package(&dep.name, &best.to_string())?;
+        let cache_path = self.client.download_package(&dep.name, &best.to_string())?;
 
         Ok(ResolvedDependency {
             name: dep.name.clone(),
@@ -204,8 +201,7 @@ pub fn parse_version_req(req: &str) -> Result<VersionReq> {
 
 /// Parse a concrete version string.
 pub fn parse_version(v: &str) -> Result<Version> {
-    let version = Version::parse(v)
-        .with_context(|| format!("invalid version: `{}`", v))?;
+    let version = Version::parse(v).with_context(|| format!("invalid version: `{}`", v))?;
     Ok(version)
 }
 
@@ -448,8 +444,7 @@ my-lib = {{ path = "{}" }}
 "#,
             dep_dir.display()
         );
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(&root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(&root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -472,8 +467,7 @@ version = "0.1.0"
 [dependencies]
 missing = { path = "/nonexistent/path/to/lib" }
 "#;
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -503,8 +497,7 @@ no-manifest-lib = {{ path = "{}" }}
 "#,
             dep_dir.display()
         );
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(&root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(&root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -544,8 +537,7 @@ lib-a = {{ path = "{}" }}
 "#,
             lib_a_dir.display()
         );
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(&root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(&root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -594,8 +586,7 @@ lib-a = {{ path = "{}" }}
 "#,
             lib_a_dir.display()
         );
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(&root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(&root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -636,8 +627,7 @@ version = "0.1.0"
 [dependencies]
 cached-lib = "^1.0"
 "#;
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(root_manifest_str).unwrap();
 
         let resolver = Resolver::new(&client);
         let resolved = resolver.resolve(&manifest).unwrap();
@@ -657,8 +647,7 @@ cached-lib = "^1.0"
 name = "app"
 version = "0.1.0"
 "#;
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);
@@ -704,8 +693,7 @@ lib-b = {{ path = "{}" }}
             lib_a_dir.display(),
             lib_b_dir.display()
         );
-        let manifest: crate::package::NectarManifest =
-            toml::from_str(&root_manifest_str).unwrap();
+        let manifest: crate::package::NectarManifest = toml::from_str(&root_manifest_str).unwrap();
 
         let cache_tmp = TempDir::new().unwrap();
         let client = make_registry_client(&cache_tmp);

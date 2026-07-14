@@ -77,7 +77,10 @@ pub fn verify_contracts(
     api_base_url: &str,
     api_token: Option<&str>,
 ) -> Vec<VerificationResult> {
-    contracts.iter().map(|c| verify_single(c, api_base_url, api_token)).collect()
+    contracts
+        .iter()
+        .map(|c| verify_single(c, api_base_url, api_token))
+        .collect()
 }
 
 /// Verify a single contract.
@@ -87,7 +90,10 @@ fn verify_single(
     api_token: Option<&str>,
 ) -> VerificationResult {
     let url = resolve_url(&contract.fetch_url, api_base_url);
-    let label = format!("{} {} ({})", contract.method, contract.fetch_url, contract.source_context);
+    let label = format!(
+        "{} {} ({})",
+        contract.method, contract.fetch_url, contract.source_context
+    );
 
     // Make the HTTP request
     let response = make_request(&url, &contract.method, api_token);
@@ -164,10 +170,7 @@ fn verify_fields(
                     field_path: field.path.clone(),
                     expected: field.inferred_type.clone(),
                     actual: ActualType::Missing,
-                    message: format!(
-                        "field '{}' not found in API response",
-                        field.path.join(".")
-                    ),
+                    message: format!("field '{}' not found in API response", field.path.join(".")),
                 });
             }
             Some(value) => {
@@ -192,7 +195,10 @@ fn verify_fields(
 }
 
 /// Navigate a JSON value by field path.
-fn navigate_json<'a>(json: &'a serde_json::Value, path: &[String]) -> Option<&'a serde_json::Value> {
+fn navigate_json<'a>(
+    json: &'a serde_json::Value,
+    path: &[String],
+) -> Option<&'a serde_json::Value> {
     let mut current = json;
     for segment in path {
         match current.get(segment) {
@@ -251,11 +257,7 @@ fn resolve_url(fetch_url: &str, base_url: &str) -> String {
 }
 
 /// Make an HTTP request using a blocking reqwest client.
-fn make_request(
-    url: &str,
-    method: &str,
-    token: Option<&str>,
-) -> Result<(u16, String), String> {
+fn make_request(url: &str, method: &str, token: Option<&str>) -> Result<(u16, String), String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
@@ -275,9 +277,13 @@ fn make_request(
 
     request = request.header("Accept", "application/json");
 
-    let response = request.send().map_err(|e| format!("request failed: {}", e))?;
+    let response = request
+        .send()
+        .map_err(|e| format!("request failed: {}", e))?;
     let status = response.status().as_u16();
-    let body = response.text().map_err(|e| format!("failed to read response: {}", e))?;
+    let body = response
+        .text()
+        .map_err(|e| format!("failed to read response: {}", e))?;
 
     Ok((status, body))
 }
@@ -340,13 +346,22 @@ mod tests {
     #[test]
     fn test_types_compatible_string() {
         assert!(types_compatible(&InferredType::String, &ActualType::String));
-        assert!(!types_compatible(&InferredType::String, &ActualType::Number));
+        assert!(!types_compatible(
+            &InferredType::String,
+            &ActualType::Number
+        ));
     }
 
     #[test]
     fn test_types_compatible_numeric() {
-        assert!(types_compatible(&InferredType::Numeric, &ActualType::Number));
-        assert!(!types_compatible(&InferredType::Numeric, &ActualType::String));
+        assert!(types_compatible(
+            &InferredType::Numeric,
+            &ActualType::Number
+        ));
+        assert!(!types_compatible(
+            &InferredType::Numeric,
+            &ActualType::String
+        ));
     }
 
     #[test]
@@ -357,17 +372,32 @@ mod tests {
 
     #[test]
     fn test_types_compatible_array() {
-        assert!(types_compatible(&InferredType::Array(Box::new(InferredType::Unknown)), &ActualType::Array));
-        assert!(!types_compatible(&InferredType::Array(Box::new(InferredType::Unknown)), &ActualType::Object));
+        assert!(types_compatible(
+            &InferredType::Array(Box::new(InferredType::Unknown)),
+            &ActualType::Array
+        ));
+        assert!(!types_compatible(
+            &InferredType::Array(Box::new(InferredType::Unknown)),
+            &ActualType::Object
+        ));
     }
 
     #[test]
     fn test_types_compatible_unknown_matches_all() {
-        assert!(types_compatible(&InferredType::Unknown, &ActualType::String));
-        assert!(types_compatible(&InferredType::Unknown, &ActualType::Number));
+        assert!(types_compatible(
+            &InferredType::Unknown,
+            &ActualType::String
+        ));
+        assert!(types_compatible(
+            &InferredType::Unknown,
+            &ActualType::Number
+        ));
         assert!(types_compatible(&InferredType::Unknown, &ActualType::Bool));
         assert!(types_compatible(&InferredType::Unknown, &ActualType::Array));
-        assert!(types_compatible(&InferredType::Unknown, &ActualType::Object));
+        assert!(types_compatible(
+            &InferredType::Unknown,
+            &ActualType::Object
+        ));
         assert!(types_compatible(&InferredType::Unknown, &ActualType::Null));
     }
 
@@ -400,7 +430,14 @@ mod tests {
             }
         });
 
-        let result = navigate_json(&json, &["user".to_string(), "profile".to_string(), "name".to_string()]);
+        let result = navigate_json(
+            &json,
+            &[
+                "user".to_string(),
+                "profile".to_string(),
+                "name".to_string(),
+            ],
+        );
         assert!(result.is_some());
         assert_eq!(result.unwrap(), &serde_json::json!("Blake"));
     }
@@ -414,18 +451,39 @@ mod tests {
 
     #[test]
     fn test_json_to_actual_type() {
-        assert_eq!(json_to_actual_type(&serde_json::json!("hello")), ActualType::String);
-        assert_eq!(json_to_actual_type(&serde_json::json!(42)), ActualType::Number);
-        assert_eq!(json_to_actual_type(&serde_json::json!(true)), ActualType::Bool);
-        assert_eq!(json_to_actual_type(&serde_json::json!([1, 2])), ActualType::Array);
-        assert_eq!(json_to_actual_type(&serde_json::json!({"a": 1})), ActualType::Object);
-        assert_eq!(json_to_actual_type(&serde_json::Value::Null), ActualType::Null);
+        assert_eq!(
+            json_to_actual_type(&serde_json::json!("hello")),
+            ActualType::String
+        );
+        assert_eq!(
+            json_to_actual_type(&serde_json::json!(42)),
+            ActualType::Number
+        );
+        assert_eq!(
+            json_to_actual_type(&serde_json::json!(true)),
+            ActualType::Bool
+        );
+        assert_eq!(
+            json_to_actual_type(&serde_json::json!([1, 2])),
+            ActualType::Array
+        );
+        assert_eq!(
+            json_to_actual_type(&serde_json::json!({"a": 1})),
+            ActualType::Object
+        );
+        assert_eq!(
+            json_to_actual_type(&serde_json::Value::Null),
+            ActualType::Null
+        );
     }
 
     #[test]
     fn test_resolve_url_absolute() {
         assert_eq!(
-            resolve_url("https://api.example.com/products", "https://staging.example.com"),
+            resolve_url(
+                "https://api.example.com/products",
+                "https://staging.example.com"
+            ),
             "https://api.example.com/products"
         );
     }
@@ -493,9 +551,7 @@ mod tests {
 
     #[test]
     fn test_verify_fields_wrong_type() {
-        let fields = vec![
-            make_field(&["price"], InferredType::Numeric),
-        ];
+        let fields = vec![make_field(&["price"], InferredType::Numeric)];
 
         let json = serde_json::json!({
             "price": "19.99"
@@ -510,9 +566,7 @@ mod tests {
 
     #[test]
     fn test_verify_fields_nested() {
-        let fields = vec![
-            make_field(&["vendor", "name"], InferredType::String),
-        ];
+        let fields = vec![make_field(&["vendor", "name"], InferredType::String)];
 
         let json = serde_json::json!({
             "vendor": {
@@ -527,9 +581,7 @@ mod tests {
 
     #[test]
     fn test_verify_fields_null_accepted() {
-        let fields = vec![
-            make_field(&["shipping_estimate"], InferredType::String),
-        ];
+        let fields = vec![make_field(&["shipping_estimate"], InferredType::String)];
 
         let json = serde_json::json!({
             "shipping_estimate": null
@@ -549,36 +601,30 @@ mod tests {
 
     #[test]
     fn test_print_verification_all_pass() {
-        let results = vec![
-            VerificationResult {
-                label: "GET /products".to_string(),
-                url: "https://api.example.com/products".to_string(),
-                method: "GET".to_string(),
-                status: VerificationStatus::Pass,
-                mismatches: vec![],
-            },
-        ];
+        let results = vec![VerificationResult {
+            label: "GET /products".to_string(),
+            url: "https://api.example.com/products".to_string(),
+            method: "GET".to_string(),
+            status: VerificationStatus::Pass,
+            mismatches: vec![],
+        }];
         assert!(print_verification_results(&results));
     }
 
     #[test]
     fn test_print_verification_with_failures() {
-        let results = vec![
-            VerificationResult {
-                label: "GET /products".to_string(),
-                url: "https://api.example.com/products".to_string(),
-                method: "GET".to_string(),
-                status: VerificationStatus::Fail,
-                mismatches: vec![
-                    Mismatch {
-                        field_path: vec!["price".to_string()],
-                        expected: InferredType::Numeric,
-                        actual: ActualType::String,
-                        message: "expected Numeric, got String".to_string(),
-                    },
-                ],
-            },
-        ];
+        let results = vec![VerificationResult {
+            label: "GET /products".to_string(),
+            url: "https://api.example.com/products".to_string(),
+            method: "GET".to_string(),
+            status: VerificationStatus::Fail,
+            mismatches: vec![Mismatch {
+                field_path: vec!["price".to_string()],
+                expected: InferredType::Numeric,
+                actual: ActualType::String,
+                message: "expected Numeric, got String".to_string(),
+            }],
+        }];
         assert!(!print_verification_results(&results));
     }
 }

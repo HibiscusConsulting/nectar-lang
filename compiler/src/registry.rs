@@ -6,7 +6,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
@@ -127,13 +127,12 @@ impl RegistryClient {
 
     /// Ensure the cache directory exists.
     pub fn ensure_cache_dir(&self) -> Result<()> {
-        fs::create_dir_all(&self.config.cache_dir)
-            .with_context(|| {
-                format!(
-                    "failed to create cache directory at {}",
-                    self.config.cache_dir.display()
-                )
-            })?;
+        fs::create_dir_all(&self.config.cache_dir).with_context(|| {
+            format!(
+                "failed to create cache directory at {}",
+                self.config.cache_dir.display()
+            )
+        })?;
         Ok(())
     }
 
@@ -152,8 +151,13 @@ impl RegistryClient {
         fs::create_dir_all(&dest)?;
 
         // Copy all files from source_dir into the cache directory.
-        copy_dir_recursive(source_dir, &dest)
-            .with_context(|| format!("failed to cache package {} from {}", name, source_dir.display()))?;
+        copy_dir_recursive(source_dir, &dest).with_context(|| {
+            format!(
+                "failed to cache package {} from {}",
+                name,
+                source_dir.display()
+            )
+        })?;
 
         // Write a metadata index entry so `fetch_package_metadata` finds it.
         self.write_cached_index(name, version)?;
@@ -328,7 +332,11 @@ mod tests {
         let source_tmp = TempDir::new().unwrap();
 
         // Create source files
-        fs::write(source_tmp.path().join("Nectar.toml"), "[package]\nname = \"x\"\nversion = \"1.0.0\"").unwrap();
+        fs::write(
+            source_tmp.path().join("Nectar.toml"),
+            "[package]\nname = \"x\"\nversion = \"1.0.0\"",
+        )
+        .unwrap();
         let sub = source_tmp.path().join("src");
         fs::create_dir(&sub).unwrap();
         fs::write(sub.join("main.nec"), "fn main() {}").unwrap();
@@ -554,7 +562,10 @@ mod tests {
         let dst_dir = dst.path().join("output");
         copy_dir_recursive(src.path(), &dst_dir).unwrap();
 
-        assert_eq!(fs::read_to_string(dst_dir.join("root.txt")).unwrap(), "root");
+        assert_eq!(
+            fs::read_to_string(dst_dir.join("root.txt")).unwrap(),
+            "root"
+        );
         assert_eq!(
             fs::read_to_string(dst_dir.join("a").join("b").join("deep.txt")).unwrap(),
             "deep"

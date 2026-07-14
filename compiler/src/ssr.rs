@@ -285,16 +285,14 @@ impl SsrCodegen {
         self.line("return __html;");
         self.indent -= 1;
         self.line("}");
-        self.line(&format!("module.exports.render_{} = render_{};", comp_name, comp_name));
+        self.line(&format!(
+            "module.exports.render_{} = render_{};",
+            comp_name, comp_name
+        ));
         self.line("");
     }
 
-    fn generate_template_ssr(
-        &mut self,
-        node: &TemplateNode,
-        comp_name: &str,
-        is_root: bool,
-    ) {
+    fn generate_template_ssr(&mut self, node: &TemplateNode, comp_name: &str, is_root: bool) {
         match node {
             TemplateNode::Element(el) => {
                 let key = self.next_key();
@@ -304,16 +302,16 @@ impl SsrCodegen {
 
                 // Add hydration marker on root element
                 if is_root {
-                    open_tag.push_str(&format!(
-                        " data-nectar-hydrate=\"{}\"",
-                        comp_name
-                    ));
+                    open_tag.push_str(&format!(" data-nectar-hydrate=\"{}\"", comp_name));
                 }
 
                 // Add hydration key for dynamic content mapping
                 open_tag.push_str(&format!(" data-nectar-key=\"{}\"", key));
 
-                self.line(&format!("__html += '{}';", self.escape_js_string(&open_tag)));
+                self.line(&format!(
+                    "__html += '{}';",
+                    self.escape_js_string(&open_tag)
+                ));
 
                 // Static and dynamic attributes
                 for attr in &el.attributes {
@@ -366,8 +364,8 @@ impl SsrCodegen {
 
                 // Void elements don't get closing tags
                 let void_elements = [
-                    "area", "base", "br", "col", "embed", "hr", "img",
-                    "input", "link", "meta", "param", "source", "track", "wbr",
+                    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+                    "param", "source", "track", "wbr",
                 ];
                 if !void_elements.contains(&el.tag.as_str()) {
                     // Render children
@@ -391,7 +389,11 @@ impl SsrCodegen {
                     key, js
                 ));
             }
-            TemplateNode::Link { to, attributes, children } => {
+            TemplateNode::Link {
+                to,
+                attributes,
+                children,
+            } => {
                 let key = self.next_key();
                 let href_js = self.expr_to_js(to);
 
@@ -432,7 +434,11 @@ impl SsrCodegen {
             TemplateNode::Layout(layout_node) => {
                 self.generate_layout_ssr(layout_node, comp_name);
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 let cond_js = self.expr_to_js(condition);
                 self.line(&format!("if ({}) {{", cond_js));
                 for child in then_children {
@@ -446,7 +452,12 @@ impl SsrCodegen {
                 }
                 self.line("}");
             }
-            TemplateNode::TemplateFor { binding, iterator, children, .. } => {
+            TemplateNode::TemplateFor {
+                binding,
+                iterator,
+                children,
+                ..
+            } => {
                 let iter_js = self.expr_to_js(iterator);
                 self.line(&format!("for (const {} of {}) {{", binding, iter_js));
                 for child in children {
@@ -481,38 +492,107 @@ impl SsrCodegen {
         let (tag, style, children) = match node {
             LayoutNode::Stack { gap, children, .. } => {
                 let g = gap.as_deref().unwrap_or("0");
-                ("section", format!("display:flex;flex-direction:column;gap:{}px", g), children)
+                (
+                    "section",
+                    format!("display:flex;flex-direction:column;gap:{}px", g),
+                    children,
+                )
             }
-            LayoutNode::Row { gap, align, children, .. } => {
+            LayoutNode::Row {
+                gap,
+                align,
+                children,
+                ..
+            } => {
                 let g = gap.as_deref().unwrap_or("0");
                 let a = align.as_deref().unwrap_or("stretch");
-                ("div", format!("display:flex;flex-direction:row;gap:{}px;align-items:{}", g, a), children)
+                (
+                    "div",
+                    format!(
+                        "display:flex;flex-direction:row;gap:{}px;align-items:{}",
+                        g, a
+                    ),
+                    children,
+                )
             }
-            LayoutNode::Grid { cols, rows: _, gap, children, .. } => {
+            LayoutNode::Grid {
+                cols,
+                rows: _,
+                gap,
+                children,
+                ..
+            } => {
                 let c = cols.as_deref().unwrap_or("1");
                 let g = gap.as_deref().unwrap_or("0");
-                ("div", format!("display:grid;grid-template-columns:repeat({},1fr);gap:{}px", c, g), children)
+                (
+                    "div",
+                    format!(
+                        "display:grid;grid-template-columns:repeat({},1fr);gap:{}px",
+                        c, g
+                    ),
+                    children,
+                )
             }
-            LayoutNode::Center { max_width, children, .. } => {
+            LayoutNode::Center {
+                max_width,
+                children,
+                ..
+            } => {
                 let mw = max_width.as_deref().unwrap_or("none");
-                ("div", format!("display:flex;justify-content:center;align-items:center;max-width:{}px;margin:0 auto", mw), children)
+                (
+                    "div",
+                    format!(
+                        "display:flex;justify-content:center;align-items:center;max-width:{}px;margin:0 auto",
+                        mw
+                    ),
+                    children,
+                )
             }
             LayoutNode::Cluster { gap, children, .. } => {
                 let g = gap.as_deref().unwrap_or("0");
-                ("div", format!("display:flex;flex-wrap:wrap;gap:{}px", g), children)
+                (
+                    "div",
+                    format!("display:flex;flex-wrap:wrap;gap:{}px", g),
+                    children,
+                )
             }
-            LayoutNode::Sidebar { side, width, children, .. } => {
+            LayoutNode::Sidebar {
+                side,
+                width,
+                children,
+                ..
+            } => {
                 let s = side.as_deref().unwrap_or("left");
                 let w = width.as_deref().unwrap_or("300");
-                let cols = if s == "right" { format!("1fr {}px", w) } else { format!("{}px 1fr", w) };
-                ("div", format!("display:grid;grid-template-columns:{}", cols), children)
+                let cols = if s == "right" {
+                    format!("1fr {}px", w)
+                } else {
+                    format!("{}px 1fr", w)
+                };
+                (
+                    "div",
+                    format!("display:grid;grid-template-columns:{}", cols),
+                    children,
+                )
             }
-            LayoutNode::Switcher { threshold, children, .. } => {
+            LayoutNode::Switcher {
+                threshold,
+                children,
+                ..
+            } => {
                 let t = threshold.as_deref().unwrap_or("600");
-                ("div", format!("display:flex;flex-wrap:wrap;--threshold:{}px", t), children)
+                (
+                    "div",
+                    format!("display:flex;flex-wrap:wrap;--threshold:{}px", t),
+                    children,
+                )
             }
         };
-        self.line(&format!("__html += '<{} style=\"{}\">';", tag, self.escape_js_string(&style)));
+        self.line(&format!(
+            "__html += '<{} style=\"{}\">';",
+            tag,
+            self.escape_js_string(&style)
+        ));
         for child in children {
             self.generate_template_ssr(child, comp_name, false);
         }
@@ -522,10 +602,7 @@ impl SsrCodegen {
     fn generate_router(&mut self, router: &RouterDef) {
         let router_name = &router.name;
         self.line(&format!("// === Router: {} ===", router_name));
-        self.line(&format!(
-            "function render_{}(props) {{",
-            router_name
-        ));
+        self.line(&format!("function render_{}(props) {{", router_name));
         self.indent += 1;
         self.line("const url = props.__url || '/';");
 
@@ -549,17 +626,11 @@ impl SsrCodegen {
                 let guard_js = self.expr_to_js(guard);
                 self.line(&format!("if ({}) {{", guard_js));
                 self.indent += 1;
-                self.line(&format!(
-                    "__html = render_{}(props);",
-                    route.component
-                ));
+                self.line(&format!("__html = render_{}(props);", route.component));
                 self.indent -= 1;
                 self.line("}");
             } else {
-                self.line(&format!(
-                    "__html = render_{}(props);",
-                    route.component
-                ));
+                self.line(&format!("__html = render_{}(props);", route.component));
             }
 
             self.indent -= 1;
@@ -653,7 +724,11 @@ impl SsrCodegen {
                 let obj = self.expr_to_js(object);
                 format!("{}.{}", obj, field)
             }
-            Expr::MethodCall { object, method, args } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 let obj = self.expr_to_js(object);
                 let args_js: Vec<String> = args.iter().map(|a| self.expr_to_js(a)).collect();
                 format!("{}.{}({})", obj, method, args_js.join(", "))
@@ -668,7 +743,11 @@ impl SsrCodegen {
                 let idx = self.expr_to_js(index);
                 format!("{}[{}]", obj, idx)
             }
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 let cond = self.expr_to_js(condition);
                 let then_js = if let Some(last) = then_block.stmts.last() {
                     self.stmt_to_js(last)
@@ -837,7 +916,9 @@ mod tests {
         let program = Program { items: vec![] };
         let output = codegen.generate(&program);
 
-        assert!(output.contains("// --- Critical CSS (inlined by nectar build --critical-css) ---"));
+        assert!(
+            output.contains("// --- Critical CSS (inlined by nectar build --critical-css) ---")
+        );
         assert!(output.contains("const __nectarSkeletonCss ="));
         assert!(output.contains("const __nectarCriticalCss ="));
         assert!(output.contains("function __criticalStyleTag()"));
@@ -905,8 +986,15 @@ mod tests {
         codegen.generate_component(&comp);
         let output = &codegen.output;
 
-        assert!(output.contains("const title = props['title'] !== undefined ? props['title'] : 'Hello';"));
-        assert!(output.contains("const count = props['count'] !== undefined ? props['count'] : undefined;"));
+        assert!(
+            output
+                .contains("const title = props['title'] !== undefined ? props['title'] : 'Hello';")
+        );
+        assert!(
+            output.contains(
+                "const count = props['count'] !== undefined ? props['count'] : undefined;"
+            )
+        );
     }
 
     #[test]
@@ -1106,17 +1194,15 @@ mod tests {
                 },
             ],
             actions: vec![],
-            computed: vec![
-                ComputedDef {
-                    name: "double_count".to_string(),
-                    return_type: Some(Type::Named("i32".to_string())),
-                    body: Block {
-                        stmts: vec![],
-                        span: span(),
-                    },
+            computed: vec![ComputedDef {
+                name: "double_count".to_string(),
+                return_type: Some(Type::Named("i32".to_string())),
+                body: Block {
+                    stmts: vec![],
                     span: span(),
                 },
-            ],
+                span: span(),
+            }],
             effects: vec![],
             selectors: vec![],
             is_pub: true,
@@ -1280,7 +1366,10 @@ mod tests {
     #[test]
     fn test_expr_to_js_string_lit() {
         let codegen = SsrCodegen::new();
-        assert_eq!(codegen.expr_to_js(&Expr::StringLit("hello".to_string())), "'hello'");
+        assert_eq!(
+            codegen.expr_to_js(&Expr::StringLit("hello".to_string())),
+            "'hello'"
+        );
     }
 
     #[test]
@@ -1518,7 +1607,10 @@ mod tests {
         let codegen = SsrCodegen::new();
         // Use an unsupported expression type to test the fallback branch
         let expr = Expr::Await(Box::new(Expr::Ident("promise".to_string())));
-        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+        assert_eq!(
+            codegen.expr_to_js(&expr),
+            "undefined /* unsupported SSR expr */"
+        );
     }
 
     #[test]
@@ -1528,7 +1620,10 @@ mod tests {
             subject: Box::new(Expr::Ident("x".to_string())),
             arms: vec![],
         };
-        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+        assert_eq!(
+            codegen.expr_to_js(&expr),
+            "undefined /* unsupported SSR expr */"
+        );
     }
 
     #[test]
@@ -1537,9 +1632,15 @@ mod tests {
         let expr = Expr::For {
             binding: "x".to_string(),
             iterator: Box::new(Expr::Ident("items".to_string())),
-            body: Block { stmts: vec![], span: span() },
+            body: Block {
+                stmts: vec![],
+                span: span(),
+            },
         };
-        assert_eq!(codegen.expr_to_js(&expr), "undefined /* unsupported SSR expr */");
+        assert_eq!(
+            codegen.expr_to_js(&expr),
+            "undefined /* unsupported SSR expr */"
+        );
     }
 
     // ---- stmt_to_js() ----
@@ -1590,7 +1691,10 @@ mod tests {
     #[test]
     fn test_route_path_to_regex_parameterized() {
         let codegen = SsrCodegen::new();
-        assert_eq!(codegen.route_path_to_regex("/user/:id"), "/^\\/user\\/[^/]+$/");
+        assert_eq!(
+            codegen.route_path_to_regex("/user/:id"),
+            "/^\\/user\\/[^/]+$/"
+        );
     }
 
     #[test]
@@ -1784,8 +1888,8 @@ mod tests {
     #[test]
     fn test_all_void_elements() {
         let void_tags = [
-            "area", "base", "br", "col", "embed", "hr", "img",
-            "input", "link", "meta", "param", "source", "track", "wbr",
+            "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param",
+            "source", "track", "wbr",
         ];
         for tag in &void_tags {
             let mut codegen = SsrCodegen::new();

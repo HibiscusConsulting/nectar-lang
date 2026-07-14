@@ -157,8 +157,16 @@ fn base64_encode(data: &[u8]) -> String {
     let mut i = 0;
     while i < data.len() {
         let b0 = data[i] as u32;
-        let b1 = if i + 1 < data.len() { data[i + 1] as u32 } else { 0 };
-        let b2 = if i + 2 < data.len() { data[i + 2] as u32 } else { 0 };
+        let b1 = if i + 1 < data.len() {
+            data[i + 1] as u32
+        } else {
+            0
+        };
+        let b2 = if i + 2 < data.len() {
+            data[i + 2] as u32
+        } else {
+            0
+        };
         let triple = (b0 << 16) | (b1 << 8) | b2;
 
         out.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
@@ -206,16 +214,32 @@ fn serve_file(path: &Path) -> Option<(Vec<u8>, &'static str)> {
 
 /// Known search engine and AI crawler User-Agent patterns.
 const BOT_PATTERNS: &[&str] = &[
-    "Googlebot", "bingbot", "GPTBot", "ClaudeBot", "PerplexityBot",
-    "ChatGPT-User", "Applebot", "Slurp", "DuckDuckBot", "Baiduspider",
-    "facebookexternalhit", "Twitterbot", "LinkedInBot",
-    "Amazonbot", "anthropic-ai", "cohere-ai", "YandexBot",
-    "Bytespider", "CCBot", "PetalBot",
+    "Googlebot",
+    "bingbot",
+    "GPTBot",
+    "ClaudeBot",
+    "PerplexityBot",
+    "ChatGPT-User",
+    "Applebot",
+    "Slurp",
+    "DuckDuckBot",
+    "Baiduspider",
+    "facebookexternalhit",
+    "Twitterbot",
+    "LinkedInBot",
+    "Amazonbot",
+    "anthropic-ai",
+    "cohere-ai",
+    "YandexBot",
+    "Bytespider",
+    "CCBot",
+    "PetalBot",
 ];
 
 /// Check if an HTTP request comes from a known search engine or AI crawler.
 fn is_bot(request: &str) -> bool {
-    let ua_line = request.lines()
+    let ua_line = request
+        .lines()
         .find(|l| l.to_lowercase().starts_with("user-agent:"))
         .unwrap_or("");
     BOT_PATTERNS.iter().any(|bot| ua_line.contains(bot))
@@ -230,7 +254,10 @@ fn http_response(status: u16, content_type: &str, body: &[u8]) -> Vec<u8> {
     };
     let header = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n",
-        status, status_text, content_type, body.len()
+        status,
+        status_text,
+        content_type,
+        body.len()
     );
     let mut resp = header.into_bytes();
     resp.extend_from_slice(body);
@@ -271,7 +298,10 @@ impl DevServer {
         let addr = format!("127.0.0.1:{}", port);
         let listener = TcpListener::bind(&addr)?;
         println!("nectar dev: serving on http://{}", addr);
-        println!("nectar dev: watching {} for changes", self.source_dir.display());
+        println!(
+            "nectar dev: watching {} for changes",
+            self.source_dir.display()
+        );
 
         // Spawn the file-watcher thread.
         let ws_clients = Arc::clone(&self.ws_clients);
@@ -331,7 +361,11 @@ impl DevServer {
             let response = if let Some((body, _)) = serve_file(&tree_path) {
                 http_response(200, "application/octet-stream", &body)
             } else {
-                http_response(404, "text/plain", b"SSR tree not found - run nectar build --ssr first")
+                http_response(
+                    404,
+                    "text/plain",
+                    b"SSR tree not found - run nectar build --ssr first",
+                )
             };
             stream.write_all(&response)?;
             stream.flush()?;
@@ -419,7 +453,8 @@ impl DevServer {
         build_dir: PathBuf,
         ws_clients: Arc<Mutex<Vec<TcpStream>>>,
     ) {
-        let mut watcher = FileWatcher::new(source_dir.clone(), "nectar", Duration::from_millis(500));
+        let mut watcher =
+            FileWatcher::new(source_dir.clone(), "nectar", Duration::from_millis(500));
 
         loop {
             thread::sleep(watcher.interval());
@@ -497,8 +532,7 @@ impl DevServer {
         let output_name = format!("{}.wat", stem);
         let output_path = build_dir.join(&output_name);
 
-        fs::create_dir_all(build_dir)
-            .map_err(|e| format!("Failed to create build dir: {}", e))?;
+        fs::create_dir_all(build_dir).map_err(|e| format!("Failed to create build dir: {}", e))?;
         fs::write(&output_path, &wat)
             .map_err(|e| format!("Failed to write {}: {}", output_path.display(), e))?;
 
@@ -526,9 +560,7 @@ impl DevServer {
 
         let frame = ws_text_frame(&message);
         let mut clients = ws_clients.lock().unwrap();
-        clients.retain_mut(|client| {
-            client.write_all(&frame).is_ok() && client.flush().is_ok()
-        });
+        clients.retain_mut(|client| client.write_all(&frame).is_ok() && client.flush().is_ok());
     }
 }
 
@@ -597,7 +629,10 @@ mod tests {
     #[test]
     fn test_content_type_with_path() {
         assert_eq!(content_type_for("/build/app.wasm"), "application/wasm");
-        assert_eq!(content_type_for("/static/runtime.js"), "application/javascript");
+        assert_eq!(
+            content_type_for("/static/runtime.js"),
+            "application/javascript"
+        );
         assert_eq!(content_type_for("/public/index.html"), "text/html");
         assert_eq!(content_type_for("/assets/style.css"), "text/css");
     }
@@ -757,10 +792,7 @@ mod tests {
 
     #[test]
     fn test_devserver_new() {
-        let server = DevServer::new(
-            PathBuf::from("/tmp/src"),
-            PathBuf::from("/tmp/build"),
-        );
+        let server = DevServer::new(PathBuf::from("/tmp/src"), PathBuf::from("/tmp/build"));
         assert_eq!(server.source_dir, PathBuf::from("/tmp/src"));
         assert_eq!(server.build_dir, PathBuf::from("/tmp/build"));
     }
@@ -772,7 +804,10 @@ mod tests {
         let key = ws_accept_key("dGhlIHNhbXBsZSBub25jZQ==");
         assert!(!key.is_empty());
         // Should produce a base64-encoded string
-        assert!(key.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '='));
+        assert!(
+            key.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+        );
     }
 
     #[test]

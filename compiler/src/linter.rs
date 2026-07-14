@@ -1,11 +1,10 @@
+use crate::ast::*;
+use crate::token::Span;
 /// Static analysis linter for the Nectar language.
 ///
 /// Runs a configurable set of lint rules over a parsed AST and returns
 /// a list of warnings with file positions.
-
 use std::collections::{HashMap, HashSet};
-use crate::ast::*;
-use crate::token::Span;
 
 // =========================================================================
 // Public types
@@ -340,17 +339,30 @@ impl Linter {
     /// and subscriptions that are acquired but never cleaned up in on_destroy.
     fn lint_resource_leaks(&mut self, component: &Component) {
         let acquisition_patterns = ["addEventListener", "setInterval", "setTimeout", "subscribe"];
-        let release_patterns = ["removeEventListener", "clearInterval", "clearTimeout", "unsubscribe"];
+        let release_patterns = [
+            "removeEventListener",
+            "clearInterval",
+            "clearTimeout",
+            "unsubscribe",
+        ];
 
         let mut acquisitions: Vec<(&str, Span)> = Vec::new();
 
         // Walk methods (excluding on_destroy) for acquisitions
         for method in &component.methods {
-            if method.name == "on_destroy" { continue; }
-            self.find_acquisition_calls_in_block(&method.body, &acquisition_patterns, &mut acquisitions);
+            if method.name == "on_destroy" {
+                continue;
+            }
+            self.find_acquisition_calls_in_block(
+                &method.body,
+                &acquisition_patterns,
+                &mut acquisitions,
+            );
         }
 
-        if acquisitions.is_empty() { return; }
+        if acquisitions.is_empty() {
+            return;
+        }
 
         // Check on_destroy exists
         let has_on_destroy = component.on_destroy.is_some()
@@ -360,7 +372,10 @@ impl Linter {
             for (acq, span) in &acquisitions {
                 self.warn(
                     "resource_leak",
-                    format!("component `{}` uses `{}` but has no on_destroy — potential memory leak", component.name, acq),
+                    format!(
+                        "component `{}` uses `{}` but has no on_destroy — potential memory leak",
+                        component.name, acq
+                    ),
                     *span,
                     Severity::Warning,
                 );
@@ -372,7 +387,9 @@ impl Linter {
         let destroy_body = if let Some(ref destroy_fn) = component.on_destroy {
             Some(&destroy_fn.body)
         } else {
-            component.methods.iter()
+            component
+                .methods
+                .iter()
                 .find(|m| m.name == "on_destroy")
                 .map(|m| &m.body)
         };
@@ -414,7 +431,9 @@ impl Linter {
     ) {
         for stmt in &block.stmts {
             match stmt {
-                Stmt::Expr(expr) | Stmt::Let { value: expr, .. } | Stmt::Signal { value: expr, .. } => {
+                Stmt::Expr(expr)
+                | Stmt::Let { value: expr, .. }
+                | Stmt::Signal { value: expr, .. } => {
                     self.find_acquisition_calls_in_expr(expr, patterns, results);
                 }
                 Stmt::Return(Some(expr)) | Stmt::Yield(expr) => {
@@ -433,7 +452,12 @@ impl Linter {
         results: &mut Vec<(&'a str, Span)>,
     ) {
         match expr {
-            Expr::MethodCall { object, method, args, .. } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+                ..
+            } => {
                 for pattern in patterns {
                     if method == pattern {
                         // Use a dummy span since Expr doesn't carry spans directly
@@ -463,7 +487,12 @@ impl Linter {
                 self.find_acquisition_calls_in_expr(left, patterns, results);
                 self.find_acquisition_calls_in_expr(right, patterns, results);
             }
-            Expr::If { condition, then_block, else_block, .. } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+                ..
+            } => {
                 self.find_acquisition_calls_in_expr(condition, patterns, results);
                 self.find_acquisition_calls_in_block(then_block, patterns, results);
                 if let Some(blk) = else_block {
@@ -511,7 +540,12 @@ impl Linter {
         }
     }
 
-    fn walk_template_for_semantics(&mut self, node: &TemplateNode, has_h1: &mut bool, is_top_level: bool) {
+    fn walk_template_for_semantics(
+        &mut self,
+        node: &TemplateNode,
+        has_h1: &mut bool,
+        is_top_level: bool,
+    ) {
         match node {
             TemplateNode::Element(el) => {
                 if el.tag == "h1" {
@@ -530,12 +564,10 @@ impl Linter {
 
                 // Warn if <img> has no alt attribute
                 if el.tag == "img" {
-                    let has_alt = el.attributes.iter().any(|attr| {
-                        match attr {
-                            Attribute::Static { name, .. } => name == "alt",
-                            Attribute::Dynamic { name, .. } => name == "alt",
-                            _ => false,
-                        }
+                    let has_alt = el.attributes.iter().any(|attr| match attr {
+                        Attribute::Static { name, .. } => name == "alt",
+                        Attribute::Dynamic { name, .. } => name == "alt",
+                        _ => false,
                     });
                     if !has_alt {
                         self.warn(
@@ -572,9 +604,9 @@ impl Linter {
                         matches!(c, TemplateNode::TextLiteral(s) if !s.trim().is_empty())
                             || matches!(c, TemplateNode::Expression(_))
                     });
-                    let has_aria_label = el.attributes.iter().any(|attr| {
-                        matches!(attr, Attribute::Aria { name, .. } if name == "aria-label")
-                    });
+                    let has_aria_label = el.attributes.iter().any(
+                        |attr| matches!(attr, Attribute::Aria { name, .. } if name == "aria-label"),
+                    );
                     if !has_text && !has_aria_label {
                         self.warn(
                             "a11y_label",
@@ -586,13 +618,18 @@ impl Linter {
                 }
 
                 // Warn if non-interactive element has on:click without role or tabindex
-                let interactive_tags = ["button", "a", "input", "select", "textarea", "details", "summary"];
+                let interactive_tags = [
+                    "button", "a", "input", "select", "textarea", "details", "summary",
+                ];
                 if !interactive_tags.contains(&el.tag.as_str()) {
                     let has_click = el.attributes.iter().any(|attr| {
                         matches!(attr, Attribute::EventHandler { event, .. } if event == "click")
                     });
                     if has_click {
-                        let has_role = el.attributes.iter().any(|attr| matches!(attr, Attribute::Role { .. }));
+                        let has_role = el
+                            .attributes
+                            .iter()
+                            .any(|attr| matches!(attr, Attribute::Role { .. }));
                         let has_tabindex = el.attributes.iter().any(|attr| {
                             matches!(attr, Attribute::Static { name, .. } | Attribute::Dynamic { name, .. } if name == "tabindex")
                         });
@@ -628,7 +665,8 @@ impl Linter {
                     if is_focusable {
                         self.warn(
                             "a11y_hidden",
-                            "element with `aria-hidden=\"true\"` should not be focusable".to_string(),
+                            "element with `aria-hidden=\"true\"` should not be focusable"
+                                .to_string(),
                             el.span,
                             Severity::Warning,
                         );
@@ -854,7 +892,10 @@ impl Linter {
             // Redundant clone: x.clone() where x is never used again.
             // This is a heuristic — we flag any .clone() call and suggest review.
             Expr::MethodCall {
-                method, object, args, ..
+                method,
+                object,
+                args,
+                ..
             } => {
                 if self.config.redundant_clone && method == "clone" && args.is_empty() {
                     if let Expr::Ident(name) = object.as_ref() {
@@ -932,10 +973,7 @@ impl Linter {
         if !is_snake_case(name) {
             self.warn(
                 "snake-case-functions",
-                format!(
-                    "{} `{}` should use snake_case naming",
-                    kind, name
-                ),
+                format!("{} `{}` should use snake_case naming", kind, name),
                 span,
                 Severity::Warning,
             );
@@ -946,10 +984,7 @@ impl Linter {
         if !is_pascal_case(name) {
             self.warn(
                 "pascal-case-types",
-                format!(
-                    "{} `{}` should use PascalCase naming",
-                    kind, name
-                ),
+                format!("{} `{}` should use PascalCase naming", kind, name),
                 span,
                 Severity::Warning,
             );
@@ -1160,7 +1195,10 @@ impl Linter {
             Expr::Spawn { body, .. } => {
                 for s in &body.stmts {
                     match s {
-                        Stmt::Expr(e) | Stmt::Let { value: e, .. } | Stmt::Signal { value: e, .. } | Stmt::Yield(e) => {
+                        Stmt::Expr(e)
+                        | Stmt::Let { value: e, .. }
+                        | Stmt::Signal { value: e, .. }
+                        | Stmt::Yield(e) => {
                             self.collect_idents_in_expr(e, idents);
                         }
                         Stmt::Return(Some(e)) => self.collect_idents_in_expr(e, idents),
@@ -1251,7 +1289,8 @@ fn is_snake_case(name: &str) -> bool {
         return true;
     }
     // snake_case: lowercase letters, digits, underscores; no uppercase; doesn't start with digit
-    name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    name.chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
         && !name.starts_with(|c: char| c.is_ascii_digit())
 }
 
@@ -1260,8 +1299,7 @@ fn is_pascal_case(name: &str) -> bool {
         return true;
     }
     // PascalCase: starts with uppercase letter, no underscores
-    name.starts_with(|c: char| c.is_ascii_uppercase())
-        && !name.contains('_')
+    name.starts_with(|c: char| c.is_ascii_uppercase()) && !name.contains('_')
 }
 
 // =========================================================================
@@ -1301,7 +1339,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -1320,7 +1361,9 @@ mod tests {
     }
 
     fn has_rule_containing(warnings: &[LintWarning], rule: &str, msg_part: &str) -> bool {
-        warnings.iter().any(|w| w.rule == rule && w.message.contains(msg_part))
+        warnings
+            .iter()
+            .any(|w| w.rule == rule && w.message.contains(msg_part))
     }
 
     // ===================================================================
@@ -1330,30 +1373,40 @@ mod tests {
     #[test]
     fn test_unused_variable_detected() {
         let program = Program {
-            items: vec![Item::Function(make_fn("foo", vec![
-                Stmt::Let {
+            items: vec![Item::Function(make_fn(
+                "foo",
+                vec![Stmt::Let {
                     name: "x".to_string(),
                     ty: None,
                     mutable: false,
                     secret: false,
                     value: Expr::Integer(42),
                     ownership: Ownership::Owned,
-                },
-            ]))],
+                }],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-variable", "`x`"),
-            "Expected unused-variable warning for `x`, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-variable", "`x`"),
+            "Expected unused-variable warning for `x`, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_snake_case_violation_detected() {
         let program = Program {
-            items: vec![Item::Function(make_fn("myFunction", vec![Stmt::Return(None)]))],
+            items: vec![Item::Function(make_fn(
+                "myFunction",
+                vec![Stmt::Return(None)],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`myFunction`"),
-            "Expected snake-case-functions warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`myFunction`"),
+            "Expected snake-case-functions warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1362,8 +1415,11 @@ mod tests {
             items: vec![Item::Function(make_fn("empty", vec![]))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "empty-block", "`empty`"),
-            "Expected empty-block warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "empty-block", "`empty`"),
+            "Expected empty-block warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1380,48 +1436,64 @@ mod tests {
             })],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`my_struct`"),
-            "Expected pascal-case-types warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`my_struct`"),
+            "Expected pascal-case-types warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_unreachable_code_detected() {
         let program = Program {
-            items: vec![Item::Function(make_fn("early_return", vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(2)),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "early_return",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(2)),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "unreachable-code"),
-            "Expected unreachable-code warning, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "unreachable-code"),
+            "Expected unreachable-code warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_mutable_not_mutated() {
         let program = Program {
-            items: vec![Item::Function(make_fn("no_mutate", vec![
-                Stmt::Let {
-                    name: "x".to_string(),
-                    ty: None,
-                    mutable: true,
-                    secret: false,
-                    value: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Ident("x".to_string())),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "no_mutate",
+                vec![
+                    Stmt::Let {
+                        name: "x".to_string(),
+                        ty: None,
+                        mutable: true,
+                        secret: false,
+                        value: Expr::Integer(0),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::Ident("x".to_string())),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
-            "Expected mutable-not-mutated warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
+            "Expected mutable-not-mutated warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_single_match_suggestion() {
         let program = Program {
-            items: vec![Item::Function(make_fn("check", vec![
-                Stmt::Expr(Expr::Match {
+            items: vec![Item::Function(make_fn(
+                "check",
+                vec![Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
                         MatchArm {
@@ -1438,12 +1510,15 @@ mod tests {
                             body: Expr::Integer(0),
                         },
                     ],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "single-match"),
-            "Expected single-match suggestion, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "single-match"),
+            "Expected single-match suggestion, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1453,65 +1528,81 @@ mod tests {
     #[test]
     fn test_unused_variable_underscore_prefix_no_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("foo", vec![
-                Stmt::Let {
+            items: vec![Item::Function(make_fn(
+                "foo",
+                vec![Stmt::Let {
                     name: "_unused".to_string(),
                     ty: None,
                     mutable: false,
                     secret: false,
                     value: Expr::Integer(42),
                     ownership: Ownership::Owned,
-                },
-            ]))],
+                }],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`_unused`"),
-            "Underscore-prefixed variables should not trigger unused-variable, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`_unused`"),
+            "Underscore-prefixed variables should not trigger unused-variable, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_used_variable_no_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("foo", vec![
-                Stmt::Let {
-                    name: "x".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(42),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Ident("x".to_string())),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "foo",
+                vec![
+                    Stmt::Let {
+                        name: "x".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(42),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::Ident("x".to_string())),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`x`"),
-            "Used variable should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`x`"),
+            "Used variable should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_unused_variable_in_nested_expr() {
         // Variable used inside a binary expression should count as used
         let program = Program {
-            items: vec![Item::Function(make_fn("foo", vec![
-                Stmt::Let {
-                    name: "a".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(1),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Binary {
-                    op: BinOp::Add,
-                    left: Box::new(Expr::Ident("a".to_string())),
-                    right: Box::new(Expr::Integer(2)),
-                }),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "foo",
+                vec![
+                    Stmt::Let {
+                        name: "a".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(1),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Ident("a".to_string())),
+                        right: Box::new(Expr::Integer(2)),
+                    }),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`a`"),
-            "Variable used in binary expr should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`a`"),
+            "Variable used in binary expr should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1528,8 +1619,11 @@ mod tests {
         };
         let warnings = lint_program(&program);
         // Both functions are private and neither calls the other
-        assert!(has_rule_containing(&warnings, "unused-function", "`helper`"),
-            "Expected unused-function for helper, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-function", "`helper`"),
+            "Expected unused-function for helper, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1537,27 +1631,37 @@ mod tests {
         let program = Program {
             items: vec![
                 Item::Function(make_fn("helper", vec![Stmt::Return(None)])),
-                Item::Function(make_fn("main_fn", vec![
-                    Stmt::Expr(Expr::FnCall {
+                Item::Function(make_fn(
+                    "main_fn",
+                    vec![Stmt::Expr(Expr::FnCall {
                         callee: Box::new(Expr::Ident("helper".to_string())),
                         args: vec![],
-                    }),
-                ])),
+                    })],
+                )),
             ],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-function", "`helper`"),
-            "Called function should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-function", "`helper`"),
+            "Called function should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_pub_function_not_flagged_unused() {
         let program = Program {
-            items: vec![Item::Function(make_pub_fn("public_api", vec![Stmt::Return(None)]))],
+            items: vec![Item::Function(make_pub_fn(
+                "public_api",
+                vec![Stmt::Return(None)],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-function", "`public_api`"),
-            "Public function should not be flagged as unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-function", "`public_api`"),
+            "Public function should not be flagged as unused, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1579,8 +1683,11 @@ mod tests {
             ],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-import", "`HashMap`"),
-            "Expected unused-import for HashMap, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-import", "`HashMap`"),
+            "Expected unused-import for HashMap, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1594,14 +1701,18 @@ mod tests {
                     group: None,
                     span: dummy_span(),
                 }),
-                Item::Function(make_fn("foo", vec![
-                    Stmt::Expr(Expr::Ident("HashMap".to_string())),
-                ])),
+                Item::Function(make_fn(
+                    "foo",
+                    vec![Stmt::Expr(Expr::Ident("HashMap".to_string()))],
+                )),
             ],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-import", "`HashMap`"),
-            "Used import should not be flagged, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-import", "`HashMap`"),
+            "Used import should not be flagged, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1611,11 +1722,17 @@ mod tests {
     #[test]
     fn test_snake_case_valid_no_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("valid_name", vec![Stmt::Return(None)]))],
+            items: vec![Item::Function(make_fn(
+                "valid_name",
+                vec![Stmt::Return(None)],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "snake-case-functions", "`valid_name`"),
-            "Valid snake_case should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "snake-case-functions", "`valid_name`"),
+            "Valid snake_case should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1626,10 +1743,15 @@ mod tests {
             methods: vec![make_fn("badMethod", vec![Stmt::Return(None)])],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Impl(im)] };
+        let program = Program {
+            items: vec![Item::Impl(im)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`badMethod`"),
-            "Expected snake-case warning for impl method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`badMethod`"),
+            "Expected snake-case warning for impl method, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1646,10 +1768,15 @@ mod tests {
             }],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Trait(t)] };
+        let program = Program {
+            items: vec![Item::Trait(t)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`badName`"),
-            "Expected snake-case warning for trait method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`badName`"),
+            "Expected snake-case warning for trait method, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1663,7 +1790,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -1677,10 +1809,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`badHandler`"),
-            "Expected snake-case warning in component method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`badHandler`"),
+            "Expected snake-case warning in component method, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1698,10 +1835,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "pascal-case-types", "`ValidName`"),
-            "Valid PascalCase should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "pascal-case-types", "`ValidName`"),
+            "Valid PascalCase should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1713,10 +1855,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Enum(e)] };
+        let program = Program {
+            items: vec![Item::Enum(e)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_enum`"),
-            "Expected pascal-case warning for enum, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_enum`"),
+            "Expected pascal-case warning for enum, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1730,7 +1877,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -1744,10 +1896,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_component`"),
-            "Expected pascal-case warning for component, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_component`"),
+            "Expected pascal-case warning for component, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1758,10 +1915,15 @@ mod tests {
             methods: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Trait(t)] };
+        let program = Program {
+            items: vec![Item::Trait(t)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_trait`"),
-            "Expected pascal-case warning for trait, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_trait`"),
+            "Expected pascal-case warning for trait, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -1776,10 +1938,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Store(s)] };
+        let program = Program {
+            items: vec![Item::Store(s)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_store`"),
-            "Expected pascal-case warning for store, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_store`"),
+            "Expected pascal-case warning for store, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1789,48 +1956,66 @@ mod tests {
     #[test]
     fn test_empty_if_block() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::If {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::If {
                     condition: Box::new(Expr::Bool(true)),
-                    then_block: Block { stmts: vec![], span: dummy_span() },
+                    then_block: Block {
+                        stmts: vec![],
+                        span: dummy_span(),
+                    },
                     else_block: None,
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "empty-block", "if block"),
-            "Expected empty-block warning for if, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "empty-block", "if block"),
+            "Expected empty-block warning for if, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_empty_else_block() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::If {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::If {
                     condition: Box::new(Expr::Bool(true)),
                     then_block: Block {
                         stmts: vec![Stmt::Expr(Expr::Integer(1))],
                         span: dummy_span(),
                     },
-                    else_block: Some(Block { stmts: vec![], span: dummy_span() }),
-                }),
-            ]))],
+                    else_block: Some(Block {
+                        stmts: vec![],
+                        span: dummy_span(),
+                    }),
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "empty-block", "else block"),
-            "Expected empty-block warning for else, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "empty-block", "else block"),
+            "Expected empty-block warning for else, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_non_empty_function_no_empty_block_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Return(Some(Expr::Integer(42))),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Return(Some(Expr::Integer(42)))],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "empty-block"),
-            "Non-empty function should not trigger empty-block, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "empty-block"),
+            "Non-empty function should not trigger empty-block, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1840,30 +2025,45 @@ mod tests {
     #[test]
     fn test_no_unreachable_when_return_is_last() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Integer(1)),
-                Stmt::Return(Some(Expr::Integer(2))),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Expr(Expr::Integer(1)),
+                    Stmt::Return(Some(Expr::Integer(2))),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "unreachable-code"),
-            "Return as last statement should not trigger unreachable, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "unreachable-code"),
+            "Return as last statement should not trigger unreachable, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_unreachable_code_only_reported_once() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(2)),
-                Stmt::Expr(Expr::Integer(3)),
-                Stmt::Expr(Expr::Integer(4)),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(2)),
+                    Stmt::Expr(Expr::Integer(3)),
+                    Stmt::Expr(Expr::Integer(4)),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        let unreachable_count = warnings.iter().filter(|w| w.rule == "unreachable-code").count();
-        assert_eq!(unreachable_count, 1,
-            "Expected exactly 1 unreachable-code warning, got {}: {:?}", unreachable_count, warnings);
+        let unreachable_count = warnings
+            .iter()
+            .filter(|w| w.rule == "unreachable-code")
+            .count();
+        assert_eq!(
+            unreachable_count, 1,
+            "Expected exactly 1 unreachable-code warning, got {}: {:?}",
+            unreachable_count, warnings
+        );
     }
 
     // ===================================================================
@@ -1873,44 +2073,56 @@ mod tests {
     #[test]
     fn test_mutable_actually_mutated_no_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "x".to_string(),
-                    ty: None,
-                    mutable: true,
-                    secret: false,
-                    value: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Assign {
-                    target: Box::new(Expr::Ident("x".to_string())),
-                    value: Box::new(Expr::Integer(1)),
-                }),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "x".to_string(),
+                        ty: None,
+                        mutable: true,
+                        secret: false,
+                        value: Expr::Integer(0),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::Assign {
+                        target: Box::new(Expr::Ident("x".to_string())),
+                        value: Box::new(Expr::Integer(1)),
+                    }),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
-            "Mutated variable should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
+            "Mutated variable should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_immutable_no_mutable_not_mutated_warning() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "x".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Ident("x".to_string())),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "x".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(0),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::Ident("x".to_string())),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
-            "Immutable variable should not trigger mutable-not-mutated, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "mutable-not-mutated", "`x`"),
+            "Immutable variable should not trigger mutable-not-mutated, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1920,46 +2132,72 @@ mod tests {
     #[test]
     fn test_match_with_three_arms_no_single_match() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Match {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
-                        MatchArm { pattern: Pattern::Literal(Expr::Integer(1)), guard: None, body: Expr::StringLit("one".to_string()) },
-                        MatchArm { pattern: Pattern::Literal(Expr::Integer(2)), guard: None, body: Expr::StringLit("two".to_string()) },
-                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::StringLit("other".to_string()) },
+                        MatchArm {
+                            pattern: Pattern::Literal(Expr::Integer(1)),
+                            guard: None,
+                            body: Expr::StringLit("one".to_string()),
+                        },
+                        MatchArm {
+                            pattern: Pattern::Literal(Expr::Integer(2)),
+                            guard: None,
+                            body: Expr::StringLit("two".to_string()),
+                        },
+                        MatchArm {
+                            pattern: Pattern::Wildcard,
+                            guard: None,
+                            body: Expr::StringLit("other".to_string()),
+                        },
                     ],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "single-match"),
-            "Match with 3 arms should not trigger single-match, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "single-match"),
+            "Match with 3 arms should not trigger single-match, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_match_two_arms_no_wildcard_no_single_match() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Match {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
                         MatchArm {
-                            pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            pattern: Pattern::Variant {
+                                name: "Some".to_string(),
+                                fields: vec![Pattern::Ident("v".to_string())],
+                            },
                             guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
                         MatchArm {
-                            pattern: Pattern::Variant { name: "None".to_string(), fields: vec![] },
+                            pattern: Pattern::Variant {
+                                name: "None".to_string(),
+                                fields: vec![],
+                            },
                             guard: None,
                             body: Expr::Integer(0),
                         },
                     ],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "single-match"),
-            "Match with 2 non-wildcard arms should not trigger single-match, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "single-match"),
+            "Match with 2 non-wildcard arms should not trigger single-match, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -1969,34 +2207,42 @@ mod tests {
     #[test]
     fn test_redundant_clone_detected() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::MethodCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::MethodCall {
                     object: Box::new(Expr::Ident("x".to_string())),
                     method: "clone".to_string(),
                     args: vec![],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "redundant-clone", "`x.clone()`"),
-            "Expected redundant-clone warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "redundant-clone", "`x.clone()`"),
+            "Expected redundant-clone warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_clone_with_args_not_flagged() {
         // .clone(something) is not the same as .clone()
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::MethodCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::MethodCall {
                     object: Box::new(Expr::Ident("x".to_string())),
                     method: "clone".to_string(),
                     args: vec![Expr::Integer(1)],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "redundant-clone"),
-            "clone() with args should not be flagged, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "redundant-clone"),
+            "clone() with args should not be flagged, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2006,21 +2252,28 @@ mod tests {
     #[test]
     fn test_config_disable_unused_variable() {
         let program = Program {
-            items: vec![Item::Function(make_fn("foo", vec![
-                Stmt::Let {
+            items: vec![Item::Function(make_fn(
+                "foo",
+                vec![Stmt::Let {
                     name: "x".to_string(),
                     ty: None,
                     mutable: false,
                     secret: false,
                     value: Expr::Integer(42),
                     ownership: Ownership::Owned,
-                },
-            ]))],
+                }],
+            ))],
         };
-        let config = LintConfig { unused_variable: false, ..Default::default() };
+        let config = LintConfig {
+            unused_variable: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "unused-variable"),
-            "Disabled rule should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "unused-variable"),
+            "Disabled rule should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2028,21 +2281,36 @@ mod tests {
         let program = Program {
             items: vec![Item::Function(make_fn("empty", vec![]))],
         };
-        let config = LintConfig { empty_block: false, ..Default::default() };
+        let config = LintConfig {
+            empty_block: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "empty-block"),
-            "Disabled empty-block should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "empty-block"),
+            "Disabled empty-block should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_config_disable_snake_case() {
         let program = Program {
-            items: vec![Item::Function(make_fn("myBadName", vec![Stmt::Return(None)]))],
+            items: vec![Item::Function(make_fn(
+                "myBadName",
+                vec![Stmt::Return(None)],
+            ))],
         };
-        let config = LintConfig { snake_case_functions: false, ..Default::default() };
+        let config = LintConfig {
+            snake_case_functions: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "snake-case-functions"),
-            "Disabled snake-case should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "snake-case-functions"),
+            "Disabled snake-case should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2056,65 +2324,103 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
-        let config = LintConfig { pascal_case_types: false, ..Default::default() };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
+        let config = LintConfig {
+            pascal_case_types: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "pascal-case-types"),
-            "Disabled pascal-case should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "pascal-case-types"),
+            "Disabled pascal-case should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_config_disable_unreachable() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(2)),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(2)),
+                ],
+            ))],
         };
-        let config = LintConfig { unreachable_code: false, ..Default::default() };
+        let config = LintConfig {
+            unreachable_code: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "unreachable-code"),
-            "Disabled unreachable should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "unreachable-code"),
+            "Disabled unreachable should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_config_disable_single_match() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Match {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
                         MatchArm {
-                            pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            pattern: Pattern::Variant {
+                                name: "Some".to_string(),
+                                fields: vec![Pattern::Ident("v".to_string())],
+                            },
                             guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
-                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
+                        MatchArm {
+                            pattern: Pattern::Wildcard,
+                            guard: None,
+                            body: Expr::Integer(0),
+                        },
                     ],
-                }),
-            ]))],
+                })],
+            ))],
         };
-        let config = LintConfig { single_match: false, ..Default::default() };
+        let config = LintConfig {
+            single_match: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "single-match"),
-            "Disabled single-match should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "single-match"),
+            "Disabled single-match should not fire, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_config_disable_redundant_clone() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::MethodCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::MethodCall {
                     object: Box::new(Expr::Ident("x".to_string())),
                     method: "clone".to_string(),
                     args: vec![],
-                }),
-            ]))],
+                })],
+            ))],
         };
-        let config = LintConfig { redundant_clone: false, ..Default::default() };
+        let config = LintConfig {
+            redundant_clone: false,
+            ..Default::default()
+        };
         let warnings = lint_program_with_config(&program, config);
-        assert!(!has_rule(&warnings, "redundant-clone"),
-            "Disabled redundant-clone should not fire, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "redundant-clone"),
+            "Disabled redundant-clone should not fire, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2131,19 +2437,27 @@ mod tests {
     #[test]
     fn test_single_match_is_info_severity() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Match {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Match {
                     subject: Box::new(Expr::Ident("x".to_string())),
                     arms: vec![
                         MatchArm {
-                            pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
+                            pattern: Pattern::Variant {
+                                name: "Some".to_string(),
+                                fields: vec![Pattern::Ident("v".to_string())],
+                            },
                             guard: None,
                             body: Expr::Ident("v".to_string()),
                         },
-                        MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
+                        MatchArm {
+                            pattern: Pattern::Wildcard,
+                            guard: None,
+                            body: Expr::Integer(0),
+                        },
                     ],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
         let single_match = warnings.iter().find(|w| w.rule == "single-match");
@@ -2154,16 +2468,17 @@ mod tests {
     #[test]
     fn test_unused_variable_is_warning_severity() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Let {
                     name: "x".to_string(),
                     ty: None,
                     mutable: false,
                     secret: false,
                     value: Expr::Integer(1),
                     ownership: Ownership::Owned,
-                },
-            ]))],
+                }],
+            ))],
         };
         let warnings = lint_program(&program);
         let w = warnings.iter().find(|w| w.rule == "unused-variable");
@@ -2174,13 +2489,14 @@ mod tests {
     #[test]
     fn test_redundant_clone_is_info_severity() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::MethodCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::MethodCall {
                     object: Box::new(Expr::Ident("x".to_string())),
                     method: "clone".to_string(),
                     args: vec![],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
         let rc = warnings.iter().find(|w| w.rule == "redundant-clone");
@@ -2227,30 +2543,44 @@ mod tests {
             actions: vec![ActionDef {
                 name: "increment".to_string(),
                 params: vec![],
-                body: Block { stmts: vec![Stmt::Return(None)], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(None)],
+                    span: dummy_span(),
+                },
                 is_async: false,
                 span: dummy_span(),
             }],
             computed: vec![ComputedDef {
                 name: "double".to_string(),
                 return_type: None,
-                body: Block { stmts: vec![Stmt::Return(None)], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(None)],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
             effects: vec![EffectDef {
                 name: "logger".to_string(),
-                body: Block { stmts: vec![Stmt::Return(None)], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(None)],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
             selectors: vec![],
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Store(s)] };
+        let program = Program {
+            items: vec![Item::Store(s)],
+        };
         let warnings = lint_program(&program);
         // AppStore is valid PascalCase, should not trigger
-        assert!(!has_rule_containing(&warnings, "pascal-case-types", "`AppStore`"),
-            "Valid PascalCase store should not trigger, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "pascal-case-types", "`AppStore`"),
+            "Valid PascalCase store should not trigger, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2279,10 +2609,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Store(s)] };
+        let program = Program {
+            items: vec![Item::Store(s)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "unreachable-code"),
-            "Expected unreachable-code in store action, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "unreachable-code"),
+            "Expected unreachable-code in store action, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2297,10 +2632,15 @@ mod tests {
             methods: vec![make_fn("do_nothing", vec![])],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Impl(im)] };
+        let program = Program {
+            items: vec![Item::Impl(im)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "empty-block", "`do_nothing`"),
-            "Expected empty-block for impl method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "empty-block", "`do_nothing`"),
+            "Expected empty-block for impl method, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2310,8 +2650,9 @@ mod tests {
     #[test]
     fn test_lint_nested_for_loop() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::For {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::For {
                     binding: "i".to_string(),
                     iterator: Box::new(Expr::Ident("items".to_string())),
                     body: Block {
@@ -2321,63 +2662,70 @@ mod tests {
                         ],
                         span: dummy_span(),
                     },
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "unreachable-code"),
-            "Expected unreachable-code in for body, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "unreachable-code"),
+            "Expected unreachable-code in for body, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_nested_while_loop() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::While {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::While {
                     condition: Box::new(Expr::Bool(true)),
                     body: Block {
-                        stmts: vec![
-                            Stmt::Let {
-                                name: "unused_in_while".to_string(),
-                                ty: None,
-                                mutable: false,
-                                secret: false,
-                                value: Expr::Integer(0),
-                                ownership: Ownership::Owned,
-                            },
-                        ],
+                        stmts: vec![Stmt::Let {
+                            name: "unused_in_while".to_string(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::Integer(0),
+                            ownership: Ownership::Owned,
+                        }],
                         span: dummy_span(),
                     },
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-variable", "`unused_in_while`"),
-            "Expected unused-variable in while body, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-variable", "`unused_in_while`"),
+            "Expected unused-variable in while body, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_nested_block_expr() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Block(Block {
-                    stmts: vec![
-                        Stmt::Let {
-                            name: "nested_unused".to_string(),
-                            ty: None,
-                            mutable: false,
-                            secret: false,
-                            value: Expr::Integer(99),
-                            ownership: Ownership::Owned,
-                        },
-                    ],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Block(Block {
+                    stmts: vec![Stmt::Let {
+                        name: "nested_unused".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(99),
+                        ownership: Ownership::Owned,
+                    }],
                     span: dummy_span(),
-                })),
-            ]))],
+                }))],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-variable", "`nested_unused`"),
-            "Expected unused-variable in nested block, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-variable", "`nested_unused`"),
+            "Expected unused-variable in nested block, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2388,173 +2736,216 @@ mod tests {
     fn test_lint_binary_expr_recurse() {
         // Single-match inside a binary expression body
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "r".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Match {
-                        subject: Box::new(Expr::Ident("x".to_string())),
-                        arms: vec![
-                            MatchArm {
-                                pattern: Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("v".to_string())] },
-                                guard: None,
-                                body: Expr::Ident("v".to_string()),
-                            },
-                            MatchArm { pattern: Pattern::Wildcard, guard: None, body: Expr::Integer(0) },
-                        ],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "r".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Match {
+                            subject: Box::new(Expr::Ident("x".to_string())),
+                            arms: vec![
+                                MatchArm {
+                                    pattern: Pattern::Variant {
+                                        name: "Some".to_string(),
+                                        fields: vec![Pattern::Ident("v".to_string())],
+                                    },
+                                    guard: None,
+                                    body: Expr::Ident("v".to_string()),
+                                },
+                                MatchArm {
+                                    pattern: Pattern::Wildcard,
+                                    guard: None,
+                                    body: Expr::Integer(0),
+                                },
+                            ],
+                        },
+                        ownership: Ownership::Owned,
                     },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::Ident("r".to_string())),
-            ]))],
+                    Stmt::Expr(Expr::Ident("r".to_string())),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "single-match"),
-            "Expected single-match in let value, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "single-match"),
+            "Expected single-match in let value, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_closure_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Closure {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Closure {
                     params: vec![("x".to_string(), None)],
                     body: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("x".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside closure, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside closure, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_fn_call_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::FnCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("foo".to_string())),
                     args: vec![Expr::MethodCall {
                         object: Box::new(Expr::Ident("y".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }],
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside fn call arg, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside fn call arg, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_index_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Index {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Index {
                     object: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("v".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }),
                     index: Box::new(Expr::Integer(0)),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside index object, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside index object, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_assign_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Assign {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Assign {
                     target: Box::new(Expr::Ident("x".to_string())),
                     value: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("y".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside assignment, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside assignment, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_unary_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Unary {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Unary {
                     op: UnaryOp::Not,
                     operand: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("z".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside unary, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside unary, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_field_access_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::FieldAccess {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::FieldAccess {
                     object: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("a".to_string())),
                         method: "clone".to_string(),
                         args: vec![],
                     }),
                     field: "x".to_string(),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside field access, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside field access, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_struct_init_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::StructInit {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::StructInit {
                     name: "Foo".to_string(),
-                    fields: vec![
-                        ("x".to_string(), Expr::MethodCall {
+                    fields: vec![(
+                        "x".to_string(),
+                        Expr::MethodCall {
                             object: Box::new(Expr::Ident("v".to_string())),
                             method: "clone".to_string(),
                             args: vec![],
-                        }),
-                    ],
-                }),
-            ]))],
+                        },
+                    )],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside struct init, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside struct init, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_try_catch_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::TryCatch {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::TryCatch {
                     body: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("a".to_string())),
                         method: "clone".to_string(),
@@ -2562,19 +2953,23 @@ mod tests {
                     }),
                     error_binding: "e".to_string(),
                     catch_body: Box::new(Expr::Integer(0)),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone in try body, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone in try body, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_fetch_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Fetch {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Fetch {
                     url: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::Ident("url".to_string())),
                         method: "clone".to_string(),
@@ -2582,55 +2977,64 @@ mod tests {
                     }),
                     options: Some(Box::new(Expr::Integer(1))),
                     contract: None,
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone in fetch url, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone in fetch url, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_await_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Await(Box::new(Expr::MethodCall {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Await(Box::new(Expr::MethodCall {
                     object: Box::new(Expr::Ident("f".to_string())),
                     method: "clone".to_string(),
                     args: vec![],
-                }))),
-            ]))],
+                })))],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "redundant-clone"),
-            "Expected redundant-clone inside await, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "redundant-clone"),
+            "Expected redundant-clone inside await, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_lint_spawn_recurse() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Expr(Expr::Spawn {
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![Stmt::Expr(Expr::Spawn {
                     body: Block {
-                        stmts: vec![
-                            Stmt::Let {
-                                name: "spawn_unused".to_string(),
-                                ty: None,
-                                mutable: false,
-                                secret: false,
-                                value: Expr::Integer(1),
-                                ownership: Ownership::Owned,
-                            },
-                        ],
+                        stmts: vec![Stmt::Let {
+                            name: "spawn_unused".to_string(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::Integer(1),
+                            ownership: Ownership::Owned,
+                        }],
                         span: dummy_span(),
                     },
                     span: dummy_span(),
-                }),
-            ]))],
+                })],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-variable", "`spawn_unused`"),
-            "Expected unused-variable in spawn block, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-variable", "`spawn_unused`"),
+            "Expected unused-variable in spawn block, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2661,10 +3065,15 @@ mod tests {
             render: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Agent(agent)] };
+        let program = Program {
+            items: vec![Item::Agent(agent)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "unreachable-code"),
-            "Expected unreachable-code in agent tool, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "unreachable-code"),
+            "Expected unreachable-code in agent tool, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2678,10 +3087,15 @@ mod tests {
             render: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Agent(agent)] };
+        let program = Program {
+            items: vec![Item::Agent(agent)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "empty-block", "`do_nothing`"),
-            "Expected empty-block warning for agent method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "empty-block", "`do_nothing`"),
+            "Expected empty-block warning for agent method, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2689,24 +3103,27 @@ mod tests {
         let test = TestDef {
             name: "my test".to_string(),
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "unused_test_var".to_string(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Integer(1),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "unused_test_var".to_string(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(1),
+                    ownership: Ownership::Owned,
+                }],
                 span: dummy_span(),
             },
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Test(test)] };
+        let program = Program {
+            items: vec![Item::Test(test)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "unused-variable", "`unused_test_var`"),
-            "Expected unused-variable in test, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "unused-variable", "`unused_test_var`"),
+            "Expected unused-variable in test, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2721,7 +3138,12 @@ mod tests {
                 styles: vec![],
                 transitions: vec![],
                 render: RenderBlock {
-                    body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                    body: TemplateNode::Element(Element {
+                        tag: "div".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
+                    }),
                     span: dummy_span(),
                 },
                 trait_bounds: vec![],
@@ -2737,10 +3159,15 @@ mod tests {
             },
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::LazyComponent(lc)] };
+        let program = Program {
+            items: vec![Item::LazyComponent(lc)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_lazy`"),
-            "Expected pascal-case warning for lazy component, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_lazy`"),
+            "Expected pascal-case warning for lazy component, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2761,7 +3188,10 @@ mod tests {
                     tag: "main".to_string(),
                     attributes: vec![],
                     children: vec![TemplateNode::Element(Element {
-                        tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "h1".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     })],
                     span: dummy_span(),
                 }),
@@ -2772,10 +3202,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_page`"),
-            "Expected pascal-case warning for page, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_page`"),
+            "Expected pascal-case warning for page, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2792,7 +3227,10 @@ mod tests {
                     tag: "main".to_string(),
                     attributes: vec![],
                     children: vec![TemplateNode::Element(Element {
-                        tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "h1".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     })],
                     span: dummy_span(),
                 }),
@@ -2803,10 +3241,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`badHandler`"),
-            "Expected snake-case warning for page method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`badHandler`"),
+            "Expected snake-case warning for page method, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -2827,7 +3270,10 @@ mod tests {
                     tag: "main".to_string(),
                     attributes: vec![],
                     children: vec![TemplateNode::Element(Element {
-                        tag: "p".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "p".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     })],
                     span: dummy_span(),
                 }),
@@ -2838,10 +3284,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "semantic_html", "h1"),
-            "Expected semantic_html warning for missing h1, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "semantic_html", "h1"),
+            "Expected semantic_html warning for missing h1, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2858,7 +3309,10 @@ mod tests {
                     tag: "main".to_string(),
                     attributes: vec![],
                     children: vec![TemplateNode::Element(Element {
-                        tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "h1".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     })],
                     span: dummy_span(),
                 }),
@@ -2869,10 +3323,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "semantic_html", "h1"),
-            "Page with h1 should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "semantic_html", "h1"),
+            "Page with h1 should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2889,7 +3348,10 @@ mod tests {
                     tag: "div".to_string(),
                     attributes: vec![],
                     children: vec![TemplateNode::Element(Element {
-                        tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "h1".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     })],
                     span: dummy_span(),
                 }),
@@ -2900,10 +3362,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "semantic_html", "div"),
-            "Expected semantic_html warning for div wrapper, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "semantic_html", "div"),
+            "Expected semantic_html warning for div wrapper, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2921,13 +3388,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "img".to_string(),
-                            attributes: vec![
-                                Attribute::Static { name: "src".to_string(), value: "pic.png".to_string() },
-                            ],
+                            attributes: vec![Attribute::Static {
+                                name: "src".to_string(),
+                                value: "pic.png".to_string(),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -2941,10 +3412,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "semantic_html", "alt"),
-            "Expected semantic_html warning for img without alt, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "semantic_html", "alt"),
+            "Expected semantic_html warning for img without alt, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -2962,13 +3438,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "img".to_string(),
-                            attributes: vec![
-                                Attribute::Static { name: "alt".to_string(), value: "description".to_string() },
-                            ],
+                            attributes: vec![Attribute::Static {
+                                name: "alt".to_string(),
+                                value: "description".to_string(),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -2982,10 +3462,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "semantic_html", "alt"),
-            "img with alt should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "semantic_html", "alt"),
+            "img with alt should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3007,11 +3492,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "input".to_string(),
-                            attributes: vec![Attribute::Static { name: "type".into(), value: "text".into() }],
+                            attributes: vec![Attribute::Static {
+                                name: "type".into(),
+                                value: "text".into(),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -3025,10 +3516,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "a11y_label", "input"),
-            "Expected a11y_label warning for input without label, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "a11y_label", "input"),
+            "Expected a11y_label warning for input without label, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3046,13 +3542,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "input".to_string(),
-                            attributes: vec![
-                                Attribute::Aria { name: "aria-label".into(), value: Expr::StringLit("Search".into()) },
-                            ],
+                            attributes: vec![Attribute::Aria {
+                                name: "aria-label".into(),
+                                value: Expr::StringLit("Search".into()),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -3066,10 +3566,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "a11y_label", "input"),
-            "Input with aria-label should not warn, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "a11y_label", "input"),
+            "Input with aria-label should not warn, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3087,7 +3592,10 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "button".to_string(),
@@ -3105,10 +3613,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "a11y_label", "button"),
-            "Expected a11y_label warning for empty button, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "a11y_label", "button"),
+            "Expected a11y_label warning for empty button, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3126,7 +3639,10 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "button".to_string(),
@@ -3144,10 +3660,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "a11y_label", "button"),
-            "Button with text should not warn, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "a11y_label", "button"),
+            "Button with text should not warn, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3165,13 +3686,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "div".to_string(),
-                            attributes: vec![
-                                Attribute::EventHandler { event: "click".into(), handler: Expr::Ident("handle".into()) },
-                            ],
+                            attributes: vec![Attribute::EventHandler {
+                                event: "click".into(),
+                                handler: Expr::Ident("handle".into()),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -3185,12 +3710,20 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "a11y_interactive", "role"),
-            "Expected a11y_interactive warning for clickable div without role, got: {:?}", warnings);
-        assert!(has_rule_containing(&warnings, "a11y_interactive", "tabindex"),
-            "Expected a11y_interactive warning for clickable div without tabindex, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "a11y_interactive", "role"),
+            "Expected a11y_interactive warning for clickable div without role, got: {:?}",
+            warnings
+        );
+        assert!(
+            has_rule_containing(&warnings, "a11y_interactive", "tabindex"),
+            "Expected a11y_interactive warning for clickable div without tabindex, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3208,14 +3741,25 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "div".to_string(),
                             attributes: vec![
-                                Attribute::EventHandler { event: "click".into(), handler: Expr::Ident("handle".into()) },
-                                Attribute::Role { value: "button".into() },
-                                Attribute::Static { name: "tabindex".into(), value: "0".into() },
+                                Attribute::EventHandler {
+                                    event: "click".into(),
+                                    handler: Expr::Ident("handle".into()),
+                                },
+                                Attribute::Role {
+                                    value: "button".into(),
+                                },
+                                Attribute::Static {
+                                    name: "tabindex".into(),
+                                    value: "0".into(),
+                                },
                             ],
                             children: vec![],
                             span: dummy_span(),
@@ -3230,12 +3774,20 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "a11y_interactive", "role"),
-            "Div with role should not warn about missing role, got: {:?}", warnings);
-        assert!(!has_rule_containing(&warnings, "a11y_interactive", "tabindex"),
-            "Div with tabindex should not warn about missing tabindex, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "a11y_interactive", "role"),
+            "Div with role should not warn about missing role, got: {:?}",
+            warnings
+        );
+        assert!(
+            !has_rule_containing(&warnings, "a11y_interactive", "tabindex"),
+            "Div with tabindex should not warn about missing tabindex, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3253,13 +3805,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "button".to_string(),
-                            attributes: vec![
-                                Attribute::Aria { name: "aria-hidden".into(), value: Expr::StringLit("true".into()) },
-                            ],
+                            attributes: vec![Attribute::Aria {
+                                name: "aria-hidden".into(),
+                                value: Expr::StringLit("true".into()),
+                            }],
                             children: vec![TemplateNode::TextLiteral("Click".into())],
                             span: dummy_span(),
                         }),
@@ -3273,10 +3829,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "a11y_hidden", "aria-hidden"),
-            "Expected a11y_hidden warning for aria-hidden on button, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "a11y_hidden", "aria-hidden"),
+            "Expected a11y_hidden warning for aria-hidden on button, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3294,13 +3855,17 @@ mod tests {
                     attributes: vec![],
                     children: vec![
                         TemplateNode::Element(Element {
-                            tag: "h1".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                            tag: "h1".to_string(),
+                            attributes: vec![],
+                            children: vec![],
+                            span: dummy_span(),
                         }),
                         TemplateNode::Element(Element {
                             tag: "div".to_string(),
-                            attributes: vec![
-                                Attribute::Aria { name: "aria-hidden".into(), value: Expr::StringLit("true".into()) },
-                            ],
+                            attributes: vec![Attribute::Aria {
+                                name: "aria-hidden".into(),
+                                value: Expr::StringLit("true".into()),
+                            }],
                             children: vec![],
                             span: dummy_span(),
                         }),
@@ -3314,10 +3879,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "a11y_hidden", "aria-hidden"),
-            "aria-hidden on non-focusable div should not warn, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "a11y_hidden", "aria-hidden"),
+            "aria-hidden on non-focusable div should not warn, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3337,10 +3907,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Form(form)] };
+        let program = Program {
+            items: vec![Item::Form(form)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "pascal-case-types", "`bad_form`"),
-            "Expected pascal-case warning for form, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "pascal-case-types", "`bad_form`"),
+            "Expected pascal-case warning for form, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3356,10 +3931,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Form(form)] };
+        let program = Program {
+            items: vec![Item::Form(form)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "snake-case-functions", "`handleSubmit`"),
-            "Expected snake-case warning for form method, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "snake-case-functions", "`handleSubmit`"),
+            "Expected snake-case warning for form method, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3384,7 +3964,10 @@ mod tests {
                     stmts: vec![Stmt::Expr(Expr::MethodCall {
                         object: Box::new(Expr::Ident("window".to_string())),
                         method: "addEventListener".to_string(),
-                        args: vec![Expr::StringLit("click".to_string()), Expr::Ident("handler".to_string())],
+                        args: vec![
+                            Expr::StringLit("click".to_string()),
+                            Expr::Ident("handler".to_string()),
+                        ],
                     })],
                     span: dummy_span(),
                 },
@@ -3396,7 +3979,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -3410,10 +3998,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "resource_leak", "addEventListener"),
-            "Expected resource_leak warning, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "resource_leak", "addEventListener"),
+            "Expected resource_leak warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3468,7 +4061,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -3482,10 +4080,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "resource_leak", "addEventListener"),
-            "Properly cleaned up resource should not trigger warning, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "resource_leak", "addEventListener"),
+            "Properly cleaned up resource should not trigger warning, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3536,7 +4139,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -3550,10 +4158,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(has_rule_containing(&warnings, "resource_leak", "setInterval"),
-            "Expected resource_leak for missing clearInterval, got: {:?}", warnings);
+        assert!(
+            has_rule_containing(&warnings, "resource_leak", "setInterval"),
+            "Expected resource_leak for missing clearInterval, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3567,7 +4180,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -3581,10 +4199,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let warnings = lint_program(&program);
-        assert!(!has_rule(&warnings, "resource_leak"),
-            "No acquisitions should not trigger resource_leak, got: {:?}", warnings);
+        assert!(
+            !has_rule(&warnings, "resource_leak"),
+            "No acquisitions should not trigger resource_leak, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3620,7 +4243,12 @@ mod tests {
             styles: vec![],
             transitions: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             trait_bounds: vec![],
@@ -3641,8 +4269,11 @@ mod tests {
             ],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-function", "`helper`"),
-            "Function called from component should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-function", "`helper`"),
+            "Function called from component should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3678,8 +4309,11 @@ mod tests {
             ],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-function", "`helper`"),
-            "Function called from impl should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-function", "`helper`"),
+            "Function called from impl should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
@@ -3713,8 +4347,11 @@ mod tests {
             ],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-function", "`helper`"),
-            "Function called from store should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-function", "`helper`"),
+            "Function called from store should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3724,45 +4361,60 @@ mod tests {
     #[test]
     fn test_yield_collects_idents() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "x".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(1),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Yield(Expr::Ident("x".to_string())),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "x".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(1),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Yield(Expr::Ident("x".to_string())),
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`x`"),
-            "Variable used in yield should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`x`"),
+            "Variable used in yield should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     #[test]
     fn test_let_destructure_collects_idents() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "data".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(1),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::LetDestructure {
-                    pattern: Pattern::Tuple(vec![Pattern::Ident("a".to_string()), Pattern::Ident("b".to_string())]),
-                    ty: None,
-                    value: Expr::Ident("data".to_string()),
-                },
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "data".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(1),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::LetDestructure {
+                        pattern: Pattern::Tuple(vec![
+                            Pattern::Ident("a".to_string()),
+                            Pattern::Ident("b".to_string()),
+                        ]),
+                        ty: None,
+                        value: Expr::Ident("data".to_string()),
+                    },
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`data`"),
-            "Variable used in destructure should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`data`"),
+            "Variable used in destructure should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3792,27 +4444,33 @@ mod tests {
     #[test]
     fn test_signal_value_idents_collected() {
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![
-                Stmt::Let {
-                    name: "initial".to_string(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Signal {
-                    name: "sig".to_string(),
-                    ty: None,
-                    secret: false,
-                    atomic: false,
-                    value: Expr::Ident("initial".to_string()),
-                },
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![
+                    Stmt::Let {
+                        name: "initial".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Integer(0),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Signal {
+                        name: "sig".to_string(),
+                        ty: None,
+                        secret: false,
+                        atomic: false,
+                        value: Expr::Ident("initial".to_string()),
+                    },
+                ],
+            ))],
         };
         let warnings = lint_program(&program);
-        assert!(!has_rule_containing(&warnings, "unused-variable", "`initial`"),
-            "Variable used as signal initial value should not be unused, got: {:?}", warnings);
+        assert!(
+            !has_rule_containing(&warnings, "unused-variable", "`initial`"),
+            "Variable used as signal initial value should not be unused, got: {:?}",
+            warnings
+        );
     }
 
     // ===================================================================
@@ -3823,16 +4481,17 @@ mod tests {
     fn test_multiple_warnings() {
         let program = Program {
             items: vec![
-                Item::Function(make_fn("myBadFn", vec![
-                    Stmt::Let {
+                Item::Function(make_fn(
+                    "myBadFn",
+                    vec![Stmt::Let {
                         name: "unused_var".to_string(),
                         ty: None,
                         mutable: true,
                         secret: false,
                         value: Expr::Integer(0),
                         ownership: Ownership::Owned,
-                    },
-                ])),
+                    }],
+                )),
                 Item::Struct(StructDef {
                     name: "bad_struct".to_string(),
                     lifetimes: vec![],
@@ -3845,10 +4504,26 @@ mod tests {
             ],
         };
         let warnings = lint_program(&program);
-        assert!(has_rule(&warnings, "snake-case-functions"), "missing snake-case, got: {:?}", warnings);
-        assert!(has_rule(&warnings, "unused-variable"), "missing unused-variable, got: {:?}", warnings);
-        assert!(has_rule(&warnings, "mutable-not-mutated"), "missing mutable-not-mutated, got: {:?}", warnings);
-        assert!(has_rule(&warnings, "pascal-case-types"), "missing pascal-case-types, got: {:?}", warnings);
+        assert!(
+            has_rule(&warnings, "snake-case-functions"),
+            "missing snake-case, got: {:?}",
+            warnings
+        );
+        assert!(
+            has_rule(&warnings, "unused-variable"),
+            "missing unused-variable, got: {:?}",
+            warnings
+        );
+        assert!(
+            has_rule(&warnings, "mutable-not-mutated"),
+            "missing mutable-not-mutated, got: {:?}",
+            warnings
+        );
+        assert!(
+            has_rule(&warnings, "pascal-case-types"),
+            "missing pascal-case-types, got: {:?}",
+            warnings
+        );
         // Note: empty-block only fires when body.stmts is empty; this function has one stmt
     }
 }

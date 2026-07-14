@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::ast::*;
 use crate::lexer::Lexer;
@@ -67,9 +67,10 @@ impl ModuleLoader {
             });
         }
 
-        let source = self.resolver.load_module(path).map_err(|e| ModuleLoadError {
-            message: e.message,
-        })?;
+        let source = self
+            .resolver
+            .load_module(path)
+            .map_err(|e| ModuleLoadError { message: e.message })?;
 
         let mut lexer = Lexer::new(&source);
         let tokens = lexer.tokenize().map_err(|e| ModuleLoadError {
@@ -85,11 +86,7 @@ impl ModuleLoader {
                 .map(|e| format!("  {}:{}: {}", e.span.line, e.span.col, e.message))
                 .collect();
             return Err(ModuleLoadError {
-                message: format!(
-                    "parse errors in {}:\n{}",
-                    path.display(),
-                    msgs.join("\n")
-                ),
+                message: format!("parse errors in {}:\n{}", path.display(), msgs.join("\n")),
             });
         }
 
@@ -103,9 +100,7 @@ impl ModuleLoader {
         items: Vec<Item>,
         current_file: &Path,
     ) -> Result<Vec<Item>, ModuleLoadError> {
-        let current_dir = current_file
-            .parent()
-            .unwrap_or_else(|| Path::new("."));
+        let current_dir = current_file.parent().unwrap_or_else(|| Path::new("."));
 
         let mut resolved = Vec::new();
 
@@ -147,7 +142,10 @@ impl ModuleLoader {
 /// Convenience function: check whether a program has any `mod` declarations
 /// that need multi-file resolution.
 pub fn has_mod_declarations(program: &Program) -> bool {
-    program.items.iter().any(|item| matches!(item, Item::Mod(_)))
+    program
+        .items
+        .iter()
+        .any(|item| matches!(item, Item::Mod(_)))
 }
 
 /// Collect all imported names from `use` statements in a program.
@@ -178,11 +176,7 @@ pub fn collect_imports(program: &Program) -> HashMap<String, (Vec<String>, Strin
             } else if use_path.segments.len() >= 2 {
                 // Single import: `use foo::Bar;` or `use foo::Bar as Baz;`
                 let original_name = use_path.segments.last().unwrap().clone();
-                let local_name = use_path
-                    .alias
-                    .as_ref()
-                    .unwrap_or(&original_name)
-                    .clone();
+                let local_name = use_path.alias.as_ref().unwrap_or(&original_name).clone();
                 let module_path = use_path.segments[..use_path.segments.len() - 1].to_vec();
                 imports.insert(local_name, (module_path, original_name));
             }

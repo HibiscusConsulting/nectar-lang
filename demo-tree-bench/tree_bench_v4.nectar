@@ -65,6 +65,7 @@ component TreeBench {
     let mut selected_id: i32 = 0;
     let mut selected_depth: i32 = 0;
     let mut uses_ids: [i32] = [];
+    let mut crumb_ids: [i32] = [];
 
     let mut status: String = "not connected — click Connect to load the root assembly from the BOM API";
 
@@ -132,11 +133,20 @@ component TreeBench {
         let merge_ms: f64 = performance_now() - t0;
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -230,6 +240,7 @@ component TreeBench {
         self.hay[0] = format("pn-0 turbofan engine hbt-9000");
         self.loaded_count = 1;
         self.selected_id = 0;
+        self.crumb_ids.push(0);
         self.pending_parent = 0 - 2;
         self.status = "auto-loading full BOM: GET /api/bom/tree … (71,284 nodes, ~4MB JSON)";
         self.last_url = "GET /api/bom/tree";
@@ -2114,11 +2125,20 @@ component TreeBench {
         self.selected_id = self.window_ids[0];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2139,11 +2159,20 @@ component TreeBench {
         self.selected_id = self.window_ids[1];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2164,11 +2193,20 @@ component TreeBench {
         self.selected_id = self.window_ids[2];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2189,11 +2227,20 @@ component TreeBench {
         self.selected_id = self.window_ids[3];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2214,11 +2261,20 @@ component TreeBench {
         self.selected_id = self.window_ids[4];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2239,11 +2295,20 @@ component TreeBench {
         self.selected_id = self.window_ids[5];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2264,11 +2329,20 @@ component TreeBench {
         self.selected_id = self.window_ids[6];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2289,11 +2363,20 @@ component TreeBench {
         self.selected_id = self.window_ids[7];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2314,11 +2397,20 @@ component TreeBench {
         self.selected_id = self.window_ids[8];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2339,11 +2431,20 @@ component TreeBench {
         self.selected_id = self.window_ids[9];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2364,11 +2465,20 @@ component TreeBench {
         self.selected_id = self.window_ids[10];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2389,11 +2499,20 @@ component TreeBench {
         self.selected_id = self.window_ids[11];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2414,11 +2533,20 @@ component TreeBench {
         self.selected_id = self.window_ids[12];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2439,11 +2567,20 @@ component TreeBench {
         self.selected_id = self.window_ids[13];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2464,11 +2601,20 @@ component TreeBench {
         self.selected_id = self.window_ids[14];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2489,11 +2635,20 @@ component TreeBench {
         self.selected_id = self.window_ids[15];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2514,11 +2669,20 @@ component TreeBench {
         self.selected_id = self.window_ids[16];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2539,11 +2703,20 @@ component TreeBench {
         self.selected_id = self.window_ids[17];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2564,11 +2737,20 @@ component TreeBench {
         self.selected_id = self.window_ids[18];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2589,11 +2771,20 @@ component TreeBench {
         self.selected_id = self.window_ids[19];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2614,11 +2805,20 @@ component TreeBench {
         self.selected_id = self.window_ids[20];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -2639,11 +2839,20 @@ component TreeBench {
         self.selected_id = self.window_ids[21];
         let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -3554,26 +3763,63 @@ component TreeBench {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 0 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 0 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[0];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3609,33 +3855,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Top Assembly (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_1(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 1 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 1 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[1];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3671,33 +3954,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Major Assembly (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_2(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 2 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 2 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[2];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3733,33 +4053,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Sub-Assembly (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_3(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 3 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 3 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[3];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3795,33 +4152,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Component (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_4(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 4 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 4 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[4];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3857,33 +4251,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Sub-Component (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_5(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 5 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 5 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[5];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3919,33 +4350,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Detail Part (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_6(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 6 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 6 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[6];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -3981,33 +4449,70 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Fastener Group (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     fn breadcrumb_jump_7(&mut self) {
         if self.capacity == 0 {
             self.status = "not connected — click Connect first";
         } else {
-                    if self.window_ids.len() == 0 {
-            self.status = "not connected — click Connect first";
+        if self.crumb_ids.len() <= 7 {
             return;
         }
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > 7 {
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
+        self.selected_id = self.crumb_ids[7];
+        let mut sd: i32 = self.selected_id;
+        let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
+        while sd > 0 {
+            sd = (sd - 1) / self.branching;
+            sdepth = sdepth + 1;
+            chain.push(sd);
+        }
+        self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
+        self.uses_ids = [];
+        if self.loaded[self.selected_id] {
+            let cc: i32 = self.children_count[self.selected_id];
+            let fc: i32 = self.selected_id * self.branching + 1;
+            let mut c: i32 = 0;
+            while c < cc {
+                self.uses_ids.push(fc + c);
+                c = c + 1;
+            }
         }
         let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {
-            if self.visible[i] == cur {
+            if self.visible[i] == self.selected_id {
                 found_row = i;
             }
             i = i + 1;
         }
         if found_row >= 0 {
             self.scroll_row = found_row;
+        }
+        self.visible = [];
+        let mut stack: [i32] = [0];
+        while stack.len() > 0 {
+            let idx: i32 = stack.pop().unwrap();
+            self.visible.push(idx);
+            if self.expanded[idx] {
+                if self.loaded[idx] {
+                    let cc: i32 = self.children_count[idx];
+                    let fc: i32 = idx * self.branching + 1;
+                    let mut c: i32 = cc - 1;
+                    while c >= 0 {
+                        stack.push(fc + c);
+                        c = c - 1;
+                    }
+                }
+            }
         }
         if self.scroll_row < 0 {
             self.scroll_row = 0;
@@ -4043,7 +4548,7 @@ component TreeBench {
             }
             r = r + 1;
         }
-            self.status = format("jumped to Fastener (row {} of {})", self.scroll_row + 1, self.visible.len());
+            self.status = format("selected PN-{} via path", self.selected_id);
         }
     }
     render {
@@ -4073,15 +4578,39 @@ component TreeBench {
                 <div style="height: 24px; padding: 0 10; background-color: #eef1f4; border: 1px solid #d0d7de; border-radius: 12; color: #24292f; font-size: 11px; align: center; justify: center; cursor: pointer" on:click={self.filter_assemblies}>"Assemblies"</div>
                 <div style="font-size: 11px; color: #6e7781; padding: 0 6">{format("→ {}", self.filter_label)}</div>
             </div>
-            <div style="direction: horizontal; gap: 8; height: 22px; align: center">
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_0}>"Top Assembly"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_1}>"Major Assembly"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_2}>"Sub-Assembly"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_3}>"Component"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_4}>"Sub-Component"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_5}>"Detail Part"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_6}>"Fastener Group"</div>
-                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_7}>"Fastener"</div>
+            <div style="direction: horizontal; gap: 5; height: 22px; align: center">
+                <div style="width: hug; font-size: 11px; font-weight: 700; color: #6e7781; padding-right: 4">"PATH"</div>
+                {if self.crumb_ids.len() > 0 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_0}>{format("{}", self.names[self.crumb_ids[0]])}</div>
+                }}
+                {if self.crumb_ids.len() > 1 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 1 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_1}>{format("{}", self.names[self.crumb_ids[1]])}</div>
+                }}
+                {if self.crumb_ids.len() > 2 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 2 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_2}>{format("{}", self.names[self.crumb_ids[2]])}</div>
+                }}
+                {if self.crumb_ids.len() > 3 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 3 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_3}>{format("{}", self.names[self.crumb_ids[3]])}</div>
+                }}
+                {if self.crumb_ids.len() > 4 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 4 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_4}>{format("{}", self.names[self.crumb_ids[4]])}</div>
+                }}
+                {if self.crumb_ids.len() > 5 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 5 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_5}>{format("{}", self.names[self.crumb_ids[5]])}</div>
+                }}
+                {if self.crumb_ids.len() > 6 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 6 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_6}>{format("{}", self.names[self.crumb_ids[6]])}</div>
+                }}
+                {if self.crumb_ids.len() > 7 { <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}
+                {if self.crumb_ids.len() > 7 {
+                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={self.breadcrumb_jump_7}>{format("{}", self.names[self.crumb_ids[7]])}</div>
+                }}
             </div>
             <div style="direction: horizontal; width: fill; height: 556px; gap: 8">
                 <div style="direction: vertical; width: 620px; height: 556px; background-color: #ffffff; border: 1px solid #d0d7de; border-radius: 4">

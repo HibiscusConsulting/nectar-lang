@@ -1,4 +1,4 @@
-use crate::token::{Token, TokenKind, FormatStringPart, Span};
+use crate::token::{FormatStringPart, Span, Token, TokenKind};
 
 pub struct Lexer {
     source: Vec<char>,
@@ -630,9 +630,7 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(
             tokens[0].kind,
-            TokenKind::FormatString(vec![
-                FormatStringPart::Lit("just a string".into()),
-            ])
+            TokenKind::FormatString(vec![FormatStringPart::Lit("just a string".into()),])
         );
     }
 
@@ -642,9 +640,9 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(
             tokens[0].kind,
-            TokenKind::FormatString(vec![
-                FormatStringPart::Lit("value: {not interpolated}".into()),
-            ])
+            TokenKind::FormatString(vec![FormatStringPart::Lit(
+                "value: {not interpolated}".into()
+            ),])
         );
     }
 
@@ -654,9 +652,7 @@ mod tests {
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(
             tokens[0].kind,
-            TokenKind::FormatString(vec![
-                FormatStringPart::Expr("x".into()),
-            ])
+            TokenKind::FormatString(vec![FormatStringPart::Expr("x".into()),])
         );
     }
 
@@ -815,7 +811,10 @@ mod tests {
     fn test_string_escape_sequences() {
         let mut lexer = Lexer::new(r#""hello\nworld\t\\\"""#);
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].kind, TokenKind::StringLit("hello\nworld\t\\\"".into()));
+        assert_eq!(
+            tokens[0].kind,
+            TokenKind::StringLit("hello\nworld\t\\\"".into())
+        );
     }
 
     #[test]
@@ -929,75 +928,134 @@ mod tests {
     #[test]
     fn test_all_keywords() {
         let keywords = vec![
-            ("let", TokenKind::Let), ("mut", TokenKind::Mut), ("fn", TokenKind::Fn),
-            ("component", TokenKind::Component), ("render", TokenKind::Render),
-            ("struct", TokenKind::Struct), ("enum", TokenKind::Enum),
-            ("impl", TokenKind::Impl), ("trait", TokenKind::Trait),
-            ("if", TokenKind::If), ("else", TokenKind::Else),
-            ("match", TokenKind::Match), ("for", TokenKind::For),
-            ("in", TokenKind::In), ("while", TokenKind::While),
-            ("return", TokenKind::Return), ("own", TokenKind::Own),
-            ("ref", TokenKind::Ref), ("self", TokenKind::SelfKw),
-            ("Self", TokenKind::SelfType), ("pub", TokenKind::Pub),
-            ("use", TokenKind::Use), ("mod", TokenKind::Mod),
-            ("true", TokenKind::True), ("false", TokenKind::False),
-            ("signal", TokenKind::Signal), ("store", TokenKind::Store),
-            ("action", TokenKind::Action), ("effect", TokenKind::Effect),
-            ("computed", TokenKind::Computed), ("async", TokenKind::Async),
-            ("await", TokenKind::Await), ("fetch", TokenKind::Fetch),
-            ("derive", TokenKind::Derive), ("spawn", TokenKind::Spawn),
-            ("channel", TokenKind::Channel), ("select", TokenKind::Select),
-            ("parallel", TokenKind::Parallel), ("stream", TokenKind::Stream),
+            ("let", TokenKind::Let),
+            ("mut", TokenKind::Mut),
+            ("fn", TokenKind::Fn),
+            ("component", TokenKind::Component),
+            ("render", TokenKind::Render),
+            ("struct", TokenKind::Struct),
+            ("enum", TokenKind::Enum),
+            ("impl", TokenKind::Impl),
+            ("trait", TokenKind::Trait),
+            ("if", TokenKind::If),
+            ("else", TokenKind::Else),
+            ("match", TokenKind::Match),
+            ("for", TokenKind::For),
+            ("in", TokenKind::In),
+            ("while", TokenKind::While),
+            ("return", TokenKind::Return),
+            ("own", TokenKind::Own),
+            ("ref", TokenKind::Ref),
+            ("self", TokenKind::SelfKw),
+            ("Self", TokenKind::SelfType),
+            ("pub", TokenKind::Pub),
+            ("use", TokenKind::Use),
+            ("mod", TokenKind::Mod),
+            ("true", TokenKind::True),
+            ("false", TokenKind::False),
+            ("signal", TokenKind::Signal),
+            ("store", TokenKind::Store),
+            ("action", TokenKind::Action),
+            ("effect", TokenKind::Effect),
+            ("computed", TokenKind::Computed),
+            ("async", TokenKind::Async),
+            ("await", TokenKind::Await),
+            ("fetch", TokenKind::Fetch),
+            ("derive", TokenKind::Derive),
+            ("spawn", TokenKind::Spawn),
+            ("channel", TokenKind::Channel),
+            ("select", TokenKind::Select),
+            ("parallel", TokenKind::Parallel),
+            ("stream", TokenKind::Stream),
             ("on_message", TokenKind::OnMessage),
             ("on_connect", TokenKind::OnConnect),
             ("on_disconnect", TokenKind::OnDisconnect),
-            ("lazy", TokenKind::Lazy), ("suspend", TokenKind::Suspend),
-            ("yield", TokenKind::Yield), ("agent", TokenKind::Agent),
-            ("prompt", TokenKind::Prompt), ("tool", TokenKind::Tool),
-            ("route", TokenKind::Route), ("link", TokenKind::Link),
-            ("navigate", TokenKind::Navigate), ("router", TokenKind::Router),
-            ("fallback", TokenKind::Fallback), ("guard", TokenKind::Guard),
-            ("style", TokenKind::Style), ("try", TokenKind::Try),
-            ("catch", TokenKind::Catch), ("test", TokenKind::Test),
-            ("assert", TokenKind::Assert), ("expect", TokenKind::Expect),
+            ("lazy", TokenKind::Lazy),
+            ("suspend", TokenKind::Suspend),
+            ("yield", TokenKind::Yield),
+            ("agent", TokenKind::Agent),
+            ("prompt", TokenKind::Prompt),
+            ("tool", TokenKind::Tool),
+            ("route", TokenKind::Route),
+            ("link", TokenKind::Link),
+            ("navigate", TokenKind::Navigate),
+            ("router", TokenKind::Router),
+            ("fallback", TokenKind::Fallback),
+            ("guard", TokenKind::Guard),
+            ("style", TokenKind::Style),
+            ("try", TokenKind::Try),
+            ("catch", TokenKind::Catch),
+            ("test", TokenKind::Test),
+            ("assert", TokenKind::Assert),
+            ("expect", TokenKind::Expect),
             ("assert_eq", TokenKind::AssertEq),
             ("transition", TokenKind::Transition),
-            ("animate", TokenKind::Animate), ("contract", TokenKind::Contract),
-            ("app", TokenKind::App), ("manifest", TokenKind::Manifest),
-            ("offline", TokenKind::Offline), ("push", TokenKind::Push),
-            ("gesture", TokenKind::Gesture), ("haptic", TokenKind::Haptic),
-            ("biometric", TokenKind::Biometric), ("camera", TokenKind::Camera),
-            ("geolocation", TokenKind::Geolocation), ("as", TokenKind::As),
-            ("where", TokenKind::Where), ("secret", TokenKind::Secret),
-            ("permissions", TokenKind::Permissions), ("page", TokenKind::Page),
-            ("meta", TokenKind::Meta), ("sitemap", TokenKind::Sitemap),
-            ("schema", TokenKind::Schema), ("canonical", TokenKind::Canonical),
-            ("form", TokenKind::Form), ("field", TokenKind::Field),
-            ("validate", TokenKind::Validate), ("must_use", TokenKind::MustUse),
-            ("chunk", TokenKind::Chunk), ("atomic", TokenKind::Atomic),
-            ("selector", TokenKind::Selector), ("embed", TokenKind::Embed),
-            ("sandbox", TokenKind::Sandbox), ("loading", TokenKind::Loading),
-            ("instant", TokenKind::Instant), ("duration", TokenKind::Duration),
-            ("pdf", TokenKind::Pdf), ("download", TokenKind::Download),
-            ("payment", TokenKind::Payment), ("miniprogram", TokenKind::MiniProgram),
+            ("animate", TokenKind::Animate),
+            ("contract", TokenKind::Contract),
+            ("app", TokenKind::App),
+            ("manifest", TokenKind::Manifest),
+            ("offline", TokenKind::Offline),
+            ("push", TokenKind::Push),
+            ("gesture", TokenKind::Gesture),
+            ("haptic", TokenKind::Haptic),
+            ("biometric", TokenKind::Biometric),
+            ("camera", TokenKind::Camera),
+            ("geolocation", TokenKind::Geolocation),
+            ("as", TokenKind::As),
+            ("where", TokenKind::Where),
+            ("secret", TokenKind::Secret),
+            ("permissions", TokenKind::Permissions),
+            ("page", TokenKind::Page),
+            ("meta", TokenKind::Meta),
+            ("sitemap", TokenKind::Sitemap),
+            ("schema", TokenKind::Schema),
+            ("canonical", TokenKind::Canonical),
+            ("form", TokenKind::Form),
+            ("field", TokenKind::Field),
+            ("validate", TokenKind::Validate),
+            ("must_use", TokenKind::MustUse),
+            ("chunk", TokenKind::Chunk),
+            ("atomic", TokenKind::Atomic),
+            ("selector", TokenKind::Selector),
+            ("embed", TokenKind::Embed),
+            ("sandbox", TokenKind::Sandbox),
+            ("loading", TokenKind::Loading),
+            ("instant", TokenKind::Instant),
+            ("duration", TokenKind::Duration),
+            ("pdf", TokenKind::Pdf),
+            ("download", TokenKind::Download),
+            ("payment", TokenKind::Payment),
+            ("miniprogram", TokenKind::MiniProgram),
             ("banking", TokenKind::Banking),
-            ("map", TokenKind::MapKeyword), ("auth", TokenKind::Auth),
-            ("upload", TokenKind::Upload), ("env", TokenKind::Env),
-            ("db", TokenKind::Db), ("trace", TokenKind::Trace),
-            ("flag", TokenKind::Flag), ("cache", TokenKind::Cache),
-            ("query", TokenKind::Query), ("mutation", TokenKind::Mutation),
+            ("map", TokenKind::MapKeyword),
+            ("auth", TokenKind::Auth),
+            ("upload", TokenKind::Upload),
+            ("env", TokenKind::Env),
+            ("db", TokenKind::Db),
+            ("trace", TokenKind::Trace),
+            ("flag", TokenKind::Flag),
+            ("cache", TokenKind::Cache),
+            ("query", TokenKind::Query),
+            ("mutation", TokenKind::Mutation),
             ("invalidate", TokenKind::Invalidate),
             ("optimistic", TokenKind::Optimistic),
-            ("breakpoint", TokenKind::Breakpoint), ("fluid", TokenKind::Fluid),
+            ("breakpoint", TokenKind::Breakpoint),
+            ("fluid", TokenKind::Fluid),
             ("clipboard", TokenKind::Clipboard),
             ("draggable", TokenKind::Draggable),
-            ("droppable", TokenKind::Droppable), ("a11y", TokenKind::A11y),
-            ("manual", TokenKind::Manual), ("hybrid", TokenKind::Hybrid),
-            ("layout", TokenKind::Layout), ("outlet", TokenKind::Outlet),
+            ("droppable", TokenKind::Droppable),
+            ("a11y", TokenKind::A11y),
+            ("manual", TokenKind::Manual),
+            ("hybrid", TokenKind::Hybrid),
+            ("layout", TokenKind::Layout),
+            ("outlet", TokenKind::Outlet),
             ("crypto", TokenKind::Crypto),
-            ("theme", TokenKind::Theme), ("spring", TokenKind::Spring),
-            ("stagger", TokenKind::Stagger), ("keyframes", TokenKind::Keyframes),
-            ("shortcut", TokenKind::Shortcut), ("virtual", TokenKind::Virtual),
+            ("theme", TokenKind::Theme),
+            ("spring", TokenKind::Spring),
+            ("stagger", TokenKind::Stagger),
+            ("keyframes", TokenKind::Keyframes),
+            ("shortcut", TokenKind::Shortcut),
+            ("virtual", TokenKind::Virtual),
         ];
         for (src, expected) in keywords {
             let mut lexer = Lexer::new(src);
@@ -1009,10 +1067,14 @@ mod tests {
     #[test]
     fn test_type_keywords() {
         let types = vec![
-            ("i32", TokenKind::I32), ("i64", TokenKind::I64),
-            ("f32", TokenKind::F32), ("f64", TokenKind::F64),
-            ("u32", TokenKind::U32), ("u64", TokenKind::U64),
-            ("bool", TokenKind::Bool_), ("String", TokenKind::StringType),
+            ("i32", TokenKind::I32),
+            ("i64", TokenKind::I64),
+            ("f32", TokenKind::F32),
+            ("f64", TokenKind::F64),
+            ("u32", TokenKind::U32),
+            ("u64", TokenKind::U64),
+            ("bool", TokenKind::Bool_),
+            ("String", TokenKind::StringType),
         ];
         for (src, expected) in types {
             let mut lexer = Lexer::new(src);

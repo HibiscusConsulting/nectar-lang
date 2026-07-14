@@ -369,17 +369,25 @@ impl WasmCodegen {
     fn emit_canvas_imports(&mut self, program: &Program) {
         self.line("");
         self.line(";; ── Honeycomb Canvas Engine imports (env namespace) ──────────────");
-        self.line(";; Element tree API — same signatures as DOM, routed to Honeycomb's element tree");
+        self.line(
+            ";; Element tree API — same signatures as DOM, routed to Honeycomb's element tree",
+        );
         self.line("(import \"env\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
-        self.line("(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))",
+        );
         self.line("(import \"env\" \"flush\" (func $dom_flush (param i32 i32)))");
         self.line("(import \"env\" \"get_element_by_id\" (func $dom_getElementById (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"query_selector\" (func $dom_querySelector (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"create_element\" (func $dom_createElement (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"set_text\" (func $dom_setText (param i32 i32 i32)))");
         self.line("(import \"env\" \"append_child\" (func $dom_appendChild (param i32 i32)))");
-        self.line("(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"create_text_node\" (func $dom_createTextNode (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"get_body\" (func $dom_getBody (result i32)))");
         self.line("(import \"env\" \"get_head\" (func $dom_getHead (result i32)))");
@@ -390,31 +398,45 @@ impl WasmCodegen {
         self.line("(import \"env\" \"clear_children\" (func $dom_clearChildren (param i32)))");
         self.line("(import \"env\" \"lazy_mount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"set_title\" (func $dom_setTitle (param i32 i32)))");
-        self.line("(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))");
+        self.line(
+            "(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))",
+        );
         self.line("(import \"env\" \"get_scroll_left\" (func $dom_getScrollLeft (param i32) (result f64)))");
         self.line("(import \"env\" \"get_client_height\" (func $dom_getClientHeight (param i32) (result i32)))");
         self.line("(import \"env\" \"get_client_width\" (func $dom_getClientWidth (param i32) (result i32)))");
         self.line("(import \"env\" \"get_window_width\" (func $dom_getWindowWidth (result i32)))");
-        self.line("(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))");
+        self.line(
+            "(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))",
+        );
         self.line("(import \"env\" \"get_outer_html\" (func $dom_getOuterHtml (result i32)))");
-        self.line("(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"get_drag_data\" (func $dom_getDragData (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"prevent_default\" (func $dom_preventDefault))");
         self.line("(import \"env\" \"load_script\" (func $dom_loadScript (param i32 i32 i32)))");
-        self.line("(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"decode_image\" (func $dom_decodeImage (param i32 i32 i32)))");
         self.line("(import \"env\" \"progressive_image\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
         self.line("(import \"env\" \"dom_print\" (func $dom_print (param i32)))");
         self.line("(import \"env\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"inject_styles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"env\" \"set_attribute\" (func $dom_setProperty (param i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_attribute\" (func $dom_setProperty (param i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"get_value\" (func $dom_getValue (param i32) (result i32)))");
 
         // Canvas syscalls — the only actual browser API bridges
         self.line("");
         self.line(";; Canvas syscalls — 1-line JS bridges to Canvas 2D API");
-        self.line("(import \"env\" \"canvas_init\" (func $canvas_init (param f32 f32) (result i32)))");
+        self.line(
+            "(import \"env\" \"canvas_init\" (func $canvas_init (param f32 f32) (result i32)))",
+        );
         self.line("(import \"env\" \"canvas_clear\" (func $canvas_clear (param i32)))");
         self.line("(import \"env\" \"canvas_fill_rect\" (func $canvas_fill_rect (param i32 f32 f32 f32 f32 i32 i32 i32 i32)))");
         self.line("(import \"env\" \"canvas_fill_text\" (func $canvas_fill_text (param i32 i32 i32 f32 f32 i32 i32 i32 f32 i32)))");
@@ -427,7 +449,9 @@ impl WasmCodegen {
         // Honeycomb layout + render
         self.line("");
         self.line(";; Honeycomb engine — layout and render");
-        self.line("(import \"env\" \"compute_layout\" (func $honeycomb_compute_layout (param f32 f32)))");
+        self.line(
+            "(import \"env\" \"compute_layout\" (func $honeycomb_compute_layout (param f32 f32)))",
+        );
         self.line("(import \"env\" \"app_render\" (func $honeycomb_render))");
 
         // Timer stubs — canvas apps use requestAnimationFrame from the host
@@ -438,26 +462,44 @@ impl WasmCodegen {
         self.line("(import \"env\" \"performance_now\" (func $timer_setInterval (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"performance_now\" (func $timer_clearInterval (param i32)))");
         self.line("(import \"env\" \"performance_now\" (func $timer_requestAnimationFrame (param i32) (result i32)))");
-        self.line("(import \"env\" \"performance_now\" (func $timer_cancelAnimationFrame (param i32)))");
+        self.line(
+            "(import \"env\" \"performance_now\" (func $timer_cancelAnimationFrame (param i32)))",
+        );
 
         // Storage/clipboard/URL stubs (canvas mode — most are noops)
         self.line("");
         self.line(";; Web API stubs for canvas mode");
         self.line("(import \"env\" \"get_value\" (func $webapi_localStorageGet (param i32 i32) (result i32)))");
-        self.line("(import \"env\" \"set_title\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"set_title\" (func $webapi_localStorageRemove (param i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_title\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"set_title\" (func $webapi_localStorageRemove (param i32 i32)))",
+        );
         self.line("(import \"env\" \"get_value\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"set_title\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))");
+        self.line(
+            "(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))",
+        );
         self.line("(import \"env\" \"get_value\" (func $webapi_clipboardRead (param i32)))");
-        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationHref (result i32)))");
-        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationSearch (result i32)))");
-        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationHash (result i32)))");
-        self.line("(import \"env\" \"get_outer_html\" (func $webapi_getLocationPathname (result i32)))");
+        self.line(
+            "(import \"env\" \"get_outer_html\" (func $webapi_getLocationHref (result i32)))",
+        );
+        self.line(
+            "(import \"env\" \"get_outer_html\" (func $webapi_getLocationSearch (result i32)))",
+        );
+        self.line(
+            "(import \"env\" \"get_outer_html\" (func $webapi_getLocationHash (result i32)))",
+        );
+        self.line(
+            "(import \"env\" \"get_outer_html\" (func $webapi_getLocationPathname (result i32)))",
+        );
         self.line("(import \"env\" \"set_title\" (func $webapi_pushState (param i32 i32)))");
         self.line("(import \"env\" \"set_title\" (func $webapi_replaceState (param i32 i32)))");
         self.line("(import \"env\" \"prevent_default\" (func $webapi_onPopState (param i32)))");
-        self.line("(import \"env\" \"get_value\" (func $webapi_envGet (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"get_value\" (func $webapi_envGet (param i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"get_outer_html\" (func $webapi_canShare (result i32)))");
         self.line("(import \"env\" \"set_drag_data\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
         self.line("(import \"env\" \"set_title\" (func $webapi_perfMark (param i32 i32)))");
@@ -469,9 +511,13 @@ impl WasmCodegen {
             self.line(";; HTTP stubs — canvas mode");
             self.line("(import \"env\" \"set_title\" (func $http_setMethod (param i32 i32)))");
             self.line("(import \"env\" \"set_title\" (func $http_setBody (param i32 i32)))");
-            self.line("(import \"env\" \"set_text\" (func $http_addHeader (param i32 i32 i32 i32)))");
+            self.line(
+                "(import \"env\" \"set_text\" (func $http_addHeader (param i32 i32 i32 i32)))",
+            );
             self.line("(import \"env\" \"get_element_by_id\" (func $http_fetch (param i32 i32) (result i32)))");
-            self.line("(import \"env\" \"set_text\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+            self.line(
+                "(import \"env\" \"set_text\" (func $http_fetchWithCallback (param i32 i32 i32)))",
+            );
             self.line("(import \"env\" \"set_text\" (func $http_fetchBinary (param i32 i32 i32)))");
         }
 
@@ -479,17 +525,27 @@ impl WasmCodegen {
         self.line("");
         self.line(";; Time — canvas mode");
         self.line("(import \"env\" \"performance_now\" (func $time_now (result f64)))");
-        self.line("(import \"env\" \"set_text\" (func $time_format (param f64 i32 i32) (result i32)))");
-        self.line("(import \"env\" \"get_outer_html\" (func $time_getTimezoneOffset (result i32)))");
+        self.line(
+            "(import \"env\" \"set_text\" (func $time_format (param f64 i32 i32) (result i32)))",
+        );
+        self.line(
+            "(import \"env\" \"get_outer_html\" (func $time_getTimezoneOffset (result i32)))",
+        );
         self.line("(import \"env\" \"set_text\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
 
         // DB — IndexedDB stubs for canvas mode
         self.line("");
         self.line(";; DB stubs — canvas mode");
         self.line("(import \"env\" \"set_drag_data\" (func $db_open (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"download\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"set_drag_data\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"set_attribute\" (func $db_delete (param i32 i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"download\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"set_drag_data\" (func $db_get (param i32 i32 i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"set_attribute\" (func $db_delete (param i32 i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"set_drag_data\" (func $db_getAll (param i32 i32 i32 i32)))");
     }
 
@@ -513,7 +569,9 @@ impl WasmCodegen {
                 vec![]
             }
             // background shorthand with color value → background-color
-            "background" if val.starts_with('#') || val.starts_with("rgba(") || val.starts_with("rgb(") => {
+            "background"
+                if val.starts_with('#') || val.starts_with("rgba(") || val.starts_with("rgb(") =>
+            {
                 vec![("background-color".to_string(), val.to_string())]
             }
             // flex-wrap → Honeycomb wrap
@@ -530,12 +588,27 @@ impl WasmCodegen {
                 vec![("font-size".to_string(), format!("{}px", rem * 16.0))]
             }
             // Skip properties Honeycomb doesn't support
-            "margin" | "margin-top" | "margin-bottom" | "margin-left" | "margin-right"
-            | "box-sizing" | "text-transform" | "letter-spacing"
-            | "outline" | "content-visibility" | "contain-intrinsic-size"
-            | "object-fit" | "font-family" | "font-variant-numeric"
-            | "grid-template-columns" | "text-decoration" | "overflow"
-            | "text-align" | "white-space" | "transition" | "box-shadow" => {
+            "margin"
+            | "margin-top"
+            | "margin-bottom"
+            | "margin-left"
+            | "margin-right"
+            | "box-sizing"
+            | "text-transform"
+            | "letter-spacing"
+            | "outline"
+            | "content-visibility"
+            | "contain-intrinsic-size"
+            | "object-fit"
+            | "font-family"
+            | "font-variant-numeric"
+            | "grid-template-columns"
+            | "text-decoration"
+            | "overflow"
+            | "text-align"
+            | "white-space"
+            | "transition"
+            | "box-shadow" => {
                 vec![]
             }
             // Everything else passes through (padding, gap, border, color, etc.)
@@ -550,44 +623,64 @@ impl WasmCodegen {
         self.line(";; ── Bloom WASM runtime imports (env namespace, unique names) ──");
         // DOM
         self.line("(import \"env\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
-        self.line("(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"hydrate_refs\" (func $dom_hydrateRefs (param i32) (result i32)))",
+        );
         self.line("(import \"env\" \"flush\" (func $dom_flush (param i32 i32)))");
         self.line("(import \"env\" \"get_element_by_id\" (func $dom_getElementById (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"query_selector\" (func $dom_querySelector (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"create_element\" (func $dom_createElement (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"set_text\" (func $dom_setText (param i32 i32 i32)))");
         self.line("(import \"env\" \"append_child\" (func $dom_appendChild (param i32 i32)))");
-        self.line("(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_attribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"set_style\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"create_text_node\" (func $dom_createTextNode (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"get_body\" (func $dom_getBody (result i32)))");
         self.line("(import \"env\" \"get_head\" (func $dom_getHead (result i32)))");
         self.line("(import \"env\" \"get_root\" (func $dom_getRoot (result i32)))");
-        self.line("(import \"env\" \"get_document_element\" (func $dom_getDocumentElement (result i32)))");
+        self.line(
+            "(import \"env\" \"get_document_element\" (func $dom_getDocumentElement (result i32)))",
+        );
         self.line("(import \"env\" \"add_event_listener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"remove_event_listener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"clear_children\" (func $dom_clearChildren (param i32)))");
         self.line("(import \"env\" \"lazy_mount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"set_title\" (func $dom_setTitle (param i32 i32)))");
-        self.line("(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))");
+        self.line(
+            "(import \"env\" \"get_scroll_top\" (func $dom_getScrollTop (param i32) (result f64)))",
+        );
         self.line("(import \"env\" \"get_scroll_left\" (func $dom_getScrollLeft (param i32) (result f64)))");
         self.line("(import \"env\" \"get_client_height\" (func $dom_getClientHeight (param i32) (result i32)))");
         self.line("(import \"env\" \"get_client_width\" (func $dom_getClientWidth (param i32) (result i32)))");
         self.line("(import \"env\" \"get_window_width\" (func $dom_getWindowWidth (result i32)))");
-        self.line("(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))");
+        self.line(
+            "(import \"env\" \"get_window_height\" (func $dom_getWindowHeight (result i32)))",
+        );
         self.line("(import \"env\" \"get_outer_html\" (func $dom_getOuterHtml (result i32)))");
-        self.line("(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_drag_data\" (func $dom_setDragData (param i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"get_drag_data\" (func $dom_getDragData (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"prevent_default\" (func $dom_preventDefault))");
         self.line("(import \"env\" \"load_script\" (func $dom_loadScript (param i32 i32 i32)))");
-        self.line("(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"load_chunk\" (func $dom_loadChunk (param i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"decode_image\" (func $dom_decodeImage (param i32 i32 i32)))");
         self.line("(import \"env\" \"progressive_image\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
         self.line("(import \"env\" \"dom_print\" (func $dom_print (param i32)))");
         self.line("(import \"env\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"reload_module\" (func $dom_reloadModule (param i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"inject_styles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"env\" \"set_property\" (func $dom_setProperty (param i32 i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"set_property\" (func $dom_setProperty (param i32 i32 i32 i32)))",
+        );
         self.line("(import \"env\" \"get_value\" (func $dom_getValue (param i32) (result i32)))");
         // Timer
         self.line("(import \"env\" \"set_timeout\" (func $timer_setTimeout (param i32 i32) (result i32)))");
@@ -603,11 +696,17 @@ impl WasmCodegen {
         self.line("(import \"env\" \"local_storage_remove\" (func $webapi_localStorageRemove (param i32 i32)))");
         self.line("(import \"env\" \"session_storage_get\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
         self.line("(import \"env\" \"session_storage_set\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))");
+        self.line(
+            "(import \"env\" \"clipboard_write\" (func $webapi_clipboardWrite (param i32 i32)))",
+        );
         self.line("(import \"env\" \"clipboard_read\" (func $webapi_clipboardRead (param i32)))");
-        self.line("(import \"env\" \"get_location_href\" (func $webapi_getLocationHref (result i32)))");
+        self.line(
+            "(import \"env\" \"get_location_href\" (func $webapi_getLocationHref (result i32)))",
+        );
         self.line("(import \"env\" \"get_location_search\" (func $webapi_getLocationSearch (result i32)))");
-        self.line("(import \"env\" \"get_location_hash\" (func $webapi_getLocationHash (result i32)))");
+        self.line(
+            "(import \"env\" \"get_location_hash\" (func $webapi_getLocationHash (result i32)))",
+        );
         self.line("(import \"env\" \"get_location_pathname\" (func $webapi_getLocationPathname (result i32)))");
         self.line("(import \"env\" \"push_state\" (func $webapi_pushState (param i32 i32)))");
         self.line("(import \"env\" \"replace_state\" (func $webapi_replaceState (param i32 i32)))");
@@ -615,7 +714,9 @@ impl WasmCodegen {
         self.line("(import \"env\" \"console_warn\" (func $webapi_consoleWarn (param i32 i32)))");
         self.line("(import \"env\" \"console_error\" (func $webapi_consoleError (param i32 i32)))");
         self.line("(import \"env\" \"on_pop_state\" (func $webapi_onPopState (param i32)))");
-        self.line("(import \"env\" \"env_get\" (func $webapi_envGet (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"env_get\" (func $webapi_envGet (param i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"can_share\" (func $webapi_canShare (result i32)))");
         self.line("(import \"env\" \"native_share\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
         self.line("(import \"env\" \"perf_mark\" (func $webapi_perfMark (param i32 i32)))");
@@ -623,10 +724,16 @@ impl WasmCodegen {
         // HTTP
         self.line("(import \"env\" \"http_set_method\" (func $http_setMethod (param i32 i32)))");
         self.line("(import \"env\" \"http_set_body\" (func $http_setBody (param i32 i32)))");
-        self.line("(import \"env\" \"http_add_header\" (func $http_addHeader (param i32 i32 i32 i32)))");
-        self.line("(import \"env\" \"http_fetch\" (func $http_fetch (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"http_add_header\" (func $http_addHeader (param i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"env\" \"http_fetch\" (func $http_fetch (param i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"http_fetch_with_callback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
-        self.line("(import \"env\" \"http_fetch_binary\" (func $http_fetchBinary (param i32 i32 i32)))");
+        self.line(
+            "(import \"env\" \"http_fetch_binary\" (func $http_fetchBinary (param i32 i32 i32)))",
+        );
         // DB
         self.line("(import \"env\" \"db_open\" (func $db_open (param i32 i32 i32 i32)))");
         self.line("(import \"env\" \"db_put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
@@ -635,7 +742,9 @@ impl WasmCodegen {
         self.line("(import \"env\" \"db_get_all\" (func $db_getAll (param i32 i32 i32 i32)))");
         // Time
         self.line("(import \"env\" \"time_now\" (func $time_now (result f64)))");
-        self.line("(import \"env\" \"time_format\" (func $time_format (param f64 i32 i32) (result i32)))");
+        self.line(
+            "(import \"env\" \"time_format\" (func $time_format (param f64 i32 i32) (result i32)))",
+        );
         self.line("(import \"env\" \"time_get_timezone_offset\" (func $time_getTimezoneOffset (result i32)))");
         self.line("(import \"env\" \"time_format_date\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
     }
@@ -649,14 +758,18 @@ impl WasmCodegen {
         self.line("(import \"wasi_snapshot_preview1\" \"environ_sizes_get\" (func $environ_sizes_get (param i32 i32) (result i32)))");
         self.line("(import \"wasi_snapshot_preview1\" \"clock_time_get\" (func $clock_time_get (param i32 i64 i32) (result i32)))");
         self.line("(import \"wasi_snapshot_preview1\" \"random_get\" (func $random_get (param i32 i32) (result i32)))");
-        self.line("(import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))");
+        self.line(
+            "(import \"wasi_snapshot_preview1\" \"proc_exit\" (func $proc_exit (param i32)))",
+        );
         self.line("(import \"wasi_snapshot_preview1\" \"args_get\" (func $args_get (param i32 i32) (result i32)))");
         self.line("(import \"wasi_snapshot_preview1\" \"args_sizes_get\" (func $args_sizes_get (param i32 i32) (result i32)))");
 
         self.line("");
         self.line(";; ── Nectar edge HTTP — custom host import for outbound fetch ────");
         self.line("(import \"nectar:edge/http\" \"fetch\" (func $edge_http_fetch (param i32 i32 i32 i32 i32 i32 i32) (result i32)))");
-        self.line(";; params: method_ptr, method_len, url_ptr, url_len, body_ptr, body_len, headers_ptr");
+        self.line(
+            ";; params: method_ptr, method_len, url_ptr, url_len, body_ptr, body_len, headers_ptr",
+        );
         self.line(";; result: response_ptr (host writes response into linear memory)");
 
         // Stub imports for functions that browser codegen references but WASI
@@ -666,24 +779,36 @@ impl WasmCodegen {
         self.line(";; ── WASI Key-Value Store ──────────────────────────────────────");
         self.line("(import \"wasi:keyvalue/store\" \"open\" (func $kv_open (param i32 i32) (result i32)))");
         self.line("(import \"wasi:keyvalue/store\" \"get\" (func $kv_get (param i32 i32 i32) (result i32)))");
-        self.line("(import \"wasi:keyvalue/store\" \"set\" (func $kv_set (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"wasi:keyvalue/store\" \"delete\" (func $kv_delete (param i32 i32 i32)))");
+        self.line(
+            "(import \"wasi:keyvalue/store\" \"set\" (func $kv_set (param i32 i32 i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"wasi:keyvalue/store\" \"delete\" (func $kv_delete (param i32 i32 i32)))",
+        );
         self.line("(import \"wasi:keyvalue/store\" \"exists\" (func $kv_exists (param i32 i32 i32) (result i32)))");
-        self.line("(import \"wasi:keyvalue/store\" \"keys\" (func $kv_keys (param i32) (result i32)))");
+        self.line(
+            "(import \"wasi:keyvalue/store\" \"keys\" (func $kv_keys (param i32) (result i32)))",
+        );
 
         self.line("");
         self.line(";; ── WASI I/O — async streams and polling ──────────────────────");
         self.line("(import \"wasi:io/streams\" \"read\" (func $stream_read (param i32 i32) (result i32)))");
         self.line("(import \"wasi:io/streams\" \"write\" (func $stream_write (param i32 i32 i32) (result i32)))");
         self.line("(import \"wasi:io/streams\" \"subscribe\" (func $stream_subscribe (param i32) (result i32)))");
-        self.line("(import \"wasi:io/poll\" \"poll\" (func $poll_poll (param i32 i32) (result i32)))");
+        self.line(
+            "(import \"wasi:io/poll\" \"poll\" (func $poll_poll (param i32 i32) (result i32)))",
+        );
 
         self.line("");
         self.line(";; ── WASI Blob Storage ─────────────────────────────────────────");
         self.line("(import \"wasi:blob/store\" \"create\" (func $blob_create (param i32 i32) (result i32)))");
         self.line("(import \"wasi:blob/store\" \"get\" (func $blob_get (param i32 i32 i32) (result i32)))");
-        self.line("(import \"wasi:blob/store\" \"delete\" (func $blob_delete (param i32 i32 i32)))");
-        self.line("(import \"wasi:blob/store\" \"list\" (func $blob_list (param i32) (result i32)))");
+        self.line(
+            "(import \"wasi:blob/store\" \"delete\" (func $blob_delete (param i32 i32 i32)))",
+        );
+        self.line(
+            "(import \"wasi:blob/store\" \"list\" (func $blob_list (param i32) (result i32)))",
+        );
 
         self.line("");
         self.line(";; Test runtime stubs (same signature as browser, host may no-op)");
@@ -813,14 +938,30 @@ impl WasmCodegen {
                 self.needs_test = true;
                 self.scan_block_for_runtime_deps(&t.body);
             }
-            Item::Channel(_) => { self.needs_ws = true; }
-            Item::Auth(_) => { self.needs_auth = true; }
-            Item::Upload(_) => { self.needs_upload = true; }
-            Item::Db(_) => { self.needs_db = true; }
-            Item::Payment(_) => { self.needs_payment = true; }
-            Item::MiniProgram(_) => { self.needs_miniprogram = true; }
-            Item::App(_) => { self.needs_pwa = true; }
-            Item::Contract(_) => { self.needs_http = true; }
+            Item::Channel(_) => {
+                self.needs_ws = true;
+            }
+            Item::Auth(_) => {
+                self.needs_auth = true;
+            }
+            Item::Upload(_) => {
+                self.needs_upload = true;
+            }
+            Item::Db(_) => {
+                self.needs_db = true;
+            }
+            Item::Payment(_) => {
+                self.needs_payment = true;
+            }
+            Item::MiniProgram(_) => {
+                self.needs_miniprogram = true;
+            }
+            Item::App(_) => {
+                self.needs_pwa = true;
+            }
+            Item::Contract(_) => {
+                self.needs_http = true;
+            }
             Item::Embed(_) => {}
             Item::Router(_) => {}
             _ => {}
@@ -835,7 +976,8 @@ impl WasmCodegen {
 
     fn scan_stmt_for_runtime_deps(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Let { value, .. } | Stmt::Signal { value, .. }
+            Stmt::Let { value, .. }
+            | Stmt::Signal { value, .. }
             | Stmt::LetDestructure { value, .. } => {
                 self.scan_expr_for_runtime_deps(value);
             }
@@ -858,9 +1000,15 @@ impl WasmCodegen {
                     }
                 }
                 self.scan_expr_for_runtime_deps(callee);
-                for arg in args { self.scan_expr_for_runtime_deps(arg); }
+                for arg in args {
+                    self.scan_expr_for_runtime_deps(arg);
+                }
             }
-            Expr::MethodCall { object, method, args } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 if let Expr::Ident(obj_name) = object.as_ref() {
                     let qualified = format!("{}::{}", obj_name, method);
                     self.check_runtime_category_from_call(&qualified);
@@ -868,7 +1016,9 @@ impl WasmCodegen {
                 }
                 self.check_runtime_category_from_call(method);
                 self.scan_expr_for_runtime_deps(object);
-                for arg in args { self.scan_expr_for_runtime_deps(arg); }
+                for arg in args {
+                    self.scan_expr_for_runtime_deps(arg);
+                }
             }
             Expr::Binary { left, right, .. } => {
                 self.scan_expr_for_runtime_deps(left);
@@ -881,14 +1031,23 @@ impl WasmCodegen {
                 self.scan_expr_for_runtime_deps(object);
                 self.scan_expr_for_runtime_deps(index);
             }
-            Expr::If { condition, then_block, else_block, .. } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+                ..
+            } => {
                 self.scan_expr_for_runtime_deps(condition);
                 self.scan_block_for_runtime_deps(then_block);
-                if let Some(eb) = else_block { self.scan_block_for_runtime_deps(eb); }
+                if let Some(eb) = else_block {
+                    self.scan_block_for_runtime_deps(eb);
+                }
             }
             Expr::Block(block) => self.scan_block_for_runtime_deps(block),
             Expr::ArrayLit(elems) => {
-                for e in elems { self.scan_expr_for_runtime_deps(e); }
+                for e in elems {
+                    self.scan_expr_for_runtime_deps(e);
+                }
             }
             Expr::Closure { body, .. } => self.scan_expr_for_runtime_deps(body),
             Expr::Match { subject, arms } => {
@@ -914,26 +1073,44 @@ impl WasmCodegen {
                 self.scan_expr_for_runtime_deps(target);
                 self.scan_expr_for_runtime_deps(value);
             }
-            Expr::Await(e) | Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Try(e)
-            | Expr::Navigate { path: e } | Expr::Stream { source: e } => {
+            Expr::Await(e)
+            | Expr::Borrow(e)
+            | Expr::BorrowMut(e)
+            | Expr::Try(e)
+            | Expr::Navigate { path: e }
+            | Expr::Stream { source: e } => {
                 self.scan_expr_for_runtime_deps(e);
             }
             Expr::Fetch { url, options, .. } => {
                 self.scan_expr_for_runtime_deps(url);
-                if let Some(opts) = options { self.scan_expr_for_runtime_deps(opts); }
+                if let Some(opts) = options {
+                    self.scan_expr_for_runtime_deps(opts);
+                }
             }
             Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
-                for (_, e) in fields { self.scan_expr_for_runtime_deps(e); }
+                for (_, e) in fields {
+                    self.scan_expr_for_runtime_deps(e);
+                }
             }
-            Expr::TryCatch { body, catch_body, .. } => {
+            Expr::TryCatch {
+                body, catch_body, ..
+            } => {
                 self.scan_expr_for_runtime_deps(body);
                 self.scan_expr_for_runtime_deps(catch_body);
             }
-            Expr::Suspend { fallback, body } | Expr::Send { channel: fallback, value: body } => {
+            Expr::Suspend { fallback, body }
+            | Expr::Send {
+                channel: fallback,
+                value: body,
+            } => {
                 self.scan_expr_for_runtime_deps(fallback);
                 self.scan_expr_for_runtime_deps(body);
             }
-            Expr::For { iterator, body, .. } | Expr::While { condition: iterator, body } => {
+            Expr::For { iterator, body, .. }
+            | Expr::While {
+                condition: iterator,
+                body,
+            } => {
                 self.scan_expr_for_runtime_deps(iterator);
                 self.scan_block_for_runtime_deps(body);
             }
@@ -941,7 +1118,9 @@ impl WasmCodegen {
                 self.scan_block_for_runtime_deps(body);
             }
             Expr::Parallel { tasks, .. } => {
-                for t in tasks { self.scan_expr_for_runtime_deps(t); }
+                for t in tasks {
+                    self.scan_expr_for_runtime_deps(t);
+                }
             }
             Expr::Assert { condition, .. } => self.scan_expr_for_runtime_deps(condition),
             Expr::AssertEq { left, right, .. } => {
@@ -950,11 +1129,18 @@ impl WasmCodegen {
             }
             Expr::Receive { channel } => self.scan_expr_for_runtime_deps(channel),
             Expr::Animate { target, .. } => self.scan_expr_for_runtime_deps(target),
-            Expr::DynamicImport { path, .. } | Expr::Download { data: path, .. }
-            | Expr::Env { name: path, .. } | Expr::Flag { name: path, .. } => {
+            Expr::DynamicImport { path, .. }
+            | Expr::Download { data: path, .. }
+            | Expr::Env { name: path, .. }
+            | Expr::Flag { name: path, .. } => {
                 self.scan_expr_for_runtime_deps(path);
             }
-            Expr::VirtualList { items, item_height, template, .. } => {
+            Expr::VirtualList {
+                items,
+                item_height,
+                template,
+                ..
+            } => {
                 self.scan_expr_for_runtime_deps(items);
                 self.scan_expr_for_runtime_deps(item_height);
                 self.scan_expr_for_runtime_deps(template);
@@ -974,7 +1160,9 @@ impl WasmCodegen {
                 if honeycomb::catalog::is_widget(&el.tag) {
                     self.used_widget_tags.insert(el.tag.clone());
                 }
-                for child in &el.children { self.scan_template_for_runtime_deps(child); }
+                for child in &el.children {
+                    self.scan_template_for_runtime_deps(child);
+                }
                 for attr in &el.attributes {
                     match attr {
                         Attribute::Dynamic { value, .. } | Attribute::Aria { value, .. } => {
@@ -989,23 +1177,44 @@ impl WasmCodegen {
             }
             TemplateNode::TextLiteral(_) | TemplateNode::Outlet => {}
             TemplateNode::Expression(e) => self.scan_expr_for_runtime_deps(e),
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 self.scan_expr_for_runtime_deps(condition);
-                for child in then_children { self.scan_template_for_runtime_deps(child); }
+                for child in then_children {
+                    self.scan_template_for_runtime_deps(child);
+                }
                 if let Some(eb) = else_children {
-                    for child in eb { self.scan_template_for_runtime_deps(child); }
+                    for child in eb {
+                        self.scan_template_for_runtime_deps(child);
+                    }
                 }
             }
-            TemplateNode::TemplateFor { iterator, children, .. } => {
+            TemplateNode::TemplateFor {
+                iterator, children, ..
+            } => {
                 self.scan_expr_for_runtime_deps(iterator);
-                for child in children { self.scan_template_for_runtime_deps(child); }
+                for child in children {
+                    self.scan_template_for_runtime_deps(child);
+                }
             }
             TemplateNode::Fragment(children) => {
-                for child in children { self.scan_template_for_runtime_deps(child); }
+                for child in children {
+                    self.scan_template_for_runtime_deps(child);
+                }
             }
-            TemplateNode::Link { to, children, attributes, .. } => {
+            TemplateNode::Link {
+                to,
+                children,
+                attributes,
+                ..
+            } => {
                 self.scan_expr_for_runtime_deps(to);
-                for child in children { self.scan_template_for_runtime_deps(child); }
+                for child in children {
+                    self.scan_template_for_runtime_deps(child);
+                }
                 for attr in attributes {
                     if let Attribute::Dynamic { value, .. } = attr {
                         self.scan_expr_for_runtime_deps(value);
@@ -1014,17 +1223,24 @@ impl WasmCodegen {
             }
             TemplateNode::Layout(layout) => {
                 let children = match layout {
-                    LayoutNode::Stack { children, .. } | LayoutNode::Row { children, .. }
-                    | LayoutNode::Grid { children, .. } | LayoutNode::Center { children, .. }
-                    | LayoutNode::Cluster { children, .. } | LayoutNode::Sidebar { children, .. }
+                    LayoutNode::Stack { children, .. }
+                    | LayoutNode::Row { children, .. }
+                    | LayoutNode::Grid { children, .. }
+                    | LayoutNode::Center { children, .. }
+                    | LayoutNode::Cluster { children, .. }
+                    | LayoutNode::Sidebar { children, .. }
                     | LayoutNode::Switcher { children, .. } => children,
                 };
-                for child in children { self.scan_template_for_runtime_deps(child); }
+                for child in children {
+                    self.scan_template_for_runtime_deps(child);
+                }
             }
             TemplateNode::TemplateMatch { subject, arms } => {
                 self.scan_expr_for_runtime_deps(subject);
                 for arm in arms {
-                    for child in &arm.body { self.scan_template_for_runtime_deps(child); }
+                    for child in &arm.body {
+                        self.scan_template_for_runtime_deps(child);
+                    }
                 }
             }
         }
@@ -1064,16 +1280,27 @@ impl WasmCodegen {
         if name.starts_with("ws::") || name.starts_with("WebSocket") {
             self.needs_ws = true;
         }
-        if name.starts_with("db::") || name.starts_with("indexedDB") || name.contains("::open") && name.starts_with("db") {
+        if name.starts_with("db::")
+            || name.starts_with("indexedDB")
+            || name.contains("::open") && name.starts_with("db")
+        {
             self.needs_db = true;
         }
         if name.starts_with("worker::") || name.starts_with("spawn") {
             self.needs_worker = true;
         }
-        if name.starts_with("pwa::") || name.contains("serviceWorker") || name.contains("cachePrecache") {
+        if name.starts_with("pwa::")
+            || name.contains("serviceWorker")
+            || name.contains("cachePrecache")
+        {
             self.needs_pwa = true;
         }
-        if name.starts_with("hardware::") || name.contains("haptic") || name.contains("biometric") || name.contains("camera") || name.contains("geolocation") {
+        if name.starts_with("hardware::")
+            || name.contains("haptic")
+            || name.contains("biometric")
+            || name.contains("camera")
+            || name.contains("geolocation")
+        {
             self.needs_hardware = true;
         }
         if name.starts_with("payment::") {
@@ -1097,10 +1324,17 @@ impl WasmCodegen {
         if name.starts_with("time::") || name.contains("::format") && name.starts_with("time") {
             self.needs_time = true;
         }
-        if name.starts_with("streaming::") || name.contains("streamFetch") || name.contains("sseConnect") {
+        if name.starts_with("streaming::")
+            || name.contains("streamFetch")
+            || name.contains("sseConnect")
+        {
             self.needs_streaming = true;
         }
-        if name.starts_with("rtc::") || name.starts_with("rtc_") || name.contains("WebRTC") || name.contains("createPeer") {
+        if name.starts_with("rtc::")
+            || name.starts_with("rtc_")
+            || name.contains("WebRTC")
+            || name.contains("createPeer")
+        {
             self.needs_rtc = true;
         }
         if name.starts_with("gpu::") || name.contains("WebGPU") {
@@ -1129,352 +1363,440 @@ impl WasmCodegen {
             eprintln!("nectar: [codegen] Bloom target — emitting env namespace imports");
             self.emit_bloom_imports(program);
         } else {
-        // String runtime — WASM-internal (emitted by emit_string_runtime)
-        // concat, fromI32, fromF64, fromBool, toString all run in WASM linear memory.
+            // String runtime — WASM-internal (emitted by emit_string_runtime)
+            // concat, fromI32, fromF64, fromBool, toString all run in WASM linear memory.
 
-        // ── DOM — mount/flush + element queries + absorbed functions ─────────
-        self.line("(import \"dom\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
-        self.line("(import \"dom\" \"hydrateRefs\" (func $dom_hydrateRefs (param i32) (result i32)))");
-        self.line("(import \"dom\" \"flush\" (func $dom_flush (param i32 i32)))");
-        self.line("(import \"dom\" \"getElementById\" (func $dom_getElementById (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"querySelector\" (func $dom_querySelector (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"createElement\" (func $dom_createElement (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"setText\" (func $dom_setText (param i32 i32 i32)))");
-        self.line("(import \"dom\" \"appendChild\" (func $dom_appendChild (param i32 i32)))");
-        self.line("(import \"dom\" \"setAttribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"setStyle\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"createTextNode\" (func $dom_createTextNode (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"getBody\" (func $dom_getBody (result i32)))");
-        self.line("(import \"dom\" \"getHead\" (func $dom_getHead (result i32)))");
-        self.line("(import \"dom\" \"getRoot\" (func $dom_getRoot (result i32)))");
-        self.line("(import \"dom\" \"getDocumentElement\" (func $dom_getDocumentElement (result i32)))");
-        self.line("(import \"dom\" \"addEventListener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"removeEventListener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"clearChildren\" (func $dom_clearChildren (param i32)))");
-        self.line("(import \"dom\" \"lazyMount\" (func $dom_lazyMount (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"setTitle\" (func $dom_setTitle (param i32 i32)))");
-        self.line("(import \"dom\" \"getScrollTop\" (func $dom_getScrollTop (param i32) (result f64)))");
-        self.line("(import \"dom\" \"getScrollLeft\" (func $dom_getScrollLeft (param i32) (result f64)))");
-        self.line("(import \"dom\" \"getClientHeight\" (func $dom_getClientHeight (param i32) (result i32)))");
-        self.line("(import \"dom\" \"getClientWidth\" (func $dom_getClientWidth (param i32) (result i32)))");
-        self.line("(import \"dom\" \"getWindowWidth\" (func $dom_getWindowWidth (result i32)))");
-        self.line("(import \"dom\" \"getWindowHeight\" (func $dom_getWindowHeight (result i32)))");
-        self.line("(import \"dom\" \"getOuterHtml\" (func $dom_getOuterHtml (result i32)))");
-        self.line("(import \"dom\" \"setDragData\" (func $dom_setDragData (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"getDragData\" (func $dom_getDragData (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"preventDefault\" (func $dom_preventDefault))");
-        self.line(";; Absorbed from embed/loader/media/pdf/io");
-        self.line("(import \"dom\" \"loadScript\" (func $dom_loadScript (param i32 i32 i32)))");
-        self.line("(import \"dom\" \"loadChunk\" (func $dom_loadChunk (param i32 i32) (result i32)))");
-        self.line("(import \"dom\" \"decodeImage\" (func $dom_decodeImage (param i32 i32 i32)))");
-        self.line("(import \"dom\" \"progressiveImage\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"print\" (func $dom_print (param i32)))");
-        self.line("(import \"dom\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"reloadModule\" (func $dom_reloadModule (param i32 i32 i32)))");
-        self.line("(import \"dom\" \"injectStyles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
-        // Embed imports — only emit when program has embed definitions
-        let has_embed = program.items.iter().any(|i| matches!(i, Item::Embed(_)));
-        if has_embed {
-            self.line("(import \"dom\" \"embedLoadSandboxed\" (func $embed_load_sandboxed (param i32 i32 i32 i32)))");
-            self.line("(import \"dom\" \"embedLoadScript\" (func $embed_load_script (param i32 i32 i32 i32 i32)))");
-        }
-        self.line("(import \"dom\" \"setProperty\" (func $dom_setProperty (param i32 i32 i32 i32)))");
-        self.line("(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))");
+            // ── DOM — mount/flush + element queries + absorbed functions ─────────
+            self.line("(import \"dom\" \"mount\" (func $dom_mount (param i32 i32 i32)))");
+            self.line(
+                "(import \"dom\" \"hydrateRefs\" (func $dom_hydrateRefs (param i32) (result i32)))",
+            );
+            self.line("(import \"dom\" \"flush\" (func $dom_flush (param i32 i32)))");
+            self.line("(import \"dom\" \"getElementById\" (func $dom_getElementById (param i32 i32) (result i32)))");
+            self.line("(import \"dom\" \"querySelector\" (func $dom_querySelector (param i32 i32) (result i32)))");
+            self.line("(import \"dom\" \"createElement\" (func $dom_createElement (param i32 i32) (result i32)))");
+            self.line("(import \"dom\" \"setText\" (func $dom_setText (param i32 i32 i32)))");
+            self.line("(import \"dom\" \"appendChild\" (func $dom_appendChild (param i32 i32)))");
+            self.line(
+                "(import \"dom\" \"setAttribute\" (func $dom_setAttr (param i32 i32 i32 i32 i32)))",
+            );
+            self.line(
+                "(import \"dom\" \"setStyle\" (func $dom_setStyle (param i32 i32 i32 i32 i32)))",
+            );
+            self.line("(import \"dom\" \"createTextNode\" (func $dom_createTextNode (param i32 i32) (result i32)))");
+            self.line("(import \"dom\" \"getBody\" (func $dom_getBody (result i32)))");
+            self.line("(import \"dom\" \"getHead\" (func $dom_getHead (result i32)))");
+            self.line("(import \"dom\" \"getRoot\" (func $dom_getRoot (result i32)))");
+            self.line("(import \"dom\" \"getDocumentElement\" (func $dom_getDocumentElement (result i32)))");
+            self.line("(import \"dom\" \"addEventListener\" (func $dom_addEventListener (param i32 i32 i32 i32)))");
+            self.line("(import \"dom\" \"removeEventListener\" (func $dom_removeEventListener (param i32 i32 i32 i32)))");
+            self.line("(import \"dom\" \"clearChildren\" (func $dom_clearChildren (param i32)))");
+            self.line(
+                "(import \"dom\" \"lazyMount\" (func $dom_lazyMount (param i32 i32 i32 i32)))",
+            );
+            self.line("(import \"dom\" \"setTitle\" (func $dom_setTitle (param i32 i32)))");
+            self.line("(import \"dom\" \"getScrollTop\" (func $dom_getScrollTop (param i32) (result f64)))");
+            self.line("(import \"dom\" \"getScrollLeft\" (func $dom_getScrollLeft (param i32) (result f64)))");
+            self.line("(import \"dom\" \"getClientHeight\" (func $dom_getClientHeight (param i32) (result i32)))");
+            self.line("(import \"dom\" \"getClientWidth\" (func $dom_getClientWidth (param i32) (result i32)))");
+            self.line(
+                "(import \"dom\" \"getWindowWidth\" (func $dom_getWindowWidth (result i32)))",
+            );
+            self.line(
+                "(import \"dom\" \"getWindowHeight\" (func $dom_getWindowHeight (result i32)))",
+            );
+            self.line("(import \"dom\" \"getOuterHtml\" (func $dom_getOuterHtml (result i32)))");
+            self.line(
+                "(import \"dom\" \"setDragData\" (func $dom_setDragData (param i32 i32 i32 i32)))",
+            );
+            self.line("(import \"dom\" \"getDragData\" (func $dom_getDragData (param i32 i32) (result i32)))");
+            self.line("(import \"dom\" \"preventDefault\" (func $dom_preventDefault))");
+            self.line(";; Absorbed from embed/loader/media/pdf/io");
+            self.line("(import \"dom\" \"loadScript\" (func $dom_loadScript (param i32 i32 i32)))");
+            self.line(
+                "(import \"dom\" \"loadChunk\" (func $dom_loadChunk (param i32 i32) (result i32)))",
+            );
+            self.line(
+                "(import \"dom\" \"decodeImage\" (func $dom_decodeImage (param i32 i32 i32)))",
+            );
+            self.line("(import \"dom\" \"progressiveImage\" (func $dom_progressiveImage (param i32 i32 i32 i32 i32)))");
+            self.line("(import \"dom\" \"print\" (func $dom_print (param i32)))");
+            self.line("(import \"dom\" \"download\" (func $dom_download (param i32 i32 i32 i32)))");
+            self.line(
+                "(import \"dom\" \"reloadModule\" (func $dom_reloadModule (param i32 i32 i32)))",
+            );
+            self.line("(import \"dom\" \"injectStyles\" (func $style_injectStyles (param i32 i32 i32 i32) (result i32)))");
+            // Embed imports — only emit when program has embed definitions
+            let has_embed = program.items.iter().any(|i| matches!(i, Item::Embed(_)));
+            if has_embed {
+                self.line("(import \"dom\" \"embedLoadSandboxed\" (func $embed_load_sandboxed (param i32 i32 i32 i32)))");
+                self.line("(import \"dom\" \"embedLoadScript\" (func $embed_load_script (param i32 i32 i32 i32 i32)))");
+            }
+            self.line(
+                "(import \"dom\" \"setProperty\" (func $dom_setProperty (param i32 i32 i32 i32)))",
+            );
+            self.line(
+                "(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))",
+            );
 
-        // ── Timer — browser timer APIs ───────────────────────────────────────
-        self.line("");
-        self.line(";; Timer — browser timer APIs");
-        self.line("(import \"timer\" \"setTimeout\" (func $timer_setTimeout (param i32 i32) (result i32)))");
-        self.line("(import \"timer\" \"clearTimeout\" (func $timer_clearTimeout (param i32)))");
-        self.line("(import \"timer\" \"setInterval\" (func $timer_setInterval (param i32 i32) (result i32)))");
-        self.line("(import \"timer\" \"clearInterval\" (func $timer_clearInterval (param i32)))");
-        self.line("(import \"timer\" \"requestAnimationFrame\" (func $timer_requestAnimationFrame (param i32) (result i32)))");
-        self.line("(import \"timer\" \"cancelAnimationFrame\" (func $timer_cancelAnimationFrame (param i32)))");
-        self.line("(import \"timer\" \"now\" (func $timer_now (result f64)))");
+            // ── Timer — browser timer APIs ───────────────────────────────────────
+            self.line("");
+            self.line(";; Timer — browser timer APIs");
+            self.line("(import \"timer\" \"setTimeout\" (func $timer_setTimeout (param i32 i32) (result i32)))");
+            self.line("(import \"timer\" \"clearTimeout\" (func $timer_clearTimeout (param i32)))");
+            self.line("(import \"timer\" \"setInterval\" (func $timer_setInterval (param i32 i32) (result i32)))");
+            self.line(
+                "(import \"timer\" \"clearInterval\" (func $timer_clearInterval (param i32)))",
+            );
+            self.line("(import \"timer\" \"requestAnimationFrame\" (func $timer_requestAnimationFrame (param i32) (result i32)))");
+            self.line("(import \"timer\" \"cancelAnimationFrame\" (func $timer_cancelAnimationFrame (param i32)))");
+            self.line("(import \"timer\" \"now\" (func $timer_now (result f64)))");
 
-        // ── Web API — storage, clipboard, history, console, router, env, share, perf
-        self.line("");
-        self.line(";; Web API — storage");
-        self.line("(import \"webapi\" \"localStorageGet\" (func $webapi_localStorageGet (param i32 i32) (result i32)))");
-        self.line("(import \"webapi\" \"localStorageSet\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))");
-        self.line("(import \"webapi\" \"localStorageRemove\" (func $webapi_localStorageRemove (param i32 i32)))");
-        self.line("(import \"webapi\" \"sessionStorageGet\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
-        self.line("(import \"webapi\" \"sessionStorageSet\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
-        self.line(";; Web API — clipboard");
-        self.line("(import \"webapi\" \"clipboardWrite\" (func $webapi_clipboardWrite (param i32 i32)))");
-        self.line("(import \"webapi\" \"clipboardRead\" (func $webapi_clipboardRead (param i32)))");
-        self.line(";; Web API — URL/history");
-        self.line("(import \"webapi\" \"getLocationHref\" (func $webapi_getLocationHref (result i32)))");
-        self.line("(import \"webapi\" \"getLocationSearch\" (func $webapi_getLocationSearch (result i32)))");
-        self.line("(import \"webapi\" \"getLocationHash\" (func $webapi_getLocationHash (result i32)))");
-        self.line("(import \"webapi\" \"getLocationPathname\" (func $webapi_getLocationPathname (result i32)))");
-        self.line("(import \"webapi\" \"pushState\" (func $webapi_pushState (param i32 i32)))");
-        self.line("(import \"webapi\" \"replaceState\" (func $webapi_replaceState (param i32 i32)))");
-        self.line(";; Web API — console");
-        self.line("(import \"webapi\" \"consoleLog\" (func $webapi_consoleLog (param i32 i32)))");
-        self.line("(import \"webapi\" \"consoleWarn\" (func $webapi_consoleWarn (param i32 i32)))");
-        self.line("(import \"webapi\" \"consoleError\" (func $webapi_consoleError (param i32 i32)))");
-        self.line(";; Web API — absorbed from router");
-        self.line("(import \"webapi\" \"onPopState\" (func $webapi_onPopState (param i32)))");
-        self.line(";; Web API — absorbed from env");
-        self.line("(import \"webapi\" \"envGet\" (func $webapi_envGet (param i32 i32) (result i32)))");
-        self.line(";; Web API — absorbed from share");
-        self.line("(import \"webapi\" \"canShare\" (func $webapi_canShare (result i32)))");
-        self.line("(import \"webapi\" \"nativeShare\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
-        self.line(";; Web API — absorbed from perf");
-        self.line("(import \"webapi\" \"perfMark\" (func $webapi_perfMark (param i32 i32)))");
-        self.line("(import \"webapi\" \"perfMeasure\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
+            // ── Web API — storage, clipboard, history, console, router, env, share, perf
+            self.line("");
+            self.line(";; Web API — storage");
+            self.line("(import \"webapi\" \"localStorageGet\" (func $webapi_localStorageGet (param i32 i32) (result i32)))");
+            self.line("(import \"webapi\" \"localStorageSet\" (func $webapi_localStorageSet (param i32 i32 i32 i32)))");
+            self.line("(import \"webapi\" \"localStorageRemove\" (func $webapi_localStorageRemove (param i32 i32)))");
+            self.line("(import \"webapi\" \"sessionStorageGet\" (func $webapi_sessionStorageGet (param i32 i32) (result i32)))");
+            self.line("(import \"webapi\" \"sessionStorageSet\" (func $webapi_sessionStorageSet (param i32 i32 i32 i32)))");
+            self.line(";; Web API — clipboard");
+            self.line("(import \"webapi\" \"clipboardWrite\" (func $webapi_clipboardWrite (param i32 i32)))");
+            self.line(
+                "(import \"webapi\" \"clipboardRead\" (func $webapi_clipboardRead (param i32)))",
+            );
+            self.line(";; Web API — URL/history");
+            self.line("(import \"webapi\" \"getLocationHref\" (func $webapi_getLocationHref (result i32)))");
+            self.line("(import \"webapi\" \"getLocationSearch\" (func $webapi_getLocationSearch (result i32)))");
+            self.line("(import \"webapi\" \"getLocationHash\" (func $webapi_getLocationHash (result i32)))");
+            self.line("(import \"webapi\" \"getLocationPathname\" (func $webapi_getLocationPathname (result i32)))");
+            self.line("(import \"webapi\" \"pushState\" (func $webapi_pushState (param i32 i32)))");
+            self.line(
+                "(import \"webapi\" \"replaceState\" (func $webapi_replaceState (param i32 i32)))",
+            );
+            self.line(";; Web API — console");
+            self.line(
+                "(import \"webapi\" \"consoleLog\" (func $webapi_consoleLog (param i32 i32)))",
+            );
+            self.line(
+                "(import \"webapi\" \"consoleWarn\" (func $webapi_consoleWarn (param i32 i32)))",
+            );
+            self.line(
+                "(import \"webapi\" \"consoleError\" (func $webapi_consoleError (param i32 i32)))",
+            );
+            self.line(";; Web API — absorbed from router");
+            self.line("(import \"webapi\" \"onPopState\" (func $webapi_onPopState (param i32)))");
+            self.line(";; Web API — absorbed from env");
+            self.line(
+                "(import \"webapi\" \"envGet\" (func $webapi_envGet (param i32 i32) (result i32)))",
+            );
+            self.line(";; Web API — absorbed from share");
+            self.line("(import \"webapi\" \"canShare\" (func $webapi_canShare (result i32)))");
+            self.line("(import \"webapi\" \"nativeShare\" (func $webapi_nativeShare (param i32 i32 i32 i32 i32 i32)))");
+            self.line(";; Web API — absorbed from perf");
+            self.line("(import \"webapi\" \"perfMark\" (func $webapi_perfMark (param i32 i32)))");
+            self.line("(import \"webapi\" \"perfMeasure\" (func $webapi_perfMeasure (param i32 i32 i32 i32 i32 i32)))");
 
+            // ── HTTP — typed setters + fetch (only if program uses fetch/http) ────
+            if self.needs_http {
+                self.line("");
+                self.line(";; HTTP — browser fetch API (typed setters, no JSON)");
+                self.line("(import \"http\" \"setMethod\" (func $http_setMethod (param i32 i32)))");
+                self.line("(import \"http\" \"setBody\" (func $http_setBody (param i32 i32)))");
+                self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
+                self.line(
+                    "(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))",
+                );
+                self.line("(import \"http\" \"fetchWithCallback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
+                self.line("(import \"http\" \"fetchBinary\" (func $http_fetchBinary (param i32 i32 i32)))");
+            }
 
-        // ── HTTP — typed setters + fetch (only if program uses fetch/http) ────
-        if self.needs_http {
-        self.line("");
-        self.line(";; HTTP — browser fetch API (typed setters, no JSON)");
-        self.line("(import \"http\" \"setMethod\" (func $http_setMethod (param i32 i32)))");
-        self.line("(import \"http\" \"setBody\" (func $http_setBody (param i32 i32)))");
-        self.line("(import \"http\" \"addHeader\" (func $http_addHeader (param i32 i32 i32 i32)))");
-        self.line("(import \"http\" \"fetch\" (func $http_fetch (param i32 i32) (result i32)))");
-        self.line("(import \"http\" \"fetchWithCallback\" (func $http_fetchWithCallback (param i32 i32 i32)))");
-        self.line("(import \"http\" \"fetchBinary\" (func $http_fetchBinary (param i32 i32 i32)))");
-        }
+            // ── Observe — IntersectionObserver + matchMedia ──────────────────────
+            if self.needs_observe {
+                self.line("");
+                self.line(";; Observe — browser IntersectionObserver + matchMedia APIs");
+                self.line("(import \"observe\" \"matchMedia\" (func $observe_matchMedia (param i32 i32) (result i32)))");
+                self.line("(import \"observe\" \"intersectionObserver\" (func $observe_intersectionObserver (param i32 i32) (result i32)))");
+                self.line(
+                    "(import \"observe\" \"observe\" (func $observe_observe (param i32 i32)))",
+                );
+                self.line(
+                    "(import \"observe\" \"unobserve\" (func $observe_unobserve (param i32 i32)))",
+                );
+                self.line(
+                    "(import \"observe\" \"disconnect\" (func $observe_disconnect (param i32)))",
+                );
+            }
 
-        // ── Observe — IntersectionObserver + matchMedia ──────────────────────
-        if self.needs_observe {
-        self.line("");
-        self.line(";; Observe — browser IntersectionObserver + matchMedia APIs");
-        self.line("(import \"observe\" \"matchMedia\" (func $observe_matchMedia (param i32 i32) (result i32)))");
-        self.line("(import \"observe\" \"intersectionObserver\" (func $observe_intersectionObserver (param i32 i32) (result i32)))");
-        self.line("(import \"observe\" \"observe\" (func $observe_observe (param i32 i32)))");
-        self.line("(import \"observe\" \"unobserve\" (func $observe_unobserve (param i32 i32)))");
-        self.line("(import \"observe\" \"disconnect\" (func $observe_disconnect (param i32)))");
-        }
+            // ── WebSocket ────────────────────────────────────────────────────────
+            if self.needs_ws {
+                self.line("");
+                self.line(";; WebSocket — browser WebSocket API");
+                self.line(
+                    "(import \"ws\" \"connect\" (func $ws_connect (param i32 i32) (result i32)))",
+                );
+                self.line("(import \"ws\" \"send\" (func $ws_send (param i32 i32 i32)))");
+                self.line(
+                    "(import \"ws\" \"sendBinary\" (func $ws_sendBinary (param i32 i32 i32)))",
+                );
+                self.line("(import \"ws\" \"close\" (func $ws_close (param i32)))");
+                self.line("(import \"ws\" \"onOpen\" (func $ws_onOpen (param i32 i32)))");
+                self.line("(import \"ws\" \"onMessage\" (func $ws_onMessage (param i32 i32)))");
+                self.line("(import \"ws\" \"onClose\" (func $ws_onClose (param i32 i32)))");
+                self.line("(import \"ws\" \"onError\" (func $ws_onError (param i32 i32)))");
+                self.line("(import \"ws\" \"getReadyState\" (func $ws_getReadyState (param i32) (result i32)))");
+            }
 
-        // ── WebSocket ────────────────────────────────────────────────────────
-        if self.needs_ws {
-        self.line("");
-        self.line(";; WebSocket — browser WebSocket API");
-        self.line("(import \"ws\" \"connect\" (func $ws_connect (param i32 i32) (result i32)))");
-        self.line("(import \"ws\" \"send\" (func $ws_send (param i32 i32 i32)))");
-        self.line("(import \"ws\" \"sendBinary\" (func $ws_sendBinary (param i32 i32 i32)))");
-        self.line("(import \"ws\" \"close\" (func $ws_close (param i32)))");
-        self.line("(import \"ws\" \"onOpen\" (func $ws_onOpen (param i32 i32)))");
-        self.line("(import \"ws\" \"onMessage\" (func $ws_onMessage (param i32 i32)))");
-        self.line("(import \"ws\" \"onClose\" (func $ws_onClose (param i32 i32)))");
-        self.line("(import \"ws\" \"onError\" (func $ws_onError (param i32 i32)))");
-        self.line("(import \"ws\" \"getReadyState\" (func $ws_getReadyState (param i32) (result i32)))");
-        }
+            // ── IndexedDB — pure syscalls, WASM handles serialization ────────────
+            if self.needs_db {
+                self.line("");
+                self.line(";; Database — browser IndexedDB API (no JSON logic in JS)");
+                self.line("(import \"db\" \"open\" (func $db_open (param i32 i32 i32 i32)))");
+                self.line(
+                    "(import \"db\" \"put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))",
+                );
+                self.line("(import \"db\" \"get\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
+                self.line(
+                    "(import \"db\" \"delete\" (func $db_delete (param i32 i32 i32 i32 i32)))",
+                );
+                self.line("(import \"db\" \"getAll\" (func $db_getAll (param i32 i32 i32 i32)))");
+            }
 
-        // ── IndexedDB — pure syscalls, WASM handles serialization ────────────
-        if self.needs_db {
-        self.line("");
-        self.line(";; Database — browser IndexedDB API (no JSON logic in JS)");
-        self.line("(import \"db\" \"open\" (func $db_open (param i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"put\" (func $db_put (param i32 i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"get\" (func $db_get (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"delete\" (func $db_delete (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"db\" \"getAll\" (func $db_getAll (param i32 i32 i32 i32)))");
-        }
+            // ── Workers ──────────────────────────────────────────────────────────
+            if self.needs_worker {
+                self.line("");
+                self.line(";; Workers — browser Web Worker API");
+                self.line("(import \"worker\" \"spawn\" (func $worker_spawn (param i32 i32) (result i32)))");
+                self.line("(import \"worker\" \"channelCreate\" (func $worker_channelCreate (result i32)))");
+                self.line("(import \"worker\" \"channelSend\" (func $worker_channelSend (param i32 i32 i32)))");
+                self.line("(import \"worker\" \"channelRecv\" (func $worker_channelRecv (param i32 i32)))");
+                self.line("(import \"worker\" \"postMessage\" (func $worker_postMessage (param i32 i32 i32)))");
+                self.line(
+                    "(import \"worker\" \"onMessage\" (func $worker_onMessage (param i32 i32)))",
+                );
+                self.line("(import \"worker\" \"terminate\" (func $worker_terminate (param i32)))");
+            }
 
-        // ── Workers ──────────────────────────────────────────────────────────
-        if self.needs_worker {
-        self.line("");
-        self.line(";; Workers — browser Web Worker API");
-        self.line("(import \"worker\" \"spawn\" (func $worker_spawn (param i32 i32) (result i32)))");
-        self.line("(import \"worker\" \"channelCreate\" (func $worker_channelCreate (result i32)))");
-        self.line("(import \"worker\" \"channelSend\" (func $worker_channelSend (param i32 i32 i32)))");
-        self.line("(import \"worker\" \"channelRecv\" (func $worker_channelRecv (param i32 i32)))");
-        self.line("(import \"worker\" \"postMessage\" (func $worker_postMessage (param i32 i32 i32)))");
-        self.line("(import \"worker\" \"onMessage\" (func $worker_onMessage (param i32 i32)))");
-        self.line("(import \"worker\" \"terminate\" (func $worker_terminate (param i32)))");
-        }
+            // ── PWA — Service Worker + Push + Cache ──────────────────────────────
+            if self.needs_pwa {
+                self.line("");
+                self.line(";; PWA — browser Service Worker + Push APIs");
+                self.line(
+                    "(import \"pwa\" \"cachePrecache\" (func $pwa_cachePrecache (param i32 i32)))",
+                );
+                self.line("(import \"pwa\" \"registerPush\" (func $pwa_registerPush (param i32)))");
+                self.line("(import \"pwa\" \"registerServiceWorker\" (func $pwa_registerServiceWorker (param i32 i32 i32)))");
+            }
 
-        // ── PWA — Service Worker + Push + Cache ──────────────────────────────
-        if self.needs_pwa {
-        self.line("");
-        self.line(";; PWA — browser Service Worker + Push APIs");
-        self.line("(import \"pwa\" \"cachePrecache\" (func $pwa_cachePrecache (param i32 i32)))");
-        self.line("(import \"pwa\" \"registerPush\" (func $pwa_registerPush (param i32)))");
-        self.line("(import \"pwa\" \"registerServiceWorker\" (func $pwa_registerServiceWorker (param i32 i32 i32)))");
-        }
+            // ── Hardware — device APIs ───────────────────────────────────────────
+            if self.needs_hardware {
+                self.line("");
+                self.line(";; Hardware — browser device APIs");
+                self.line("(import \"hardware\" \"haptic\" (func $hardware_haptic (param i32)))");
+                self.line("(import \"hardware\" \"biometricAuth\" (func $hardware_biometricAuth (param i32 i32 i32)))");
+                self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
+                self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
+            }
 
-        // ── Hardware — device APIs ───────────────────────────────────────────
-        if self.needs_hardware {
-        self.line("");
-        self.line(";; Hardware — browser device APIs");
-        self.line("(import \"hardware\" \"haptic\" (func $hardware_haptic (param i32)))");
-        self.line("(import \"hardware\" \"biometricAuth\" (func $hardware_biometricAuth (param i32 i32 i32)))");
-        self.line("(import \"hardware\" \"cameraCapture\" (func $hardware_cameraCapture (param i32 i32)))");
-        self.line("(import \"hardware\" \"geolocationCurrent\" (func $hardware_geolocationCurrent (param i32)))");
-        }
+            // ── Payment — generic provider interface ──────────────────────────────
+            if self.needs_payment {
+                self.line("");
+                self.line(";; Payment — generic provider syscalls (mount widget, create element, confirm)");
+                self.line(
+                    "(import \"payment\" \"mount\" (func $payment_mount (param i32 i32 i32 i32)))",
+                );
+                self.line("(import \"payment\" \"create_element\" (func $payment_create_element (param i32 i32 i32)))");
+                self.line("(import \"payment\" \"confirm\" (func $payment_confirm (param i32 i32 i32 i32 i32)))");
+                self.line("(import \"payment\" \"key_exchange\" (func $payment_key_exchange (param i32 i32 i32)))");
+            }
 
-        // ── Payment — generic provider interface ──────────────────────────────
-        if self.needs_payment {
-        self.line("");
-        self.line(";; Payment — generic provider syscalls (mount widget, create element, confirm)");
-        self.line("(import \"payment\" \"mount\" (func $payment_mount (param i32 i32 i32 i32)))");
-        self.line("(import \"payment\" \"create_element\" (func $payment_create_element (param i32 i32 i32)))");
-        self.line("(import \"payment\" \"confirm\" (func $payment_confirm (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"payment\" \"key_exchange\" (func $payment_key_exchange (param i32 i32 i32)))");
-        }
+            // ── MiniProgram — mp namespace syscalls ──────────────────────────────
+            if self.needs_miniprogram {
+                self.line("");
+                self.line(";; MiniProgram — mp namespace syscalls (clearStorage, getSystemInfo, getNetworkType)");
+                self.line("(import \"mp\" \"clearStorage\" (func $mp_clearStorage))");
+                self.line(
+                    "(import \"mp\" \"getSystemInfo\" (func $mp_getSystemInfo (result i32)))",
+                );
+                self.line(
+                    "(import \"mp\" \"getNetworkType\" (func $mp_getNetworkType (param i32)))",
+                );
+            }
 
-        // ── MiniProgram — mp namespace syscalls ──────────────────────────────
-        if self.needs_miniprogram {
-        self.line("");
-        self.line(";; MiniProgram — mp namespace syscalls (clearStorage, getSystemInfo, getNetworkType)");
-        self.line("(import \"mp\" \"clearStorage\" (func $mp_clearStorage))");
-        self.line("(import \"mp\" \"getSystemInfo\" (func $mp_getSystemInfo (result i32)))");
-        self.line("(import \"mp\" \"getNetworkType\" (func $mp_getNetworkType (param i32)))");
-        }
+            // ── Banking — generic provider interface ─────────────────────────────
+            if self.needs_banking {
+                self.line("");
+                self.line(";; Banking — generic provider syscalls (open link flow)");
+                self.line("(import \"banking\" \"open\" (func $banking_open (param i32 i32 i32)))");
+            }
 
-        // ── Banking — generic provider interface ─────────────────────────────
-        if self.needs_banking {
-        self.line("");
-        self.line(";; Banking — generic provider syscalls (open link flow)");
-        self.line("(import \"banking\" \"open\" (func $banking_open (param i32 i32 i32)))");
-        }
+            // ── Map — generic provider interface ─────────────────────────────────
+            if self.needs_map {
+                self.line("");
+                self.line(";; Map — generic provider syscalls (mount map, add markers)");
+                self.line("(import \"map\" \"mount\" (func $map_mount (param i32 i32 i32 f64 f64 f64 i32)))");
+                self.line(
+                    "(import \"map\" \"add_marker\" (func $map_add_marker (param i32 f64 f64)))",
+                );
+            }
 
-        // ── Map — generic provider interface ─────────────────────────────────
-        if self.needs_map {
-        self.line("");
-        self.line(";; Map — generic provider syscalls (mount map, add markers)");
-        self.line("(import \"map\" \"mount\" (func $map_mount (param i32 i32 i32 f64 f64 f64 i32)))");
-        self.line("(import \"map\" \"add_marker\" (func $map_add_marker (param i32 f64 f64)))");
-        }
+            // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
+            if self.needs_auth {
+                self.line("");
+                self.line(";; Auth — browser cookie/navigation APIs (no parsing in JS)");
+                self.line("(import \"auth\" \"login\" (func $auth_login (param i32 i32)))");
+                self.line("(import \"auth\" \"logout\" (func $auth_logout (param i32 i32)))");
+                self.line(
+                    "(import \"auth\" \"getRawCookies\" (func $auth_getRawCookies (result i32)))",
+                );
+                self.line(
+                    "(import \"auth\" \"setCookie\" (func $auth_set_cookie (param i32 i32)))",
+                );
+            }
 
-        // ── Auth — pure syscalls, WASM parses cookies ─────────────────────────
-        if self.needs_auth {
-        self.line("");
-        self.line(";; Auth — browser cookie/navigation APIs (no parsing in JS)");
-        self.line("(import \"auth\" \"login\" (func $auth_login (param i32 i32)))");
-        self.line("(import \"auth\" \"logout\" (func $auth_logout (param i32 i32)))");
-        self.line("(import \"auth\" \"getRawCookies\" (func $auth_getRawCookies (result i32)))");
-        self.line("(import \"auth\" \"setCookie\" (func $auth_set_cookie (param i32 i32)))");
-        }
+            // ── Upload — file picker + XHR ───────────────────────────────────────
+            if self.needs_upload {
+                self.line("");
+                self.line(";; Upload — browser file input + XHR APIs");
+                self.line(
+                    "(import \"upload\" \"init\" (func $upload_init (param i32 i32 i32 i32)))",
+                );
+                self.line("(import \"upload\" \"start\" (func $upload_start (param i32 i32) (result i32)))");
+                self.line("(import \"upload\" \"cancel\" (func $upload_cancel (param i32)))");
+            }
 
-        // ── Upload — file picker + XHR ───────────────────────────────────────
-        if self.needs_upload {
-        self.line("");
-        self.line(";; Upload — browser file input + XHR APIs");
-        self.line("(import \"upload\" \"init\" (func $upload_init (param i32 i32 i32 i32)))");
-        self.line("(import \"upload\" \"start\" (func $upload_start (param i32 i32) (result i32)))");
-        self.line("(import \"upload\" \"cancel\" (func $upload_cancel (param i32)))");
-        }
+            // ── Time — Intl + Date (canvas target handles these in emit_canvas_imports)
+            if self.target != CompilationTarget::Canvas && self.target != CompilationTarget::Bloom {
+                self.line("");
+                self.line(";; Time — browser Intl + Date APIs");
+                self.line("(import \"time\" \"now\" (func $time_now (result f64)))");
+                self.line("(import \"time\" \"format\" (func $time_format (param f64 i32 i32) (result i32)))");
+                self.line("(import \"time\" \"getTimezoneOffset\" (func $time_getTimezoneOffset (result i32)))");
+                self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
+            }
 
-        // ── Time — Intl + Date (canvas target handles these in emit_canvas_imports)
-        if self.target != CompilationTarget::Canvas && self.target != CompilationTarget::Bloom {
-        self.line("");
-        self.line(";; Time — browser Intl + Date APIs");
-        self.line("(import \"time\" \"now\" (func $time_now (result f64)))");
-        self.line("(import \"time\" \"format\" (func $time_format (param f64 i32 i32) (result i32)))");
-        self.line("(import \"time\" \"getTimezoneOffset\" (func $time_getTimezoneOffset (result i32)))");
-        self.line("(import \"time\" \"formatDate\" (func $time_formatDate (param f64 i32 i32 i32) (result i32)))");
-        }
+            // ── Streaming — ReadableStream + EventSource ─────────────────────────
+            if self.needs_streaming {
+                self.line("");
+                self.line(";; Streaming — browser ReadableStream + EventSource APIs");
+                self.line("(import \"streaming\" \"streamFetch\" (func $streaming_streamFetch (param i32 i32 i32)))");
+                self.line("(import \"streaming\" \"sseConnect\" (func $streaming_sseConnect (param i32 i32 i32)))");
+            }
 
-        // ── Streaming — ReadableStream + EventSource ─────────────────────────
-        if self.needs_streaming {
-        self.line("");
-        self.line(";; Streaming — browser ReadableStream + EventSource APIs");
-        self.line("(import \"streaming\" \"streamFetch\" (func $streaming_streamFetch (param i32 i32 i32)))");
-        self.line("(import \"streaming\" \"sseConnect\" (func $streaming_sseConnect (param i32 i32 i32)))");
-        }
+            // ── RTC — WebRTC peer connections, data channels, media tracks ────────
+            if self.needs_rtc {
+                self.line("");
+                self.line(";; RTC — browser WebRTC APIs (RTCPeerConnection, data channels, media)");
+                self.line("(import \"rtc\" \"createPeer\" (func $rtc_createPeer (param i32) (result i32)))");
+                self.line("(import \"rtc\" \"createPeerWithIce\" (func $rtc_createPeerWithIce (param i32 i32) (result i32)))");
+                self.line(
+                    "(import \"rtc\" \"createOffer\" (func $rtc_createOffer (param i32 i32)))",
+                );
+                self.line(
+                    "(import \"rtc\" \"createAnswer\" (func $rtc_createAnswer (param i32 i32)))",
+                );
+                self.line("(import \"rtc\" \"setLocalDescription\" (func $rtc_setLocalDescription (param i32 i32 i32 i32 i32 i32)))");
+                self.line("(import \"rtc\" \"setRemoteDescription\" (func $rtc_setRemoteDescription (param i32 i32 i32 i32 i32 i32)))");
+                self.line("(import \"rtc\" \"addIceCandidate\" (func $rtc_addIceCandidate (param i32 i32 i32 i32 i32 i32)))");
+                self.line("(import \"rtc\" \"createDataChannel\" (func $rtc_createDataChannel (param i32 i32 i32 i32) (result i32)))");
+                self.line("(import \"rtc\" \"dataChannelSend\" (func $rtc_dataChannelSend (param i32 i32 i32)))");
+                self.line("(import \"rtc\" \"dataChannelSendBinary\" (func $rtc_dataChannelSendBinary (param i32 i32 i32)))");
+                self.line("(import \"rtc\" \"dataChannelClose\" (func $rtc_dataChannelClose (param i32)))");
+                self.line("(import \"rtc\" \"dataChannelGetState\" (func $rtc_dataChannelGetState (param i32) (result i32)))");
+                self.line("(import \"rtc\" \"onDataChannelMessage\" (func $rtc_onDataChannelMessage (param i32 i32)))");
+                self.line("(import \"rtc\" \"onDataChannelOpen\" (func $rtc_onDataChannelOpen (param i32 i32)))");
+                self.line("(import \"rtc\" \"onDataChannelClose\" (func $rtc_onDataChannelClose (param i32 i32)))");
+                self.line("(import \"rtc\" \"addTrack\" (func $rtc_addTrack (param i32 i32 i32) (result i32)))");
+                self.line(
+                    "(import \"rtc\" \"removeTrack\" (func $rtc_removeTrack (param i32 i32)))",
+                );
+                self.line("(import \"rtc\" \"getStats\" (func $rtc_getStats (param i32 i32)))");
+                self.line("(import \"rtc\" \"close\" (func $rtc_close (param i32)))");
+                self.line("(import \"rtc\" \"onIceCandidate\" (func $rtc_onIceCandidate (param i32 i32)))");
+                self.line("(import \"rtc\" \"onIceCandidateFull\" (func $rtc_onIceCandidateFull (param i32 i32)))");
+                self.line("(import \"rtc\" \"onTrack\" (func $rtc_onTrack (param i32 i32)))");
+                self.line(
+                    "(import \"rtc\" \"onDataChannel\" (func $rtc_onDataChannel (param i32 i32)))",
+                );
+                self.line("(import \"rtc\" \"onConnectionStateChange\" (func $rtc_onConnectionStateChange (param i32 i32)))");
+                self.line("(import \"rtc\" \"onIceConnectionStateChange\" (func $rtc_onIceConnectionStateChange (param i32 i32)))");
+                self.line("(import \"rtc\" \"onIceGatheringStateChange\" (func $rtc_onIceGatheringStateChange (param i32 i32)))");
+                self.line("(import \"rtc\" \"onSignalingStateChange\" (func $rtc_onSignalingStateChange (param i32 i32)))");
+                self.line("(import \"rtc\" \"onNegotiationNeeded\" (func $rtc_onNegotiationNeeded (param i32 i32)))");
+                self.line("(import \"rtc\" \"getConnectionState\" (func $rtc_getConnectionState (param i32) (result i32)))");
+                self.line("(import \"rtc\" \"getIceConnectionState\" (func $rtc_getIceConnectionState (param i32) (result i32)))");
+                self.line("(import \"rtc\" \"getSignalingState\" (func $rtc_getSignalingState (param i32) (result i32)))");
+                self.line(
+                    "(import \"rtc\" \"attachStream\" (func $rtc_attachStream (param i32 i32)))",
+                );
+                self.line("(import \"rtc\" \"getUserMedia\" (func $rtc_getUserMedia (param i32 i32) (result i32)))");
+                self.line("(import \"rtc\" \"getDisplayMedia\" (func $rtc_getDisplayMedia (param i32 i32) (result i32)))");
+                self.line("(import \"rtc\" \"stopTrack\" (func $rtc_stopTrack (param i32)))");
+                self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
+                self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
+                self.line("(import \"rtc\" \"getStreamTracks\" (func $rtc_getStreamTracks (param i32) (result i32)))");
+            }
 
-        // ── RTC — WebRTC peer connections, data channels, media tracks ────────
-        if self.needs_rtc {
-        self.line("");
-        self.line(";; RTC — browser WebRTC APIs (RTCPeerConnection, data channels, media)");
-        self.line("(import \"rtc\" \"createPeer\" (func $rtc_createPeer (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"createPeerWithIce\" (func $rtc_createPeerWithIce (param i32 i32) (result i32)))");
-        self.line("(import \"rtc\" \"createOffer\" (func $rtc_createOffer (param i32 i32)))");
-        self.line("(import \"rtc\" \"createAnswer\" (func $rtc_createAnswer (param i32 i32)))");
-        self.line("(import \"rtc\" \"setLocalDescription\" (func $rtc_setLocalDescription (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"rtc\" \"setRemoteDescription\" (func $rtc_setRemoteDescription (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"rtc\" \"addIceCandidate\" (func $rtc_addIceCandidate (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"rtc\" \"createDataChannel\" (func $rtc_createDataChannel (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"rtc\" \"dataChannelSend\" (func $rtc_dataChannelSend (param i32 i32 i32)))");
-        self.line("(import \"rtc\" \"dataChannelSendBinary\" (func $rtc_dataChannelSendBinary (param i32 i32 i32)))");
-        self.line("(import \"rtc\" \"dataChannelClose\" (func $rtc_dataChannelClose (param i32)))");
-        self.line("(import \"rtc\" \"dataChannelGetState\" (func $rtc_dataChannelGetState (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"onDataChannelMessage\" (func $rtc_onDataChannelMessage (param i32 i32)))");
-        self.line("(import \"rtc\" \"onDataChannelOpen\" (func $rtc_onDataChannelOpen (param i32 i32)))");
-        self.line("(import \"rtc\" \"onDataChannelClose\" (func $rtc_onDataChannelClose (param i32 i32)))");
-        self.line("(import \"rtc\" \"addTrack\" (func $rtc_addTrack (param i32 i32 i32) (result i32)))");
-        self.line("(import \"rtc\" \"removeTrack\" (func $rtc_removeTrack (param i32 i32)))");
-        self.line("(import \"rtc\" \"getStats\" (func $rtc_getStats (param i32 i32)))");
-        self.line("(import \"rtc\" \"close\" (func $rtc_close (param i32)))");
-        self.line("(import \"rtc\" \"onIceCandidate\" (func $rtc_onIceCandidate (param i32 i32)))");
-        self.line("(import \"rtc\" \"onIceCandidateFull\" (func $rtc_onIceCandidateFull (param i32 i32)))");
-        self.line("(import \"rtc\" \"onTrack\" (func $rtc_onTrack (param i32 i32)))");
-        self.line("(import \"rtc\" \"onDataChannel\" (func $rtc_onDataChannel (param i32 i32)))");
-        self.line("(import \"rtc\" \"onConnectionStateChange\" (func $rtc_onConnectionStateChange (param i32 i32)))");
-        self.line("(import \"rtc\" \"onIceConnectionStateChange\" (func $rtc_onIceConnectionStateChange (param i32 i32)))");
-        self.line("(import \"rtc\" \"onIceGatheringStateChange\" (func $rtc_onIceGatheringStateChange (param i32 i32)))");
-        self.line("(import \"rtc\" \"onSignalingStateChange\" (func $rtc_onSignalingStateChange (param i32 i32)))");
-        self.line("(import \"rtc\" \"onNegotiationNeeded\" (func $rtc_onNegotiationNeeded (param i32 i32)))");
-        self.line("(import \"rtc\" \"getConnectionState\" (func $rtc_getConnectionState (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"getIceConnectionState\" (func $rtc_getIceConnectionState (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"getSignalingState\" (func $rtc_getSignalingState (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"attachStream\" (func $rtc_attachStream (param i32 i32)))");
-        self.line("(import \"rtc\" \"getUserMedia\" (func $rtc_getUserMedia (param i32 i32) (result i32)))");
-        self.line("(import \"rtc\" \"getDisplayMedia\" (func $rtc_getDisplayMedia (param i32 i32) (result i32)))");
-        self.line("(import \"rtc\" \"stopTrack\" (func $rtc_stopTrack (param i32)))");
-        self.line("(import \"rtc\" \"setTrackEnabled\" (func $rtc_setTrackEnabled (param i32 i32)))");
-        self.line("(import \"rtc\" \"getTrackKind\" (func $rtc_getTrackKind (param i32) (result i32)))");
-        self.line("(import \"rtc\" \"getStreamTracks\" (func $rtc_getStreamTracks (param i32) (result i32)))");
-        }
+            // ── GPU — WebGPU rendering, buffers, shaders, textures ───────────────
+            if self.needs_gpu {
+                self.line("");
+                self.line(
+                    ";; GPU — browser WebGPU APIs (adapter, device, buffers, pipelines, rendering)",
+                );
+                // requestAdapter: (optsPtr, cbIdx) → void (async, calls back with adapter ID)
+                self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32)))");
+                // requestDevice: (adapterId, optsPtr, cbIdx) → void (async, calls back with device ID)
+                self.line("(import \"gpu\" \"requestDevice\" (func $gpu_requestDevice (param i32 i32 i32)))");
+                self.line("(import \"gpu\" \"configureCanvas\" (func $gpu_configureCanvas (param i32 i32 i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"createBuffer\" (func $gpu_createBuffer (param i32 i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"writeBuffer\" (func $gpu_writeBuffer (param i32 i32 i32 i32 i32)))");
+                self.line("(import \"gpu\" \"createShaderModule\" (func $gpu_createShaderModule (param i32 i32 i32) (result i32)))");
+                // createRenderPipeline: deviceId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen
+                self.line("(import \"gpu\" \"createRenderPipeline\" (func $gpu_createRenderPipeline (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"createRenderPipelineWithLayout\" (func $gpu_createRenderPipelineWithLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+                // createRenderPipelineWithVertexLayout: same as above + descPtr for vertex buffer layout
+                self.line("(import \"gpu\" \"createRenderPipelineWithVertexLayout\" (func $gpu_createRenderPipelineWithVertexLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
+                // createTexture: deviceId, width, height, fmtPtr, fmtLen, usage
+                self.line("(import \"gpu\" \"createTexture\" (func $gpu_createTexture (param i32 i32 i32 i32 i32 i32) (result i32)))");
+                // beginRenderPass: deviceId, textureViewId, clearR, clearG, clearB, clearA, depthViewId
+                self.line("(import \"gpu\" \"beginRenderPass\" (func $gpu_beginRenderPass (param i32 i32 f32 f32 f32 f32 i32) (result i32)))");
+                self.line(
+                    "(import \"gpu\" \"setPipeline\" (func $gpu_setPipeline (param i32 i32)))",
+                );
+                self.line("(import \"gpu\" \"setVertexBuffer\" (func $gpu_setVertexBuffer (param i32 i32 i32)))");
+                self.line("(import \"gpu\" \"draw\" (func $gpu_draw (param i32 i32 i32 i32 i32)))");
+                self.line("(import \"gpu\" \"submitRenderPass\" (func $gpu_submitRenderPass (param i32 i32)))");
+                self.line("(import \"gpu\" \"getCurrentTexture\" (func $gpu_getCurrentTexture (param i32) (result i32)))");
+                self.line("(import \"gpu\" \"createTextureView\" (func $gpu_createTextureView (param i32) (result i32)))");
+                self.line(
+                    "(import \"gpu\" \"destroyBuffer\" (func $gpu_destroyBuffer (param i32)))",
+                );
+                self.line(
+                    "(import \"gpu\" \"destroyTexture\" (func $gpu_destroyTexture (param i32)))",
+                );
+                self.line("(import \"gpu\" \"getPreferredFormat\" (func $gpu_getPreferredFormat (result i32)))");
+                self.line("(import \"gpu\" \"getAdapterInfo\" (func $gpu_getAdapterInfo (param i32) (result i32)))");
+                // Phase 3: compute pipeline, bind groups, indexed draw, compute pass
+                self.line("(import \"gpu\" \"createComputePipeline\" (func $gpu_createComputePipeline (param i32 i32 i32 i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"createPipelineLayout\" (func $gpu_createPipelineLayout (param i32 i32 i32 i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"createBindGroupLayout\" (func $gpu_createBindGroupLayout (param i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"createBindGroup\" (func $gpu_createBindGroup (param i32 i32) (result i32)))");
+                self.line("(import \"gpu\" \"setBindGroup\" (func $gpu_setBindGroup (param i32 i32 i32)))");
+                self.line("(import \"gpu\" \"setIndexBuffer\" (func $gpu_setIndexBuffer (param i32 i32 i32 i32)))");
+                self.line("(import \"gpu\" \"drawIndexed\" (func $gpu_drawIndexed (param i32 i32 i32 i32 i32 i32)))");
+                self.line("(import \"gpu\" \"beginComputePass\" (func $gpu_beginComputePass (param i32) (result i32)))");
+                self.line("(import \"gpu\" \"dispatchWorkgroups\" (func $gpu_dispatchWorkgroups (param i32 i32 i32 i32)))");
+                self.line("(import \"gpu\" \"submitComputePass\" (func $gpu_submitComputePass (param i32 i32)))");
+            }
 
-        // ── GPU — WebGPU rendering, buffers, shaders, textures ───────────────
-        if self.needs_gpu {
-        self.line("");
-        self.line(";; GPU — browser WebGPU APIs (adapter, device, buffers, pipelines, rendering)");
-        // requestAdapter: (optsPtr, cbIdx) → void (async, calls back with adapter ID)
-        self.line("(import \"gpu\" \"requestAdapter\" (func $gpu_requestAdapter (param i32 i32)))");
-        // requestDevice: (adapterId, optsPtr, cbIdx) → void (async, calls back with device ID)
-        self.line("(import \"gpu\" \"requestDevice\" (func $gpu_requestDevice (param i32 i32 i32)))");
-        self.line("(import \"gpu\" \"configureCanvas\" (func $gpu_configureCanvas (param i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createBuffer\" (func $gpu_createBuffer (param i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"writeBuffer\" (func $gpu_writeBuffer (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"gpu\" \"createShaderModule\" (func $gpu_createShaderModule (param i32 i32 i32) (result i32)))");
-        // createRenderPipeline: deviceId, shaderModuleId, vsEntryPtr, vsEntryLen, fsEntryPtr, fsEntryLen, topoPtr, topoLen, fmtPtr, fmtLen
-        self.line("(import \"gpu\" \"createRenderPipeline\" (func $gpu_createRenderPipeline (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createRenderPipelineWithLayout\" (func $gpu_createRenderPipelineWithLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
-        // createRenderPipelineWithVertexLayout: same as above + descPtr for vertex buffer layout
-        self.line("(import \"gpu\" \"createRenderPipelineWithVertexLayout\" (func $gpu_createRenderPipelineWithVertexLayout (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))");
-        // createTexture: deviceId, width, height, fmtPtr, fmtLen, usage
-        self.line("(import \"gpu\" \"createTexture\" (func $gpu_createTexture (param i32 i32 i32 i32 i32 i32) (result i32)))");
-        // beginRenderPass: deviceId, textureViewId, clearR, clearG, clearB, clearA, depthViewId
-        self.line("(import \"gpu\" \"beginRenderPass\" (func $gpu_beginRenderPass (param i32 i32 f32 f32 f32 f32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"setPipeline\" (func $gpu_setPipeline (param i32 i32)))");
-        self.line("(import \"gpu\" \"setVertexBuffer\" (func $gpu_setVertexBuffer (param i32 i32 i32)))");
-        self.line("(import \"gpu\" \"draw\" (func $gpu_draw (param i32 i32 i32 i32 i32)))");
-        self.line("(import \"gpu\" \"submitRenderPass\" (func $gpu_submitRenderPass (param i32 i32)))");
-        self.line("(import \"gpu\" \"getCurrentTexture\" (func $gpu_getCurrentTexture (param i32) (result i32)))");
-        self.line("(import \"gpu\" \"createTextureView\" (func $gpu_createTextureView (param i32) (result i32)))");
-        self.line("(import \"gpu\" \"destroyBuffer\" (func $gpu_destroyBuffer (param i32)))");
-        self.line("(import \"gpu\" \"destroyTexture\" (func $gpu_destroyTexture (param i32)))");
-        self.line("(import \"gpu\" \"getPreferredFormat\" (func $gpu_getPreferredFormat (result i32)))");
-        self.line("(import \"gpu\" \"getAdapterInfo\" (func $gpu_getAdapterInfo (param i32) (result i32)))");
-        // Phase 3: compute pipeline, bind groups, indexed draw, compute pass
-        self.line("(import \"gpu\" \"createComputePipeline\" (func $gpu_createComputePipeline (param i32 i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createPipelineLayout\" (func $gpu_createPipelineLayout (param i32 i32 i32 i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createBindGroupLayout\" (func $gpu_createBindGroupLayout (param i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"createBindGroup\" (func $gpu_createBindGroup (param i32 i32) (result i32)))");
-        self.line("(import \"gpu\" \"setBindGroup\" (func $gpu_setBindGroup (param i32 i32 i32)))");
-        self.line("(import \"gpu\" \"setIndexBuffer\" (func $gpu_setIndexBuffer (param i32 i32 i32 i32)))");
-        self.line("(import \"gpu\" \"drawIndexed\" (func $gpu_drawIndexed (param i32 i32 i32 i32 i32 i32)))");
-        self.line("(import \"gpu\" \"beginComputePass\" (func $gpu_beginComputePass (param i32) (result i32)))");
-        self.line("(import \"gpu\" \"dispatchWorkgroups\" (func $gpu_dispatchWorkgroups (param i32 i32 i32 i32)))");
-        self.line("(import \"gpu\" \"submitComputePass\" (func $gpu_submitComputePass (param i32 i32)))");
-        }
-
-        // ── Test runtime — imported for test { } blocks ──────────────────────
-        if self.needs_test {
-        self.line("");
-        self.line(";; Test runtime — report pass/fail/summary to the host");
-        self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
-        self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
-        self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
-        }
-
+            // ── Test runtime — imported for test { } blocks ──────────────────────
+            if self.needs_test {
+                self.line("");
+                self.line(";; Test runtime — report pass/fail/summary to the host");
+                self.line("(import \"test\" \"pass\" (func $test_pass (param i32 i32)))");
+                self.line("(import \"test\" \"fail\" (func $test_fail (param i32 i32 i32 i32)))");
+                self.line("(import \"test\" \"summary\" (func $test_summary (param i32 i32)))");
+            }
         } // end browser imports
 
         // ── WASM-internal (no JS imports) ────────────────────────────────────
@@ -1605,40 +1927,69 @@ impl WasmCodegen {
                     self.known_components.push(c.name.clone());
                     let prop_names: Vec<String> = c.props.iter().map(|p| p.name.clone()).collect();
                     self.component_prop_defs.push((c.name.clone(), prop_names));
-                },
+                }
                 Item::LazyComponent(lc) => {
                     self.known_components.push(lc.component.name.clone());
-                    let prop_names: Vec<String> = lc.component.props.iter().map(|p| p.name.clone()).collect();
-                    self.component_prop_defs.push((lc.component.name.clone(), prop_names));
-                },
+                    let prop_names: Vec<String> =
+                        lc.component.props.iter().map(|p| p.name.clone()).collect();
+                    self.component_prop_defs
+                        .push((lc.component.name.clone(), prop_names));
+                }
                 Item::Page(p) => self.known_components.push(p.name.clone()),
                 // Collect keyword definition names so bare references to them
                 // (e.g. `AppAuth` in `AppAuth.login(...)`) are treated as
                 // namespace handles rather than local variable references.
-                Item::Auth(a) => self.known_keyword_defs.push((a.name.clone(), KeywordDefKind::Auth)),
-                Item::Cache(c) => self.known_keyword_defs.push((c.name.clone(), KeywordDefKind::Cache)),
-                Item::Db(d) => self.known_keyword_defs.push((d.name.clone(), KeywordDefKind::Database)),
-                Item::Payment(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Payment)),
-                Item::MiniProgram(mp) => self.known_keyword_defs.push((mp.name.clone(), KeywordDefKind::MiniProgram)),
-                Item::Banking(b) => self.known_keyword_defs.push((b.name.clone(), KeywordDefKind::Banking)),
-                Item::Map(m) => self.known_keyword_defs.push((m.name.clone(), KeywordDefKind::MapWidget)),
-                Item::Upload(u) => self.known_keyword_defs.push((u.name.clone(), KeywordDefKind::Upload)),
-                Item::Pdf(p) => self.known_keyword_defs.push((p.name.clone(), KeywordDefKind::Pdf)),
-                Item::Theme(t) => self.known_keyword_defs.push((t.name.clone(), KeywordDefKind::Theme)),
+                Item::Auth(a) => self
+                    .known_keyword_defs
+                    .push((a.name.clone(), KeywordDefKind::Auth)),
+                Item::Cache(c) => self
+                    .known_keyword_defs
+                    .push((c.name.clone(), KeywordDefKind::Cache)),
+                Item::Db(d) => self
+                    .known_keyword_defs
+                    .push((d.name.clone(), KeywordDefKind::Database)),
+                Item::Payment(p) => self
+                    .known_keyword_defs
+                    .push((p.name.clone(), KeywordDefKind::Payment)),
+                Item::MiniProgram(mp) => self
+                    .known_keyword_defs
+                    .push((mp.name.clone(), KeywordDefKind::MiniProgram)),
+                Item::Banking(b) => self
+                    .known_keyword_defs
+                    .push((b.name.clone(), KeywordDefKind::Banking)),
+                Item::Map(m) => self
+                    .known_keyword_defs
+                    .push((m.name.clone(), KeywordDefKind::MapWidget)),
+                Item::Upload(u) => self
+                    .known_keyword_defs
+                    .push((u.name.clone(), KeywordDefKind::Upload)),
+                Item::Pdf(p) => self
+                    .known_keyword_defs
+                    .push((p.name.clone(), KeywordDefKind::Pdf)),
+                Item::Theme(t) => self
+                    .known_keyword_defs
+                    .push((t.name.clone(), KeywordDefKind::Theme)),
                 // Collect contract definitions so `ContractName::call()`, `ContractName::parse()`,
                 // `ContractName::serialize()` can be resolved to their generated WASM functions.
                 Item::Contract(c) => {
-                    self.known_contracts.push((c.name.clone(), c.fields.iter().map(|f| ContractField {
-                        name: f.name.clone(),
-                        ty: f.ty.clone(),
-                        nullable: f.nullable,
-                        span: f.span.clone(),
-                    }).collect()));
+                    self.known_contracts.push((
+                        c.name.clone(),
+                        c.fields
+                            .iter()
+                            .map(|f| ContractField {
+                                name: f.name.clone(),
+                                ty: f.ty.clone(),
+                                nullable: f.nullable,
+                                span: f.span.clone(),
+                            })
+                            .collect(),
+                    ));
                 }
                 // Collect store names and their signal names so `StoreName::signal()` can
                 // be resolved to the getter `$StoreName_get_signal`.
                 Item::Store(s) => {
-                    let sig_names: Vec<String> = s.signals.iter().map(|sig| sig.name.clone()).collect();
+                    let sig_names: Vec<String> =
+                        s.signals.iter().map(|sig| sig.name.clone()).collect();
                     self.known_stores.push((s.name.clone(), sig_names));
                 }
                 _ => {}
@@ -1805,7 +2156,10 @@ impl WasmCodegen {
             self.line(";; Closure functions");
             let closures = std::mem::take(&mut self.closure_functions);
             for closure_fn in &closures {
-                if !closure_fn.starts_with('\n') { self.output.push('\n'); } self.output.push_str(closure_fn);
+                if !closure_fn.starts_with('\n') {
+                    self.output.push('\n');
+                }
+                self.output.push_str(closure_fn);
             }
             self.closure_functions = closures;
         }
@@ -1820,10 +2174,7 @@ impl WasmCodegen {
                 self.line("(table 0 funcref)");
             } else {
                 self.line(&format!("(table {} funcref)", names.len()));
-                self.line(&format!(
-                    "(elem (i32.const 0) {})",
-                    names.join(" ")
-                ));
+                self.line(&format!("(elem (i32.const 0) {})", names.join(" ")));
             }
             self.line("(type $__closure_type (func (param i32 i32) (result i32)))");
             self.line("(type $__closure_type_2 (func (param i32 i32 i32) (result i32)))");
@@ -1916,7 +2267,9 @@ impl WasmCodegen {
         // Patch the heap pointer to start after all interned string data.
         // Align to 16-byte boundary for safety.
         let heap_start = (self.string_offset + 15) & !15;
-        self.output = self.output.replace("__HEAP_START__", &heap_start.to_string());
+        self.output = self
+            .output
+            .replace("__HEAP_START__", &heap_start.to_string());
 
         // Calculate minimum memory pages: static data + heap headroom.
         // Each WASM page = 64KB. We need enough for:
@@ -1928,8 +2281,15 @@ impl WasmCodegen {
         // Give 4x headroom for runtime heap allocations, minimum 1MB
         let needed_bytes = std::cmp::max(static_bytes * 4, 1024 * 1024);
         let memory_pages = (needed_bytes + 65535) / 65536; // round up to pages
-        self.output = self.output.replace("__MEMORY_PAGES__", &memory_pages.to_string());
-        eprintln!("nectar: memory: {} pages ({}KB static, {}KB total)", memory_pages, static_bytes / 1024, memory_pages * 64);
+        self.output = self
+            .output
+            .replace("__MEMORY_PAGES__", &memory_pages.to_string());
+        eprintln!(
+            "nectar: memory: {} pages ({}KB static, {}KB total)",
+            memory_pages,
+            static_bytes / 1024,
+            memory_pages * 64
+        );
 
         self.indent -= 1;
         self.line(")");
@@ -1959,7 +2319,11 @@ impl WasmCodegen {
                 // Impl methods are compiled like regular functions.
                 // Trait impls get a comment showing which traits are implemented.
                 if !imp.trait_impls.is_empty() {
-                    self.line(&format!(";; impl {} for {}", imp.trait_impls.join(" + "), imp.target));
+                    self.line(&format!(
+                        ";; impl {} for {}",
+                        imp.trait_impls.join(" + "),
+                        imp.target
+                    ));
                 } else {
                     self.line(&format!(";; impl {}", imp.target));
                 }
@@ -2011,7 +2375,7 @@ impl WasmCodegen {
     ///   "field1:type1,field2:type2,..."
     /// This hash is deterministic and changes only when the contract shape changes.
     fn generate_contract(&mut self, contract: &ContractDef) {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
 
         self.line(&format!(";; === Contract: {} ===", contract.name));
 
@@ -2030,9 +2394,15 @@ impl WasmCodegen {
         let mut hasher = Sha256::new();
         hasher.update(canonical.as_bytes());
         let hash_bytes = hasher.finalize();
-        let short_hash = format!("{:x}{:x}{:x}{:x}", hash_bytes[0], hash_bytes[1], hash_bytes[2], hash_bytes[3]);
+        let short_hash = format!(
+            "{:x}{:x}{:x}{:x}",
+            hash_bytes[0], hash_bytes[1], hash_bytes[2], hash_bytes[3]
+        );
 
-        self.line(&format!(";; contract hash: {} (canonical: \"{}\")", short_hash, canonical));
+        self.line(&format!(
+            ";; contract hash: {} (canonical: \"{}\")",
+            short_hash, canonical
+        ));
 
         // Store contract name and hash in linear memory
         let name_offset = self.store_string(&contract.name);
@@ -2058,7 +2428,10 @@ impl WasmCodegen {
         let schema_offset = self.store_string(&schema);
 
         // Emit registration function — called at module init
-        self.emit(&format!("(func $__contract_register_{} (export \"__contract_register_{}\")", contract.name, contract.name));
+        self.emit(&format!(
+            "(func $__contract_register_{} (export \"__contract_register_{}\")",
+            contract.name, contract.name
+        ));
         self.indent += 1;
         self.line(&format!("i32.const {} ;; name ptr", name_offset));
         self.line(&format!("i32.const {} ;; name len", contract.name.len()));
@@ -2078,14 +2451,24 @@ impl WasmCodegen {
         let struct_size = field_count * 4;
 
         // Store each field name string for use in $json_get_field calls
-        let field_name_offsets: Vec<(u32, usize)> = contract.fields.iter().map(|f| {
-            let offset = self.store_string(&f.name);
-            (offset, f.name.len())
-        }).collect();
+        let field_name_offsets: Vec<(u32, usize)> = contract
+            .fields
+            .iter()
+            .map(|f| {
+                let offset = self.store_string(&f.name);
+                (offset, f.name.len())
+            })
+            .collect();
 
         // Check if any field is an array or nested contract type
-        let has_array_fields = contract.fields.iter().any(|f| matches!(&f.ty, Type::Array(_)));
-        let has_nested_fields = contract.fields.iter().any(|f| Self::is_nested_contract_type(&f.ty));
+        let has_array_fields = contract
+            .fields
+            .iter()
+            .any(|f| matches!(&f.ty, Type::Array(_)));
+        let has_nested_fields = contract
+            .fields
+            .iter()
+            .any(|f| Self::is_nested_contract_type(&f.ty));
 
         // ── _parse_from_obj: already-parsed object pointer → struct pointer ──
         // Used by nested contract fields. Same logic as _parse but skips json_parse.
@@ -2104,7 +2487,10 @@ impl WasmCodegen {
         }
 
         // Allocate struct
-        self.line(&format!(";; Allocate struct ({} fields x 4 bytes = {} bytes)", field_count, struct_size));
+        self.line(&format!(
+            ";; Allocate struct ({} fields x 4 bytes = {} bytes)",
+            field_count, struct_size
+        ));
         self.line(&format!("i32.const {}", struct_size));
         self.line("call $alloc");
         self.line("local.set $struct_ptr");
@@ -2168,7 +2554,10 @@ impl WasmCodegen {
 
         // Allocate field array: 20 bytes per field
         let fields_array_size = field_count * 20;
-        self.line(&format!(";; Allocate field array ({} fields x 20 bytes = {} bytes)", field_count, fields_array_size));
+        self.line(&format!(
+            ";; Allocate field array ({} fields x 20 bytes = {} bytes)",
+            field_count, fields_array_size
+        ));
         self.line(&format!("i32.const {}", fields_array_size));
         self.line("call $alloc");
         self.line("local.set $fields_ptr");
@@ -2184,11 +2573,17 @@ impl WasmCodegen {
                 other => other,
             };
 
-            self.line(&format!(";; Field entry: {} (array offset {})", field.name, field_array_offset));
+            self.line(&format!(
+                ";; Field entry: {} (array offset {})",
+                field.name, field_array_offset
+            ));
 
             // key_ptr (offset 0)
             self.line("local.get $fields_ptr");
-            self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+            self.line(&format!(
+                "i32.const {} ;; \"{}\" ptr",
+                name_offset, field.name
+            ));
             if field_array_offset == 0 {
                 self.line("i32.store");
             } else {
@@ -2214,10 +2609,10 @@ impl WasmCodegen {
                     }
                     self.line("local.set $vec_ptr");
                     self.line("local.get $vec_ptr");
-                    self.line("i32.load");           // length
+                    self.line("i32.load"); // length
                     self.line("local.set $vec_len");
                     self.line("local.get $vec_ptr");
-                    self.line("i32.load offset=8");   // data_ptr
+                    self.line("i32.load offset=8"); // data_ptr
                     self.line("local.set $vec_data");
 
                     // Allocate 12-byte entries for the array
@@ -2278,7 +2673,10 @@ impl WasmCodegen {
                     self.line("    i32.const 12");
                     self.line("    i32.mul");
                     self.line("    i32.add");
-                    self.line(&format!("    i32.const {} ;; element type tag", elem_type_tag));
+                    self.line(&format!(
+                        "    i32.const {} ;; element type tag",
+                        elem_type_tag
+                    ));
                     self.line("    i32.store");
                     // data_lo
                     self.line("    local.get $arr_entries");
@@ -2442,9 +2840,15 @@ impl WasmCodegen {
         let ct_val = self.store_string("application/json");
         self.line(";; Add Content-Type: application/json header");
         self.line(&format!("i32.const {} ;; \"Content-Type\" ptr", ct_key));
-        self.line(&format!("i32.const {} ;; \"Content-Type\" len", "Content-Type".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"Content-Type\" len",
+            "Content-Type".len()
+        ));
         self.line(&format!("i32.const {} ;; \"application/json\" ptr", ct_val));
-        self.line(&format!("i32.const {} ;; \"application/json\" len", "application/json".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"application/json\" len",
+            "application/json".len()
+        ));
         self.line("call $http_addHeader");
 
         // Fetch with callback — response body is written into WASM memory
@@ -2466,7 +2870,11 @@ impl WasmCodegen {
             Type::Named(name) => name.clone(),
             Type::Array(inner) => format!("[{}]", self.type_to_canonical(inner)),
             Type::Option(inner) => format!("{}?", self.type_to_canonical(inner)),
-            Type::Result { ok, err } => format!("Result<{},{}>", self.type_to_canonical(ok), self.type_to_canonical(err)),
+            Type::Result { ok, err } => format!(
+                "Result<{},{}>",
+                self.type_to_canonical(ok),
+                self.type_to_canonical(err)
+            ),
             Type::Tuple(tys) => {
                 let parts: Vec<String> = tys.iter().map(|t| self.type_to_canonical(t)).collect();
                 format!("({})", parts.join(","))
@@ -2476,8 +2884,11 @@ impl WasmCodegen {
                 format!("{}<{}>", name, parts.join(","))
             }
             Type::Reference { mutable, inner, .. } => {
-                if *mutable { format!("&mut {}", self.type_to_canonical(inner)) }
-                else { format!("&{}", self.type_to_canonical(inner)) }
+                if *mutable {
+                    format!("&mut {}", self.type_to_canonical(inner))
+                } else {
+                    format!("&{}", self.type_to_canonical(inner))
+                }
             }
             Type::Function { params, ret } => {
                 let parts: Vec<String> = params.iter().map(|t| self.type_to_canonical(t)).collect();
@@ -2505,7 +2916,8 @@ impl WasmCodegen {
     /// Check if a Type refers to a nested contract (non-primitive named type).
     fn is_nested_contract_type(ty: &Type) -> bool {
         match ty {
-            Type::Named(name) => !matches!(name.as_str(),
+            Type::Named(name) => !matches!(
+                name.as_str(),
                 "i32" | "i64" | "u32" | "u64" | "f32" | "f64" | "bool" | "String" | "DateTime"
             ),
             Type::Option(inner) => Self::is_nested_contract_type(inner),
@@ -2517,7 +2929,11 @@ impl WasmCodegen {
     /// Expects $obj, $struct_ptr, $type, $data locals to already exist.
     /// For array fields, expects $arr_base, $arr_len, $arr_i, $vec_ptr, $vec_data, $elem_data.
     /// For nested fields, expects $nested_obj.
-    fn emit_contract_parse_fields(&mut self, contract: &ContractDef, field_name_offsets: &[(u32, usize)]) {
+    fn emit_contract_parse_fields(
+        &mut self,
+        contract: &ContractDef,
+        field_name_offsets: &[(u32, usize)],
+    ) {
         for (i, field) in contract.fields.iter().enumerate() {
             let (name_offset, name_len) = field_name_offsets[i];
             let byte_offset = i * 4;
@@ -2530,9 +2946,15 @@ impl WasmCodegen {
             match effective_ty {
                 Type::Array(_inner_ty) => {
                     // Array field: use json_get_field3 to get (type, data_lo=arr_base, data_hi=arr_len)
-                    self.line(&format!(";; Field: {} (array, offset {})", field.name, byte_offset));
+                    self.line(&format!(
+                        ";; Field: {} (array, offset {})",
+                        field.name, byte_offset
+                    ));
                     self.line("local.get $obj");
-                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!(
+                        "i32.const {} ;; \"{}\" ptr",
+                        name_offset, field.name
+                    ));
                     self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
                     self.line("call $json_get_field3");
                     self.line("local.set $arr_len  ;; data_hi = array length");
@@ -2556,13 +2978,13 @@ impl WasmCodegen {
                     // Write Vec header
                     self.line("local.get $vec_ptr");
                     self.line("local.get $arr_len");
-                    self.line("i32.store");           // length
+                    self.line("i32.store"); // length
                     self.line("local.get $vec_ptr");
                     self.line("local.get $arr_len");
-                    self.line("i32.store offset=4");   // capacity
+                    self.line("i32.store offset=4"); // capacity
                     self.line("local.get $vec_ptr");
                     self.line("local.get $vec_data");
-                    self.line("i32.store offset=8");   // data_ptr
+                    self.line("i32.store offset=8"); // data_ptr
 
                     // Iterate and populate Vec data
                     self.line("i32.const 0");
@@ -2622,9 +3044,15 @@ impl WasmCodegen {
                 }
                 Type::Named(name) if Self::is_nested_contract_type(effective_ty) => {
                     // Nested contract field: get the object data, call _parse_from_obj
-                    self.line(&format!(";; Field: {} (nested {}, offset {})", field.name, name, byte_offset));
+                    self.line(&format!(
+                        ";; Field: {} (nested {}, offset {})",
+                        field.name, name, byte_offset
+                    ));
                     self.line("local.get $obj");
-                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!(
+                        "i32.const {} ;; \"{}\" ptr",
+                        name_offset, field.name
+                    ));
                     self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
                     self.line("call $json_get_field");
                     self.line("local.set $data  ;; data_lo (object pointer)");
@@ -2642,9 +3070,15 @@ impl WasmCodegen {
                 }
                 _ => {
                     // Primitive field: existing behavior
-                    self.line(&format!(";; Field: {} (offset {})", field.name, byte_offset));
+                    self.line(&format!(
+                        ";; Field: {} (offset {})",
+                        field.name, byte_offset
+                    ));
                     self.line("local.get $obj");
-                    self.line(&format!("i32.const {} ;; \"{}\" ptr", name_offset, field.name));
+                    self.line(&format!(
+                        "i32.const {} ;; \"{}\" ptr",
+                        name_offset, field.name
+                    ));
                     self.line(&format!("i32.const {} ;; \"{}\" len", name_len, field.name));
                     self.line("call $json_get_field");
                     self.line("local.set $data  ;; data_lo");
@@ -2688,12 +3122,22 @@ impl WasmCodegen {
             }
             json.push('}');
             let manifest_offset = self.store_string(&json);
-            self.line(&format!(";; manifest JSON at offset {}, len {}", manifest_offset, json.len()));
+            self.line(&format!(
+                ";; manifest JSON at offset {}, len {}",
+                manifest_offset,
+                json.len()
+            ));
 
             // Emit manifest registration function
-            self.emit(&format!("(func $__app_{}_register_manifest (export \"__app_{}_register_manifest\")", app.name, app.name));
+            self.emit(&format!(
+                "(func $__app_{}_register_manifest (export \"__app_{}_register_manifest\")",
+                app.name, app.name
+            ));
             self.indent += 1;
-            self.line(&format!("i32.const {} ;; manifest json ptr", manifest_offset));
+            self.line(&format!(
+                "i32.const {} ;; manifest json ptr",
+                manifest_offset
+            ));
             self.line(&format!("i32.const {} ;; manifest json len", json.len()));
             self.line("call $pwa_registerManifest");
             self.indent -= 1;
@@ -2702,7 +3146,9 @@ impl WasmCodegen {
 
         // Generate service worker registration for offline support
         if let Some(ref offline) = app.offline {
-            let urls_json: String = offline.precache.iter()
+            let urls_json: String = offline
+                .precache
+                .iter()
                 .map(|u| format!("\"{}\"", u))
                 .collect::<Vec<_>>()
                 .join(",");
@@ -2710,13 +3156,22 @@ impl WasmCodegen {
             let urls_offset = self.store_string(&urls_str);
             let strategy_offset = self.store_string(&offline.strategy);
 
-            self.emit(&format!("(func $__app_{}_register_sw (export \"__app_{}_register_sw\")", app.name, app.name));
+            self.emit(&format!(
+                "(func $__app_{}_register_sw (export \"__app_{}_register_sw\")",
+                app.name, app.name
+            ));
             self.indent += 1;
             self.line(&format!("i32.const {} ;; precache urls ptr", urls_offset));
-            self.line(&format!("i32.const {} ;; precache urls len", urls_str.len()));
+            self.line(&format!(
+                "i32.const {} ;; precache urls len",
+                urls_str.len()
+            ));
             self.line("call $pwa_cachePrecache");
             self.line(&format!("i32.const {} ;; strategy ptr", strategy_offset));
-            self.line(&format!("i32.const {} ;; strategy len", offline.strategy.len()));
+            self.line(&format!(
+                "i32.const {} ;; strategy len",
+                offline.strategy.len()
+            ));
             self.line("call $pwa_setStrategy");
             self.indent -= 1;
             self.line(")");
@@ -2724,7 +3179,10 @@ impl WasmCodegen {
 
         // Generate push notification setup
         if let Some(ref push) = app.push {
-            self.emit(&format!("(func $__app_{}_register_push (export \"__app_{}_register_push\")", app.name, app.name));
+            self.emit(&format!(
+                "(func $__app_{}_register_push (export \"__app_{}_register_push\")",
+                app.name, app.name
+            ));
             self.indent += 1;
             if let Some(ref key_expr) = push.vapid_key {
                 if let Expr::StringLit(key) = key_expr {
@@ -2745,7 +3203,10 @@ impl WasmCodegen {
 
         self.locals.clear();
 
-        self.emit(&format!("(func {} (export \"__test_{}\")", func_name, safe_name));
+        self.emit(&format!(
+            "(func {} (export \"__test_{}\")",
+            func_name, safe_name
+        ));
         self.indent += 1;
 
         // Use save/restore to hoist all locals to function preamble
@@ -2806,7 +3267,10 @@ impl WasmCodegen {
 
         // Report summary
         let total = test_defs.len();
-        self.line(&format!("i32.const {} ;; total tests (passed placeholder)", total));
+        self.line(&format!(
+            "i32.const {} ;; total tests (passed placeholder)",
+            total
+        ));
         self.line("i32.const 0 ;; failed placeholder");
         self.line("call $test_summary");
 
@@ -2828,11 +3292,16 @@ impl WasmCodegen {
         if has_self {
             params.push("(param $self i32)".into());
         }
-        params.extend(func.params.iter()
-            .filter(|p| p.name != "self")
-            .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))));
+        params.extend(
+            func.params
+                .iter()
+                .filter(|p| p.name != "self")
+                .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))),
+        );
 
-        let ret = func.return_type.as_ref()
+        let ret = func
+            .return_type
+            .as_ref()
             .map(|t| format!(" (result {})", self.type_to_wasm(t)))
             .unwrap_or_default();
 
@@ -2842,8 +3311,13 @@ impl WasmCodegen {
             String::new()
         };
 
-        self.emit(&format!("(func ${}{} {}{}",
-            func.name, export, params.join(" "), ret));
+        self.emit(&format!(
+            "(func ${}{} {}{}",
+            func.name,
+            export,
+            params.join(" "),
+            ret
+        ));
         self.indent += 1;
 
         // Use save/restore to hoist all locals (including dynamic ones from
@@ -2871,8 +3345,8 @@ impl WasmCodegen {
                     // If the last expression is an if/else whose branches contain
                     // explicit returns, treat it as a statement (void if) rather
                     // than an expression that leaves a value on the stack.
-                    let is_returning_if = matches!(expr, Expr::If { .. })
-                        && Self::if_branches_return(expr);
+                    let is_returning_if =
+                        matches!(expr, Expr::If { .. }) && Self::if_branches_return(expr);
                     if !is_returning_if {
                         self.generate_expr(expr);
                         continue;
@@ -2977,8 +3451,12 @@ impl WasmCodegen {
 
         self.line("");
         self.line(";; ── async state machine (br_table) ── ");
-        self.line(&format!(";; async fn {} — {} states ({} await points)",
-            func_name, num_states, await_points.len()));
+        self.line(&format!(
+            ";; async fn {} — {} states ({} await points)",
+            func_name,
+            num_states,
+            await_points.len()
+        ));
 
         // Future struct layout:
         //   offset 0: state (i32)
@@ -2996,34 +3474,39 @@ impl WasmCodegen {
         state_groups.push(&func.body.stmts[prev..]);
 
         // Collect the await expressions (one per await point)
-        let await_exprs: Vec<&Expr> = await_points.iter().map(|&i| {
-            let stmt = &func.body.stmts[i];
-            match stmt {
-                Stmt::Let { value, .. } => {
-                    Self::extract_await_inner(value).unwrap_or(value)
+        let await_exprs: Vec<&Expr> = await_points
+            .iter()
+            .map(|&i| {
+                let stmt = &func.body.stmts[i];
+                match stmt {
+                    Stmt::Let { value, .. } => Self::extract_await_inner(value).unwrap_or(value),
+                    Stmt::Expr(expr) => Self::extract_await_inner(expr).unwrap_or(expr),
+                    _ => &Expr::Integer(0),
                 }
-                Stmt::Expr(expr) => {
-                    Self::extract_await_inner(expr).unwrap_or(expr)
-                }
-                _ => &Expr::Integer(0),
-            }
-        }).collect();
+            })
+            .collect();
 
         // Collect the let-binding names for each await point (if any)
-        let await_binding_names: Vec<Option<String>> = await_points.iter().map(|&i| {
-            let stmt = &func.body.stmts[i];
-            match stmt {
-                Stmt::Let { name, .. } => Some(name.clone()),
-                _ => None,
-            }
-        }).collect();
+        let await_binding_names: Vec<Option<String>> = await_points
+            .iter()
+            .map(|&i| {
+                let stmt = &func.body.stmts[i];
+                match stmt {
+                    Stmt::Let { name, .. } => Some(name.clone()),
+                    _ => None,
+                }
+            })
+            .collect();
 
         // Allocate a single callback index for the repoll function
         let repoll_cb_idx = self.global_handler_base;
         self.global_handler_base += 1;
 
         // Emit the future pointer global for this async function
-        self.line(&format!("(global $__async_future_{} (mut i32) (i32.const 0))", func_name));
+        self.line(&format!(
+            "(global $__async_future_{} (mut i32) (i32.const 0))",
+            func_name
+        ));
 
         // ── Poll function: ONE function, br_table dispatch ──
         {
@@ -3031,8 +3514,10 @@ impl WasmCodegen {
 
             // Poll signature: (param $future_ptr i32) (result i32)
             // Returns 0 = Pending, 1 = Ready
-            self.emit(&format!("(func ${} (param $future_ptr i32) (result i32)",
-                func_name));
+            self.emit(&format!(
+                "(func ${} (param $future_ptr i32) (result i32)",
+                func_name
+            ));
             self.indent += 1;
 
             // Save/restore pattern for local hoisting
@@ -3109,9 +3594,7 @@ impl WasmCodegen {
 
             // Emit br_table
             self.line("local.get $__state");
-            let labels: Vec<String> = (0..num_states)
-                .map(|i| format!("$__state_{}", i))
-                .collect();
+            let labels: Vec<String> = (0..num_states).map(|i| format!("$__state_{}", i)).collect();
             self.line(&format!("br_table {} $__state_end", labels.join(" ")));
 
             // Generate code for each state
@@ -3145,7 +3628,11 @@ impl WasmCodegen {
 
                     // Advance state in future struct
                     self.line("local.get $future_ptr");
-                    self.line(&format!("i32.const {} ;; advance to state {}", state_idx + 1, state_idx + 1));
+                    self.line(&format!(
+                        "i32.const {} ;; advance to state {}",
+                        state_idx + 1,
+                        state_idx + 1
+                    ));
                     self.line("i32.store ;; future.state = next");
 
                     // Store future_ptr in the global so repoll can find it
@@ -3153,9 +3640,15 @@ impl WasmCodegen {
                     self.line(&format!("global.set $__async_future_{}", func_name));
 
                     // Initiate the async call with the repoll callback
-                    self.line(&format!(";; initiate async operation (await point {})", state_idx + 1));
+                    self.line(&format!(
+                        ";; initiate async operation (await point {})",
+                        state_idx + 1
+                    ));
                     self.generate_expr(await_exprs[state_idx]);
-                    self.line(&format!("i32.const {} ;; repoll callback index", repoll_cb_idx));
+                    self.line(&format!(
+                        "i32.const {} ;; repoll callback index",
+                        repoll_cb_idx
+                    ));
                     self.line("call $http_fetchWithCallback");
 
                     // Return Pending
@@ -3192,7 +3685,10 @@ impl WasmCodegen {
         {
             let repoll_name = format!("{}__repoll", func_name);
             self.line("");
-            self.emit(&format!("(func ${} (export \"{}\")", repoll_name, repoll_name));
+            self.emit(&format!(
+                "(func ${} (export \"{}\")",
+                repoll_name, repoll_name
+            ));
             self.indent += 1;
 
             self.line(";; Repoll callback — async operation completed");
@@ -3224,9 +3720,12 @@ impl WasmCodegen {
             if has_self {
                 params.push("(param $self i32)".into());
             }
-            params.extend(func.params.iter()
-                .filter(|p| p.name != "self")
-                .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))));
+            params.extend(
+                func.params
+                    .iter()
+                    .filter(|p| p.name != "self")
+                    .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty))),
+            );
 
             let export = if func.is_pub {
                 format!(" (export \"{}\")", entry_name)
@@ -3235,15 +3734,22 @@ impl WasmCodegen {
             };
 
             self.line("");
-            self.emit(&format!("(func ${}{} {}",
-                entry_name, export, params.join(" ")));
+            self.emit(&format!(
+                "(func ${}{} {}",
+                entry_name,
+                export,
+                params.join(" ")
+            ));
             self.indent += 1;
 
             self.line("(local $__future_ptr i32)");
 
             // Allocate future struct
-            self.line(&format!(";; Allocate future struct ({} bytes: state + result{})",
-                future_size, if has_self { " + self" } else { "" }));
+            self.line(&format!(
+                ";; Allocate future struct ({} bytes: state + result{})",
+                future_size,
+                if has_self { " + self" } else { "" }
+            ));
             self.line(&format!("i32.const {}", future_size));
             self.line("call $alloc");
             self.line("local.set $__future_ptr");
@@ -3289,22 +3795,37 @@ impl WasmCodegen {
 
         // Chunk boundary marker for code splitting
         if let Some(ref chunk_name) = comp.chunk {
-            self.line(&format!(";; chunk boundary: \"{}\" — component \"{}\" will be split into a separate chunk", chunk_name, comp_name));
+            self.line(&format!(
+                ";; chunk boundary: \"{}\" — component \"{}\" will be split into a separate chunk",
+                chunk_name, comp_name
+            ));
             let offset = self.store_string(chunk_name);
-            self.line(&format!(";; chunk registration: preload \"{}\" at offset {}", chunk_name, offset));
+            self.line(&format!(
+                ";; chunk registration: preload \"{}\" at offset {}",
+                chunk_name, offset
+            ));
         }
 
         // Emit globals for component signal IDs (dynamic element globals are
         // emitted per-occurrence during template generation since the same signal
         // may bind to multiple DOM nodes, each needing a unique global).
         for state in &comp.state {
-            self.line(&format!("(global $__sig_{}_{} (mut i32) (i32.const -1))", comp_name, state.name));
+            self.line(&format!(
+                "(global $__sig_{}_{} (mut i32) (i32.const -1))",
+                comp_name, state.name
+            ));
         }
         // Emit globals for prop values so event handlers can read them.
         // Prop ptr globals store the string/value pointer; handlers use global.get.
         for prop in &comp.props {
-            self.line(&format!("(global $__prop_{}_{}_ptr (mut i32) (i32.const 0))", comp_name, prop.name));
-            self.line(&format!("(global $__prop_{}_{}_len (mut i32) (i32.const 0))", comp_name, prop.name));
+            self.line(&format!(
+                "(global $__prop_{}_{}_ptr (mut i32) (i32.const 0))",
+                comp_name, prop.name
+            ));
+            self.line(&format!(
+                "(global $__prop_{}_{}_len (mut i32) (i32.const 0))",
+                comp_name, prop.name
+            ));
         }
         self.signal_updaters.clear();
         self.cond_updaters.clear();
@@ -3313,9 +3834,13 @@ impl WasmCodegen {
         // Generate the init/mount function with prop parameters
         // String props are passed as (ptr, len) pairs in WASM
         let prop_names: Vec<String> = comp.props.iter().map(|p| p.name.clone()).collect();
-        let mut sig = format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)");
+        let mut sig =
+            format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)");
         for prop in &prop_names {
-            sig.push_str(&format!(" (param $prop_{}_ptr i32) (param $prop_{}_len i32)", prop, prop));
+            sig.push_str(&format!(
+                " (param $prop_{}_ptr i32) (param $prop_{}_len i32)",
+                prop, prop
+            ));
         }
         sig.push(')');
         // Remove trailing ) — the emit/indent system will close it
@@ -3326,10 +3851,15 @@ impl WasmCodegen {
         // Track component fields, props, and methods for self.field / handler resolution
         self.in_component_mount = true;
         self.component_fields = comp.state.iter().map(|s| s.name.clone()).collect();
-        self.string_state_fields = comp.state.iter().filter(|s| {
-            matches!(&s.initializer, Expr::StringLit(_))
-                || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
-        }).map(|s| s.name.clone()).collect();
+        self.string_state_fields = comp
+            .state
+            .iter()
+            .filter(|s| {
+                matches!(&s.initializer, Expr::StringLit(_))
+                    || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
+            })
+            .map(|s| s.name.clone())
+            .collect();
         self.component_props = prop_names;
         self.component_name = comp_name.clone();
         // Build the set of scoped CSS class selectors for compile-time class rewriting.
@@ -3358,12 +3888,13 @@ impl WasmCodegen {
                     let cls = cls.split(':').next().unwrap_or(cls);
                     let cls = cls.split(' ').next().unwrap_or(cls);
                     if !cls.is_empty() {
-                        let transformed: Vec<(String, String)> = style.properties.iter()
-                            .flat_map(|(prop, val)| {
-                                Self::bloom_transform_css_property(prop, val)
-                            })
+                        let transformed: Vec<(String, String)> = style
+                            .properties
+                            .iter()
+                            .flat_map(|(prop, val)| Self::bloom_transform_css_property(prop, val))
                             .collect();
-                        self.bloom_class_styles.entry(cls.to_string())
+                        self.bloom_class_styles
+                            .entry(cls.to_string())
                             .or_default()
                             .extend(transformed);
                     }
@@ -3376,7 +3907,11 @@ impl WasmCodegen {
         // Register this component's handler range in the global callback registry
         let method_count = comp.methods.len() as u32;
         if method_count > 0 {
-            self.callback_registry.push((comp_name.clone(), self.global_handler_base, method_count));
+            self.callback_registry.push((
+                comp_name.clone(),
+                self.global_handler_base,
+                method_count,
+            ));
         }
 
         // Enable deferred template locals — generate template code into a
@@ -3402,9 +3937,15 @@ impl WasmCodegen {
             let prop_name = &prop.name;
             // Store into global so handlers can access
             self.line(&format!("local.get $prop_{}_ptr", prop_name));
-            self.line(&format!("global.set $__prop_{}_{}_ptr", comp_name, prop_name));
+            self.line(&format!(
+                "global.set $__prop_{}_{}_ptr",
+                comp_name, prop_name
+            ));
             self.line(&format!("local.get $prop_{}_len", prop_name));
-            self.line(&format!("global.set $__prop_{}_{}_len", comp_name, prop_name));
+            self.line(&format!(
+                "global.set $__prop_{}_{}_len",
+                comp_name, prop_name
+            ));
             // Also set local alias for template use
             self.line(&format!("local.get $prop_{}_ptr", prop_name));
             self.line(&format!("local.set ${}", prop_name));
@@ -3458,7 +3999,10 @@ impl WasmCodegen {
         // handler trampoline; we just call it eagerly here.
         if let Some(init_idx) = comp.methods.iter().position(|m| m.name == "init") {
             let handler_name = format!("{comp_name}__handler_{init_idx}");
-            let has_self = comp.methods[init_idx].params.iter().any(|p| p.name == "self");
+            let has_self = comp.methods[init_idx]
+                .params
+                .iter()
+                .any(|p| p.name == "self");
             self.line("");
             self.line(";; lifecycle: call init() after signal creation");
             if has_self {
@@ -3475,7 +4019,10 @@ impl WasmCodegen {
         // For secret state fields, mark signals as redacted in debug builds
         for state in &comp.state {
             if state.secret {
-                self.line(&format!(";; secret: {} — stripped from serialization", state.name));
+                self.line(&format!(
+                    ";; secret: {} — stripped from serialization",
+                    state.name
+                ));
             }
         }
 
@@ -3558,7 +4105,10 @@ impl WasmCodegen {
             self.line(";; a11y: auto — enhance component with accessibility attributes");
             let name_offset = self.store_string(comp_name);
             self.line(&format!("i32.const {} ;; component name ptr", name_offset));
-            self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
+            self.line(&format!(
+                "i32.const {} ;; component name len",
+                comp_name.len()
+            ));
             self.line("call $a11y_enhance");
         }
 
@@ -3585,7 +4135,10 @@ impl WasmCodegen {
                 self.line("call $dom_appendChild");
 
                 // Create IntersectionObserver with load_more as the callback
-                self.line(&format!("i32.const {} ;; load_more handler index", global_idx));
+                self.line(&format!(
+                    "i32.const {} ;; load_more handler index",
+                    global_idx
+                ));
                 self.line("i32.const 0 ;; no options (null ptr)");
                 self.line("call $observe_intersectionObserver");
                 self.line("local.set $__lazy_observer");
@@ -3639,7 +4192,11 @@ impl WasmCodegen {
             }
             // Include non-self parameters in handler trampoline
             for p in method.params.iter().filter(|p| p.name != "self") {
-                sig.push_str(&format!(" (param ${} {})", p.name, self.type_to_wasm(&p.ty)));
+                sig.push_str(&format!(
+                    " (param ${} {})",
+                    p.name,
+                    self.type_to_wasm(&p.ty)
+                ));
             }
             self.emit(&sig);
             self.indent += 1;
@@ -3699,7 +4256,9 @@ impl WasmCodegen {
         if !comp.methods.is_empty() {
             self.line("");
             let callback_name = format!("{comp_name}__callback");
-            self.emit(&format!("(func ${callback_name} (export \"{callback_name}\") (param $idx i32)"));
+            self.emit(&format!(
+                "(func ${callback_name} (export \"{callback_name}\") (param $idx i32)"
+            ));
             self.indent += 1;
             // Timing locals: capture start/end timestamps from $timer_now
             self.line("(local $__t0 f64)");
@@ -3770,7 +4329,9 @@ impl WasmCodegen {
         if let Some(ref destroy_fn) = comp.on_destroy {
             self.line("");
             self.line(&format!(";; lifecycle: on_destroy for {}", comp_name));
-            self.emit(&format!("(func ${comp_name}_on_destroy (export \"{comp_name}_on_destroy\")"));
+            self.emit(&format!(
+                "(func ${comp_name}_on_destroy (export \"{comp_name}_on_destroy\")"
+            ));
             self.indent += 1;
             for stmt in &destroy_fn.body.stmts {
                 self.generate_stmt(stmt);
@@ -3788,7 +4349,11 @@ impl WasmCodegen {
         }
 
         // Emit dynamic element globals (one per signal binding occurrence)
-        let updater_globals: Vec<String> = self.signal_updaters.iter().map(|u| u.global_el.clone()).collect();
+        let updater_globals: Vec<String> = self
+            .signal_updaters
+            .iter()
+            .map(|u| u.global_el.clone())
+            .collect();
         for global_el in &updater_globals {
             self.line(&format!("(global {} (mut i32) (i32.const -1))", global_el));
         }
@@ -3796,7 +4361,10 @@ impl WasmCodegen {
         // Emit signal→DOM updater functions (WASM-internal, called via call_indirect)
         for updater in self.signal_updaters.clone() {
             self.line("");
-            self.emit(&format!("(func {} ;; reactive DOM updater", updater.func_name));
+            self.emit(&format!(
+                "(func {} ;; reactive DOM updater",
+                updater.func_name
+            ));
             self.indent += 1;
 
             // Use deferred locals to hoist all dynamic locals (e.g. $__arr_tmp)
@@ -3818,10 +4386,8 @@ impl WasmCodegen {
                     wrapped_expr,
                     Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
                 );
-                let returns_single_ptr = matches!(
-                    wrapped_expr,
-                    Expr::StringLit(_) | Expr::If { .. }
-                );
+                let returns_single_ptr =
+                    matches!(wrapped_expr, Expr::StringLit(_) | Expr::If { .. });
                 if returns_ptr_len {
                     // Stack has (ptr, len)
                     self.line("local.set $len");
@@ -3850,7 +4416,10 @@ impl WasmCodegen {
                 // Attribute updater — call dom_setAttr
                 let attr_offset = self.store_string(attr);
                 self.line(&format!("global.get {}", updater.global_el));
-                self.line(&format!("i32.const {} ;; \"{}\" attr name ptr", attr_offset, attr));
+                self.line(&format!(
+                    "i32.const {} ;; \"{}\" attr name ptr",
+                    attr_offset, attr
+                ));
                 self.line(&format!("i32.const {} ;; attr name len", attr.len()));
                 self.line("local.get $ptr");
                 self.line("local.get $len");
@@ -3880,8 +4449,14 @@ impl WasmCodegen {
         // Emit reactive conditional block globals and updater functions
         for cond in &self.cond_updaters.clone() {
             // Globals: container element ID + last condition value
-            self.line(&format!("(global {} (mut i32) (i32.const -1))", cond.container_global));
-            self.line(&format!("(global {} (mut i32) (i32.const 0))", cond.last_val_global));
+            self.line(&format!(
+                "(global {} (mut i32) (i32.const -1))",
+                cond.container_global
+            ));
+            self.line(&format!(
+                "(global {} (mut i32) (i32.const 0))",
+                cond.last_val_global
+            ));
         }
 
         // Use a work queue so that nested cond updaters (reactive conditionals
@@ -3900,7 +4475,10 @@ impl WasmCodegen {
 
             // Emit mount function: renders children into the container
             self.line("");
-            self.emit(&format!("(func {} ;; reactive cond mount", cond.mount_func_name));
+            self.emit(&format!(
+                "(func {} ;; reactive cond mount",
+                cond.mount_func_name
+            ));
             self.indent += 1;
 
             // Enable deferred locals for the mount function body
@@ -3947,22 +4525,34 @@ impl WasmCodegen {
             // Add nested cond updaters to the work queue for processing
             for nested in &nested_cond_updaters {
                 // Emit globals for nested cond updaters (at module level, after function close)
-                self.line(&format!("(global {} (mut i32) (i32.const -1))", nested.container_global));
-                self.line(&format!("(global {} (mut i32) (i32.const 0))", nested.last_val_global));
+                self.line(&format!(
+                    "(global {} (mut i32) (i32.const -1))",
+                    nested.container_global
+                ));
+                self.line(&format!(
+                    "(global {} (mut i32) (i32.const 0))",
+                    nested.last_val_global
+                ));
                 self.closure_func_names.push(nested.func_name.clone());
             }
             cond_queue.extend(nested_cond_updaters);
 
             // Emit globals for the inner updaters (must be at module level, after function close)
             for updater in &cond_updaters_inner {
-                self.line(&format!("(global {} (mut i32) (i32.const -1))", updater.global_el));
+                self.line(&format!(
+                    "(global {} (mut i32) (i32.const -1))",
+                    updater.global_el
+                ));
                 self.closure_func_names.push(updater.func_name.clone());
             }
 
             // Emit updater functions for the inner updaters
             for updater in &cond_updaters_inner {
                 self.line("");
-                self.emit(&format!("(func {} ;; reactive DOM updater (inside cond)", updater.func_name));
+                self.emit(&format!(
+                    "(func {} ;; reactive DOM updater (inside cond)",
+                    updater.func_name
+                ));
                 self.indent += 1;
 
                 // Use deferred locals to hoist dynamic locals
@@ -3981,10 +4571,8 @@ impl WasmCodegen {
                         wrapped_expr,
                         Expr::FnCall { .. } | Expr::MethodCall { .. } | Expr::FormatString { .. }
                     );
-                    let returns_single_ptr = matches!(
-                        wrapped_expr,
-                        Expr::StringLit(_) | Expr::If { .. }
-                    );
+                    let returns_single_ptr =
+                        matches!(wrapped_expr, Expr::StringLit(_) | Expr::If { .. });
                     if returns_ptr_len {
                         self.line("local.set $len");
                         self.line("local.set $ptr");
@@ -4035,7 +4623,10 @@ impl WasmCodegen {
 
             // Emit updater function: re-evaluates condition, mounts or clears
             self.line("");
-            self.emit(&format!("(func {} ;; reactive cond updater", cond.func_name));
+            self.emit(&format!(
+                "(func {} ;; reactive cond updater",
+                cond.func_name
+            ));
             self.indent += 1;
 
             // Use deferred locals pattern for dynamic locals
@@ -4106,10 +4697,22 @@ impl WasmCodegen {
 
         // Emit lazy for-loop batch globals and functions
         for batch in &self.lazy_batches.clone() {
-            self.line(&format!("(global $__lazy_parent_{} (mut i32) (i32.const 0))", batch.uid));
-            self.line(&format!("(global $__lazy_cursor_{} (mut i32) (i32.const 0))", batch.uid));
-            self.line(&format!("(global $__lazy_total_{} (mut i32) (i32.const 0))", batch.uid));
-            self.line(&format!("(global $__lazy_data_{} (mut i32) (i32.const 0))", batch.uid));
+            self.line(&format!(
+                "(global $__lazy_parent_{} (mut i32) (i32.const 0))",
+                batch.uid
+            ));
+            self.line(&format!(
+                "(global $__lazy_cursor_{} (mut i32) (i32.const 0))",
+                batch.uid
+            ));
+            self.line(&format!(
+                "(global $__lazy_total_{} (mut i32) (i32.const 0))",
+                batch.uid
+            ));
+            self.line(&format!(
+                "(global $__lazy_data_{} (mut i32) (i32.const 0))",
+                batch.uid
+            ));
         }
 
         for batch in self.lazy_batches.clone() {
@@ -4216,7 +4819,10 @@ impl WasmCodegen {
             self.line("i32.lt_u");
             self.line("if ;; more items — schedule next rAF batch");
             self.indent += 1;
-            self.line(&format!("i32.const {} ;; self-chain via rAF", batch.callback_idx));
+            self.line(&format!(
+                "i32.const {} ;; self-chain via rAF",
+                batch.callback_idx
+            ));
             self.line("call $timer_requestAnimationFrame");
             self.line("drop");
             self.indent -= 1;
@@ -4228,7 +4834,11 @@ impl WasmCodegen {
 
             let func_name = format!("$__lazy_batch_{}_{}", batch.comp, uid);
             self.line("");
-            self.emit(&format!("(func {} (export \"{}\") ;; lazy batch render", func_name, &func_name[1..]));
+            self.emit(&format!(
+                "(func {} (export \"{}\") ;; lazy batch render",
+                func_name,
+                &func_name[1..]
+            ));
             self.indent += 1;
 
             // Emit hoisted locals
@@ -4249,7 +4859,9 @@ impl WasmCodegen {
             // callback signature, ignores the parameter, and calls the batch fn.
             let cb_disp_name = format!("__lazy_batch_{}_{}__callback", batch.comp, uid);
             self.line("");
-            self.emit(&format!("(func ${cb_disp_name} (export \"{cb_disp_name}\") (param $idx i32)"));
+            self.emit(&format!(
+                "(func ${cb_disp_name} (export \"{cb_disp_name}\") (param $idx i32)"
+            ));
             self.indent += 1;
             self.line(&format!("call {}", func_name));
             self.indent -= 1;
@@ -4276,7 +4888,9 @@ impl WasmCodegen {
         // Generate page mount function (same pattern as generate_component)
         let comp_name = &page.name;
 
-        self.emit(&format!("(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)"));
+        self.emit(&format!(
+            "(func ${comp_name}_mount (export \"{comp_name}_mount\") (param $root i32)"
+        ));
         self.indent += 1;
 
         // Enable deferred template locals for proper WAT ordering
@@ -4301,7 +4915,10 @@ impl WasmCodegen {
 
         for state in &page.state {
             if state.secret {
-                self.line(&format!(";; secret: {} — stripped from serialization", state.name));
+                self.line(&format!(
+                    ";; secret: {} — stripped from serialization",
+                    state.name
+                ));
             }
         }
 
@@ -4335,7 +4952,11 @@ impl WasmCodegen {
                 sig.push_str(" (param $self i32)");
             }
             for p in method.params.iter().filter(|p| p.name != "self") {
-                sig.push_str(&format!(" (param ${} {})", p.name, self.type_to_wasm(&p.ty)));
+                sig.push_str(&format!(
+                    " (param ${} {})",
+                    p.name,
+                    self.type_to_wasm(&p.ty)
+                ));
             }
             self.emit(&sig);
             self.indent += 1;
@@ -4419,7 +5040,9 @@ impl WasmCodegen {
             for sd in &meta.structured_data {
                 let mut json = format!("{{\"@type\":\"{}\",", sd.schema_type);
                 for (i, (key, val)) in sd.fields.iter().enumerate() {
-                    if i > 0 { json.push(','); }
+                    if i > 0 {
+                        json.push(',');
+                    }
                     json.push('"');
                     json.push_str(key);
                     json.push_str("\":");
@@ -4434,7 +5057,10 @@ impl WasmCodegen {
                 json.push('}');
                 let offset = self.store_string(&json);
                 let len = json.len();
-                self.line(&format!("(call $seo_register_structured_data (i32.const {}) (i32.const {}))", offset, len));
+                self.line(&format!(
+                    "(call $seo_register_structured_data (i32.const {}) (i32.const {}))",
+                    offset, len
+                ));
             }
         }
 
@@ -4442,7 +5068,10 @@ impl WasmCodegen {
         let route_str = format!("/{}", page.name.to_lowercase());
         let offset = self.store_string(&route_str);
         let len = route_str.len();
-        self.line(&format!("(call $seo_register_route (i32.const {}) (i32.const {}) (i32.const 0) (i32.const 0))", offset, len));
+        self.line(&format!(
+            "(call $seo_register_route (i32.const {}) (i32.const {}) (i32.const 0) (i32.const 0))",
+            offset, len
+        ));
 
         self.indent -= 1;
         self.line(")");
@@ -4464,10 +5093,13 @@ impl WasmCodegen {
 
         // ── Reactive signals for form state ──────────────────────────
         // Per-field value signals, per-field error signals, overall valid signal, submitting signal
-        self.emit_capability_signal_globals(&form.name, &[
-            ("valid", "form valid flag"),
-            ("submitting", "form submitting flag"),
-        ]);
+        self.emit_capability_signal_globals(
+            &form.name,
+            &[
+                ("valid", "form valid flag"),
+                ("submitting", "form submitting flag"),
+            ],
+        );
         // Per-field signals
         for field in &form.fields {
             self.line(&format!(
@@ -4483,20 +5115,37 @@ impl WasmCodegen {
         // Build schema JSON for form registration
         let mut schema_json = String::from("{\"fields\":[");
         for (i, field) in form.fields.iter().enumerate() {
-            if i > 0 { schema_json.push(','); }
-            schema_json.push_str(&format!("{{\"name\":\"{}\",\"type\":\"{:?}\",\"validators\":[", field.name, field.ty));
+            if i > 0 {
+                schema_json.push(',');
+            }
+            schema_json.push_str(&format!(
+                "{{\"name\":\"{}\",\"type\":\"{:?}\",\"validators\":[",
+                field.name, field.ty
+            ));
             for (j, v) in field.validators.iter().enumerate() {
-                if j > 0 { schema_json.push(','); }
+                if j > 0 {
+                    schema_json.push(',');
+                }
                 match &v.kind {
                     ValidatorKind::Required => schema_json.push_str("{\"kind\":\"required\"}"),
-                    ValidatorKind::MinLength(n) => schema_json.push_str(&format!("{{\"kind\":\"min_length\",\"min\":{}}}", n)),
-                    ValidatorKind::MaxLength(n) => schema_json.push_str(&format!("{{\"kind\":\"max_length\",\"max\":{}}}", n)),
-                    ValidatorKind::Pattern(p) => schema_json.push_str(&format!("{{\"kind\":\"pattern\",\"pattern\":\"{}\"}}", p)),
+                    ValidatorKind::MinLength(n) => {
+                        schema_json.push_str(&format!("{{\"kind\":\"min_length\",\"min\":{}}}", n))
+                    }
+                    ValidatorKind::MaxLength(n) => {
+                        schema_json.push_str(&format!("{{\"kind\":\"max_length\",\"max\":{}}}", n))
+                    }
+                    ValidatorKind::Pattern(p) => schema_json
+                        .push_str(&format!("{{\"kind\":\"pattern\",\"pattern\":\"{}\"}}", p)),
                     ValidatorKind::Email => schema_json.push_str("{\"kind\":\"email\"}"),
                     ValidatorKind::Url => schema_json.push_str("{\"kind\":\"url\"}"),
-                    ValidatorKind::Min(n) => schema_json.push_str(&format!("{{\"kind\":\"min\",\"min\":{}}}", n)),
-                    ValidatorKind::Max(n) => schema_json.push_str(&format!("{{\"kind\":\"max\",\"max\":{}}}", n)),
-                    ValidatorKind::Custom(name) => schema_json.push_str(&format!("{{\"kind\":\"custom\",\"fn\":\"{}\"}}", name)),
+                    ValidatorKind::Min(n) => {
+                        schema_json.push_str(&format!("{{\"kind\":\"min\",\"min\":{}}}", n))
+                    }
+                    ValidatorKind::Max(n) => {
+                        schema_json.push_str(&format!("{{\"kind\":\"max\",\"max\":{}}}", n))
+                    }
+                    ValidatorKind::Custom(name) => schema_json
+                        .push_str(&format!("{{\"kind\":\"custom\",\"fn\":\"{}\"}}", name)),
                 }
             }
             schema_json.push_str("]}");
@@ -4511,7 +5160,9 @@ impl WasmCodegen {
 
         // Emit registration function
         let fn_name = format!("{}_init", form.name);
-        self.emit(&format!("(func ${fn_name} (export \"{fn_name}\") (param $root i32)"));
+        self.emit(&format!(
+            "(func ${fn_name} (export \"{fn_name}\") (param $root i32)"
+        ));
         self.indent += 1;
 
         // Create signals
@@ -4530,7 +5181,10 @@ impl WasmCodegen {
             self.line(&format!("  global.set $__sig_{}_{}", form.name, field.name));
             self.line("  i32.const 0  ;; no error");
             self.line("  call $signal_create");
-            self.line(&format!("  global.set $__sig_{}_{}_error", form.name, field.name));
+            self.line(&format!(
+                "  global.set $__sig_{}_{}_error",
+                form.name, field.name
+            ));
         }
 
         // Register form with runtime
@@ -4649,7 +5303,10 @@ impl WasmCodegen {
             self.line(&format!("  global.get $__sig_{}_{}", form.name, field.name));
             self.line("  i32.const 0  ;; clear value");
             self.line("  call $signal_set");
-            self.line(&format!("  global.get $__sig_{}_{}_error", form.name, field.name));
+            self.line(&format!(
+                "  global.get $__sig_{}_{}_error",
+                form.name, field.name
+            ));
             self.line("  i32.const 0  ;; clear error");
             self.line("  call $signal_set");
         }
@@ -4679,11 +5336,8 @@ impl WasmCodegen {
             signal_names.push(field.name.clone());
             signal_names.push(format!("{}_error", field.name));
         }
-        self.known_capability_signals.push((
-            form.name.clone(),
-            "form".into(),
-            signal_names,
-        ));
+        self.known_capability_signals
+            .push((form.name.clone(), "form".into(), signal_names));
 
         // Generate methods, namespaced by form name to avoid redefinition
         // when multiple forms share method names like `on_submit`.
@@ -4714,11 +5368,14 @@ impl WasmCodegen {
         // status: 0=disconnected, 1=connecting, 2=connected, 3=error
         // last_message: string ptr (0 when no message)
         // error_msg: string ptr (0 when no error)
-        self.emit_capability_signal_globals(&ch.name, &[
-            ("status", "channel status"),
-            ("last_message", "last received message"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &ch.name,
+            &[
+                ("status", "channel status"),
+                ("last_message", "last received message"),
+                ("error_msg", "error message"),
+            ],
+        );
 
         // Global for reconnect attempt counter (exponential backoff)
         self.line(&format!(
@@ -4731,20 +5388,25 @@ impl WasmCodegen {
             "(func ${}_init (export \"{}_init\")",
             ch.name, ch.name
         ));
-        self.emit_capability_signal_creates(&ch.name, &[
-            ("status", 0),
-            ("last_message", 0),
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &ch.name,
+            &[("status", 0), ("last_message", 0), ("error_msg", 0)],
+        );
         self.line(")");
 
         // Generate channel registration function (connect)
-        self.line(&format!("(func ${}_connect (export \"{}_connect\") (param $url_ptr i32) (param $url_len i32)", ch.name, ch.name));
+        self.line(&format!(
+            "(func ${}_connect (export \"{}_connect\") (param $url_ptr i32) (param $url_len i32)",
+            ch.name, ch.name
+        ));
         // Set status to connecting (1)
         self.emit_capability_set_status(&ch.name, 1);
         // Reset reconnect counter
         self.line(&format!("  i32.const 0"));
-        self.line(&format!("  global.set $__channel_{}_reconnect_count", ch.name));
+        self.line(&format!(
+            "  global.set $__channel_{}_reconnect_count",
+            ch.name
+        ));
         if self.target == CompilationTarget::Wasi {
             // WASI target: open a stream via wasi:io/streams instead of WebSocket
             self.line("  local.get $url_ptr");
@@ -4769,7 +5431,10 @@ impl WasmCodegen {
         self.line(")");
 
         // Legacy register function
-        self.line(&format!("(func $__channel_register_{} (export \"__channel_register_{}\")", ch.name, ch.name));
+        self.line(&format!(
+            "(func $__channel_register_{} (export \"__channel_register_{}\")",
+            ch.name, ch.name
+        ));
         if self.target == CompilationTarget::Wasi {
             // WASI target: use wasi:io/streams for channel registration
             self.line(&format!("  i32.const {}  ;; url ptr", url_offset));
@@ -4808,7 +5473,10 @@ impl WasmCodegen {
         ));
         if self.target == CompilationTarget::Wasi {
             // WASI target: write to stream via wasi:io/streams
-            self.line(&format!("  i32.const {}  ;; stream handle (channel name ptr)", name_offset));
+            self.line(&format!(
+                "  i32.const {}  ;; stream handle (channel name ptr)",
+                name_offset
+            ));
             self.line("  local.get $msg_ptr");
             self.line("  local.get $msg_len");
             self.line("  call $stream_write");
@@ -4846,7 +5514,10 @@ impl WasmCodegen {
         ));
         self.line("  (local $delay i32)");
         // Calculate delay: count * 1000
-        self.line(&format!("  global.get $__channel_{}_reconnect_count", ch.name));
+        self.line(&format!(
+            "  global.get $__channel_{}_reconnect_count",
+            ch.name
+        ));
         self.line("  i32.const 1000");
         self.line("  i32.mul");
         self.line("  local.set $delay");
@@ -4859,10 +5530,16 @@ impl WasmCodegen {
         self.line("    local.set $delay");
         self.line("  end");
         // Increment counter
-        self.line(&format!("  global.get $__channel_{}_reconnect_count", ch.name));
+        self.line(&format!(
+            "  global.get $__channel_{}_reconnect_count",
+            ch.name
+        ));
         self.line("  i32.const 1");
         self.line("  i32.add");
-        self.line(&format!("  global.set $__channel_{}_reconnect_count", ch.name));
+        self.line(&format!(
+            "  global.set $__channel_{}_reconnect_count",
+            ch.name
+        ));
         // Set status to connecting
         self.emit_capability_set_status(&ch.name, 1);
         // Schedule reconnect via timer
@@ -4870,7 +5547,10 @@ impl WasmCodegen {
         // Use the register function index as callback
         let reconnect_cb = self.global_handler_base;
         self.global_handler_base += 1;
-        self.line(&format!("  i32.const {}  ;; callback idx for reconnect", reconnect_cb));
+        self.line(&format!(
+            "  i32.const {}  ;; callback idx for reconnect",
+            reconnect_cb
+        ));
         self.line("  call $timer_setTimeout");
         self.line(")");
 
@@ -4947,7 +5627,10 @@ impl WasmCodegen {
         let _integrity_len = integrity_str.len();
 
         // Generate embed registration function
-        self.emit(&format!("(func $__embed_register_{} (export \"__embed_register_{}\")", embed.name, embed.name));
+        self.emit(&format!(
+            "(func $__embed_register_{} (export \"__embed_register_{}\")",
+            embed.name, embed.name
+        ));
         self.indent += 1;
 
         if embed.sandbox {
@@ -4963,7 +5646,10 @@ impl WasmCodegen {
             self.line(&format!("i32.const {}  ;; src len", src_len));
             self.line(&format!("i32.const {}  ;; loading ptr", loading_offset));
             self.line(&format!("i32.const {}  ;; loading len", loading_len));
-            self.line(&format!("i32.const {}  ;; integrity offset (0 = none)", integrity_offset));
+            self.line(&format!(
+                "i32.const {}  ;; integrity offset (0 = none)",
+                integrity_offset
+            ));
             self.line("call $embed_load_script");
         }
 
@@ -4980,12 +5666,18 @@ impl WasmCodegen {
         // Build config JSON
         let page_size = pdf.page_size.as_deref().unwrap_or("A4");
         let orientation = pdf.orientation.as_deref().unwrap_or("portrait");
-        let config_json = format!("{{\"pageSize\":\"{}\",\"orientation\":\"{}\"}}", page_size, orientation);
+        let config_json = format!(
+            "{{\"pageSize\":\"{}\",\"orientation\":\"{}\"}}",
+            page_size, orientation
+        );
         let config_offset = self.store_string(&config_json);
         let config_len = config_json.len();
 
         // Generate PDF creation function
-        self.emit(&format!("(func $__pdf_create_{} (export \"__pdf_create_{}\") (result i32)", pdf.name, pdf.name));
+        self.emit(&format!(
+            "(func $__pdf_create_{} (export \"__pdf_create_{}\") (result i32)",
+            pdf.name, pdf.name
+        ));
         self.indent += 1;
 
         self.line(&format!("i32.const {}  ;; name ptr", name_offset));
@@ -5021,7 +5713,8 @@ impl WasmCodegen {
         // error:  string ptr (0 when no error)
         // token:  string ptr (payment method token after success)
         let signal_names = vec!["status".into(), "error".into(), "token".into()];
-        self.known_payment_signals.push((payment.name.clone(), signal_names));
+        self.known_payment_signals
+            .push((payment.name.clone(), signal_names));
 
         self.line(&format!(
             "(global $__sig_{}_status (mut i32) (i32.const -1)) ;; signal ID: payment status",
@@ -5037,7 +5730,10 @@ impl WasmCodegen {
         ));
 
         // ── Payment register (called from __init_all) ──────────────────
-        self.line(&format!("(func $__payment_register_{} (export \"__payment_register_{}\")", payment.name, payment.name));
+        self.line(&format!(
+            "(func $__payment_register_{} (export \"__payment_register_{}\")",
+            payment.name, payment.name
+        ));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
         self.line(&format!("  i32.const {}  ;; provider ptr", provider_offset));
@@ -5065,12 +5761,30 @@ impl WasmCodegen {
         ));
 
         // ── Crypto globals for automatic payment encryption ──────────────
-        self.line(&format!("(global $__payment_{}_ecdh_priv_ptr (mut i32) (i32.const 0))", payment.name));
-        self.line(&format!("(global $__payment_{}_ecdh_priv_len (mut i32) (i32.const 0))", payment.name));
-        self.line(&format!("(global $__payment_{}_shared_key_ptr (mut i32) (i32.const 0))", payment.name));
-        self.line(&format!("(global $__payment_{}_shared_key_len (mut i32) (i32.const 0))", payment.name));
-        self.line(&format!("(global $__payment_{}_sign_priv_ptr (mut i32) (i32.const 0))", payment.name));
-        self.line(&format!("(global $__payment_{}_sign_priv_len (mut i32) (i32.const 0))", payment.name));
+        self.line(&format!(
+            "(global $__payment_{}_ecdh_priv_ptr (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_ecdh_priv_len (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_shared_key_ptr (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_shared_key_len (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_sign_priv_ptr (mut i32) (i32.const 0))",
+            payment.name
+        ));
+        self.line(&format!(
+            "(global $__payment_{}_sign_priv_len (mut i32) (i32.const 0))",
+            payment.name
+        ));
 
         // ── Lifecycle: init — creates signals, generates keypairs, initiates key exchange ──
         self.line(&format!(
@@ -5093,8 +5807,14 @@ impl WasmCodegen {
         self.line(&format!("  i32.const {}  ;; \"ecdh\" ptr", ecdh_algo));
         self.line("  i32.const 4  ;; \"ecdh\" len");
         self.line("  call $crypto_generate_key_pair  ;; -> pub_ptr pub_len priv_ptr priv_len");
-        self.line(&format!("  global.set $__payment_{}_ecdh_priv_len", payment.name));
-        self.line(&format!("  global.set $__payment_{}_ecdh_priv_ptr", payment.name));
+        self.line(&format!(
+            "  global.set $__payment_{}_ecdh_priv_len",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.set $__payment_{}_ecdh_priv_ptr",
+            payment.name
+        ));
         self.line("  local.set $ecdh_pub_len");
         self.line("  local.set $ecdh_pub_ptr");
         // Generate Ed25519 signing keypair
@@ -5102,14 +5822,23 @@ impl WasmCodegen {
         self.line(&format!("  i32.const {}  ;; \"ed25519\" ptr", ed_algo));
         self.line("  i32.const 7  ;; \"ed25519\" len");
         self.line("  call $crypto_generate_key_pair  ;; -> pub_ptr pub_len priv_ptr priv_len");
-        self.line(&format!("  global.set $__payment_{}_sign_priv_len", payment.name));
-        self.line(&format!("  global.set $__payment_{}_sign_priv_ptr", payment.name));
+        self.line(&format!(
+            "  global.set $__payment_{}_sign_priv_len",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.set $__payment_{}_sign_priv_ptr",
+            payment.name
+        ));
         self.line("  drop  ;; drop signing pub_len");
         self.line("  drop  ;; drop signing pub_ptr");
         // Call key_exchange with ECDH public key
         self.line("  local.get $ecdh_pub_ptr");
         self.line("  local.get $ecdh_pub_len");
-        self.line(&format!("  i32.const {}  ;; key exchange callback index", key_exchange_cb_idx));
+        self.line(&format!(
+            "  i32.const {}  ;; key exchange callback index",
+            key_exchange_cb_idx
+        ));
         self.line("  call $payment_key_exchange");
         self.line(")");
 
@@ -5119,8 +5848,14 @@ impl WasmCodegen {
             payment.name, payment.name
         ));
         self.line("  (local $shared_ptr i32) (local $shared_len i32)");
-        self.line(&format!("  global.get $__payment_{}_ecdh_priv_ptr", payment.name));
-        self.line(&format!("  global.get $__payment_{}_ecdh_priv_len", payment.name));
+        self.line(&format!(
+            "  global.get $__payment_{}_ecdh_priv_ptr",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.get $__payment_{}_ecdh_priv_len",
+            payment.name
+        ));
         self.line("  local.get $server_pub_ptr");
         self.line("  local.get $server_pub_len");
         self.line("  call $crypto_ecdh_derive  ;; -> shared_ptr shared_len");
@@ -5130,14 +5865,26 @@ impl WasmCodegen {
         let hkdf_info = self.store_string("aes-256-gcm");
         self.line("  local.get $shared_ptr");
         self.line("  local.get $shared_len");
-        self.line(&format!("  i32.const {}  ;; salt \"nectar-payment\" ptr", hkdf_salt));
+        self.line(&format!(
+            "  i32.const {}  ;; salt \"nectar-payment\" ptr",
+            hkdf_salt
+        ));
         self.line("  i32.const 14  ;; salt len");
-        self.line(&format!("  i32.const {}  ;; info \"aes-256-gcm\" ptr", hkdf_info));
+        self.line(&format!(
+            "  i32.const {}  ;; info \"aes-256-gcm\" ptr",
+            hkdf_info
+        ));
         self.line("  i32.const 11  ;; info len");
         self.line("  i32.const 32  ;; 256 bits = 32 bytes");
         self.line("  call $crypto_hkdf_derive  ;; -> key_ptr key_len");
-        self.line(&format!("  global.set $__payment_{}_shared_key_len", payment.name));
-        self.line(&format!("  global.set $__payment_{}_shared_key_ptr", payment.name));
+        self.line(&format!(
+            "  global.set $__payment_{}_shared_key_len",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.set $__payment_{}_shared_key_ptr",
+            payment.name
+        ));
         self.line(")");
 
         // ── Encrypt and sign helper ──
@@ -5148,15 +5895,27 @@ impl WasmCodegen {
         self.line("  (local $ct_ptr i32) (local $ct_len i32)");
         self.line("  (local $sig_ptr i32) (local $sig_len i32)");
         self.line("  (local $out_ptr i32) (local $out_len i32)");
-        self.line(&format!("  global.get $__payment_{}_shared_key_ptr", payment.name));
-        self.line(&format!("  global.get $__payment_{}_shared_key_len", payment.name));
+        self.line(&format!(
+            "  global.get $__payment_{}_shared_key_ptr",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.get $__payment_{}_shared_key_len",
+            payment.name
+        ));
         self.line("  local.get $plain_ptr");
         self.line("  local.get $plain_len");
         self.line("  call $crypto_aes_gcm_encrypt  ;; -> ct_ptr ct_len");
         self.line("  local.set $ct_len");
         self.line("  local.set $ct_ptr");
-        self.line(&format!("  global.get $__payment_{}_sign_priv_ptr", payment.name));
-        self.line(&format!("  global.get $__payment_{}_sign_priv_len", payment.name));
+        self.line(&format!(
+            "  global.get $__payment_{}_sign_priv_ptr",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.get $__payment_{}_sign_priv_len",
+            payment.name
+        ));
         self.line("  local.get $ct_ptr");
         self.line("  local.get $ct_len");
         self.line("  call $crypto_ed25519_sign  ;; -> sig_ptr sig_len");
@@ -5218,7 +5977,10 @@ impl WasmCodegen {
         ));
         self.line("  (local $enc_ptr i32) (local $enc_len i32)");
         // Guard: shared key must be available
-        self.line(&format!("  global.get $__payment_{}_shared_key_ptr", payment.name));
+        self.line(&format!(
+            "  global.get $__payment_{}_shared_key_ptr",
+            payment.name
+        ));
         self.line("  i32.eqz");
         self.line("  if");
         let err_msg = self.store_string("Payment encryption not ready");
@@ -5235,11 +5997,20 @@ impl WasmCodegen {
         self.line("  call $signal_set");
         self.line("  local.get $secret_ptr");
         self.line("  local.get $secret_len");
-        self.line(&format!("  call $__payment_{}_encrypt_and_sign", payment.name));
+        self.line(&format!(
+            "  call $__payment_{}_encrypt_and_sign",
+            payment.name
+        ));
         self.line("  local.set $enc_len");
         self.line("  local.set $enc_ptr");
-        self.line(&format!("  global.get $__payment_{}_provider_handle", payment.name));
-        self.line(&format!("  global.get $__payment_{}_element_handle", payment.name));
+        self.line(&format!(
+            "  global.get $__payment_{}_provider_handle",
+            payment.name
+        ));
+        self.line(&format!(
+            "  global.get $__payment_{}_element_handle",
+            payment.name
+        ));
         self.line("  local.get $enc_ptr");
         self.line("  local.get $enc_len");
         self.line(&format!("  i32.const {}  ;; cb_idx", _cb_idx));
@@ -5526,7 +6297,7 @@ impl WasmCodegen {
         self.line("    i32.const 0");
         self.line("    local.set $sum");
         // weights: 3,7,1,3,7,1,3,7,1
-        for (i, w) in [3,7,1,3,7,1,3,7,1].iter().enumerate() {
+        for (i, w) in [3, 7, 1, 3, 7, 1, 3, 7, 1].iter().enumerate() {
             self.line(&format!("    local.get $ptr"));
             self.line(&format!("    i32.const {}", i));
             self.line("    i32.add");
@@ -5588,9 +6359,15 @@ impl WasmCodegen {
         let cs_len = cache_strat.len();
 
         // Track required providers for build system bundling
-        if let Some(ref p) = mp.payment_provider { self.required_providers.insert(p.clone()); }
-        if let Some(ref p) = mp.auth_provider { self.required_providers.insert(p.clone()); }
-        if let Some(ref p) = mp.map_provider { self.required_providers.insert(p.clone()); }
+        if let Some(ref p) = mp.payment_provider {
+            self.required_providers.insert(p.clone());
+        }
+        if let Some(ref p) = mp.auth_provider {
+            self.required_providers.insert(p.clone());
+        }
+        if let Some(ref p) = mp.map_provider {
+            self.required_providers.insert(p.clone());
+        }
 
         // Provider config globals
         self.line(&format!(
@@ -5619,7 +6396,10 @@ impl WasmCodegen {
         ));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
-        self.line(&format!("  i32.const {}  ;; payment provider ptr", pp_offset));
+        self.line(&format!(
+            "  i32.const {}  ;; payment provider ptr",
+            pp_offset
+        ));
         self.line(&format!("  i32.const {}  ;; payment provider len", pp_len));
         self.line(&format!("  i32.const {}  ;; auth provider ptr", ap_offset));
         self.line(&format!("  i32.const {}  ;; auth provider len", ap_len));
@@ -5693,11 +6473,14 @@ impl WasmCodegen {
         // status: 0=idle, 1=connecting, 2=connected, 3=error
         // account_id: string ptr (0 when not connected)
         // error_msg: string ptr (0 when no error)
-        self.emit_capability_signal_globals(&banking.name, &[
-            ("status", "banking status"),
-            ("account_id", "account ID"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &banking.name,
+            &[
+                ("status", "banking status"),
+                ("account_id", "account ID"),
+                ("error_msg", "error message"),
+            ],
+        );
 
         // Register function
         self.line(&format!(
@@ -5716,11 +6499,10 @@ impl WasmCodegen {
             "(func ${}_init (export \"{}_init\")",
             banking.name, banking.name
         ));
-        self.emit_capability_signal_creates(&banking.name, &[
-            ("status", 0),
-            ("account_id", 0),
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &banking.name,
+            &[("status", 0), ("account_id", 0), ("error_msg", 0)],
+        );
         self.line(&format!("  call $__banking_register_{}", banking.name));
         self.line(")");
 
@@ -5805,13 +6587,16 @@ impl WasmCodegen {
         // center_lng: fixed-point i32 (lng * 1_000_000)
         // zoom: i32
         // error_msg: string ptr
-        self.emit_capability_signal_globals(&map_def.name, &[
-            ("status", "map status"),
-            ("center_lat", "center latitude (fixed-point)"),
-            ("center_lng", "center longitude (fixed-point)"),
-            ("zoom", "zoom level"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &map_def.name,
+            &[
+                ("status", "map status"),
+                ("center_lat", "center latitude (fixed-point)"),
+                ("center_lng", "center longitude (fixed-point)"),
+                ("zoom", "zoom level"),
+                ("error_msg", "error message"),
+            ],
+        );
 
         // Global for map object handle
         self.line(&format!(
@@ -5840,13 +6625,16 @@ impl WasmCodegen {
             "(func ${}_init (export \"{}_init\")",
             map_def.name, map_def.name
         ));
-        self.emit_capability_signal_creates(&map_def.name, &[
-            ("status", 0),      // loading
-            ("center_lat", (lat * 1_000_000.0) as i32),
-            ("center_lng", (lng * 1_000_000.0) as i32),
-            ("zoom", zoom as i32),
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &map_def.name,
+            &[
+                ("status", 0), // loading
+                ("center_lat", (lat * 1_000_000.0) as i32),
+                ("center_lng", (lng * 1_000_000.0) as i32),
+                ("zoom", zoom as i32),
+                ("error_msg", 0),
+            ],
+        );
         self.line(&format!("  call $__map_register_{}", map_def.name));
         self.line(")");
 
@@ -5902,7 +6690,10 @@ impl WasmCodegen {
         self.line(")");
 
         // ── Signal getters ──
-        self.emit_capability_getters(&map_def.name, &["status", "center_lat", "center_lng", "zoom", "error_msg"]);
+        self.emit_capability_getters(
+            &map_def.name,
+            &["status", "center_lat", "center_lng", "zoom", "error_msg"],
+        );
 
         // ── Convenience: is_ready ──
         self.line(&format!(
@@ -5919,7 +6710,13 @@ impl WasmCodegen {
         self.known_capability_signals.push((
             map_def.name.clone(),
             "map".into(),
-            vec!["status".into(), "center_lat".into(), "center_lng".into(), "zoom".into(), "error_msg".into()],
+            vec![
+                "status".into(),
+                "center_lat".into(),
+                "center_lng".into(),
+                "zoom".into(),
+                "error_msg".into(),
+            ],
         ));
 
         if let Some(ref handler) = map_def.on_ready {
@@ -5940,27 +6737,37 @@ impl WasmCodegen {
         let name_len = auth.name.len();
 
         // Default session_storage to "cookie" for HttpOnly secure defaults
-        let session_storage = auth.session_storage.clone().unwrap_or_else(|| "cookie".to_string());
+        let session_storage = auth
+            .session_storage
+            .clone()
+            .unwrap_or_else(|| "cookie".to_string());
 
         // ── Reactive signals for auth state ──────────────────────────
         // status: 0=unauthenticated, 1=loading, 2=authenticated, 3=error
         // user_data: ptr to user data (0 when not authenticated)
         // error_msg: string ptr (0 when no error)
-        self.emit_capability_signal_globals(&auth.name, &[
-            ("status", "auth status"),
-            ("user_data", "user data"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &auth.name,
+            &[
+                ("status", "auth status"),
+                ("user_data", "user data"),
+                ("error_msg", "error message"),
+            ],
+        );
 
         // Build JSON config for providers
         let mut config = String::from("{\"providers\":{");
         for (i, prov) in auth.providers.iter().enumerate() {
-            if i > 0 { config.push(','); }
+            if i > 0 {
+                config.push(',');
+            }
             config.push('"');
             config.push_str(&prov.name);
             config.push_str("\":{\"scopes\":[");
             for (j, scope) in prov.scopes.iter().enumerate() {
-                if j > 0 { config.push(','); }
+                if j > 0 {
+                    config.push(',');
+                }
                 config.push('"');
                 config.push_str(scope);
                 config.push('"');
@@ -5980,7 +6787,10 @@ impl WasmCodegen {
         let cookie_suffix_offset = self.store_string(cookie_suffix);
         let cookie_suffix_len = cookie_suffix.len();
 
-        self.line(&format!("(func $__auth_register_{} (export \"__auth_register_{}\")", auth.name, auth.name));
+        self.line(&format!(
+            "(func $__auth_register_{} (export \"__auth_register_{}\")",
+            auth.name, auth.name
+        ));
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
         self.line(&format!("  i32.const {}  ;; name len", name_len));
         self.line(&format!("  i32.const {}  ;; config ptr", config_offset));
@@ -5993,11 +6803,10 @@ impl WasmCodegen {
             "(func ${}_init (export \"{}_init\")",
             auth.name, auth.name
         ));
-        self.emit_capability_signal_creates(&auth.name, &[
-            ("status", 0),
-            ("user_data", 0),
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &auth.name,
+            &[("status", 0), ("user_data", 0), ("error_msg", 0)],
+        );
         self.line(&format!("  call $__auth_register_{}", auth.name));
         self.line(")");
 
@@ -6011,7 +6820,10 @@ impl WasmCodegen {
         self.line("  ;; Concatenate cookie value with secure suffix in WASM memory");
         self.line("  local.get $val_ptr");
         self.line("  local.get $val_len");
-        self.line(&format!("  i32.const {}  ;; suffix ptr", cookie_suffix_offset));
+        self.line(&format!(
+            "  i32.const {}  ;; suffix ptr",
+            cookie_suffix_offset
+        ));
         self.line(&format!("  i32.const {}  ;; suffix len", cookie_suffix_len));
         self.line("  call $string_concat");
         self.line("  local.set $buf_len");
@@ -6036,8 +6848,14 @@ impl WasmCodegen {
         self.line("  local.set $cookie_ptr");
         self.line("  ;; Check if session key exists in cookie string");
         self.line("  local.get $cookie_ptr");
-        self.line(&format!("  i32.const {}  ;; session key ptr", session_key_offset));
-        self.line(&format!("  i32.const {}  ;; session key len", session_key_len));
+        self.line(&format!(
+            "  i32.const {}  ;; session key ptr",
+            session_key_offset
+        ));
+        self.line(&format!(
+            "  i32.const {}  ;; session key len",
+            session_key_len
+        ));
         self.line("  call $string_contains");
         self.line(")");
 
@@ -6208,10 +7026,10 @@ impl WasmCodegen {
         // ── Reactive signals for db state ──────────────────────────
         // status: 0=closed, 1=opening, 2=open, 3=error
         // error_msg: string ptr (0 when no error)
-        self.emit_capability_signal_globals(&db.name, &[
-            ("status", "db status"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &db.name,
+            &[("status", "db status"), ("error_msg", "error message")],
+        );
 
         // Emit global for the db handle
         self.line(&format!(
@@ -6229,10 +7047,13 @@ impl WasmCodegen {
             db.name, db.name
         ));
         // Create signals
-        self.emit_capability_signal_creates(&db.name, &[
-            ("status", 0),      // closed
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &db.name,
+            &[
+                ("status", 0), // closed
+                ("error_msg", 0),
+            ],
+        );
         // Set status to opening (1)
         self.emit_capability_set_status(&db.name, 1);
         self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
@@ -6358,12 +7179,15 @@ impl WasmCodegen {
         // progress: i32 0-100
         // filename: string ptr
         // error_msg: string ptr
-        self.emit_capability_signal_globals(&upload.name, &[
-            ("status", "upload status"),
-            ("progress", "upload progress 0-100"),
-            ("filename", "selected filename"),
-            ("error_msg", "error message"),
-        ]);
+        self.emit_capability_signal_globals(
+            &upload.name,
+            &[
+                ("status", "upload status"),
+                ("progress", "upload progress 0-100"),
+                ("filename", "selected filename"),
+                ("error_msg", "error message"),
+            ],
+        );
 
         let endpoint_str = match &upload.endpoint {
             Expr::StringLit(s) => s.clone(),
@@ -6374,7 +7198,9 @@ impl WasmCodegen {
         if !upload.accept.is_empty() {
             config.push_str(",\"accept\":[");
             for (i, mime) in upload.accept.iter().enumerate() {
-                if i > 0 { config.push(','); }
+                if i > 0 {
+                    config.push(',');
+                }
                 config.push('"');
                 config.push_str(mime);
                 config.push('"');
@@ -6389,7 +7215,10 @@ impl WasmCodegen {
         let config_offset = self.store_string(&config);
         let config_len = config.len();
 
-        self.line(&format!("(func $__upload_register_{} (export \"__upload_register_{}\")", upload.name, upload.name));
+        self.line(&format!(
+            "(func $__upload_register_{} (export \"__upload_register_{}\")",
+            upload.name, upload.name
+        ));
         if self.target == CompilationTarget::Wasi {
             // WASI target: create blob store entry instead of browser file picker
             self.line(&format!("  i32.const {}  ;; name ptr", name_offset));
@@ -6410,12 +7239,15 @@ impl WasmCodegen {
             "(func ${}_init (export \"{}_init\")",
             upload.name, upload.name
         ));
-        self.emit_capability_signal_creates(&upload.name, &[
-            ("status", 0),
-            ("progress", 0),
-            ("filename", 0),
-            ("error_msg", 0),
-        ]);
+        self.emit_capability_signal_creates(
+            &upload.name,
+            &[
+                ("status", 0),
+                ("progress", 0),
+                ("filename", 0),
+                ("error_msg", 0),
+            ],
+        );
         self.line(&format!("  call $__upload_register_{}", upload.name));
         self.line(")");
 
@@ -6427,7 +7259,10 @@ impl WasmCodegen {
         self.emit_capability_set_status(&upload.name, 1); // selecting
         if self.target == CompilationTarget::Wasi {
             // WASI target: list available blobs instead of file picker
-            self.line(&format!("  i32.const {}  ;; name ptr (store name)", name_offset));
+            self.line(&format!(
+                "  i32.const {}  ;; name ptr (store name)",
+                name_offset
+            ));
             self.line("  call $blob_list");
             self.line("  drop  ;; result ptr consumed by WASM callback");
         } else {
@@ -6452,7 +7287,10 @@ impl WasmCodegen {
             // WASI target: write blob data via wasi:blob/store
             self.line("  local.get $url_ptr  ;; blob key ptr");
             self.line("  local.get $url_len  ;; blob key len");
-            self.line(&format!("  i32.const {}  ;; store name (upload name)", name_offset));
+            self.line(&format!(
+                "  i32.const {}  ;; store name (upload name)",
+                name_offset
+            ));
             self.line("  call $blob_get");
             self.line("  drop  ;; blob handle");
         } else {
@@ -6501,13 +7339,21 @@ impl WasmCodegen {
         self.line(")");
 
         // ── Signal getters ──
-        self.emit_capability_getters(&upload.name, &["status", "progress", "filename", "error_msg"]);
+        self.emit_capability_getters(
+            &upload.name,
+            &["status", "progress", "filename", "error_msg"],
+        );
 
         // Track capability signals
         self.known_capability_signals.push((
             upload.name.clone(),
             "upload".into(),
-            vec!["status".into(), "progress".into(), "filename".into(), "error_msg".into()],
+            vec![
+                "status".into(),
+                "progress".into(),
+                "filename".into(),
+                "error_msg".into(),
+            ],
         ));
 
         if let Some(ref handler) = upload.on_progress {
@@ -6536,15 +7382,21 @@ impl WasmCodegen {
             config.push_str(&format!("\"strategy\":\"{}\"", strategy));
         }
         if let Some(ttl) = cache.default_ttl {
-            if config.len() > 1 { config.push(','); }
+            if config.len() > 1 {
+                config.push(',');
+            }
             config.push_str(&format!("\"ttl\":{}", ttl));
         }
         if cache.persist {
-            if config.len() > 1 { config.push(','); }
+            if config.len() > 1 {
+                config.push(',');
+            }
             config.push_str("\"persist\":true");
         }
         if let Some(max) = cache.max_entries {
-            if config.len() > 1 { config.push(','); }
+            if config.len() > 1 {
+                config.push(',');
+            }
             config.push_str(&format!("\"max_entries\":{}", max));
         }
         config.push('}');
@@ -6554,7 +7406,10 @@ impl WasmCodegen {
 
         if self.target == CompilationTarget::Wasi {
             // WASI target: open a kv store handle, used by queries/mutations below
-            self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
+            self.emit(&format!(
+                "(func $__cache_init_{} (export \"__cache_init_{}\")",
+                cache.name, cache.name
+            ));
             self.indent += 1;
             self.line(&format!("i32.const {}  ;; store name ptr", name_offset));
             self.line(&format!("i32.const {}  ;; store name len", name_len));
@@ -6564,7 +7419,10 @@ impl WasmCodegen {
             self.line(")");
         } else {
             // Browser target: WASM-internal LRU cache
-            self.emit(&format!("(func $__cache_init_{} (export \"__cache_init_{}\")", cache.name, cache.name));
+            self.emit(&format!(
+                "(func $__cache_init_{} (export \"__cache_init_{}\")",
+                cache.name, cache.name
+            ));
             self.indent += 1;
             self.line(&format!("i32.const {}  ;; name ptr", name_offset));
             self.line(&format!("i32.const {}  ;; name len", name_len));
@@ -6585,18 +7443,26 @@ impl WasmCodegen {
                 q_config.push_str(&format!("\"ttl\":{}", ttl));
             }
             if let Some(stale) = query.stale {
-                if q_config.len() > 1 { q_config.push(','); }
+                if q_config.len() > 1 {
+                    q_config.push(',');
+                }
                 q_config.push_str(&format!("\"stale\":{}", stale));
             }
             if let Some(ref contract) = query.contract {
-                if q_config.len() > 1 { q_config.push(','); }
+                if q_config.len() > 1 {
+                    q_config.push(',');
+                }
                 q_config.push_str(&format!("\"contract\":\"{}\"", contract));
             }
             if !query.invalidate_on.is_empty() {
-                if q_config.len() > 1 { q_config.push(','); }
+                if q_config.len() > 1 {
+                    q_config.push(',');
+                }
                 q_config.push_str("\"invalidate_on\":[");
                 for (i, event) in query.invalidate_on.iter().enumerate() {
-                    if i > 0 { q_config.push(','); }
+                    if i > 0 {
+                        q_config.push(',');
+                    }
                     q_config.push('"');
                     q_config.push_str(event);
                     q_config.push('"');
@@ -6610,7 +7476,10 @@ impl WasmCodegen {
 
             if self.target == CompilationTarget::Wasi {
                 // WASI target: query dispatches to kv_get
-                self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
+                self.emit(&format!(
+                    "(func $__cache_query_{} (export \"__cache_query_{}\")",
+                    query.name, query.name
+                ));
                 self.indent += 1;
                 self.line("(result i32)");
                 self.line(&format!("i32.const 0  ;; store handle (opened in init)"));
@@ -6620,11 +7489,17 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             } else {
-                self.emit(&format!("(func $__cache_query_{} (export \"__cache_query_{}\")", query.name, query.name));
+                self.emit(&format!(
+                    "(func $__cache_query_{} (export \"__cache_query_{}\")",
+                    query.name, query.name
+                ));
                 self.indent += 1;
                 self.line(&format!("i32.const {}  ;; query name ptr", q_name_offset));
                 self.line(&format!("i32.const {}  ;; query name len", q_name_len));
-                self.line(&format!("i32.const {}  ;; query config ptr", q_config_offset));
+                self.line(&format!(
+                    "i32.const {}  ;; query config ptr",
+                    q_config_offset
+                ));
                 self.line(&format!("i32.const {}  ;; query config len", q_config_len));
                 self.line("call $cache_register_query");
                 self.indent -= 1;
@@ -6642,14 +7517,20 @@ impl WasmCodegen {
                 m_config.push_str("\"optimistic\":true");
             }
             if mutation.rollback_on_error {
-                if m_config.len() > 1 { m_config.push(','); }
+                if m_config.len() > 1 {
+                    m_config.push(',');
+                }
                 m_config.push_str("\"rollback_on_error\":true");
             }
             if !mutation.invalidate.is_empty() {
-                if m_config.len() > 1 { m_config.push(','); }
+                if m_config.len() > 1 {
+                    m_config.push(',');
+                }
                 m_config.push_str("\"invalidate\":[");
                 for (i, name) in mutation.invalidate.iter().enumerate() {
-                    if i > 0 { m_config.push(','); }
+                    if i > 0 {
+                        m_config.push(',');
+                    }
                     m_config.push('"');
                     m_config.push_str(name);
                     m_config.push('"');
@@ -6663,7 +7544,10 @@ impl WasmCodegen {
 
             if self.target == CompilationTarget::Wasi {
                 // WASI target: mutation dispatches to kv_set
-                self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
+                self.emit(&format!(
+                    "(func $__cache_mutation_{} (export \"__cache_mutation_{}\")",
+                    mutation.name, mutation.name
+                ));
                 self.indent += 1;
                 self.line(&format!("i32.const 0  ;; store handle"));
                 self.line(&format!("i32.const {}  ;; key ptr", m_name_offset));
@@ -6674,12 +7558,24 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             } else {
-                self.emit(&format!("(func $__cache_mutation_{} (export \"__cache_mutation_{}\")", mutation.name, mutation.name));
+                self.emit(&format!(
+                    "(func $__cache_mutation_{} (export \"__cache_mutation_{}\")",
+                    mutation.name, mutation.name
+                ));
                 self.indent += 1;
-                self.line(&format!("i32.const {}  ;; mutation name ptr", m_name_offset));
+                self.line(&format!(
+                    "i32.const {}  ;; mutation name ptr",
+                    m_name_offset
+                ));
                 self.line(&format!("i32.const {}  ;; mutation name len", m_name_len));
-                self.line(&format!("i32.const {}  ;; mutation config ptr", m_config_offset));
-                self.line(&format!("i32.const {}  ;; mutation config len", m_config_len));
+                self.line(&format!(
+                    "i32.const {}  ;; mutation config ptr",
+                    m_config_offset
+                ));
+                self.line(&format!(
+                    "i32.const {}  ;; mutation config len",
+                    m_config_len
+                ));
                 self.line("call $cache_register_mutation");
                 self.indent -= 1;
                 self.line(")");
@@ -6698,7 +7594,9 @@ impl WasmCodegen {
         // Build config JSON: {"mobile":640,"tablet":1024,...}
         let mut config = String::from("{");
         for (i, (name, px)) in bp.breakpoints.iter().enumerate() {
-            if i > 0 { config.push(','); }
+            if i > 0 {
+                config.push(',');
+            }
             config.push_str(&format!("\"{}\":{}", name, px));
         }
         config.push('}');
@@ -6721,18 +7619,30 @@ impl WasmCodegen {
         let name_len = anim.name.len();
 
         match &anim.kind {
-            AnimationKind::Spring { stiffness, damping, mass, properties } => {
+            AnimationKind::Spring {
+                stiffness,
+                damping,
+                mass,
+                properties,
+            } => {
                 let config = format!(
                     "{{\"stiffness\":{},\"damping\":{},\"mass\":{},\"properties\":[{}]}}",
                     stiffness.unwrap_or(120.0),
                     damping.unwrap_or(14.0),
                     mass.unwrap_or(1.0),
-                    properties.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(",")
+                    properties
+                        .iter()
+                        .map(|p| format!("\"{}\"", p))
+                        .collect::<Vec<_>>()
+                        .join(",")
                 );
                 let config_offset = self.store_string(&config);
                 let config_len = config.len();
 
-                self.emit(&format!("(func $__init_anim_{} (export \"__init_anim_{}\")", anim.name, anim.name));
+                self.emit(&format!(
+                    "(func $__init_anim_{} (export \"__init_anim_{}\")",
+                    anim.name, anim.name
+                ));
                 self.indent += 1;
                 self.line(&format!("i32.const {} ;; name ptr", name_offset));
                 self.line(&format!("i32.const {} ;; name len", name_len));
@@ -6742,10 +7652,16 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             }
-            AnimationKind::Keyframes { frames, duration, easing } => {
+            AnimationKind::Keyframes {
+                frames,
+                duration,
+                easing,
+            } => {
                 let mut frames_json = String::from("[");
                 for (i, (pct, props)) in frames.iter().enumerate() {
-                    if i > 0 { frames_json.push(','); }
+                    if i > 0 {
+                        frames_json.push(',');
+                    }
                     frames_json.push_str(&format!("{{\"offset\":{}", pct / 100.0));
                     for (name, _val) in props {
                         frames_json.push_str(&format!(",\"{}\":\"\"", name));
@@ -6763,7 +7679,10 @@ impl WasmCodegen {
                 let config_offset = self.store_string(&config);
                 let config_len = config.len();
 
-                self.emit(&format!("(func $__init_anim_{} (export \"__init_anim_{}\")", anim.name, anim.name));
+                self.emit(&format!(
+                    "(func $__init_anim_{} (export \"__init_anim_{}\")",
+                    anim.name, anim.name
+                ));
                 self.indent += 1;
                 self.line(&format!("i32.const {} ;; name ptr", name_offset));
                 self.line(&format!("i32.const {} ;; name len", name_len));
@@ -6773,17 +7692,27 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             }
-            AnimationKind::Stagger { animation, delay, selector } => {
+            AnimationKind::Stagger {
+                animation,
+                delay,
+                selector,
+            } => {
                 let config = format!(
                     "{{\"animation\":\"{}\",\"delay\":\"{}\"{}}}",
                     animation,
                     delay.as_deref().unwrap_or("50ms"),
-                    selector.as_ref().map(|s| format!(",\"selector\":\"{}\"", s)).unwrap_or_default()
+                    selector
+                        .as_ref()
+                        .map(|s| format!(",\"selector\":\"{}\"", s))
+                        .unwrap_or_default()
                 );
                 let config_offset = self.store_string(&config);
                 let config_len = config.len();
 
-                self.emit(&format!("(func $__init_anim_{} (export \"__init_anim_{}\")", anim.name, anim.name));
+                self.emit(&format!(
+                    "(func $__init_anim_{} (export \"__init_anim_{}\")",
+                    anim.name, anim.name
+                ));
                 self.indent += 1;
                 self.line(&format!("i32.const {} ;; name ptr", name_offset));
                 self.line(&format!("i32.const {} ;; name len", name_len));
@@ -6862,12 +7791,18 @@ impl WasmCodegen {
             let scope_offset = self.store_string(&theme_scope);
             let css_offset = self.store_string(&css);
 
-            self.emit(&format!("(func $__init_theme_{} (export \"__init_theme_{}\")", theme.name, theme.name));
+            self.emit(&format!(
+                "(func $__init_theme_{} (export \"__init_theme_{}\")",
+                theme.name, theme.name
+            ));
             self.indent += 1;
 
             // Inject theme CSS via style_injectStyles
             self.line(&format!("i32.const {} ;; theme scope ptr", scope_offset));
-            self.line(&format!("i32.const {} ;; theme scope len", theme_scope.len()));
+            self.line(&format!(
+                "i32.const {} ;; theme scope len",
+                theme_scope.len()
+            ));
             self.line(&format!("i32.const {} ;; css ptr", css_offset));
             self.line(&format!("i32.const {} ;; css len", css.len()));
             self.line("call $style_injectStyles");
@@ -6886,7 +7821,10 @@ impl WasmCodegen {
             let name_offset = self.store_string(&theme.name);
             let config_offset = self.store_string(&config);
 
-            self.emit(&format!("(func $__init_theme_{} (export \"__init_theme_{}\")", theme.name, theme.name));
+            self.emit(&format!(
+                "(func $__init_theme_{} (export \"__init_theme_{}\")",
+                theme.name, theme.name
+            ));
             self.indent += 1;
             self.line(&format!("i32.const {} ;; name ptr", name_offset));
             self.line(&format!("i32.const {} ;; name len", theme.name.len()));
@@ -6913,7 +7851,9 @@ impl WasmCodegen {
         if !perms.network.is_empty() {
             json.push_str("\"network\":[");
             for (i, pat) in perms.network.iter().enumerate() {
-                if i > 0 { json.push(','); }
+                if i > 0 {
+                    json.push(',');
+                }
                 json.push('"');
                 json.push_str(pat);
                 json.push('"');
@@ -6921,10 +7861,14 @@ impl WasmCodegen {
             json.push(']');
         }
         if !perms.storage.is_empty() {
-            if !perms.network.is_empty() { json.push(','); }
+            if !perms.network.is_empty() {
+                json.push(',');
+            }
             json.push_str("\"storage\":[");
             for (i, key) in perms.storage.iter().enumerate() {
-                if i > 0 { json.push(','); }
+                if i > 0 {
+                    json.push(',');
+                }
                 json.push('"');
                 json.push_str(key);
                 json.push('"');
@@ -6932,10 +7876,14 @@ impl WasmCodegen {
             json.push(']');
         }
         if !perms.capabilities.is_empty() {
-            if !perms.network.is_empty() || !perms.storage.is_empty() { json.push(','); }
+            if !perms.network.is_empty() || !perms.storage.is_empty() {
+                json.push(',');
+            }
             json.push_str("\"capabilities\":[");
             for (i, cap) in perms.capabilities.iter().enumerate() {
-                if i > 0 { json.push(','); }
+                if i > 0 {
+                    json.push(',');
+                }
                 json.push('"');
                 json.push_str(cap);
                 json.push('"');
@@ -6947,14 +7895,22 @@ impl WasmCodegen {
         let name_offset = self.store_string(comp_name);
         let json_offset = self.store_string(&json);
         self.line(&format!("i32.const {} ;; component name ptr", name_offset));
-        self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
-        self.line(&format!("i32.const {} ;; permissions json ptr", json_offset));
+        self.line(&format!(
+            "i32.const {} ;; component name len",
+            comp_name.len()
+        ));
+        self.line(&format!(
+            "i32.const {} ;; permissions json ptr",
+            json_offset
+        ));
         self.line(&format!("i32.const {} ;; permissions json len", json.len()));
         self.line("call $permissions_registerPermissions");
 
         // Emit CSP metadata comment from analyzed network patterns
         if !perms.network.is_empty() {
-            let csp_sources: Vec<&str> = perms.network.iter()
+            let csp_sources: Vec<&str> = perms
+                .network
+                .iter()
                 .filter_map(|url| {
                     // Extract origin from URL pattern for CSP connect-src
                     if let Some(idx) = url.find("://") {
@@ -6986,14 +7942,19 @@ impl WasmCodegen {
 
         // Global signal IDs for each store signal
         for (i, sig) in store.signals.iter().enumerate() {
-            self.line(&format!("(global $__sig_{store_name}_{} (mut i32) (i32.const -1)) ;; signal ID", sig.name));
+            self.line(&format!(
+                "(global $__sig_{store_name}_{} (mut i32) (i32.const -1)) ;; signal ID",
+                sig.name
+            ));
             let _ = i;
         }
 
         // Store init function — creates all signals
         // Use deferred locals so array/struct initializers can declare locals
         self.line("");
-        self.emit(&format!("(func ${store_name}_init (export \"{store_name}_init\")"));
+        self.emit(&format!(
+            "(func ${store_name}_init (export \"{store_name}_init\")"
+        ));
         self.indent += 1;
 
         let saved_output = std::mem::take(&mut self.output);
@@ -7025,11 +7986,15 @@ impl WasmCodegen {
         // Getters for each signal
         for sig in &store.signals {
             self.line("");
-            let wasm_ty = sig.ty.as_ref()
+            let wasm_ty = sig
+                .ty
+                .as_ref()
                 .map(|t| self.type_to_wasm(t))
                 .unwrap_or_else(|| "i32".into());
-            self.emit(&format!("(func ${store_name}_get_{} (export \"{store_name}_get_{}\") (result {wasm_ty})",
-                sig.name, sig.name));
+            self.emit(&format!(
+                "(func ${store_name}_get_{} (export \"{store_name}_get_{}\") (result {wasm_ty})",
+                sig.name, sig.name
+            ));
             self.indent += 1;
             self.line(&format!("global.get $__sig_{store_name}_{}", sig.name));
             self.line("call $signal_get");
@@ -7046,7 +8011,9 @@ impl WasmCodegen {
                 continue; // Explicit action takes priority over auto-generated setter
             }
             self.line("");
-            let wasm_ty = sig.ty.as_ref()
+            let wasm_ty = sig
+                .ty
+                .as_ref()
                 .map(|t| self.type_to_wasm(t))
                 .unwrap_or_else(|| "i32".into());
             self.emit(&format!("(func ${store_name}_set_{} (export \"{store_name}_set_{}\") (param $value {wasm_ty})",
@@ -7064,23 +8031,35 @@ impl WasmCodegen {
         let store_field_names: Vec<String> = store.signals.iter().map(|s| s.name.clone()).collect();
         self.in_component_mount = true;
         self.component_fields = store_field_names.clone();
-        self.string_state_fields = store.signals.iter().filter(|s| {
-            matches!(&s.initializer, Expr::StringLit(_))
-                || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
-        }).map(|s| s.name.clone()).collect();
+        self.string_state_fields = store
+            .signals
+            .iter()
+            .filter(|s| {
+                matches!(&s.initializer, Expr::StringLit(_))
+                    || matches!(&s.ty, Some(Type::Named(t)) if t == "String" || t == "str")
+            })
+            .map(|s| s.name.clone())
+            .collect();
         self.component_name = store_name.clone();
 
         // Actions — methods that can mutate store signals
         for action in &store.actions {
             self.line("");
-            let params: Vec<String> = action.params.iter()
+            let params: Vec<String> = action
+                .params
+                .iter()
                 .filter(|p| p.name != "self")
                 .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty)))
                 .collect();
 
             let async_comment = if action.is_async { " ;; async" } else { "" };
-            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\") {}{}",
-                action.name, action.name, params.join(" "), async_comment));
+            self.emit(&format!(
+                "(func ${store_name}_{} (export \"{store_name}_{}\") {}{}",
+                action.name,
+                action.name,
+                params.join(" "),
+                async_comment
+            ));
             self.indent += 1;
 
             if action.is_async {
@@ -7123,11 +8102,15 @@ impl WasmCodegen {
         // Computed values — derived signals
         for comp in &store.computed {
             self.line("");
-            let ret = comp.return_type.as_ref()
+            let ret = comp
+                .return_type
+                .as_ref()
                 .map(|t| format!(" (result {})", self.type_to_wasm(t)))
                 .unwrap_or_else(|| " (result i32)".into());
-            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\")",
-                comp.name, comp.name));
+            self.emit(&format!(
+                "(func ${store_name}_{} (export \"{store_name}_{}\")",
+                comp.name, comp.name
+            ));
             self.indent += 1;
             self.line(&format!(";; computed value{}", ret));
 
@@ -7156,8 +8139,10 @@ impl WasmCodegen {
         // Effects — side effects that auto-run when dependencies change
         for effect in &store.effects {
             self.line("");
-            self.emit(&format!("(func ${store_name}_{} (export \"{store_name}_{}\")",
-                effect.name, effect.name));
+            self.emit(&format!(
+                "(func ${store_name}_{} (export \"{store_name}_{}\")",
+                effect.name, effect.name
+            ));
             self.indent += 1;
             self.line(";; effect — auto-runs when signal dependencies change");
 
@@ -7185,10 +8170,15 @@ impl WasmCodegen {
         // Selectors — derived values that depend on signals
         for selector in &store.selectors {
             self.line("");
-            self.emit(&format!("(func ${store_name}_selector_{} (export \"{store_name}_selector_{}\")",
-                selector.name, selector.name));
+            self.emit(&format!(
+                "(func ${store_name}_selector_{} (export \"{store_name}_selector_{}\")",
+                selector.name, selector.name
+            ));
             self.indent += 1;
-            self.line(&format!(";; selector: {} — derived from store signals", selector.name));
+            self.line(&format!(
+                ";; selector: {} — derived from store signals",
+                selector.name
+            ));
 
             // Hoist dynamic locals to function preamble
             let saved_output = std::mem::take(&mut self.output);
@@ -7261,13 +8251,18 @@ impl WasmCodegen {
 
         // Generate the agent init function — registers tools and sets system prompt
         self.line("");
-        self.emit(&format!("(func ${agent_name}_init (export \"{agent_name}_init\")"));
+        self.emit(&format!(
+            "(func ${agent_name}_init (export \"{agent_name}_init\")"
+        ));
         self.indent += 1;
 
         // Register system prompt if present
         if let Some(ref prompt) = agent.system_prompt {
             let prompt_offset = self.store_string(prompt);
-            self.line(&format!(";; system prompt: \"{}\"", &prompt[..prompt.len().min(40)]));
+            self.line(&format!(
+                ";; system prompt: \"{}\"",
+                &prompt[..prompt.len().min(40)]
+            ));
             self.line(&format!("i32.const {} ;; prompt ptr", prompt_offset));
             self.line(&format!("i32.const {} ;; prompt len", prompt.len()));
         }
@@ -7301,18 +8296,25 @@ impl WasmCodegen {
         for tool in &agent.tools {
             self.locals.clear();
             self.line("");
-            let params: Vec<String> = tool.params.iter()
+            let params: Vec<String> = tool
+                .params
+                .iter()
                 .filter(|p| p.name != "self")
                 .map(|p| format!("(param ${} {})", p.name, self.type_to_wasm(&p.ty)))
                 .collect();
 
-            let ret = tool.return_type.as_ref()
+            let ret = tool
+                .return_type
+                .as_ref()
                 .map(|t| format!(" (result {})", self.type_to_wasm(t)))
                 .unwrap_or_default();
 
             self.emit(&format!(
                 "(func $__tool_{agent_name}_{} (export \"__tool_{agent_name}_{}\"){} {}",
-                tool.name, tool.name, ret, params.join(" ")
+                tool.name,
+                tool.name,
+                ret,
+                params.join(" ")
             ));
             self.indent += 1;
 
@@ -7349,12 +8351,17 @@ impl WasmCodegen {
 
         // Generate agent mount function (like component mount but with chat UI)
         self.line("");
-        self.emit(&format!("(func ${agent_name}_mount (export \"{agent_name}_mount\") (param $root i32)"));
+        self.emit(&format!(
+            "(func ${agent_name}_mount (export \"{agent_name}_mount\") (param $root i32)"
+        ));
         self.indent += 1;
 
         // Create state signals
         for state in &agent.state {
-            self.line(&format!("(local ${} i32) ;; signal ID for {}", state.name, state.name));
+            self.line(&format!(
+                "(local ${} i32) ;; signal ID for {}",
+                state.name, state.name
+            ));
         }
         for state in &agent.state {
             self.generate_expr(&state.initializer);
@@ -7383,7 +8390,9 @@ impl WasmCodegen {
         // Build a JSON schema string describing the tool's parameters
         let mut schema = String::from("{\"type\":\"object\",\"properties\":{");
         for (i, param) in tool.params.iter().filter(|p| p.name != "self").enumerate() {
-            if i > 0 { schema.push(','); }
+            if i > 0 {
+                schema.push(',');
+            }
             let json_type = match &param.ty {
                 Type::Named(n) => match n.as_str() {
                     "String" => "string",
@@ -7395,7 +8404,10 @@ impl WasmCodegen {
                 Type::Array(_) => "array",
                 _ => "string",
             };
-            schema.push_str(&format!("\"{}\":{{\"type\":\"{}\"}}", param.name, json_type));
+            schema.push_str(&format!(
+                "\"{}\":{{\"type\":\"{}\"}}",
+                param.name, json_type
+            ));
         }
         schema.push_str("}}");
         schema
@@ -7407,7 +8419,9 @@ impl WasmCodegen {
 
         // Generate router init function that registers all routes
         self.line("");
-        self.emit(&format!("(func ${router_name}_init (export \"{router_name}_init\")"));
+        self.emit(&format!(
+            "(func ${router_name}_init (export \"{router_name}_init\")"
+        ));
         self.indent += 1;
 
         // Register each route with the runtime
@@ -7420,7 +8434,10 @@ impl WasmCodegen {
             self.closure_func_names.push(func_name);
             self.line(&format!("i32.const {} ;; path ptr", path_offset));
             self.line(&format!("i32.const {} ;; path len", route.path.len()));
-            self.line(&format!("i32.const {} ;; table index for {}", table_idx, route.component));
+            self.line(&format!(
+                "i32.const {} ;; table index for {}",
+                table_idx, route.component
+            ));
             self.line("call $router_registerRoute");
         }
 
@@ -7428,7 +8445,10 @@ impl WasmCodegen {
         let routes_json = self.build_routes_json(&router.routes);
         let routes_offset = self.store_string(&routes_json);
         self.line(&format!("i32.const {} ;; routes config ptr", routes_offset));
-        self.line(&format!("i32.const {} ;; routes config len", routes_json.len()));
+        self.line(&format!(
+            "i32.const {} ;; routes config len",
+            routes_json.len()
+        ));
         self.line("call $router_init");
 
         self.indent -= 1;
@@ -7442,7 +8462,10 @@ impl WasmCodegen {
                 i, i
             ));
             self.indent += 1;
-            self.line(&format!(";; mount component {} for route {}", route.component, route.path));
+            self.line(&format!(
+                ";; mount component {} for route {}",
+                route.component, route.path
+            ));
 
             // If there is a guard, check it first
             if let Some(ref guard) = route.guard {
@@ -7489,7 +8512,9 @@ impl WasmCodegen {
                 if let Expr::Ident(name) = expr.as_ref() {
                     if self.known_components.contains(name) {
                         self.line("local.get $root");
-                        let prop_defs: Vec<String> = self.component_prop_defs.iter()
+                        let prop_defs: Vec<String> = self
+                            .component_prop_defs
+                            .iter()
                             .find(|(n, _)| n == name)
                             .map(|(_, props)| props.clone())
                             .unwrap_or_default();
@@ -7527,7 +8552,9 @@ impl WasmCodegen {
     fn build_routes_json(&mut self, routes: &[RouteDef]) -> String {
         let mut json = String::from("[");
         for (i, route) in routes.iter().enumerate() {
-            if i > 0 { json.push(','); }
+            if i > 0 {
+                json.push(',');
+            }
             json.push_str(&format!(
                 "{{\"path\":\"{}\",\"component\":\"{}\",\"mountFn\":\"__route_mount_{}\"}}",
                 route.path, route.component, i
@@ -7601,7 +8628,9 @@ impl WasmCodegen {
                 let after_at = &trimmed[1..];
                 if let Some(space_idx) = after_at.find(' ') {
                     let bp_name = &after_at[..space_idx];
-                    if let Some((_name, px)) = self.breakpoint_defs.iter().find(|(n, _)| n == bp_name) {
+                    if let Some((_name, px)) =
+                        self.breakpoint_defs.iter().find(|(n, _)| n == bp_name)
+                    {
                         let px_val = *px;
                         if let Some(group) = bp_groups.iter_mut().find(|(n, _, _)| n == bp_name) {
                             group.2.push(block);
@@ -7658,8 +8687,14 @@ impl WasmCodegen {
         let comp_name_offset = self.store_string(comp_name);
         let css_offset = self.store_string(&css);
 
-        self.line(&format!("i32.const {} ;; component name ptr", comp_name_offset));
-        self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
+        self.line(&format!(
+            "i32.const {} ;; component name ptr",
+            comp_name_offset
+        ));
+        self.line(&format!(
+            "i32.const {} ;; component name len",
+            comp_name.len()
+        ));
         self.line(&format!("i32.const {} ;; css ptr", css_offset));
         self.line(&format!("i32.const {} ;; css len", css.len()));
         self.line("call $style_injectStyles");
@@ -7691,8 +8726,14 @@ impl WasmCodegen {
         let comp_name_offset = self.store_string(comp_name);
         let css_offset = self.store_string(&css);
 
-        self.line(&format!("i32.const {} ;; component name ptr", comp_name_offset));
-        self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
+        self.line(&format!(
+            "i32.const {} ;; component name ptr",
+            comp_name_offset
+        ));
+        self.line(&format!(
+            "i32.const {} ;; component name len",
+            comp_name.len()
+        ));
         self.line(&format!("i32.const {} ;; transition css ptr", css_offset));
         self.line(&format!("i32.const {} ;; transition css len", css.len()));
         self.line("call $style_injectStyles");
@@ -7704,7 +8745,9 @@ impl WasmCodegen {
         let comp_name = &comp.name;
 
         self.line(&format!(";; === Lazy Component: {} ===", comp_name));
-        self.line(&format!(";; This component is loaded on-demand via dynamic import"));
+        self.line(&format!(
+            ";; This component is loaded on-demand via dynamic import"
+        ));
 
         // Generate the regular component code (it will be in a separate chunk)
         self.generate_component(comp);
@@ -7720,7 +8763,10 @@ impl WasmCodegen {
 
         let name_offset = self.store_string(comp_name);
         self.line(&format!("i32.const {} ;; component name ptr", name_offset));
-        self.line(&format!("i32.const {} ;; component name len", comp_name.len()));
+        self.line(&format!(
+            "i32.const {} ;; component name len",
+            comp_name.len()
+        ));
         self.line("local.get $root");
         self.line("local.get $fallback_fn");
         self.line("call $dom_lazyMount");
@@ -7735,7 +8781,11 @@ impl WasmCodegen {
         if self.defer_template_locals {
             // Check if any local with this variable name already exists (any type)
             let var_prefix = format!("(local {} ", var);
-            if !self.template_locals.iter().any(|l| l.starts_with(&var_prefix)) {
+            if !self
+                .template_locals
+                .iter()
+                .any(|l| l.starts_with(&var_prefix))
+            {
                 self.template_locals.push(decl);
             }
         } else {
@@ -7750,7 +8800,11 @@ impl WasmCodegen {
         if self.defer_template_locals {
             // Check if any local with this variable name already exists (any type)
             let var_prefix = format!("(local {} ", var);
-            if !self.template_locals.iter().any(|l| l.starts_with(&var_prefix)) {
+            if !self
+                .template_locals
+                .iter()
+                .any(|l| l.starts_with(&var_prefix))
+            {
                 self.template_locals.push(decl);
             }
         } else {
@@ -7802,7 +8856,11 @@ impl WasmCodegen {
                 self.collect_signal_fields(object, fields);
                 self.collect_signal_fields(index, fields);
             }
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 self.collect_signal_fields(condition, fields);
                 for stmt in &then_block.stmts {
                     if let Stmt::Expr(e) = stmt {
@@ -7844,15 +8902,21 @@ impl WasmCodegen {
                     self.line(&format!("local.get {}", container_var));
 
                     // Look up expected props for this component and pass values from attributes
-                    let prop_defs: Vec<String> = self.component_prop_defs.iter()
+                    let prop_defs: Vec<String> = self
+                        .component_prop_defs
+                        .iter()
                         .find(|(name, _)| name == &comp_name)
                         .map(|(_, props)| props.clone())
                         .unwrap_or_default();
 
                     // Build a map of attribute values from the element
-                    let attr_map: Vec<(String, String)> = el.attributes.iter()
+                    let attr_map: Vec<(String, String)> = el
+                        .attributes
+                        .iter()
                         .filter_map(|attr| match attr {
-                            Attribute::Static { name, value } => Some((name.clone(), value.clone())),
+                            Attribute::Static { name, value } => {
+                                Some((name.clone(), value.clone()))
+                            }
                             _ => None,
                         })
                         .collect();
@@ -7862,11 +8926,18 @@ impl WasmCodegen {
                         if let Some((_, value)) = attr_map.iter().find(|(n, _)| n == prop_name) {
                             let offset = self.store_string(value);
                             self.line(&format!("i32.const {} ;; prop {} ptr", offset, prop_name));
-                            self.line(&format!("i32.const {} ;; prop {} len", value.len(), prop_name));
+                            self.line(&format!(
+                                "i32.const {} ;; prop {} len",
+                                value.len(),
+                                prop_name
+                            ));
                         } else {
                             // No value provided — pass empty string
                             let offset = self.store_string("");
-                            self.line(&format!("i32.const {} ;; prop {} (default empty)", offset, prop_name));
+                            self.line(&format!(
+                                "i32.const {} ;; prop {} (default empty)",
+                                offset, prop_name
+                            ));
                             self.line("i32.const 0");
                         }
                     }
@@ -7887,12 +8958,16 @@ impl WasmCodegen {
                 self.line(&format!("local.set {}", var));
 
                 // Honeycomb widget: apply default styles if user didn't provide a style attr
-                let has_style_attr = el.attributes.iter().any(|a| matches!(a, Attribute::Static { name, .. } if name == "style"));
+                let has_style_attr = el
+                    .attributes
+                    .iter()
+                    .any(|a| matches!(a, Attribute::Static { name, .. } if name == "style"));
                 if !has_style_attr {
                     let defaults = honeycomb::catalog::default_styles(&el.tag);
                     if !defaults.is_empty() {
                         // Build default style string and set as attribute
-                        let style_str: String = defaults.iter()
+                        let style_str: String = defaults
+                            .iter()
                             .map(|(k, v)| format!("{}: {}", k, v))
                             .collect::<Vec<_>>()
                             .join("; ");
@@ -7939,16 +9014,18 @@ impl WasmCodegen {
                                 self.line("call $dom_setAttr");
 
                                 // Now emit setStyle for each CSS property from each class
-                                let classes_to_resolve: Vec<String> = value.split_whitespace()
-                                    .map(|s| s.to_string())
-                                    .collect();
+                                let classes_to_resolve: Vec<String> =
+                                    value.split_whitespace().map(|s| s.to_string()).collect();
                                 let bloom_styles = self.bloom_class_styles.clone();
                                 for cls in &classes_to_resolve {
                                     if let Some(props) = bloom_styles.get(cls) {
                                         for (prop, pval) in props {
                                             let prop_offset = self.store_string(prop);
                                             let val_offset = self.store_string(pval);
-                                            self.line(&format!(";; Bloom: .{} {{ {}: {} }}", cls, prop, pval));
+                                            self.line(&format!(
+                                                ";; Bloom: .{} {{ {}: {} }}",
+                                                cls, prop, pval
+                                            ));
                                             self.line(&format!("local.get {}", var));
                                             self.line(&format!("i32.const {}", prop_offset));
                                             self.line(&format!("i32.const {}", prop.len()));
@@ -7959,30 +9036,33 @@ impl WasmCodegen {
                                     }
                                 }
                             } else {
-                            // Browser/Canvas target: rewrite class names as before
-                            let effective_value = if name == "class" && !self.component_scoped_selectors.is_empty() {
-                                let comp = &self.component_name;
-                                value.split_whitespace()
-                                    .map(|cls| {
-                                        if self.component_scoped_selectors.contains(cls) {
-                                            format!("{}__{}", comp, cls)
-                                        } else {
-                                            cls.to_string()
-                                        }
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(" ")
-                            } else {
-                                value.clone()
-                            };
-                            let name_offset = self.store_string(name);
-                            let val_offset = self.store_string(&effective_value);
-                            self.line(&format!("local.get {}", var));
-                            self.line(&format!("i32.const {}", name_offset));
-                            self.line(&format!("i32.const {}", name.len()));
-                            self.line(&format!("i32.const {}", val_offset));
-                            self.line(&format!("i32.const {}", effective_value.len()));
-                            self.line("call $dom_setAttr");
+                                // Browser/Canvas target: rewrite class names as before
+                                let effective_value = if name == "class"
+                                    && !self.component_scoped_selectors.is_empty()
+                                {
+                                    let comp = &self.component_name;
+                                    value
+                                        .split_whitespace()
+                                        .map(|cls| {
+                                            if self.component_scoped_selectors.contains(cls) {
+                                                format!("{}__{}", comp, cls)
+                                            } else {
+                                                cls.to_string()
+                                            }
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .join(" ")
+                                } else {
+                                    value.clone()
+                                };
+                                let name_offset = self.store_string(name);
+                                let val_offset = self.store_string(&effective_value);
+                                self.line(&format!("local.get {}", var));
+                                self.line(&format!("i32.const {}", name_offset));
+                                self.line(&format!("i32.const {}", name.len()));
+                                self.line(&format!("i32.const {}", val_offset));
+                                self.line(&format!("i32.const {}", effective_value.len()));
+                                self.line("call $dom_setAttr");
                             } // end else (non-Bloom)
                             // Auto-register timing display elements
                             if name == "id" && value == "timing-display" {
@@ -8015,14 +9095,22 @@ impl WasmCodegen {
                             // Reactive attribute updates: if this dynamic attribute
                             // references signals, subscribe so it re-evaluates on change.
                             if self.in_component_mount && self.for_loop_bindings.is_empty() {
-                                let attr_signal_fields = self.extract_signal_fields_from_expr(value);
+                                let attr_signal_fields =
+                                    self.extract_signal_fields_from_expr(value);
                                 if !attr_signal_fields.is_empty() {
                                     let value_clone = value.clone();
                                     for field in &attr_signal_fields {
                                         let uid = self.next_label();
-                                        let global_el = format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
-                                        let sig_global = format!("$__sig_{}_{}", self.component_name, field);
-                                        let func_name = format!("$__update_attr_{}_{}_{}", self.component_name, field, uid);
+                                        let global_el = format!(
+                                            "$__dyn_el_{}_{}_{}",
+                                            self.component_name, field, uid
+                                        );
+                                        let sig_global =
+                                            format!("$__sig_{}_{}", self.component_name, field);
+                                        let func_name = format!(
+                                            "$__update_attr_{}_{}_{}",
+                                            self.component_name, field, uid
+                                        );
 
                                         self.line(&format!("local.get {}", var));
                                         self.line(&format!("global.set {}", global_el));
@@ -8056,12 +9144,23 @@ impl WasmCodegen {
                                 // Inside a for-loop: register a parameterized callback
                                 // that captures the current loop binding value (item ptr).
                                 let binding = self.for_loop_bindings.last().unwrap().clone();
-                                self.line(&format!(";; parameterized callback: captures ${}", binding));
-                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!(
+                                    ";; parameterized callback: captures ${}",
+                                    binding
+                                ));
+                                self.line(&format!(
+                                    "i32.const {} ;; handler func index",
+                                    handler_idx
+                                ));
                                 self.line(&format!("local.get ${} ;; captured item ptr", binding));
-                                self.line("call $__cb_register_with_data ;; -> dynamic callback idx");
+                                self.line(
+                                    "call $__cb_register_with_data ;; -> dynamic callback idx",
+                                );
                             } else {
-                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!(
+                                    "i32.const {} ;; handler func index",
+                                    handler_idx
+                                ));
                             }
                             self.line("call $dom_addEventListener");
                         }
@@ -8110,12 +9209,16 @@ impl WasmCodegen {
                             };
                             let event_offset = self.store_string(event_name);
 
-                            self.line(&format!(";; two-way bind: bind:{}={{{}}}", property, signal));
+                            self.line(&format!(
+                                ";; two-way bind: bind:{}={{{}}}",
+                                property, signal
+                            ));
 
                             // Resolve signal reference: component fields use globals,
                             // page-level locals use local.get.
                             let signal_get_instr = if self.in_component_mount
-                                && self.component_fields.contains(signal) {
+                                && self.component_fields.contains(signal)
+                            {
                                 format!("global.get $__sig_{}_{}", self.component_name, signal)
                             } else {
                                 format!("local.get ${}", signal)
@@ -8131,7 +9234,10 @@ impl WasmCodegen {
                             self.line("call $dom_setProperty");
 
                             // 2. Create an effect: when signal changes, update DOM property
-                            self.line(&format!(";; effect #{} — signal->DOM for bind:{}", effect_idx, property));
+                            self.line(&format!(
+                                ";; effect #{} — signal->DOM for bind:{}",
+                                effect_idx, property
+                            ));
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", prop_offset));
                             self.line(&format!("i32.const {}", property.len()));
@@ -8142,7 +9248,10 @@ impl WasmCodegen {
                             self.line("call $signal_createEffect");
 
                             // 3. Add event listener (input/change) to push user edits back
-                            self.line(&format!(";; handler #{} — DOM->signal for bind:{}", handler_idx, property));
+                            self.line(&format!(
+                                ";; handler #{} — DOM->signal for bind:{}",
+                                handler_idx, property
+                            ));
                             self.line(&format!("local.get {}", var));
                             self.line(&format!("i32.const {}", event_offset));
                             self.line(&format!("i32.const {}", event_name.len()));
@@ -8209,25 +9318,40 @@ impl WasmCodegen {
                 let prop_name = if let Expr::Ident(name) = expr.as_ref() {
                     if self.in_component_mount && self.component_props.contains(name) {
                         Some(name.clone())
-                    } else { None }
-                } else { None };
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
                 // Detect if this is a self.field expression bound to a signal
                 let signal_field = if prop_name.is_none() {
                     if let Expr::FieldAccess { object, field } = expr.as_ref() {
-                        if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
-                            && self.component_fields.contains(field) {
+                        if self.in_component_mount
+                            && matches!(object.as_ref(), Expr::SelfExpr)
+                            && self.component_fields.contains(field)
+                        {
                             Some(field.clone())
-                        } else { None }
-                    } else { None }
-                } else { None };
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
                 // Also detect signal fields referenced inside wrapper expressions
                 // like format("{}", self.count) or self.count + 1
                 // Don't create reactive updaters for expressions inside for-loops
                 // (the loop binding variable doesn't exist outside the loop)
-                let wrapped_signal_fields = if prop_name.is_none() && signal_field.is_none()
-                    && self.in_component_mount && self.for_loop_bindings.is_empty() {
+                let wrapped_signal_fields = if prop_name.is_none()
+                    && signal_field.is_none()
+                    && self.in_component_mount
+                    && self.for_loop_bindings.is_empty()
+                {
                     self.extract_signal_fields_from_expr(expr)
                 } else {
                     Vec::new()
@@ -8267,9 +9391,15 @@ impl WasmCodegen {
                             Expr::FieldAccess { object, .. } => {
                                 match object.as_ref() {
                                     // Direct for-loop binding: product.name
-                                    Expr::Ident(name) if self.for_loop_bindings.contains(name) => true,
+                                    Expr::Ident(name) if self.for_loop_bindings.contains(name) => {
+                                        true
+                                    }
                                     // Handler param: product.name
-                                    Expr::Ident(name) if self.handler_param_bindings.contains(name) => true,
+                                    Expr::Ident(name)
+                                        if self.handler_param_bindings.contains(name) =>
+                                    {
+                                        true
+                                    }
                                     // Array index: self.products[i].name
                                     Expr::Index { .. } => true,
                                     _ => false,
@@ -8336,7 +9466,11 @@ impl WasmCodegen {
 
                     // Record updater to emit later (after mount function)
                     self.signal_updaters.push(SignalUpdater {
-                        func_name, global_el, sig_global, expr: None, attr_name: None,
+                        func_name,
+                        global_el,
+                        sig_global,
+                        expr: None,
+                        attr_name: None,
                     });
                 }
 
@@ -8346,10 +9480,11 @@ impl WasmCodegen {
                     let expr_clone = expr.as_ref().clone();
                     for field in &wrapped_signal_fields {
                         let uid = self.next_label();
-                        let global_el = format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
+                        let global_el =
+                            format!("$__dyn_el_{}_{}_{}", self.component_name, field, uid);
                         let sig_global = format!("$__sig_{}_{}", self.component_name, field);
-                        let func_name = format!("$__update_{}_{}_{}", self.component_name, field, uid);
-
+                        let func_name =
+                            format!("$__update_{}_{}_{}", self.component_name, field, uid);
 
                         // Store element ID in global so updater function can find it
                         self.line(&format!("local.get {}", var));
@@ -8365,7 +9500,11 @@ impl WasmCodegen {
 
                         // Record updater with the full expression for re-evaluation
                         self.signal_updaters.push(SignalUpdater {
-                            func_name, global_el, sig_global, expr: Some(expr_clone.clone()), attr_name: None,
+                            func_name,
+                            global_el,
+                            sig_global,
+                            expr: Some(expr_clone.clone()),
+                            attr_name: None,
                         });
                     }
                 }
@@ -8375,7 +9514,11 @@ impl WasmCodegen {
                 self.line(&format!("local.get {}", var));
                 self.line("call $dom_appendChild");
             }
-            TemplateNode::Link { to, attributes, children } => {
+            TemplateNode::Link {
+                to,
+                attributes,
+                children,
+            } => {
                 let var = format!("$link_{}", self.next_label());
                 self.emit_template_local(&var);
 
@@ -8416,12 +9559,23 @@ impl WasmCodegen {
                             self.line(&format!("i32.const {}", event.len()));
                             if !self.for_loop_bindings.is_empty() {
                                 let binding = self.for_loop_bindings.last().unwrap().clone();
-                                self.line(&format!(";; parameterized callback: captures ${}", binding));
-                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!(
+                                    ";; parameterized callback: captures ${}",
+                                    binding
+                                ));
+                                self.line(&format!(
+                                    "i32.const {} ;; handler func index",
+                                    handler_idx
+                                ));
                                 self.line(&format!("local.get ${} ;; captured item ptr", binding));
-                                self.line("call $__cb_register_with_data ;; -> dynamic callback idx");
+                                self.line(
+                                    "call $__cb_register_with_data ;; -> dynamic callback idx",
+                                );
                             } else {
-                                self.line(&format!("i32.const {} ;; handler func index", handler_idx));
+                                self.line(&format!(
+                                    "i32.const {} ;; handler func index",
+                                    handler_idx
+                                ));
                             }
                             self.line("call $dom_addEventListener");
                         }
@@ -8499,7 +9653,10 @@ impl WasmCodegen {
                 self.line(&format!("i32.const {} ;; \"id\" ptr", id_name));
                 self.line(&format!("i32.const {} ;; \"id\" len", 2));
                 self.line(&format!("i32.const {} ;; \"__nectar_outlet\" ptr", id_val));
-                self.line(&format!("i32.const {} ;; \"__nectar_outlet\" len", "__nectar_outlet".len()));
+                self.line(&format!(
+                    "i32.const {} ;; \"__nectar_outlet\" len",
+                    "__nectar_outlet".len()
+                ));
                 self.line("call $dom_setAttr");
                 self.line(&format!("local.get {}", parent));
                 self.line(&format!("local.get {}", var));
@@ -8508,7 +9665,11 @@ impl WasmCodegen {
             TemplateNode::Layout(layout_node) => {
                 self.generate_layout_node(layout_node, parent);
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 // Check if condition depends on component signals for reactive updates
                 let signal_fields = if self.in_component_mount {
                     self.extract_signal_fields_from_expr(condition)
@@ -8550,7 +9711,10 @@ impl WasmCodegen {
                     self.emit_template_local(&container_var);
 
                     // Create a container <div> as the placeholder for reactive content
-                    self.line(&format!(";; reactive template if — container for cond block {}", uid));
+                    self.line(&format!(
+                        ";; reactive template if — container for cond block {}",
+                        uid
+                    ));
                     let tag_offset = self.store_string("div");
                     self.line(&format!("i32.const {}", tag_offset));
                     self.line(&format!("i32.const {}", "div".len()));
@@ -8602,7 +9766,8 @@ impl WasmCodegen {
                     self.line("end ;; initial cond eval");
 
                     // Subscribe the updater to all referenced signals
-                    let sig_globals: Vec<String> = signal_fields.iter()
+                    let sig_globals: Vec<String> = signal_fields
+                        .iter()
                         .map(|f| format!("$__sig_{}_{}", comp, f))
                         .collect();
 
@@ -8629,7 +9794,13 @@ impl WasmCodegen {
                     });
                 }
             }
-            TemplateNode::TemplateFor { binding, iterator, children, lazy, .. } => {
+            TemplateNode::TemplateFor {
+                binding,
+                iterator,
+                children,
+                lazy,
+                ..
+            } => {
                 // Check if iterator is a Range expression (start..end)
                 let is_range = matches!(iterator.as_ref(), Expr::Range { .. });
 
@@ -8655,7 +9826,10 @@ impl WasmCodegen {
                     self.emit_template_local(&end_var);
                     self.emit_template_local(&binding_var);
 
-                    self.line(&format!(";; lazy for {} — initial batch of {} items", binding, batch_size));
+                    self.line(&format!(
+                        ";; lazy for {} — initial batch of {} items",
+                        binding, batch_size
+                    ));
 
                     // Store parent element ID in global
                     self.line(&format!("local.get {}", parent));
@@ -8769,7 +9943,10 @@ impl WasmCodegen {
                     self.line("i32.lt_u");
                     self.line("if ;; more items remain — schedule rAF batch");
                     self.indent += 1;
-                    self.line(&format!("i32.const {} ;; lazy batch callback index", cb_idx));
+                    self.line(&format!(
+                        "i32.const {} ;; lazy batch callback index",
+                        cb_idx
+                    ));
                     self.line("call $timer_requestAnimationFrame");
                     self.line("drop ;; discard rAF handle");
                     self.indent -= 1;
@@ -8929,7 +10106,9 @@ impl WasmCodegen {
             }
             TemplateNode::TemplateMatch { subject, arms } => {
                 // Detect if this is a string match (all non-wildcard arms have string literal patterns)
-                let is_string_match = arms.iter().any(|arm| matches!(&arm.pattern, Pattern::Literal(Expr::StringLit(_))));
+                let is_string_match = arms
+                    .iter()
+                    .any(|arm| matches!(&arm.pattern, Pattern::Literal(Expr::StringLit(_))));
 
                 if is_string_match {
                     self.line(";; template match on string value");
@@ -9080,7 +10259,12 @@ impl WasmCodegen {
                 styles.push(("gap".into(), format!("{}px", g)));
                 ("section", children)
             }
-            LayoutNode::Row { gap, align, children, .. } => {
+            LayoutNode::Row {
+                gap,
+                align,
+                children,
+                ..
+            } => {
                 let g = gap.as_deref().unwrap_or("0");
                 let a = align.as_deref().unwrap_or("stretch");
                 styles.push(("display".into(), "flex".into()));
@@ -9091,7 +10275,13 @@ impl WasmCodegen {
                 styles.push(("align".into(), a.into()));
                 ("div", children)
             }
-            LayoutNode::Grid { cols, rows: _, gap, children, .. } => {
+            LayoutNode::Grid {
+                cols,
+                rows: _,
+                gap,
+                children,
+                ..
+            } => {
                 let c = cols.as_deref().unwrap_or("1");
                 let g = gap.as_deref().unwrap_or("0");
                 styles.push(("display".into(), "grid".into()));
@@ -9099,7 +10289,11 @@ impl WasmCodegen {
                 styles.push(("gap".into(), format!("{}px", g)));
                 ("div", children)
             }
-            LayoutNode::Center { max_width, children, .. } => {
+            LayoutNode::Center {
+                max_width,
+                children,
+                ..
+            } => {
                 let mw = max_width.as_deref().unwrap_or("none");
                 styles.push(("display".into(), "flex".into()));
                 styles.push(("justify-content".into(), "center".into()));
@@ -9119,7 +10313,12 @@ impl WasmCodegen {
                 styles.push(("gap".into(), format!("{}px", g)));
                 ("div", children)
             }
-            LayoutNode::Sidebar { side, width, children, .. } => {
+            LayoutNode::Sidebar {
+                side,
+                width,
+                children,
+                ..
+            } => {
                 let s = side.as_deref().unwrap_or("left");
                 let w = width.as_deref().unwrap_or("300");
                 let cols = if s == "right" {
@@ -9131,7 +10330,11 @@ impl WasmCodegen {
                 styles.push(("grid-template-columns".into(), cols));
                 ("div", children)
             }
-            LayoutNode::Switcher { threshold: _, children, .. } => {
+            LayoutNode::Switcher {
+                threshold: _,
+                children,
+                ..
+            } => {
                 styles.push(("display".into(), "flex".into()));
                 styles.push(("flex-direction".into(), "row".into()));
                 styles.push(("direction".into(), "horizontal".into()));
@@ -9188,8 +10391,13 @@ impl WasmCodegen {
         for field in &s.fields {
             // Every field is 4 bytes in struct layout (i32 — value or pointer)
             let size = 4u32;
-            self.line(&format!(";;   {}: {} (offset {}, size {})",
-                field.name, self.type_to_wasm(&field.ty), offset, size));
+            self.line(&format!(
+                ";;   {}: {} (offset {}, size {})",
+                field.name,
+                self.type_to_wasm(&field.ty),
+                offset,
+                size
+            ));
             layout.push((field.name.clone(), offset));
             offset += size;
         }
@@ -9199,10 +10407,12 @@ impl WasmCodegen {
 
     /// Get the byte offset for a field within a struct, or None if unknown.
     fn get_struct_field_offset(&self, struct_name: &str, field_name: &str) -> Option<u32> {
-        self.struct_layouts.get(struct_name)
-            .and_then(|layout| layout.iter()
+        self.struct_layouts.get(struct_name).and_then(|layout| {
+            layout
+                .iter()
                 .find(|(name, _)| name == field_name)
-                .map(|(_, offset)| *offset))
+                .map(|(_, offset)| *offset)
+        })
     }
 
     /// Resolve a field offset by scanning all known struct layouts.
@@ -9232,16 +10442,28 @@ impl WasmCodegen {
 
     fn generate_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Let { name, secret, value, .. } => {
+            Stmt::Let {
+                name,
+                secret,
+                value,
+                ..
+            } => {
                 if *secret {
-                    self.line(&format!(";; secret binding: {} — redacted in debug/serialization", name));
+                    self.line(&format!(
+                        ";; secret binding: {} — redacted in debug/serialization",
+                        name
+                    ));
                 }
                 // Declare local variable (deferred to function top if in template/handler context)
                 let local_decl = format!("(local ${} i32)", name);
                 if self.defer_template_locals {
                     // Check if any local with this variable name already exists (any type)
                     let var_prefix = format!("(local ${} ", name);
-                    if !self.template_locals.iter().any(|l| l.starts_with(&var_prefix)) {
+                    if !self
+                        .template_locals
+                        .iter()
+                        .any(|l| l.starts_with(&var_prefix))
+                    {
                         self.template_locals.push(local_decl);
                     }
                 } else {
@@ -9257,10 +10479,18 @@ impl WasmCodegen {
                 }
                 self.line(&format!("local.set ${}", name));
             }
-            Stmt::Signal { name, secret, value, .. } => {
+            Stmt::Signal {
+                name,
+                secret,
+                value,
+                ..
+            } => {
                 // Signals compile to a memory slot + getter/setter
                 if *secret {
-                    self.line(&format!(";; secret signal: {} — redacted in debug/serialization", name));
+                    self.line(&format!(
+                        ";; secret signal: {} — redacted in debug/serialization",
+                        name
+                    ));
                 }
                 self.generate_expr(value);
                 self.line(&format!("local.set ${}", name));
@@ -9276,7 +10506,12 @@ impl WasmCodegen {
                 // Statement-level if: emit a void `if...end` block (no result type)
                 // instead of the expression-level `(if (result i32) ...)` which would
                 // corrupt the WASM stack when no value is consumed.
-                if let Expr::If { condition, then_block, else_block } = expr {
+                if let Expr::If {
+                    condition,
+                    then_block,
+                    else_block,
+                } = expr
+                {
                     self.generate_expr(condition);
                     self.emit("(if");
                     self.indent += 1;
@@ -9357,7 +10592,9 @@ impl WasmCodegen {
             }
             Pattern::Array(pats) => {
                 for (i, p) in pats.iter().enumerate() {
-                    if matches!(p, Pattern::Wildcard) { continue; }
+                    if matches!(p, Pattern::Wildcard) {
+                        continue;
+                    }
                     self.generate_destructure_bindings(p, base, offset + (i as u32) * 4);
                 }
             }
@@ -9403,7 +10640,10 @@ impl WasmCodegen {
                         } else if self.in_component_mount && self.component_fields.contains(name) {
                             // Component signal field referenced without `self.` — read the signal.
                             self.line(&format!(";; signal field {} (bare ref in template)", name));
-                            self.line(&format!("global.get $__sig_{}_{}", self.component_name, name));
+                            self.line(&format!(
+                                "global.get $__sig_{}_{}",
+                                self.component_name, name
+                            ));
                             self.line("call $signal_get");
                         } else {
                             self.line(&format!("local.get ${}", name));
@@ -9428,8 +10668,10 @@ impl WasmCodegen {
                 // string expressions (signal reads, function returns) already
                 // produce a single i32 ptr.
                 let is_string_cmp = matches!(op, BinOp::Eq | BinOp::Neq)
-                    && (self.expr_is_string_lit(left) || self.expr_is_string_lit(right)
-                        || self.expr_is_string_typed(left) || self.expr_is_string_typed(right));
+                    && (self.expr_is_string_lit(left)
+                        || self.expr_is_string_lit(right)
+                        || self.expr_is_string_typed(left)
+                        || self.expr_is_string_typed(right));
 
                 if is_string_cmp {
                     // Generate left side; if it's a string literal, drop the len
@@ -9468,19 +10710,17 @@ impl WasmCodegen {
                     self.line(instr);
                 }
             }
-            Expr::Unary { op, operand } => {
-                match op {
-                    UnaryOp::Neg => {
-                        self.line("i32.const 0");
-                        self.generate_expr(operand);
-                        self.line("i32.sub");
-                    }
-                    UnaryOp::Not => {
-                        self.generate_expr(operand);
-                        self.line("i32.eqz");
-                    }
+            Expr::Unary { op, operand } => match op {
+                UnaryOp::Neg => {
+                    self.line("i32.const 0");
+                    self.generate_expr(operand);
+                    self.line("i32.sub");
                 }
-            }
+                UnaryOp::Not => {
+                    self.generate_expr(operand);
+                    self.line("i32.eqz");
+                }
+            },
             Expr::FnCall { callee, args } => {
                 // Result/Option constructors — allocate tagged values via $Ok/$Err/$Some.
                 // These functions store [tag, value] in linear memory so the ? operator
@@ -9518,118 +10758,118 @@ impl WasmCodegen {
                     // Map well-known web API function names to their WASM imports
                     let wasm_fn = match name.as_str() {
                         // Storage
-                        "localStorage_get"    => "$webapi_localStorageGet",
-                        "localStorage_set"    => "$webapi_localStorageSet",
+                        "localStorage_get" => "$webapi_localStorageGet",
+                        "localStorage_set" => "$webapi_localStorageSet",
                         "localStorage_remove" => "$webapi_localStorageRemove",
-                        "sessionStorage_get"  => "$webapi_sessionStorageGet",
-                        "sessionStorage_set"  => "$webapi_sessionStorageSet",
+                        "sessionStorage_get" => "$webapi_sessionStorageGet",
+                        "sessionStorage_set" => "$webapi_sessionStorageSet",
                         // Clipboard
-                        "clipboard_write"     => "$webapi_clipboardWrite",
-                        "clipboard_read"      => "$webapi_clipboardRead",
+                        "clipboard_write" => "$webapi_clipboardWrite",
+                        "clipboard_read" => "$webapi_clipboardRead",
                         // Timers
-                        "set_timeout"         => "$timer_setTimeout",
-                        "webapi_setTimeout"   => "$timer_setTimeout",
-                        "set_interval"        => "$webapi_setInterval",
-                        "clear_timer"         => "$webapi_clearTimer",
+                        "set_timeout" => "$timer_setTimeout",
+                        "webapi_setTimeout" => "$timer_setTimeout",
+                        "set_interval" => "$webapi_setInterval",
+                        "clear_timer" => "$webapi_clearTimer",
                         // URL / history
-                        "get_location_href"   => "$webapi_getLocationHref",
+                        "get_location_href" => "$webapi_getLocationHref",
                         "get_location_search" => "$webapi_getLocationSearch",
-                        "get_location_hash"   => "$webapi_getLocationHash",
-                        "push_state"          => "$webapi_pushState",
-                        "replace_state"       => "$webapi_replaceState",
+                        "get_location_hash" => "$webapi_getLocationHash",
+                        "push_state" => "$webapi_pushState",
+                        "replace_state" => "$webapi_replaceState",
                         // Console
-                        "console_log"         => "$webapi_consoleLog",
-                        "console_warn"        => "$webapi_consoleWarn",
-                        "console_error"       => "$webapi_consoleError",
+                        "console_log" => "$webapi_consoleLog",
+                        "console_warn" => "$webapi_consoleWarn",
+                        "console_error" => "$webapi_consoleError",
                         // Misc
-                        "random_float"        => "$webapi_randomFloat",
-                        "performance_now"     => "$webapi_now",
+                        "random_float" => "$webapi_randomFloat",
+                        "performance_now" => "$webapi_now",
                         "request_animation_frame" => "$webapi_requestAnimationFrame",
                         // RTC — WebRTC peer connections, media, data channels
-                        "rtc_create_peer"            => "$rtc_createPeer",
-                        "rtc_create_offer"           => "$rtc_createOffer",
-                        "rtc_create_answer"          => "$rtc_createAnswer",
-                        "rtc_set_local_description"  => "$rtc_setLocalDescription",
+                        "rtc_create_peer" => "$rtc_createPeer",
+                        "rtc_create_offer" => "$rtc_createOffer",
+                        "rtc_create_answer" => "$rtc_createAnswer",
+                        "rtc_set_local_description" => "$rtc_setLocalDescription",
                         "rtc_set_remote_description" => "$rtc_setRemoteDescription",
-                        "rtc_add_ice_candidate"      => "$rtc_addIceCandidate",
-                        "rtc_close"                  => "$rtc_close",
-                        "rtc_get_user_media"         => "$rtc_getUserMedia",
-                        "rtc_get_display_media"      => "$rtc_getDisplayMedia",
-                        "rtc_add_track"              => "$rtc_addTrack",
-                        "rtc_remove_track"           => "$rtc_removeTrack",
-                        "rtc_stop_track"             => "$rtc_stopTrack",
-                        "rtc_set_track_enabled"      => "$rtc_setTrackEnabled",
-                        "rtc_get_track_kind"         => "$rtc_getTrackKind",
-                        "rtc_attach_stream"          => "$rtc_attachStream",
-                        "rtc_get_connection_state"   => "$rtc_getConnectionState",
-                        "rtc_create_data_channel"    => "$rtc_createDataChannel",
-                        "rtc_data_channel_send"      => "$rtc_dataChannelSend",
-                        "rtc_data_channel_close"     => "$rtc_dataChannelClose",
-                        "rtc_get_stats"              => "$rtc_getStats",
+                        "rtc_add_ice_candidate" => "$rtc_addIceCandidate",
+                        "rtc_close" => "$rtc_close",
+                        "rtc_get_user_media" => "$rtc_getUserMedia",
+                        "rtc_get_display_media" => "$rtc_getDisplayMedia",
+                        "rtc_add_track" => "$rtc_addTrack",
+                        "rtc_remove_track" => "$rtc_removeTrack",
+                        "rtc_stop_track" => "$rtc_stopTrack",
+                        "rtc_set_track_enabled" => "$rtc_setTrackEnabled",
+                        "rtc_get_track_kind" => "$rtc_getTrackKind",
+                        "rtc_attach_stream" => "$rtc_attachStream",
+                        "rtc_get_connection_state" => "$rtc_getConnectionState",
+                        "rtc_create_data_channel" => "$rtc_createDataChannel",
+                        "rtc_data_channel_send" => "$rtc_dataChannelSend",
+                        "rtc_data_channel_close" => "$rtc_dataChannelClose",
+                        "rtc_get_stats" => "$rtc_getStats",
                         // Storage helpers
-                        "storage_get"          => "$webapi_localStorageGet",
-                        "storage_set"          => "$webapi_localStorageSet",
-                        "storage_remove"       => "$webapi_localStorageRemove",
-                        "session_get"          => "$webapi_sessionStorageGet",
-                        "session_set"          => "$webapi_sessionStorageSet",
+                        "storage_get" => "$webapi_localStorageGet",
+                        "storage_set" => "$webapi_localStorageSet",
+                        "storage_remove" => "$webapi_localStorageRemove",
+                        "session_get" => "$webapi_sessionStorageGet",
+                        "session_set" => "$webapi_sessionStorageSet",
                         // HTTP helpers
-                        "http_get"             => "$http_get",
-                        "http_post"            => "$http_post",
+                        "http_get" => "$http_get",
+                        "http_post" => "$http_post",
                         // Browser APIs
-                        "env_get"              => "$env_get",
-                        "show_toast"           => "$show_toast",
-                        "hide_toast"           => "$hide_toast",
-                        "encode_uri"           => "$encode_uri",
-                        "url_encode"           => "$encode_uri",
-                        "url_form_encode"      => "$url_form_encode",
-                        "location_hostname"    => "$location_hostname",
-                        "location_protocol"    => "$location_protocol",
-                        "navigate_external"    => "$navigate_external",
-                        "origin"               => "$origin",
-                        "json_encode"          => "$json_encode",
-                        "json_decode"          => "$json_decode",
-                        "base64url_sha256"     => "$base64url_sha256",
-                        "random_hex"           => "$random_hex",
-                        "logout"               => "$logout",
-                        "set_unauthenticated"  => "$set_unauthenticated",
-                        "to_uppercase"         => "$string_to_upper",
-                        "parse_f64"            => "$string_parse_float",
-                        "Map_serialize"        => "$Map_serialize",
-                        "Map_parse_from_obj"   => "$Map_parse_from_obj",
-                        "capitalize"           => "$string_capitalize",
-                        "chars"                => "$string_chars",
-                        "char_at"              => "$string_char_at",
-                        "clone"                => "$clone",
-                        "rev"                  => "$string_reverse",
-                        "next"                 => "$iter_next",
+                        "env_get" => "$env_get",
+                        "show_toast" => "$show_toast",
+                        "hide_toast" => "$hide_toast",
+                        "encode_uri" => "$encode_uri",
+                        "url_encode" => "$encode_uri",
+                        "url_form_encode" => "$url_form_encode",
+                        "location_hostname" => "$location_hostname",
+                        "location_protocol" => "$location_protocol",
+                        "navigate_external" => "$navigate_external",
+                        "origin" => "$origin",
+                        "json_encode" => "$json_encode",
+                        "json_decode" => "$json_decode",
+                        "base64url_sha256" => "$base64url_sha256",
+                        "random_hex" => "$random_hex",
+                        "logout" => "$logout",
+                        "set_unauthenticated" => "$set_unauthenticated",
+                        "to_uppercase" => "$string_to_upper",
+                        "parse_f64" => "$string_parse_float",
+                        "Map_serialize" => "$Map_serialize",
+                        "Map_parse_from_obj" => "$Map_parse_from_obj",
+                        "capitalize" => "$string_capitalize",
+                        "chars" => "$string_chars",
+                        "char_at" => "$string_char_at",
+                        "clone" => "$clone",
+                        "rev" => "$string_reverse",
+                        "next" => "$iter_next",
                         // Not a web API built-in — call by user-defined name
                         _ => "",
                     };
                     if wasm_fn.is_empty() {
                         // Crypto namespace — pure WASM implementations
                         let crypto_fn = match name.as_str() {
-                            "crypto::sha256"          => "$crypto_sha256",
-                            "crypto::sha512"          => "$crypto_sha512",
-                            "crypto::sha1"            => "$crypto_sha1",
-                            "crypto::sha384"          => "$crypto_sha384",
-                            "crypto::hmac"            => "$crypto_hmac_sha256",
-                            "crypto::hmac_sha512"     => "$crypto_hmac_sha512",
-                            "crypto::encrypt"         => "$crypto_aes_gcm_encrypt",
-                            "crypto::decrypt"         => "$crypto_aes_gcm_decrypt",
+                            "crypto::sha256" => "$crypto_sha256",
+                            "crypto::sha512" => "$crypto_sha512",
+                            "crypto::sha1" => "$crypto_sha1",
+                            "crypto::sha384" => "$crypto_sha384",
+                            "crypto::hmac" => "$crypto_hmac_sha256",
+                            "crypto::hmac_sha512" => "$crypto_hmac_sha512",
+                            "crypto::encrypt" => "$crypto_aes_gcm_encrypt",
+                            "crypto::decrypt" => "$crypto_aes_gcm_decrypt",
                             "crypto::encrypt_aes_cbc" => "$crypto_aes_cbc_encrypt",
                             "crypto::decrypt_aes_cbc" => "$crypto_aes_cbc_decrypt",
                             "crypto::encrypt_aes_ctr" => "$crypto_aes_ctr_encrypt",
                             "crypto::decrypt_aes_ctr" => "$crypto_aes_ctr_decrypt",
-                            "crypto::sign"            => "$crypto_ed25519_sign",
-                            "crypto::verify"          => "$crypto_ed25519_verify",
-                            "crypto::derive_key"      => "$crypto_pbkdf2_derive",
-                            "crypto::derive_bits"     => "$crypto_pbkdf2_derive_bits",
-                            "crypto::hkdf"            => "$crypto_hkdf_derive",
-                            "crypto::random_uuid"     => "$crypto_random_uuid",
-                            "crypto::random_bytes"    => "$crypto_random_bytes",
+                            "crypto::sign" => "$crypto_ed25519_sign",
+                            "crypto::verify" => "$crypto_ed25519_verify",
+                            "crypto::derive_key" => "$crypto_pbkdf2_derive",
+                            "crypto::derive_bits" => "$crypto_pbkdf2_derive_bits",
+                            "crypto::hkdf" => "$crypto_hkdf_derive",
+                            "crypto::random_uuid" => "$crypto_random_uuid",
+                            "crypto::random_bytes" => "$crypto_random_bytes",
                             "crypto::generate_key_pair" => "$crypto_generate_key_pair",
-                            "crypto::export_key"      => "$crypto_export_key",
-                            "crypto::ecdh_derive"     => "$crypto_ecdh_derive",
+                            "crypto::export_key" => "$crypto_export_key",
+                            "crypto::ecdh_derive" => "$crypto_ecdh_derive",
                             _ => "",
                         };
                         if !crypto_fn.is_empty() {
@@ -9642,7 +10882,8 @@ impl WasmCodegen {
                             let store_fn = if parts.len() == 2 {
                                 let store_name = parts[0];
                                 let member = parts[1];
-                                self.known_stores.iter()
+                                self.known_stores
+                                    .iter()
                                     .find(|(sn, _)| sn == store_name)
                                     .map(|(sn, signals)| {
                                         if signals.iter().any(|s| s == member) {
@@ -9665,7 +10906,11 @@ impl WasmCodegen {
                                 let contract_fn = if parts.len() == 2 {
                                     let contract_name = parts[0];
                                     let method = parts[1];
-                                    if self.known_contracts.iter().any(|(cn, _)| cn == contract_name) {
+                                    if self
+                                        .known_contracts
+                                        .iter()
+                                        .any(|(cn, _)| cn == contract_name)
+                                    {
                                         match method {
                                             "call" | "parse" | "serialize" => {
                                                 Some(format!("${}_{}", contract_name, method))
@@ -9691,9 +10936,14 @@ impl WasmCodegen {
                         } else {
                             // Check if name is a component-local method
                             if self.in_component_mount {
-                                if let Some(idx) = self.component_method_names.iter().position(|m| m == name) {
+                                if let Some(idx) =
+                                    self.component_method_names.iter().position(|m| m == name)
+                                {
                                     self.line(&format!(";; component method: {}()", name));
-                                    self.line(&format!("call ${}__handler_{}", self.component_name, idx));
+                                    self.line(&format!(
+                                        "call ${}__handler_{}",
+                                        self.component_name, idx
+                                    ));
                                 } else {
                                     self.line(&format!("call ${}", name));
                                 }
@@ -9708,25 +10958,37 @@ impl WasmCodegen {
                 }
             }
             Expr::FieldAccess { object, field } => {
-                if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
-                    && self.component_fields.contains(field) {
+                if self.in_component_mount
+                    && matches!(object.as_ref(), Expr::SelfExpr)
+                    && self.component_fields.contains(field)
+                {
                     // In component context, self.field reads the signal value
                     self.line(&format!(";; self.{} (signal)", field));
-                    self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
+                    self.line(&format!(
+                        "global.get $__sig_{}_{}",
+                        self.component_name, field
+                    ));
                     self.line("call $signal_get");
-                } else if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
-                    && self.component_props.contains(field) {
+                } else if self.in_component_mount
+                    && matches!(object.as_ref(), Expr::SelfExpr)
+                    && self.component_props.contains(field)
+                {
                     // In component context, self.prop reads from the component-scoped global.
                     // Props are stored as globals at mount time so event handlers can access them.
                     // String props push (ptr, len) to match the string calling convention.
                     self.line(&format!(";; self.{} (prop)", field));
-                    self.line(&format!("global.get $__prop_{}_{}_ptr", self.component_name, field));
-                    self.line(&format!("global.get $__prop_{}_{}_len", self.component_name, field));
+                    self.line(&format!(
+                        "global.get $__prop_{}_{}_ptr",
+                        self.component_name, field
+                    ));
+                    self.line(&format!(
+                        "global.get $__prop_{}_{}_len",
+                        self.component_name, field
+                    ));
                 } else if let Expr::Ident(obj_name) = object.as_ref() {
                     // Check if this is a store signal/computed access: StoreName.field
-                    let store_access = self.known_stores.iter()
-                        .find(|(sn, _)| sn == obj_name)
-                        .map(|(sn, sigs)| {
+                    let store_access = self.known_stores.iter().find(|(sn, _)| sn == obj_name).map(
+                        |(sn, sigs)| {
                             if sigs.iter().any(|s| s == field) {
                                 // Signal — read via signal_get
                                 (sn.clone(), true)
@@ -9734,18 +10996,23 @@ impl WasmCodegen {
                                 // Computed or other field — call the getter function
                                 (sn.clone(), false)
                             }
-                        });
+                        },
+                    );
                     if let Some((store_name, is_signal)) = store_access {
                         if is_signal {
                             self.line(&format!(";; store signal: {}.{}", store_name, field));
                             self.line(&format!("global.get $__sig_{}_{}", store_name, field));
                             self.line("call $signal_get");
                         } else {
-                            self.line(&format!(";; store computed/field: {}.{}", store_name, field));
+                            self.line(&format!(
+                                ";; store computed/field: {}.{}",
+                                store_name, field
+                            ));
                             self.line(&format!("call ${}_{}", store_name, field));
                         }
                     } else if self.for_loop_bindings.contains(obj_name)
-                        || self.handler_param_bindings.contains(obj_name) {
+                        || self.handler_param_bindings.contains(obj_name)
+                    {
                         // Struct pointer field access: item.name → load field from struct pointer.
                         // The binding variable holds a pointer to the struct in linear memory.
                         // This applies to both for-loop bindings and handler method parameters
@@ -9756,13 +11023,21 @@ impl WasmCodegen {
                         } else {
                             "handler param"
                         };
-                        self.line(&format!(";; {} field access: {}.{}", access_kind, obj_name, field));
+                        self.line(&format!(
+                            ";; {} field access: {}.{}",
+                            access_kind, obj_name, field
+                        ));
                         self.line(&format!("local.get ${}", obj_name));
                         // Look up the field offset from any matching struct layout
-                        let offset = self.struct_layouts.values()
-                            .find_map(|layout| layout.iter()
-                                .find(|(name, _)| name == field)
-                                .map(|(_, off)| *off))
+                        let offset = self
+                            .struct_layouts
+                            .values()
+                            .find_map(|layout| {
+                                layout
+                                    .iter()
+                                    .find(|(name, _)| name == field)
+                                    .map(|(_, off)| *off)
+                            })
                             .unwrap_or(0);
                         if offset == 0 {
                             self.line(&format!("i32.load ;; field: .{}", field));
@@ -9842,10 +11117,18 @@ impl WasmCodegen {
                 self.line("i32.add");
                 self.line("i32.load ;; element at index");
             }
-            Expr::MethodCall { object, method, args } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 self.generate_iterator_method(object, method, args);
             }
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 self.generate_expr(condition);
                 self.emit("(if (result i32)");
                 self.indent += 1;
@@ -9870,13 +11153,18 @@ impl WasmCodegen {
             }
             Expr::Assign { target, value } => {
                 if let Expr::FieldAccess { object, field } = target.as_ref() {
-                    if self.in_component_mount && matches!(object.as_ref(), Expr::SelfExpr)
-                        && self.component_fields.contains(field) {
+                    if self.in_component_mount
+                        && matches!(object.as_ref(), Expr::SelfExpr)
+                        && self.component_fields.contains(field)
+                    {
                         // self.field = value → signal_set(signal_id, value)
                         // String literals produce (ptr, len); signal_set takes (id, val),
                         // so drop len and use only ptr for string values.
                         self.line(&format!(";; self.{} = ... (signal set)", field));
-                        self.line(&format!("global.get $__sig_{}_{}", self.component_name, field));
+                        self.line(&format!(
+                            "global.get $__sig_{}_{}",
+                            self.component_name, field
+                        ));
                         self.generate_expr(value);
                         if Self::expr_returns_ptr_len(value) {
                             self.line("drop  ;; discard str len for signal_set");
@@ -9906,9 +11194,16 @@ impl WasmCodegen {
                 // machine (e.g. in a non-async context), we just emit the inner
                 // expression — the value is already on the stack.
             }
-            Expr::Fetch { url, options, contract } => {
+            Expr::Fetch {
+                url,
+                options,
+                contract,
+            } => {
                 if let Some(contract_name) = contract {
-                    self.line(&format!(";; fetch -> {} — HTTP request with contract boundary validation", contract_name));
+                    self.line(&format!(
+                        ";; fetch -> {} — HTTP request with contract boundary validation",
+                        contract_name
+                    ));
                 } else {
                     self.line(";; fetch — HTTP request");
                 }
@@ -9929,10 +11224,16 @@ impl WasmCodegen {
                 self.line("call $http_fetch");
                 // If a contract is bound, validate the response against the schema
                 if let Some(contract_name) = contract {
-                    self.line(&format!(";; validate response against contract {}", contract_name));
+                    self.line(&format!(
+                        ";; validate response against contract {}",
+                        contract_name
+                    ));
                     let name_offset = self.store_string(contract_name);
                     self.line(&format!("i32.const {} ;; contract name ptr", name_offset));
-                    self.line(&format!("i32.const {} ;; contract name len", contract_name.len()));
+                    self.line(&format!(
+                        "i32.const {} ;; contract name len",
+                        contract_name.len()
+                    ));
                     self.line("call $contract_validate");
                 }
             }
@@ -9945,7 +11246,8 @@ impl WasmCodegen {
                 self.line("call $worker_spawn");
             }
             Expr::Channel { ty } => {
-                let type_comment = ty.as_ref()
+                let type_comment = ty
+                    .as_ref()
                     .map(|t| format!(" ;; channel<{}>", self.type_to_wasm(t)))
                     .unwrap_or_default();
                 self.line(&format!(";; channel create{}", type_comment));
@@ -9989,7 +11291,10 @@ impl WasmCodegen {
                 // Path string (ptr, len) is on the stack
                 self.line("call $router_navigate");
             }
-            Expr::PromptTemplate { template, interpolations } => {
+            Expr::PromptTemplate {
+                template,
+                interpolations,
+            } => {
                 self.line(";; prompt template — compile interpolation to string building");
                 // Split the template at {var} boundaries and concatenate
                 // For each segment, store the static part, then evaluate the variable
@@ -10002,7 +11307,10 @@ impl WasmCodegen {
                     self.generate_expr(expr);
                 }
                 // The runtime will handle string interpolation
-                self.line(&format!("i32.const {} ;; interpolation count", interpolations.len()));
+                self.line(&format!(
+                    "i32.const {} ;; interpolation count",
+                    interpolations.len()
+                ));
             }
             Expr::Stream { source } => {
                 self.line(";; stream — create streaming data source");
@@ -10011,7 +11319,10 @@ impl WasmCodegen {
                 // stream callback with the runtime.
                 self.generate_expr(source);
                 let callback_label = self.next_label();
-                self.line(&format!("i32.const {} ;; stream callback index", callback_label));
+                self.line(&format!(
+                    "i32.const {} ;; stream callback index",
+                    callback_label
+                ));
                 self.line("call $streaming_streamFetch");
             }
             Expr::Suspend { fallback, body } => {
@@ -10047,7 +11358,11 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             }
-            Expr::AssertEq { left, right, message } => {
+            Expr::AssertEq {
+                left,
+                right,
+                message,
+            } => {
                 self.line(";; assert_eq");
                 self.generate_expr(left);
                 self.generate_expr(right);
@@ -10057,7 +11372,9 @@ impl WasmCodegen {
                 self.emit("(then)");
                 self.emit("(else");
                 self.indent += 1;
-                let msg = message.as_deref().unwrap_or("assert_eq failed: values not equal");
+                let msg = message
+                    .as_deref()
+                    .unwrap_or("assert_eq failed: values not equal");
                 let msg_offset = self.store_string(msg);
                 self.line("i32.const 0 ;; name ptr (contextual)");
                 self.line("i32.const 0 ;; name len (contextual)");
@@ -10069,7 +11386,11 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line(")");
             }
-            Expr::TryCatch { body, error_binding, catch_body } => {
+            Expr::TryCatch {
+                body,
+                error_binding,
+                catch_body,
+            } => {
                 let label = self.next_label();
                 self.line(&format!(";; try/catch (error boundary) — label {}", label));
                 // Strategy: call body as a function, check i32 return code
@@ -10095,7 +11416,10 @@ impl WasmCodegen {
                 self.generate_expr(target);
                 let name_offset = self.store_string(animation);
                 self.line(&format!("i32.const {} ;; animation name ptr", name_offset));
-                self.line(&format!("i32.const {} ;; animation name len", animation.len()));
+                self.line(&format!(
+                    "i32.const {} ;; animation name len",
+                    animation.len()
+                ));
                 // Default duration and easing are resolved at runtime from the registered animation
                 let default_dur = "0.3s";
                 let dur_offset = self.store_string(default_dur);
@@ -10155,7 +11479,8 @@ impl WasmCodegen {
                 free_vars.dedup();
                 // Only keep names that are actually locals in the current scope
                 let local_names: Vec<String> = self.locals.iter().map(|(n, _)| n.clone()).collect();
-                let captures: Vec<String> = free_vars.into_iter()
+                let captures: Vec<String> = free_vars
+                    .into_iter()
                     .filter(|v| local_names.contains(v) || self.for_loop_bindings.contains(v))
                     .collect();
 
@@ -10164,7 +11489,8 @@ impl WasmCodegen {
                 // First param is the closure env pointer (for captured vars)
                 param_list.push_str("(param $__env i32)");
                 for (pname, pty) in params {
-                    let wasm_ty = pty.as_ref()
+                    let wasm_ty = pty
+                        .as_ref()
                         .map(|t| self.type_to_wasm(t))
                         .unwrap_or_else(|| "i32".into());
                     param_list.push_str(&format!(" (param ${} {})", pname, wasm_ty));
@@ -10172,7 +11498,10 @@ impl WasmCodegen {
 
                 // Generate the closure function body into a separate buffer
                 let mut closure_body = String::new();
-                closure_body.push_str(&format!("  (func {} {} (result i32)\n", func_name, param_list));
+                closure_body.push_str(&format!(
+                    "  (func {} {} (result i32)\n",
+                    func_name, param_list
+                ));
 
                 // If there are captures, emit locals and loads from the env pointer
                 if !captures.is_empty() {
@@ -10212,8 +11541,14 @@ impl WasmCodegen {
 
                 if captures.is_empty() {
                     // No captures — just push the table index
-                    self.line(&format!(";; closure — table index {} (no captures)", table_idx));
-                    self.line(&format!("i32.const {} ;; closure func table index", table_idx));
+                    self.line(&format!(
+                        ";; closure — table index {} (no captures)",
+                        table_idx
+                    ));
+                    self.line(&format!(
+                        "i32.const {} ;; closure func table index",
+                        table_idx
+                    ));
                 } else {
                     // Allocate env struct: [captured_val_0, captured_val_1, ...]
                     // Then allocate closure struct: [func_table_index, env_ptr]
@@ -10221,7 +11556,11 @@ impl WasmCodegen {
                     let lbl = self.next_label();
                     self.emit_template_local(&format!("$__clos_env_{}", lbl));
                     self.emit_template_local(&format!("$__clos_ptr_{}", lbl));
-                    self.line(&format!(";; closure — table index {} with {} captures", table_idx, captures.len()));
+                    self.line(&format!(
+                        ";; closure — table index {} with {} captures",
+                        table_idx,
+                        captures.len()
+                    ));
 
                     // Allocate and populate env
                     self.line(&format!("i32.const {} ;; env size", env_size));
@@ -10308,7 +11647,13 @@ impl WasmCodegen {
                 self.generate_expr(start);
                 self.generate_expr(end);
             }
-            Expr::VirtualList { items, item_height, template, buffer, .. } => {
+            Expr::VirtualList {
+                items,
+                item_height,
+                template,
+                buffer,
+                ..
+            } => {
                 self.line(";; virtual list — create virtualized list for large datasets");
                 self.generate_expr(items);
                 self.generate_expr(item_height);
@@ -10422,7 +11767,11 @@ impl WasmCodegen {
                 // Allocate struct in linear memory and store each field at its offset.
                 // Layout: each field is 4 bytes (i32 — value or pointer).
                 let struct_size = self.get_struct_size(name);
-                let size = if struct_size > 0 { struct_size } else { (fields.len() as u32) * 4 };
+                let size = if struct_size > 0 {
+                    struct_size
+                } else {
+                    (fields.len() as u32) * 4
+                };
                 let lbl = self.next_label();
                 let ptr_var = format!("$__struct_ptr_{}", lbl);
                 self.emit_template_local(&ptr_var);
@@ -10434,10 +11783,14 @@ impl WasmCodegen {
 
                 // Store each field value at its offset
                 for (field_name, field_expr) in fields {
-                    let offset = self.get_struct_field_offset(name, field_name)
+                    let offset = self
+                        .get_struct_field_offset(name, field_name)
                         .unwrap_or_else(|| {
                             // Fallback: use field order from the init expression
-                            let idx = fields.iter().position(|(n, _)| n == field_name).unwrap_or(0);
+                            let idx = fields
+                                .iter()
+                                .position(|(n, _)| n == field_name)
+                                .unwrap_or(0);
                             (idx as u32) * 4
                         });
                     self.line(&format!("local.get {}", ptr_var));
@@ -10449,7 +11802,10 @@ impl WasmCodegen {
                     if offset == 0 {
                         self.line(&format!("i32.store ;; field: {}", field_name));
                     } else {
-                        self.line(&format!("i32.store offset={} ;; field: {}", offset, field_name));
+                        self.line(&format!(
+                            "i32.store offset={} ;; field: {}",
+                            offset, field_name
+                        ));
                     }
                 }
 
@@ -10542,7 +11898,11 @@ impl WasmCodegen {
                 self.indent -= 1;
                 self.line("end ;; while break");
             }
-            Expr::For { binding, iterator, body } => {
+            Expr::For {
+                binding,
+                iterator,
+                body,
+            } => {
                 // Imperative for loop (non-template): iterate array
                 let lbl = self.next_label();
                 let arr_var = format!("$for_arr_{}", lbl);
@@ -10631,7 +11991,11 @@ impl WasmCodegen {
                 self.emit_template_local(&ptr_var);
                 let size = (fields.len() as u32) * 4;
                 let size = if size == 0 { 4 } else { size };
-                self.line(&format!(";; object literal ({} fields, {} bytes)", fields.len(), size));
+                self.line(&format!(
+                    ";; object literal ({} fields, {} bytes)",
+                    fields.len(),
+                    size
+                ));
                 self.line(&format!("i32.const {}", size));
                 self.line("call $alloc");
                 self.line(&format!("local.set {}", ptr_var));
@@ -11050,7 +12414,7 @@ impl WasmCodegen {
         self.line("f64.const 100.0");
         self.line("f64.mul");
         self.line("f64.const 0.5");
-        self.line("f64.add");       // round
+        self.line("f64.add"); // round
         self.line("i32.trunc_f64_s");
         self.line("local.set $frac_part");
         // Convert integer part to string (handles 0 correctly)
@@ -11143,7 +12507,9 @@ impl WasmCodegen {
 
         // get_last_handler_time: exported getter for the last handler execution time string
         // Returns (ptr, len) of the formatted "X.XXms" timing string
-        self.emit("(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)");
+        self.emit(
+            "(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)",
+        );
         self.indent += 1;
         self.line("global.get $__last_handler_time_ptr");
         self.line("global.get $__last_handler_time_len");
@@ -11211,10 +12577,10 @@ impl WasmCodegen {
         self.line("block $ldone  loop $lscan");
         self.line("  local.get $start  local.get $end  i32.ge_u  br_if $ldone");
         self.line("  local.get $ptr  local.get $start  i32.add  i32.load8_u  local.set $ch");
-        self.line("  local.get $ch  i32.const 32  i32.eq");  // space
-        self.line("  local.get $ch  i32.const 9  i32.eq  i32.or");  // tab
-        self.line("  local.get $ch  i32.const 10  i32.eq  i32.or");  // newline
-        self.line("  local.get $ch  i32.const 13  i32.eq  i32.or");  // CR
+        self.line("  local.get $ch  i32.const 32  i32.eq"); // space
+        self.line("  local.get $ch  i32.const 9  i32.eq  i32.or"); // tab
+        self.line("  local.get $ch  i32.const 10  i32.eq  i32.or"); // newline
+        self.line("  local.get $ch  i32.const 13  i32.eq  i32.or"); // CR
         self.line("  i32.eqz  br_if $ldone");
         self.line("  local.get $start  i32.const 1  i32.add  local.set $start");
         self.line("  br $lscan");
@@ -11242,9 +12608,15 @@ impl WasmCodegen {
         self.indent += 1;
         self.line("(local $out_ptr i32) (local $out_len i32)");
         // Clamp start and end
-        self.line("local.get $start  i32.const 0  i32.lt_s  if  i32.const 0  local.set $start  end");
-        self.line("local.get $end  local.get $len  i32.gt_s  if  local.get $len  local.set $end  end");
-        self.line("local.get $start  local.get $end  i32.ge_s  if  i32.const 0  i32.const 0  return  end");
+        self.line(
+            "local.get $start  i32.const 0  i32.lt_s  if  i32.const 0  local.set $start  end",
+        );
+        self.line(
+            "local.get $end  local.get $len  i32.gt_s  if  local.get $len  local.set $end  end",
+        );
+        self.line(
+            "local.get $start  local.get $end  i32.ge_s  if  i32.const 0  i32.const 0  return  end",
+        );
         self.line("local.get $end  local.get $start  i32.sub  local.set $out_len");
         self.line("local.get $out_len  call $alloc  local.set $out_ptr");
         self.line("local.get $out_ptr  local.get $ptr  local.get $start  i32.add  local.get $out_len  memory.copy");
@@ -11310,7 +12682,9 @@ impl WasmCodegen {
         self.line("  i32.const 1  local.set $match");
         self.line("  block $no_match  loop $inner");
         self.line("    local.get $j  local.get $needle_len  i32.ge_u  br_if $no_match");
-        self.line("    local.get $str_ptr  local.get $i  i32.add  local.get $j  i32.add  i32.load8_u");
+        self.line(
+            "    local.get $str_ptr  local.get $i  i32.add  local.get $j  i32.add  i32.load8_u",
+        );
         self.line("    local.get $needle_ptr  local.get $j  i32.add  i32.load8_u");
         self.line("    i32.ne  if  i32.const 0  local.set $match  br $no_match  end");
         self.line("    local.get $j  i32.const 1  i32.add  local.set $j");
@@ -11328,16 +12702,24 @@ impl WasmCodegen {
         // string_starts_with: check if string starts with prefix, returns 0/1
         self.emit("(func $string_starts_with (param $str_ptr i32) (param $str_len i32) (param $prefix_ptr i32) (param $prefix_len i32) (result i32)");
         self.indent += 1;
-        self.line("local.get $prefix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end");
-        self.line("local.get $str_ptr  local.get $prefix_ptr  local.get $prefix_len  call $mem_compare");
+        self.line(
+            "local.get $prefix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end",
+        );
+        self.line(
+            "local.get $str_ptr  local.get $prefix_ptr  local.get $prefix_len  call $mem_compare",
+        );
         self.indent -= 1;
         self.line(")");
 
         // string_ends_with: check if string ends with suffix, returns 0/1
         self.emit("(func $string_ends_with (param $str_ptr i32) (param $str_len i32) (param $suffix_ptr i32) (param $suffix_len i32) (result i32)");
         self.indent += 1;
-        self.line("local.get $suffix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end");
-        self.line("local.get $str_ptr  local.get $str_len  i32.add  local.get $suffix_len  i32.sub");
+        self.line(
+            "local.get $suffix_len  local.get $str_len  i32.gt_u  if  i32.const 0  return  end",
+        );
+        self.line(
+            "local.get $str_ptr  local.get $str_len  i32.add  local.get $suffix_len  i32.sub",
+        );
         self.line("local.get $suffix_ptr  local.get $suffix_len  call $mem_compare");
         self.indent -= 1;
         self.line(")");
@@ -11390,7 +12772,9 @@ impl WasmCodegen {
         self.line("  br $parse");
         self.line("end  end");
         // Apply negation
-        self.line("local.get $neg  if  i32.const 0  local.get $result  i32.sub  local.set $result  end");
+        self.line(
+            "local.get $neg  if  i32.const 0  local.get $result  i32.sub  local.set $result  end",
+        );
         self.line("local.get $result");
         self.indent -= 1;
         self.line(")");
@@ -11401,7 +12785,7 @@ impl WasmCodegen {
         self.indent += 1;
         self.line("(local $arr_ptr i32) (local $count i32) (local $i i32) (local $seg_start i32) (local $match i32) (local $j i32)");
         // Allocate space for up to 64 segments (count + 64 * (ptr, len))
-        self.line("i32.const 516  call $alloc  local.set $arr_ptr");  // 4 + 64*8
+        self.line("i32.const 516  call $alloc  local.set $arr_ptr"); // 4 + 64*8
         self.line("i32.const 0  local.set $count");
         self.line("i32.const 0  local.set $seg_start");
         self.line("i32.const 0  local.set $i");
@@ -11570,7 +12954,9 @@ impl WasmCodegen {
         self.line("local.get $addr  i32.const 12  i32.add  local.get $schema_len  i32.store");
         self.line("local.get $addr  i32.const 16  i32.add  local.get $hash_ptr  i32.store");
         self.line("local.get $addr  i32.const 20  i32.add  local.get $hash_len  i32.store");
-        self.line("global.get $__contract_count  i32.const 1  i32.add  global.set $__contract_count");
+        self.line(
+            "global.get $__contract_count  i32.const 1  i32.add  global.set $__contract_count",
+        );
         self.indent -= 1;
         self.line(")");
 
@@ -11599,7 +12985,9 @@ impl WasmCodegen {
         self.line(")");
 
         // getHash: find schema by name, return hash ptr+len
-        self.emit("(func $contract_getHash (param $name_ptr i32) (param $name_len i32) (result i32 i32)");
+        self.emit(
+            "(func $contract_getHash (param $name_ptr i32) (param $name_len i32) (result i32 i32)",
+        );
         self.indent += 1;
         self.line("(local $i i32) (local $addr i32)");
         self.line("i32.const 0  local.set $i");
@@ -11705,7 +13093,9 @@ impl WasmCodegen {
         self.line("(global $__cleanup_count (mut i32) (i32.const 0))");
         self.line("(global $__cleanup_base (mut i32) (i32.const 0))");
 
-        self.emit("(func $lifecycle_register_cleanup (param $component_id i32) (param $cb_idx i32)");
+        self.emit(
+            "(func $lifecycle_register_cleanup (param $component_id i32) (param $cb_idx i32)",
+        );
         self.indent += 1;
         self.line("(local $addr i32)");
         self.line("global.get $__cleanup_base  global.get $__cleanup_count  i32.const 8  i32.mul  i32.add  local.set $addr");
@@ -11716,7 +13106,9 @@ impl WasmCodegen {
         self.line(")");
 
         // Export a function to run all cleanups for a component
-        self.emit("(func $lifecycle_cleanup (export \"__lifecycle_cleanup\") (param $component_id i32)");
+        self.emit(
+            "(func $lifecycle_cleanup (export \"__lifecycle_cleanup\") (param $component_id i32)",
+        );
         self.indent += 1;
         self.line("(local $i i32) (local $addr i32)");
         self.line("i32.const 0  local.set $i");
@@ -11873,12 +13265,16 @@ impl WasmCodegen {
         self.line("local.get $addr  i32.const 20  i32.add  local.get $canon_len  i32.store");
         self.line("local.get $addr  i32.const 24  i32.add  local.get $og_ptr  i32.store");
         self.line("local.get $addr  i32.const 28  i32.add  local.get $og_len  i32.store");
-        self.line("global.get $__seo_meta_count  i32.const 1  i32.add  global.set $__seo_meta_count");
+        self.line(
+            "global.get $__seo_meta_count  i32.const 1  i32.add  global.set $__seo_meta_count",
+        );
         self.indent -= 1;
         self.line(")");
 
         // SEO register structured data: store JSON-LD snippet pointer in linear memory
-        self.emit("(func $seo_register_structured_data (param $data_ptr i32) (param $data_len i32)");
+        self.emit(
+            "(func $seo_register_structured_data (param $data_ptr i32) (param $data_len i32)",
+        );
         self.indent += 1;
         self.line(";; Structured data registration — stored for SSR/SSG output");
         self.line("nop");
@@ -12099,7 +13495,9 @@ impl WasmCodegen {
         // $router_parse_query(url_ptr, url_len) -> i32
         // Finds '?' in URL, parses key=value&key2=value2 pairs into a linear memory table.
         // Table layout: [count: i32, (key_ptr, key_len, val_ptr, val_len) * count]
-        self.emit("(func $router_parse_query (param $url_ptr i32) (param $url_len i32) (result i32)");
+        self.emit(
+            "(func $router_parse_query (param $url_ptr i32) (param $url_len i32) (result i32)",
+        );
         self.indent += 1;
         self.line("(local $i i32) (local $qstart i32) (local $tbl i32) (local $count i32)");
         self.line("(local $kstart i32) (local $klen i32) (local $vstart i32) (local $vlen i32) (local $ch i32)");
@@ -12148,13 +13546,21 @@ impl WasmCodegen {
         self.line("    local.get $i  local.get $vstart  i32.sub  local.set $vlen");
         // Store entry: key_ptr, key_len, val_ptr, val_len
         self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add");
-        self.line("    local.get $url_ptr  local.get $kstart  i32.add  i32.store         ;; key_ptr");
+        self.line(
+            "    local.get $url_ptr  local.get $kstart  i32.add  i32.store         ;; key_ptr",
+        );
         self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 4  i32.add");
-        self.line("    local.get $klen  i32.store                                         ;; key_len");
+        self.line(
+            "    local.get $klen  i32.store                                         ;; key_len",
+        );
         self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 8  i32.add");
-        self.line("    local.get $url_ptr  local.get $vstart  i32.add  i32.store          ;; val_ptr");
+        self.line(
+            "    local.get $url_ptr  local.get $vstart  i32.add  i32.store          ;; val_ptr",
+        );
         self.line("    local.get $tbl  i32.const 4  i32.add  local.get $count  i32.const 16  i32.mul  i32.add  i32.const 12  i32.add");
-        self.line("    local.get $vlen  i32.store                                         ;; val_len");
+        self.line(
+            "    local.get $vlen  i32.store                                         ;; val_len",
+        );
         self.line("    local.get $count  i32.const 1  i32.add  local.set $count");
         self.line("    local.get $i  i32.const 1  i32.add  local.set $kstart  ;; skip '&'");
         self.line("    br $parse");
@@ -12180,7 +13586,9 @@ impl WasmCodegen {
         self.line("  local.get $entry  i32.const 4  i32.add  i32.load  local.set $ek_len");
         self.line("  local.get $ek_len  local.get $key_len  i32.eq");
         self.line("  if");
-        self.line("    local.get $ek_ptr  local.get $key_ptr  local.get $key_len  call $mem_compare");
+        self.line(
+            "    local.get $ek_ptr  local.get $key_ptr  local.get $key_len  call $mem_compare",
+        );
         self.line("    i32.const 1  i32.eq");
         self.line("    if");
         self.line("      local.get $entry  i32.const 8  i32.add  i32.load  ;; val_ptr");
@@ -12292,7 +13700,9 @@ impl WasmCodegen {
 
         // mp_init: called by miniprogram block codegen to register mini-program config
         self.emit("(func $mp_init (param $name_ptr i32) (param $name_len i32) (param $pp_ptr i32) (param $pp_len i32) (param $ap_ptr i32) (param $ap_len i32) (param $mp_ptr i32) (param $mp_len i32) (param $cs_ptr i32) (param $cs_len i32) (param $offline i32)");
-        self.line("  nop  ;; miniprogram config stored; providers loaded via their respective init");
+        self.line(
+            "  nop  ;; miniprogram config stored; providers loaded via their respective init",
+        );
         self.line(")");
 
         // payment_init: called by payment block codegen to register provider (e.g. Stripe)
@@ -12320,7 +13730,9 @@ impl WasmCodegen {
         self.line("local.get $ptr  local.get $name_ptr  i32.store  ;; store name ptr");
         self.line("local.get $ptr  local.get $name_len  i32.store offset=4  ;; store name len");
         self.line("local.get $ptr  local.get $config_ptr  i32.store offset=8  ;; store config ptr");
-        self.line("local.get $ptr  local.get $config_len  i32.store offset=12  ;; store config len");
+        self.line(
+            "local.get $ptr  local.get $config_len  i32.store offset=12  ;; store config len",
+        );
         self.line("local.get $ptr");
         self.indent -= 1;
         self.line(")");
@@ -12341,7 +13753,9 @@ impl WasmCodegen {
         self.line(")");
         // pwa_setStrategy: stores caching strategy; applied via pwa.cachePrecache syscall
         self.emit("(func $pwa_setStrategy (param $ptr i32) (param $len i32)");
-        self.line("  nop  ;; caching strategy config stored; applied via pwa.cachePrecache syscall");
+        self.line(
+            "  nop  ;; caching strategy config stored; applied via pwa.cachePrecache syscall",
+        );
         self.line(")");
 
         if self.target == CompilationTarget::Browser && self.needs_ws {
@@ -12457,24 +13871,32 @@ impl WasmCodegen {
         self.line(";; ══ Crypto runtime (pure WASM — no JS bridges) ═════════════════");
         // K constants stored in string data section (read-only)
         let sha256_k: Vec<u32> = vec![
-            0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-            0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-            0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-            0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-            0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-            0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-            0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-            0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
+            0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
+            0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f,
+            0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+            0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+            0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+            0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116,
+            0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+            0xc67178f2,
         ];
         // Store K constants as raw bytes in the string data section
         let k_bytes: Vec<u8> = sha256_k.iter().flat_map(|k| k.to_le_bytes()).collect();
         let k_str: String = k_bytes.iter().map(|b| *b as char).collect();
         let k_offset = self.store_string(&k_str);
         let hex_offset = self.store_string("0123456789abcdef");
-        self.line(&format!("(global $__crypto_scratch i32 (i32.const {})) ;; K constants in string data", k_offset));
+        self.line(&format!(
+            "(global $__crypto_scratch i32 (i32.const {})) ;; K constants in string data",
+            k_offset
+        ));
         self.line("(global $__crypto_work (mut i32) (i32.const 0)) ;; allocated from heap at init");
         self.line("(global $__crypto_out (mut i32) (i32.const 0)) ;; allocated from heap at init");
-        self.line(&format!("(global $__crypto_hex i32 (i32.const {})) ;; hex chars in string data", hex_offset));
+        self.line(&format!(
+            "(global $__crypto_hex i32 (i32.const {})) ;; hex chars in string data",
+            hex_offset
+        ));
         self.line("(global $__crypto_xseed (mut i32) (i32.const 0x6A09E667))");
 
         // xorshift32 PRNG
@@ -12528,7 +13950,9 @@ impl WasmCodegen {
         self.line("  local.get $i  i32.const 16  i32.ge_u  br_if $ld_done");
         self.line("  (local.set $t1 (i32.add (local.get $blk_ptr) (i32.mul (local.get $i) (i32.const 4))))");
         self.line("  (i32.or (i32.or (i32.shl (i32.load8_u (local.get $t1)) (i32.const 24)) (i32.shl (i32.load8_u (i32.add (local.get $t1) (i32.const 1))) (i32.const 16))) (i32.or (i32.shl (i32.load8_u (i32.add (local.get $t1) (i32.const 2))) (i32.const 8)) (i32.load8_u (i32.add (local.get $t1) (i32.const 3)))))");
-        self.line("  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))");
+        self.line(
+            "  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))",
+        );
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $ld_loop");
         self.line("end  end");
         // Extend W[16..63]
@@ -12539,15 +13963,28 @@ impl WasmCodegen {
         self.line("  (local.set $t1 (i32.xor (i32.xor (i32.rotr (local.get $t1) (i32.const 17)) (i32.rotr (local.get $t1) (i32.const 19))) (i32.shr_u (local.get $t1) (i32.const 10))))");
         self.line("  (local.set $t2 (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 15)) (i32.const 4)))))");
         self.line("  (local.set $t2 (i32.xor (i32.xor (i32.rotr (local.get $t2) (i32.const 7)) (i32.rotr (local.get $t2) (i32.const 18))) (i32.shr_u (local.get $t2) (i32.const 3))))");
-        self.line("  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4)))");
+        self.line(
+            "  (i32.store (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4)))",
+        );
         self.line("    (i32.add (i32.add (local.get $t1) (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 7)) (i32.const 4)))))");
         self.line("      (i32.add (local.get $t2) (i32.load (i32.add (local.get $w_ptr) (i32.mul (i32.sub (local.get $i) (i32.const 16)) (i32.const 4)))))))");
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $ext_loop");
         self.line("end  end");
         // Load state
         self.line("local.get $state_ptr  i32.load  local.set $a");
-        for (off, var) in [(4,"$b"),(8,"$c"),(12,"$d"),(16,"$e"),(20,"$f"),(24,"$g"),(28,"$h")] {
-            self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  i32.load  local.set {}", off, var));
+        for (off, var) in [
+            (4, "$b"),
+            (8, "$c"),
+            (12, "$d"),
+            (16, "$e"),
+            (20, "$f"),
+            (24, "$g"),
+            (28, "$h"),
+        ] {
+            self.line(&format!(
+                "local.get $state_ptr  i32.const {}  i32.add  i32.load  local.set {}",
+                off, var
+            ));
         }
         // 64 rounds
         self.line("i32.const 0  local.set $i");
@@ -12558,37 +13995,71 @@ impl WasmCodegen {
         self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (global.get $__crypto_scratch) (i32.mul (local.get $i) (i32.const 4))))))");
         self.line("  (local.set $t1 (i32.add (local.get $t1) (i32.load (i32.add (local.get $w_ptr) (i32.mul (local.get $i) (i32.const 4))))))");
         self.line("  (local.set $t2 (i32.add (i32.xor (i32.xor (i32.rotr (local.get $a) (i32.const 2)) (i32.rotr (local.get $a) (i32.const 13))) (i32.rotr (local.get $a) (i32.const 22))) (i32.xor (i32.xor (i32.and (local.get $a) (local.get $b)) (i32.and (local.get $a) (local.get $c))) (i32.and (local.get $b) (local.get $c)))))");
-        self.line("  local.get $g  local.set $h  local.get $f  local.set $g  local.get $e  local.set $f");
+        self.line(
+            "  local.get $g  local.set $h  local.get $f  local.set $g  local.get $e  local.set $f",
+        );
         self.line("  (local.set $e (i32.add (local.get $d) (local.get $t1)))");
-        self.line("  local.get $c  local.set $d  local.get $b  local.set $c  local.get $a  local.set $b");
+        self.line(
+            "  local.get $c  local.set $d  local.get $b  local.set $c  local.get $a  local.set $b",
+        );
         self.line("  (local.set $a (i32.add (local.get $t1) (local.get $t2)))");
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $rnd_loop");
         self.line("end  end");
         // Add to state
         self.line("local.get $state_ptr  (i32.add (i32.load (local.get $state_ptr)) (local.get $a))  i32.store");
-        for (off, var) in [(4,"$b"),(8,"$c"),(12,"$d"),(16,"$e"),(20,"$f"),(24,"$g"),(28,"$h")] {
+        for (off, var) in [
+            (4, "$b"),
+            (8, "$c"),
+            (12, "$d"),
+            (16, "$e"),
+            (20, "$f"),
+            (24, "$g"),
+            (28, "$h"),
+        ] {
             self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  (i32.add (i32.load (i32.add (local.get $state_ptr) (i32.const {}))) (local.get {}))  i32.store", off, off, var));
         }
         self.indent -= 1;
         self.line(")");
 
         // SHA-256 full
-        self.emit("(func $crypto_sha256 (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.emit(
+            "(func $crypto_sha256 (param $data_ptr i32) (param $data_len i32) (result i32 i32)",
+        );
         self.indent += 1;
         self.line("(local $state_ptr i32) (local $buf_ptr i32) (local $pos i32) (local $remaining i32) (local $bit_len i32) (local $i i32)");
         self.line("i32.const 32  call $alloc  local.set $state_ptr");
         self.line("i32.const 128  call $alloc  local.set $buf_ptr");
-        let ivs: [(i32,u32);8] = [(0,0x6A09E667),(4,0xBB67AE85),(8,0x3C6EF372),(12,0xA54FF53A),(16,0x510E527F),(20,0x9B05688C),(24,0x1F83D9AB),(28,0x5BE0CD19)];
+        let ivs: [(i32, u32); 8] = [
+            (0, 0x6A09E667),
+            (4, 0xBB67AE85),
+            (8, 0x3C6EF372),
+            (12, 0xA54FF53A),
+            (16, 0x510E527F),
+            (20, 0x9B05688C),
+            (24, 0x1F83D9AB),
+            (28, 0x5BE0CD19),
+        ];
         for (off, val) in &ivs {
-            if *off == 0 { self.line(&format!("local.get $state_ptr  i32.const 0x{:08X}  i32.store", val)); }
-            else { self.line(&format!("local.get $state_ptr  i32.const {}  i32.add  i32.const 0x{:08X}  i32.store", off, val)); }
+            if *off == 0 {
+                self.line(&format!(
+                    "local.get $state_ptr  i32.const 0x{:08X}  i32.store",
+                    val
+                ));
+            } else {
+                self.line(&format!(
+                    "local.get $state_ptr  i32.const {}  i32.add  i32.const 0x{:08X}  i32.store",
+                    off, val
+                ));
+            }
         }
         self.line("local.get $data_len  local.set $remaining  i32.const 0  local.set $pos");
         self.line("block $blk_done  loop $blk_loop");
         self.line("  local.get $remaining  i32.const 64  i32.lt_u  br_if $blk_done");
         self.line("  local.get $state_ptr  (i32.add (local.get $data_ptr) (local.get $pos))  call $crypto_sha256_block");
         self.line("  local.get $pos  i32.const 64  i32.add  local.set $pos");
-        self.line("  local.get $remaining  i32.const 64  i32.sub  local.set $remaining  br $blk_loop");
+        self.line(
+            "  local.get $remaining  i32.const 64  i32.sub  local.set $remaining  br $blk_loop",
+        );
         self.line("end  end");
         // Copy tail
         self.line("i32.const 0  local.set $i");
@@ -12598,22 +14069,37 @@ impl WasmCodegen {
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $cp_loop");
         self.line("end  end");
         // Pad
-        self.line("(i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0x80))");
+        self.line(
+            "(i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0x80))",
+        );
         self.line("local.get $remaining  i32.const 1  i32.add  local.set $remaining");
         self.line("local.get $remaining  i32.const 56  i32.gt_u  if");
         self.indent += 1;
         self.line("block $z1  loop $z1l  local.get $remaining  i32.const 64  i32.ge_u  br_if $z1");
-        self.line("  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))");
-        self.line("  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z1l  end  end");
+        self.line(
+            "  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))",
+        );
+        self.line(
+            "  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z1l  end  end",
+        );
         self.line("local.get $state_ptr  local.get $buf_ptr  call $crypto_sha256_block");
         self.line("i32.const 0  local.set $remaining");
         self.indent -= 1;
         self.line("end");
         self.line("block $z2  loop $z2l  local.get $remaining  i32.const 56  i32.ge_u  br_if $z2");
-        self.line("  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))");
-        self.line("  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z2l  end  end");
+        self.line(
+            "  (i32.store8 (i32.add (local.get $buf_ptr) (local.get $remaining)) (i32.const 0))",
+        );
+        self.line(
+            "  local.get $remaining  i32.const 1  i32.add  local.set $remaining  br $z2l  end  end",
+        );
         self.line("(local.set $bit_len (i32.mul (local.get $data_len) (i32.const 8)))");
-        for i in 0..4 { self.line(&format!("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const {})) (i32.const 0))", 56 + i)); }
+        for i in 0..4 {
+            self.line(&format!(
+                "(i32.store8 (i32.add (local.get $buf_ptr) (i32.const {})) (i32.const 0))",
+                56 + i
+            ));
+        }
         self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 60)) (i32.shr_u (local.get $bit_len) (i32.const 24)))");
         self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 61)) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 16)) (i32.const 255)))");
         self.line("(i32.store8 (i32.add (local.get $buf_ptr) (i32.const 62)) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 8)) (i32.const 255)))");
@@ -12621,7 +14107,9 @@ impl WasmCodegen {
         self.line("local.get $state_ptr  local.get $buf_ptr  call $crypto_sha256_block");
         // State → big-endian bytes → hex
         self.line("i32.const 0  local.set $i");
-        self.line("block $out_done  loop $out_loop  local.get $i  i32.const 8  i32.ge_u  br_if $out_done");
+        self.line(
+            "block $out_done  loop $out_loop  local.get $i  i32.const 8  i32.ge_u  br_if $out_done",
+        );
         self.line("  (local.set $bit_len (i32.load (i32.add (local.get $state_ptr) (i32.mul (local.get $i) (i32.const 4)))))");
         self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.mul (local.get $i) (i32.const 4))) (i32.shr_u (local.get $bit_len) (i32.const 24)))");
         self.line("  (i32.store8 (i32.add (global.get $__crypto_out) (i32.add (i32.mul (local.get $i) (i32.const 4)) (i32.const 1))) (i32.and (i32.shr_u (local.get $bit_len) (i32.const 16)) (i32.const 255)))");
@@ -12634,13 +14122,18 @@ impl WasmCodegen {
 
         // SHA-1, SHA-384, SHA-512 — delegate through SHA-256
         for name in &["sha1", "sha384"] {
-            self.emit(&format!("(func $crypto_{} (param $data_ptr i32) (param $data_len i32) (result i32 i32)", name));
+            self.emit(&format!(
+                "(func $crypto_{} (param $data_ptr i32) (param $data_len i32) (result i32 i32)",
+                name
+            ));
             self.indent += 1;
             self.line("local.get $data_ptr  local.get $data_len  call $crypto_sha256");
             self.indent -= 1;
             self.line(")");
         }
-        self.emit("(func $crypto_sha512 (param $data_ptr i32) (param $data_len i32) (result i32 i32)");
+        self.emit(
+            "(func $crypto_sha512 (param $data_ptr i32) (param $data_len i32) (result i32 i32)",
+        );
         self.indent += 1;
         self.line("(local $h1_ptr i32) (local $h1_len i32)");
         self.line("local.get $data_ptr  local.get $data_len  call $crypto_sha256");
@@ -12703,7 +14196,9 @@ impl WasmCodegen {
         self.line("(local $out_ptr i32) (local $i i32) (local $kb i32)");
         self.line("local.get $plain_len  call $alloc  local.set $out_ptr");
         self.line("i32.const 0  local.set $i");
-        self.line("block $done  loop $loop  local.get $i  local.get $plain_len  i32.ge_u  br_if $done");
+        self.line(
+            "block $done  loop $loop  local.get $i  local.get $plain_len  i32.ge_u  br_if $done",
+        );
         self.line("  (local.set $kb (i32.load8_u (i32.add (local.get $key_ptr) (i32.rem_u (local.get $i) (local.get $key_len)))))");
         self.line("  (i32.store8 (i32.add (local.get $out_ptr) (local.get $i)) (i32.xor (i32.load8_u (i32.add (local.get $plain_ptr) (local.get $i))) (local.get $kb)))");
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $loop  end  end");
@@ -12712,7 +14207,13 @@ impl WasmCodegen {
         self.line(")");
 
         // AES decrypt + CBC/CTR variants — all symmetric XOR
-        for name in &["aes_gcm_decrypt", "aes_cbc_encrypt", "aes_cbc_decrypt", "aes_ctr_encrypt", "aes_ctr_decrypt"] {
+        for name in &[
+            "aes_gcm_decrypt",
+            "aes_cbc_encrypt",
+            "aes_cbc_decrypt",
+            "aes_ctr_encrypt",
+            "aes_ctr_decrypt",
+        ] {
             self.emit(&format!("(func $crypto_{} (param $key_ptr i32) (param $key_len i32) (param $in_ptr i32) (param $in_len i32) (result i32 i32)", name));
             self.indent += 1;
             self.line("local.get $key_ptr  local.get $key_len  local.get $in_ptr  local.get $in_len  call $crypto_aes_gcm_encrypt");
@@ -12733,7 +14234,9 @@ impl WasmCodegen {
         self.line("(local $expected_ptr i32) (local $expected_len i32) (local $i i32)");
         self.line("local.get $pub_ptr  local.get $pub_len  local.get $data_ptr  local.get $data_len  call $crypto_hmac_sha256");
         self.line("local.set $expected_len  local.set $expected_ptr");
-        self.line("local.get $sig_len  local.get $expected_len  i32.ne  if  i32.const 0  return  end");
+        self.line(
+            "local.get $sig_len  local.get $expected_len  i32.ne  if  i32.const 0  return  end",
+        );
         self.line("i32.const 0  local.set $i");
         self.line("block $cmp  loop $cmpl  local.get $i  local.get $sig_len  i32.ge_u  br_if $cmp");
         self.line("  (i32.load8_u (i32.add (local.get $sig_ptr) (local.get $i)))  (i32.load8_u (i32.add (local.get $expected_ptr) (local.get $i)))  i32.ne  if  i32.const 0  return  end");
@@ -12746,12 +14249,16 @@ impl WasmCodegen {
         self.emit("(func $crypto_pbkdf2_derive (param $pwd_ptr i32) (param $pwd_len i32) (param $salt_ptr i32) (param $salt_len i32) (result i32 i32)");
         self.indent += 1;
         self.line("(local $i i32) (local $combined_ptr i32)");
-        self.line("(local.set $combined_ptr (call $alloc (i32.add (local.get $salt_len) (i32.const 4))))");
+        self.line(
+            "(local.set $combined_ptr (call $alloc (i32.add (local.get $salt_len) (i32.const 4))))",
+        );
         self.line("i32.const 0  local.set $i");
         self.line("block $cs  loop $csl  local.get $i  local.get $salt_len  i32.ge_u  br_if $cs");
         self.line("  (i32.store8 (i32.add (local.get $combined_ptr) (local.get $i)) (i32.load8_u (i32.add (local.get $salt_ptr) (local.get $i))))");
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $csl  end  end");
-        self.line("(i32.store8 (i32.add (local.get $combined_ptr) (local.get $salt_len)) (i32.const 0))");
+        self.line(
+            "(i32.store8 (i32.add (local.get $combined_ptr) (local.get $salt_len)) (i32.const 0))",
+        );
         self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 1))) (i32.const 0))");
         self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 2))) (i32.const 0))");
         self.line("(i32.store8 (i32.add (local.get $combined_ptr) (i32.add (local.get $salt_len) (i32.const 3))) (i32.const 1))");
@@ -12793,7 +14300,9 @@ impl WasmCodegen {
         for pos in &[4, 6, 8, 10] {
             self.line(&format!("  local.get $i  i32.const {}  i32.eq  if  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.const 0x2d))  local.get $r  i32.const 1  i32.add  local.set $r  end", pos));
         }
-        self.line("  (local.set $byte (i32.load8_u (i32.add (global.get $__crypto_out) (local.get $i))))");
+        self.line(
+            "  (local.set $byte (i32.load8_u (i32.add (global.get $__crypto_out) (local.get $i))))",
+        );
         self.line("  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.load8_u (i32.add (global.get $__crypto_hex) (i32.and (i32.shr_u (local.get $byte) (i32.const 4)) (i32.const 15)))))");
         self.line("  local.get $r  i32.const 1  i32.add  local.set $r");
         self.line("  (i32.store8 (i32.add (local.get $out) (local.get $r)) (i32.load8_u (i32.add (global.get $__crypto_hex) (i32.and (local.get $byte) (i32.const 15)))))");
@@ -12809,7 +14318,9 @@ impl WasmCodegen {
         self.line("(local $out i32) (local $i i32) (local $r i32)");
         self.line("local.get $length  call $alloc  local.set $out");
         self.line("i32.const 0  local.set $i");
-        self.line("block $done  loop $loop  local.get $i  local.get $length  i32.ge_u  br_if $done");
+        self.line(
+            "block $done  loop $loop  local.get $i  local.get $length  i32.ge_u  br_if $done",
+        );
         self.line("  call $crypto_xorshift32  local.set $r");
         self.line("  (i32.store8 (i32.add (local.get $out) (local.get $i)) (i32.and (local.get $r) (i32.const 255)))");
         self.line("  local.get $i  i32.const 1  i32.add  local.set $i  br $loop  end  end");
@@ -12820,10 +14331,16 @@ impl WasmCodegen {
         // Generate key pair
         self.emit("(func $crypto_generate_key_pair (param $algo_ptr i32) (param $algo_len i32) (result i32 i32 i32 i32)");
         self.indent += 1;
-        self.line("(local $priv_ptr i32) (local $priv_len i32) (local $pub_ptr i32) (local $pub_len i32)");
-        self.line("i32.const 32  call $crypto_random_bytes  local.set $priv_len  local.set $priv_ptr");
+        self.line(
+            "(local $priv_ptr i32) (local $priv_len i32) (local $pub_ptr i32) (local $pub_len i32)",
+        );
+        self.line(
+            "i32.const 32  call $crypto_random_bytes  local.set $priv_len  local.set $priv_ptr",
+        );
         self.line("local.get $priv_ptr  local.get $priv_len  call $crypto_sha256  local.set $pub_len  local.set $pub_ptr");
-        self.line("local.get $pub_ptr  local.get $pub_len  local.get $priv_ptr  local.get $priv_len");
+        self.line(
+            "local.get $pub_ptr  local.get $pub_len  local.get $priv_ptr  local.get $priv_len",
+        );
         self.indent -= 1;
         self.line(")");
 
@@ -12878,7 +14395,7 @@ impl WasmCodegen {
         self.line("local.set $addr");
         self.line("local.get $addr");
         self.line("local.get $initial");
-        self.line("i32.store");          // addr+0 = value
+        self.line("i32.store"); // addr+0 = value
         self.line("local.get $addr");
         self.line("i32.const 0");
         self.line("i32.store offset=4"); // addr+4 = subscriber_count = 0
@@ -13205,7 +14722,8 @@ impl WasmCodegen {
         for stmt in &block.stmts {
             match stmt {
                 Stmt::Let { name, ty, .. } => {
-                    let wasm_ty = ty.as_ref()
+                    let wasm_ty = ty
+                        .as_ref()
                         .map(|t| self.ast_type_to_wasm(t))
                         .unwrap_or(WasmType::I32);
                     // Avoid duplicate local declarations (variable shadowing)
@@ -13250,14 +14768,14 @@ impl WasmCodegen {
                 "f32" => "f32".into(),
                 "f64" => "f64".into(),
                 "String" => "i32".into(), // pointer
-                _ => "i32".into(), // struct pointer
+                _ => "i32".into(),        // struct pointer
             },
             // Generic types are erased at codegen — they compile to i32
             // (pointer to heap-allocated data). Monomorphization can be
             // added in a future pass.
             Type::Generic { .. } => "i32".into(),
             Type::Reference { .. } => "i32".into(), // pointer
-            Type::Array(_) => "i32".into(), // pointer
+            Type::Array(_) => "i32".into(),         // pointer
             _ => "i32".into(),
         }
     }
@@ -13292,7 +14810,7 @@ impl WasmCodegen {
                 "i32" | "u32" | "f32" | "bool" => 4,
                 "i64" | "u64" | "f64" => 8,
                 "String" => 8, // ptr + len
-                _ => 4, // pointer
+                _ => 4,        // pointer
             },
             _ => 4,
         }
@@ -14417,7 +15935,8 @@ impl WasmCodegen {
                 // Self method calls — self.method_b() inside a component handler
                 // dispatches to the corresponding handler function.
                 if matches!(object, Expr::SelfExpr) && self.in_component_mount {
-                    if let Some(idx) = self.component_method_names.iter().position(|m| m == method) {
+                    if let Some(idx) = self.component_method_names.iter().position(|m| m == method)
+                    {
                         self.line(&format!(";; self.{}() — component method call", method));
                         self.line("i32.const 0 ;; self (signals are global)");
                         for arg in args {
@@ -14437,12 +15956,35 @@ impl WasmCodegen {
                 // import and call it directly, only evaluating the arguments.
                 let is_namespace = if let Expr::Ident(obj_name) = object {
                     // Known stdlib/built-in namespaces used as static call targets
-                    matches!(obj_name.as_str(),
-                        "time" | "Duration" | "DateTime" | "clipboard" | "crypto" | "auth" |
-                        "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
-                        "pwa" | "console" | "hardware" | "webapi" | "rtc" | "router" |
-                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
-                        "http" | "debounce"
+                    matches!(
+                        obj_name.as_str(),
+                        "time"
+                            | "Duration"
+                            | "DateTime"
+                            | "clipboard"
+                            | "crypto"
+                            | "auth"
+                            | "db"
+                            | "upload"
+                            | "payment"
+                            | "banking"
+                            | "map"
+                            | "channel"
+                            | "ws"
+                            | "pwa"
+                            | "console"
+                            | "hardware"
+                            | "webapi"
+                            | "rtc"
+                            | "router"
+                            | "streaming"
+                            | "dom"
+                            | "timer"
+                            | "observe"
+                            | "worker"
+                            | "theme"
+                            | "http"
+                            | "debounce"
                     )
                 } else {
                     false
@@ -14452,7 +15994,8 @@ impl WasmCodegen {
                 // e.g. `AppAuth.login("google")`, `AppCache.users()`.
                 // These are resolved to their corresponding WASM syscall/runtime functions.
                 let kw_def_kind = if let Expr::Ident(obj_name) = object {
-                    self.known_keyword_defs.iter()
+                    self.known_keyword_defs
+                        .iter()
                         .find(|(n, _)| n == obj_name)
                         .map(|(_, k)| k.clone())
                 } else {
@@ -14474,16 +16017,16 @@ impl WasmCodegen {
                     // The receiver is a namespace handle (not a local), so we skip it and
                     // only evaluate the arguments before calling the appropriate import.
                     let ns = match kind {
-                        KeywordDefKind::Auth       => "auth",
-                        KeywordDefKind::Banking    => "banking",
-                        KeywordDefKind::Cache      => "cache",
-                        KeywordDefKind::Database   => "db",
-                        KeywordDefKind::MapWidget  => "map",
+                        KeywordDefKind::Auth => "auth",
+                        KeywordDefKind::Banking => "banking",
+                        KeywordDefKind::Cache => "cache",
+                        KeywordDefKind::Database => "db",
+                        KeywordDefKind::MapWidget => "map",
                         KeywordDefKind::MiniProgram => "mp",
-                        KeywordDefKind::Payment    => "payment",
-                        KeywordDefKind::Upload     => "upload",
-                        KeywordDefKind::Pdf        => "pdf",
-                        KeywordDefKind::Theme      => "theme",
+                        KeywordDefKind::Payment => "payment",
+                        KeywordDefKind::Upload => "upload",
+                        KeywordDefKind::Pdf => "pdf",
+                        KeywordDefKind::Theme => "theme",
                     };
                     let qualified = format!("{}::{}", ns, method);
                     let wasm_fn = self.resolve_stdlib_fn(&qualified);
@@ -14494,14 +16037,16 @@ impl WasmCodegen {
                     self.line(&format!("call {}", wasm_fn));
                 } else if let Expr::Ident(obj_name) = object {
                     // Check if this is a store method call: StoreName.action()
-                    let store_match = self.known_stores.iter()
-                        .find(|(sn, _)| sn == obj_name);
+                    let store_match = self.known_stores.iter().find(|(sn, _)| sn == obj_name);
                     if let Some((store_name, sigs)) = store_match {
                         let store_name = store_name.clone();
                         let is_signal = sigs.iter().any(|s| s == method);
                         if is_signal {
                             // Signal getter: StoreName.signal_name()
-                            self.line(&format!(";; store signal getter: {}.{}()", store_name, method));
+                            self.line(&format!(
+                                ";; store signal getter: {}.{}()",
+                                store_name, method
+                            ));
                             self.line(&format!("global.get $__sig_{}_{}", store_name, method));
                             self.line("call $signal_get");
                         } else {
@@ -14586,35 +16131,58 @@ impl WasmCodegen {
             }
             Expr::MethodCall { object, args, .. } => {
                 Self::collect_free_vars(object, bound, out);
-                for a in args { Self::collect_free_vars(a, bound, out); }
+                for a in args {
+                    Self::collect_free_vars(a, bound, out);
+                }
             }
             Expr::FnCall { callee, args } => {
                 Self::collect_free_vars(callee, bound, out);
-                for a in args { Self::collect_free_vars(a, bound, out); }
+                for a in args {
+                    Self::collect_free_vars(a, bound, out);
+                }
             }
             Expr::Index { object, index } => {
                 Self::collect_free_vars(object, bound, out);
                 Self::collect_free_vars(index, bound, out);
             }
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 Self::collect_free_vars(condition, bound, out);
-                for s in &then_block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+                for s in &then_block.stmts {
+                    Self::collect_free_vars_stmt(s, bound, out);
+                }
                 if let Some(eb) = else_block {
-                    for s in &eb.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+                    for s in &eb.stmts {
+                        Self::collect_free_vars_stmt(s, bound, out);
+                    }
                 }
             }
             Expr::Block(block) => {
-                for s in &block.stmts { Self::collect_free_vars_stmt(s, bound, out); }
+                for s in &block.stmts {
+                    Self::collect_free_vars_stmt(s, bound, out);
+                }
             }
             Expr::ArrayLit(elems) => {
-                for e in elems { Self::collect_free_vars(e, bound, out); }
+                for e in elems {
+                    Self::collect_free_vars(e, bound, out);
+                }
             }
             Expr::StructInit { fields, .. } | Expr::ObjectLit { fields } => {
-                for (_, e) in fields { Self::collect_free_vars(e, bound, out); }
+                for (_, e) in fields {
+                    Self::collect_free_vars(e, bound, out);
+                }
             }
-            Expr::Closure { params: inner_params, body: inner_body } => {
+            Expr::Closure {
+                params: inner_params,
+                body: inner_body,
+            } => {
                 let mut new_bound: Vec<&str> = bound.to_vec();
-                for (n, _) in inner_params { new_bound.push(n.as_str()); }
+                for (n, _) in inner_params {
+                    new_bound.push(n.as_str());
+                }
                 Self::collect_free_vars(inner_body, &new_bound, out);
             }
             Expr::Assign { target, value } => {
@@ -14650,17 +16218,39 @@ impl WasmCodegen {
             // Namespace method calls — check if the resolved WASM function is void
             Expr::MethodCall { object, method, .. } => {
                 if let Expr::Ident(obj_name) = object.as_ref() {
-                    if matches!(obj_name.as_str(),
-                        "time" | "Duration" | "clipboard" | "crypto" | "auth" |
-                        "db" | "upload" | "payment" | "banking" | "map" | "channel" | "ws" |
-                        "pwa" | "console" | "hardware" | "webapi" | "rtc" |
-                        "streaming" | "dom" | "timer" | "observe" | "worker" | "theme" |
-                        "http" | "router"
+                    if matches!(
+                        obj_name.as_str(),
+                        "time"
+                            | "Duration"
+                            | "clipboard"
+                            | "crypto"
+                            | "auth"
+                            | "db"
+                            | "upload"
+                            | "payment"
+                            | "banking"
+                            | "map"
+                            | "channel"
+                            | "ws"
+                            | "pwa"
+                            | "console"
+                            | "hardware"
+                            | "webapi"
+                            | "rtc"
+                            | "streaming"
+                            | "dom"
+                            | "timer"
+                            | "observe"
+                            | "worker"
+                            | "theme"
+                            | "http"
+                            | "router"
                     ) {
                         let qualified = format!("{}::{}", obj_name, method);
                         let wasm_fn = self.resolve_stdlib_fn(&qualified);
                         // Known void functions (no result type)
-                        return matches!(wasm_fn.as_str(),
+                        return matches!(
+                            wasm_fn.as_str(),
                             "$webapi_clipboardWrite" |
                             "$webapi_localStorageSet" |
                             "$webapi_localStorageRemove" |
@@ -14724,13 +16314,25 @@ impl WasmCodegen {
             Expr::FnCall { callee, .. } => {
                 if let Expr::Ident(name) = callee.as_ref() {
                     // Bare RTC/webapi void functions
-                    if matches!(name.as_str(),
-                        "rtc_close" | "rtc_set_local_description" | "rtc_set_remote_description" |
-                        "rtc_add_ice_candidate" | "rtc_remove_track" | "rtc_stop_track" |
-                        "rtc_set_track_enabled" | "rtc_attach_stream" | "rtc_data_channel_close" |
-                        "console_log" | "console_warn" | "console_error" |
-                        "localStorage_set" | "localStorage_remove" |
-                        "clipboard_write" | "push_state" | "replace_state"
+                    if matches!(
+                        name.as_str(),
+                        "rtc_close"
+                            | "rtc_set_local_description"
+                            | "rtc_set_remote_description"
+                            | "rtc_add_ice_candidate"
+                            | "rtc_remove_track"
+                            | "rtc_stop_track"
+                            | "rtc_set_track_enabled"
+                            | "rtc_attach_stream"
+                            | "rtc_data_channel_close"
+                            | "console_log"
+                            | "console_warn"
+                            | "console_error"
+                            | "localStorage_set"
+                            | "localStorage_remove"
+                            | "clipboard_write"
+                            | "push_state"
+                            | "replace_state"
                     ) {
                         return true;
                     }
@@ -14740,7 +16342,9 @@ impl WasmCodegen {
                             let store_name = parts[0];
                             // If it's a known store and the member is NOT a signal (i.e. it's an action),
                             // the call is void.
-                            if let Some((_, signals)) = self.known_stores.iter().find(|(sn, _)| sn == store_name) {
+                            if let Some((_, signals)) =
+                                self.known_stores.iter().find(|(sn, _)| sn == store_name)
+                            {
                                 let member = parts[1];
                                 if !signals.iter().any(|s| s == member) {
                                     return true;
@@ -14760,11 +16364,19 @@ impl WasmCodegen {
     /// Returns true if an `Expr::If` has branches that all end with explicit
     /// `return` statements, meaning the if does not produce a stack value.
     fn if_branches_return(expr: &Expr) -> bool {
-        if let Expr::If { then_block, else_block, .. } = expr {
-            let then_returns = then_block.stmts.last()
+        if let Expr::If {
+            then_block,
+            else_block,
+            ..
+        } = expr
+        {
+            let then_returns = then_block
+                .stmts
+                .last()
                 .map(|s| matches!(s, Stmt::Return(_)))
                 .unwrap_or(false);
-            let else_returns = else_block.as_ref()
+            let else_returns = else_block
+                .as_ref()
                 .and_then(|eb| eb.stmts.last())
                 .map(|s| matches!(s, Stmt::Return(_)))
                 .unwrap_or(false);
@@ -14979,12 +16591,12 @@ impl WasmCodegen {
             "Duration::millis" => "$time_duration_millis".into(),
             // Crypto — pure WASM implementations. Map well-known names to their
             // actual generated function names in emit_crypto_runtime.
-            "crypto::sha256"  => "$crypto_sha256".into(),
-            "crypto::sha512"  => "$crypto_sha512".into(),
-            "crypto::sha1"    => "$crypto_sha1".into(),
-            "crypto::sha384"  => "$crypto_sha384".into(),
+            "crypto::sha256" => "$crypto_sha256".into(),
+            "crypto::sha512" => "$crypto_sha512".into(),
+            "crypto::sha1" => "$crypto_sha1".into(),
+            "crypto::sha384" => "$crypto_sha384".into(),
             // hmac maps to the SHA-256 variant (the default and most common)
-            "crypto::hmac"    => "$crypto_hmac_sha256".into(),
+            "crypto::hmac" => "$crypto_hmac_sha256".into(),
             "crypto::hmac_sha256" => "$crypto_hmac_sha256".into(),
             "crypto::hmac_sha512" => "$crypto_hmac_sha512".into(),
             "crypto::encrypt" | "crypto::encrypt_aes_gcm" => "$crypto_aes_gcm_encrypt".into(),
@@ -14993,11 +16605,11 @@ impl WasmCodegen {
             "crypto::decrypt_aes_cbc" => "$crypto_aes_cbc_decrypt".into(),
             "crypto::encrypt_aes_ctr" => "$crypto_aes_ctr_encrypt".into(),
             "crypto::decrypt_aes_ctr" => "$crypto_aes_ctr_decrypt".into(),
-            "crypto::sign"    => "$crypto_ed25519_sign".into(),
-            "crypto::verify"  => "$crypto_ed25519_verify".into(),
+            "crypto::sign" => "$crypto_ed25519_sign".into(),
+            "crypto::verify" => "$crypto_ed25519_verify".into(),
             "crypto::derive_key" => "$crypto_pbkdf2_derive".into(),
             "crypto::derive_bits" => "$crypto_pbkdf2_derive_bits".into(),
-            "crypto::hkdf"    => "$crypto_hkdf_derive".into(),
+            "crypto::hkdf" => "$crypto_hkdf_derive".into(),
             "crypto::random_uuid" | "crypto::uuid" => "$crypto_random_uuid".into(),
             "crypto::random_bytes" => "$crypto_random_bytes".into(),
             "crypto::generate_key_pair" => "$crypto_generate_key_pair".into(),
@@ -15045,7 +16657,9 @@ impl WasmCodegen {
             "debounce::cancel" => "$debounce_cancel".into(),
             // HTTP — typed setters + fetch
             "http::fetch" => "$http_fetch".into(),
-            "http::fetchWithCallback" | "http::fetch_with_callback" => "$http_fetchWithCallback".into(),
+            "http::fetchWithCallback" | "http::fetch_with_callback" => {
+                "$http_fetchWithCallback".into()
+            }
             "http::setMethod" | "http::set_method" => "$http_setMethod".into(),
             "http::setBody" | "http::set_body" => "$http_setBody".into(),
             "http::addHeader" | "http::add_header" => "$http_addHeader".into(),
@@ -15056,36 +16670,66 @@ impl WasmCodegen {
             "console::warn" => "$webapi_consoleWarn".into(),
             "console::error" => "$webapi_consoleError".into(),
             // Theme — WASM-internal theme runtime functions
-            "theme::init"   => "$theme_init".into(),
+            "theme::init" => "$theme_init".into(),
             "theme::toggle" => "$theme_toggle".into(),
-            "theme::set"    => "$theme_set".into(),
+            "theme::set" => "$theme_set".into(),
             // Cache — WASM-internal cache runtime functions
-            "cache::get"    => "$cache_get".into(),
-            "cache::init"   => "$cache_init".into(),
+            "cache::get" => "$cache_get".into(),
+            "cache::init" => "$cache_init".into(),
             "cache::invalidate" => "$cache_invalidate".into(),
             // PDF — WASM-internal pdf creation function
-            "pdf::create"   => "$__pdf_create_".into(),
-            "pdf::print"    => "$dom_print".into(),
+            "pdf::create" => "$__pdf_create_".into(),
+            "pdf::print" => "$dom_print".into(),
             // RTC — map snake_case stdlib names to camelCase WAT imports
             "rtc_create_peer" | "rtc::create_peer" | "rtc::createPeer" => "$rtc_createPeer".into(),
-            "rtc_create_offer" | "rtc::create_offer" | "rtc::createOffer" => "$rtc_createOffer".into(),
-            "rtc_create_answer" | "rtc::create_answer" | "rtc::createAnswer" => "$rtc_createAnswer".into(),
-            "rtc_set_local_description" | "rtc::set_local_description" | "rtc::setLocalDescription" => "$rtc_setLocalDescription".into(),
-            "rtc_set_remote_description" | "rtc::set_remote_description" | "rtc::setRemoteDescription" => "$rtc_setRemoteDescription".into(),
-            "rtc_add_ice_candidate" | "rtc::add_ice_candidate" | "rtc::addIceCandidate" => "$rtc_addIceCandidate".into(),
+            "rtc_create_offer" | "rtc::create_offer" | "rtc::createOffer" => {
+                "$rtc_createOffer".into()
+            }
+            "rtc_create_answer" | "rtc::create_answer" | "rtc::createAnswer" => {
+                "$rtc_createAnswer".into()
+            }
+            "rtc_set_local_description"
+            | "rtc::set_local_description"
+            | "rtc::setLocalDescription" => "$rtc_setLocalDescription".into(),
+            "rtc_set_remote_description"
+            | "rtc::set_remote_description"
+            | "rtc::setRemoteDescription" => "$rtc_setRemoteDescription".into(),
+            "rtc_add_ice_candidate" | "rtc::add_ice_candidate" | "rtc::addIceCandidate" => {
+                "$rtc_addIceCandidate".into()
+            }
             "rtc_close" | "rtc::close" => "$rtc_close".into(),
-            "rtc_get_user_media" | "rtc::get_user_media" | "rtc::getUserMedia" => "$rtc_getUserMedia".into(),
-            "rtc_get_display_media" | "rtc::get_display_media" | "rtc::getDisplayMedia" => "$rtc_getDisplayMedia".into(),
+            "rtc_get_user_media" | "rtc::get_user_media" | "rtc::getUserMedia" => {
+                "$rtc_getUserMedia".into()
+            }
+            "rtc_get_display_media" | "rtc::get_display_media" | "rtc::getDisplayMedia" => {
+                "$rtc_getDisplayMedia".into()
+            }
             "rtc_add_track" | "rtc::add_track" | "rtc::addTrack" => "$rtc_addTrack".into(),
-            "rtc_remove_track" | "rtc::remove_track" | "rtc::removeTrack" => "$rtc_removeTrack".into(),
+            "rtc_remove_track" | "rtc::remove_track" | "rtc::removeTrack" => {
+                "$rtc_removeTrack".into()
+            }
             "rtc_stop_track" | "rtc::stop_track" | "rtc::stopTrack" => "$rtc_stopTrack".into(),
-            "rtc_set_track_enabled" | "rtc::set_track_enabled" | "rtc::setTrackEnabled" => "$rtc_setTrackEnabled".into(),
-            "rtc_get_track_kind" | "rtc::get_track_kind" | "rtc::getTrackKind" => "$rtc_getTrackKind".into(),
-            "rtc_attach_stream" | "rtc::attach_stream" | "rtc::attachStream" => "$rtc_attachStream".into(),
-            "rtc_get_connection_state" | "rtc::get_connection_state" | "rtc::getConnectionState" => "$rtc_getConnectionState".into(),
-            "rtc_create_data_channel" | "rtc::create_data_channel" | "rtc::createDataChannel" => "$rtc_createDataChannel".into(),
-            "rtc_data_channel_send" | "rtc::data_channel_send" | "rtc::dataChannelSend" => "$rtc_dataChannelSend".into(),
-            "rtc_data_channel_close" | "rtc::data_channel_close" | "rtc::dataChannelClose" => "$rtc_dataChannelClose".into(),
+            "rtc_set_track_enabled" | "rtc::set_track_enabled" | "rtc::setTrackEnabled" => {
+                "$rtc_setTrackEnabled".into()
+            }
+            "rtc_get_track_kind" | "rtc::get_track_kind" | "rtc::getTrackKind" => {
+                "$rtc_getTrackKind".into()
+            }
+            "rtc_attach_stream" | "rtc::attach_stream" | "rtc::attachStream" => {
+                "$rtc_attachStream".into()
+            }
+            "rtc_get_connection_state"
+            | "rtc::get_connection_state"
+            | "rtc::getConnectionState" => "$rtc_getConnectionState".into(),
+            "rtc_create_data_channel" | "rtc::create_data_channel" | "rtc::createDataChannel" => {
+                "$rtc_createDataChannel".into()
+            }
+            "rtc_data_channel_send" | "rtc::data_channel_send" | "rtc::dataChannelSend" => {
+                "$rtc_dataChannelSend".into()
+            }
+            "rtc_data_channel_close" | "rtc::data_channel_close" | "rtc::dataChannelClose" => {
+                "$rtc_dataChannelClose".into()
+            }
             "rtc_get_stats" | "rtc::get_stats" | "rtc::getStats" => "$rtc_getStats".into(),
             // GPU — WebGPU syscall bridges (snake_case stdlib → camelCase WAT imports)
             "gpu_request_adapter" | "gpu::request_adapter" => "$gpu_requestAdapter".into(),
@@ -15093,33 +16737,59 @@ impl WasmCodegen {
             "gpu_configure_canvas" | "gpu::configure_canvas" => "$gpu_configureCanvas".into(),
             "gpu_create_buffer" | "gpu::create_buffer" => "$gpu_createBuffer".into(),
             "gpu_write_buffer" | "gpu::write_buffer" => "$gpu_writeBuffer".into(),
-            "gpu_create_shader_module" | "gpu::create_shader_module" => "$gpu_createShaderModule".into(),
-            "gpu_create_render_pipeline" | "gpu::create_render_pipeline" => "$gpu_createRenderPipeline".into(),
-            "gpu_create_render_pipeline_with_layout" | "gpu::create_render_pipeline_with_layout" => "$gpu_createRenderPipelineWithLayout".into(),
-            "gpu_create_render_pipeline_with_vertex_layout" | "gpu::create_render_pipeline_with_vertex_layout" => "$gpu_createRenderPipelineWithVertexLayout".into(),
+            "gpu_create_shader_module" | "gpu::create_shader_module" => {
+                "$gpu_createShaderModule".into()
+            }
+            "gpu_create_render_pipeline" | "gpu::create_render_pipeline" => {
+                "$gpu_createRenderPipeline".into()
+            }
+            "gpu_create_render_pipeline_with_layout"
+            | "gpu::create_render_pipeline_with_layout" => {
+                "$gpu_createRenderPipelineWithLayout".into()
+            }
+            "gpu_create_render_pipeline_with_vertex_layout"
+            | "gpu::create_render_pipeline_with_vertex_layout" => {
+                "$gpu_createRenderPipelineWithVertexLayout".into()
+            }
             "gpu_create_texture" | "gpu::create_texture" => "$gpu_createTexture".into(),
             "gpu_begin_render_pass" | "gpu::begin_render_pass" => "$gpu_beginRenderPass".into(),
             "gpu_set_pipeline" | "gpu::set_pipeline" => "$gpu_setPipeline".into(),
             "gpu_set_vertex_buffer" | "gpu::set_vertex_buffer" => "$gpu_setVertexBuffer".into(),
             "gpu_draw" | "gpu::draw" => "$gpu_draw".into(),
             "gpu_submit_render_pass" | "gpu::submit_render_pass" => "$gpu_submitRenderPass".into(),
-            "gpu_get_current_texture" | "gpu::get_current_texture" => "$gpu_getCurrentTexture".into(),
-            "gpu_create_texture_view" | "gpu::create_texture_view" => "$gpu_createTextureView".into(),
+            "gpu_get_current_texture" | "gpu::get_current_texture" => {
+                "$gpu_getCurrentTexture".into()
+            }
+            "gpu_create_texture_view" | "gpu::create_texture_view" => {
+                "$gpu_createTextureView".into()
+            }
             "gpu_destroy_buffer" | "gpu::destroy_buffer" => "$gpu_destroyBuffer".into(),
             "gpu_destroy_texture" | "gpu::destroy_texture" => "$gpu_destroyTexture".into(),
-            "gpu_get_preferred_format" | "gpu::get_preferred_format" => "$gpu_getPreferredFormat".into(),
+            "gpu_get_preferred_format" | "gpu::get_preferred_format" => {
+                "$gpu_getPreferredFormat".into()
+            }
             "gpu_get_adapter_info" | "gpu::get_adapter_info" => "$gpu_getAdapterInfo".into(),
             // GPU Phase 3: compute, bind groups, indexed draw
-            "gpu_create_compute_pipeline" | "gpu::create_compute_pipeline" => "$gpu_createComputePipeline".into(),
-            "gpu_create_pipeline_layout" | "gpu::create_pipeline_layout" => "$gpu_createPipelineLayout".into(),
-            "gpu_create_bind_group_layout" | "gpu::create_bind_group_layout" => "$gpu_createBindGroupLayout".into(),
+            "gpu_create_compute_pipeline" | "gpu::create_compute_pipeline" => {
+                "$gpu_createComputePipeline".into()
+            }
+            "gpu_create_pipeline_layout" | "gpu::create_pipeline_layout" => {
+                "$gpu_createPipelineLayout".into()
+            }
+            "gpu_create_bind_group_layout" | "gpu::create_bind_group_layout" => {
+                "$gpu_createBindGroupLayout".into()
+            }
             "gpu_create_bind_group" | "gpu::create_bind_group" => "$gpu_createBindGroup".into(),
             "gpu_set_bind_group" | "gpu::set_bind_group" => "$gpu_setBindGroup".into(),
             "gpu_set_index_buffer" | "gpu::set_index_buffer" => "$gpu_setIndexBuffer".into(),
             "gpu_draw_indexed" | "gpu::draw_indexed" => "$gpu_drawIndexed".into(),
             "gpu_begin_compute_pass" | "gpu::begin_compute_pass" => "$gpu_beginComputePass".into(),
-            "gpu_dispatch_workgroups" | "gpu::dispatch_workgroups" => "$gpu_dispatchWorkgroups".into(),
-            "gpu_submit_compute_pass" | "gpu::submit_compute_pass" => "$gpu_submitComputePass".into(),
+            "gpu_dispatch_workgroups" | "gpu::dispatch_workgroups" => {
+                "$gpu_dispatchWorkgroups".into()
+            }
+            "gpu_submit_compute_pass" | "gpu::submit_compute_pass" => {
+                "$gpu_submitComputePass".into()
+            }
             // Binary fetch
             "fetch_binary" | "http::fetch_binary" => "$http_fetchBinary".into(),
             _ => {
@@ -15140,7 +16810,9 @@ impl WasmCodegen {
             _ => return self.global_handler_base, // fallback
         };
         // Find the method index within the current component
-        let local_idx = self.component_method_names.iter()
+        let local_idx = self
+            .component_method_names
+            .iter()
             .position(|m| m == &method_name)
             .unwrap_or(0) as u32;
         // Return global index = base + local index
@@ -15203,7 +16875,10 @@ impl WasmCodegen {
         for (s, offset) in self.strings.clone() {
             // Escape special characters for WAT string literals
             let escaped = s.replace('\\', "\\\\").replace('"', "\\\"");
-            self.line(&format!("(data (i32.const {}) \"{}\\00\")", offset, escaped));
+            self.line(&format!(
+                "(data (i32.const {}) \"{}\\00\")",
+                offset, escaped
+            ));
         }
     }
 
@@ -15468,7 +17143,9 @@ impl WasmCodegen {
 
         // $flags_is_enabled (param $name_ptr i32) (param $name_len i32) (result i32)
         self.line("");
-        self.emit("(func $flags_is_enabled (param $name_ptr i32) (param $name_len i32) (result i32)");
+        self.emit(
+            "(func $flags_is_enabled (param $name_ptr i32) (param $name_len i32) (result i32)",
+        );
         self.indent += 1;
         self.line("(local $idx i32)");
         self.line("(local $addr i32)");
@@ -15558,7 +17235,6 @@ impl WasmCodegen {
         self.line(")");
     }
 
-
     fn emit_ai_runtime(&mut self) {
         self.line("");
         self.line(";; ========== AI tool registration runtime (WASM-internal) ==========");
@@ -15585,13 +17261,13 @@ impl WasmCodegen {
         // Store fields
         self.line("local.get $addr");
         self.line("local.get $name_ptr");
-        self.line("i32.store");           // offset 0: name_ptr
+        self.line("i32.store"); // offset 0: name_ptr
         self.line("local.get $addr");
         self.line("local.get $name_len");
-        self.line("i32.store offset=4");  // offset 4: name_len
+        self.line("i32.store offset=4"); // offset 4: name_len
         self.line("local.get $addr");
         self.line("local.get $desc_ptr");
-        self.line("i32.store offset=8");  // offset 8: desc_ptr
+        self.line("i32.store offset=8"); // offset 8: desc_ptr
         self.line("local.get $addr");
         self.line("local.get $desc_len");
         self.line("i32.store offset=12"); // offset 12: desc_len
@@ -15632,9 +17308,9 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("local.set $addr");
         self.line("local.get $addr");
-        self.line("i32.load");            // name_ptr
+        self.line("i32.load"); // name_ptr
         self.line("local.get $addr");
-        self.line("i32.load offset=4");   // name_len
+        self.line("i32.load offset=4"); // name_len
         self.indent -= 1;
         self.line(")");
 
@@ -15650,9 +17326,9 @@ impl WasmCodegen {
         self.line("i32.add");
         self.line("local.set $addr");
         self.line("local.get $addr");
-        self.line("i32.load offset=16");  // schema_ptr
+        self.line("i32.load offset=16"); // schema_ptr
         self.line("local.get $addr");
-        self.line("i32.load offset=20");  // schema_len
+        self.line("i32.load offset=20"); // schema_len
         self.indent -= 1;
         self.line(")");
 
@@ -15679,7 +17355,9 @@ impl WasmCodegen {
         self.line("");
         self.line(";; ========== Accessibility runtime (WASM-internal) ==========");
         self.line(";; All a11y operations write SET_ATTR opcodes to the command buffer.");
-        self.line(";; No JS logic — WASM builds attribute strings and flushes via existing dom.flush().");
+        self.line(
+            ";; No JS logic — WASM builds attribute strings and flushes via existing dom.flush().",
+        );
         self.line("");
 
         // Command buffer location for a11y ops — reuse the existing command buffer
@@ -15709,7 +17387,10 @@ impl WasmCodegen {
         self.line("(local $role_name_ptr i32)");
         // Store "role" string in memory
         let role_str_offset = self.store_string("role");
-        self.line(&format!("i32.const {}  local.set $role_name_ptr", role_str_offset));
+        self.line(&format!(
+            "i32.const {}  local.set $role_name_ptr",
+            role_str_offset
+        ));
         self.line("local.get $el");
         self.line("local.get $role_name_ptr");
         self.line("i32.const 4 ;; len(\"role\")");
@@ -15742,8 +17423,14 @@ impl WasmCodegen {
         self.line("local.set $style_el");
         // set textContent to the CSS
         self.line("local.get $style_el");
-        self.line(&format!("i32.const {} ;; \"textContent\" ptr", text_content));
-        self.line(&format!("i32.const {} ;; \"textContent\" len", "textContent".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"textContent\" ptr",
+            text_content
+        ));
+        self.line(&format!(
+            "i32.const {} ;; \"textContent\" len",
+            "textContent".len()
+        ));
         self.line(&format!("i32.const {} ;; focus CSS ptr", css_offset));
         self.line(&format!("i32.const {} ;; focus CSS len", focus_css.len()));
         self.line("call $dom_setAttr");
@@ -15942,7 +17629,9 @@ impl WasmCodegen {
         // era = z / 146097
         self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
         // doe = z - era * 146097
-        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        self.line(
+            "local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe",
+        );
         // yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365
         self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
         // y = yoe + era * 400
@@ -15969,7 +17658,9 @@ impl WasmCodegen {
         self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
         self.line("i32.const 719468  i32.add  local.set $z");
         self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
-        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        self.line(
+            "local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe",
+        );
         self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
         self.line("local.get $doe  local.get $yoe  i32.const 365  i32.mul  i32.sub  local.get $yoe  i32.const 4  i32.div_s  i32.sub  local.set $doy");
         self.line("i32.const 5  local.get $doy  i32.mul  i32.const 2  i32.add  i32.const 153  i32.div_s  local.set $mp");
@@ -15990,7 +17681,9 @@ impl WasmCodegen {
         self.line("local.get $ts  i64.const 86400000  i64.div_s  i32.wrap_i64");
         self.line("i32.const 719468  i32.add  local.set $z");
         self.line("local.get $z  i32.const 146097  i32.div_s  local.set $era");
-        self.line("local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe");
+        self.line(
+            "local.get $z  local.get $era  i32.const 146097  i32.mul  i32.sub  local.set $doe",
+        );
         self.line("local.get $doe  local.get $doe  i32.const 1460  i32.div_s  i32.sub  local.get $doe  i32.const 36524  i32.div_s  i32.add  local.get $doe  i32.const 146096  i32.div_s  i32.sub  i32.const 365  i32.div_s  local.set $yoe");
         self.line("local.get $doe  local.get $yoe  i32.const 365  i32.mul  i32.sub  local.get $yoe  i32.const 4  i32.div_s  i32.sub  local.set $doy");
         self.line("i32.const 5  local.get $doy  i32.mul  i32.const 2  i32.add  i32.const 153  i32.div_s  local.set $mp");
@@ -16003,7 +17696,9 @@ impl WasmCodegen {
         self.emit("(func $datetime_hour (param $ts i64) (result i32)");
         self.indent += 1;
         // hour = (ts / 3600000) % 24
-        self.line("local.get $ts  i64.const 3600000  i64.div_s  i64.const 24  i64.rem_s  i32.wrap_i64");
+        self.line(
+            "local.get $ts  i64.const 3600000  i64.div_s  i64.const 24  i64.rem_s  i32.wrap_i64",
+        );
         self.indent -= 1;
         self.line(")");
 
@@ -16011,7 +17706,9 @@ impl WasmCodegen {
         self.line("");
         self.emit("(func $datetime_minute (param $ts i64) (result i32)");
         self.indent += 1;
-        self.line("local.get $ts  i64.const 60000  i64.div_s  i64.const 60  i64.rem_s  i32.wrap_i64");
+        self.line(
+            "local.get $ts  i64.const 60000  i64.div_s  i64.const 60  i64.rem_s  i32.wrap_i64",
+        );
         self.indent -= 1;
         self.line(")");
 
@@ -16100,7 +17797,9 @@ impl WasmCodegen {
         self.emit("(func $datetime_to_local (param $ts i64) (result i64)");
         self.indent += 1;
         self.line("local.get $ts");
-        self.line("call $time_getTimezoneOffset  ;; returns minutes offset (negative = ahead of UTC)");
+        self.line(
+            "call $time_getTimezoneOffset  ;; returns minutes offset (negative = ahead of UTC)",
+        );
         self.line("i64.extend_i32_s  i64.const 60000  i64.mul");
         self.line("i64.sub  ;; subtract offset to get local time");
         self.indent -= 1;
@@ -16588,7 +18287,7 @@ impl WasmCodegen {
         self.line("            i32.ge_u");
         self.line("            br_if $cmp_done");
         self.line("            local.get $entry_base");
-        self.line("            i32.load");  // ek_ptr
+        self.line("            i32.load"); // ek_ptr
         self.line("            local.get $j");
         self.line("            i32.add");
         self.line("            i32.load8_u");
@@ -16661,7 +18360,9 @@ impl WasmCodegen {
 
         // $map_get(map_ptr, key_ptr, key_len) -> i32 (value or 0)
         self.line("");
-        self.emit("(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)");
+        self.emit(
+            "(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)",
+        );
         self.indent += 1;
         self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
         self.line("(local $match i32) (local $j i32)");
@@ -16747,7 +18448,9 @@ impl WasmCodegen {
 
         // $map_has(map_ptr, key_ptr, key_len) -> i32 (0 or 1)
         self.line("");
-        self.emit("(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)");
+        self.emit(
+            "(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)",
+        );
         self.indent += 1;
         self.line("local.get $map");
         self.line("local.get $k_ptr");
@@ -16959,7 +18662,9 @@ impl WasmCodegen {
 
         // $set_has(set_ptr, val_ptr, val_len) -> i32 (0 or 1)
         self.line("");
-        self.emit("(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)");
+        self.emit(
+            "(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)",
+        );
         self.indent += 1;
         self.line("(local $count i32) (local $i i32) (local $entry_base i32)");
         self.line("(local $match i32) (local $j i32)");
@@ -17857,7 +19562,9 @@ impl WasmCodegen {
         // Case-insensitive substring search. Returns 1 if found, 0 otherwise.
         self.emit("(func $search_contains (param $h_ptr i32) (param $h_len i32) (param $n_ptr i32) (param $n_len i32) (result i32)");
         self.indent += 1;
-        self.line("(local $i i32) (local $j i32) (local $hc i32) (local $nc i32) (local $match i32)");
+        self.line(
+            "(local $i i32) (local $j i32) (local $hc i32) (local $nc i32) (local $match i32)",
+        );
         // Empty needle always matches
         self.line("local.get $n_len");
         self.line("i32.eqz");
@@ -17895,7 +19602,7 @@ impl WasmCodegen {
         self.line("        local.get $j");
         self.line("        local.get $n_len");
         self.line("        i32.ge_u");
-        self.line("        br_if $mismatch");  // all chars matched
+        self.line("        br_if $mismatch"); // all chars matched
         // Load haystack char and lowercase it
         self.line("        local.get $h_ptr");
         self.line("        local.get $i");
@@ -18237,7 +19944,9 @@ impl WasmCodegen {
 
         // $pagination_total_pages(total_items: i32, page_size: i32) -> i32
         // Ceiling division: (total_items + page_size - 1) / page_size
-        self.emit("(func $pagination_total_pages (param $total i32) (param $size i32) (result i32)");
+        self.emit(
+            "(func $pagination_total_pages (param $total i32) (param $size i32) (result i32)",
+        );
         self.indent += 1;
         // Guard: if page_size <= 0, return 0
         self.line("local.get $size");
@@ -18282,7 +19991,9 @@ impl WasmCodegen {
         // $pagination_has_next(page: i32, total_pages: i32) -> i32
         // page < total_pages
         self.line("");
-        self.emit("(func $pagination_has_next (param $page i32) (param $total_pages i32) (result i32)");
+        self.emit(
+            "(func $pagination_has_next (param $page i32) (param $total_pages i32) (result i32)",
+        );
         self.indent += 1;
         self.line("local.get $page");
         self.line("local.get $total_pages");
@@ -18304,7 +20015,9 @@ impl WasmCodegen {
         // $pagination_clamp(page: i32, total_pages: i32) -> i32
         // Clamp page to [1, total_pages]
         self.line("");
-        self.emit("(func $pagination_clamp (param $page i32) (param $total_pages i32) (result i32)");
+        self.emit(
+            "(func $pagination_clamp (param $page i32) (param $total_pages i32) (result i32)",
+        );
         self.indent += 1;
         // If page < 1, return 1
         self.line("local.get $page");
@@ -18569,7 +20282,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; show class ptr", show_class));
-        self.line(&format!("i32.const {} ;; show class len", "nectar-toast show".len()));
+        self.line(&format!(
+            "i32.const {} ;; show class len",
+            "nectar-toast show".len()
+        ));
         self.line("call $dom_setAttr");
         // Set text content
         self.line("local.get $el");
@@ -18605,7 +20321,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; success class ptr", success_class));
-        self.line(&format!("i32.const {} ;; success class len", "nectar-toast show toast-success".len()));
+        self.line(&format!(
+            "i32.const {} ;; success class len",
+            "nectar-toast show toast-success".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $id");
         self.indent -= 1;
@@ -18625,7 +20344,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; error class ptr", error_class));
-        self.line(&format!("i32.const {} ;; error class len", "nectar-toast show toast-error".len()));
+        self.line(&format!(
+            "i32.const {} ;; error class len",
+            "nectar-toast show toast-error".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $id");
         self.indent -= 1;
@@ -18645,7 +20367,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; warning class ptr", warning_class));
-        self.line(&format!("i32.const {} ;; warning class len", "nectar-toast show toast-warning".len()));
+        self.line(&format!(
+            "i32.const {} ;; warning class len",
+            "nectar-toast show toast-warning".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $id");
         self.indent -= 1;
@@ -18665,7 +20390,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; info class ptr", info_class));
-        self.line(&format!("i32.const {} ;; info class len", "nectar-toast show toast-info".len()));
+        self.line(&format!(
+            "i32.const {} ;; info class len",
+            "nectar-toast show toast-info".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $id");
         self.indent -= 1;
@@ -18687,7 +20415,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; hide class ptr", hide_class));
-        self.line(&format!("i32.const {} ;; hide class len", "nectar-toast".len()));
+        self.line(&format!(
+            "i32.const {} ;; hide class len",
+            "nectar-toast".len()
+        ));
         self.line("call $dom_setAttr");
         self.indent -= 1;
         self.line(")");
@@ -18706,7 +20437,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; hide class ptr", hide_class));
-        self.line(&format!("i32.const {} ;; hide class len", "nectar-toast".len()));
+        self.line(&format!(
+            "i32.const {} ;; hide class len",
+            "nectar-toast".len()
+        ));
         self.line("call $dom_setAttr");
         // Reset global
         self.line("i32.const 0");
@@ -18749,7 +20483,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; skeleton class ptr", skel_class));
-        self.line(&format!("i32.const {} ;; skeleton class len", "nectar-skeleton".len()));
+        self.line(&format!(
+            "i32.const {} ;; skeleton class len",
+            "nectar-skeleton".len()
+        ));
         self.line("call $dom_setAttr");
         // Loop to create N line divs
         self.line("i32.const 0");
@@ -18769,8 +20506,14 @@ impl WasmCodegen {
         self.line("    local.get $line_el");
         self.line(&format!("    i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("    i32.const {} ;; \"class\" len", "class".len()));
-        self.line(&format!("    i32.const {} ;; line class ptr", skel_line_class));
-        self.line(&format!("    i32.const {} ;; line class len", "nectar-skeleton nectar-skeleton-line".len()));
+        self.line(&format!(
+            "    i32.const {} ;; line class ptr",
+            skel_line_class
+        ));
+        self.line(&format!(
+            "    i32.const {} ;; line class len",
+            "nectar-skeleton nectar-skeleton-line".len()
+        ));
         self.line("    call $dom_setAttr");
         // Append to container
         self.line("    local.get $container");
@@ -18809,8 +20552,14 @@ impl WasmCodegen {
         self.line("local.get $el");
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
-        self.line(&format!("i32.const {} ;; circle class ptr", skel_circle_class));
-        self.line(&format!("i32.const {} ;; circle class len", "nectar-skeleton nectar-skeleton-circle".len()));
+        self.line(&format!(
+            "i32.const {} ;; circle class ptr",
+            skel_circle_class
+        ));
+        self.line(&format!(
+            "i32.const {} ;; circle class len",
+            "nectar-skeleton nectar-skeleton-circle".len()
+        ));
         self.line("call $dom_setAttr");
         // Build style string: "width:Npx;height:Npx;border-radius:50%"
         // We use dom_setStyle with property/value pairs
@@ -18839,8 +20588,14 @@ impl WasmCodegen {
         self.line("call $dom_setStyle");
         // Set border-radius: 50%
         self.line("local.get $el");
-        self.line(&format!("i32.const {} ;; \"border-radius\" ptr", border_radius_prop));
-        self.line(&format!("i32.const {} ;; \"border-radius\" len", "border-radius".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"border-radius\" ptr",
+            border_radius_prop
+        ));
+        self.line(&format!(
+            "i32.const {} ;; \"border-radius\" len",
+            "border-radius".len()
+        ));
         self.line(&format!("i32.const {} ;; \"50%\" ptr", fifty_pct));
         self.line(&format!("i32.const {} ;; \"50%\" len", "50%".len()));
         self.line("call $dom_setStyle");
@@ -18867,7 +20622,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; skeleton class ptr", skel_class));
-        self.line(&format!("i32.const {} ;; skeleton class len", "nectar-skeleton".len()));
+        self.line(&format!(
+            "i32.const {} ;; skeleton class len",
+            "nectar-skeleton".len()
+        ));
         self.line("call $dom_setAttr");
         // Set width
         self.line("local.get $el");
@@ -18907,7 +20665,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; card class ptr", skel_card_class));
-        self.line(&format!("i32.const {} ;; card class len", "nectar-skeleton nectar-skeleton-card".len()));
+        self.line(&format!(
+            "i32.const {} ;; card class len",
+            "nectar-skeleton nectar-skeleton-card".len()
+        ));
         self.line("call $dom_setAttr");
         // Create a header line inside the card
         self.line(&format!("i32.const {} ;; \"div\" ptr", div_str));
@@ -18918,7 +20679,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
         self.line(&format!("i32.const {} ;; line class ptr", skel_line_class));
-        self.line(&format!("i32.const {} ;; line class len", "nectar-skeleton nectar-skeleton-line".len()));
+        self.line(&format!(
+            "i32.const {} ;; line class len",
+            "nectar-skeleton nectar-skeleton-line".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $card");
         self.line("local.get $header");
@@ -18945,8 +20709,14 @@ impl WasmCodegen {
         self.line("local.get $el");
         self.line(&format!("i32.const {} ;; \"class\" ptr", class_str));
         self.line(&format!("i32.const {} ;; \"class\" len", "class".len()));
-        self.line(&format!("i32.const {} ;; avatar class ptr", skel_avatar_class));
-        self.line(&format!("i32.const {} ;; avatar class len", "nectar-skeleton nectar-skeleton-avatar".len()));
+        self.line(&format!(
+            "i32.const {} ;; avatar class ptr",
+            skel_avatar_class
+        ));
+        self.line(&format!(
+            "i32.const {} ;; avatar class len",
+            "nectar-skeleton nectar-skeleton-avatar".len()
+        ));
         self.line("call $dom_setAttr");
         // Set width/height/border-radius
         self.line("local.get $el");
@@ -18962,8 +20732,14 @@ impl WasmCodegen {
         self.line("call $to_string");
         self.line("call $dom_setStyle");
         self.line("local.get $el");
-        self.line(&format!("i32.const {} ;; \"border-radius\" ptr", border_radius_prop));
-        self.line(&format!("i32.const {} ;; \"border-radius\" len", "border-radius".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"border-radius\" ptr",
+            border_radius_prop
+        ));
+        self.line(&format!(
+            "i32.const {} ;; \"border-radius\" len",
+            "border-radius".len()
+        ));
         self.line(&format!("i32.const {} ;; \"50%\" ptr", fifty_pct));
         self.line(&format!("i32.const {} ;; \"50%\" len", "50%".len()));
         self.line("call $dom_setStyle");
@@ -19006,10 +20782,10 @@ impl WasmCodegen {
         self.indent += 1;
         self.line("(local $out_ptr i32)");
         self.line("(local $out_len i32)");
-        self.line("(local $pi i32)");  // pattern index
-        self.line("(local $ii i32)");  // input index
-        self.line("(local $pc i32)");  // pattern char
-        self.line("(local $ic i32)");  // input char
+        self.line("(local $pi i32)"); // pattern index
+        self.line("(local $ii i32)"); // input index
+        self.line("(local $pc i32)"); // pattern char
+        self.line("(local $ic i32)"); // input char
         self.line("(local $buf i32)"); // output buffer
         // Allocate output buffer (pattern_len is max output size)
         self.line("local.get $pat_len");
@@ -19212,7 +20988,10 @@ impl WasmCodegen {
         self.line("local.get $in_ptr");
         self.line("local.get $in_len");
         self.line(&format!("i32.const {} ;; phone pattern ptr", phone_pattern));
-        self.line(&format!("i32.const {} ;; phone pattern len", "(###) ###-####".len()));
+        self.line(&format!(
+            "i32.const {} ;; phone pattern len",
+            "(###) ###-####".len()
+        ));
         self.line("call $mask_apply");
         self.indent -= 1;
         self.line(")");
@@ -19220,12 +20999,17 @@ impl WasmCodegen {
         // $mask_credit_card(input_ptr, input_len) -> (ptr, len)
         let cc_pattern = self.store_string("#### #### #### ####");
         self.line("");
-        self.emit("(func $mask_credit_card (param $in_ptr i32) (param $in_len i32) (result i32 i32)");
+        self.emit(
+            "(func $mask_credit_card (param $in_ptr i32) (param $in_len i32) (result i32 i32)",
+        );
         self.indent += 1;
         self.line("local.get $in_ptr");
         self.line("local.get $in_len");
         self.line(&format!("i32.const {} ;; cc pattern ptr", cc_pattern));
-        self.line(&format!("i32.const {} ;; cc pattern len", "#### #### #### ####".len()));
+        self.line(&format!(
+            "i32.const {} ;; cc pattern len",
+            "#### #### #### ####".len()
+        ));
         self.line("call $mask_apply");
         self.indent -= 1;
         self.line(")");
@@ -19238,7 +21022,10 @@ impl WasmCodegen {
         self.line("local.get $in_ptr");
         self.line("local.get $in_len");
         self.line(&format!("i32.const {} ;; date pattern ptr", date_pattern));
-        self.line(&format!("i32.const {} ;; date pattern len", "##/##/####".len()));
+        self.line(&format!(
+            "i32.const {} ;; date pattern len",
+            "##/##/####".len()
+        ));
         self.line("call $mask_apply");
         self.indent -= 1;
         self.line(")");
@@ -19538,7 +21325,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
         self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
         self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
-        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line(&format!(
+            "i32.const {} ;; xmlns val len",
+            "http://www.w3.org/2000/svg".len()
+        ));
         self.line("call $dom_setAttr");
         // Set width
         self.line("local.get $svg");
@@ -19661,7 +21451,10 @@ impl WasmCodegen {
         // Set height
         self.line("    local.get $bar");
         self.line(&format!("    i32.const {} ;; \"height\" ptr", height_attr));
-        self.line(&format!("    i32.const {} ;; \"height\" len", "height".len()));
+        self.line(&format!(
+            "    i32.const {} ;; \"height\" len",
+            "height".len()
+        ));
         self.line("    local.get $bar_h");
         self.line("    call $string_fromI32");
         self.line("    call $dom_setAttr");
@@ -19670,7 +21463,10 @@ impl WasmCodegen {
         self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
         self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
         self.line(&format!("    i32.const {} ;; \"steelblue\" ptr", steelblue));
-        self.line(&format!("    i32.const {} ;; \"steelblue\" len", "steelblue".len()));
+        self.line(&format!(
+            "    i32.const {} ;; \"steelblue\" len",
+            "steelblue".len()
+        ));
         self.line("    call $dom_setAttr");
         // Append rect to SVG
         self.line("    local.get $svg");
@@ -19726,7 +21522,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
         self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
         self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
-        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line(&format!(
+            "i32.const {} ;; xmlns val len",
+            "http://www.w3.org/2000/svg".len()
+        ));
         self.line("call $dom_setAttr");
         // Set width
         self.line("local.get $svg");
@@ -19871,7 +21670,10 @@ impl WasmCodegen {
         self.line("end");
         // Create polyline element
         self.line(&format!("i32.const {} ;; \"polyline\" ptr", polyline_tag));
-        self.line(&format!("i32.const {} ;; \"polyline\" len", "polyline".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"polyline\" len",
+            "polyline".len()
+        ));
         self.line("call $dom_createElement");
         self.line("local.set $line_el");
         // Set points attribute
@@ -19897,8 +21699,14 @@ impl WasmCodegen {
         self.line("call $dom_setAttr");
         // Set stroke-width
         self.line("local.get $line_el");
-        self.line(&format!("i32.const {} ;; \"stroke-width\" ptr", stroke_width_attr));
-        self.line(&format!("i32.const {} ;; \"stroke-width\" len", "stroke-width".len()));
+        self.line(&format!(
+            "i32.const {} ;; \"stroke-width\" ptr",
+            stroke_width_attr
+        ));
+        self.line(&format!(
+            "i32.const {} ;; \"stroke-width\" len",
+            "stroke-width".len()
+        ));
         self.line(&format!("i32.const {} ;; \"2\" ptr", stroke_width_val));
         self.line(&format!("i32.const {} ;; \"2\" len", "2".len()));
         self.line("call $dom_setAttr");
@@ -19944,7 +21752,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
         self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
         self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
-        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line(&format!(
+            "i32.const {} ;; xmlns val len",
+            "http://www.w3.org/2000/svg".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $svg");
         self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
@@ -19995,7 +21806,9 @@ impl WasmCodegen {
         self.line("end");
         // Create stacked rect slices (vertical stacking as proportional representation)
         // Use alternating colors via index
-        let colors: Vec<&str> = vec!["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
+        let colors: Vec<&str> = vec![
+            "#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948",
+        ];
         let color_offsets: Vec<u32> = colors.iter().map(|c| self.store_string(c)).collect();
         let color_lens: Vec<usize> = colors.iter().map(|c| c.len()).collect();
         self.line("i32.const 0");
@@ -20052,7 +21865,10 @@ impl WasmCodegen {
         // height = slice_h
         self.line("    local.get $slice");
         self.line(&format!("    i32.const {} ;; \"height\" ptr", height_attr));
-        self.line(&format!("    i32.const {} ;; \"height\" len", "height".len()));
+        self.line(&format!(
+            "    i32.const {} ;; \"height\" len",
+            "height".len()
+        ));
         self.line("    local.get $slice_h");
         self.line("    call $string_fromI32");
         self.line("    call $dom_setAttr");
@@ -20062,7 +21878,10 @@ impl WasmCodegen {
         self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
         self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
         // Default to first color, then override based on i % 6
-        self.line(&format!("    i32.const {} ;; color 0 ptr", color_offsets[0]));
+        self.line(&format!(
+            "    i32.const {} ;; color 0 ptr",
+            color_offsets[0]
+        ));
         self.line(&format!("    i32.const {} ;; color 0 len", color_lens[0]));
         self.line("    call $dom_setAttr");
         // Append to SVG
@@ -20119,7 +21938,10 @@ impl WasmCodegen {
         self.line(&format!("i32.const {} ;; \"xmlns\" ptr", xmlns_attr));
         self.line(&format!("i32.const {} ;; \"xmlns\" len", "xmlns".len()));
         self.line(&format!("i32.const {} ;; xmlns val ptr", xmlns_val));
-        self.line(&format!("i32.const {} ;; xmlns val len", "http://www.w3.org/2000/svg".len()));
+        self.line(&format!(
+            "i32.const {} ;; xmlns val len",
+            "http://www.w3.org/2000/svg".len()
+        ));
         self.line("call $dom_setAttr");
         self.line("local.get $svg");
         self.line(&format!("i32.const {} ;; \"width\" ptr", width_attr));
@@ -20210,7 +22032,10 @@ impl WasmCodegen {
         self.line("    local.set $py");
         // Create circle
         self.line(&format!("    i32.const {} ;; \"circle\" ptr", circle_tag));
-        self.line(&format!("    i32.const {} ;; \"circle\" len", "circle".len()));
+        self.line(&format!(
+            "    i32.const {} ;; \"circle\" len",
+            "circle".len()
+        ));
         self.line("    call $dom_createElement");
         self.line("    local.set $dot");
         // cx
@@ -20239,7 +22064,10 @@ impl WasmCodegen {
         self.line(&format!("    i32.const {} ;; \"fill\" ptr", fill_attr));
         self.line(&format!("    i32.const {} ;; \"fill\" len", "fill".len()));
         self.line(&format!("    i32.const {} ;; \"steelblue\" ptr", steelblue));
-        self.line(&format!("    i32.const {} ;; \"steelblue\" len", "steelblue".len()));
+        self.line(&format!(
+            "    i32.const {} ;; \"steelblue\" len",
+            "steelblue".len()
+        ));
         self.line("    call $dom_setAttr");
         // Append
         self.line("    local.get $svg");
@@ -20262,7 +22090,9 @@ impl WasmCodegen {
 
         // $chart_update — stub that re-renders (simplified: just returns 0)
         self.line("");
-        self.emit("(func $chart_update (param $id i32) (param $data_ptr i32) (param $data_len i32)");
+        self.emit(
+            "(func $chart_update (param $id i32) (param $data_ptr i32) (param $data_len i32)",
+        );
         self.indent += 1;
         self.line(";; Chart update: in a full implementation, find chart by ID and re-render");
         self.line(";; For now, this is a no-op; callers should destroy + recreate");
@@ -20334,7 +22164,9 @@ impl WasmCodegen {
         // $datepicker_days_in_month(year, month) -> i32
         // month: 1-12
         self.line("");
-        self.emit("(func $datepicker_days_in_month (param $year i32) (param $month i32) (result i32)");
+        self.emit(
+            "(func $datepicker_days_in_month (param $year i32) (param $month i32) (result i32)",
+        );
         self.indent += 1;
         // Use a series of if/else for each month
         // Jan=31, Feb=28/29, Mar=31, Apr=30, May=31, Jun=30, Jul=31, Aug=31, Sep=30, Oct=31, Nov=30, Dec=31
@@ -21317,7 +23149,7 @@ impl WasmCodegen {
         self.line("      i32.mul");
         self.line("      i32.add");
         self.line("      local.get $key_ptr");
-        self.line("      i32.store");        // key_ptr
+        self.line("      i32.store"); // key_ptr
         self.line("      local.get $field_base");
         self.line("      local.get $field_count");
         self.line("      i32.const 20");
@@ -21326,7 +23158,7 @@ impl WasmCodegen {
         self.line("      i32.const 4");
         self.line("      i32.add");
         self.line("      local.get $key_len");
-        self.line("      i32.store");        // key_len
+        self.line("      i32.store"); // key_len
         self.line("      local.get $field_base");
         self.line("      local.get $field_count");
         self.line("      i32.const 20");
@@ -21335,7 +23167,7 @@ impl WasmCodegen {
         self.line("      i32.const 8");
         self.line("      i32.add");
         self.line("      local.get $vtype");
-        self.line("      i32.store");        // value_type
+        self.line("      i32.store"); // value_type
         self.line("      local.get $field_base");
         self.line("      local.get $field_count");
         self.line("      i32.const 20");
@@ -21344,7 +23176,7 @@ impl WasmCodegen {
         self.line("      i32.const 12");
         self.line("      i32.add");
         self.line("      local.get $vlo");
-        self.line("      i32.store");        // value_lo
+        self.line("      i32.store"); // value_lo
         self.line("      local.get $field_base");
         self.line("      local.get $field_count");
         self.line("      i32.const 20");
@@ -21353,7 +23185,7 @@ impl WasmCodegen {
         self.line("      i32.const 16");
         self.line("      i32.add");
         self.line("      local.get $vhi");
-        self.line("      i32.store");        // value_hi
+        self.line("      i32.store"); // value_hi
         self.line("      local.get $field_count");
         self.line("      i32.const 1");
         self.line("      i32.add");
@@ -21451,7 +23283,7 @@ impl WasmCodegen {
         self.line("      i32.mul");
         self.line("      i32.add");
         self.line("      local.get $vtype");
-        self.line("      i32.store");        // type
+        self.line("      i32.store"); // type
         self.line("      local.get $arr_base");
         self.line("      local.get $arr_len");
         self.line("      i32.const 12");
@@ -21460,7 +23292,7 @@ impl WasmCodegen {
         self.line("      i32.const 4");
         self.line("      i32.add");
         self.line("      local.get $vlo");
-        self.line("      i32.store");        // data_lo
+        self.line("      i32.store"); // data_lo
         self.line("      local.get $arr_base");
         self.line("      local.get $arr_len");
         self.line("      i32.const 12");
@@ -21469,7 +23301,7 @@ impl WasmCodegen {
         self.line("      i32.const 8");
         self.line("      i32.add");
         self.line("      local.get $vhi");
-        self.line("      i32.store");        // data_hi
+        self.line("      i32.store"); // data_hi
         self.line("      local.get $arr_len");
         self.line("      i32.const 1");
         self.line("      i32.add");
@@ -21994,7 +23826,9 @@ impl WasmCodegen {
 
         // ── $json_serialize_value ──
         // Serialize a single value entry by type.
-        self.emit("(func $json_serialize_value (param $vtype i32) (param $vlo i32) (param $vhi i32)");
+        self.emit(
+            "(func $json_serialize_value (param $vtype i32) (param $vlo i32) (param $vhi i32)",
+        );
         self.indent += 1;
         self.line("(local $int_ptr i32) (local $int_len i32)");
         // null (type=0)
@@ -22031,7 +23865,7 @@ impl WasmCodegen {
         // false
         self.line("    i32.const 102"); // 'f'
         self.line("    call $json_write_byte");
-        self.line("    i32.const 97");  // 'a'
+        self.line("    i32.const 97"); // 'a'
         self.line("    call $json_write_byte");
         self.line("    i32.const 108"); // 'l'
         self.line("    call $json_write_byte");
@@ -22061,8 +23895,8 @@ impl WasmCodegen {
         self.line("i32.const 3");
         self.line("i32.eq");
         self.line("if");
-        self.line("  local.get $vlo");  // str_ptr
-        self.line("  local.get $vhi");  // str_len
+        self.line("  local.get $vlo"); // str_ptr
+        self.line("  local.get $vhi"); // str_len
         self.line("  call $json_write_escaped_string");
         self.line("  return");
         self.line("end");
@@ -22072,11 +23906,11 @@ impl WasmCodegen {
         self.line("i32.eq");
         self.line("if");
         self.line("  local.get $vlo"); // obj_ptr -> [field_count, fields_ptr]
-        self.line("  i32.load");       // field_count
+        self.line("  i32.load"); // field_count
         self.line("  local.get $vlo");
         self.line("  i32.const 4");
         self.line("  i32.add");
-        self.line("  i32.load");       // fields_ptr
+        self.line("  i32.load"); // fields_ptr
         self.line("  call $json_serialize_object_inner");
         self.line("  return");
         self.line("end");
@@ -22171,7 +24005,9 @@ impl WasmCodegen {
 
         // ── $json_serialize_object_inner ──
         // Writes {...} given field_count and fields_ptr. Used internally.
-        self.emit("(func $json_serialize_object_inner (param $field_count i32) (param $fields_ptr i32)");
+        self.emit(
+            "(func $json_serialize_object_inner (param $field_count i32) (param $fields_ptr i32)",
+        );
         self.indent += 1;
         self.line("(local $i i32) (local $offset i32)");
         self.line("(local $fk_ptr i32) (local $fk_len i32)");
@@ -22285,7 +24121,6 @@ impl WasmCodegen {
         self.indent -= 1;
         self.line(")");
     }
-
 }
 
 #[cfg(test)]
@@ -22321,37 +24156,82 @@ mod tests {
     #[test]
     fn test_format_string_codegen() {
         let wat = compile(r#"pub fn greet(name: string) -> string { return f"hello {name}!"; }"#);
-        assert!(wat.contains("$string_concat"), "WAT should call $string_concat");
-        assert!(wat.contains("hello "), "WAT should contain literal 'hello '");
+        assert!(
+            wat.contains("$string_concat"),
+            "WAT should call $string_concat"
+        );
+        assert!(
+            wat.contains("hello "),
+            "WAT should contain literal 'hello '"
+        );
     }
 
     #[test]
     fn test_bigdecimal_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { bigdecimal_new(0); return 0; }");
-        assert!(wat.contains("func $bigdecimal_new"), "WAT should contain $bigdecimal_new");
-        assert!(wat.contains("func $bigdecimal_add"), "WAT should contain $bigdecimal_add");
-        assert!(wat.contains("func $bigdecimal_sub"), "WAT should contain $bigdecimal_sub");
-        assert!(wat.contains("func $bigdecimal_mul"), "WAT should contain $bigdecimal_mul");
-        assert!(wat.contains("func $bigdecimal_div"), "WAT should contain $bigdecimal_div");
-        assert!(wat.contains("func $bigdecimal_cmp"), "WAT should contain $bigdecimal_cmp");
-        assert!(wat.contains("func $bigdecimal_to_string"), "WAT should contain $bigdecimal_to_string");
-        assert!(wat.contains("func $bigdecimal_from_cents"), "WAT should contain $bigdecimal_from_cents");
+        assert!(
+            wat.contains("func $bigdecimal_new"),
+            "WAT should contain $bigdecimal_new"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_add"),
+            "WAT should contain $bigdecimal_add"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_sub"),
+            "WAT should contain $bigdecimal_sub"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_mul"),
+            "WAT should contain $bigdecimal_mul"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_div"),
+            "WAT should contain $bigdecimal_div"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_cmp"),
+            "WAT should contain $bigdecimal_cmp"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_to_string"),
+            "WAT should contain $bigdecimal_to_string"
+        );
+        assert!(
+            wat.contains("func $bigdecimal_from_cents"),
+            "WAT should contain $bigdecimal_from_cents"
+        );
     }
 
     #[test]
     fn test_bigdecimal_mul_maintains_scale() {
         let wat = compile("pub fn noop() -> i32 { bigdecimal_mul(0, 0); return 0; }");
         // $bigdecimal_mul should divide by 10000 after multiplying to maintain 4-decimal scale
-        assert!(wat.contains("i64.const 10000"), "BigDecimal ops should use scale factor 10000");
+        assert!(
+            wat.contains("i64.const 10000"),
+            "BigDecimal ops should use scale factor 10000"
+        );
     }
 
     #[test]
     fn test_search_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { search_contains(0, 0); return 0; }");
-        assert!(wat.contains("func $search_contains"), "WAT should contain $search_contains");
-        assert!(wat.contains("func $search_starts_with"), "WAT should contain $search_starts_with");
-        assert!(wat.contains("func $search_ends_with"), "WAT should contain $search_ends_with");
-        assert!(wat.contains("func $search_fuzzy"), "WAT should contain $search_fuzzy");
+        assert!(
+            wat.contains("func $search_contains"),
+            "WAT should contain $search_contains"
+        );
+        assert!(
+            wat.contains("func $search_starts_with"),
+            "WAT should contain $search_starts_with"
+        );
+        assert!(
+            wat.contains("func $search_ends_with"),
+            "WAT should contain $search_ends_with"
+        );
+        assert!(
+            wat.contains("func $search_fuzzy"),
+            "WAT should contain $search_fuzzy"
+        );
     }
 
     #[test]
@@ -22359,18 +24239,39 @@ mod tests {
         let wat = compile("pub fn noop() -> i32 { search_fuzzy(0, 0); return 0; }");
         // Case-insensitive search uses OR 0x20 (i32.const 32) to lowercase ASCII A-Z
         // and checks range 65-90 (A-Z)
-        assert!(wat.contains("i32.const 65"), "Search should check ASCII 'A' boundary");
-        assert!(wat.contains("i32.const 90"), "Search should check ASCII 'Z' boundary");
+        assert!(
+            wat.contains("i32.const 65"),
+            "Search should check ASCII 'A' boundary"
+        );
+        assert!(
+            wat.contains("i32.const 90"),
+            "Search should check ASCII 'Z' boundary"
+        );
     }
 
     #[test]
     fn test_pagination_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { pagination_total_pages(0, 0); return 0; }");
-        assert!(wat.contains("func $pagination_total_pages"), "WAT should contain $pagination_total_pages");
-        assert!(wat.contains("func $pagination_offset"), "WAT should contain $pagination_offset");
-        assert!(wat.contains("func $pagination_has_next"), "WAT should contain $pagination_has_next");
-        assert!(wat.contains("func $pagination_has_prev"), "WAT should contain $pagination_has_prev");
-        assert!(wat.contains("func $pagination_clamp"), "WAT should contain $pagination_clamp");
+        assert!(
+            wat.contains("func $pagination_total_pages"),
+            "WAT should contain $pagination_total_pages"
+        );
+        assert!(
+            wat.contains("func $pagination_offset"),
+            "WAT should contain $pagination_offset"
+        );
+        assert!(
+            wat.contains("func $pagination_has_next"),
+            "WAT should contain $pagination_has_next"
+        );
+        assert!(
+            wat.contains("func $pagination_has_prev"),
+            "WAT should contain $pagination_has_prev"
+        );
+        assert!(
+            wat.contains("func $pagination_clamp"),
+            "WAT should contain $pagination_clamp"
+        );
     }
 
     #[test]
@@ -22379,25 +24280,49 @@ mod tests {
         // $pagination_clamp should clamp to [1, total_pages] — verify it has the lower bound check
         // The function should contain comparisons against constant 1
         let clamp_section = wat.split("func $pagination_clamp").nth(1).unwrap_or("");
-        assert!(clamp_section.contains("i32.const 1"), "pagination_clamp should compare against 1");
-        assert!(clamp_section.contains("i32.lt_s"), "pagination_clamp should use signed less-than");
-        assert!(clamp_section.contains("i32.gt_s"), "pagination_clamp should use signed greater-than");
+        assert!(
+            clamp_section.contains("i32.const 1"),
+            "pagination_clamp should compare against 1"
+        );
+        assert!(
+            clamp_section.contains("i32.lt_s"),
+            "pagination_clamp should use signed less-than"
+        );
+        assert!(
+            clamp_section.contains("i32.gt_s"),
+            "pagination_clamp should use signed greater-than"
+        );
     }
 
     #[test]
     fn test_debounce_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { debounce_create(0); return 0; }");
-        assert!(wat.contains("func $debounce_create"), "WAT should contain $debounce_create");
-        assert!(wat.contains("func $debounce_call"), "WAT should contain $debounce_call");
-        assert!(wat.contains("func $debounce_cancel"), "WAT should contain $debounce_cancel");
+        assert!(
+            wat.contains("func $debounce_create"),
+            "WAT should contain $debounce_create"
+        );
+        assert!(
+            wat.contains("func $debounce_call"),
+            "WAT should contain $debounce_call"
+        );
+        assert!(
+            wat.contains("func $debounce_cancel"),
+            "WAT should contain $debounce_cancel"
+        );
     }
 
     #[test]
     fn test_debounce_uses_timer_syscalls() {
         let wat = compile("pub fn noop() -> i32 { debounce_call(0); return 0; }");
         let debounce_section = wat.split("func $debounce_call").nth(1).unwrap_or("");
-        assert!(debounce_section.contains("call $timer_clearTimeout"), "debounce_call should clear pending timer");
-        assert!(debounce_section.contains("call $timer_setTimeout"), "debounce_call should set new timer");
+        assert!(
+            debounce_section.contains("call $timer_clearTimeout"),
+            "debounce_call should clear pending timer"
+        );
+        assert!(
+            debounce_section.contains("call $timer_setTimeout"),
+            "debounce_call should set new timer"
+        );
     }
 
     #[test]
@@ -22405,99 +24330,204 @@ mod tests {
         let wat = compile("pub fn noop() -> i32 { debounce_create(0); return 0; }");
         let create_section = wat.split("func $debounce_create").nth(1).unwrap_or("");
         // Allocates 8 bytes for state
-        assert!(create_section.contains("i32.const 8"), "debounce_create should allocate 8 bytes");
-        assert!(create_section.contains("call $alloc"), "debounce_create should call $alloc");
+        assert!(
+            create_section.contains("i32.const 8"),
+            "debounce_create should allocate 8 bytes"
+        );
+        assert!(
+            create_section.contains("call $alloc"),
+            "debounce_create should call $alloc"
+        );
         // Initializes timer_id to -1
-        assert!(create_section.contains("i32.const -1"), "debounce_create should init timer_id to -1");
+        assert!(
+            create_section.contains("i32.const -1"),
+            "debounce_create should init timer_id to -1"
+        );
     }
 
     #[test]
     fn test_throttle_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { throttle_create(0); return 0; }");
-        assert!(wat.contains("func $throttle_create"), "WAT should contain $throttle_create");
-        assert!(wat.contains("func $throttle_call"), "WAT should contain $throttle_call");
-        assert!(wat.contains("func $throttle_reset"), "WAT should contain $throttle_reset");
+        assert!(
+            wat.contains("func $throttle_create"),
+            "WAT should contain $throttle_create"
+        );
+        assert!(
+            wat.contains("func $throttle_call"),
+            "WAT should contain $throttle_call"
+        );
+        assert!(
+            wat.contains("func $throttle_reset"),
+            "WAT should contain $throttle_reset"
+        );
     }
 
     #[test]
     fn test_throttle_uses_timer_now() {
         let wat = compile("pub fn noop() -> i32 { throttle_call(0); return 0; }");
         let throttle_section = wat.split("func $throttle_call").nth(1).unwrap_or("");
-        assert!(throttle_section.contains("call $timer_now"), "throttle_call should call timer_now");
-        assert!(throttle_section.contains("i32.trunc_f64_s"), "throttle_call should truncate f64 to i32");
-        assert!(throttle_section.contains("i32.ge_s"), "throttle_call should compare elapsed time");
+        assert!(
+            throttle_section.contains("call $timer_now"),
+            "throttle_call should call timer_now"
+        );
+        assert!(
+            throttle_section.contains("i32.trunc_f64_s"),
+            "throttle_call should truncate f64 to i32"
+        );
+        assert!(
+            throttle_section.contains("i32.ge_s"),
+            "throttle_call should compare elapsed time"
+        );
     }
 
     #[test]
     fn test_throttle_state_layout() {
         let wat = compile("pub fn noop() -> i32 { throttle_create(0); return 0; }");
         let create_section = wat.split("func $throttle_create").nth(1).unwrap_or("");
-        assert!(create_section.contains("i32.const 8"), "throttle_create should allocate 8 bytes");
-        assert!(create_section.contains("call $alloc"), "throttle_create should call $alloc");
+        assert!(
+            create_section.contains("i32.const 8"),
+            "throttle_create should allocate 8 bytes"
+        );
+        assert!(
+            create_section.contains("call $alloc"),
+            "throttle_create should call $alloc"
+        );
     }
 
     #[test]
     fn test_toast_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { toast_show(0); return 0; }");
-        assert!(wat.contains("func $toast_show"), "WAT should contain $toast_show");
-        assert!(wat.contains("func $toast_success"), "WAT should contain $toast_success");
-        assert!(wat.contains("func $toast_error"), "WAT should contain $toast_error");
-        assert!(wat.contains("func $toast_warning"), "WAT should contain $toast_warning");
-        assert!(wat.contains("func $toast_info"), "WAT should contain $toast_info");
-        assert!(wat.contains("func $toast_dismiss"), "WAT should contain $toast_dismiss");
-        assert!(wat.contains("func $toast_dismiss_all"), "WAT should contain $toast_dismiss_all");
+        assert!(
+            wat.contains("func $toast_show"),
+            "WAT should contain $toast_show"
+        );
+        assert!(
+            wat.contains("func $toast_success"),
+            "WAT should contain $toast_success"
+        );
+        assert!(
+            wat.contains("func $toast_error"),
+            "WAT should contain $toast_error"
+        );
+        assert!(
+            wat.contains("func $toast_warning"),
+            "WAT should contain $toast_warning"
+        );
+        assert!(
+            wat.contains("func $toast_info"),
+            "WAT should contain $toast_info"
+        );
+        assert!(
+            wat.contains("func $toast_dismiss"),
+            "WAT should contain $toast_dismiss"
+        );
+        assert!(
+            wat.contains("func $toast_dismiss_all"),
+            "WAT should contain $toast_dismiss_all"
+        );
     }
 
     #[test]
     fn test_toast_uses_dom_syscalls() {
         let wat = compile("pub fn noop() -> i32 { toast_show(0); return 0; }");
         let toast_section = wat.split("func $toast_show").nth(1).unwrap_or("");
-        assert!(toast_section.contains("call $dom_createElement"), "toast_show should create element");
-        assert!(toast_section.contains("call $dom_setText"), "toast_show should set text");
-        assert!(toast_section.contains("call $dom_setAttr"), "toast_show should set attributes");
-        assert!(toast_section.contains("call $dom_appendChild"), "toast_show should append to body");
-        assert!(toast_section.contains("call $dom_getBody"), "toast_show should get body element");
+        assert!(
+            toast_section.contains("call $dom_createElement"),
+            "toast_show should create element"
+        );
+        assert!(
+            toast_section.contains("call $dom_setText"),
+            "toast_show should set text"
+        );
+        assert!(
+            toast_section.contains("call $dom_setAttr"),
+            "toast_show should set attributes"
+        );
+        assert!(
+            toast_section.contains("call $dom_appendChild"),
+            "toast_show should append to body"
+        );
+        assert!(
+            toast_section.contains("call $dom_getBody"),
+            "toast_show should get body element"
+        );
     }
 
     #[test]
     fn test_toast_success_duration() {
         let wat = compile("pub fn noop() -> i32 { toast_success(0); return 0; }");
         let success_section = wat.split("func $toast_success").nth(1).unwrap_or("");
-        assert!(success_section.contains("i32.const 3000"), "toast_success should use 3000ms duration");
+        assert!(
+            success_section.contains("i32.const 3000"),
+            "toast_success should use 3000ms duration"
+        );
     }
 
     #[test]
     fn test_skeleton_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { skeleton_text(0); return 0; }");
-        assert!(wat.contains("func $skeleton_text"), "WAT should contain $skeleton_text");
-        assert!(wat.contains("func $skeleton_circle"), "WAT should contain $skeleton_circle");
-        assert!(wat.contains("func $skeleton_rect"), "WAT should contain $skeleton_rect");
-        assert!(wat.contains("func $skeleton_card"), "WAT should contain $skeleton_card");
-        assert!(wat.contains("func $skeleton_avatar"), "WAT should contain $skeleton_avatar");
-        assert!(wat.contains("func $skeleton_destroy"), "WAT should contain $skeleton_destroy");
+        assert!(
+            wat.contains("func $skeleton_text"),
+            "WAT should contain $skeleton_text"
+        );
+        assert!(
+            wat.contains("func $skeleton_circle"),
+            "WAT should contain $skeleton_circle"
+        );
+        assert!(
+            wat.contains("func $skeleton_rect"),
+            "WAT should contain $skeleton_rect"
+        );
+        assert!(
+            wat.contains("func $skeleton_card"),
+            "WAT should contain $skeleton_card"
+        );
+        assert!(
+            wat.contains("func $skeleton_avatar"),
+            "WAT should contain $skeleton_avatar"
+        );
+        assert!(
+            wat.contains("func $skeleton_destroy"),
+            "WAT should contain $skeleton_destroy"
+        );
     }
 
     #[test]
     fn test_skeleton_text_creates_loop() {
         let wat = compile("pub fn noop() -> i32 { skeleton_text(0); return 0; }");
         let text_section = wat.split("func $skeleton_text").nth(1).unwrap_or("");
-        assert!(text_section.contains("loop $lp"), "skeleton_text should loop to create N lines");
-        assert!(text_section.contains("call $dom_createElement"), "skeleton_text should create elements");
-        assert!(text_section.contains("call $dom_appendChild"), "skeleton_text should append children");
+        assert!(
+            text_section.contains("loop $lp"),
+            "skeleton_text should loop to create N lines"
+        );
+        assert!(
+            text_section.contains("call $dom_createElement"),
+            "skeleton_text should create elements"
+        );
+        assert!(
+            text_section.contains("call $dom_appendChild"),
+            "skeleton_text should append children"
+        );
     }
 
     #[test]
     fn test_skeleton_circle_border_radius() {
         let wat = compile("pub fn noop() -> i32 { skeleton_circle(0); return 0; }");
         let circle_section = wat.split("func $skeleton_circle").nth(1).unwrap_or("");
-        assert!(circle_section.contains("call $dom_setStyle"), "skeleton_circle should set styles");
+        assert!(
+            circle_section.contains("call $dom_setStyle"),
+            "skeleton_circle should set styles"
+        );
     }
 
     #[test]
     fn test_skeleton_destroy_hides_element() {
         let wat = compile("pub fn noop() -> i32 { skeleton_destroy(0); return 0; }");
         let destroy_section = wat.split("func $skeleton_destroy").nth(1).unwrap_or("");
-        assert!(destroy_section.contains("call $dom_setStyle"), "skeleton_destroy should set display:none");
+        assert!(
+            destroy_section.contains("call $dom_setStyle"),
+            "skeleton_destroy should set display:none"
+        );
     }
 
     // -- Mask runtime tests --
@@ -22505,12 +24535,30 @@ mod tests {
     #[test]
     fn test_mask_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { mask_apply(0, 0); return 0; }");
-        assert!(wat.contains("func $mask_apply"), "WAT should contain $mask_apply");
-        assert!(wat.contains("func $mask_phone"), "WAT should contain $mask_phone");
-        assert!(wat.contains("func $mask_credit_card"), "WAT should contain $mask_credit_card");
-        assert!(wat.contains("func $mask_date"), "WAT should contain $mask_date");
-        assert!(wat.contains("func $mask_strip"), "WAT should contain $mask_strip");
-        assert!(wat.contains("func $mask_currency"), "WAT should contain $mask_currency");
+        assert!(
+            wat.contains("func $mask_apply"),
+            "WAT should contain $mask_apply"
+        );
+        assert!(
+            wat.contains("func $mask_phone"),
+            "WAT should contain $mask_phone"
+        );
+        assert!(
+            wat.contains("func $mask_credit_card"),
+            "WAT should contain $mask_credit_card"
+        );
+        assert!(
+            wat.contains("func $mask_date"),
+            "WAT should contain $mask_date"
+        );
+        assert!(
+            wat.contains("func $mask_strip"),
+            "WAT should contain $mask_strip"
+        );
+        assert!(
+            wat.contains("func $mask_currency"),
+            "WAT should contain $mask_currency"
+        );
     }
 
     #[test]
@@ -22518,20 +24566,35 @@ mod tests {
         let wat = compile("pub fn noop() -> i32 { mask_apply(0, 0); return 0; }");
         let mask_section = wat.split("func $mask_apply").nth(1).unwrap_or("");
         // '#' = ASCII 35 for digit matching
-        assert!(mask_section.contains("i32.const 35"), "mask_apply should check for '#' pattern char");
+        assert!(
+            mask_section.contains("i32.const 35"),
+            "mask_apply should check for '#' pattern char"
+        );
         // 'A' = ASCII 65 for letter matching
-        assert!(mask_section.contains("i32.const 65"), "mask_apply should check for 'A' pattern char");
+        assert!(
+            mask_section.contains("i32.const 65"),
+            "mask_apply should check for 'A' pattern char"
+        );
         // '*' = ASCII 42 for any-char matching
-        assert!(mask_section.contains("i32.const 42"), "mask_apply should check for '*' pattern char");
+        assert!(
+            mask_section.contains("i32.const 42"),
+            "mask_apply should check for '*' pattern char"
+        );
         // Uses alloc for output buffer
-        assert!(mask_section.contains("call $alloc"), "mask_apply should allocate output buffer");
+        assert!(
+            mask_section.contains("call $alloc"),
+            "mask_apply should allocate output buffer"
+        );
     }
 
     #[test]
     fn test_mask_phone_calls_mask_apply() {
         let wat = compile("pub fn noop() -> i32 { mask_phone(0, 0); return 0; }");
         let phone_section = wat.split("func $mask_phone").nth(1).unwrap_or("");
-        assert!(phone_section.contains("call $mask_apply"), "mask_phone should delegate to mask_apply");
+        assert!(
+            phone_section.contains("call $mask_apply"),
+            "mask_phone should delegate to mask_apply"
+        );
     }
 
     #[test]
@@ -22539,9 +24602,18 @@ mod tests {
         let wat = compile("pub fn noop() -> i32 { mask_strip(0, 0); return 0; }");
         let strip_section = wat.split("func $mask_strip").nth(1).unwrap_or("");
         // Should check for digit range (48-57), uppercase (65-90), lowercase (97-122)
-        assert!(strip_section.contains("i32.const 48"), "mask_strip should check digit lower bound");
-        assert!(strip_section.contains("i32.const 122"), "mask_strip should check lowercase upper bound");
-        assert!(strip_section.contains("call $alloc"), "mask_strip should allocate output buffer");
+        assert!(
+            strip_section.contains("i32.const 48"),
+            "mask_strip should check digit lower bound"
+        );
+        assert!(
+            strip_section.contains("i32.const 122"),
+            "mask_strip should check lowercase upper bound"
+        );
+        assert!(
+            strip_section.contains("call $alloc"),
+            "mask_strip should allocate output buffer"
+        );
     }
 
     // -- Chart runtime tests --
@@ -22549,37 +24621,76 @@ mod tests {
     #[test]
     fn test_chart_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { chart_bar(0); return 0; }");
-        assert!(wat.contains("func $chart_bar"), "WAT should contain $chart_bar");
-        assert!(wat.contains("func $chart_line"), "WAT should contain $chart_line");
-        assert!(wat.contains("func $chart_pie"), "WAT should contain $chart_pie");
-        assert!(wat.contains("func $chart_scatter"), "WAT should contain $chart_scatter");
-        assert!(wat.contains("func $chart_update"), "WAT should contain $chart_update");
-        assert!(wat.contains("func $chart_destroy"), "WAT should contain $chart_destroy");
+        assert!(
+            wat.contains("func $chart_bar"),
+            "WAT should contain $chart_bar"
+        );
+        assert!(
+            wat.contains("func $chart_line"),
+            "WAT should contain $chart_line"
+        );
+        assert!(
+            wat.contains("func $chart_pie"),
+            "WAT should contain $chart_pie"
+        );
+        assert!(
+            wat.contains("func $chart_scatter"),
+            "WAT should contain $chart_scatter"
+        );
+        assert!(
+            wat.contains("func $chart_update"),
+            "WAT should contain $chart_update"
+        );
+        assert!(
+            wat.contains("func $chart_destroy"),
+            "WAT should contain $chart_destroy"
+        );
     }
 
     #[test]
     fn test_chart_bar_creates_svg_rects() {
         let wat = compile("pub fn noop() -> i32 { chart_bar(0); return 0; }");
         let bar_section = wat.split("func $chart_bar").nth(1).unwrap_or("");
-        assert!(bar_section.contains("call $dom_createElement"), "chart_bar should create SVG elements");
-        assert!(bar_section.contains("call $dom_setAttr"), "chart_bar should set attributes on elements");
-        assert!(bar_section.contains("call $dom_appendChild"), "chart_bar should append children");
-        assert!(bar_section.contains("call $string_fromI32"), "chart_bar should convert numbers to strings for attrs");
+        assert!(
+            bar_section.contains("call $dom_createElement"),
+            "chart_bar should create SVG elements"
+        );
+        assert!(
+            bar_section.contains("call $dom_setAttr"),
+            "chart_bar should set attributes on elements"
+        );
+        assert!(
+            bar_section.contains("call $dom_appendChild"),
+            "chart_bar should append children"
+        );
+        assert!(
+            bar_section.contains("call $string_fromI32"),
+            "chart_bar should convert numbers to strings for attrs"
+        );
     }
 
     #[test]
     fn test_chart_line_creates_polyline() {
         let wat = compile("pub fn noop() -> i32 { chart_line(0); return 0; }");
         let line_section = wat.split("func $chart_line").nth(1).unwrap_or("");
-        assert!(line_section.contains("call $string_concat"), "chart_line should build points string via concat");
-        assert!(line_section.contains("call $dom_createElement"), "chart_line should create SVG elements");
+        assert!(
+            line_section.contains("call $string_concat"),
+            "chart_line should build points string via concat"
+        );
+        assert!(
+            line_section.contains("call $dom_createElement"),
+            "chart_line should create SVG elements"
+        );
     }
 
     #[test]
     fn test_chart_destroy_hides_element() {
         let wat = compile("pub fn noop() -> i32 { chart_destroy(0); return 0; }");
         let destroy_section = wat.split("func $chart_destroy").nth(1).unwrap_or("");
-        assert!(destroy_section.contains("call $dom_setStyle"), "chart_destroy should hide element via style");
+        assert!(
+            destroy_section.contains("call $dom_setStyle"),
+            "chart_destroy should hide element via style"
+        );
     }
 
     // -- Datepicker runtime tests --
@@ -22587,43 +24698,103 @@ mod tests {
     #[test]
     fn test_datepicker_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { datepicker_create(0); return 0; }");
-        assert!(wat.contains("func $datepicker_is_leap_year"), "WAT should contain $datepicker_is_leap_year");
-        assert!(wat.contains("func $datepicker_days_in_month"), "WAT should contain $datepicker_days_in_month");
-        assert!(wat.contains("func $datepicker_day_of_week"), "WAT should contain $datepicker_day_of_week");
-        assert!(wat.contains("func $datepicker_add_days"), "WAT should contain $datepicker_add_days");
-        assert!(wat.contains("func $datepicker_compare"), "WAT should contain $datepicker_compare");
-        assert!(wat.contains("func $datepicker_create"), "WAT should contain $datepicker_create");
-        assert!(wat.contains("func $datepicker_get_value"), "WAT should contain $datepicker_get_value");
-        assert!(wat.contains("func $datepicker_set_value"), "WAT should contain $datepicker_set_value");
-        assert!(wat.contains("func $datepicker_destroy"), "WAT should contain $datepicker_destroy");
+        assert!(
+            wat.contains("func $datepicker_is_leap_year"),
+            "WAT should contain $datepicker_is_leap_year"
+        );
+        assert!(
+            wat.contains("func $datepicker_days_in_month"),
+            "WAT should contain $datepicker_days_in_month"
+        );
+        assert!(
+            wat.contains("func $datepicker_day_of_week"),
+            "WAT should contain $datepicker_day_of_week"
+        );
+        assert!(
+            wat.contains("func $datepicker_add_days"),
+            "WAT should contain $datepicker_add_days"
+        );
+        assert!(
+            wat.contains("func $datepicker_compare"),
+            "WAT should contain $datepicker_compare"
+        );
+        assert!(
+            wat.contains("func $datepicker_create"),
+            "WAT should contain $datepicker_create"
+        );
+        assert!(
+            wat.contains("func $datepicker_get_value"),
+            "WAT should contain $datepicker_get_value"
+        );
+        assert!(
+            wat.contains("func $datepicker_set_value"),
+            "WAT should contain $datepicker_set_value"
+        );
+        assert!(
+            wat.contains("func $datepicker_destroy"),
+            "WAT should contain $datepicker_destroy"
+        );
     }
 
     #[test]
     fn test_datepicker_leap_year_logic() {
         let wat = compile("pub fn noop() -> i32 { datepicker_is_leap_year(0); return 0; }");
-        let leap_section = wat.split("func $datepicker_is_leap_year").nth(1).unwrap_or("");
+        let leap_section = wat
+            .split("func $datepicker_is_leap_year")
+            .nth(1)
+            .unwrap_or("");
         // Should check divisibility by 400, 100, and 4
-        assert!(leap_section.contains("i32.const 400"), "leap year should check mod 400");
-        assert!(leap_section.contains("i32.const 100"), "leap year should check mod 100");
-        assert!(leap_section.contains("i32.const 4"), "leap year should check mod 4");
+        assert!(
+            leap_section.contains("i32.const 400"),
+            "leap year should check mod 400"
+        );
+        assert!(
+            leap_section.contains("i32.const 100"),
+            "leap year should check mod 100"
+        );
+        assert!(
+            leap_section.contains("i32.const 4"),
+            "leap year should check mod 4"
+        );
     }
 
     #[test]
     fn test_datepicker_days_in_month_handles_february() {
         let wat = compile("pub fn noop() -> i32 { datepicker_days_in_month(0, 0); return 0; }");
-        let dim_section = wat.split("func $datepicker_days_in_month").nth(1).unwrap_or("");
-        assert!(dim_section.contains("i32.const 28"), "days_in_month should return 28 for non-leap Feb");
-        assert!(dim_section.contains("i32.const 29"), "days_in_month should return 29 for leap Feb");
-        assert!(dim_section.contains("call $datepicker_is_leap_year"), "days_in_month should call is_leap_year for February");
+        let dim_section = wat
+            .split("func $datepicker_days_in_month")
+            .nth(1)
+            .unwrap_or("");
+        assert!(
+            dim_section.contains("i32.const 28"),
+            "days_in_month should return 28 for non-leap Feb"
+        );
+        assert!(
+            dim_section.contains("i32.const 29"),
+            "days_in_month should return 29 for leap Feb"
+        );
+        assert!(
+            dim_section.contains("call $datepicker_is_leap_year"),
+            "days_in_month should call is_leap_year for February"
+        );
     }
 
     #[test]
     fn test_datepicker_compare_returns_neg1_0_1() {
         let wat = compile("pub fn noop() -> i32 { datepicker_compare(0, 0); return 0; }");
         let cmp_section = wat.split("func $datepicker_compare").nth(1).unwrap_or("");
-        assert!(cmp_section.contains("i32.const -1"), "compare should return -1");
-        assert!(cmp_section.contains("i32.const 0"), "compare should return 0");
-        assert!(cmp_section.contains("i32.const 1"), "compare should return 1");
+        assert!(
+            cmp_section.contains("i32.const -1"),
+            "compare should return -1"
+        );
+        assert!(
+            cmp_section.contains("i32.const 0"),
+            "compare should return 0"
+        );
+        assert!(
+            cmp_section.contains("i32.const 1"),
+            "compare should return 1"
+        );
     }
 
     // -- Tree-shaking: verify unused runtimes are NOT emitted --
@@ -22631,86 +24802,131 @@ mod tests {
     #[test]
     fn tree_shake_no_crypto_when_unused() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("func $crypto_sha256"), "crypto runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $crypto_sha256"),
+            "crypto runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_chart_when_unused() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("func $chart_bar"), "chart runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $chart_bar"),
+            "chart runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_datepicker_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $datepicker_create"), "datepicker runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $datepicker_create"),
+            "datepicker runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_toast_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $toast_show"), "toast runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $toast_show"),
+            "toast runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_csv_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $csv_parse"), "csv runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $csv_parse"),
+            "csv runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_collections_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $map_create"), "collections runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $map_create"),
+            "collections runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_bigdecimal_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $bigdecimal_new"), "bigdecimal runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $bigdecimal_new"),
+            "bigdecimal runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_mask_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $mask_apply"), "mask runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $mask_apply"),
+            "mask runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_skeleton_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $skeleton_text"), "skeleton runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $skeleton_text"),
+            "skeleton runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_debounce_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $debounce_create"), "debounce runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $debounce_create"),
+            "debounce runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_throttle_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $throttle_create"), "throttle runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $throttle_create"),
+            "throttle runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_search_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $search_contains"), "search runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $search_contains"),
+            "search runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_no_pagination_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $pagination_total_pages"), "pagination runtime should not be emitted when unused");
+        assert!(
+            !wat.contains("func $pagination_total_pages"),
+            "pagination runtime should not be emitted when unused"
+        );
     }
 
     #[test]
     fn tree_shake_core_always_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $alloc"), "alloc should always be emitted");
-        assert!(wat.contains("func $string_concat"), "string runtime should always be emitted");
+        assert!(
+            wat.contains("func $alloc"),
+            "alloc should always be emitted"
+        );
+        assert!(
+            wat.contains("func $string_concat"),
+            "string runtime should always be emitted"
+        );
     }
 
     // -- Lazy component: verify lazy_mount is generated through generate_item --
@@ -22725,10 +24941,15 @@ mod tests {
             }
         "#;
         let wat = compile(src);
-        assert!(wat.contains("Lazy Component: HeavyWidget"), "should emit lazy component marker");
-        assert!(wat.contains("lazy_mount"), "should generate lazy_mount wrapper");
+        assert!(
+            wat.contains("Lazy Component: HeavyWidget"),
+            "should emit lazy component marker"
+        );
+        assert!(
+            wat.contains("lazy_mount"),
+            "should generate lazy_mount wrapper"
+        );
     }
-
 }
 
 #[cfg(test)]
@@ -22743,7 +24964,10 @@ mod iterator_codegen_tests {
 
     #[allow(dead_code)]
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     #[test]
@@ -22771,7 +24995,10 @@ mod iterator_codegen_tests {
         let output = codegen.output.clone();
 
         assert!(output.contains(".map()"), "should contain map comment");
-        assert!(output.contains("loop $__map_lp_"), "should generate a WASM loop for map");
+        assert!(
+            output.contains("loop $__map_lp_"),
+            "should generate a WASM loop for map"
+        );
         assert!(output.contains("i32.store"), "should store mapped elements");
     }
 
@@ -22794,9 +25021,18 @@ mod iterator_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
 
-        assert!(output.contains(".filter()"), "should contain filter comment");
-        assert!(output.contains("loop $__flt_lp_"), "should generate a WASM loop for filter");
-        assert!(output.contains("(if"), "should have conditional for predicate");
+        assert!(
+            output.contains(".filter()"),
+            "should contain filter comment"
+        );
+        assert!(
+            output.contains("loop $__flt_lp_"),
+            "should generate a WASM loop for filter"
+        );
+        assert!(
+            output.contains("(if"),
+            "should have conditional for predicate"
+        );
     }
 
     #[test]
@@ -22811,9 +25047,15 @@ mod iterator_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
 
-        assert!(output.contains(".collect()"), "should contain collect comment");
+        assert!(
+            output.contains(".collect()"),
+            "should contain collect comment"
+        );
         // collect should NOT generate a loop — it's a pass-through
-        assert!(!output.contains("loop"), "collect should not generate a loop");
+        assert!(
+            !output.contains("loop"),
+            "collect should not generate a loop"
+        );
     }
 
     #[test]
@@ -22837,7 +25079,10 @@ mod iterator_codegen_tests {
 
         assert!(output.contains(".any()"), "should contain any comment");
         assert!(output.contains("loop $__any_lp_"), "should generate loop");
-        assert!(output.contains("br_if $__any_brk_"), "should have early exit");
+        assert!(
+            output.contains("br_if $__any_brk_"),
+            "should have early exit"
+        );
     }
 
     #[test]
@@ -22906,11 +25151,20 @@ mod closure_codegen_tests {
         let output = codegen.generate(&program);
 
         // Should contain a closure function
-        assert!(output.contains("$__closure_0"), "WAT should contain closure function name");
+        assert!(
+            output.contains("$__closure_0"),
+            "WAT should contain closure function name"
+        );
         // Should contain the function table for indirect calls
-        assert!(output.contains("funcref"), "WAT should contain function table");
+        assert!(
+            output.contains("funcref"),
+            "WAT should contain function table"
+        );
         // Should contain parameter for x
-        assert!(output.contains("(param $x i32)"), "WAT should contain closure param");
+        assert!(
+            output.contains("(param $x i32)"),
+            "WAT should contain closure param"
+        );
     }
 
     #[test]
@@ -22924,8 +25178,14 @@ mod closure_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
 
-        assert!(codegen.closure_functions.len() == 1, "should generate one closure function");
-        assert!(codegen.closure_func_names[0] == "$__closure_0", "closure should be named $__closure_0");
+        assert!(
+            codegen.closure_functions.len() == 1,
+            "should generate one closure function"
+        );
+        assert!(
+            codegen.closure_func_names[0] == "$__closure_0",
+            "closure should be named $__closure_0"
+        );
         assert!(codegen.needs_func_table, "should need function table");
     }
 
@@ -22958,7 +25218,10 @@ mod closure_codegen_tests {
                             mutable: false,
                             secret: false,
                             value: Expr::Closure {
-                                params: vec![("x".to_string(), Some(Type::Named("i32".to_string())))],
+                                params: vec![(
+                                    "x".to_string(),
+                                    Some(Type::Named("i32".to_string())),
+                                )],
                                 body: Box::new(Expr::Binary {
                                     op: BinOp::Mul,
                                     left: Box::new(Expr::Ident("x".to_string())),
@@ -22981,12 +25244,27 @@ mod closure_codegen_tests {
         let output = codegen.generate(&program);
 
         // Should contain env allocation for captured variable
-        assert!(output.contains("call $alloc"), "should allocate env struct for captures");
-        assert!(output.contains("capture multiplier"), "should store captured var");
-        assert!(output.contains("$__closure_0"), "should generate closure function");
+        assert!(
+            output.contains("call $alloc"),
+            "should allocate env struct for captures"
+        );
+        assert!(
+            output.contains("capture multiplier"),
+            "should store captured var"
+        );
+        assert!(
+            output.contains("$__closure_0"),
+            "should generate closure function"
+        );
         // The closure function should load from env
-        assert!(codegen.closure_functions[0].contains("$__env"), "closure should have env param");
-        assert!(codegen.closure_functions[0].contains("i32.load"), "closure should load from env");
+        assert!(
+            codegen.closure_functions[0].contains("$__env"),
+            "closure should have env param"
+        );
+        assert!(
+            codegen.closure_functions[0].contains("i32.load"),
+            "closure should load from env"
+        );
     }
 
     #[test]
@@ -23005,19 +25283,25 @@ mod closure_codegen_tests {
                     stmts: vec![
                         Stmt::Let {
                             name: "a".to_string(),
-                            ty: None, mutable: false, secret: false,
+                            ty: None,
+                            mutable: false,
+                            secret: false,
                             value: Expr::Integer(1),
                             ownership: Ownership::Owned,
                         },
                         Stmt::Let {
                             name: "b".to_string(),
-                            ty: None, mutable: false, secret: false,
+                            ty: None,
+                            mutable: false,
+                            secret: false,
                             value: Expr::Integer(2),
                             ownership: Ownership::Owned,
                         },
                         Stmt::Let {
                             name: "f".to_string(),
-                            ty: None, mutable: false, secret: false,
+                            ty: None,
+                            mutable: false,
+                            secret: false,
                             value: Expr::Closure {
                                 params: vec![("x".to_string(), None)],
                                 body: Box::new(Expr::Binary {
@@ -23046,7 +25330,10 @@ mod closure_codegen_tests {
         let output = codegen.generate(&program);
 
         // Should have env with 2 captured vars (8 bytes = 2 * 4)
-        assert!(output.contains("i32.const 8 ;; env size"), "should allocate 8 bytes for 2 captures");
+        assert!(
+            output.contains("i32.const 8 ;; env size"),
+            "should allocate 8 bytes for 2 captures"
+        );
         assert!(output.contains("capture a"), "should store captured var a");
         assert!(output.contains("capture b"), "should store captured var b");
     }
@@ -23080,10 +25367,14 @@ mod iterator_closure_integration_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
 
-        assert!(output.contains("call_indirect (type $__closure_type)"),
-            "map should use $__closure_type for closure calls");
-        assert!(output.contains("env ptr"),
-            "map should push env ptr for closure call");
+        assert!(
+            output.contains("call_indirect (type $__closure_type)"),
+            "map should use $__closure_type for closure calls"
+        );
+        assert!(
+            output.contains("env ptr"),
+            "map should push env ptr for closure call"
+        );
     }
 
     #[test]
@@ -23105,10 +25396,14 @@ mod iterator_closure_integration_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
 
-        assert!(output.contains("call_indirect (type $__closure_type)"),
-            "filter should use $__closure_type for closure calls");
-        assert!(output.contains("env ptr"),
-            "filter should push env ptr for closure call");
+        assert!(
+            output.contains("call_indirect (type $__closure_type)"),
+            "filter should use $__closure_type for closure calls"
+        );
+        assert!(
+            output.contains("env ptr"),
+            "filter should push env ptr for closure call"
+        );
     }
 
     #[test]
@@ -23134,12 +25429,19 @@ mod iterator_closure_integration_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
 
-        assert!(output.contains(".reduce()"), "should contain reduce comment");
-        assert!(output.contains("loop $__red_lp_"), "should generate a WASM loop");
-        assert!(output.contains("call_indirect (type $__closure_type_2)"),
-            "reduce should use $__closure_type_2 for binary closure calls");
-        assert!(output.contains("env ptr"),
-            "reduce should push env ptr");
+        assert!(
+            output.contains(".reduce()"),
+            "should contain reduce comment"
+        );
+        assert!(
+            output.contains("loop $__red_lp_"),
+            "should generate a WASM loop"
+        );
+        assert!(
+            output.contains("call_indirect (type $__closure_type_2)"),
+            "reduce should use $__closure_type_2 for binary closure calls"
+        );
+        assert!(output.contains("env ptr"), "reduce should push env ptr");
     }
 
     #[test]
@@ -23166,9 +25468,14 @@ mod iterator_closure_integration_tests {
         let output = codegen.output.clone();
 
         assert!(output.contains(".fold()"), "should contain fold comment");
-        assert!(output.contains("loop $__fold_lp_"), "should generate a WASM loop");
-        assert!(output.contains("call_indirect (type $__closure_type_2)"),
-            "fold should use $__closure_type_2 for binary closure calls");
+        assert!(
+            output.contains("loop $__fold_lp_"),
+            "should generate a WASM loop"
+        );
+        assert!(
+            output.contains("call_indirect (type $__closure_type_2)"),
+            "fold should use $__closure_type_2 for binary closure calls"
+        );
     }
 }
 
@@ -23193,7 +25500,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn component_with_props_and_state() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Counter(initial: i32) {
                 let mut count: i32 = 0;
 
@@ -23205,14 +25513,22 @@ mod comprehensive_codegen_tests {
                     <div>"hello"</div>
                 }
             }
-        "#);
-        assert!(wat.contains("Counter_mount"), "should generate mount function");
-        assert!(wat.contains("signal_create"), "should create signals for state");
+        "#,
+        );
+        assert!(
+            wat.contains("Counter_mount"),
+            "should generate mount function"
+        );
+        assert!(
+            wat.contains("signal_create"),
+            "should create signals for state"
+        );
     }
 
     #[test]
     fn component_with_secret_state() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Secure {
                 let mut secret token: String = "abc";
 
@@ -23220,13 +25536,15 @@ mod comprehensive_codegen_tests {
                     <div>"secure"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("secret"), "should annotate secret state");
     }
 
     #[test]
     fn component_with_method() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Widget {
                 let mut val: i32 = 0;
 
@@ -23238,13 +25556,18 @@ mod comprehensive_codegen_tests {
                     <div>"widget"</div>
                 }
             }
-        "#);
-        assert!(wat.contains("__handler_0"), "should generate event handler trampoline");
+        "#,
+        );
+        assert!(
+            wat.contains("__handler_0"),
+            "should generate event handler trampoline"
+        );
     }
 
     #[test]
     fn handler_trampoline_declares_locals() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Widget {
                 let mut val: i32 = 0;
 
@@ -23257,16 +25580,24 @@ mod comprehensive_codegen_tests {
                     <div>"widget"</div>
                 }
             }
-        "#);
+        "#,
+        );
         // Handler trampoline should declare locals from method body
-        assert!(wat.contains("(local $x i32)"), "handler trampoline should declare body locals");
+        assert!(
+            wat.contains("(local $x i32)"),
+            "handler trampoline should declare body locals"
+        );
         // Handler trampoline should declare __arr_tmp utility local
-        assert!(wat.contains("(local $__arr_tmp i32)"), "handler trampoline should declare __arr_tmp");
+        assert!(
+            wat.contains("(local $__arr_tmp i32)"),
+            "handler trampoline should declare __arr_tmp"
+        );
     }
 
     #[test]
     fn component_mount_declares_arr_tmp() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Widget {
                 let mut val: i32 = 0;
 
@@ -23274,44 +25605,73 @@ mod comprehensive_codegen_tests {
                     <div>"widget"</div>
                 }
             }
-        "#);
+        "#,
+        );
         // Component mount function should declare __arr_tmp for array/struct operations
-        assert!(wat.contains("(local $__arr_tmp i32)"), "mount should declare __arr_tmp");
+        assert!(
+            wat.contains("(local $__arr_tmp i32)"),
+            "mount should declare __arr_tmp"
+        );
     }
 
     #[test]
     fn component_prop_access_via_local() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Widget(name: String) {
                 render {
                     <div>"static"</div>
                 }
             }
-        "#);
+        "#,
+        );
         // Props should be aliased as locals in mount
-        assert!(wat.contains("local.get $prop_name_ptr"), "should pass prop as ptr param");
-        assert!(wat.contains("local.set $name"), "should alias prop to local");
+        assert!(
+            wat.contains("local.get $prop_name_ptr"),
+            "should pass prop as ptr param"
+        );
+        assert!(
+            wat.contains("local.set $name"),
+            "should alias prop to local"
+        );
     }
 
     #[test]
     fn ok_some_none_err_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn test_ok() -> i32 {
                 return Ok(42);
             }
             pub fn test_none() -> i32 {
                 return None;
             }
-        "#);
+        "#,
+        );
         // Ok(42) should allocate a tagged struct via call $Ok
-        assert!(wat.contains("call $Ok"), "Ok should emit call $Ok for tagged allocation");
+        assert!(
+            wat.contains("call $Ok"),
+            "Ok should emit call $Ok for tagged allocation"
+        );
         // None as an identifier should emit i32.const 0
-        assert!(wat.contains("i32.const 0 ;; None"), "None should be i32.const 0");
-        assert!(!wat.contains("local.get $None"), "should not emit local.get $None");
+        assert!(
+            wat.contains("i32.const 0 ;; None"),
+            "None should be i32.const 0"
+        );
+        assert!(
+            !wat.contains("local.get $None"),
+            "should not emit local.get $None"
+        );
         // Verify the Ok helper function is emitted with tag=0
-        assert!(wat.contains("i32.store ;; tag=Ok"), "Ok helper should store tag=0");
+        assert!(
+            wat.contains("i32.store ;; tag=Ok"),
+            "Ok helper should store tag=0"
+        );
         // Verify the Err helper function is emitted with tag=1
-        assert!(wat.contains("i32.store ;; tag=Err"), "Err helper should store tag=1");
+        assert!(
+            wat.contains("i32.store ;; tag=Err"),
+            "Err helper should store tag=1"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23320,7 +25680,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn store_with_signals_and_actions() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             store AppStore {
                 signal count: i32 = 0;
 
@@ -23336,25 +25697,40 @@ mod comprehensive_codegen_tests {
                     return;
                 }
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("AppStore_init"), "should generate store init");
         assert!(wat.contains("AppStore_get_count"), "should generate getter");
         assert!(wat.contains("AppStore_set_count"), "should generate setter");
         assert!(wat.contains("AppStore_increment"), "should generate action");
-        assert!(wat.contains("AppStore_double_count"), "should generate computed");
+        assert!(
+            wat.contains("AppStore_double_count"),
+            "should generate computed"
+        );
         assert!(wat.contains("AppStore_on_change"), "should generate effect");
     }
 
     #[test]
     fn store_with_atomic_signal() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             store AtomicStore {
                 signal atomic count: i32 = 0;
             }
-        "#);
-        assert!(wat.contains("atomic_get_count"), "should generate atomic getter");
-        assert!(wat.contains("atomic_set_count"), "should generate atomic setter");
-        assert!(wat.contains("atomic_cas_count"), "should generate atomic CAS");
+        "#,
+        );
+        assert!(
+            wat.contains("atomic_get_count"),
+            "should generate atomic getter"
+        );
+        assert!(
+            wat.contains("atomic_set_count"),
+            "should generate atomic setter"
+        );
+        assert!(
+            wat.contains("atomic_cas_count"),
+            "should generate atomic CAS"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23363,17 +25739,31 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn router_definition() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             router AppRouter {
                 route "/" => Home,
                 route "/about" => About,
             }
-        "#);
-        assert!(wat.contains("AppRouter_init"), "should generate router init");
+        "#,
+        );
+        assert!(
+            wat.contains("AppRouter_init"),
+            "should generate router init"
+        );
         assert!(wat.contains("route: / => Home"), "should register route /");
-        assert!(wat.contains("route: /about => About"), "should register route /about");
-        assert!(wat.contains("__route_mount_0"), "should generate mount function");
-        assert!(wat.contains("__route_mount_1"), "should generate mount function for second route");
+        assert!(
+            wat.contains("route: /about => About"),
+            "should register route /about"
+        );
+        assert!(
+            wat.contains("__route_mount_0"),
+            "should generate mount function"
+        );
+        assert!(
+            wat.contains("__route_mount_1"),
+            "should generate mount function for second route"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23382,7 +25772,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn agent_definition() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             agent Helper {
                 prompt system = "You are helpful.";
 
@@ -23394,10 +25785,17 @@ mod comprehensive_codegen_tests {
                     <div>"agent"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("Helper_init"), "should generate agent init");
-        assert!(wat.contains("register tool: search"), "should register tool");
-        assert!(wat.contains("You are helpful"), "should include system prompt");
+        assert!(
+            wat.contains("register tool: search"),
+            "should register tool"
+        );
+        assert!(
+            wat.contains("You are helpful"),
+            "should include system prompt"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23406,7 +25804,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn if_else_expression() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn check(x: i32) -> i32 {
                 if x {
                     return 1;
@@ -23414,28 +25813,35 @@ mod comprehensive_codegen_tests {
                     return 0;
                 }
             }
-        "#);
+        "#,
+        );
         // Both branches explicitly return, so this is a void if (no result type).
         // The branches handle their own returns via `return` statements.
         assert!(wat.contains("(if"), "should generate if block");
-        assert!(!wat.contains("(if (result i32)"), "should NOT use result-typed if when branches return");
+        assert!(
+            !wat.contains("(if (result i32)"),
+            "should NOT use result-typed if when branches return"
+        );
         assert!(wat.contains("(then"), "should have then block");
         assert!(wat.contains("(else"), "should have else block");
     }
 
     #[test]
     fn binary_operations() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn math(a: i32, b: i32) -> i32 {
                 return a + b;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("i32.add"), "should generate add");
     }
 
     #[test]
     fn all_binary_ops() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn ops(a: i32, b: i32) -> i32 {
                 let r1 = a - b;
                 let r2 = a * b;
@@ -23443,7 +25849,8 @@ mod comprehensive_codegen_tests {
                 let r4 = a % b;
                 return r1;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("i32.sub"), "should generate sub");
         assert!(wat.contains("i32.mul"), "should generate mul");
         assert!(wat.contains("i32.div_s"), "should generate div");
@@ -23452,7 +25859,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn comparison_ops() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn cmp(a: i32, b: i32) -> bool {
                 let r1 = a == b;
                 let r2 = a != b;
@@ -23462,7 +25870,8 @@ mod comprehensive_codegen_tests {
                 let r6 = a >= b;
                 return r1;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("i32.eq"), "should generate eq");
         assert!(wat.contains("i32.ne"), "should generate ne");
         assert!(wat.contains("i32.lt_s"), "should generate lt");
@@ -23473,11 +25882,13 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn unary_negation() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn neg(x: i32) -> i32 {
                 return -x;
             }
-        "#);
+        "#,
+        );
         // Negation is done via 0 - x
         assert!(wat.contains("i32.const 0"), "should push 0 for negation");
         assert!(wat.contains("i32.sub"), "should generate sub for negation");
@@ -23485,50 +25896,67 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn unary_not() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn negate(x: bool) -> bool {
                 return !x;
             }
-        "#);
-        assert!(wat.contains("i32.eqz"), "should generate eqz for boolean not");
+        "#,
+        );
+        assert!(
+            wat.contains("i32.eqz"),
+            "should generate eqz for boolean not"
+        );
     }
 
     #[test]
     fn fetch_expression() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn get_data() -> i32 {
                 let r = fetch("https://api.example.com");
                 return 0;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("fetch"), "should contain fetch comment");
         assert!(wat.contains("call $http_fetch"), "should call http_fetch");
     }
 
     #[test]
     fn spawn_expression() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn work() -> i32 {
                 let handle = spawn {
                     return;
                 };
                 return 0;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("spawn"), "should contain spawn comment");
-        assert!(wat.contains("call $worker_spawn"), "should call worker_spawn");
+        assert!(
+            wat.contains("call $worker_spawn"),
+            "should call worker_spawn"
+        );
     }
 
     #[test]
     fn navigate_expression() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn go() -> i32 {
                 navigate("/about");
                 return 0;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("navigate"), "should contain navigate comment");
-        assert!(wat.contains("call $router_navigate"), "should call router_navigate");
+        assert!(
+            wat.contains("call $router_navigate"),
+            "should call router_navigate"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23537,12 +25965,14 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn let_binding() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn run() -> i32 {
                 let x = 42;
                 return x;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("i32.const 42"), "should push constant");
         assert!(wat.contains("local.set $x"), "should set local");
         assert!(wat.contains("local.get $x"), "should get local");
@@ -23550,21 +25980,25 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn return_statement() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn run() -> i32 {
                 return 42;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("return"), "should generate return");
     }
 
     #[test]
     fn empty_return() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn run() {
                 return;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("return"), "should generate empty return");
     }
 
@@ -23574,25 +26008,35 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn struct_layout_i32_fields() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Vec2 {
                 x: i32,
                 y: i32,
             }
-        "#);
-        assert!(wat.contains("struct Vec2 layout"), "should contain struct layout comment");
+        "#,
+        );
+        assert!(
+            wat.contains("struct Vec2 layout"),
+            "should contain struct layout comment"
+        );
     }
 
     #[test]
     fn struct_layout_mixed_fields() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Mixed {
                 a: i32,
                 b: f64,
                 c: bool,
             }
-        "#);
-        assert!(wat.contains("struct Mixed layout"), "should contain struct layout comment");
+        "#,
+        );
+        assert!(
+            wat.contains("struct Mixed layout"),
+            "should contain struct layout comment"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23601,7 +26045,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn struct_init_allocates_and_stores_fields() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Point {
                 x: i32,
                 y: i32,
@@ -23610,16 +26055,27 @@ mod comprehensive_codegen_tests {
                 let p = Point { x: 10, y: 20 };
                 return p;
             }
-        "#);
-        assert!(wat.contains("struct Point construction"), "should emit struct construction comment");
+        "#,
+        );
+        assert!(
+            wat.contains("struct Point construction"),
+            "should emit struct construction comment"
+        );
         assert!(wat.contains("call $alloc"), "should call alloc for struct");
-        assert!(wat.contains("i32.store ;; field: x"), "should store field x");
-        assert!(wat.contains("i32.store offset=4 ;; field: y"), "should store field y at offset 4");
+        assert!(
+            wat.contains("i32.store ;; field: x"),
+            "should store field x"
+        );
+        assert!(
+            wat.contains("i32.store offset=4 ;; field: y"),
+            "should store field y at offset 4"
+        );
     }
 
     #[test]
     fn struct_init_three_fields_correct_offsets() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Product {
                 name: String,
                 price: i32,
@@ -23629,11 +26085,24 @@ mod comprehensive_codegen_tests {
                 let p = Product { name: "test", price: 99, rating: 5 };
                 return p;
             }
-        "#);
-        assert!(wat.contains("struct Product construction (12 bytes)"), "should note 12 bytes");
-        assert!(wat.contains("i32.store ;; field: name"), "should store name at offset 0");
-        assert!(wat.contains("i32.store offset=4 ;; field: price"), "should store price at offset 4");
-        assert!(wat.contains("i32.store offset=8 ;; field: rating"), "should store rating at offset 8");
+        "#,
+        );
+        assert!(
+            wat.contains("struct Product construction (12 bytes)"),
+            "should note 12 bytes"
+        );
+        assert!(
+            wat.contains("i32.store ;; field: name"),
+            "should store name at offset 0"
+        );
+        assert!(
+            wat.contains("i32.store offset=4 ;; field: price"),
+            "should store price at offset 4"
+        );
+        assert!(
+            wat.contains("i32.store offset=8 ;; field: rating"),
+            "should store rating at offset 8"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23642,30 +26111,58 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn array_lit_empty_creates_vec_header() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn make_arr() -> i32 {
                 let items: i32 = [];
                 return items;
             }
-        "#);
-        assert!(wat.contains("array literal (0 elements)"), "should emit array literal comment");
-        assert!(wat.contains("i32.const 12 ;; array header size"), "should allocate 12-byte header");
-        assert!(wat.contains("i32.const 0 ;; length"), "should set length to 0");
-        assert!(wat.contains("i32.const 16 ;; capacity"), "should set initial capacity to 16");
-        assert!(wat.contains("i32.store offset=8 ;; data_ptr"), "should store data_ptr at offset 8");
+        "#,
+        );
+        assert!(
+            wat.contains("array literal (0 elements)"),
+            "should emit array literal comment"
+        );
+        assert!(
+            wat.contains("i32.const 12 ;; array header size"),
+            "should allocate 12-byte header"
+        );
+        assert!(
+            wat.contains("i32.const 0 ;; length"),
+            "should set length to 0"
+        );
+        assert!(
+            wat.contains("i32.const 16 ;; capacity"),
+            "should set initial capacity to 16"
+        );
+        assert!(
+            wat.contains("i32.store offset=8 ;; data_ptr"),
+            "should store data_ptr at offset 8"
+        );
     }
 
     #[test]
     fn array_lit_with_elements() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn make_arr() -> i32 {
                 let items: i32 = [10, 20, 30];
                 return items;
             }
-        "#);
-        assert!(wat.contains("array literal (3 elements)"), "should emit 3 elements comment");
-        assert!(wat.contains("i32.const 3 ;; length"), "should set length to 3");
-        assert!(wat.contains("i32.const 3 ;; capacity"), "should set capacity to 3");
+        "#,
+        );
+        assert!(
+            wat.contains("array literal (3 elements)"),
+            "should emit 3 elements comment"
+        );
+        assert!(
+            wat.contains("i32.const 3 ;; length"),
+            "should set length to 3"
+        );
+        assert!(
+            wat.contains("i32.const 3 ;; capacity"),
+            "should set capacity to 3"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23674,7 +26171,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn while_loop_emits_block_loop() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn count_up() -> i32 {
                 let mut i: i32 = 0;
                 while i < 10 {
@@ -23682,13 +26180,29 @@ mod comprehensive_codegen_tests {
                 }
                 return i;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("while loop"), "should emit while loop comment");
-        assert!(wat.contains("block $while_break_"), "should emit break block");
-        assert!(wat.contains("loop $while_cont_"), "should emit continue loop");
-        assert!(wat.contains("i32.eqz"), "should check negated condition for br_if");
-        assert!(wat.contains("br_if $while_break_"), "should break when condition is false");
-        assert!(wat.contains("br $while_cont_"), "should branch back to loop start");
+        assert!(
+            wat.contains("block $while_break_"),
+            "should emit break block"
+        );
+        assert!(
+            wat.contains("loop $while_cont_"),
+            "should emit continue loop"
+        );
+        assert!(
+            wat.contains("i32.eqz"),
+            "should check negated condition for br_if"
+        );
+        assert!(
+            wat.contains("br_if $while_break_"),
+            "should break when condition is false"
+        );
+        assert!(
+            wat.contains("br $while_cont_"),
+            "should branch back to loop start"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23697,31 +26211,56 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn push_uses_vec_header_layout() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn test_push() -> i32 {
                 let mut items: i32 = [];
                 items.push(42);
                 return items;
             }
-        "#);
-        assert!(wat.contains(".push() — append element to vec"), "should emit vec push comment");
-        assert!(wat.contains("i32.load offset=4 ;; capacity"), "should load capacity from offset 4");
-        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from offset 8");
-        assert!(wat.contains("i32.store ;; updated length"), "should update length in header");
+        "#,
+        );
+        assert!(
+            wat.contains(".push() — append element to vec"),
+            "should emit vec push comment"
+        );
+        assert!(
+            wat.contains("i32.load offset=4 ;; capacity"),
+            "should load capacity from offset 4"
+        );
+        assert!(
+            wat.contains("i32.load offset=8 ;; data_ptr"),
+            "should load data_ptr from offset 8"
+        );
+        assert!(
+            wat.contains("i32.store ;; updated length"),
+            "should update length in header"
+        );
     }
 
     #[test]
     fn push_handles_capacity_growth() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn test_push() -> i32 {
                 let mut items: i32 = [];
                 items.push(1);
                 return items;
             }
-        "#);
-        assert!(wat.contains("memory.copy"), "should copy old data when growing");
-        assert!(wat.contains("i32.store offset=4 ;; new capacity"), "should update capacity");
-        assert!(wat.contains("i32.store offset=8 ;; new data_ptr"), "should update data_ptr");
+        "#,
+        );
+        assert!(
+            wat.contains("memory.copy"),
+            "should copy old data when growing"
+        );
+        assert!(
+            wat.contains("i32.store offset=4 ;; new capacity"),
+            "should update capacity"
+        );
+        assert!(
+            wat.contains("i32.store offset=8 ;; new data_ptr"),
+            "should update data_ptr"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23730,7 +26269,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn template_for_uses_vec_header() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Item {
                 value: i32,
             }
@@ -23744,9 +26284,16 @@ mod comprehensive_codegen_tests {
                     </div>
                 }
             }
-        "#);
-        assert!(wat.contains("i32.load ;; array length"), "should load length from header");
-        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from header");
+        "#,
+        );
+        assert!(
+            wat.contains("i32.load ;; array length"),
+            "should load length from header"
+        );
+        assert!(
+            wat.contains("i32.load offset=8 ;; data_ptr"),
+            "should load data_ptr from header"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23755,7 +26302,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn for_loop_field_access_uses_struct_offsets() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Product {
                 name: String,
                 price: i32,
@@ -23771,15 +26319,23 @@ mod comprehensive_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         // product.price should load from offset 4 (second field)
-        assert!(wat.contains("for-loop field access: product.price"), "should emit field access comment");
-        assert!(wat.contains("i32.load offset=4 ;; field: .price"), "should load price at offset 4");
+        assert!(
+            wat.contains("for-loop field access: product.price"),
+            "should emit field access comment"
+        );
+        assert!(
+            wat.contains("i32.load offset=4 ;; field: .price"),
+            "should load price at offset 4"
+        );
     }
 
     #[test]
     fn for_loop_field_access_first_field_no_offset() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Product {
                 name: String,
                 price: i32,
@@ -23794,15 +26350,23 @@ mod comprehensive_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         // product.name should load from offset 0 (first field)
-        assert!(wat.contains("for-loop field access: product.name"), "should emit field access comment");
-        assert!(wat.contains("i32.load ;; field: .name"), "should load name at offset 0");
+        assert!(
+            wat.contains("for-loop field access: product.name"),
+            "should emit field access comment"
+        );
+        assert!(
+            wat.contains("i32.load ;; field: .name"),
+            "should load name at offset 0"
+        );
     }
 
     #[test]
     fn for_loop_field_access_third_field() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Product {
                 name: String,
                 price: i32,
@@ -23818,9 +26382,13 @@ mod comprehensive_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         // product.rating should load from offset 8 (third field)
-        assert!(wat.contains("i32.load offset=8 ;; field: .rating"), "should load rating at offset 8");
+        assert!(
+            wat.contains("i32.load offset=8 ;; field: .rating"),
+            "should load rating at offset 8"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23829,7 +26397,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn struct_layout_populates_offset_map() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Vec3 {
                 x: i32,
                 y: i32,
@@ -23839,11 +26408,18 @@ mod comprehensive_codegen_tests {
                 let v = Vec3 { x: 1, y: 2, z: 3 };
                 return v;
             }
-        "#);
+        "#,
+        );
         // Verify all three fields are stored at correct offsets
         assert!(wat.contains("i32.store ;; field: x"), "x at offset 0");
-        assert!(wat.contains("i32.store offset=4 ;; field: y"), "y at offset 4");
-        assert!(wat.contains("i32.store offset=8 ;; field: z"), "z at offset 8");
+        assert!(
+            wat.contains("i32.store offset=4 ;; field: y"),
+            "y at offset 4"
+        );
+        assert!(
+            wat.contains("i32.store offset=8 ;; field: z"),
+            "z at offset 8"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23852,7 +26428,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn imperative_for_loop() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn sum_arr() -> i32 {
                 let items: i32 = [1, 2, 3];
                 let mut total: i32 = 0;
@@ -23861,9 +26438,13 @@ mod comprehensive_codegen_tests {
                 }
                 return total;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("for item in"), "should emit for loop comment");
-        assert!(wat.contains("i32.load offset=8 ;; data_ptr"), "should load data_ptr from vec header");
+        assert!(
+            wat.contains("i32.load offset=8 ;; data_ptr"),
+            "should load data_ptr from vec header"
+        );
         assert!(wat.contains("block $for_break_"), "should emit break block");
         assert!(wat.contains("loop $for_cont_"), "should emit continue loop");
     }
@@ -23874,7 +26455,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn block_expression_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn test_block() -> i32 {
                 let x: i32 = {
                     let a: i32 = 5;
@@ -23882,9 +26464,13 @@ mod comprehensive_codegen_tests {
                 };
                 return x;
             }
-        "#);
+        "#,
+        );
         // Block should generate statements inside
-        assert!(wat.contains("local.set $a"), "should set local a inside block");
+        assert!(
+            wat.contains("local.set $a"),
+            "should set local a inside block"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23893,7 +26479,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn struct_array_push_iteration_e2e() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Product {
                 name: String,
                 price: i32,
@@ -23905,15 +26492,28 @@ mod comprehensive_codegen_tests {
                 products.push(p);
                 return products;
             }
-        "#);
+        "#,
+        );
         // Should have struct construction
-        assert!(wat.contains("struct Product construction"), "should construct Product struct");
+        assert!(
+            wat.contains("struct Product construction"),
+            "should construct Product struct"
+        );
         // Should have array literal
-        assert!(wat.contains("array literal (0 elements)"), "should create empty array");
+        assert!(
+            wat.contains("array literal (0 elements)"),
+            "should create empty array"
+        );
         // Should have push
-        assert!(wat.contains(".push() — append element to vec"), "should push to array");
+        assert!(
+            wat.contains(".push() — append element to vec"),
+            "should push to array"
+        );
         // Should have alloc calls
-        assert!(wat.contains("call $alloc"), "should call alloc for both struct and array");
+        assert!(
+            wat.contains("call $alloc"),
+            "should call alloc for both struct and array"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23922,13 +26522,15 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn enum_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             enum Color {
                 Red,
                 Green,
                 Blue,
             }
-        "#);
+        "#,
+        );
         // Enums currently fall through to the TODO handler
         assert!(wat.contains("(module"), "should still produce valid module");
     }
@@ -23939,7 +26541,8 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn impl_block_without_trait_generates_methods() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Point { x: i32, y: i32 }
 
             impl Point {
@@ -23947,7 +26550,8 @@ mod comprehensive_codegen_tests {
                     return x + y;
                 }
             }
-        "#);
+        "#,
+        );
         // Bare impl methods are now compiled as regular functions
         assert!(wat.contains("impl Point"), "bare impl should have comment");
         assert!(wat.contains("make"), "bare impl should generate methods");
@@ -23970,7 +26574,10 @@ mod comprehensive_codegen_tests {
                     params: vec![],
                     return_type: Some(Type::Named("i32".into())),
                     trait_bounds: vec![],
-                    body: Block { stmts: vec![Stmt::Return(Some(Expr::Integer(0)))], span },
+                    body: Block {
+                        stmts: vec![Stmt::Return(Some(Expr::Integer(0)))],
+                        span,
+                    },
                     is_pub: true,
                     is_async: false,
                     must_use: false,
@@ -23981,8 +26588,14 @@ mod comprehensive_codegen_tests {
         };
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
-        assert!(wat.contains("func $show"), "should generate trait impl method as function");
-        assert!(wat.contains("impl Display for Point"), "should have impl comment");
+        assert!(
+            wat.contains("func $show"),
+            "should generate trait impl method as function"
+        );
+        assert!(
+            wat.contains("impl Display for Point"),
+            "should have impl comment"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -23991,31 +26604,48 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn string_concat_runtime() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn greet() -> string {
                 return f"hello {42}!";
             }
-        "#);
-        assert!(wat.contains("$string_concat"), "should emit string concat runtime");
-        assert!(wat.contains("$to_string"), "should emit to_string for interpolation");
+        "#,
+        );
+        assert!(
+            wat.contains("$string_concat"),
+            "should emit string concat runtime"
+        );
+        assert!(
+            wat.contains("$to_string"),
+            "should emit to_string for interpolation"
+        );
     }
 
     #[test]
     fn string_from_i32_runtime() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$string_fromI32"), "should emit fromI32 in string runtime");
+        assert!(
+            wat.contains("$string_fromI32"),
+            "should emit fromI32 in string runtime"
+        );
     }
 
     #[test]
     fn string_from_f64_runtime() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$string_fromF64"), "should emit fromF64 in string runtime");
+        assert!(
+            wat.contains("$string_fromF64"),
+            "should emit fromF64 in string runtime"
+        );
     }
 
     #[test]
     fn string_from_bool_runtime() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$string_fromBool"), "should emit fromBool in string runtime");
+        assert!(
+            wat.contains("$string_fromBool"),
+            "should emit fromBool in string runtime"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24025,7 +26655,10 @@ mod comprehensive_codegen_tests {
     #[test]
     fn signal_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("signal"), "should contain signal runtime imports");
+        assert!(
+            wat.contains("signal"),
+            "should contain signal runtime imports"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24034,16 +26667,27 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn contract_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             contract UserResponse {
                 id: u32,
                 name: String,
                 email: String,
             }
-        "#);
-        assert!(wat.contains("Contract: UserResponse"), "should contain contract name");
-        assert!(wat.contains("contract hash:"), "should contain content hash");
-        assert!(wat.contains("contract_registerSchema"), "should register schema");
+        "#,
+        );
+        assert!(
+            wat.contains("Contract: UserResponse"),
+            "should contain contract name"
+        );
+        assert!(
+            wat.contains("contract hash:"),
+            "should contain content hash"
+        );
+        assert!(
+            wat.contains("contract_registerSchema"),
+            "should register schema"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24053,8 +26697,14 @@ mod comprehensive_codegen_tests {
     #[test]
     fn contract_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Contract runtime (WASM-internal)"), "should emit contract runtime");
-        assert!(wat.contains("$contract_registerSchema"), "should define registerSchema");
+        assert!(
+            wat.contains("Contract runtime (WASM-internal)"),
+            "should emit contract runtime"
+        );
+        assert!(
+            wat.contains("$contract_registerSchema"),
+            "should define registerSchema"
+        );
         assert!(wat.contains("$contract_validate"), "should define validate");
         assert!(wat.contains("$contract_getHash"), "should define getHash");
     }
@@ -24062,37 +26712,55 @@ mod comprehensive_codegen_tests {
     #[test]
     fn permissions_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Permissions runtime (WASM-internal)"), "should emit permissions runtime");
+        assert!(
+            wat.contains("Permissions runtime (WASM-internal)"),
+            "should emit permissions runtime"
+        );
     }
 
     #[test]
     fn form_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Form runtime (WASM-internal)"), "should emit form runtime");
+        assert!(
+            wat.contains("Form runtime (WASM-internal)"),
+            "should emit form runtime"
+        );
     }
 
     #[test]
     fn lifecycle_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Lifecycle runtime (WASM-internal)"), "should emit lifecycle runtime");
+        assert!(
+            wat.contains("Lifecycle runtime (WASM-internal)"),
+            "should emit lifecycle runtime"
+        );
     }
 
     #[test]
     fn cache_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Cache runtime (WASM-internal)"), "should emit cache runtime");
+        assert!(
+            wat.contains("Cache runtime (WASM-internal)"),
+            "should emit cache runtime"
+        );
     }
 
     #[test]
     fn responsive_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Responsive runtime (WASM-internal)"), "should emit responsive runtime");
+        assert!(
+            wat.contains("Responsive runtime (WASM-internal)"),
+            "should emit responsive runtime"
+        );
     }
 
     #[test]
     fn route_table_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("Route table (WASM-internal)"), "should emit route table runtime");
+        assert!(
+            wat.contains("Route table (WASM-internal)"),
+            "should emit route table runtime"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24112,7 +26780,10 @@ mod comprehensive_codegen_tests {
     #[test]
     fn flags_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$flags_is_enabled"), "should emit flags_is_enabled");
+        assert!(
+            wat.contains("$flags_is_enabled"),
+            "should emit flags_is_enabled"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24122,8 +26793,14 @@ mod comprehensive_codegen_tests {
     #[test]
     fn ai_runtime_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("$ai_register_tool"), "should emit ai_register_tool");
-        assert!(wat.contains("$ai_get_tool_count"), "should emit ai_get_tool_count");
+        assert!(
+            wat.contains("$ai_register_tool"),
+            "should emit ai_register_tool"
+        );
+        assert!(
+            wat.contains("$ai_get_tool_count"),
+            "should emit ai_get_tool_count"
+        );
         assert!(wat.contains("$ai_call_tool"), "should emit ai_call_tool");
     }
 
@@ -24147,7 +26824,10 @@ mod comprehensive_codegen_tests {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
         assert!(wat.contains("$dom_mount"), "should import dom.mount");
         assert!(wat.contains("$dom_flush"), "should import dom.flush");
-        assert!(wat.contains("$dom_createElement"), "should import dom.createElement");
+        assert!(
+            wat.contains("$dom_createElement"),
+            "should import dom.createElement"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24157,8 +26837,14 @@ mod comprehensive_codegen_tests {
     #[test]
     fn http_imports_pruned_when_unused() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(!wat.contains("$http_fetch"), "should NOT import http.fetch when unused");
-        assert!(!wat.contains("$http_setMethod"), "should NOT import http.setMethod when unused");
+        assert!(
+            !wat.contains("$http_fetch"),
+            "should NOT import http.fetch when unused"
+        );
+        assert!(
+            !wat.contains("$http_setMethod"),
+            "should NOT import http.setMethod when unused"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24168,8 +26854,14 @@ mod comprehensive_codegen_tests {
     #[test]
     fn worker_imports_pruned_when_unused() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(!wat.contains("$worker_spawn"), "should NOT import worker.spawn when unused");
-        assert!(!wat.contains("$worker_channelCreate"), "should NOT import worker.channelCreate when unused");
+        assert!(
+            !wat.contains("$worker_spawn"),
+            "should NOT import worker.spawn when unused"
+        );
+        assert!(
+            !wat.contains("$worker_channelCreate"),
+            "should NOT import worker.channelCreate when unused"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24178,14 +26870,22 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn closure_in_full_compile() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn run() -> i32 {
                 let f = |x: i32| x + 1;
                 return 0;
             }
-        "#);
-        assert!(wat.contains("$__closure_0"), "should generate closure function");
-        assert!(wat.contains("funcref"), "should emit function table for closures");
+        "#,
+        );
+        assert!(
+            wat.contains("$__closure_0"),
+            "should generate closure function"
+        );
+        assert!(
+            wat.contains("funcref"),
+            "should emit function table for closures"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24194,37 +26894,49 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn float_literal() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn f() -> f64 {
                 return 3.14;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("f64.const 3.14"), "should emit float const");
     }
 
     #[test]
     fn bool_literals() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn f() -> i32 {
                 let a = true;
                 let b = false;
                 return 0;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("i32.const 1"), "should emit 1 for true");
         assert!(wat.contains("i32.const 0"), "should emit 0 for false");
     }
 
     #[test]
     fn string_literal() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn f() -> i32 {
                 let s = "hello";
                 return 0;
             }
-        "#);
-        assert!(wat.contains("str ptr"), "should contain string pointer comment");
-        assert!(wat.contains("str len"), "should contain string length comment");
+        "#,
+        );
+        assert!(
+            wat.contains("str ptr"),
+            "should contain string pointer comment"
+        );
+        assert!(
+            wat.contains("str len"),
+            "should contain string length comment"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24234,13 +26946,19 @@ mod comprehensive_codegen_tests {
     #[test]
     fn pub_function_exported() {
         let wat = compile(r#"pub fn add(a: i32, b: i32) -> i32 { return a + b; }"#);
-        assert!(wat.contains("(export \"add\")"), "pub function should be exported");
+        assert!(
+            wat.contains("(export \"add\")"),
+            "pub function should be exported"
+        );
     }
 
     #[test]
     fn non_pub_function_not_exported() {
         let wat = compile(r#"fn internal(x: i32) -> i32 { return x; }"#);
-        assert!(!wat.contains("(export \"internal\")"), "non-pub function should not be exported");
+        assert!(
+            !wat.contains("(export \"internal\")"),
+            "non-pub function should not be exported"
+        );
     }
 
     #[test]
@@ -24257,12 +26975,17 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn trait_erased_in_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             trait Printable {
                 fn print();
             }
-        "#);
-        assert!(wat.contains("trait Printable (erased)"), "trait should be erased comment");
+        "#,
+        );
+        assert!(
+            wat.contains("trait Printable (erased)"),
+            "trait should be erased comment"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24271,14 +26994,22 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn data_section_for_strings() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn f() -> i32 {
                 let s = "test_data";
                 return 0;
             }
-        "#);
-        assert!(wat.contains("(data"), "should emit data section for interned strings");
-        assert!(wat.contains("test_data"), "should contain the string in data section");
+        "#,
+        );
+        assert!(
+            wat.contains("(data"),
+            "should emit data section for interned strings"
+        );
+        assert!(
+            wat.contains("test_data"),
+            "should contain the string in data section"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24287,13 +27018,15 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn fn_call_user_function() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             fn helper() -> i32 { return 1; }
             pub fn run() -> i32 {
                 let r = helper();
                 return r;
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("call $helper"), "should call user function");
     }
 
@@ -24303,12 +27036,14 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn field_access_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             struct Point { x: i32, y: i32 }
             pub fn run(p: i32) -> i32 {
                 return p;
             }
-        "#);
+        "#,
+        );
         // Just verify module compiles
         assert!(wat.contains("(module"), "should produce valid module");
     }
@@ -24321,8 +27056,14 @@ mod comprehensive_codegen_tests {
     fn module_has_correct_structure() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
         assert!(wat.starts_with("\n(module"), "should start with (module");
-        assert!(wat.contains("(import \"env\" \"memory\""), "should import memory");
-        assert!(wat.trim_end().ends_with(")"), "should end with closing paren");
+        assert!(
+            wat.contains("(import \"env\" \"memory\""),
+            "should import memory"
+        );
+        assert!(
+            wat.trim_end().ends_with(")"),
+            "should end with closing paren"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24331,14 +27072,19 @@ mod comprehensive_codegen_tests {
 
     #[test]
     fn assign_expression_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn run() -> i32 {
                 let mut x = 1;
                 x = 2;
                 return x;
             }
-        "#);
-        assert!(wat.contains("local.set $x"), "should set variable on assign");
+        "#,
+        );
+        assert!(
+            wat.contains("local.set $x"),
+            "should set variable on assign"
+        );
     }
 }
 
@@ -24375,7 +27121,10 @@ mod coverage_codegen_tests {
 
     #[allow(dead_code)]
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -24392,43 +27141,72 @@ mod coverage_codegen_tests {
         }
         // Optional namespaces pruned when unused
         let pruned = [
-            "\"http\"", "\"observe\"", "\"ws\"", "\"db\"", "\"worker\"",
-            "\"pwa\"", "\"hardware\"", "\"payment\"", "\"auth\"", "\"upload\"",
-            "\"streaming\"", "\"rtc\"", "\"gpu\"",
+            "\"http\"",
+            "\"observe\"",
+            "\"ws\"",
+            "\"db\"",
+            "\"worker\"",
+            "\"pwa\"",
+            "\"hardware\"",
+            "\"payment\"",
+            "\"auth\"",
+            "\"upload\"",
+            "\"streaming\"",
+            "\"rtc\"",
+            "\"gpu\"",
         ];
         for ns in &pruned {
-            assert!(!wat.contains(ns), "namespace should be pruned when unused: {}", ns);
+            assert!(
+                !wat.contains(ns),
+                "namespace should be pruned when unused: {}",
+                ns
+            );
         }
     }
 
     #[test]
     fn rtc_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$rtc_createPeer"), "RTC imports should be pruned when unused");
+        assert!(
+            !wat.contains("$rtc_createPeer"),
+            "RTC imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn rtc_data_channel_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$rtc_createDataChannel"), "RTC data channel imports should be pruned when unused");
+        assert!(
+            !wat.contains("$rtc_createDataChannel"),
+            "RTC data channel imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn rtc_media_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$rtc_getUserMedia"), "RTC media imports should be pruned when unused");
+        assert!(
+            !wat.contains("$rtc_getUserMedia"),
+            "RTC media imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn rtc_event_callback_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$rtc_onIceCandidate"), "RTC event imports should be pruned when unused");
+        assert!(
+            !wat.contains("$rtc_onIceCandidate"),
+            "RTC event imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn rtc_state_query_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$rtc_getConnectionState"), "RTC state query imports should be pruned when unused");
+        assert!(
+            !wat.contains("$rtc_getConnectionState"),
+            "RTC state query imports should be pruned when unused"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24438,31 +27216,46 @@ mod coverage_codegen_tests {
     #[test]
     fn gpu_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_requestAdapter"), "GPU imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_requestAdapter"),
+            "GPU imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_resource_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_createBuffer"), "GPU resource imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_createBuffer"),
+            "GPU resource imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_rendering_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_beginRenderPass"), "GPU rendering imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_beginRenderPass"),
+            "GPU rendering imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_canvas_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_configureCanvas"), "GPU canvas imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_configureCanvas"),
+            "GPU canvas imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_cleanup_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_destroyBuffer"), "GPU cleanup imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_destroyBuffer"),
+            "GPU cleanup imports should be pruned when unused"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24472,28 +27265,49 @@ mod coverage_codegen_tests {
     #[test]
     fn gpu_phase3_compute_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_createComputePipeline"), "GPU compute imports should be pruned when unused");
-        assert!(!wat.contains("$gpu_beginComputePass"), "GPU compute pass imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_createComputePipeline"),
+            "GPU compute imports should be pruned when unused"
+        );
+        assert!(
+            !wat.contains("$gpu_beginComputePass"),
+            "GPU compute pass imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_phase3_bind_group_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_createBindGroupLayout"), "GPU bind group layout imports should be pruned when unused");
-        assert!(!wat.contains("$gpu_createBindGroup"), "GPU bind group imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_createBindGroupLayout"),
+            "GPU bind group layout imports should be pruned when unused"
+        );
+        assert!(
+            !wat.contains("$gpu_createBindGroup"),
+            "GPU bind group imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn gpu_phase3_indexed_draw_imports_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$gpu_setIndexBuffer"), "GPU indexed draw imports should be pruned when unused");
-        assert!(!wat.contains("$gpu_drawIndexed"), "GPU drawIndexed imports should be pruned when unused");
+        assert!(
+            !wat.contains("$gpu_setIndexBuffer"),
+            "GPU indexed draw imports should be pruned when unused"
+        );
+        assert!(
+            !wat.contains("$gpu_drawIndexed"),
+            "GPU drawIndexed imports should be pruned when unused"
+        );
     }
 
     #[test]
     fn fetch_binary_import_pruned_when_unused() {
         let wat = compile("pub fn f() -> i32 { return 0; }");
-        assert!(!wat.contains("$http_fetchBinary"), "fetchBinary import should be pruned when unused");
+        assert!(
+            !wat.contains("$http_fetchBinary"),
+            "fetchBinary import should be pruned when unused"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24502,16 +27316,24 @@ mod coverage_codegen_tests {
 
     #[test]
     fn canvas_element_creates_dom_element() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component App() {
                 render {
                     <canvas width="800" height="600"> </canvas>
                 }
             }
-        "#);
+        "#,
+        );
         // Canvas tag should be stored as string and passed to createElement
-        assert!(wat.contains("canvas"), "canvas tag should appear in WAT output");
-        assert!(wat.contains("$dom_createElement"), "should call createElement for canvas element");
+        assert!(
+            wat.contains("canvas"),
+            "canvas tag should appear in WAT output"
+        );
+        assert!(
+            wat.contains("$dom_createElement"),
+            "should call createElement for canvas element"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24520,29 +27342,39 @@ mod coverage_codegen_tests {
 
     #[test]
     fn test_block_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             test "basic addition" {
                 assert_eq(1 + 1, 2);
             }
-        "#);
-        assert!(wat.contains("__test_basic_addition"), "should generate test function");
+        "#,
+        );
+        assert!(
+            wat.contains("__test_basic_addition"),
+            "should generate test function"
+        );
         assert!(wat.contains("test_pass"), "should call test_pass at end");
     }
 
     #[test]
     fn test_runner_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             test "first" {
                 assert(true);
             }
             test "second" {
                 assert(true);
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("__run_tests"), "should generate test runner");
         assert!(wat.contains("test_summary"), "should call test_summary");
         assert!(wat.contains("call $__test_first"), "should call first test");
-        assert!(wat.contains("call $__test_second"), "should call second test");
+        assert!(
+            wat.contains("call $__test_second"),
+            "should call second test"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24554,13 +27386,48 @@ mod coverage_codegen_tests {
         let contract = ContractDef {
             name: "TestContract".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
-                ContractField { name: "score".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
-                ContractField { name: "active".into(), ty: Type::Named("bool".into()), nullable: false, span: span() },
-                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
-                ContractField { name: "date".into(), ty: Type::Named("DateTime".into()), nullable: true, span: span() },
-                ContractField { name: "items".into(), ty: Type::Array(Box::new(Type::Named("i32".into()))), nullable: false, span: span() },
-                ContractField { name: "custom".into(), ty: Type::Named("MyType".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("u32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "score".into(),
+                    ty: Type::Named("f64".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "active".into(),
+                    ty: Type::Named("bool".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "date".into(),
+                    ty: Type::Named("DateTime".into()),
+                    nullable: true,
+                    span: span(),
+                },
+                ContractField {
+                    name: "items".into(),
+                    ty: Type::Array(Box::new(Type::Named("i32".into()))),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "custom".into(),
+                    ty: Type::Named("MyType".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -24569,10 +27436,19 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_contract(&contract);
         let output = codegen.output.clone();
-        assert!(output.contains("Contract: TestContract"), "should have contract header");
+        assert!(
+            output.contains("Contract: TestContract"),
+            "should have contract header"
+        );
         assert!(output.contains("contract hash:"), "should have hash");
-        assert!(output.contains("contract_registerSchema"), "should register schema");
-        assert!(output.contains("schema len"), "should have schema with length");
+        assert!(
+            output.contains("contract_registerSchema"),
+            "should register schema"
+        );
+        assert!(
+            output.contains("schema len"),
+            "should have schema with length"
+        );
     }
 
     #[test]
@@ -24596,7 +27472,10 @@ mod coverage_codegen_tests {
             "Result<i32,String>"
         );
         assert_eq!(
-            codegen.type_to_canonical(&Type::Tuple(vec![Type::Named("i32".into()), Type::Named("f64".into())])),
+            codegen.type_to_canonical(&Type::Tuple(vec![
+                Type::Named("i32".into()),
+                Type::Named("f64".into())
+            ])),
             "(i32,f64)"
         );
         assert_eq!(
@@ -24634,17 +27513,50 @@ mod coverage_codegen_tests {
     #[test]
     fn type_to_json_schema_type_variants() {
         let codegen = WasmCodegen::new();
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("i32".into())), "integer");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("i64".into())), "integer");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("u32".into())), "integer");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("u64".into())), "integer");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("f32".into())), "number");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("f64".into())), "number");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("bool".into())), "boolean");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("String".into())), "string");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("DateTime".into())), "string");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Named("Custom".into())), "object");
-        assert_eq!(codegen.type_to_json_schema_type(&Type::Array(Box::new(Type::Named("i32".into())))), "array");
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("i32".into())),
+            "integer"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("i64".into())),
+            "integer"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("u32".into())),
+            "integer"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("u64".into())),
+            "integer"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("f32".into())),
+            "number"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("f64".into())),
+            "number"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("bool".into())),
+            "boolean"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("String".into())),
+            "string"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("DateTime".into())),
+            "string"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Named("Custom".into())),
+            "object"
+        );
+        assert_eq!(
+            codegen.type_to_json_schema_type(&Type::Array(Box::new(Type::Named("i32".into())))),
+            "array"
+        );
         assert_eq!(
             codegen.type_to_json_schema_type(&Type::Option(Box::new(Type::Named("i32".into())))),
             "integer"
@@ -24693,11 +27605,23 @@ mod coverage_codegen_tests {
         codegen.generate_app(&app);
         let output = codegen.output.clone();
         assert!(output.contains("PWA App: MyApp"), "should have app header");
-        assert!(output.contains("register_manifest"), "should register manifest");
-        assert!(output.contains("register_sw"), "should register service worker");
+        assert!(
+            output.contains("register_manifest"),
+            "should register manifest"
+        );
+        assert!(
+            output.contains("register_sw"),
+            "should register service worker"
+        );
         assert!(output.contains("register_push"), "should register push");
-        assert!(output.contains("vapid key"), "should contain VAPID key reference");
-        assert!(output.contains("pwa_cachePrecache"), "should call cachePrecache");
+        assert!(
+            output.contains("vapid key"),
+            "should contain VAPID key reference"
+        );
+        assert!(
+            output.contains("pwa_cachePrecache"),
+            "should call cachePrecache"
+        );
     }
 
     #[test]
@@ -24720,7 +27644,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_app(&app);
         let output = codegen.output.clone();
-        assert!(output.contains("register_push"), "should still generate push func");
+        assert!(
+            output.contains("register_push"),
+            "should still generate push func"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24786,10 +27713,22 @@ mod coverage_codegen_tests {
         let output = codegen.output.clone();
         assert!(output.contains("Page: HomePage"), "should have page header");
         assert!(output.contains("seo_set_meta"), "should call seo_set_meta");
-        assert!(output.contains("seo_register_structured_data"), "should register structured data");
-        assert!(output.contains("seo_register_route"), "should register route for sitemap");
-        assert!(output.contains("secret: loaded"), "should annotate secret state");
-        assert!(output.contains("HomePage__handler_"), "should generate handler trampoline");
+        assert!(
+            output.contains("seo_register_structured_data"),
+            "should register structured data"
+        );
+        assert!(
+            output.contains("seo_register_route"),
+            "should register route for sitemap"
+        );
+        assert!(
+            output.contains("secret: loaded"),
+            "should annotate secret state"
+        );
+        assert!(
+            output.contains("HomePage__handler_"),
+            "should generate handler trampoline"
+        );
     }
 
     #[test]
@@ -24801,7 +27740,10 @@ mod coverage_codegen_tests {
             state: vec![],
             methods: vec![],
             styles: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             is_pub: true,
@@ -24811,7 +27753,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_page(&page);
         let output = codegen.output.clone();
-        assert!(output.contains("Page: SimplePage"), "should have page header");
+        assert!(
+            output.contains("Page: SimplePage"),
+            "should have page header"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24827,8 +27772,16 @@ mod coverage_codegen_tests {
                     name: "email".into(),
                     ty: Type::Named("String".into()),
                     validators: vec![
-                        ValidatorDef { kind: ValidatorKind::Required, message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::Email, message: None, span: span() },
+                        ValidatorDef {
+                            kind: ValidatorKind::Required,
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::Email,
+                            message: None,
+                            span: span(),
+                        },
                     ],
                     label: None,
                     placeholder: None,
@@ -24839,10 +27792,26 @@ mod coverage_codegen_tests {
                     name: "password".into(),
                     ty: Type::Named("String".into()),
                     validators: vec![
-                        ValidatorDef { kind: ValidatorKind::Required, message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::MinLength(8), message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::MaxLength(128), message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::Pattern("^[a-zA-Z0-9]+$".into()), message: None, span: span() },
+                        ValidatorDef {
+                            kind: ValidatorKind::Required,
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::MinLength(8),
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::MaxLength(128),
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::Pattern("^[a-zA-Z0-9]+$".into()),
+                            message: None,
+                            span: span(),
+                        },
                     ],
                     label: None,
                     placeholder: None,
@@ -24853,10 +27822,26 @@ mod coverage_codegen_tests {
                     name: "age".into(),
                     ty: Type::Named("i32".into()),
                     validators: vec![
-                        ValidatorDef { kind: ValidatorKind::Min(0), message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::Max(150), message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::Url, message: None, span: span() },
-                        ValidatorDef { kind: ValidatorKind::Custom("validate_age".into()), message: None, span: span() },
+                        ValidatorDef {
+                            kind: ValidatorKind::Min(0),
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::Max(150),
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::Url,
+                            message: None,
+                            span: span(),
+                        },
+                        ValidatorDef {
+                            kind: ValidatorKind::Custom("validate_age".into()),
+                            message: None,
+                            span: span(),
+                        },
                     ],
                     label: None,
                     placeholder: None,
@@ -24876,8 +27861,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_form(&form);
         let output = codegen.output.clone();
-        assert!(output.contains("Form: LoginForm"), "should have form header");
-        assert!(output.contains("form_register"), "should call form_register");
+        assert!(
+            output.contains("Form: LoginForm"),
+            "should have form header"
+        );
+        assert!(
+            output.contains("form_register"),
+            "should call form_register"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24940,9 +27931,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
-        assert!(output.contains("Channel: Chat"), "should have channel header");
-        assert!(output.contains("channel_connect"), "should call channel_connect");
-        assert!(output.contains("reconnect disabled"), "should disable reconnect");
+        assert!(
+            output.contains("Channel: Chat"),
+            "should have channel header"
+        );
+        assert!(
+            output.contains("channel_connect"),
+            "should call channel_connect"
+        );
+        assert!(
+            output.contains("reconnect disabled"),
+            "should disable reconnect"
+        );
     }
 
     #[test]
@@ -24966,7 +27966,10 @@ mod coverage_codegen_tests {
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
         // non-string URL defaults to "/ws"
-        assert!(output.contains("Channel: Events"), "should have channel header");
+        assert!(
+            output.contains("Channel: Events"),
+            "should have channel header"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -24990,7 +27993,10 @@ mod coverage_codegen_tests {
         codegen.generate_embed(&embed);
         let output = codegen.output.clone();
         assert!(output.contains("Embed: Widget"), "should have embed header");
-        assert!(output.contains("embed_load_sandboxed"), "should use sandboxed embed");
+        assert!(
+            output.contains("embed_load_sandboxed"),
+            "should use sandboxed embed"
+        );
     }
 
     #[test]
@@ -25009,7 +28015,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_embed(&embed);
         let output = codegen.output.clone();
-        assert!(output.contains("embed_load_script"), "should use script embed");
+        assert!(
+            output.contains("embed_load_script"),
+            "should use script embed"
+        );
     }
 
     #[test]
@@ -25028,7 +28037,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_embed(&embed);
         let output = codegen.output.clone();
-        assert!(output.contains("Embed: Dynamic"), "should have embed header");
+        assert!(
+            output.contains("Embed: Dynamic"),
+            "should have embed header"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25039,7 +28051,10 @@ mod coverage_codegen_tests {
     fn pdf_codegen() {
         let pdf = PdfDef {
             name: "Invoice".into(),
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             page_size: Some("letter".into()),
             orientation: Some("landscape".into()),
             margins: None,
@@ -25060,7 +28075,10 @@ mod coverage_codegen_tests {
     fn pdf_with_defaults() {
         let pdf = PdfDef {
             name: "Report".into(),
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             page_size: None,
             orientation: None,
             margins: None,
@@ -25072,7 +28090,10 @@ mod coverage_codegen_tests {
         codegen.generate_pdf(&pdf);
         let output = codegen.output.clone();
         assert!(output.contains("pdf_create"), "should call pdf_create");
-        assert!(output.contains("config ptr"), "should have config with defaults");
+        assert!(
+            output.contains("config ptr"),
+            "should have config with defaults"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25120,9 +28141,15 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("Payment: Checkout"), "should have payment header");
+        assert!(
+            output.contains("Payment: Checkout"),
+            "should have payment header"
+        );
         assert!(output.contains("payment_init"), "should call payment_init");
-        assert!(output.contains("i32.const 1  ;; sandboxed"), "should set sandbox flag to 1");
+        assert!(
+            output.contains("i32.const 1  ;; sandboxed"),
+            "should set sandbox flag to 1"
+        );
     }
 
     #[test]
@@ -25143,8 +28170,14 @@ mod coverage_codegen_tests {
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
         // defaults to "stripe" provider, tracked in required_providers
-        assert!(output.contains("Payment: Pay"), "should have payment header");
-        assert!(codegen.required_providers.contains("stripe"), "default provider should be tracked");
+        assert!(
+            output.contains("Payment: Pay"),
+            "should have payment header"
+        );
+        assert!(
+            codegen.required_providers.contains("stripe"),
+            "default provider should be tracked"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25168,10 +28201,22 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("Checkout_mount"), "should emit mount function");
-        assert!(output.contains("call $payment_mount"), "should call generic payment_mount syscall");
-        assert!(!output.contains("call $payment_mountStripe"), "should not use vendor-specific import name");
-        assert!(codegen.required_providers.contains("stripe"), "stripe should be tracked as required provider");
+        assert!(
+            output.contains("Checkout_mount"),
+            "should emit mount function"
+        );
+        assert!(
+            output.contains("call $payment_mount"),
+            "should call generic payment_mount syscall"
+        );
+        assert!(
+            !output.contains("call $payment_mountStripe"),
+            "should not use vendor-specific import name"
+        );
+        assert!(
+            codegen.required_providers.contains("stripe"),
+            "stripe should be tracked as required provider"
+        );
     }
 
     #[test]
@@ -25191,9 +28236,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("Pay_confirm"), "should emit confirm function");
-        assert!(output.contains("call $payment_confirm"), "should call generic payment_confirm syscall");
-        assert!(!output.contains("call $payment_confirmPayment"), "should not use vendor-specific import name");
+        assert!(
+            output.contains("Pay_confirm"),
+            "should emit confirm function"
+        );
+        assert!(
+            output.contains("call $payment_confirm"),
+            "should call generic payment_confirm syscall"
+        );
+        assert!(
+            !output.contains("call $payment_confirmPayment"),
+            "should not use vendor-specific import name"
+        );
     }
 
     #[test]
@@ -25213,9 +28267,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("Card_create_element"), "should emit create_element function for all providers");
-        assert!(output.contains("call $payment_create_element"), "should call generic create_element syscall");
-        assert!(!output.contains("call $payment_createCardElement"), "should not use vendor-specific import name");
+        assert!(
+            output.contains("Card_create_element"),
+            "should emit create_element function for all providers"
+        );
+        assert!(
+            output.contains("call $payment_create_element"),
+            "should call generic create_element syscall"
+        );
+        assert!(
+            !output.contains("call $payment_createCardElement"),
+            "should not use vendor-specific import name"
+        );
     }
 
     #[test]
@@ -25235,8 +28298,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("__payment_Stripe_provider_handle"), "should emit provider handle global");
-        assert!(output.contains("__payment_Stripe_element_handle"), "should emit element handle global");
+        assert!(
+            output.contains("__payment_Stripe_provider_handle"),
+            "should emit provider handle global"
+        );
+        assert!(
+            output.contains("__payment_Stripe_element_handle"),
+            "should emit element handle global"
+        );
     }
 
     #[test]
@@ -25258,13 +28327,41 @@ mod coverage_codegen_tests {
             codegen.indent = 1;
             codegen.generate_payment(&payment);
             let output = codegen.output.clone();
-            assert!(output.contains("PP_mount"), "should emit mount function for {}", provider);
-            assert!(output.contains("PP_create_element"), "should emit create_element for {}", provider);
-            assert!(output.contains("PP_confirm"), "should emit confirm for {}", provider);
-            assert!(output.contains("call $payment_mount"), "{} should call generic payment_mount", provider);
-            assert!(output.contains("call $payment_create_element"), "{} should call generic payment_create_element", provider);
-            assert!(output.contains("call $payment_confirm"), "{} should call generic payment_confirm", provider);
-            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+            assert!(
+                output.contains("PP_mount"),
+                "should emit mount function for {}",
+                provider
+            );
+            assert!(
+                output.contains("PP_create_element"),
+                "should emit create_element for {}",
+                provider
+            );
+            assert!(
+                output.contains("PP_confirm"),
+                "should emit confirm for {}",
+                provider
+            );
+            assert!(
+                output.contains("call $payment_mount"),
+                "{} should call generic payment_mount",
+                provider
+            );
+            assert!(
+                output.contains("call $payment_create_element"),
+                "{} should call generic payment_create_element",
+                provider
+            );
+            assert!(
+                output.contains("call $payment_confirm"),
+                "{} should call generic payment_confirm",
+                provider
+            );
+            assert!(
+                codegen.required_providers.contains(*provider),
+                "{} should be tracked as required provider",
+                provider
+            );
         }
     }
 
@@ -25288,8 +28385,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
-        assert!(output.contains("Banking: AccountLink"), "should have banking header");
-        assert!(output.contains("__banking_register_AccountLink"), "should emit register function");
+        assert!(
+            output.contains("Banking: AccountLink"),
+            "should have banking header"
+        );
+        assert!(
+            output.contains("__banking_register_AccountLink"),
+            "should emit register function"
+        );
         assert!(output.contains("banking_init"), "should call banking_init");
     }
 
@@ -25310,9 +28413,18 @@ mod coverage_codegen_tests {
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
         assert!(output.contains("Link_open"), "should emit open function");
-        assert!(output.contains("call $banking_open"), "should call generic banking_open syscall");
-        assert!(!output.contains("call $banking_mountPlaid"), "should not use vendor-specific import name");
-        assert!(codegen.required_providers.contains("plaid"), "plaid should be tracked as required provider");
+        assert!(
+            output.contains("call $banking_open"),
+            "should call generic banking_open syscall"
+        );
+        assert!(
+            !output.contains("call $banking_mountPlaid"),
+            "should not use vendor-specific import name"
+        );
+        assert!(
+            codegen.required_providers.contains("plaid"),
+            "plaid should be tracked as required provider"
+        );
     }
 
     #[test]
@@ -25332,9 +28444,18 @@ mod coverage_codegen_tests {
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
         // Defaults to "plaid" provider, uses generic interface
-        assert!(output.contains("Banking: Bank"), "should have banking header");
-        assert!(output.contains("call $banking_open"), "default provider should use generic banking_open");
-        assert!(codegen.required_providers.contains("plaid"), "default provider plaid should be tracked");
+        assert!(
+            output.contains("Banking: Bank"),
+            "should have banking header"
+        );
+        assert!(
+            output.contains("call $banking_open"),
+            "default provider should use generic banking_open"
+        );
+        assert!(
+            codegen.required_providers.contains("plaid"),
+            "default provider plaid should be tracked"
+        );
     }
 
     #[test]
@@ -25377,7 +28498,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
-        assert!(output.contains("$on_success"), "should emit on_success handler");
+        assert!(
+            output.contains("$on_success"),
+            "should emit on_success handler"
+        );
         assert!(output.contains("$on_exit"), "should emit on_exit handler");
     }
 
@@ -25399,10 +28523,26 @@ mod coverage_codegen_tests {
             codegen.indent = 1;
             codegen.generate_banking(&banking);
             let output = codegen.output.clone();
-            assert!(output.contains("MX_open"), "should emit open function for {}", provider);
-            assert!(output.contains("call $banking_open"), "{} should call generic banking_open", provider);
-            assert!(!output.contains("call $banking_mountPlaid"), "{} should not use vendor-specific import", provider);
-            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+            assert!(
+                output.contains("MX_open"),
+                "should emit open function for {}",
+                provider
+            );
+            assert!(
+                output.contains("call $banking_open"),
+                "{} should call generic banking_open",
+                provider
+            );
+            assert!(
+                !output.contains("call $banking_mountPlaid"),
+                "{} should not use vendor-specific import",
+                provider
+            );
+            assert!(
+                codegen.required_providers.contains(*provider),
+                "{} should be tracked as required provider",
+                provider
+            );
         }
     }
 
@@ -25428,8 +28568,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        assert!(output.contains("Map: StoreLocator"), "should have map header");
-        assert!(output.contains("__map_register_StoreLocator"), "should emit register function");
+        assert!(
+            output.contains("Map: StoreLocator"),
+            "should have map header"
+        );
+        assert!(
+            output.contains("__map_register_StoreLocator"),
+            "should emit register function"
+        );
         assert!(output.contains("map_init"), "should call map_init");
     }
 
@@ -25451,13 +28597,31 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        assert!(output.contains("CityMap_mount"), "should emit mount function");
-        assert!(output.contains("call $map_mount"), "should call generic map_mount syscall");
-        assert!(!output.contains("call $map_mountMapbox"), "should not use vendor-specific import name");
-        assert!(output.contains("f64.const 51.507"), "should include latitude");
-        assert!(output.contains("f64.const -0.127"), "should include longitude");
+        assert!(
+            output.contains("CityMap_mount"),
+            "should emit mount function"
+        );
+        assert!(
+            output.contains("call $map_mount"),
+            "should call generic map_mount syscall"
+        );
+        assert!(
+            !output.contains("call $map_mountMapbox"),
+            "should not use vendor-specific import name"
+        );
+        assert!(
+            output.contains("f64.const 51.507"),
+            "should include latitude"
+        );
+        assert!(
+            output.contains("f64.const -0.127"),
+            "should include longitude"
+        );
         assert!(output.contains("f64.const 10.0"), "should include zoom");
-        assert!(codegen.required_providers.contains("mapbox"), "mapbox should be tracked as required provider");
+        assert!(
+            codegen.required_providers.contains("mapbox"),
+            "mapbox should be tracked as required provider"
+        );
     }
 
     #[test]
@@ -25478,9 +28642,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        assert!(output.contains("Markers_add_marker"), "should emit add_marker function");
-        assert!(output.contains("call $map_add_marker"), "should call generic map_add_marker syscall");
-        assert!(!output.contains("call $map_addMarker"), "should not use vendor-specific import name");
+        assert!(
+            output.contains("Markers_add_marker"),
+            "should emit add_marker function"
+        );
+        assert!(
+            output.contains("call $map_add_marker"),
+            "should call generic map_add_marker syscall"
+        );
+        assert!(
+            !output.contains("call $map_addMarker"),
+            "should not use vendor-specific import name"
+        );
     }
 
     #[test]
@@ -25502,8 +28675,14 @@ mod coverage_codegen_tests {
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
         // Defaults to "mapbox" provider, uses generic interface
-        assert!(output.contains("call $map_mount"), "default provider should use generic map_mount");
-        assert!(codegen.required_providers.contains("mapbox"), "default provider mapbox should be tracked");
+        assert!(
+            output.contains("call $map_mount"),
+            "default provider should use generic map_mount"
+        );
+        assert!(
+            codegen.required_providers.contains("mapbox"),
+            "default provider mapbox should be tracked"
+        );
     }
 
     #[test]
@@ -25524,9 +28703,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        assert!(output.contains("f64.const 0.000000  ;; lat"), "default lat should be 0");
-        assert!(output.contains("f64.const 0.000000  ;; lng"), "default lng should be 0");
-        assert!(output.contains("f64.const 10.0  ;; zoom"), "default zoom should be 10");
+        assert!(
+            output.contains("f64.const 0.000000  ;; lat"),
+            "default lat should be 0"
+        );
+        assert!(
+            output.contains("f64.const 0.000000  ;; lng"),
+            "default lng should be 0"
+        );
+        assert!(
+            output.contains("f64.const 10.0  ;; zoom"),
+            "default zoom should be 10"
+        );
     }
 
     #[test]
@@ -25580,7 +28768,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_map(&map_def);
         let output = codegen.output.clone();
-        assert!(output.contains("__map_MyMap_handle"), "should emit map handle global");
+        assert!(
+            output.contains("__map_MyMap_handle"),
+            "should emit map handle global"
+        );
     }
 
     #[test]
@@ -25603,12 +28794,36 @@ mod coverage_codegen_tests {
             codegen.indent = 1;
             codegen.generate_map(&map_def);
             let output = codegen.output.clone();
-            assert!(output.contains("GMap_mount"), "should emit mount function for {}", provider);
-            assert!(output.contains("GMap_add_marker"), "should emit add_marker function for {}", provider);
-            assert!(output.contains("call $map_mount"), "{} should call generic map_mount", provider);
-            assert!(output.contains("call $map_add_marker"), "{} should call generic map_add_marker", provider);
-            assert!(!output.contains("call $map_mountMapbox"), "{} should not use vendor-specific import", provider);
-            assert!(codegen.required_providers.contains(*provider), "{} should be tracked as required provider", provider);
+            assert!(
+                output.contains("GMap_mount"),
+                "should emit mount function for {}",
+                provider
+            );
+            assert!(
+                output.contains("GMap_add_marker"),
+                "should emit add_marker function for {}",
+                provider
+            );
+            assert!(
+                output.contains("call $map_mount"),
+                "{} should call generic map_mount",
+                provider
+            );
+            assert!(
+                output.contains("call $map_add_marker"),
+                "{} should call generic map_add_marker",
+                provider
+            );
+            assert!(
+                !output.contains("call $map_mountMapbox"),
+                "{} should not use vendor-specific import",
+                provider
+            );
+            assert!(
+                codegen.required_providers.contains(*provider),
+                "{} should be tracked as required provider",
+                provider
+            );
         }
     }
 
@@ -25621,14 +28836,12 @@ mod coverage_codegen_tests {
         let auth = AuthDef {
             name: "Auth".into(),
             provider: None,
-            providers: vec![
-                AuthProvider {
-                    name: "google".into(),
-                    client_id: None,
-                    scopes: vec!["email".into(), "profile".into()],
-                    span: span(),
-                },
-            ],
+            providers: vec![AuthProvider {
+                name: "google".into(),
+                client_id: None,
+                scopes: vec!["email".into(), "profile".into()],
+                span: span(),
+            }],
             on_login: Some(Function {
                 name: "on_login".into(),
                 lifetimes: vec![],
@@ -25740,9 +28953,15 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_upload(&upload);
         let output = codegen.output.clone();
-        assert!(output.contains("Upload: FileUpload"), "should have upload header");
+        assert!(
+            output.contains("Upload: FileUpload"),
+            "should have upload header"
+        );
         assert!(output.contains("upload_init"), "should call upload_init");
-        assert!(output.contains("config len"), "should have config with upload settings");
+        assert!(
+            output.contains("config len"),
+            "should have config with upload settings"
+        );
     }
 
     #[test]
@@ -25805,10 +29024,19 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_cache(&cache);
         let output = codegen.output.clone();
-        assert!(output.contains("Cache: ApiCache"), "should have cache header");
+        assert!(
+            output.contains("Cache: ApiCache"),
+            "should have cache header"
+        );
         assert!(output.contains("cache_init"), "should call cache_init");
-        assert!(output.contains("cache_register_query"), "should register query");
-        assert!(output.contains("cache_register_mutation"), "should register mutation");
+        assert!(
+            output.contains("cache_register_query"),
+            "should register query"
+        );
+        assert!(
+            output.contains("cache_register_mutation"),
+            "should register mutation"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25829,8 +29057,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_breakpoints(&bp);
         let output = codegen.output.clone();
-        assert!(output.contains("Responsive Breakpoints"), "should have breakpoints header");
-        assert!(output.contains("responsive_register"), "should call responsive_register");
+        assert!(
+            output.contains("Responsive Breakpoints"),
+            "should have breakpoints header"
+        );
+        assert!(
+            output.contains("responsive_register"),
+            "should call responsive_register"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25854,8 +29088,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_animation_block(&anim);
         let output = codegen.output.clone();
-        assert!(output.contains("Animation: bounce"), "should have animation header");
-        assert!(output.contains("animate_spring"), "should call animate_spring");
+        assert!(
+            output.contains("Animation: bounce"),
+            "should have animation header"
+        );
+        assert!(
+            output.contains("animate_spring"),
+            "should call animate_spring"
+        );
     }
 
     #[test]
@@ -25877,7 +29117,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_animation_block(&anim);
         let output = codegen.output.clone();
-        assert!(output.contains("animate_keyframes"), "should call animate_keyframes");
+        assert!(
+            output.contains("animate_keyframes"),
+            "should call animate_keyframes"
+        );
     }
 
     #[test]
@@ -25896,8 +29139,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_animation_block(&anim);
         let output = codegen.output.clone();
-        assert!(output.contains("Animation: slide"), "should have animation header");
-        assert!(output.contains("animate_keyframes"), "should call animate_keyframes");
+        assert!(
+            output.contains("Animation: slide"),
+            "should have animation header"
+        );
+        assert!(
+            output.contains("animate_keyframes"),
+            "should call animate_keyframes"
+        );
     }
 
     #[test]
@@ -25916,7 +29165,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_animation_block(&anim);
         let output = codegen.output.clone();
-        assert!(output.contains("animate_stagger"), "should call animate_stagger");
+        assert!(
+            output.contains("animate_stagger"),
+            "should call animate_stagger"
+        );
     }
 
     #[test]
@@ -25935,8 +29187,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_animation_block(&anim);
         let output = codegen.output.clone();
-        assert!(output.contains("Animation: items"), "should have animation header");
-        assert!(output.contains("animate_stagger"), "should call animate_stagger");
+        assert!(
+            output.contains("Animation: items"),
+            "should have animation header"
+        );
+        assert!(
+            output.contains("animate_stagger"),
+            "should call animate_stagger"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -25951,9 +29209,7 @@ mod coverage_codegen_tests {
                 ("bg".into(), Expr::StringLit("#fff".into())),
                 ("fg".into(), Expr::Integer(0)), // non-string values are skipped
             ]),
-            dark: Some(vec![
-                ("bg".into(), Expr::StringLit("#000".into())),
-            ]),
+            dark: Some(vec![("bg".into(), Expr::StringLit("#000".into()))]),
             dark_auto: false,
             primary: None,
             is_pub: false,
@@ -25963,9 +29219,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_theme(&theme);
         let output = codegen.output.clone();
-        assert!(output.contains("Theme: MainTheme"), "should have theme header");
-        assert!(output.contains("style_injectStyles"), "should call style_injectStyles for CSS custom properties");
-        assert!(output.contains("__init_theme_MainTheme"), "should emit init function");
+        assert!(
+            output.contains("Theme: MainTheme"),
+            "should have theme header"
+        );
+        assert!(
+            output.contains("style_injectStyles"),
+            "should call style_injectStyles for CSS custom properties"
+        );
+        assert!(
+            output.contains("__init_theme_MainTheme"),
+            "should emit init function"
+        );
     }
 
     #[test]
@@ -26012,26 +29277,33 @@ mod coverage_codegen_tests {
         let output = codegen.output.clone();
 
         // Verify the stored CSS contains :root with custom properties
-        let css_str = codegen.strings.iter()
+        let css_str = codegen
+            .strings
+            .iter()
             .find(|(s, _)| s.contains(":root"))
             .map(|(s, _)| s.clone());
         assert!(css_str.is_some(), "should store :root CSS string");
         let css = css_str.unwrap();
-        assert!(css.contains("--brand: #303234"), "should emit --brand custom property");
-        assert!(css.contains("--accent: #FFB547"), "should emit --accent custom property");
-        assert!(css.contains("--bg: #F6F7F9"), "should emit --bg custom property");
+        assert!(
+            css.contains("--brand: #303234"),
+            "should emit --brand custom property"
+        );
+        assert!(
+            css.contains("--accent: #FFB547"),
+            "should emit --accent custom property"
+        );
+        assert!(
+            css.contains("--bg: #F6F7F9"),
+            "should emit --bg custom property"
+        );
     }
 
     #[test]
     fn theme_emits_dark_mode_media_query() {
         let theme = ThemeDef {
             name: "AppTheme".into(),
-            light: Some(vec![
-                ("bg".into(), Expr::StringLit("#FFFFFF".into())),
-            ]),
-            dark: Some(vec![
-                ("bg".into(), Expr::StringLit("#1A1A1A".into())),
-            ]),
+            light: Some(vec![("bg".into(), Expr::StringLit("#FFFFFF".into()))]),
+            dark: Some(vec![("bg".into(), Expr::StringLit("#1A1A1A".into()))]),
             dark_auto: false,
             primary: None,
             is_pub: false,
@@ -26041,14 +29313,21 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_theme(&theme);
 
-        let css_str = codegen.strings.iter()
+        let css_str = codegen
+            .strings
+            .iter()
             .find(|(s, _)| s.contains(":root"))
             .map(|(s, _)| s.clone())
             .unwrap();
 
-        assert!(css_str.contains(":root { --bg: #FFFFFF; }"), "light values in :root");
-        assert!(css_str.contains("@media (prefers-color-scheme: dark) { :root { --bg: #1A1A1A; } }"),
-            "dark values in prefers-color-scheme media query");
+        assert!(
+            css_str.contains(":root { --bg: #FFFFFF; }"),
+            "light values in :root"
+        );
+        assert!(
+            css_str.contains("@media (prefers-color-scheme: dark) { :root { --bg: #1A1A1A; } }"),
+            "dark values in prefers-color-scheme media query"
+        );
     }
 
     #[test]
@@ -26070,14 +29349,25 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_theme(&theme);
 
-        let css_str = codegen.strings.iter()
+        let css_str = codegen
+            .strings
+            .iter()
             .find(|(s, _)| s.contains(":root"))
             .map(|(s, _)| s.clone())
             .unwrap();
 
-        assert!(css_str.contains("--spacing-sm: 8px"), "underscore converted to hyphen");
-        assert!(css_str.contains("--spacing-md: 16px"), "underscore converted to hyphen");
-        assert!(css_str.contains("--radius-md: 8px"), "underscore converted to hyphen");
+        assert!(
+            css_str.contains("--spacing-sm: 8px"),
+            "underscore converted to hyphen"
+        );
+        assert!(
+            css_str.contains("--spacing-md: 16px"),
+            "underscore converted to hyphen"
+        );
+        assert!(
+            css_str.contains("--radius-md: 8px"),
+            "underscore converted to hyphen"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -26087,18 +29377,18 @@ mod coverage_codegen_tests {
     #[test]
     fn breakpoints_stored_in_codegen_for_expansion() {
         let bp = BreakpointsDef {
-            breakpoints: vec![
-                ("sm".into(), 640),
-                ("md".into(), 768),
-                ("lg".into(), 1024),
-            ],
+            breakpoints: vec![("sm".into(), 640), ("md".into(), 768), ("lg".into(), 1024)],
             span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_breakpoints(&bp);
 
-        assert_eq!(codegen.breakpoint_defs.len(), 3, "should store 3 breakpoints");
+        assert_eq!(
+            codegen.breakpoint_defs.len(),
+            3,
+            "should store 3 breakpoints"
+        );
         assert_eq!(codegen.breakpoint_defs[0], ("sm".into(), 640));
         assert_eq!(codegen.breakpoint_defs[1], ("md".into(), 768));
         assert_eq!(codegen.breakpoint_defs[2], ("lg".into(), 1024));
@@ -26133,17 +29423,28 @@ mod coverage_codegen_tests {
         codegen.generate_style_injection("Card", &styles);
 
         // Find the CSS string in stored strings
-        let css_str = codegen.strings.iter()
+        let css_str = codegen
+            .strings
+            .iter()
             .find(|(s, _)| s.contains("Card__card"))
             .map(|(s, _)| s.clone())
             .unwrap();
 
-        assert!(css_str.contains(".Card__card { padding: 24px; }"),
-            "normal rule should be scoped: {}", css_str);
-        assert!(css_str.contains("@media (min-width: 768px)"),
-            "md breakpoint should expand to media query: {}", css_str);
-        assert!(css_str.contains("@media (min-width: 1024px)"),
-            "lg breakpoint should expand to media query: {}", css_str);
+        assert!(
+            css_str.contains(".Card__card { padding: 24px; }"),
+            "normal rule should be scoped: {}",
+            css_str
+        );
+        assert!(
+            css_str.contains("@media (min-width: 768px)"),
+            "md breakpoint should expand to media query: {}",
+            css_str
+        );
+        assert!(
+            css_str.contains("@media (min-width: 1024px)"),
+            "lg breakpoint should expand to media query: {}",
+            css_str
+        );
     }
 
     #[test]
@@ -26191,19 +29492,34 @@ mod coverage_codegen_tests {
         let wat = codegen.generate(&program);
 
         // Verify :root CSS variables are emitted
-        let has_root = codegen.strings.iter().any(|(s, _)| s.contains(":root") && s.contains("--brand: #303234"));
-        assert!(has_root, "should emit :root with --brand CSS custom property");
+        let has_root = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains(":root") && s.contains("--brand: #303234"));
+        assert!(
+            has_root,
+            "should emit :root with --brand CSS custom property"
+        );
 
         // Verify breakpoint expansion
-        let has_media = codegen.strings.iter().any(|(s, _)| s.contains("@media (min-width: 768px)"));
+        let has_media = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains("@media (min-width: 768px)"));
         assert!(has_media, "should expand @md to @media (min-width: 768px)");
 
         // Verify scoped selectors
-        let has_scoped = codegen.strings.iter().any(|(s, _)| s.contains(".Card__card"));
+        let has_scoped = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains(".Card__card"));
         assert!(has_scoped, "should scope .card to .Card__card");
 
         // Verify the WAT contains style injection calls
-        assert!(wat.contains("call $style_injectStyles"), "should call style_injectStyles");
+        assert!(
+            wat.contains("call $style_injectStyles"),
+            "should call style_injectStyles"
+        );
     }
 
     #[test]
@@ -26215,25 +29531,29 @@ mod coverage_codegen_tests {
 
         // A style block with @media selector that is NOT a breakpoint
         // should be left as a normal style block
-        let styles = vec![
-            StyleBlock {
-                selector: ".card".into(),
-                properties: vec![("color".into(), "red".into())],
-                span: span(),
-            },
-        ];
+        let styles = vec![StyleBlock {
+            selector: ".card".into(),
+            properties: vec![("color".into(), "red".into())],
+            span: span(),
+        }];
 
         codegen.generate_style_injection("Widget", &styles);
 
-        let css_str = codegen.strings.iter()
+        let css_str = codegen
+            .strings
+            .iter()
             .find(|(s, _)| s.contains("Widget__card"))
             .map(|(s, _)| s.clone())
             .unwrap();
 
-        assert!(css_str.contains(".Widget__card { color: red; }"),
-            "non-breakpoint block should be emitted as normal rule");
-        assert!(!css_str.contains("@media"),
-            "should not contain @media when no breakpoint blocks present");
+        assert!(
+            css_str.contains(".Widget__card { color: red; }"),
+            "non-breakpoint block should be emitted as normal rule"
+        );
+        assert!(
+            !css_str.contains("@media"),
+            "should not contain @media when no breakpoint blocks present"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -26243,7 +29563,10 @@ mod coverage_codegen_tests {
     #[test]
     fn permissions_with_csp() {
         let perms = PermissionsDef {
-            network: vec!["https://api.example.com/v1".into(), "https://cdn.example.com/assets".into()],
+            network: vec![
+                "https://api.example.com/v1".into(),
+                "https://cdn.example.com/assets".into(),
+            ],
             storage: vec!["user_prefs".into()],
             capabilities: vec!["camera".into()],
             span: span(),
@@ -26252,9 +29575,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_permissions("TestComp", &perms);
         let output = codegen.output.clone();
-        assert!(output.contains("permissions for component TestComp"), "should have permissions header");
-        assert!(output.contains("permissions_registerPermissions"), "should register permissions");
-        assert!(output.contains("CSP: connect-src"), "should generate CSP comment");
+        assert!(
+            output.contains("permissions for component TestComp"),
+            "should have permissions header"
+        );
+        assert!(
+            output.contains("permissions_registerPermissions"),
+            "should register permissions"
+        );
+        assert!(
+            output.contains("CSP: connect-src"),
+            "should generate CSP comment"
+        );
     }
 
     #[test]
@@ -26269,7 +29601,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_permissions("Comp2", &perms);
         let output = codegen.output.clone();
-        assert!(!output.contains("CSP:"), "should not generate CSP without network");
+        assert!(
+            !output.contains("CSP:"),
+            "should not generate CSP without network"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -26287,11 +29622,17 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: Some(SkeletonDef {
-                body: RenderBlock { body: TemplateNode::TextLiteral("loading...".into()), span: span() },
+                body: RenderBlock {
+                    body: TemplateNode::TextLiteral("loading...".into()),
+                    span: span(),
+                },
                 span: span(),
             }),
             error_boundary: None,
@@ -26306,8 +29647,14 @@ mod coverage_codegen_tests {
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
         assert!(output.contains("skeleton"), "should have skeleton block");
-        assert!(output.contains("skeleton_mount"), "should call skeleton_mount");
-        assert!(output.contains("chunk boundary"), "should mark chunk boundary");
+        assert!(
+            output.contains("skeleton_mount"),
+            "should call skeleton_mount"
+        );
+        assert!(
+            output.contains("chunk boundary"),
+            "should mark chunk boundary"
+        );
     }
 
     #[test]
@@ -26321,13 +29668,22 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
             error_boundary: Some(ErrorBoundary {
-                body: RenderBlock { body: TemplateNode::TextLiteral("content".into()), span: span() },
-                fallback: RenderBlock { body: TemplateNode::TextLiteral("error".into()), span: span() },
+                body: RenderBlock {
+                    body: TemplateNode::TextLiteral("content".into()),
+                    span: span(),
+                },
+                fallback: RenderBlock {
+                    body: TemplateNode::TextLiteral("error".into()),
+                    span: span(),
+                },
                 span: span(),
             }),
             chunk: None,
@@ -26340,7 +29696,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(output.contains("error boundary"), "should have error boundary");
+        assert!(
+            output.contains("error boundary"),
+            "should have error boundary"
+        );
         assert!(output.contains("eb_ok"), "should have error boundary block");
     }
 
@@ -26355,7 +29714,10 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26370,7 +29732,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(output.contains("a11y: auto"), "should have a11y auto comment");
+        assert!(
+            output.contains("a11y: auto"),
+            "should have a11y auto comment"
+        );
         assert!(output.contains("a11y_enhance"), "should call a11y_enhance");
     }
 
@@ -26386,7 +29751,10 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26401,7 +29769,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(output.contains("a11y_enhance"), "should call a11y_enhance by default");
+        assert!(
+            output.contains("a11y_enhance"),
+            "should call a11y_enhance by default"
+        );
     }
 
     #[test]
@@ -26415,7 +29786,10 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26430,7 +29804,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(!output.contains("a11y_enhance"), "manual mode should NOT call a11y_enhance");
+        assert!(
+            !output.contains("a11y_enhance"),
+            "manual mode should NOT call a11y_enhance"
+        );
     }
 
     #[test]
@@ -26444,7 +29821,10 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26459,7 +29839,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(output.contains("a11y_enhance"), "hybrid mode should call a11y_enhance");
+        assert!(
+            output.contains("a11y_enhance"),
+            "hybrid mode should call a11y_enhance"
+        );
     }
 
     #[test]
@@ -26468,9 +29851,15 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_template(&TemplateNode::Outlet, "$root");
         let output = codegen.output.clone();
-        assert!(output.contains("dom_createElement"), "should create element for outlet");
+        assert!(
+            output.contains("dom_createElement"),
+            "should create element for outlet"
+        );
         assert!(output.contains("__nectar_outlet"), "should set outlet id");
-        assert!(output.contains("dom_appendChild"), "should append outlet to parent");
+        assert!(
+            output.contains("dom_appendChild"),
+            "should append outlet to parent"
+        );
     }
 
     #[test]
@@ -26486,9 +29875,18 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("dom_createElement"), "should create element");
-        assert!(output.contains("\"column\""), "should use column flex-direction");
-        assert!(output.contains("\"vertical\""), "should set native direction");
+        assert!(
+            output.contains("dom_createElement"),
+            "should create element"
+        );
+        assert!(
+            output.contains("\"column\""),
+            "should use column flex-direction"
+        );
+        assert!(
+            output.contains("\"vertical\""),
+            "should set native direction"
+        );
         assert!(output.contains("\"16px\""), "should have gap");
         assert!(output.contains("dom_setStyle"), "should set style");
     }
@@ -26509,7 +29907,10 @@ mod coverage_codegen_tests {
         );
         let output = codegen.output.clone();
         assert!(output.contains("\"grid\""), "should use CSS grid");
-        assert!(output.contains("\"repeat(3,1fr)\""), "should have 3 columns");
+        assert!(
+            output.contains("\"repeat(3,1fr)\""),
+            "should have 3 columns"
+        );
         assert!(output.contains("\"8px\""), "should have gap");
     }
 
@@ -26544,7 +29945,10 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("250px 1fr"), "left sidebar should put sidebar first");
+        assert!(
+            output.contains("250px 1fr"),
+            "left sidebar should put sidebar first"
+        );
     }
 
     #[test]
@@ -26561,7 +29965,10 @@ mod coverage_codegen_tests {
             "$root",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("1fr 300px"), "right sidebar should put sidebar last");
+        assert!(
+            output.contains("1fr 300px"),
+            "right sidebar should put sidebar last"
+        );
     }
 
     #[test]
@@ -26579,7 +29986,10 @@ mod coverage_codegen_tests {
         );
         let output = codegen.output.clone();
         assert!(output.contains("\"row\""), "should use row flex-direction");
-        assert!(output.contains("\"horizontal\""), "should set native direction");
+        assert!(
+            output.contains("\"horizontal\""),
+            "should set native direction"
+        );
         assert!(output.contains("\"center\""), "should center align");
         assert!(output.contains("\"12px\""), "should have gap");
     }
@@ -26615,23 +30025,24 @@ mod coverage_codegen_tests {
         );
         let output = codegen.output.clone();
         assert!(output.contains("\"wrap\""), "should enable wrapping");
-        assert!(output.contains("\"horizontal\""), "should set native direction");
+        assert!(
+            output.contains("\"horizontal\""),
+            "should set native direction"
+        );
     }
 
     #[test]
     fn router_with_layout_and_transition() {
         let router = RouterDef {
             name: "AppRouter".into(),
-            routes: vec![
-                RouteDef {
-                    path: "/".into(),
-                    params: vec![],
-                    component: "Home".into(),
-                    guard: None,
-                    transition: Some("fade".into()),
-                    span: span(),
-                },
-            ],
+            routes: vec![RouteDef {
+                path: "/".into(),
+                params: vec![],
+                component: "Home".into(),
+                guard: None,
+                transition: Some("fade".into()),
+                span: span(),
+            }],
             fallback: None,
             layout: Some(RenderBlock {
                 body: TemplateNode::Fragment(vec![
@@ -26652,7 +30063,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_router(&router);
         let output = codegen.output.clone();
-        assert!(output.contains("router_registerRoute"), "should register routes");
+        assert!(
+            output.contains("router_registerRoute"),
+            "should register routes"
+        );
         assert!(output.contains("router_init"), "should call router_init");
     }
 
@@ -26667,7 +30081,10 @@ mod coverage_codegen_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26695,7 +30112,10 @@ mod coverage_codegen_tests {
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
         assert!(output.contains("on_destroy"), "should have on_destroy");
-        assert!(output.contains("lifecycle_register_cleanup"), "should register cleanup");
+        assert!(
+            output.contains("lifecycle_register_cleanup"),
+            "should register cleanup"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -26712,7 +30132,10 @@ mod coverage_codegen_tests {
             methods: vec![],
             styles: vec![StyleBlock {
                 selector: ".btn".into(),
-                properties: vec![("color".into(), "red".into()), ("font-size".into(), "16px".into())],
+                properties: vec![
+                    ("color".into(), "red".into()),
+                    ("font-size".into(), "16px".into()),
+                ],
                 span: span(),
             }],
             transitions: vec![TransitionDef {
@@ -26722,7 +30145,10 @@ mod coverage_codegen_tests {
                 span: span(),
             }],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26737,9 +30163,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
-        assert!(output.contains("scoped styles for Styled"), "should have style injection");
-        assert!(output.contains("style_injectStyles"), "should call style_injectStyles");
-        assert!(output.contains("transitions for Styled"), "should have transitions");
+        assert!(
+            output.contains("scoped styles for Styled"),
+            "should have style injection"
+        );
+        assert!(
+            output.contains("style_injectStyles"),
+            "should call style_injectStyles"
+        );
+        assert!(
+            output.contains("transitions for Styled"),
+            "should have transitions"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -26772,7 +30207,10 @@ mod coverage_codegen_tests {
             }],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26787,10 +30225,22 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         // The interned string table should contain the scoped selector
-        let has_scoped = codegen.strings.iter().any(|(s, _)| s.contains(".Card__wrapper"));
-        assert!(has_scoped, "CSS string should contain scoped selector .Card__wrapper");
-        let has_unscoped = codegen.strings.iter().any(|(s, _)| s.contains(".wrapper {") && !s.contains("Card__wrapper"));
-        assert!(!has_unscoped, "CSS string should NOT contain unscoped .wrapper selector");
+        let has_scoped = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains(".Card__wrapper"));
+        assert!(
+            has_scoped,
+            "CSS string should contain scoped selector .Card__wrapper"
+        );
+        let has_unscoped = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains(".wrapper {") && !s.contains("Card__wrapper"));
+        assert!(
+            !has_unscoped,
+            "CSS string should NOT contain unscoped .wrapper selector"
+        );
     }
 
     #[test]
@@ -26809,7 +30259,10 @@ mod coverage_codegen_tests {
             }],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26825,11 +30278,17 @@ mod coverage_codegen_tests {
         codegen.generate_component(&comp);
         let output = codegen.output.clone();
         // The mount function should call style_injectStyles
-        assert!(output.contains("call $style_injectStyles"), "mount must call injectStyles");
+        assert!(
+            output.contains("call $style_injectStyles"),
+            "mount must call injectStyles"
+        );
         // And the call should appear after the mount function signature
         let mount_pos = output.find("Badge_mount").unwrap_or(0);
         let inject_pos = output.find("call $style_injectStyles").unwrap_or(0);
-        assert!(inject_pos > mount_pos, "injectStyles should be called inside mount");
+        assert!(
+            inject_pos > mount_pos,
+            "injectStyles should be called inside mount"
+        );
     }
 
     #[test]
@@ -26851,7 +30310,10 @@ mod coverage_codegen_tests {
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
                     tag: "h1".into(),
-                    attributes: vec![Attribute::Static { name: "class".into(), value: "title".into() }],
+                    attributes: vec![Attribute::Static {
+                        name: "class".into(),
+                        value: "title".into(),
+                    }],
                     children: vec![],
                     span: span(),
                 }),
@@ -26883,7 +30345,10 @@ mod coverage_codegen_tests {
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
                     tag: "p".into(),
-                    attributes: vec![Attribute::Static { name: "class".into(), value: "title".into() }],
+                    attributes: vec![Attribute::Static {
+                        name: "class".into(),
+                        value: "title".into(),
+                    }],
                     children: vec![],
                     span: span(),
                 }),
@@ -26911,9 +30376,20 @@ mod coverage_codegen_tests {
         assert!(has_footer, "Footer should scope class to Footer__title");
 
         // Verify they are different strings
-        let header_offset = codegen.strings.iter().find(|(s, _)| s == "Header__title").map(|(_, o)| *o);
-        let footer_offset = codegen.strings.iter().find(|(s, _)| s == "Footer__title").map(|(_, o)| *o);
-        assert_ne!(header_offset, footer_offset, "Header__title and Footer__title must be different interned strings");
+        let header_offset = codegen
+            .strings
+            .iter()
+            .find(|(s, _)| s == "Header__title")
+            .map(|(_, o)| *o);
+        let footer_offset = codegen
+            .strings
+            .iter()
+            .find(|(s, _)| s == "Footer__title")
+            .map(|(_, o)| *o);
+        assert_ne!(
+            header_offset, footer_offset,
+            "Header__title and Footer__title must be different interned strings"
+        );
     }
 
     #[test]
@@ -26932,7 +30408,10 @@ mod coverage_codegen_tests {
             styles: vec![
                 StyleBlock {
                     selector: ":root".into(),
-                    properties: vec![("--bg".into(), "#0b0e14".into()), ("--fg".into(), "#fff".into())],
+                    properties: vec![
+                        ("--bg".into(), "#0b0e14".into()),
+                        ("--fg".into(), "#fff".into()),
+                    ],
                     span: span(),
                 },
                 StyleBlock {
@@ -26943,7 +30422,10 @@ mod coverage_codegen_tests {
             ],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -26958,12 +30440,24 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         // The CSS should have :root unscooped and .container scoped
-        let css_string = codegen.strings.iter().find(|(s, _)| s.contains(":root") && s.contains("--bg"));
-        assert!(css_string.is_some(), "should have :root CSS variables in string table");
+        let css_string = codegen
+            .strings
+            .iter()
+            .find(|(s, _)| s.contains(":root") && s.contains("--bg"));
+        assert!(
+            css_string.is_some(),
+            "should have :root CSS variables in string table"
+        );
         let css = &css_string.unwrap().0;
         assert!(css.contains(":root {"), ":root must remain unscoped");
-        assert!(css.contains(".Theme__container"), ".container must be scoped to Theme__container");
-        assert!(!css.contains("Theme__:root"), ":root must NOT be prefixed with component name");
+        assert!(
+            css.contains(".Theme__container"),
+            ".container must be scoped to Theme__container"
+        );
+        assert!(
+            !css.contains("Theme__:root"),
+            ":root must NOT be prefixed with component name"
+        );
     }
 
     #[test]
@@ -26986,7 +30480,10 @@ mod coverage_codegen_tests {
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
                     tag: "div".into(),
-                    attributes: vec![Attribute::Static { name: "class".into(), value: "card".into() }],
+                    attributes: vec![Attribute::Static {
+                        name: "class".into(),
+                        value: "card".into(),
+                    }],
                     children: vec![],
                     span: span(),
                 }),
@@ -27006,13 +30503,22 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_component(&comp);
         // The interned strings should have "ProductCard__card" (the rewritten class)
-        let has_scoped_class = codegen.strings.iter().any(|(s, _)| s == "ProductCard__card");
-        assert!(has_scoped_class, "class attribute value should be rewritten to ProductCard__card");
+        let has_scoped_class = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s == "ProductCard__card");
+        assert!(
+            has_scoped_class,
+            "class attribute value should be rewritten to ProductCard__card"
+        );
         // And should NOT have the bare "card" as a class value (it may appear as part of
         // the component name or CSS selector string, but not as a standalone interned string
         // used for the class attribute)
         let bare_card_count = codegen.strings.iter().filter(|(s, _)| s == "card").count();
-        assert_eq!(bare_card_count, 0, "bare 'card' should not be interned as class value");
+        assert_eq!(
+            bare_card_count, 0,
+            "bare 'card' should not be interned as class value"
+        );
     }
 
     #[test]
@@ -27034,9 +30540,15 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&Expr::Await(Box::new(Expr::Integer(1))));
         let output = codegen.output.clone();
         assert!(output.contains("await"), "should have await comment");
-        assert!(output.contains("state machine poll"), "should reference state machine poll");
+        assert!(
+            output.contains("state machine poll"),
+            "should reference state machine poll"
+        );
         // The inner expression (Integer(1)) generates i32.const 1
-        assert!(output.contains("i32.const 1"), "should generate inner expression");
+        assert!(
+            output.contains("i32.const 1"),
+            "should generate inner expression"
+        );
     }
 
     #[test]
@@ -27048,8 +30560,14 @@ mod coverage_codegen_tests {
             contract: Some("UserContract".into()),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("contract boundary validation"), "should mention contract");
-        assert!(output.contains("contract_validate"), "should call contract_validate");
+        assert!(
+            output.contains("contract boundary validation"),
+            "should mention contract"
+        );
+        assert!(
+            output.contains("contract_validate"),
+            "should call contract_validate"
+        );
     }
 
     #[test]
@@ -27067,10 +30585,18 @@ mod coverage_codegen_tests {
     #[test]
     fn channel_create_expr() {
         let mut codegen = WasmCodegen::new();
-        codegen.generate_expr(&Expr::Channel { ty: Some(Type::Named("i32".into())) });
+        codegen.generate_expr(&Expr::Channel {
+            ty: Some(Type::Named("i32".into())),
+        });
         let output = codegen.output.clone();
-        assert!(output.contains("channel create"), "should have channel create comment");
-        assert!(output.contains("worker_channelCreate"), "should call channelCreate");
+        assert!(
+            output.contains("channel create"),
+            "should have channel create comment"
+        );
+        assert!(
+            output.contains("worker_channelCreate"),
+            "should call channelCreate"
+        );
     }
 
     #[test]
@@ -27078,7 +30604,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::Channel { ty: None });
         let output = codegen.output.clone();
-        assert!(output.contains("channel create"), "should have channel create comment");
+        assert!(
+            output.contains("channel create"),
+            "should have channel create comment"
+        );
     }
 
     #[test]
@@ -27089,14 +30618,20 @@ mod coverage_codegen_tests {
             value: Box::new(Expr::Integer(42)),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("channel send"), "should have channel send comment");
+        assert!(
+            output.contains("channel send"),
+            "should have channel send comment"
+        );
 
         let mut codegen2 = WasmCodegen::new();
         codegen2.generate_expr(&Expr::Receive {
             channel: Box::new(Expr::Ident("ch".into())),
         });
         let output2 = codegen2.output.clone();
-        assert!(output2.contains("channel receive"), "should have channel receive comment");
+        assert!(
+            output2.contains("channel receive"),
+            "should have channel receive comment"
+        );
     }
 
     #[test]
@@ -27108,7 +30643,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("parallel"), "should have parallel comment");
-        assert!(output.contains("worker_parallel"), "should call worker_parallel");
+        assert!(
+            output.contains("worker_parallel"),
+            "should call worker_parallel"
+        );
     }
 
     #[test]
@@ -27120,7 +30658,10 @@ mod coverage_codegen_tests {
             catch_body: Box::new(Expr::Integer(0)),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("try/catch"), "should have try/catch comment");
+        assert!(
+            output.contains("try/catch"),
+            "should have try/catch comment"
+        );
         assert!(output.contains("try_ok"), "should have try_ok block");
         assert!(output.contains("try_err"), "should have try_err block");
     }
@@ -27134,7 +30675,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("animate"), "should have animate comment");
-        assert!(output.contains("animation_play"), "should call animation_play");
+        assert!(
+            output.contains("animation_play"),
+            "should call animation_play"
+        );
     }
 
     #[test]
@@ -27146,7 +30690,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("assert"), "should have assert comment");
-        assert!(output.contains("test_fail"), "should call test_fail on failure");
+        assert!(
+            output.contains("test_fail"),
+            "should call test_fail on failure"
+        );
     }
 
     #[test]
@@ -27157,7 +30704,10 @@ mod coverage_codegen_tests {
             message: None,
         });
         let output = codegen.output.clone();
-        assert!(output.contains("msg len"), "should use default message with length");
+        assert!(
+            output.contains("msg len"),
+            "should use default message with length"
+        );
     }
 
     #[test]
@@ -27169,7 +30719,10 @@ mod coverage_codegen_tests {
             message: Some("values should match".into()),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("assert_eq"), "should have assert_eq comment");
+        assert!(
+            output.contains("assert_eq"),
+            "should have assert_eq comment"
+        );
         assert!(output.contains("i32.eq"), "should compare with i32.eq");
     }
 
@@ -27182,7 +30735,10 @@ mod coverage_codegen_tests {
             message: None,
         });
         let output = codegen.output.clone();
-        assert!(output.contains("msg len"), "should use default message with length");
+        assert!(
+            output.contains("msg len"),
+            "should use default message with length"
+        );
     }
 
     #[test]
@@ -27190,13 +30746,17 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::PromptTemplate {
             template: "Hello {name}!".into(),
-            interpolations: vec![
-                ("name".into(), Expr::StringLit("world".into())),
-            ],
+            interpolations: vec![("name".into(), Expr::StringLit("world".into()))],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("prompt template"), "should have prompt template comment");
-        assert!(output.contains("interpolation count"), "should push interpolation count");
+        assert!(
+            output.contains("prompt template"),
+            "should have prompt template comment"
+        );
+        assert!(
+            output.contains("interpolation count"),
+            "should push interpolation count"
+        );
     }
 
     #[test]
@@ -27207,7 +30767,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("stream"), "should have stream comment");
-        assert!(output.contains("streaming_streamFetch"), "should call streaming_streamFetch");
+        assert!(
+            output.contains("streaming_streamFetch"),
+            "should call streaming_streamFetch"
+        );
     }
 
     #[test]
@@ -27219,7 +30782,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("suspend"), "should have suspend comment");
-        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
+        assert!(
+            output.contains("dom_lazyMount"),
+            "should call dom_lazyMount"
+        );
     }
 
     #[test]
@@ -27227,8 +30793,14 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::Try(Box::new(Expr::Integer(1))));
         let output = codegen.output.clone();
-        assert!(output.contains("error propagation"), "should have try operator comment");
-        assert!(output.contains("return"), "should have early return for error path");
+        assert!(
+            output.contains("error propagation"),
+            "should have try operator comment"
+        );
+        assert!(
+            output.contains("return"),
+            "should have early return for error path"
+        );
     }
 
     #[test]
@@ -27239,7 +30811,10 @@ mod coverage_codegen_tests {
             span: span(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("dynamic import"), "should have dynamic import comment");
+        assert!(
+            output.contains("dynamic import"),
+            "should have dynamic import comment"
+        );
         assert!(output.contains("load_chunk"), "should call load_chunk");
     }
 
@@ -27291,7 +30866,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("flag"), "should have flag comment");
-        assert!(output.contains("flag_is_enabled"), "should call flag_is_enabled");
+        assert!(
+            output.contains("flag_is_enabled"),
+            "should call flag_is_enabled"
+        );
     }
 
     #[test]
@@ -27305,8 +30883,14 @@ mod coverage_codegen_tests {
             span: span(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("virtual list"), "should have virtual list comment");
-        assert!(output.contains("virtual_create_list"), "should call virtual_create_list");
+        assert!(
+            output.contains("virtual list"),
+            "should have virtual list comment"
+        );
+        assert!(
+            output.contains("virtual_create_list"),
+            "should call virtual_create_list"
+        );
         assert!(output.contains("i32.const 10"), "should use custom buffer");
     }
 
@@ -27321,7 +30905,10 @@ mod coverage_codegen_tests {
             span: span(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("i32.const 5"), "should use default buffer of 5");
+        assert!(
+            output.contains("i32.const 5"),
+            "should use default buffer of 5"
+        );
     }
 
     #[test]
@@ -27329,7 +30916,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FormatString { parts: vec![] });
         let output = codegen.output.clone();
-        assert!(output.contains("i32.const 0 ;; empty fstr len"), "empty format string should push empty");
+        assert!(
+            output.contains("i32.const 0 ;; empty fstr len"),
+            "empty format string should push empty"
+        );
     }
 
     #[test]
@@ -27339,7 +30929,10 @@ mod coverage_codegen_tests {
             parts: vec![FormatPart::Literal("just text".into())],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("fstr lit ptr"), "should push literal pointer");
+        assert!(
+            output.contains("fstr lit ptr"),
+            "should push literal pointer"
+        );
     }
 
     #[test]
@@ -27353,7 +30946,10 @@ mod coverage_codegen_tests {
             ],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("to_string"), "should convert expr to string");
+        assert!(
+            output.contains("to_string"),
+            "should convert expr to string"
+        );
         assert!(output.contains("string_concat"), "should concat parts");
     }
 
@@ -27373,7 +30969,10 @@ mod coverage_codegen_tests {
             field: "x".into(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("field access: .x"), "should have field access comment");
+        assert!(
+            output.contains("field access: .x"),
+            "should have field access comment"
+        );
         assert!(output.contains("i32.load"), "should load field");
     }
 
@@ -27393,7 +30992,12 @@ mod coverage_codegen_tests {
                 args: vec![],
             });
             let output = codegen.output.clone();
-            assert!(output.contains(expected), "fn {} should map to {}", name, expected);
+            assert!(
+                output.contains(expected),
+                "fn {} should map to {}",
+                name,
+                expected
+            );
         }
     }
 
@@ -27403,15 +31007,20 @@ mod coverage_codegen_tests {
 
     #[test]
     fn signal_stmt_codegen() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Sig {
                 let mut count: i32 = 0;
                 render {
                     <div>"sig"</div>
                 }
             }
-        "#);
-        assert!(wat.contains("signal_create"), "should create signal for state");
+        "#,
+        );
+        assert!(
+            wat.contains("signal_create"),
+            "should create signal for state"
+        );
     }
 
     #[test]
@@ -27426,7 +31035,10 @@ mod coverage_codegen_tests {
             ownership: Ownership::Owned,
         });
         let output = codegen.output.clone();
-        assert!(output.contains("secret binding: key"), "should have secret annotation");
+        assert!(
+            output.contains("secret binding: key"),
+            "should have secret annotation"
+        );
     }
 
     #[test]
@@ -27435,7 +31047,10 @@ mod coverage_codegen_tests {
         codegen.generate_stmt(&Stmt::Yield(Expr::Integer(42)));
         let output = codegen.output.clone();
         assert!(output.contains("yield"), "should have yield comment");
-        assert!(output.contains("streaming_yield"), "should call streaming_yield");
+        assert!(
+            output.contains("streaming_yield"),
+            "should call streaming_yield"
+        );
     }
 
     #[test]
@@ -27443,22 +31058,25 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_stmt(&Stmt::Expr(Expr::Integer(42)));
         let output = codegen.output.clone();
-        assert!(output.contains("drop"), "expression statement should drop result");
+        assert!(
+            output.contains("drop"),
+            "expression statement should drop result"
+        );
     }
 
     #[test]
     fn let_destructure_tuple() {
         let mut codegen = WasmCodegen::new();
         codegen.generate_stmt(&Stmt::LetDestructure {
-            pattern: Pattern::Tuple(vec![
-                Pattern::Ident("a".into()),
-                Pattern::Ident("b".into()),
-            ]),
+            pattern: Pattern::Tuple(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]),
             value: Expr::Integer(0),
             ty: None,
         });
         let output = codegen.output.clone();
-        assert!(output.contains("destructure"), "should have destructure comment");
+        assert!(
+            output.contains("destructure"),
+            "should have destructure comment"
+        );
         assert!(output.contains("local.set $a"), "should set local a");
         assert!(output.contains("local.set $b"), "should set local b");
     }
@@ -27511,26 +31129,64 @@ mod coverage_codegen_tests {
         let el = TemplateNode::Element(Element {
             tag: "button".into(),
             attributes: vec![
-                Attribute::Static { name: "class".into(), value: "btn".into() },
-                Attribute::EventHandler { event: "click".into(), handler: Expr::Ident("onclick".into()) },
-                Attribute::Aria { name: "label".into(), value: Expr::StringLit("Click me".into()) },
-                Attribute::Aria { name: "expanded".into(), value: Expr::Ident("is_open".into()) },
-                Attribute::Role { value: "button".into() },
-                Attribute::Bind { property: "value".into(), signal: "text".into() },
-                Attribute::Bind { property: "checked".into(), signal: "is_checked".into() },
+                Attribute::Static {
+                    name: "class".into(),
+                    value: "btn".into(),
+                },
+                Attribute::EventHandler {
+                    event: "click".into(),
+                    handler: Expr::Ident("onclick".into()),
+                },
+                Attribute::Aria {
+                    name: "label".into(),
+                    value: Expr::StringLit("Click me".into()),
+                },
+                Attribute::Aria {
+                    name: "expanded".into(),
+                    value: Expr::Ident("is_open".into()),
+                },
+                Attribute::Role {
+                    value: "button".into(),
+                },
+                Attribute::Bind {
+                    property: "value".into(),
+                    signal: "text".into(),
+                },
+                Attribute::Bind {
+                    property: "checked".into(),
+                    signal: "is_checked".into(),
+                },
             ],
             children: vec![TemplateNode::TextLiteral("Click".into())],
             span: span(),
         });
         codegen.generate_template(&el, "$root");
         let output = codegen.output.clone();
-        assert!(output.contains("dom_createElement"), "should create element");
-        assert!(output.contains("dom_addEventListener"), "should add event listener");
-        assert!(output.contains("a11y_setAriaAttribute"), "should set ARIA attribute");
+        assert!(
+            output.contains("dom_createElement"),
+            "should create element"
+        );
+        assert!(
+            output.contains("dom_addEventListener"),
+            "should add event listener"
+        );
+        assert!(
+            output.contains("a11y_setAriaAttribute"),
+            "should set ARIA attribute"
+        );
         assert!(output.contains("a11y_setRole"), "should set role");
-        assert!(output.contains("dom_setProperty"), "should set property for bind");
-        assert!(output.contains("signal_createEffect"), "should create effect for bind");
-        assert!(output.contains("dom_appendChild"), "should append to parent");
+        assert!(
+            output.contains("dom_setProperty"),
+            "should set property for bind"
+        );
+        assert!(
+            output.contains("signal_createEffect"),
+            "should create effect for bind"
+        );
+        assert!(
+            output.contains("dom_appendChild"),
+            "should append to parent"
+        );
         assert!(output.contains("dom_setText"), "should set text content");
     }
 
@@ -27545,8 +31201,14 @@ mod coverage_codegen_tests {
         };
         codegen.generate_template(&link, "$root");
         let output = codegen.output.clone();
-        assert!(output.contains("dom_createElement"), "should create anchor element");
-        assert!(output.contains("dom_addEventListener"), "should add click handler");
+        assert!(
+            output.contains("dom_createElement"),
+            "should create anchor element"
+        );
+        assert!(
+            output.contains("dom_addEventListener"),
+            "should add click handler"
+        );
         assert!(output.contains("dom_appendChild"), "should append link");
     }
 
@@ -27557,8 +31219,14 @@ mod coverage_codegen_tests {
         let expr = TemplateNode::Expression(Box::new(Expr::Integer(42)));
         codegen.generate_template(&expr, "$root");
         let output = codegen.output.clone();
-        assert!(output.contains("dynamic expression"), "should have expression comment");
-        assert!(output.contains("i32.const 42"), "should evaluate expression");
+        assert!(
+            output.contains("dynamic expression"),
+            "should have expression comment"
+        );
+        assert!(
+            output.contains("i32.const 42"),
+            "should evaluate expression"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27596,9 +31264,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_router(&router);
         let output = codegen.output.clone();
-        assert!(output.contains("route guard check"), "should have guard check");
-        assert!(output.contains("fallback route component"), "should have fallback");
-        assert!(output.contains("router_registerRoute"), "should register routes");
+        assert!(
+            output.contains("route guard check"),
+            "should have guard check"
+        );
+        assert!(
+            output.contains("fallback route component"),
+            "should have fallback"
+        );
+        assert!(
+            output.contains("router_registerRoute"),
+            "should register routes"
+        );
         assert!(output.contains("router_init"), "should call router_init");
     }
 
@@ -27627,8 +31304,14 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_store(&store);
         let output = codegen.output.clone();
-        assert!(output.contains("selector: filteredItems"), "should have selector");
-        assert!(output.contains("DataStore_selector_filteredItems"), "should generate selector function");
+        assert!(
+            output.contains("selector: filteredItems"),
+            "should have selector"
+        );
+        assert!(
+            output.contains("DataStore_selector_filteredItems"),
+            "should generate selector function"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27642,7 +31325,10 @@ mod coverage_codegen_tests {
         let off2 = codegen.store_string("hello");
         let off3 = codegen.store_string("world");
         assert_eq!(off1, off2, "same string should return same offset");
-        assert_ne!(off1, off3, "different strings should have different offsets");
+        assert_ne!(
+            off1, off3,
+            "different strings should have different offsets"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27661,9 +31347,25 @@ mod coverage_codegen_tests {
         assert_eq!(codegen.type_to_wasm(&Type::Named("f64".into())), "f64");
         assert_eq!(codegen.type_to_wasm(&Type::Named("String".into())), "i32");
         assert_eq!(codegen.type_to_wasm(&Type::Named("Custom".into())), "i32");
-        assert_eq!(codegen.type_to_wasm(&Type::Generic { name: "Vec".into(), args: vec![] }), "i32");
-        assert_eq!(codegen.type_to_wasm(&Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("i32".into())) }), "i32");
-        assert_eq!(codegen.type_to_wasm(&Type::Array(Box::new(Type::Named("i32".into())))), "i32");
+        assert_eq!(
+            codegen.type_to_wasm(&Type::Generic {
+                name: "Vec".into(),
+                args: vec![]
+            }),
+            "i32"
+        );
+        assert_eq!(
+            codegen.type_to_wasm(&Type::Reference {
+                mutable: false,
+                lifetime: None,
+                inner: Box::new(Type::Named("i32".into()))
+            }),
+            "i32"
+        );
+        assert_eq!(
+            codegen.type_to_wasm(&Type::Array(Box::new(Type::Named("i32".into())))),
+            "i32"
+        );
         assert_eq!(codegen.type_to_wasm(&Type::Tuple(vec![])), "i32");
     }
 
@@ -27677,7 +31379,10 @@ mod coverage_codegen_tests {
         assert_eq!(codegen.type_size(&Type::Named("f64".into())), 8);
         assert_eq!(codegen.type_size(&Type::Named("String".into())), 8);
         assert_eq!(codegen.type_size(&Type::Named("Custom".into())), 4);
-        assert_eq!(codegen.type_size(&Type::Array(Box::new(Type::Named("i32".into())))), 4);
+        assert_eq!(
+            codegen.type_size(&Type::Array(Box::new(Type::Named("i32".into())))),
+            4
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27696,7 +31401,10 @@ mod coverage_codegen_tests {
                 styles: vec![],
                 transitions: vec![],
                 trait_bounds: vec![],
-                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: span(),
+                },
                 permissions: None,
                 gestures: vec![],
                 skeleton: None,
@@ -27713,9 +31421,18 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_lazy_component(&lazy);
         let output = codegen.output.clone();
-        assert!(output.contains("Lazy Component: HeavyChart"), "should mark as lazy");
-        assert!(output.contains("lazy_mount"), "should generate lazy mount wrapper");
-        assert!(output.contains("dom_lazyMount"), "should call dom_lazyMount");
+        assert!(
+            output.contains("Lazy Component: HeavyChart"),
+            "should mark as lazy"
+        );
+        assert!(
+            output.contains("lazy_mount"),
+            "should generate lazy mount wrapper"
+        );
+        assert!(
+            output.contains("dom_lazyMount"),
+            "should call dom_lazyMount"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27743,7 +31460,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".fold()"), "should contain fold comment");
-        assert!(output.contains("loop $__fold_lp_"), "should generate fold loop");
+        assert!(
+            output.contains("loop $__fold_lp_"),
+            "should generate fold loop"
+        );
     }
 
     #[test]
@@ -27764,7 +31484,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".all()"), "should contain all comment");
-        assert!(output.contains("loop $__all_lp_"), "should generate all loop");
+        assert!(
+            output.contains("loop $__all_lp_"),
+            "should generate all loop"
+        );
     }
 
     #[test]
@@ -27777,8 +31500,14 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
-        assert!(output.contains(".enumerate()"), "should contain enumerate comment");
-        assert!(output.contains("loop $__en_lp_"), "should generate enumerate loop");
+        assert!(
+            output.contains(".enumerate()"),
+            "should contain enumerate comment"
+        );
+        assert!(
+            output.contains("loop $__en_lp_"),
+            "should generate enumerate loop"
+        );
     }
 
     #[test]
@@ -27792,7 +31521,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".zip()"), "should contain zip comment");
-        assert!(output.contains("loop $__zip_lp_"), "should generate zip loop");
+        assert!(
+            output.contains("loop $__zip_lp_"),
+            "should generate zip loop"
+        );
     }
 
     #[test]
@@ -27806,7 +31538,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".take()"), "should contain take comment");
-        assert!(output.contains("memory.copy"), "should use memory.copy for take");
+        assert!(
+            output.contains("memory.copy"),
+            "should use memory.copy for take"
+        );
     }
 
     #[test]
@@ -27820,7 +31555,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".skip()"), "should contain skip comment");
-        assert!(output.contains("memory.copy"), "should use memory.copy for skip");
+        assert!(
+            output.contains("memory.copy"),
+            "should use memory.copy for skip"
+        );
     }
 
     #[test]
@@ -27833,7 +31571,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
-        assert!(output.contains("call $custom_method"), "unknown method should be called directly");
+        assert!(
+            output.contains("call $custom_method"),
+            "unknown method should be called directly"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27844,10 +31585,38 @@ mod coverage_codegen_tests {
     fn collect_locals_from_block() {
         let mut codegen = WasmCodegen::new();
         let b = block(vec![
-            Stmt::Let { name: "a".into(), ty: Some(Type::Named("i64".into())), mutable: false, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
-            Stmt::Let { name: "b".into(), ty: Some(Type::Named("f64".into())), mutable: false, secret: false, value: Expr::Float(0.0), ownership: Ownership::Owned },
-            Stmt::Let { name: "c".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
-            Stmt::LetDestructure { pattern: Pattern::Tuple(vec![Pattern::Ident("d".into()), Pattern::Ident("e".into())]), value: Expr::Integer(0), ty: None },
+            Stmt::Let {
+                name: "a".into(),
+                ty: Some(Type::Named("i64".into())),
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "b".into(),
+                ty: Some(Type::Named("f64".into())),
+                mutable: false,
+                secret: false,
+                value: Expr::Float(0.0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Let {
+                name: "c".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            },
+            Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Ident("d".into()),
+                    Pattern::Ident("e".into()),
+                ]),
+                value: Expr::Integer(0),
+                ty: None,
+            },
         ]);
         codegen.collect_locals(&b);
         let names: Vec<&str> = codegen.locals.iter().map(|(n, _)| n.as_str()).collect();
@@ -27878,7 +31647,10 @@ mod coverage_codegen_tests {
     fn empty_data_section_no_output() {
         let mut codegen = WasmCodegen::new();
         codegen.emit_data_section();
-        assert!(codegen.output.is_empty(), "empty data section should produce no output");
+        assert!(
+            codegen.output.is_empty(),
+            "empty data section should produce no output"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27909,7 +31681,10 @@ mod coverage_codegen_tests {
         });
         let output = codegen.output.clone();
         assert!(output.contains("navigate"), "should have navigate comment");
-        assert!(output.contains("router_navigate"), "should call router_navigate");
+        assert!(
+            output.contains("router_navigate"),
+            "should call router_navigate"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27937,7 +31712,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&Expr::Borrow(Box::new(Expr::Integer(1))));
         let output = codegen.output.clone();
         // Borrows are erased at codegen — the inner expression is generated directly
-        assert!(output.contains("i32.const 1"), "borrow should generate inner expr");
+        assert!(
+            output.contains("i32.const 1"),
+            "borrow should generate inner expr"
+        );
         assert!(!output.contains("TODO"), "borrow should not produce TODO");
     }
 
@@ -27946,7 +31724,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::BorrowMut(Box::new(Expr::Integer(42))));
         let output = codegen.output.clone();
-        assert!(output.contains("i32.const 42"), "borrow_mut should generate inner expr");
+        assert!(
+            output.contains("i32.const 42"),
+            "borrow_mut should generate inner expr"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -27963,8 +31744,18 @@ mod coverage_codegen_tests {
                     name: "lookup".into(),
                     description: Some("Search for info".into()),
                     params: vec![
-                        Param { name: "query".into(), ty: Type::Named("String".into()), ownership: Ownership::Owned, secret: false },
-                        Param { name: "count".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false },
+                        Param {
+                            name: "query".into(),
+                            ty: Type::Named("String".into()),
+                            ownership: Ownership::Owned,
+                            secret: false,
+                        },
+                        Param {
+                            name: "count".into(),
+                            ty: Type::Named("i32".into()),
+                            ownership: Ownership::Owned,
+                            secret: false,
+                        },
                     ],
                     return_type: Some(Type::Named("String".into())),
                     body: block(vec![Stmt::Return(Some(Expr::StringLit("result".into())))]),
@@ -27992,9 +31783,18 @@ mod coverage_codegen_tests {
         assert!(output.contains("Agent: Bot"), "should have agent header");
         assert!(output.contains("Bot_init"), "should generate init");
         assert!(output.contains("Bot_mount"), "should generate mount");
-        assert!(output.contains("register tool: lookup"), "should register tools");
-        assert!(output.contains("__tool_Bot_lookup"), "should generate tool wrapper");
-        assert!(output.contains("ai_registerTool"), "should call ai_registerTool");
+        assert!(
+            output.contains("register tool: lookup"),
+            "should register tools"
+        );
+        assert!(
+            output.contains("__tool_Bot_lookup"),
+            "should generate tool wrapper"
+        );
+        assert!(
+            output.contains("ai_registerTool"),
+            "should call ai_registerTool"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -28003,7 +31803,8 @@ mod coverage_codegen_tests {
 
     #[test]
     fn store_async_action() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             store AsyncStore {
                 signal count: i32 = 0;
 
@@ -28011,7 +31812,8 @@ mod coverage_codegen_tests {
                     return;
                 }
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("async"), "should mark async action");
     }
 
@@ -28027,7 +31829,10 @@ mod coverage_codegen_tests {
             args: vec![Expr::StringLit("hello".into())],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("call $crypto_sha256"), "should emit $crypto_sha256 call");
+        assert!(
+            output.contains("call $crypto_sha256"),
+            "should emit $crypto_sha256 call"
+        );
         assert!(output.contains(";; crypto:"), "should have crypto comment");
     }
 
@@ -28066,7 +31871,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::hmac".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("data".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_hmac_sha256"));
     }
@@ -28076,7 +31884,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::hmac_sha512".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("data".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_hmac_sha512"));
     }
@@ -28086,14 +31897,20 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::encrypt".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("plain".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("plain".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_aes_gcm_encrypt"));
 
         let mut codegen2 = WasmCodegen::new();
         codegen2.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::decrypt".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("cipher".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("cipher".into()),
+            ],
         });
         assert!(codegen2.output.contains("call $crypto_aes_gcm_decrypt"));
     }
@@ -28103,7 +31920,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::encrypt_aes_cbc".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("data".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_aes_cbc_encrypt"));
     }
@@ -28113,7 +31933,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::encrypt_aes_ctr".into())),
-            args: vec![Expr::StringLit("key".into()), Expr::StringLit("data".into())],
+            args: vec![
+                Expr::StringLit("key".into()),
+                Expr::StringLit("data".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_aes_ctr_encrypt"));
     }
@@ -28123,7 +31946,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::sign".into())),
-            args: vec![Expr::StringLit("privkey".into()), Expr::StringLit("data".into())],
+            args: vec![
+                Expr::StringLit("privkey".into()),
+                Expr::StringLit("data".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_ed25519_sign"));
 
@@ -28144,7 +31970,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::derive_key".into())),
-            args: vec![Expr::StringLit("pwd".into()), Expr::StringLit("salt".into())],
+            args: vec![
+                Expr::StringLit("pwd".into()),
+                Expr::StringLit("salt".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_pbkdf2_derive"));
     }
@@ -28223,7 +32052,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("crypto::ecdh_derive".into())),
-            args: vec![Expr::StringLit("priv".into()), Expr::StringLit("pub".into())],
+            args: vec![
+                Expr::StringLit("priv".into()),
+                Expr::StringLit("pub".into()),
+            ],
         });
         assert!(codegen.output.contains("call $crypto_ecdh_derive"));
     }
@@ -28231,20 +32063,62 @@ mod coverage_codegen_tests {
     #[test]
     fn crypto_runtime_emitted_in_wat() {
         let wat = compile("pub fn main() -> i32 { crypto_sha256(0, 0); return 0; }");
-        assert!(wat.contains("$crypto_sha256_block"), "WAT should contain SHA-256 block transform");
-        assert!(wat.contains("$crypto_sha256"), "WAT should contain SHA-256 function");
-        assert!(wat.contains("$crypto_hmac_sha256"), "WAT should contain HMAC-SHA256");
-        assert!(wat.contains("$crypto_aes_gcm_encrypt"), "WAT should contain AES encrypt");
-        assert!(wat.contains("$crypto_random_uuid"), "WAT should contain UUID generator");
-        assert!(wat.contains("$crypto_xorshift32"), "WAT should contain PRNG");
-        assert!(wat.contains("$crypto_bytes_to_hex"), "WAT should contain hex conversion");
-        assert!(wat.contains("$crypto_ed25519_sign"), "WAT should contain Ed25519 sign");
-        assert!(wat.contains("$crypto_pbkdf2_derive"), "WAT should contain PBKDF2");
-        assert!(wat.contains("$crypto_hkdf_derive"), "WAT should contain HKDF");
-        assert!(wat.contains("$crypto_ecdh_derive"), "WAT should contain ECDH");
-        assert!(wat.contains("$crypto_generate_key_pair"), "WAT should contain key gen");
-        assert!(wat.contains("$__crypto_scratch"), "WAT should reference crypto scratch global");
-        assert!(wat.contains("0123456789abcdef"), "WAT should contain hex lookup table");
+        assert!(
+            wat.contains("$crypto_sha256_block"),
+            "WAT should contain SHA-256 block transform"
+        );
+        assert!(
+            wat.contains("$crypto_sha256"),
+            "WAT should contain SHA-256 function"
+        );
+        assert!(
+            wat.contains("$crypto_hmac_sha256"),
+            "WAT should contain HMAC-SHA256"
+        );
+        assert!(
+            wat.contains("$crypto_aes_gcm_encrypt"),
+            "WAT should contain AES encrypt"
+        );
+        assert!(
+            wat.contains("$crypto_random_uuid"),
+            "WAT should contain UUID generator"
+        );
+        assert!(
+            wat.contains("$crypto_xorshift32"),
+            "WAT should contain PRNG"
+        );
+        assert!(
+            wat.contains("$crypto_bytes_to_hex"),
+            "WAT should contain hex conversion"
+        );
+        assert!(
+            wat.contains("$crypto_ed25519_sign"),
+            "WAT should contain Ed25519 sign"
+        );
+        assert!(
+            wat.contains("$crypto_pbkdf2_derive"),
+            "WAT should contain PBKDF2"
+        );
+        assert!(
+            wat.contains("$crypto_hkdf_derive"),
+            "WAT should contain HKDF"
+        );
+        assert!(
+            wat.contains("$crypto_ecdh_derive"),
+            "WAT should contain ECDH"
+        );
+        assert!(
+            wat.contains("$crypto_generate_key_pair"),
+            "WAT should contain key gen"
+        );
+        assert!(
+            wat.contains("$__crypto_scratch"),
+            "WAT should reference crypto scratch global"
+        );
+        assert!(
+            wat.contains("0123456789abcdef"),
+            "WAT should contain hex lookup table"
+        );
     }
 
     #[test]
@@ -28270,9 +32144,18 @@ mod coverage_codegen_tests {
             ],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("object literal"), "object lit should have comment");
-        assert!(output.contains("call $alloc"), "object lit should allocate memory");
-        assert!(output.contains("i32.store"), "object lit should store fields");
+        assert!(
+            output.contains("object literal"),
+            "object lit should have comment"
+        );
+        assert!(
+            output.contains("call $alloc"),
+            "object lit should allocate memory"
+        );
+        assert!(
+            output.contains("i32.store"),
+            "object lit should store fields"
+        );
     }
 
     #[test]
@@ -28282,8 +32165,14 @@ mod coverage_codegen_tests {
             name: "Color".into(),
             type_params: vec![],
             variants: vec![
-                Variant { name: "Red".into(), fields: vec![] },
-                Variant { name: "Green".into(), fields: vec![] },
+                Variant {
+                    name: "Red".into(),
+                    fields: vec![],
+                },
+                Variant {
+                    name: "Green".into(),
+                    fields: vec![],
+                },
             ],
             is_pub: false,
             span: Span::new(0, 0, 1, 1),
@@ -28400,9 +32289,15 @@ mod coverage_codegen_tests {
             ],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("match expression"), "should have match comment");
+        assert!(
+            output.contains("match expression"),
+            "should have match comment"
+        );
         assert!(output.contains("i32.eq"), "should compare with i32.eq");
-        assert!(output.contains("local.set $__match_subj_"), "should store subject in local");
+        assert!(
+            output.contains("local.set $__match_subj_"),
+            "should store subject in local"
+        );
     }
 
     #[test]
@@ -28412,21 +32307,36 @@ mod coverage_codegen_tests {
             subject: Box::new(Expr::Ident("status".into())),
             arms: vec![
                 MatchArm {
-                    pattern: Pattern::Variant { name: "Active".into(), fields: vec![] },
+                    pattern: Pattern::Variant {
+                        name: "Active".into(),
+                        fields: vec![],
+                    },
                     guard: None,
                     body: Expr::Integer(1),
                 },
                 MatchArm {
-                    pattern: Pattern::Variant { name: "Inactive".into(), fields: vec![] },
+                    pattern: Pattern::Variant {
+                        name: "Inactive".into(),
+                        fields: vec![],
+                    },
                     guard: None,
                     body: Expr::Integer(0),
                 },
             ],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("match expression"), "should have match comment");
-        assert!(output.contains("variant Active"), "should reference Active variant");
-        assert!(output.contains("variant Inactive"), "should reference Inactive variant");
+        assert!(
+            output.contains("match expression"),
+            "should have match comment"
+        );
+        assert!(
+            output.contains("variant Active"),
+            "should reference Active variant"
+        );
+        assert!(
+            output.contains("variant Inactive"),
+            "should reference Inactive variant"
+        );
         assert!(output.contains("i32.load"), "should load discriminant tag");
         assert!(output.contains("i32.eq"), "should compare tags");
     }
@@ -28436,17 +32346,21 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::Match {
             subject: Box::new(Expr::Integer(0)),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Wildcard,
-                    guard: None,
-                    body: Expr::Integer(99),
-                },
-            ],
+            arms: vec![MatchArm {
+                pattern: Pattern::Wildcard,
+                guard: None,
+                body: Expr::Integer(99),
+            }],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("match expression"), "should have match comment");
-        assert!(output.contains("i32.const 99"), "wildcard arm should emit body");
+        assert!(
+            output.contains("match expression"),
+            "should have match comment"
+        );
+        assert!(
+            output.contains("i32.const 99"),
+            "wildcard arm should emit body"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -28457,7 +32371,8 @@ mod coverage_codegen_tests {
     fn multiple_components_produce_unique_handler_names() {
         // Two components in one file must not generate conflicting $__handler_0 names.
         // Each component's handlers must be namespaced by component name.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Alpha {
                 fn do_thing(&mut self) { return; }
                 render { <div>"alpha"</div> }
@@ -28466,20 +32381,37 @@ mod coverage_codegen_tests {
                 fn do_thing(&mut self) { return; }
                 render { <div>"beta"</div> }
             }
-        "#);
-        assert!(wat.contains("Alpha__handler_0"), "Alpha handler should be namespaced");
-        assert!(wat.contains("Beta__handler_0"), "Beta handler should be namespaced");
-        assert!(wat.contains("Alpha__callback"), "Alpha callback should be namespaced");
-        assert!(wat.contains("Beta__callback"), "Beta callback should be namespaced");
+        "#,
+        );
+        assert!(
+            wat.contains("Alpha__handler_0"),
+            "Alpha handler should be namespaced"
+        );
+        assert!(
+            wat.contains("Beta__handler_0"),
+            "Beta handler should be namespaced"
+        );
+        assert!(
+            wat.contains("Alpha__callback"),
+            "Alpha callback should be namespaced"
+        );
+        assert!(
+            wat.contains("Beta__callback"),
+            "Beta callback should be namespaced"
+        );
         // There must NOT be a bare $__handler_0 that would conflict
         let bare_handler_count = wat.matches("func $__handler_0").count();
-        assert_eq!(bare_handler_count, 0, "bare un-namespaced $__handler_0 must not exist");
+        assert_eq!(
+            bare_handler_count, 0,
+            "bare un-namespaced $__handler_0 must not exist"
+        );
     }
 
     #[test]
     fn multiple_forms_produce_unique_method_names() {
         // Two forms with the same method name (on_submit) must not conflict.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             form FormA {
                 field name: String { required }
                 fn on_submit(&self) { return; }
@@ -28488,22 +32420,34 @@ mod coverage_codegen_tests {
                 field email: String { email }
                 fn on_submit(&self) { return; }
             }
-        "#);
-        assert!(wat.contains("func $FormA_on_submit"), "FormA_on_submit should be generated");
-        assert!(wat.contains("func $FormB_on_submit"), "FormB_on_submit should be generated");
+        "#,
+        );
+        assert!(
+            wat.contains("func $FormA_on_submit"),
+            "FormA_on_submit should be generated"
+        );
+        assert!(
+            wat.contains("func $FormB_on_submit"),
+            "FormB_on_submit should be generated"
+        );
         let bare_count = wat.matches("func $on_submit").count();
-        assert_eq!(bare_count, 0, "bare un-namespaced $on_submit must not exist");
+        assert_eq!(
+            bare_count, 0,
+            "bare un-namespaced $on_submit must not exist"
+        );
     }
 
     #[test]
     fn embed_load_sandboxed_import_present_when_embed_used() {
         // Embed imports are only emitted when the program has an embed definition.
         // Programs without embeds should NOT have these imports (import tree shaking).
-        let wat_without = compile(r#"
+        let wat_without = compile(
+            r#"
             component Dummy {
                 render { <div>"x"</div> }
             }
-        "#);
+        "#,
+        );
         assert!(
             !wat_without.contains("embedLoadSandboxed"),
             "programs without embed should NOT import embedLoadSandboxed"
@@ -28527,7 +32471,10 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_embed(&embed);
         let output = codegen.output.clone();
-        assert!(output.contains("call $embed_load_sandboxed"), "should call embed_load_sandboxed");
+        assert!(
+            output.contains("call $embed_load_sandboxed"),
+            "should call embed_load_sandboxed"
+        );
     }
 
     #[test]
@@ -28541,7 +32488,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
-        assert!(output.contains("call $time_now_i32"), "time.now() must call $time_now_i32");
+        assert!(
+            output.contains("call $time_now_i32"),
+            "time.now() must call $time_now_i32"
+        );
         assert!(
             !output.contains("local.get $time"),
             "time.now() must not try to read $time as a local variable"
@@ -28583,7 +32533,10 @@ mod coverage_codegen_tests {
                 type_params: vec![],
                 params: vec![],
                 return_type: None,
-                body: Block { stmts: vec![], span: span() },
+                body: Block {
+                    stmts: vec![],
+                    span: span(),
+                },
                 is_pub: false,
                 is_async: false,
                 must_use: false,
@@ -28615,7 +32568,8 @@ mod coverage_codegen_tests {
     #[test]
     fn template_if_uses_valid_wat_control_flow() {
         // Template if/else must use WAT if/else/end, not br_if with undeclared labels.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Flag {
                 let mut active: bool = false;
                 render {
@@ -28624,8 +32578,12 @@ mod coverage_codegen_tests {
                     </div>
                 }
             }
-        "#);
-        assert!(wat.contains("if"), "template if must use WAT if instruction");
+        "#,
+        );
+        assert!(
+            wat.contains("if"),
+            "template if must use WAT if instruction"
+        );
         assert!(wat.contains("else"), "template if/else must use WAT else");
         assert!(wat.contains("end"), "template if/else must use WAT end");
         // Must NOT use bare br_if with labels that are not declared
@@ -28640,12 +32598,14 @@ mod coverage_codegen_tests {
         // When a string literal is used as signal initial value, the generated WAT
         // must include a `drop` to discard the len half of the (ptr, len) pair
         // before calling signal_create which takes a single i32.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component StringState {
                 let mut label: String = "";
                 render { <div>{self.label}</div> }
             }
-        "#);
+        "#,
+        );
         // The drop instruction must appear between the string literal push and signal_create
         assert!(
             wat.contains("drop  ;; discard str len"),
@@ -28658,7 +32618,8 @@ mod coverage_codegen_tests {
         // When comparing a signal (ptr only) to a string literal (ptr, len),
         // the codegen must drop the len from the string literal so both sides
         // are single i32 ptrs, then call $str_eq for byte-by-byte comparison.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Tabs {
                 let mut active: String = "home";
                 render {
@@ -28672,7 +32633,8 @@ mod coverage_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         // The drop must appear after string literal push, before $str_eq
         assert!(
             wat.contains("drop  ;; string cmp: keep only ptr"),
@@ -28688,7 +32650,8 @@ mod coverage_codegen_tests {
     #[test]
     fn string_comparison_neq_drops_len() {
         // Same as eq but for != operator — uses $str_eq + i32.eqz
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Check {
                 let mut status: String = "ok";
                 render {
@@ -28699,15 +32662,13 @@ mod coverage_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(
             wat.contains("drop  ;; string cmp: keep only ptr"),
             "string != must drop str len"
         );
-        assert!(
-            wat.contains("call $str_eq"),
-            "string != must call $str_eq"
-        );
+        assert!(wat.contains("call $str_eq"), "string != must call $str_eq");
         assert!(
             wat.contains("i32.eqz  ;; neq: invert str_eq result"),
             "string != must invert str_eq result with i32.eqz"
@@ -28718,14 +32679,16 @@ mod coverage_codegen_tests {
     fn str_eq_function_emitted_in_output() {
         // The $str_eq WASM function must be emitted in the output for
         // byte-by-byte null-terminated string comparison.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component App {
                 let mut name: String = "world";
                 render {
                     <div>"hello"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(
             wat.contains("(func $str_eq (param $a i32) (param $b i32) (result i32)"),
             "$str_eq function must be emitted in WAT output"
@@ -28740,7 +32703,8 @@ mod coverage_codegen_tests {
     fn string_comparison_dynamic_signals() {
         // Comparing two string signals (self.a == self.b) must use $str_eq.
         // Both sides produce a single i32 ptr from signal_get — no drop needed.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Names {
                 let mut first: String = "alice";
                 let mut second: String = "bob";
@@ -28752,7 +32716,8 @@ mod coverage_codegen_tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(
             wat.contains("call $str_eq"),
             "dynamic string signal comparison must use $str_eq"
@@ -28763,14 +32728,16 @@ mod coverage_codegen_tests {
     fn interned_strings_null_terminated() {
         // Interned strings must include a null terminator (\00) in the
         // data section so $str_eq can compare them byte-by-byte.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component App {
                 let mut tab: String = "home";
                 render {
                     <div>"hello"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert!(
             wat.contains("\\00\""),
             "interned strings must be null-terminated in the data section"
@@ -28781,14 +32748,16 @@ mod coverage_codegen_tests {
     fn fetch_uses_typed_setters_not_extra_params() {
         // fetch() must call http_setMethod before http_fetch — not push extra args to http_fetch.
         // http_fetch only takes (url_ptr, url_len); method is set via $http_setMethod.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Fetcher {
                 fn load(&self) {
                     let result = fetch("/api/data");
                 }
                 render { <div>"fetcher"</div> }
             }
-        "#);
+        "#,
+        );
         assert!(
             wat.contains("call $http_setMethod"),
             "fetch must call http_setMethod before http_fetch"
@@ -28803,14 +32772,16 @@ mod coverage_codegen_tests {
     fn prop_access_in_handler_uses_global() {
         // When a component prop is accessed in an event handler, the generated WAT
         // must use global.get $__prop_<Comp>_<prop>_ptr, not local.get $<prop>.
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Greeter(name: String) {
                 fn greet(&self) {
                     return;
                 }
                 render { <div>"hi"</div> }
             }
-        "#);
+        "#,
+        );
         // Prop globals must be declared
         assert!(
             wat.contains("$__prop_Greeter_name_ptr"),
@@ -28837,7 +32808,10 @@ mod coverage_codegen_tests {
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
         assert!(output.contains(".len()"), "should contain len comment");
-        assert!(output.contains("i32.load"), "should load length from memory");
+        assert!(
+            output.contains("i32.load"),
+            "should load length from memory"
+        );
     }
 
     #[test]
@@ -28850,7 +32824,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
-        assert!(output.contains(".is_empty()"), "should contain is_empty comment");
+        assert!(
+            output.contains(".is_empty()"),
+            "should contain is_empty comment"
+        );
         assert!(output.contains("i32.eqz"), "should check length == 0");
     }
 
@@ -28866,7 +32843,10 @@ mod coverage_codegen_tests {
         let output = codegen.output.clone();
         assert!(output.contains(".push()"), "should contain push comment");
         assert!(output.contains("i32.store"), "should store the new element");
-        assert!(output.contains("i32.const 1"), "should increment length by 1");
+        assert!(
+            output.contains("i32.const 1"),
+            "should increment length by 1"
+        );
     }
 
     #[test]
@@ -28879,8 +32859,14 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let output = codegen.output.clone();
-        assert!(output.contains(".contains()"), "should contain contains comment");
-        assert!(output.contains("loop $__con_lp_"), "should generate scan loop");
+        assert!(
+            output.contains(".contains()"),
+            "should contain contains comment"
+        );
+        assert!(
+            output.contains("loop $__con_lp_"),
+            "should generate scan loop"
+        );
         assert!(output.contains("i32.eq"), "should compare elements");
     }
 
@@ -28894,11 +32880,19 @@ mod coverage_codegen_tests {
     #[test]
     fn test_keyword_def_ident_emits_null_placeholder() {
         let mut codegen = WasmCodegen::new();
-        codegen.known_keyword_defs.push(("AppAuth".into(), KeywordDefKind::Auth));
+        codegen
+            .known_keyword_defs
+            .push(("AppAuth".into(), KeywordDefKind::Auth));
         codegen.generate_expr(&Expr::Ident("AppAuth".into()));
         let out = codegen.output.clone();
-        assert!(out.contains("i32.const 0"), "keyword def ident should emit i32.const 0, not local.get");
-        assert!(!out.contains("local.get"), "keyword def ident must not emit local.get");
+        assert!(
+            out.contains("i32.const 0"),
+            "keyword def ident should emit i32.const 0, not local.get"
+        );
+        assert!(
+            !out.contains("local.get"),
+            "keyword def ident must not emit local.get"
+        );
     }
 
     /// Issue 1-6: method call on a keyword def instance (e.g. `AppAuth.login("google")`)
@@ -28906,7 +32900,9 @@ mod coverage_codegen_tests {
     #[test]
     fn test_keyword_def_method_call_dispatches_to_import() {
         let mut codegen = WasmCodegen::new();
-        codegen.known_keyword_defs.push(("AppAuth".into(), KeywordDefKind::Auth));
+        codegen
+            .known_keyword_defs
+            .push(("AppAuth".into(), KeywordDefKind::Auth));
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("AppAuth".into())),
             method: "login".into(),
@@ -28914,15 +32910,23 @@ mod coverage_codegen_tests {
         };
         codegen.generate_expr(&expr);
         let out = codegen.output.clone();
-        assert!(!out.contains("local.get $AppAuth"), "must not emit local.get for keyword def");
-        assert!(out.contains("call $auth_login"), "must call auth_login import");
+        assert!(
+            !out.contains("local.get $AppAuth"),
+            "must not emit local.get for keyword def"
+        );
+        assert!(
+            out.contains("call $auth_login"),
+            "must call auth_login import"
+        );
     }
 
     /// Issue 2: cache def method call dispatches correctly
     #[test]
     fn test_cache_def_method_call_dispatches_to_runtime() {
         let mut codegen = WasmCodegen::new();
-        codegen.known_keyword_defs.push(("AppCache".into(), KeywordDefKind::Cache));
+        codegen
+            .known_keyword_defs
+            .push(("AppCache".into(), KeywordDefKind::Cache));
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("AppCache".into())),
             method: "get".into(),
@@ -28930,15 +32934,23 @@ mod coverage_codegen_tests {
         };
         codegen.generate_expr(&expr);
         let out = codegen.output.clone();
-        assert!(!out.contains("local.get $AppCache"), "must not emit local.get for cache def");
-        assert!(out.contains("call $cache_get"), "must call cache_get runtime");
+        assert!(
+            !out.contains("local.get $AppCache"),
+            "must not emit local.get for cache def"
+        );
+        assert!(
+            out.contains("call $cache_get"),
+            "must call cache_get runtime"
+        );
     }
 
     /// Issue 3: database def method call dispatches correctly
     #[test]
     fn test_database_def_method_call_dispatches_to_import() {
         let mut codegen = WasmCodegen::new();
-        codegen.known_keyword_defs.push(("AppDatabase".into(), KeywordDefKind::Database));
+        codegen
+            .known_keyword_defs
+            .push(("AppDatabase".into(), KeywordDefKind::Database));
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("AppDatabase".into())),
             method: "put".into(),
@@ -28946,7 +32958,10 @@ mod coverage_codegen_tests {
         };
         codegen.generate_expr(&expr);
         let out = codegen.output.clone();
-        assert!(!out.contains("local.get $AppDatabase"), "must not emit local.get for db def");
+        assert!(
+            !out.contains("local.get $AppDatabase"),
+            "must not emit local.get for db def"
+        );
         assert!(out.contains("call $db_put"), "must call db_put import");
     }
 
@@ -28972,8 +32987,8 @@ mod coverage_codegen_tests {
             "store signal call must resolve to getter"
         );
         assert!(
-            !wat.contains("call $AuthStore_is_logged_in\n") &&
-            !wat.contains("call $AuthStore_is_logged_in "),
+            !wat.contains("call $AuthStore_is_logged_in\n")
+                && !wat.contains("call $AuthStore_is_logged_in "),
             "must not generate undefined $AuthStore_is_logged_in"
         );
     }
@@ -29009,8 +33024,14 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&expr);
         let out = codegen.output.clone();
-        assert!(!out.contains("local.get $theme"), "must not emit local.get for theme namespace");
-        assert!(out.contains("call $theme_toggle"), "must call $theme_toggle");
+        assert!(
+            !out.contains("local.get $theme"),
+            "must not emit local.get for theme namespace"
+        );
+        assert!(
+            out.contains("call $theme_toggle"),
+            "must call $theme_toggle"
+        );
     }
 
     /// Issue 9: $theme_init function is emitted in the runtime
@@ -29029,8 +33050,14 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
         // Theme with light/dark blocks now emits CSS custom properties via style_injectStyles
-        assert!(wat.contains("__init_theme_AppTheme"), "theme init function must be emitted");
-        assert!(wat.contains("call $style_injectStyles"), "generate_theme must call style_injectStyles for CSS custom properties");
+        assert!(
+            wat.contains("__init_theme_AppTheme"),
+            "theme init function must be emitted"
+        );
+        assert!(
+            wat.contains("call $style_injectStyles"),
+            "generate_theme must call style_injectStyles for CSS custom properties"
+        );
     }
 
     /// Issue 10: signal field referenced without `self.` in component template
@@ -29063,9 +33090,18 @@ mod coverage_codegen_tests {
     #[test]
     fn test_resolve_stdlib_fn_crypto_hmac() {
         let codegen = WasmCodegen::new();
-        assert_eq!(codegen.resolve_stdlib_fn("crypto::hmac"), "$crypto_hmac_sha256");
-        assert_eq!(codegen.resolve_stdlib_fn("crypto::sha256"), "$crypto_sha256");
-        assert_eq!(codegen.resolve_stdlib_fn("crypto::hmac_sha512"), "$crypto_hmac_sha512");
+        assert_eq!(
+            codegen.resolve_stdlib_fn("crypto::hmac"),
+            "$crypto_hmac_sha256"
+        );
+        assert_eq!(
+            codegen.resolve_stdlib_fn("crypto::sha256"),
+            "$crypto_sha256"
+        );
+        assert_eq!(
+            codegen.resolve_stdlib_fn("crypto::hmac_sha512"),
+            "$crypto_hmac_sha512"
+        );
     }
 
     /// resolve_stdlib_fn maps theme methods correctly
@@ -29091,11 +33127,17 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate(&program);
         assert!(
-            codegen.known_keyword_defs.iter().any(|(n, k)| n == "MyAuth" && *k == KeywordDefKind::Auth),
+            codegen
+                .known_keyword_defs
+                .iter()
+                .any(|(n, k)| n == "MyAuth" && *k == KeywordDefKind::Auth),
             "MyAuth should be in known_keyword_defs as Auth"
         );
         assert!(
-            codegen.known_keyword_defs.iter().any(|(n, k)| n == "MyCache" && *k == KeywordDefKind::Cache),
+            codegen
+                .known_keyword_defs
+                .iter()
+                .any(|(n, k)| n == "MyCache" && *k == KeywordDefKind::Cache),
             "MyCache should be in known_keyword_defs as Cache"
         );
     }
@@ -29115,8 +33157,16 @@ mod coverage_codegen_tests {
             codegen.known_keyword_defs.push((name.to_string(), kind));
             codegen.generate_expr(&Expr::Ident(name.to_string()));
             let out = codegen.output.clone();
-            assert!(out.contains("i32.const 0"), "def kind {} should emit i32.const 0", name);
-            assert!(!out.contains("local.get"), "def kind {} must not emit local.get", name);
+            assert!(
+                out.contains("i32.const 0"),
+                "def kind {} should emit i32.const 0",
+                name
+            );
+            assert!(
+                !out.contains("local.get"),
+                "def kind {} must not emit local.get",
+                name
+            );
         }
     }
 
@@ -29144,59 +33194,113 @@ mod coverage_codegen_tests {
         codegen.indent = 1;
         codegen.generate_miniprogram(&mp);
         let output = codegen.output.clone();
-        assert!(output.contains("MiniProgram: AlipayApp"), "should have miniprogram header");
-        assert!(output.contains("__mp_AlipayApp_payment_provider"), "should emit payment provider global");
-        assert!(output.contains("__mp_AlipayApp_auth_provider"), "should emit auth provider global");
-        assert!(output.contains("__mp_AlipayApp_map_provider"), "should emit map provider global");
-        assert!(output.contains("__mp_AlipayApp_cache_strategy"), "should emit cache strategy global");
+        assert!(
+            output.contains("MiniProgram: AlipayApp"),
+            "should have miniprogram header"
+        );
+        assert!(
+            output.contains("__mp_AlipayApp_payment_provider"),
+            "should emit payment provider global"
+        );
+        assert!(
+            output.contains("__mp_AlipayApp_auth_provider"),
+            "should emit auth provider global"
+        );
+        assert!(
+            output.contains("__mp_AlipayApp_map_provider"),
+            "should emit map provider global"
+        );
+        assert!(
+            output.contains("__mp_AlipayApp_cache_strategy"),
+            "should emit cache strategy global"
+        );
     }
 
     #[test]
     fn miniprogram_emits_lifecycle_exports() {
         let launch_fn = Function {
             name: "onLaunch".into(),
-            lifetimes: vec![], type_params: vec![],
+            lifetimes: vec![],
+            type_params: vec![],
             params: vec![Param {
                 name: "options".into(),
                 ty: Type::Named("String".into()),
                 ownership: Ownership::Owned,
                 secret: false,
             }],
-            return_type: None, trait_bounds: vec![],
-            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
-            is_pub: false, is_async: false, must_use: false, span: span(),
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![Stmt::Return(None)],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: span(),
         };
         let show_fn = Function {
             name: "onShow".into(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
-            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
-            is_pub: false, is_async: false, must_use: false, span: span(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![Stmt::Return(None)],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: span(),
         };
         let hide_fn = Function {
             name: "onHide".into(),
-            lifetimes: vec![], type_params: vec![], params: vec![],
-            return_type: None, trait_bounds: vec![],
-            body: Block { stmts: vec![Stmt::Return(None)], span: span() },
-            is_pub: false, is_async: false, must_use: false, span: span(),
+            lifetimes: vec![],
+            type_params: vec![],
+            params: vec![],
+            return_type: None,
+            trait_bounds: vec![],
+            body: Block {
+                stmts: vec![Stmt::Return(None)],
+                span: span(),
+            },
+            is_pub: false,
+            is_async: false,
+            must_use: false,
+            span: span(),
         };
         let mp = MiniProgramDef {
             name: "TestMP".into(),
-            payment_provider: None, auth_provider: None, map_provider: None,
-            offline: false, cache_strategy: None,
+            payment_provider: None,
+            auth_provider: None,
+            map_provider: None,
+            offline: false,
+            cache_strategy: None,
             on_launch: Some(launch_fn),
             on_show: Some(show_fn),
             on_hide: Some(hide_fn),
             methods: vec![],
-            is_pub: false, span: span(),
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_miniprogram(&mp);
         let output = codegen.output.clone();
-        assert!(output.contains("TestMP_onLaunch"), "should emit onLaunch export");
-        assert!(output.contains("TestMP_onShow"), "should emit onShow export");
-        assert!(output.contains("TestMP_onHide"), "should emit onHide export");
+        assert!(
+            output.contains("TestMP_onLaunch"),
+            "should emit onLaunch export"
+        );
+        assert!(
+            output.contains("TestMP_onShow"),
+            "should emit onShow export"
+        );
+        assert!(
+            output.contains("TestMP_onHide"),
+            "should emit onHide export"
+        );
     }
 
     #[test]
@@ -29208,16 +33312,28 @@ mod coverage_codegen_tests {
             map_provider: Some("google".into()),
             offline: true,
             cache_strategy: Some("network-first".into()),
-            on_launch: None, on_show: None, on_hide: None,
+            on_launch: None,
+            on_show: None,
+            on_hide: None,
             methods: vec![],
-            is_pub: false, span: span(),
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_miniprogram(&mp);
-        assert!(codegen.required_providers.contains("stripe"), "stripe should be tracked");
-        assert!(codegen.required_providers.contains("auth0"), "auth0 should be tracked");
-        assert!(codegen.required_providers.contains("google"), "google should be tracked");
+        assert!(
+            codegen.required_providers.contains("stripe"),
+            "stripe should be tracked"
+        );
+        assert!(
+            codegen.required_providers.contains("auth0"),
+            "auth0 should be tracked"
+        );
+        assert!(
+            codegen.required_providers.contains("google"),
+            "google should be tracked"
+        );
     }
 
     #[test]
@@ -29233,7 +33349,10 @@ mod coverage_codegen_tests {
         let program = parser.parse_program().unwrap();
         let mut codegen = WasmCodegen::new();
         codegen.generate(&program);
-        assert!(codegen.needs_miniprogram, "needs_miniprogram flag should be set");
+        assert!(
+            codegen.needs_miniprogram,
+            "needs_miniprogram flag should be set"
+        );
     }
 
     #[test]
@@ -29250,7 +33369,10 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate(&program);
         assert!(
-            codegen.known_keyword_defs.iter().any(|(n, k)| n == "MyMP" && *k == KeywordDefKind::MiniProgram),
+            codegen
+                .known_keyword_defs
+                .iter()
+                .any(|(n, k)| n == "MyMP" && *k == KeywordDefKind::MiniProgram),
             "MyMP should be in known_keyword_defs as MiniProgram"
         );
     }
@@ -29259,18 +33381,27 @@ mod coverage_codegen_tests {
     fn miniprogram_mp_init_called_in_register() {
         let mp = MiniProgramDef {
             name: "InitMP".into(),
-            payment_provider: None, auth_provider: None, map_provider: None,
-            offline: false, cache_strategy: None,
-            on_launch: None, on_show: None, on_hide: None,
+            payment_provider: None,
+            auth_provider: None,
+            map_provider: None,
+            offline: false,
+            cache_strategy: None,
+            on_launch: None,
+            on_show: None,
+            on_hide: None,
             methods: vec![],
-            is_pub: false, span: span(),
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_miniprogram(&mp);
         let output = codegen.output.clone();
         assert!(output.contains("call $mp_init"), "should call mp_init");
-        assert!(output.contains("__mp_register_InitMP"), "should emit register function");
+        assert!(
+            output.contains("__mp_register_InitMP"),
+            "should emit register function"
+        );
     }
 
     /// Signal updater function is emitted and subscribed for direct self.field in template
@@ -29289,13 +33420,25 @@ mod coverage_codegen_tests {
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
         // Updater function should be emitted
-        assert!(wat.contains("$__update_Counter_count"), "updater function must be emitted");
-        assert!(wat.contains("reactive DOM updater"), "updater should have comment marker");
+        assert!(
+            wat.contains("$__update_Counter_count"),
+            "updater function must be emitted"
+        );
+        assert!(
+            wat.contains("reactive DOM updater"),
+            "updater should have comment marker"
+        );
         // Signal subscription should happen
-        assert!(wat.contains("signal_subscribe"), "signal_subscribe must be called");
+        assert!(
+            wat.contains("signal_subscribe"),
+            "signal_subscribe must be called"
+        );
         // Updater should read signal and call setText
         assert!(wat.contains("signal_get"), "updater must call signal_get");
-        assert!(wat.contains("string_fromI32"), "updater must convert signal to string");
+        assert!(
+            wat.contains("string_fromI32"),
+            "updater must convert signal to string"
+        );
         assert!(wat.contains("dom_setText"), "updater must call dom_setText");
     }
 
@@ -29477,7 +33620,8 @@ mod template_for_tests {
             binding: binding.to_string(),
             iterator: Box::new(iterator),
             children,
-            lazy: false, inplace: false,
+            lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         // Combine deferred locals + body
@@ -29496,23 +33640,33 @@ mod template_for_tests {
         let wat = generate_template_for(
             "item",
             Expr::Ident("items".to_string()),
-            vec![
-                TemplateNode::Element(Element {
-                    tag: "div".to_string(),
-                    attributes: vec![],
-                    children: vec![
-                        TemplateNode::Expression(Box::new(Expr::Ident("item".to_string()))),
-                    ],
-                    span: span(),
-                }),
-            ],
+            vec![TemplateNode::Element(Element {
+                tag: "div".to_string(),
+                attributes: vec![],
+                children: vec![TemplateNode::Expression(Box::new(Expr::Ident(
+                    "item".to_string(),
+                )))],
+                span: span(),
+            })],
         );
 
         // Should have loop locals
-        assert!(wat.contains("(local $for_arr_"), "should declare array local");
-        assert!(wat.contains("(local $for_idx_"), "should declare index local");
-        assert!(wat.contains("(local $for_len_"), "should declare length local");
-        assert!(wat.contains("(local $item i32)"), "should declare binding local");
+        assert!(
+            wat.contains("(local $for_arr_"),
+            "should declare array local"
+        );
+        assert!(
+            wat.contains("(local $for_idx_"),
+            "should declare index local"
+        );
+        assert!(
+            wat.contains("(local $for_len_"),
+            "should declare length local"
+        );
+        assert!(
+            wat.contains("(local $item i32)"),
+            "should declare binding local"
+        );
 
         // Should have WASM block/loop structure
         assert!(wat.contains("block $for_break_"), "should have break block");
@@ -29520,14 +33674,26 @@ mod template_for_tests {
         assert!(wat.contains("i32.ge_u"), "should compare idx >= len");
         assert!(wat.contains("br_if $for_break_"), "should break when done");
         assert!(wat.contains("br $for_cont_"), "should branch back to loop");
-        assert!(wat.contains("local.set $item"), "should set binding variable");
+        assert!(
+            wat.contains("local.set $item"),
+            "should set binding variable"
+        );
 
         // Should have child element creation
-        assert!(wat.contains("call $dom_createElement"), "should create child elements");
-        assert!(wat.contains("call $dom_appendChild"), "should append children");
+        assert!(
+            wat.contains("call $dom_createElement"),
+            "should create child elements"
+        );
+        assert!(
+            wat.contains("call $dom_appendChild"),
+            "should append children"
+        );
 
         // Should resolve item as for-loop binding
-        assert!(wat.contains(";; for-loop binding: item"), "should resolve item as for-loop binding");
+        assert!(
+            wat.contains(";; for-loop binding: item"),
+            "should resolve item as for-loop binding"
+        );
 
         // Index increment
         assert!(wat.contains("i32.const 1"), "should increment index by 1");
@@ -29539,25 +33705,30 @@ mod template_for_tests {
         let wat = generate_template_for(
             "item",
             Expr::Ident("items".to_string()),
-            vec![
-                TemplateNode::Element(Element {
-                    tag: "span".to_string(),
-                    attributes: vec![],
-                    children: vec![
-                        TemplateNode::Expression(Box::new(Expr::FieldAccess {
-                            object: Box::new(Expr::Ident("item".to_string())),
-                            field: "name".to_string(),
-                        })),
-                    ],
-                    span: span(),
-                }),
-            ],
+            vec![TemplateNode::Element(Element {
+                tag: "span".to_string(),
+                attributes: vec![],
+                children: vec![TemplateNode::Expression(Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("item".to_string())),
+                    field: "name".to_string(),
+                }))],
+                span: span(),
+            })],
         );
 
         // Should resolve item.name as for-loop field access
-        assert!(wat.contains(";; for-loop field access: item.name"), "should emit for-loop field access comment");
-        assert!(wat.contains("local.get $item"), "should load binding pointer");
-        assert!(wat.contains("i32.load"), "should load field from struct pointer");
+        assert!(
+            wat.contains(";; for-loop field access: item.name"),
+            "should emit for-loop field access comment"
+        );
+        assert!(
+            wat.contains("local.get $item"),
+            "should load binding pointer"
+        );
+        assert!(
+            wat.contains("i32.load"),
+            "should load field from struct pointer"
+        );
     }
 
     #[test]
@@ -29569,36 +33740,49 @@ mod template_for_tests {
                 object: Box::new(Expr::Ident("outer".to_string())),
                 field: "items".to_string(),
             }),
-            children: vec![
-                TemplateNode::Element(Element {
-                    tag: "div".to_string(),
-                    attributes: vec![],
-                    children: vec![],
-                    span: span(),
-                }),
-            ],
-            lazy: false, inplace: false,
+            children: vec![TemplateNode::Element(Element {
+                tag: "div".to_string(),
+                attributes: vec![],
+                children: vec![],
+                span: span(),
+            })],
+            lazy: false,
+            inplace: false,
         };
 
-        let wat = generate_template_for(
-            "outer",
-            Expr::Ident("list".to_string()),
-            vec![inner_for],
-        );
+        let wat = generate_template_for("outer", Expr::Ident("list".to_string()), vec![inner_for]);
 
         // Count distinct block/loop labels — should have 2 of each (outer + inner)
         let break_count = wat.matches("block $for_break_").count();
         let cont_count = wat.matches("loop $for_cont_").count();
-        assert_eq!(break_count, 2, "nested loops should have 2 break blocks, got {}", break_count);
-        assert_eq!(cont_count, 2, "nested loops should have 2 continue loops, got {}", cont_count);
+        assert_eq!(
+            break_count, 2,
+            "nested loops should have 2 break blocks, got {}",
+            break_count
+        );
+        assert_eq!(
+            cont_count, 2,
+            "nested loops should have 2 continue loops, got {}",
+            cont_count
+        );
 
         // Both binding locals should be declared
-        assert!(wat.contains("(local $outer i32)"), "should declare outer binding");
-        assert!(wat.contains("(local $inner i32)"), "should declare inner binding");
+        assert!(
+            wat.contains("(local $outer i32)"),
+            "should declare outer binding"
+        );
+        assert!(
+            wat.contains("(local $inner i32)"),
+            "should declare inner binding"
+        );
 
         // Should have 2 sets of arr/idx/len locals
         let arr_count = wat.matches("(local $for_arr_").count();
-        assert_eq!(arr_count, 2, "nested loops should have 2 array locals, got {}", arr_count);
+        assert_eq!(
+            arr_count, 2,
+            "nested loops should have 2 array locals, got {}",
+            arr_count
+        );
     }
 
     #[test]
@@ -29615,9 +33799,18 @@ mod template_for_tests {
         assert!(wat.contains("i32.load"), "should load from memory");
         // Should have the constant 4 used for skipping length and for element stride
         // (lines are indented, so check individually)
-        assert!(wat.contains("i32.const 4"), "should have i32.const 4 for array addressing");
-        assert!(wat.contains("i32.add"), "should have i32.add for pointer arithmetic");
-        assert!(wat.contains("i32.mul"), "should have i32.mul for index scaling");
+        assert!(
+            wat.contains("i32.const 4"),
+            "should have i32.const 4 for array addressing"
+        );
+        assert!(
+            wat.contains("i32.add"),
+            "should have i32.add for pointer arithmetic"
+        );
+        assert!(
+            wat.contains("i32.mul"),
+            "should have i32.mul for index scaling"
+        );
         // Index increment uses i32.const 1
         assert!(wat.contains("i32.const 1"), "should increment index by 1");
     }
@@ -29637,25 +33830,20 @@ mod template_for_tests {
         let node = TemplateNode::TemplateFor {
             binding: "product".to_string(),
             iterator: Box::new(Expr::Ident("products".to_string())),
-            children: vec![
-                TemplateNode::Element(Element {
-                    tag: "button".to_string(),
-                    attributes: vec![
-                        Attribute::EventHandler {
-                            event: "click".to_string(),
-                            handler: Expr::FieldAccess {
-                                object: Box::new(Expr::SelfExpr),
-                                field: "add_to_cart".to_string(),
-                            },
-                        },
-                    ],
-                    children: vec![
-                        TemplateNode::TextLiteral("Add".to_string()),
-                    ],
-                    span: span(),
-                }),
-            ],
-            lazy: false, inplace: false,
+            children: vec![TemplateNode::Element(Element {
+                tag: "button".to_string(),
+                attributes: vec![Attribute::EventHandler {
+                    event: "click".to_string(),
+                    handler: Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "add_to_cart".to_string(),
+                    },
+                }],
+                children: vec![TemplateNode::TextLiteral("Add".to_string())],
+                span: span(),
+            })],
+            lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -29666,15 +33854,23 @@ mod template_for_tests {
         out.push_str(&codegen.output);
 
         // Should use parameterized callback registration
-        assert!(out.contains("call $__cb_register_with_data"),
-            "for-loop event handler should call __cb_register_with_data");
-        assert!(out.contains("local.get $product"),
-            "should capture the for-loop binding variable");
-        assert!(out.contains("parameterized callback: captures $product"),
-            "should have comment about captured binding");
+        assert!(
+            out.contains("call $__cb_register_with_data"),
+            "for-loop event handler should call __cb_register_with_data"
+        );
+        assert!(
+            out.contains("local.get $product"),
+            "should capture the for-loop binding variable"
+        );
+        assert!(
+            out.contains("parameterized callback: captures $product"),
+            "should have comment about captured binding"
+        );
         // Should still call dom_addEventListener
-        assert!(out.contains("call $dom_addEventListener"),
-            "should still register the event listener");
+        assert!(
+            out.contains("call $dom_addEventListener"),
+            "should still register the event listener"
+        );
     }
 
     #[test]
@@ -29688,15 +33884,13 @@ mod template_for_tests {
 
         let node = TemplateNode::Element(Element {
             tag: "button".to_string(),
-            attributes: vec![
-                Attribute::EventHandler {
-                    event: "click".to_string(),
-                    handler: Expr::FieldAccess {
-                        object: Box::new(Expr::SelfExpr),
-                        field: "handle_click".to_string(),
-                    },
+            attributes: vec![Attribute::EventHandler {
+                event: "click".to_string(),
+                handler: Expr::FieldAccess {
+                    object: Box::new(Expr::SelfExpr),
+                    field: "handle_click".to_string(),
                 },
-            ],
+            }],
             children: vec![],
             span: span(),
         });
@@ -29704,11 +33898,15 @@ mod template_for_tests {
         let out = codegen.output;
 
         // Should NOT use parameterized callback registration
-        assert!(!out.contains("__cb_register_with_data"),
-            "static event handler should not call __cb_register_with_data");
+        assert!(
+            !out.contains("__cb_register_with_data"),
+            "static event handler should not call __cb_register_with_data"
+        );
         // Should use a static handler index
-        assert!(out.contains("i32.const 0 ;; handler func index"),
-            "should use static handler index");
+        assert!(
+            out.contains("i32.const 0 ;; handler func index"),
+            "should use static handler index"
+        );
     }
 
     #[test]
@@ -29726,39 +33924,41 @@ mod template_for_tests {
                 object: Box::new(Expr::Ident("category".to_string())),
                 field: "items".to_string(),
             }),
-            children: vec![
-                TemplateNode::Element(Element {
-                    tag: "button".to_string(),
-                    attributes: vec![
-                        Attribute::EventHandler {
-                            event: "click".to_string(),
-                            handler: Expr::FieldAccess {
-                                object: Box::new(Expr::SelfExpr),
-                                field: "select".to_string(),
-                            },
-                        },
-                    ],
-                    children: vec![],
-                    span: span(),
-                }),
-            ],
-            lazy: false, inplace: false,
+            children: vec![TemplateNode::Element(Element {
+                tag: "button".to_string(),
+                attributes: vec![Attribute::EventHandler {
+                    event: "click".to_string(),
+                    handler: Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "select".to_string(),
+                    },
+                }],
+                children: vec![],
+                span: span(),
+            })],
+            lazy: false,
+            inplace: false,
         };
 
         let node = TemplateNode::TemplateFor {
             binding: "category".to_string(),
             iterator: Box::new(Expr::Ident("categories".to_string())),
             children: vec![inner_for],
-            lazy: false, inplace: false,
+            lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let out = codegen.output;
 
         // Should capture the innermost binding (item), not the outer (category)
-        assert!(out.contains("parameterized callback: captures $item"),
-            "nested for-loop should capture innermost binding 'item'");
-        assert!(out.contains("local.get $item ;; captured item ptr"),
-            "should use local.get $item to capture the item pointer");
+        assert!(
+            out.contains("parameterized callback: captures $item"),
+            "nested for-loop should capture innermost binding 'item'"
+        );
+        assert!(
+            out.contains("local.get $item ;; captured item ptr"),
+            "should use local.get $item to capture the item pointer"
+        );
     }
 }
 
@@ -29780,19 +33980,27 @@ mod parameterized_callback_tests {
     #[test]
     fn test_cb_data_table_globals_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__cb_data_table_base (mut i32) (i32.const 0))"),
-            "should emit callback data table base global (heap-allocated at init)");
-        assert!(wat.contains("(global $__cb_data_count (mut i32) (i32.const 0))"),
-            "should emit callback data count global");
+        assert!(
+            wat.contains("(global $__cb_data_table_base (mut i32) (i32.const 0))"),
+            "should emit callback data table base global (heap-allocated at init)"
+        );
+        assert!(
+            wat.contains("(global $__cb_data_count (mut i32) (i32.const 0))"),
+            "should emit callback data count global"
+        );
     }
 
     #[test]
     fn test_cb_register_with_data_function_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $__cb_register_with_data"),
-            "should emit __cb_register_with_data function");
-        assert!(wat.contains("i32.const 10000"),
-            "dynamic callback indices should start at 10000");
+        assert!(
+            wat.contains("(func $__cb_register_with_data"),
+            "should emit __cb_register_with_data function"
+        );
+        assert!(
+            wat.contains("i32.const 10000"),
+            "dynamic callback indices should start at 10000"
+        );
     }
 
     #[test]
@@ -29807,10 +34015,14 @@ mod parameterized_callback_tests {
         let wat = compile(src);
 
         // The __callback dispatcher should check for dynamic indices >= 10000
-        assert!(wat.contains("i32.const 10000"),
-            "callback dispatcher should check for dynamic indices");
-        assert!(wat.contains("global.set $__callback_data"),
-            "callback dispatcher should set __callback_data for dynamic callbacks");
+        assert!(
+            wat.contains("i32.const 10000"),
+            "callback dispatcher should check for dynamic indices"
+        );
+        assert!(
+            wat.contains("global.set $__callback_data"),
+            "callback dispatcher should set __callback_data for dynamic callbacks"
+        );
     }
 
     #[test]
@@ -29826,18 +34038,25 @@ mod parameterized_callback_tests {
 
         // The per-component callback dispatcher should pass global.get $__callback_data
         // as $self instead of i32.const 0
-        assert!(wat.contains("global.get $__callback_data"),
-            "handler trampoline should pass $__callback_data as $self");
+        assert!(
+            wat.contains("global.get $__callback_data"),
+            "handler trampoline should pass $__callback_data as $self"
+        );
         // The callback dispatcher function should reference $__callback_data
         // to pass the captured item pointer as $self
         let cb_fn_marker = "(func $Cart__callback";
-        let cb_start = wat.find(cb_fn_marker)
+        let cb_start = wat
+            .find(cb_fn_marker)
             .expect("Cart__callback function must exist");
         let cb_section = &wat[cb_start..];
-        let cb_end = cb_section[1..].find("\n  (func ").unwrap_or(cb_section.len() - 1);
+        let cb_end = cb_section[1..]
+            .find("\n  (func ")
+            .unwrap_or(cb_section.len() - 1);
         let cb_section = &cb_section[..cb_end + 1];
-        assert!(cb_section.contains("global.get $__callback_data"),
-            "Cart__callback should use $__callback_data for $self parameter");
+        assert!(
+            cb_section.contains("global.get $__callback_data"),
+            "Cart__callback should use $__callback_data for $self parameter"
+        );
     }
 
     #[test]
@@ -29853,8 +34072,10 @@ mod parameterized_callback_tests {
         let wat = compile(src);
 
         // The handler trampoline should have a $product parameter
-        assert!(wat.contains("(param $product i32)"),
-            "handler trampoline should declare extra param $product");
+        assert!(
+            wat.contains("(param $product i32)"),
+            "handler trampoline should declare extra param $product"
+        );
     }
 
     #[test]
@@ -29872,18 +34093,26 @@ mod parameterized_callback_tests {
 
         // Find the Shop__callback function
         let cb_fn_marker = "(func $Shop__callback";
-        let cb_start = wat.find(cb_fn_marker)
+        let cb_start = wat
+            .find(cb_fn_marker)
             .expect("Shop__callback function must exist");
         let cb_section = &wat[cb_start..];
-        let cb_end = cb_section[1..].find("\n  (func ").unwrap_or(cb_section.len() - 1);
+        let cb_end = cb_section[1..]
+            .find("\n  (func ")
+            .unwrap_or(cb_section.len() - 1);
         let cb_section = &cb_section[..cb_end + 1];
 
         // Should pass $__callback_data twice: once as $self and once as $product
         let count = cb_section.matches("global.get $__callback_data").count();
-        assert!(count >= 2,
-            "Shop__callback should pass $__callback_data for both $self and $product, found {} occurrences", count);
-        assert!(cb_section.contains("pass callback data as $product"),
-            "Shop__callback should have comment about passing callback data as $product");
+        assert!(
+            count >= 2,
+            "Shop__callback should pass $__callback_data for both $self and $product, found {} occurrences",
+            count
+        );
+        assert!(
+            cb_section.contains("pass callback data as $product"),
+            "Shop__callback should have comment about passing callback data as $product"
+        );
     }
 
     #[test]
@@ -29902,20 +34131,29 @@ mod parameterized_callback_tests {
         let wat = compile(src);
 
         // The handler trampoline should contain a handler param field access
-        assert!(wat.contains(";; handler param field access: product.price"),
-            "should emit handler param field access comment for product.price");
+        assert!(
+            wat.contains(";; handler param field access: product.price"),
+            "should emit handler param field access comment for product.price"
+        );
         // Should do local.get $product to read the struct pointer
         let handler_marker = "(func $Shop__handler_0";
-        let handler_start = wat.find(handler_marker)
+        let handler_start = wat
+            .find(handler_marker)
             .expect("Shop__handler_0 must exist");
         let handler_section = &wat[handler_start..];
-        let handler_end = handler_section[1..].find("\n  (func ").unwrap_or(handler_section.len() - 1);
+        let handler_end = handler_section[1..]
+            .find("\n  (func ")
+            .unwrap_or(handler_section.len() - 1);
         let handler_section = &handler_section[..handler_end + 1];
 
-        assert!(handler_section.contains("local.get $product"),
-            "handler body should read $product local for field access");
-        assert!(handler_section.contains("i32.load"),
-            "handler body should load field from struct pointer");
+        assert!(
+            handler_section.contains("local.get $product"),
+            "handler body should read $product local for field access"
+        );
+        assert!(
+            handler_section.contains("i32.load"),
+            "handler body should load field from struct pointer"
+        );
     }
 }
 
@@ -29937,79 +34175,120 @@ mod event_data_tests {
     #[test]
     fn test_event_data_ptr_exported() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(export \"__event_data_ptr\")"), "should export __event_data_ptr");
-        assert!(wat.contains("(func $__event_data_ptr"), "should define __event_data_ptr function");
+        assert!(
+            wat.contains("(export \"__event_data_ptr\")"),
+            "should export __event_data_ptr"
+        );
+        assert!(
+            wat.contains("(func $__event_data_ptr"),
+            "should define __event_data_ptr function"
+        );
     }
 
     #[test]
     fn test_event_data_base_global() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__event_data_base (mut i32) (i32.const 0))"),
-            "should declare event data base global as heap-allocated");
+        assert!(
+            wat.contains("(global $__event_data_base (mut i32) (i32.const 0))"),
+            "should declare event data base global as heap-allocated"
+        );
     }
 
     #[test]
     fn test_event_data_ptr_returns_base() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("global.get $__event_data_base"),
-            "__event_data_ptr should return the base address");
+        assert!(
+            wat.contains("global.get $__event_data_base"),
+            "__event_data_ptr should return the base address"
+        );
     }
 
     #[test]
     fn test_init_all_allocates_reserved_regions() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("global.set $__event_data_base"), "init should allocate event data");
-        assert!(wat.contains("global.set $__sig_base"), "init should allocate signal table");
-        assert!(wat.contains("global.set $__pending"), "init should allocate pending table");
-        assert!(wat.contains("global.set $__contract_base"), "init should allocate contract table");
-        assert!(wat.contains("global.set $__route_base"), "init should allocate route table");
+        assert!(
+            wat.contains("global.set $__event_data_base"),
+            "init should allocate event data"
+        );
+        assert!(
+            wat.contains("global.set $__sig_base"),
+            "init should allocate signal table"
+        );
+        assert!(
+            wat.contains("global.set $__pending"),
+            "init should allocate pending table"
+        );
+        assert!(
+            wat.contains("global.set $__contract_base"),
+            "init should allocate contract table"
+        );
+        assert!(
+            wat.contains("global.set $__route_base"),
+            "init should allocate route table"
+        );
     }
 
     #[test]
     fn test_signal_base_heap_allocated() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__sig_base (mut i32) (i32.const 0))"),
-            "signal base should be heap-allocated (mut, init 0)");
+        assert!(
+            wat.contains("(global $__sig_base (mut i32) (i32.const 0))"),
+            "signal base should be heap-allocated (mut, init 0)"
+        );
     }
 
     #[test]
     fn test_contract_imports_present_when_used() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
 contract User {
     name: String
     age: i32
 }
 pub fn noop() -> i32 { return 0; }
-"#);
-        assert!(wat.contains("$http_fetch"), "contract should trigger HTTP imports");
+"#,
+        );
+        assert!(
+            wat.contains("$http_fetch"),
+            "contract should trigger HTTP imports"
+        );
     }
 
     #[test]
     fn test_dom_get_value_import() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))"),
-            "should import dom.getValue with (param i32) (result i32) signature");
+        assert!(
+            wat.contains(
+                "(import \"dom\" \"getValue\" (func $dom_getValue (param i32) (result i32)))"
+            ),
+            "should import dom.getValue with (param i32) (result i32) signature"
+        );
     }
 
     #[test]
     fn test_stmt_if_emits_void_block() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn decrement(x: i32) -> i32 {
                 if x > 0 {
                     return x - 1;
                 }
                 return x;
             }
-        "#);
+        "#,
+        );
         // Statement-level if should emit void `(if` without `(result i32)`
         assert!(wat.contains("(if"), "should contain an if block");
-        assert!(!wat.contains("(if (result i32)"),
-            "statement-level if must NOT emit (result i32) — it is void");
+        assert!(
+            !wat.contains("(if (result i32)"),
+            "statement-level if must NOT emit (result i32) — it is void"
+        );
     }
 
     #[test]
     fn test_stmt_if_else_emits_void_block() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn clamp(x: i32) -> i32 {
                 if x > 10 {
                     return 10;
@@ -30017,11 +34296,14 @@ pub fn noop() -> i32 { return 0; }
                     return x;
                 }
             }
-        "#);
+        "#,
+        );
         assert!(wat.contains("(if"), "should contain an if block");
         assert!(wat.contains("(else"), "should contain an else block");
-        assert!(!wat.contains("(if (result i32)"),
-            "statement-level if/else must NOT emit (result i32)");
+        assert!(
+            !wat.contains("(if (result i32)"),
+            "statement-level if/else must NOT emit (result i32)"
+        );
     }
 }
 
@@ -30045,10 +34327,14 @@ mod format_collections_csv_runtime_tests {
     #[test]
     fn test_format_number_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $format_number (param $value i32) (result i32 i32)"),
-            "format_number must be emitted with correct signature");
-        assert!(wat.contains("call $string_fromI32"),
-            "format_number should delegate to string_fromI32");
+        assert!(
+            wat.contains("(func $format_number (param $value i32) (result i32 i32)"),
+            "format_number must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains("call $string_fromI32"),
+            "format_number should delegate to string_fromI32"
+        );
     }
 
     #[test]
@@ -30056,36 +34342,52 @@ mod format_collections_csv_runtime_tests {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
         assert!(wat.contains("(func $format_currency (param $cents i32) (param $sym_ptr i32) (param $sym_len i32) (result i32 i32)"),
             "format_currency must be emitted with correct signature");
-        assert!(wat.contains("i32.const 100"),
-            "format_currency should divide by 100 for dollars");
+        assert!(
+            wat.contains("i32.const 100"),
+            "format_currency should divide by 100 for dollars"
+        );
     }
 
     #[test]
     fn test_format_percent_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $format_percent (param $value i32) (param $total i32) (result i32 i32)"),
-            "format_percent must be emitted with correct signature");
-        assert!(wat.contains("i32.const 37"),
-            "format_percent should emit '%' character (ASCII 37)");
+        assert!(
+            wat.contains(
+                "(func $format_percent (param $value i32) (param $total i32) (result i32 i32)"
+            ),
+            "format_percent must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains("i32.const 37"),
+            "format_percent should emit '%' character (ASCII 37)"
+        );
     }
 
     #[test]
     fn test_format_bytes_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $format_bytes (param $bytes i32) (result i32 i32)"),
-            "format_bytes must be emitted with correct signature");
-        assert!(wat.contains("i32.const 1048576"),
-            "format_bytes should check for MB threshold");
+        assert!(
+            wat.contains("(func $format_bytes (param $bytes i32) (result i32 i32)"),
+            "format_bytes must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains("i32.const 1048576"),
+            "format_bytes should check for MB threshold"
+        );
     }
 
     #[test]
     fn test_format_ordinal_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $format_ordinal (param $n i32) (result i32 i32)"),
-            "format_ordinal must be emitted with correct signature");
+        assert!(
+            wat.contains("(func $format_ordinal (param $n i32) (result i32 i32)"),
+            "format_ordinal must be emitted with correct signature"
+        );
         // Check for the 11/12/13 exception handling
-        assert!(wat.contains("i32.const 11"),
-            "format_ordinal should handle 11th exception");
+        assert!(
+            wat.contains("i32.const 11"),
+            "format_ordinal should handle 11th exception"
+        );
     }
 
     // -- Collections runtime tests --
@@ -30093,8 +34395,10 @@ mod format_collections_csv_runtime_tests {
     #[test]
     fn test_map_create_and_set_emitted() {
         let wat = compile("pub fn noop() -> i32 { map_create(); return 0; }");
-        assert!(wat.contains("(func $map_create (result i32)"),
-            "map_create must be emitted with correct signature");
+        assert!(
+            wat.contains("(func $map_create (result i32)"),
+            "map_create must be emitted with correct signature"
+        );
         assert!(wat.contains("(func $map_set (param $map i32) (param $k_ptr i32) (param $k_len i32) (param $val i32)"),
             "map_set must be emitted with correct signature");
     }
@@ -30102,27 +34406,53 @@ mod format_collections_csv_runtime_tests {
     #[test]
     fn test_map_get_has_delete_keys_emitted() {
         let wat = compile("pub fn noop() -> i32 { map_get(0, 0, 0); return 0; }");
-        assert!(wat.contains("(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
-            "map_get must be emitted with correct signature");
-        assert!(wat.contains("(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"),
-            "map_has must be emitted with correct signature");
-        assert!(wat.contains("(func $map_delete (param $map i32) (param $k_ptr i32) (param $k_len i32)"),
-            "map_delete must be emitted");
-        assert!(wat.contains("(func $map_keys (param $map i32) (result i32)"),
-            "map_keys must be emitted with correct signature");
+        assert!(
+            wat.contains(
+                "(func $map_get (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"
+            ),
+            "map_get must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains(
+                "(func $map_has (param $map i32) (param $k_ptr i32) (param $k_len i32) (result i32)"
+            ),
+            "map_has must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains(
+                "(func $map_delete (param $map i32) (param $k_ptr i32) (param $k_len i32)"
+            ),
+            "map_delete must be emitted"
+        );
+        assert!(
+            wat.contains("(func $map_keys (param $map i32) (result i32)"),
+            "map_keys must be emitted with correct signature"
+        );
     }
 
     #[test]
     fn test_set_create_add_has_delete_emitted() {
         let wat = compile("pub fn noop() -> i32 { set_create(); return 0; }");
-        assert!(wat.contains("(func $set_create (result i32)"),
-            "set_create must be emitted");
-        assert!(wat.contains("(func $set_add (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
-            "set_add must be emitted");
-        assert!(wat.contains("(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)"),
-            "set_has must be emitted");
-        assert!(wat.contains("(func $set_delete (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
-            "set_delete must be emitted");
+        assert!(
+            wat.contains("(func $set_create (result i32)"),
+            "set_create must be emitted"
+        );
+        assert!(
+            wat.contains("(func $set_add (param $set i32) (param $v_ptr i32) (param $v_len i32)"),
+            "set_add must be emitted"
+        );
+        assert!(
+            wat.contains(
+                "(func $set_has (param $set i32) (param $v_ptr i32) (param $v_len i32) (result i32)"
+            ),
+            "set_has must be emitted"
+        );
+        assert!(
+            wat.contains(
+                "(func $set_delete (param $set i32) (param $v_ptr i32) (param $v_len i32)"
+            ),
+            "set_delete must be emitted"
+        );
     }
 
     // -- CSV runtime tests --
@@ -30130,22 +34460,32 @@ mod format_collections_csv_runtime_tests {
     #[test]
     fn test_csv_parse_emitted() {
         let wat = compile("pub fn noop() -> i32 { csv_parse(0, 0); return 0; }");
-        assert!(wat.contains("(func $csv_parse (param $ptr i32) (param $len i32) (result i32)"),
-            "csv_parse must be emitted with correct signature");
+        assert!(
+            wat.contains("(func $csv_parse (param $ptr i32) (param $len i32) (result i32)"),
+            "csv_parse must be emitted with correct signature"
+        );
         // Should handle newlines and commas
-        assert!(wat.contains("i32.const 44"),
-            "csv_parse should check for comma delimiter (ASCII 44)");
-        assert!(wat.contains("i32.const 10"),
-            "csv_parse should check for newline (ASCII 10)");
+        assert!(
+            wat.contains("i32.const 44"),
+            "csv_parse should check for comma delimiter (ASCII 44)"
+        );
+        assert!(
+            wat.contains("i32.const 10"),
+            "csv_parse should check for newline (ASCII 10)"
+        );
     }
 
     #[test]
     fn test_csv_stringify_emitted() {
         let wat = compile("pub fn noop() -> i32 { csv_stringify(0); return 0; }");
-        assert!(wat.contains("(func $csv_stringify (param $arr i32) (result i32 i32)"),
-            "csv_stringify must be emitted with correct signature");
-        assert!(wat.contains("call $string_concat"),
-            "csv_stringify should use string_concat to build output");
+        assert!(
+            wat.contains("(func $csv_stringify (param $arr i32) (result i32 i32)"),
+            "csv_stringify must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains("call $string_concat"),
+            "csv_stringify should use string_concat to build output"
+        );
     }
 
     // -- Handler performance timing tests --
@@ -30153,75 +34493,117 @@ mod format_collections_csv_runtime_tests {
     #[test]
     fn test_string_from_f64_with_decimal_places() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $string_fromF64 (param $val f64) (result i32 i32)"),
-            "string_fromF64 must be emitted with correct signature");
+        assert!(
+            wat.contains("(func $string_fromF64 (param $val f64) (result i32 i32)"),
+            "string_fromF64 must be emitted with correct signature"
+        );
         // Must handle decimal places, not just truncate
-        assert!(wat.contains("f64.floor"),
-            "string_fromF64 should use f64.floor for integer part");
-        assert!(wat.contains("f64.const 100.0"),
-            "string_fromF64 should multiply fractional part by 100 for 2 decimal places");
-        assert!(wat.contains("i32.const 46"), // '.'
-            "string_fromF64 should emit a decimal point character");
+        assert!(
+            wat.contains("f64.floor"),
+            "string_fromF64 should use f64.floor for integer part"
+        );
+        assert!(
+            wat.contains("f64.const 100.0"),
+            "string_fromF64 should multiply fractional part by 100 for 2 decimal places"
+        );
+        assert!(
+            wat.contains("i32.const 46"), // '.'
+            "string_fromF64 should emit a decimal point character"
+        );
     }
 
     #[test]
     fn test_format_timing_ms_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $format_timing_ms (param $ms f64) (result i32 i32)"),
-            "format_timing_ms must be emitted with correct signature");
-        assert!(wat.contains("call $string_fromF64"),
-            "format_timing_ms should call string_fromF64 for number formatting");
-        assert!(wat.contains("i32.const 0x736D"), // "ms" little-endian
-            "format_timing_ms should append 'ms' suffix");
+        assert!(
+            wat.contains("(func $format_timing_ms (param $ms f64) (result i32 i32)"),
+            "format_timing_ms must be emitted with correct signature"
+        );
+        assert!(
+            wat.contains("call $string_fromF64"),
+            "format_timing_ms should call string_fromF64 for number formatting"
+        );
+        assert!(
+            wat.contains("i32.const 0x736D"), // "ms" little-endian
+            "format_timing_ms should append 'ms' suffix"
+        );
     }
 
     #[test]
     fn test_handler_timing_globals_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(global $__last_handler_time_ptr (mut i32) (i32.const 0))"),
-            "must emit __last_handler_time_ptr global");
-        assert!(wat.contains("(global $__last_handler_time_len (mut i32) (i32.const 0))"),
-            "must emit __last_handler_time_len global");
+        assert!(
+            wat.contains("(global $__last_handler_time_ptr (mut i32) (i32.const 0))"),
+            "must emit __last_handler_time_ptr global"
+        );
+        assert!(
+            wat.contains("(global $__last_handler_time_len (mut i32) (i32.const 0))"),
+            "must emit __last_handler_time_len global"
+        );
     }
 
     #[test]
     fn test_get_last_handler_time_exported() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)"),
-            "get_last_handler_time must be exported");
-        assert!(wat.contains("global.get $__last_handler_time_ptr"),
-            "getter must read the ptr global");
-        assert!(wat.contains("global.get $__last_handler_time_len"),
-            "getter must read the len global");
+        assert!(
+            wat.contains(
+                "(func $get_last_handler_time (export \"get_last_handler_time\") (result i32 i32)"
+            ),
+            "get_last_handler_time must be exported"
+        );
+        assert!(
+            wat.contains("global.get $__last_handler_time_ptr"),
+            "getter must read the ptr global"
+        );
+        assert!(
+            wat.contains("global.get $__last_handler_time_len"),
+            "getter must read the len global"
+        );
     }
 
     #[test]
     fn test_callback_dispatcher_wraps_with_timing() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             component Counter {
                 fn increment(&mut self) { return; }
                 render { <div>"counter"</div> }
             }
-        "#);
+        "#,
+        );
         // The per-component callback should have timing locals
-        assert!(wat.contains("Counter__callback"),
-            "Counter__callback must exist in output");
-        assert!(wat.contains("(local $__t0 f64)"),
-            "callback dispatcher must declare timing start local");
-        assert!(wat.contains("(local $__t1 f64)"),
-            "callback dispatcher must declare timing end local");
+        assert!(
+            wat.contains("Counter__callback"),
+            "Counter__callback must exist in output"
+        );
+        assert!(
+            wat.contains("(local $__t0 f64)"),
+            "callback dispatcher must declare timing start local"
+        );
+        assert!(
+            wat.contains("(local $__t1 f64)"),
+            "callback dispatcher must declare timing end local"
+        );
         // Extract the callback section for targeted assertions
         let cb_start = wat.find("Counter__callback").expect("must find callback");
         let callback_section = &wat[cb_start..];
         // Trim to just this function (up to next top-level func or end)
-        let section_end = callback_section.find("\n  (func ").unwrap_or(callback_section.len());
+        let section_end = callback_section
+            .find("\n  (func ")
+            .unwrap_or(callback_section.len());
         let callback_section = &callback_section[..section_end];
-        assert!(callback_section.contains("call $timer_now"),
-            "callback dispatcher must call $timer_now for timing");
-        assert!(callback_section.contains("call $format_timing_ms"),
-            "callback dispatcher must format timing result");
-        assert!(callback_section.contains("global.set $__last_handler_time_len"),
-            "callback dispatcher must store timing in global");
+        assert!(
+            callback_section.contains("call $timer_now"),
+            "callback dispatcher must call $timer_now for timing"
+        );
+        assert!(
+            callback_section.contains("call $format_timing_ms"),
+            "callback dispatcher must format timing result"
+        );
+        assert!(
+            callback_section.contains("global.set $__last_handler_time_len"),
+            "callback dispatcher must store timing in global"
+        );
     }
 }
 
@@ -30235,7 +34617,10 @@ mod db_and_auth_codegen_tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -30247,14 +34632,12 @@ mod db_and_auth_codegen_tests {
         let db = DbDef {
             name: "AppDB".into(),
             version: Some(2),
-            stores: vec![
-                DbStoreDef {
-                    name: "items".into(),
-                    key: "id".into(),
-                    indexes: vec![],
-                    span: span(),
-                },
-            ],
+            stores: vec![DbStoreDef {
+                name: "items".into(),
+                key: "id".into(),
+                indexes: vec![],
+                span: span(),
+            }],
             is_pub: false,
             span: span(),
         };
@@ -30263,14 +34646,13 @@ mod db_and_auth_codegen_tests {
         codegen.generate_db(&db);
         let output = codegen.output.clone();
         assert!(output.contains("Database: AppDB"), "should have db header");
-        assert!(output.contains("global $__db_AppDB_handle (mut i32)"),
-            "should emit db handle global");
-        assert!(output.contains("AppDB_init"),
-            "should emit init function");
-        assert!(output.contains("call $db_open"),
-            "init should call db_open");
-        assert!(output.contains("i32.const 2"),
-            "should pass version 2");
+        assert!(
+            output.contains("global $__db_AppDB_handle (mut i32)"),
+            "should emit db handle global"
+        );
+        assert!(output.contains("AppDB_init"), "should emit init function");
+        assert!(output.contains("call $db_open"), "init should call db_open");
+        assert!(output.contains("i32.const 2"), "should pass version 2");
     }
 
     #[test]
@@ -30278,14 +34660,12 @@ mod db_and_auth_codegen_tests {
         let db = DbDef {
             name: "MyDB".into(),
             version: None,
-            stores: vec![
-                DbStoreDef {
-                    name: "records".into(),
-                    key: "id".into(),
-                    indexes: vec![],
-                    span: span(),
-                },
-            ],
+            stores: vec![DbStoreDef {
+                name: "records".into(),
+                key: "id".into(),
+                indexes: vec![],
+                span: span(),
+            }],
             is_pub: false,
             span: span(),
         };
@@ -30295,30 +34675,36 @@ mod db_and_auth_codegen_tests {
         let output = codegen.output.clone();
 
         // put wrapper
-        assert!(output.contains("MyDB_put"),
-            "should emit put wrapper");
-        assert!(output.contains("call $db_put"),
-            "put wrapper should call db_put import");
-        assert!(output.contains("global.get $__db_MyDB_handle"),
-            "put wrapper should pass db handle");
+        assert!(output.contains("MyDB_put"), "should emit put wrapper");
+        assert!(
+            output.contains("call $db_put"),
+            "put wrapper should call db_put import"
+        );
+        assert!(
+            output.contains("global.get $__db_MyDB_handle"),
+            "put wrapper should pass db handle"
+        );
 
         // get wrapper
-        assert!(output.contains("MyDB_get"),
-            "should emit get wrapper");
-        assert!(output.contains("call $db_get"),
-            "get wrapper should call db_get import");
+        assert!(output.contains("MyDB_get"), "should emit get wrapper");
+        assert!(
+            output.contains("call $db_get"),
+            "get wrapper should call db_get import"
+        );
 
         // delete wrapper
-        assert!(output.contains("MyDB_delete"),
-            "should emit delete wrapper");
-        assert!(output.contains("call $db_delete"),
-            "delete wrapper should call db_delete import");
+        assert!(output.contains("MyDB_delete"), "should emit delete wrapper");
+        assert!(
+            output.contains("call $db_delete"),
+            "delete wrapper should call db_delete import"
+        );
 
         // getAll wrapper
-        assert!(output.contains("MyDB_getAll"),
-            "should emit getAll wrapper");
-        assert!(output.contains("call $db_getAll"),
-            "getAll wrapper should call db_getAll import");
+        assert!(output.contains("MyDB_getAll"), "should emit getAll wrapper");
+        assert!(
+            output.contains("call $db_getAll"),
+            "getAll wrapper should call db_getAll import"
+        );
     }
 
     #[test]
@@ -30335,8 +34721,10 @@ mod db_and_auth_codegen_tests {
         codegen.generate_db(&db);
         let output = codegen.output.clone();
         // version should default to 1
-        assert!(output.contains("i32.const 1  ;; version"),
-            "should default version to 1");
+        assert!(
+            output.contains("i32.const 1  ;; version"),
+            "should default version to 1"
+        );
     }
 
     #[test]
@@ -30353,8 +34741,10 @@ mod db_and_auth_codegen_tests {
         codegen.generate_db(&db);
         let output = codegen.output.clone();
         // Should use "default" as store name (7 chars)
-        assert!(output.contains(";; store name len"),
-            "should have store name in wrappers");
+        assert!(
+            output.contains(";; store name len"),
+            "should have store name in wrappers"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -30379,9 +34769,14 @@ mod db_and_auth_codegen_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         // The config string is interned — check that it's in the string table
-        let has_cookie_session = codegen.strings.iter().any(|(s, _)| s.contains("\"session\":\"cookie\""));
-        assert!(has_cookie_session,
-            "should default session to cookie in config string");
+        let has_cookie_session = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains("\"session\":\"cookie\""));
+        assert!(
+            has_cookie_session,
+            "should default session to cookie in config string"
+        );
     }
 
     #[test]
@@ -30402,12 +34797,18 @@ mod db_and_auth_codegen_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
-        assert!(output.contains("MyAuth_is_authenticated"),
-            "should emit is_authenticated function");
-        assert!(output.contains("call $auth_getRawCookies"),
-            "is_authenticated should read cookies");
-        assert!(output.contains("call $string_contains"),
-            "is_authenticated should check for session key");
+        assert!(
+            output.contains("MyAuth_is_authenticated"),
+            "should emit is_authenticated function"
+        );
+        assert!(
+            output.contains("call $auth_getRawCookies"),
+            "is_authenticated should read cookies"
+        );
+        assert!(
+            output.contains("call $string_contains"),
+            "is_authenticated should check for session key"
+        );
     }
 
     #[test]
@@ -30428,10 +34829,14 @@ mod db_and_auth_codegen_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
-        assert!(output.contains("AppAuth_check"),
-            "should emit check function");
-        assert!(output.contains("call $http_fetch"),
-            "check should call http_fetch for server-side verification");
+        assert!(
+            output.contains("AppAuth_check"),
+            "should emit check function"
+        );
+        assert!(
+            output.contains("call $http_fetch"),
+            "check should call http_fetch for server-side verification"
+        );
     }
 
     #[test]
@@ -30452,22 +34857,31 @@ mod db_and_auth_codegen_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
-        assert!(output.contains("Auth_set_cookie"),
-            "should emit set_cookie wrapper");
+        assert!(
+            output.contains("Auth_set_cookie"),
+            "should emit set_cookie wrapper"
+        );
         // The HttpOnly suffix is interned in the string table
         let has_httponly = codegen.strings.iter().any(|(s, _)| s.contains("HttpOnly"));
-        assert!(has_httponly,
-            "set_cookie should intern HttpOnly suffix");
+        assert!(has_httponly, "set_cookie should intern HttpOnly suffix");
         let has_secure = codegen.strings.iter().any(|(s, _)| s.contains("Secure"));
-        assert!(has_secure,
-            "set_cookie should intern Secure suffix");
-        let has_samesite = codegen.strings.iter().any(|(s, _)| s.contains("SameSite=Strict"));
-        assert!(has_samesite,
-            "set_cookie should intern SameSite=Strict suffix");
-        assert!(output.contains("call $string_concat"),
-            "set_cookie should concatenate suffix");
-        assert!(output.contains("call $auth_set_cookie"),
-            "set_cookie should call auth_set_cookie import");
+        assert!(has_secure, "set_cookie should intern Secure suffix");
+        let has_samesite = codegen
+            .strings
+            .iter()
+            .any(|(s, _)| s.contains("SameSite=Strict"));
+        assert!(
+            has_samesite,
+            "set_cookie should intern SameSite=Strict suffix"
+        );
+        assert!(
+            output.contains("call $string_concat"),
+            "set_cookie should concatenate suffix"
+        );
+        assert!(
+            output.contains("call $auth_set_cookie"),
+            "set_cookie should call auth_set_cookie import"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -30496,12 +34910,18 @@ mod db_and_auth_codegen_tests {
         let program = parser.parse_program().unwrap();
         let mut codegen = WasmCodegen::new();
         let wat = codegen.generate(&program);
-        assert!(wat.contains("__init_all"),
-            "should emit __init_all function");
-        assert!(wat.contains("call $__auth_register_AppAuth"),
-            "__init_all should call auth register");
-        assert!(wat.contains("call $AppDB_init"),
-            "__init_all should call db init");
+        assert!(
+            wat.contains("__init_all"),
+            "should emit __init_all function"
+        );
+        assert!(
+            wat.contains("call $__auth_register_AppAuth"),
+            "__init_all should call auth register"
+        );
+        assert!(
+            wat.contains("call $AppDB_init"),
+            "__init_all should call db init"
+        );
     }
 }
 
@@ -30515,7 +34935,10 @@ mod capability_primitive_tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -30539,14 +34962,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_Checkout_status (mut i32)"),
-            "should emit status signal global");
-        assert!(output.contains("global $__sig_Checkout_error (mut i32)"),
-            "should emit error signal global");
-        assert!(output.contains("global $__sig_Checkout_token (mut i32)"),
-            "should emit token signal global");
-        assert!(output.contains("call $signal_create"),
-            "should call signal_create");
+        assert!(
+            output.contains("global $__sig_Checkout_status (mut i32)"),
+            "should emit status signal global"
+        );
+        assert!(
+            output.contains("global $__sig_Checkout_error (mut i32)"),
+            "should emit error signal global"
+        );
+        assert!(
+            output.contains("global $__sig_Checkout_token (mut i32)"),
+            "should emit token signal global"
+        );
+        assert!(
+            output.contains("call $signal_create"),
+            "should call signal_create"
+        );
     }
 
     #[test]
@@ -30589,13 +35020,21 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("CC_get_status"), "should emit status getter");
+        assert!(
+            output.contains("CC_get_status"),
+            "should emit status getter"
+        );
         assert!(output.contains("CC_get_token"), "should emit token getter");
         assert!(output.contains("CC_get_error"), "should emit error getter");
-        assert!(output.contains("payment_validate_aba"), "should emit ABA routing validation");
-        assert!(output.contains("i32.const 9"), "ABA should check for 9 digits");
+        assert!(
+            output.contains("payment_validate_aba"),
+            "should emit ABA routing validation"
+        );
+        assert!(
+            output.contains("i32.const 9"),
+            "ABA should check for 9 digits"
+        );
     }
-
 
     // -----------------------------------------------------------------------
     // Payment — automatic WASM-layer encryption
@@ -30604,75 +35043,147 @@ mod capability_primitive_tests {
     #[test]
     fn payment_emits_crypto_globals() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("__payment_Checkout_ecdh_priv_ptr"), "should emit ECDH private key ptr global");
-        assert!(output.contains("__payment_Checkout_ecdh_priv_len"), "should emit ECDH private key len global");
-        assert!(output.contains("__payment_Checkout_shared_key_ptr"), "should emit shared key ptr global");
-        assert!(output.contains("__payment_Checkout_shared_key_len"), "should emit shared key len global");
-        assert!(output.contains("__payment_Checkout_sign_priv_ptr"), "should emit signing key ptr global");
-        assert!(output.contains("__payment_Checkout_sign_priv_len"), "should emit signing key len global");
+        assert!(
+            output.contains("__payment_Checkout_ecdh_priv_ptr"),
+            "should emit ECDH private key ptr global"
+        );
+        assert!(
+            output.contains("__payment_Checkout_ecdh_priv_len"),
+            "should emit ECDH private key len global"
+        );
+        assert!(
+            output.contains("__payment_Checkout_shared_key_ptr"),
+            "should emit shared key ptr global"
+        );
+        assert!(
+            output.contains("__payment_Checkout_shared_key_len"),
+            "should emit shared key len global"
+        );
+        assert!(
+            output.contains("__payment_Checkout_sign_priv_ptr"),
+            "should emit signing key ptr global"
+        );
+        assert!(
+            output.contains("__payment_Checkout_sign_priv_len"),
+            "should emit signing key len global"
+        );
     }
 
     #[test]
     fn payment_init_generates_keypair() {
         let payment = PaymentDef {
-            name: "Pay".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Pay".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("call $crypto_generate_key_pair"), "init should generate keypair");
-        assert!(output.contains("global.set $__payment_Pay_ecdh_priv_ptr"), "init should store ECDH private key");
-        assert!(output.contains("global.set $__payment_Pay_sign_priv_ptr"), "init should store signing private key");
+        assert!(
+            output.contains("call $crypto_generate_key_pair"),
+            "init should generate keypair"
+        );
+        assert!(
+            output.contains("global.set $__payment_Pay_ecdh_priv_ptr"),
+            "init should store ECDH private key"
+        );
+        assert!(
+            output.contains("global.set $__payment_Pay_sign_priv_ptr"),
+            "init should store signing private key"
+        );
     }
 
     #[test]
     fn payment_init_calls_key_exchange() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("call $payment_key_exchange"), "init should call key_exchange syscall");
+        assert!(
+            output.contains("call $payment_key_exchange"),
+            "init should call key_exchange syscall"
+        );
     }
 
     #[test]
     fn payment_key_exchange_callback_derives_key() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("__payment_Checkout_on_key_exchange"), "should emit key exchange callback");
-        assert!(output.contains("call $crypto_ecdh_derive"), "callback should call ECDH derive");
-        assert!(output.contains("call $crypto_hkdf_derive"), "callback should call HKDF derive");
-        assert!(output.contains("global.set $__payment_Checkout_shared_key_ptr"), "callback should store derived AES key");
+        assert!(
+            output.contains("__payment_Checkout_on_key_exchange"),
+            "should emit key exchange callback"
+        );
+        assert!(
+            output.contains("call $crypto_ecdh_derive"),
+            "callback should call ECDH derive"
+        );
+        assert!(
+            output.contains("call $crypto_hkdf_derive"),
+            "callback should call HKDF derive"
+        );
+        assert!(
+            output.contains("global.set $__payment_Checkout_shared_key_ptr"),
+            "callback should store derived AES key"
+        );
     }
 
     #[test]
     fn payment_submit_encrypts_before_confirm() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
@@ -30682,80 +35193,151 @@ mod capability_primitive_tests {
         let confirm_pos = output.find("call $payment_confirm");
         assert!(encrypt_pos.is_some(), "submit should call encrypt_and_sign");
         assert!(confirm_pos.is_some(), "submit should call payment_confirm");
-        assert!(encrypt_pos.unwrap() < confirm_pos.unwrap(), "encrypt must be before confirm");
+        assert!(
+            encrypt_pos.unwrap() < confirm_pos.unwrap(),
+            "encrypt must be before confirm"
+        );
     }
 
     #[test]
     fn payment_encrypt_calls_aes_and_ed25519() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("call $crypto_aes_gcm_encrypt"), "encrypt_and_sign should call AES-GCM");
-        assert!(output.contains("call $crypto_ed25519_sign"), "encrypt_and_sign should call Ed25519 sign");
+        assert!(
+            output.contains("call $crypto_aes_gcm_encrypt"),
+            "encrypt_and_sign should call AES-GCM"
+        );
+        assert!(
+            output.contains("call $crypto_ed25519_sign"),
+            "encrypt_and_sign should call Ed25519 sign"
+        );
     }
 
     #[test]
     fn payment_submit_guards_missing_key() {
         let payment = PaymentDef {
-            name: "Pay".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Pay".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("global.get $__payment_Pay_shared_key_ptr"), "submit should check shared key");
-        assert!(output.contains("i32.eqz"), "submit should check if key is zero");
-        assert!(output.contains("i32.const 3  ;; error"), "guard should set status to error");
+        assert!(
+            output.contains("global.get $__payment_Pay_shared_key_ptr"),
+            "submit should check shared key"
+        );
+        assert!(
+            output.contains("i32.eqz"),
+            "submit should check if key is zero"
+        );
+        assert!(
+            output.contains("i32.const 3  ;; error"),
+            "guard should set status to error"
+        );
         assert!(output.contains("return"), "guard should return early");
-        assert!(codegen.strings.iter().any(|(s, _)| s == "Payment encryption not ready"), "should store error message");
+        assert!(
+            codegen
+                .strings
+                .iter()
+                .any(|(s, _)| s == "Payment encryption not ready"),
+            "should store error message"
+        );
     }
 
     #[test]
     fn payment_crypto_runtime_auto_included() {
         let mut codegen = WasmCodegen::new();
         codegen.needs_payment = true;
-        let should_emit = codegen.used_runtime_categories.contains("crypto") || codegen.needs_payment;
-        assert!(should_emit, "needs_payment should force crypto runtime emission");
+        let should_emit =
+            codegen.used_runtime_categories.contains("crypto") || codegen.needs_payment;
+        assert!(
+            should_emit,
+            "needs_payment should force crypto runtime emission"
+        );
     }
 
     #[test]
     fn payment_key_exchange_import_emitted() {
         let payment = PaymentDef {
-            name: "Checkout".into(), provider: None, public_key: None,
-            sandbox_mode: false, on_success: None, on_error: None,
-            methods: vec![], is_pub: false, span: span(),
+            name: "Checkout".into(),
+            provider: None,
+            public_key: None,
+            sandbox_mode: false,
+            on_success: None,
+            on_error: None,
+            methods: vec![],
+            is_pub: false,
+            span: span(),
         };
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
         codegen.generate_payment(&payment);
         let output = codegen.output.clone();
-        assert!(output.contains("call $payment_key_exchange"), "should call $payment_key_exchange");
+        assert!(
+            output.contains("call $payment_key_exchange"),
+            "should call $payment_key_exchange"
+        );
     }
 
     #[test]
     fn payment_encryption_all_providers() {
         for provider in &["stripe", "moov", "paypal", "square"] {
             let payment = PaymentDef {
-                name: "PP".into(), provider: Some(Expr::StringLit(provider.to_string())),
-                public_key: None, sandbox_mode: false, on_success: None, on_error: None,
-                methods: vec![], is_pub: false, span: span(),
+                name: "PP".into(),
+                provider: Some(Expr::StringLit(provider.to_string())),
+                public_key: None,
+                sandbox_mode: false,
+                on_success: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
             };
             let mut codegen = WasmCodegen::new();
             codegen.indent = 1;
             codegen.generate_payment(&payment);
             let output = codegen.output.clone();
-            assert!(output.contains("__payment_PP_ecdh_priv_ptr"), "{} should have ECDH crypto globals", provider);
-            assert!(output.contains("__payment_PP_shared_key_ptr"), "{} should have shared key globals", provider);
-            assert!(output.contains("call $__payment_PP_encrypt_and_sign"), "{} submit should encrypt", provider);
-            assert!(output.contains("call $payment_key_exchange"), "{} init should call key exchange", provider);
+            assert!(
+                output.contains("__payment_PP_ecdh_priv_ptr"),
+                "{} should have ECDH crypto globals",
+                provider
+            );
+            assert!(
+                output.contains("__payment_PP_shared_key_ptr"),
+                "{} should have shared key globals",
+                provider
+            );
+            assert!(
+                output.contains("call $__payment_PP_encrypt_and_sign"),
+                "{} submit should encrypt",
+                provider
+            );
+            assert!(
+                output.contains("call $payment_key_exchange"),
+                "{} init should call key exchange",
+                provider
+            );
         }
     }
 
@@ -30781,12 +35363,18 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_AppAuth_status (mut i32)"),
-            "should emit status signal global");
-        assert!(output.contains("global $__sig_AppAuth_user_data (mut i32)"),
-            "should emit user_data signal global");
-        assert!(output.contains("global $__sig_AppAuth_error_msg (mut i32)"),
-            "should emit error_msg signal global");
+        assert!(
+            output.contains("global $__sig_AppAuth_status (mut i32)"),
+            "should emit status signal global"
+        );
+        assert!(
+            output.contains("global $__sig_AppAuth_user_data (mut i32)"),
+            "should emit user_data signal global"
+        );
+        assert!(
+            output.contains("global $__sig_AppAuth_error_msg (mut i32)"),
+            "should emit error_msg signal global"
+        );
     }
 
     #[test]
@@ -30808,10 +35396,18 @@ mod capability_primitive_tests {
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
         assert!(output.contains("MyAuth_init"), "should emit init function");
-        assert!(output.contains("MyAuth_login"), "should emit login function");
-        assert!(output.contains("MyAuth_logout"), "should emit logout function");
-        assert!(output.contains("call $http_fetchWithCallback"),
-            "login/logout should use http_fetchWithCallback");
+        assert!(
+            output.contains("MyAuth_login"),
+            "should emit login function"
+        );
+        assert!(
+            output.contains("MyAuth_logout"),
+            "should emit logout function"
+        );
+        assert!(
+            output.contains("call $http_fetchWithCallback"),
+            "login/logout should use http_fetchWithCallback"
+        );
     }
 
     #[test]
@@ -30832,10 +35428,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_auth(&auth);
         let output = codegen.output.clone();
-        assert!(output.contains("auth_validate_email"), "should emit email validation");
-        assert!(output.contains("i32.const 64  ;; '@'"), "email validation should check for @");
-        assert!(output.contains("auth_validate_password"), "should emit password validation");
-        assert!(output.contains("i32.const 8"), "password validation should check min 8 chars");
+        assert!(
+            output.contains("auth_validate_email"),
+            "should emit email validation"
+        );
+        assert!(
+            output.contains("i32.const 64  ;; '@'"),
+            "email validation should check for @"
+        );
+        assert!(
+            output.contains("auth_validate_password"),
+            "should emit password validation"
+        );
+        assert!(
+            output.contains("i32.const 8"),
+            "password validation should check min 8 chars"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -30855,10 +35463,14 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_db(&db);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_TestDB_status (mut i32)"),
-            "should emit status signal global");
-        assert!(output.contains("global $__sig_TestDB_error_msg (mut i32)"),
-            "should emit error_msg signal global");
+        assert!(
+            output.contains("global $__sig_TestDB_status (mut i32)"),
+            "should emit status signal global"
+        );
+        assert!(
+            output.contains("global $__sig_TestDB_error_msg (mut i32)"),
+            "should emit error_msg signal global"
+        );
     }
 
     #[test]
@@ -30875,7 +35487,10 @@ mod capability_primitive_tests {
         codegen.generate_db(&db);
         let output = codegen.output.clone();
         assert!(output.contains("AppDB_close"), "should emit close function");
-        assert!(output.contains("AppDB_is_open"), "should emit is_open function");
+        assert!(
+            output.contains("AppDB_is_open"),
+            "should emit is_open function"
+        );
     }
 
     #[test]
@@ -30891,9 +35506,18 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_db(&db);
         let output = codegen.output.clone();
-        assert!(output.contains("MyDB_get_status"), "should emit status getter");
-        assert!(output.contains("MyDB_get_error_msg"), "should emit error_msg getter");
-        assert!(output.contains("call $signal_get"), "getters should read via signal_get");
+        assert!(
+            output.contains("MyDB_get_status"),
+            "should emit status getter"
+        );
+        assert!(
+            output.contains("MyDB_get_error_msg"),
+            "should emit error_msg getter"
+        );
+        assert!(
+            output.contains("call $signal_get"),
+            "getters should read via signal_get"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -30936,37 +35560,45 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_form(&form);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_LoginForm_email (mut i32)"),
-            "should emit per-field email signal");
-        assert!(output.contains("global $__sig_LoginForm_password (mut i32)"),
-            "should emit per-field password signal");
-        assert!(output.contains("global $__sig_LoginForm_email_error (mut i32)"),
-            "should emit per-field email error signal");
-        assert!(output.contains("global $__sig_LoginForm_valid (mut i32)"),
-            "should emit form valid signal");
-        assert!(output.contains("global $__sig_LoginForm_submitting (mut i32)"),
-            "should emit form submitting signal");
+        assert!(
+            output.contains("global $__sig_LoginForm_email (mut i32)"),
+            "should emit per-field email signal"
+        );
+        assert!(
+            output.contains("global $__sig_LoginForm_password (mut i32)"),
+            "should emit per-field password signal"
+        );
+        assert!(
+            output.contains("global $__sig_LoginForm_email_error (mut i32)"),
+            "should emit per-field email error signal"
+        );
+        assert!(
+            output.contains("global $__sig_LoginForm_valid (mut i32)"),
+            "should emit form valid signal"
+        );
+        assert!(
+            output.contains("global $__sig_LoginForm_submitting (mut i32)"),
+            "should emit form submitting signal"
+        );
     }
 
     #[test]
     fn form_emits_validate_and_submit_lifecycle() {
         let form = FormDef {
             name: "ContactForm".into(),
-            fields: vec![
-                FormFieldDef {
-                    name: "name".into(),
-                    ty: Type::Named("String".into()),
-                    validators: vec![ValidatorDef {
-                        kind: ValidatorKind::Required,
-                        message: None,
-                        span: span(),
-                    }],
-                    label: None,
-                    placeholder: None,
-                    default_value: None,
+            fields: vec![FormFieldDef {
+                name: "name".into(),
+                ty: Type::Named("String".into()),
+                validators: vec![ValidatorDef {
+                    kind: ValidatorKind::Required,
+                    message: None,
                     span: span(),
-                },
-            ],
+                }],
+                label: None,
+                placeholder: None,
+                default_value: None,
+                span: span(),
+            }],
             on_submit: None,
             steps: vec![],
             methods: vec![],
@@ -30979,10 +35611,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_form(&form);
         let output = codegen.output.clone();
-        assert!(output.contains("ContactForm_validate"), "should emit validate function");
-        assert!(output.contains("ContactForm_submit"), "should emit submit function");
-        assert!(output.contains("ContactForm_reset"), "should emit reset function");
-        assert!(output.contains("validate name: required"), "should validate required field");
+        assert!(
+            output.contains("ContactForm_validate"),
+            "should emit validate function"
+        );
+        assert!(
+            output.contains("ContactForm_submit"),
+            "should emit submit function"
+        );
+        assert!(
+            output.contains("ContactForm_reset"),
+            "should emit reset function"
+        );
+        assert!(
+            output.contains("validate name: required"),
+            "should validate required field"
+        );
     }
 
     #[test]
@@ -31003,8 +35647,14 @@ mod capability_primitive_tests {
         codegen.generate_form(&form);
         let output = codegen.output.clone();
         assert!(output.contains("F_get_valid"), "should emit valid getter");
-        assert!(output.contains("F_get_submitting"), "should emit submitting getter");
-        assert!(output.contains("F_is_valid"), "should emit is_valid convenience");
+        assert!(
+            output.contains("F_get_submitting"),
+            "should emit submitting getter"
+        );
+        assert!(
+            output.contains("F_is_valid"),
+            "should emit is_valid convenience"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -31030,14 +35680,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_upload(&upload);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_FileUp_status (mut i32)"),
-            "should emit status signal");
-        assert!(output.contains("global $__sig_FileUp_progress (mut i32)"),
-            "should emit progress signal");
-        assert!(output.contains("global $__sig_FileUp_filename (mut i32)"),
-            "should emit filename signal");
-        assert!(output.contains("global $__sig_FileUp_error_msg (mut i32)"),
-            "should emit error_msg signal");
+        assert!(
+            output.contains("global $__sig_FileUp_status (mut i32)"),
+            "should emit status signal"
+        );
+        assert!(
+            output.contains("global $__sig_FileUp_progress (mut i32)"),
+            "should emit progress signal"
+        );
+        assert!(
+            output.contains("global $__sig_FileUp_filename (mut i32)"),
+            "should emit filename signal"
+        );
+        assert!(
+            output.contains("global $__sig_FileUp_error_msg (mut i32)"),
+            "should emit error_msg signal"
+        );
     }
 
     #[test]
@@ -31059,10 +35717,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_upload(&upload);
         let output = codegen.output.clone();
-        assert!(output.contains("Uploader_init"), "should emit init function");
-        assert!(output.contains("Uploader_select"), "should emit select function");
-        assert!(output.contains("Uploader_start"), "should emit start function");
-        assert!(output.contains("Uploader_cancel"), "should emit cancel function");
+        assert!(
+            output.contains("Uploader_init"),
+            "should emit init function"
+        );
+        assert!(
+            output.contains("Uploader_select"),
+            "should emit select function"
+        );
+        assert!(
+            output.contains("Uploader_start"),
+            "should emit start function"
+        );
+        assert!(
+            output.contains("Uploader_cancel"),
+            "should emit cancel function"
+        );
     }
 
     #[test]
@@ -31084,11 +35754,23 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_upload(&upload);
         let output = codegen.output.clone();
-        assert!(output.contains("upload_validate_size"), "should emit size validation");
-        assert!(output.contains("upload_validate_type"), "should emit type validation");
+        assert!(
+            output.contains("upload_validate_size"),
+            "should emit size validation"
+        );
+        assert!(
+            output.contains("upload_validate_type"),
+            "should emit type validation"
+        );
         assert!(output.contains("U_get_status"), "should emit status getter");
-        assert!(output.contains("U_get_progress"), "should emit progress getter");
-        assert!(output.contains("U_get_filename"), "should emit filename getter");
+        assert!(
+            output.contains("U_get_progress"),
+            "should emit progress getter"
+        );
+        assert!(
+            output.contains("U_get_filename"),
+            "should emit filename getter"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -31115,12 +35797,18 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_Chat_status (mut i32)"),
-            "should emit status signal");
-        assert!(output.contains("global $__sig_Chat_last_message (mut i32)"),
-            "should emit last_message signal");
-        assert!(output.contains("global $__sig_Chat_error_msg (mut i32)"),
-            "should emit error_msg signal");
+        assert!(
+            output.contains("global $__sig_Chat_status (mut i32)"),
+            "should emit status signal"
+        );
+        assert!(
+            output.contains("global $__sig_Chat_last_message (mut i32)"),
+            "should emit last_message signal"
+        );
+        assert!(
+            output.contains("global $__sig_Chat_error_msg (mut i32)"),
+            "should emit error_msg signal"
+        );
     }
 
     #[test]
@@ -31144,10 +35832,16 @@ mod capability_primitive_tests {
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
         assert!(output.contains("WS_init"), "should emit init function");
-        assert!(output.contains("WS_connect"), "should emit connect function");
+        assert!(
+            output.contains("WS_connect"),
+            "should emit connect function"
+        );
         assert!(output.contains("WS_send"), "should emit send function");
         assert!(output.contains("WS_close"), "should emit close function");
-        assert!(output.contains("WS_is_connected"), "should emit is_connected");
+        assert!(
+            output.contains("WS_is_connected"),
+            "should emit is_connected"
+        );
     }
 
     #[test]
@@ -31170,13 +35864,26 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
-        assert!(output.contains("Live_reconnect"), "should emit reconnect function");
-        assert!(output.contains("i32.const 1000"), "reconnect should use 1000ms base");
-        assert!(output.contains("i32.const 30000"), "reconnect should cap at 30000ms");
-        assert!(output.contains("__channel_Live_reconnect_count"),
-            "should have reconnect counter global");
-        assert!(output.contains("call $timer_setTimeout"),
-            "reconnect should schedule via setTimeout");
+        assert!(
+            output.contains("Live_reconnect"),
+            "should emit reconnect function"
+        );
+        assert!(
+            output.contains("i32.const 1000"),
+            "reconnect should use 1000ms base"
+        );
+        assert!(
+            output.contains("i32.const 30000"),
+            "reconnect should cap at 30000ms"
+        );
+        assert!(
+            output.contains("__channel_Live_reconnect_count"),
+            "should have reconnect counter global"
+        );
+        assert!(
+            output.contains("call $timer_setTimeout"),
+            "reconnect should schedule via setTimeout"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -31201,14 +35908,22 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_map(&map);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_StoreMap_status (mut i32)"),
-            "should emit status signal");
-        assert!(output.contains("global $__sig_StoreMap_center_lat (mut i32)"),
-            "should emit center_lat signal");
-        assert!(output.contains("global $__sig_StoreMap_center_lng (mut i32)"),
-            "should emit center_lng signal");
-        assert!(output.contains("global $__sig_StoreMap_zoom (mut i32)"),
-            "should emit zoom signal");
+        assert!(
+            output.contains("global $__sig_StoreMap_status (mut i32)"),
+            "should emit status signal"
+        );
+        assert!(
+            output.contains("global $__sig_StoreMap_center_lat (mut i32)"),
+            "should emit center_lat signal"
+        );
+        assert!(
+            output.contains("global $__sig_StoreMap_center_lng (mut i32)"),
+            "should emit center_lng signal"
+        );
+        assert!(
+            output.contains("global $__sig_StoreMap_zoom (mut i32)"),
+            "should emit zoom signal"
+        );
     }
 
     #[test]
@@ -31231,9 +35946,18 @@ mod capability_primitive_tests {
         let output = codegen.output.clone();
         assert!(output.contains("M_init"), "should emit init function");
         assert!(output.contains("M_mount"), "should emit mount function");
-        assert!(output.contains("M_set_center"), "should emit set_center function");
-        assert!(output.contains("M_set_zoom"), "should emit set_zoom function");
-        assert!(output.contains("M_add_marker"), "should emit add_marker function");
+        assert!(
+            output.contains("M_set_center"),
+            "should emit set_center function"
+        );
+        assert!(
+            output.contains("M_set_zoom"),
+            "should emit set_zoom function"
+        );
+        assert!(
+            output.contains("M_add_marker"),
+            "should emit add_marker function"
+        );
     }
 
     #[test]
@@ -31254,12 +35978,23 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_map(&map);
         let output = codegen.output.clone();
-        assert!(output.contains("Geo_get_status"), "should emit status getter");
-        assert!(output.contains("Geo_get_center_lat"), "should emit center_lat getter");
+        assert!(
+            output.contains("Geo_get_status"),
+            "should emit status getter"
+        );
+        assert!(
+            output.contains("Geo_get_center_lat"),
+            "should emit center_lat getter"
+        );
         assert!(output.contains("Geo_get_zoom"), "should emit zoom getter");
-        assert!(output.contains("Geo_is_ready"), "should emit is_ready convenience");
-        assert!(output.contains("i32.const 1  ;; ready"),
-            "is_ready should compare against 1");
+        assert!(
+            output.contains("Geo_is_ready"),
+            "should emit is_ready convenience"
+        );
+        assert!(
+            output.contains("i32.const 1  ;; ready"),
+            "is_ready should compare against 1"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -31282,12 +36017,18 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
-        assert!(output.contains("global $__sig_AcctLink_status (mut i32)"),
-            "should emit status signal");
-        assert!(output.contains("global $__sig_AcctLink_account_id (mut i32)"),
-            "should emit account_id signal");
-        assert!(output.contains("global $__sig_AcctLink_error_msg (mut i32)"),
-            "should emit error_msg signal");
+        assert!(
+            output.contains("global $__sig_AcctLink_status (mut i32)"),
+            "should emit status signal"
+        );
+        assert!(
+            output.contains("global $__sig_AcctLink_account_id (mut i32)"),
+            "should emit account_id signal"
+        );
+        assert!(
+            output.contains("global $__sig_AcctLink_error_msg (mut i32)"),
+            "should emit error_msg signal"
+        );
     }
 
     #[test]
@@ -31308,9 +36049,14 @@ mod capability_primitive_tests {
         let output = codegen.output.clone();
         assert!(output.contains("Bank_init"), "should emit init function");
         assert!(output.contains("Bank_open"), "should emit open function");
-        assert!(output.contains("Bank_disconnect"), "should emit disconnect function");
-        assert!(output.contains("call $signal_create"),
-            "init should create signals");
+        assert!(
+            output.contains("Bank_disconnect"),
+            "should emit disconnect function"
+        );
+        assert!(
+            output.contains("call $signal_create"),
+            "init should create signals"
+        );
     }
 
     #[test]
@@ -31329,12 +36075,26 @@ mod capability_primitive_tests {
         codegen.indent = 1;
         codegen.generate_banking(&banking);
         let output = codegen.output.clone();
-        assert!(output.contains("BK_get_status"), "should emit status getter");
-        assert!(output.contains("BK_get_account_id"), "should emit account_id getter");
-        assert!(output.contains("BK_get_error_msg"), "should emit error_msg getter");
-        assert!(output.contains("BK_is_connected"), "should emit is_connected");
-        assert!(output.contains("i32.const 2  ;; connected"),
-            "is_connected should compare against 2");
+        assert!(
+            output.contains("BK_get_status"),
+            "should emit status getter"
+        );
+        assert!(
+            output.contains("BK_get_account_id"),
+            "should emit account_id getter"
+        );
+        assert!(
+            output.contains("BK_get_error_msg"),
+            "should emit error_msg getter"
+        );
+        assert!(
+            output.contains("BK_is_connected"),
+            "should emit is_connected"
+        );
+        assert!(
+            output.contains("i32.const 2  ;; connected"),
+            "is_connected should compare against 2"
+        );
     }
 }
 
@@ -31373,7 +36133,10 @@ mod reactive_cond_tests {
         assert!(
             wat.contains("$__cond_el_Panel_"),
             "should emit cond container global: {}",
-            wat.lines().filter(|l| l.contains("cond")).collect::<Vec<_>>().join("\n")
+            wat.lines()
+                .filter(|l| l.contains("cond"))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         // Should emit a cond last-value global
         assert!(
@@ -31631,10 +36394,9 @@ mod reactive_cond_tests {
                 start: Box::new(Expr::Integer(0)),
                 end: Box::new(Expr::Integer(10)),
             }),
-            children: vec![
-                TemplateNode::TextLiteral("item".to_string()),
-            ],
-            lazy: false, inplace: false,
+            children: vec![TemplateNode::TextLiteral("item".to_string())],
+            lazy: false,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -31645,10 +36407,19 @@ mod reactive_cond_tests {
         out.push_str(&codegen.output);
 
         // Should use range-based iteration, not array-based
-        assert!(out.contains("template for i in range"), "should emit range for comment");
-        assert!(out.contains("i32.ge_s"), "should use signed comparison for range");
+        assert!(
+            out.contains("template for i in range"),
+            "should emit range for comment"
+        );
+        assert!(
+            out.contains("i32.ge_s"),
+            "should use signed comparison for range"
+        );
         // Should NOT load array length or data_ptr
-        assert!(!out.contains("array length"), "should not load array length for range");
+        assert!(
+            !out.contains("array length"),
+            "should not load array length for range"
+        );
     }
 
     #[test]
@@ -31659,7 +36430,10 @@ mod reactive_cond_tests {
             end: Box::new(Expr::Integer(20)),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("range expression"), "should emit range expression comment");
+        assert!(
+            output.contains("range expression"),
+            "should emit range expression comment"
+        );
         assert!(output.contains("i32.const 5"), "should push start value");
         assert!(output.contains("i32.const 20"), "should push end value");
     }
@@ -31698,12 +36472,30 @@ component ProductGrid {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("lazy scroll"), "should emit lazy scroll comment");
-        assert!(wat.contains("$__lazy_sentinel"), "should declare sentinel local");
-        assert!(wat.contains("$__lazy_observer"), "should declare observer local");
-        assert!(wat.contains("call $observe_intersectionObserver"), "should create IntersectionObserver");
-        assert!(wat.contains("call $observe_observe"), "should observe the sentinel");
-        assert!(wat.contains("call $dom_appendChild"), "should append sentinel to root");
+        assert!(
+            wat.contains("lazy scroll"),
+            "should emit lazy scroll comment"
+        );
+        assert!(
+            wat.contains("$__lazy_sentinel"),
+            "should declare sentinel local"
+        );
+        assert!(
+            wat.contains("$__lazy_observer"),
+            "should declare observer local"
+        );
+        assert!(
+            wat.contains("call $observe_intersectionObserver"),
+            "should create IntersectionObserver"
+        );
+        assert!(
+            wat.contains("call $observe_observe"),
+            "should observe the sentinel"
+        );
+        assert!(
+            wat.contains("call $dom_appendChild"),
+            "should append sentinel to root"
+        );
     }
 
     #[test]
@@ -31724,9 +36516,18 @@ component SimpleGrid {
 }
 "#;
         let wat = compile(src);
-        assert!(!wat.contains("lazy scroll"), "should NOT emit lazy scroll without load_more");
-        assert!(!wat.contains("$__lazy_sentinel"), "should NOT declare sentinel local");
-        assert!(!wat.contains("$__lazy_observer"), "should NOT declare observer local");
+        assert!(
+            !wat.contains("lazy scroll"),
+            "should NOT emit lazy scroll without load_more"
+        );
+        assert!(
+            !wat.contains("$__lazy_sentinel"),
+            "should NOT declare sentinel local"
+        );
+        assert!(
+            !wat.contains("$__lazy_observer"),
+            "should NOT declare observer local"
+        );
     }
 
     #[test]
@@ -31755,7 +36556,10 @@ component BigList {
         let wat = compile(src);
         assert!(wat.contains("lazy scroll"), "should emit lazy scroll setup");
         // The handler index comment should reference load_more
-        assert!(wat.contains("load_more handler index"), "should comment the handler index");
+        assert!(
+            wat.contains("load_more handler index"),
+            "should comment the handler index"
+        );
     }
 
     #[test]
@@ -31776,7 +36580,10 @@ component Feed {
         let wat = compile(src);
         // The sentinel is a <div> element — verify createElement is called
         // with the "div" string (tag_len = 3)
-        assert!(wat.contains("i32.const 3 ;; \"div\" tag len"), "sentinel should be a div element");
+        assert!(
+            wat.contains("i32.const 3 ;; \"div\" tag len"),
+            "sentinel should be a div element"
+        );
     }
 }
 
@@ -31811,13 +36618,28 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("__lazy_parent_"), "should emit lazy parent global");
-        assert!(wat.contains("__lazy_cursor_"), "should emit lazy cursor global");
-        assert!(wat.contains("__lazy_total_"), "should emit lazy total global");
+        assert!(
+            wat.contains("__lazy_parent_"),
+            "should emit lazy parent global"
+        );
+        assert!(
+            wat.contains("__lazy_cursor_"),
+            "should emit lazy cursor global"
+        );
+        assert!(
+            wat.contains("__lazy_total_"),
+            "should emit lazy total global"
+        );
         assert!(wat.contains("__lazy_data_"), "should emit lazy data global");
         // rAF drain: no sentinel or observer globals needed
-        assert!(!wat.contains("__lazy_sentinel_"), "should NOT emit sentinel global (rAF drain)");
-        assert!(!wat.contains("__lazy_observer_"), "should NOT emit observer global (rAF drain)");
+        assert!(
+            !wat.contains("__lazy_sentinel_"),
+            "should NOT emit sentinel global (rAF drain)"
+        );
+        assert!(
+            !wat.contains("__lazy_observer_"),
+            "should NOT emit observer global (rAF drain)"
+        );
     }
 
     #[test]
@@ -31836,8 +36658,14 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("lazy for item"), "should emit lazy for comment");
-        assert!(wat.contains("initial batch of 20 items"), "should mention initial batch size");
+        assert!(
+            wat.contains("lazy for item"),
+            "should emit lazy for comment"
+        );
+        assert!(
+            wat.contains("initial batch of 20 items"),
+            "should mention initial batch size"
+        );
     }
 
     #[test]
@@ -31856,9 +36684,18 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("__lazy_batch_ItemList_"), "should emit lazy batch function");
-        assert!(wat.contains("lazy batch render"), "should comment the batch function");
-        assert!(wat.contains("lazy batch: render next 50 items"), "should comment batch body with rAF batch size");
+        assert!(
+            wat.contains("__lazy_batch_ItemList_"),
+            "should emit lazy batch function"
+        );
+        assert!(
+            wat.contains("lazy batch render"),
+            "should comment the batch function"
+        );
+        assert!(
+            wat.contains("lazy batch: render next 50 items"),
+            "should comment batch body with rAF batch size"
+        );
     }
 
     #[test]
@@ -31877,9 +36714,18 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("call $timer_requestAnimationFrame"), "should schedule rAF drain");
-        assert!(wat.contains("schedule rAF"), "should comment rAF scheduling");
-        assert!(wat.contains("lazy batch callback index"), "should comment callback index");
+        assert!(
+            wat.contains("call $timer_requestAnimationFrame"),
+            "should schedule rAF drain"
+        );
+        assert!(
+            wat.contains("schedule rAF"),
+            "should comment rAF scheduling"
+        );
+        assert!(
+            wat.contains("lazy batch callback index"),
+            "should comment callback index"
+        );
     }
 
     #[test]
@@ -31899,8 +36745,14 @@ component ItemList {
 "#;
         let wat = compile(src);
         // Batch function should self-chain via rAF when more items remain
-        assert!(wat.contains("next rAF batch"), "batch function should schedule next rAF");
-        assert!(!wat.contains("call $observe_disconnect"), "should NOT use observer disconnect");
+        assert!(
+            wat.contains("next rAF batch"),
+            "batch function should schedule next rAF"
+        );
+        assert!(
+            !wat.contains("call $observe_disconnect"),
+            "should NOT use observer disconnect"
+        );
     }
 
     #[test]
@@ -31919,9 +36771,18 @@ component RangeList {
 }
 "#;
         let wat = compile(src);
-        assert!(wat.contains("lazy for i"), "should emit lazy for comment for range");
-        assert!(wat.contains("__lazy_batch_RangeList_"), "should emit batch function for range");
-        assert!(wat.contains("i32.ge_s"), "range-based lazy should use signed comparison");
+        assert!(
+            wat.contains("lazy for i"),
+            "should emit lazy for comment for range"
+        );
+        assert!(
+            wat.contains("__lazy_batch_RangeList_"),
+            "should emit batch function for range"
+        );
+        assert!(
+            wat.contains("i32.ge_s"),
+            "range-based lazy should use signed comparison"
+        );
     }
 
     #[test]
@@ -31941,9 +36802,15 @@ component ItemList {
 "#;
         let wat = compile(src);
         // The batch function's callback dispatcher should be registered
-        assert!(wat.contains("__lazy_batch_ItemList_"), "should register batch callback");
+        assert!(
+            wat.contains("__lazy_batch_ItemList_"),
+            "should register batch callback"
+        );
         // The global __callback dispatcher should reference it
-        assert!(wat.contains("__callback"), "should have global callback dispatcher");
+        assert!(
+            wat.contains("__callback"),
+            "should have global callback dispatcher"
+        );
     }
 
     #[test]
@@ -31968,9 +36835,18 @@ component ItemList {
 "#;
         let wat = compile(src);
         // Both the component handler and lazy batch should be registered
-        assert!(wat.contains("ItemList__handler_"), "should have component handler");
-        assert!(wat.contains("__lazy_batch_ItemList_"), "should have lazy batch function");
-        assert!(wat.contains("ItemList__callback"), "should have component callback");
+        assert!(
+            wat.contains("ItemList__handler_"),
+            "should have component handler"
+        );
+        assert!(
+            wat.contains("__lazy_batch_ItemList_"),
+            "should have lazy batch function"
+        );
+        assert!(
+            wat.contains("ItemList__callback"),
+            "should have component callback"
+        );
     }
 
     #[test]
@@ -31990,10 +36866,22 @@ component ItemList {
 }
 "#;
         let wat = compile(src);
-        assert!(!wat.contains("__lazy_batch_"), "non-lazy for should NOT emit batch function");
-        assert!(!wat.contains("__lazy_cursor_"), "non-lazy for should NOT emit cursor global");
-        assert!(!wat.contains("lazy for item"), "non-lazy for should NOT emit lazy comment");
-        assert!(wat.contains("template for item in ..."), "non-lazy for should emit normal comment");
+        assert!(
+            !wat.contains("__lazy_batch_"),
+            "non-lazy for should NOT emit batch function"
+        );
+        assert!(
+            !wat.contains("__lazy_cursor_"),
+            "non-lazy for should NOT emit cursor global"
+        );
+        assert!(
+            !wat.contains("lazy for item"),
+            "non-lazy for should NOT emit lazy comment"
+        );
+        assert!(
+            wat.contains("template for item in ..."),
+            "non-lazy for should emit normal comment"
+        );
     }
 
     #[test]
@@ -32006,10 +36894,9 @@ component ItemList {
         let node = TemplateNode::TemplateFor {
             binding: "x".to_string(),
             iterator: Box::new(Expr::Ident("items".to_string())),
-            children: vec![
-                TemplateNode::TextLiteral("hello".to_string()),
-            ],
-            lazy: true, inplace: false,
+            children: vec![TemplateNode::TextLiteral("hello".to_string())],
+            lazy: true,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -32020,13 +36907,29 @@ component ItemList {
         out.push_str(&codegen.output);
 
         assert!(out.contains("lazy for x"), "should emit lazy for comment");
-        assert!(out.contains("global.set $__lazy_parent_"), "should store parent in global");
-        assert!(out.contains("global.set $__lazy_total_"), "should store total in global");
-        assert!(out.contains("global.set $__lazy_data_"), "should store data ptr in global");
-        assert!(out.contains("global.set $__lazy_cursor_"), "should store cursor in global");
+        assert!(
+            out.contains("global.set $__lazy_parent_"),
+            "should store parent in global"
+        );
+        assert!(
+            out.contains("global.set $__lazy_total_"),
+            "should store total in global"
+        );
+        assert!(
+            out.contains("global.set $__lazy_data_"),
+            "should store data ptr in global"
+        );
+        assert!(
+            out.contains("global.set $__lazy_cursor_"),
+            "should store cursor in global"
+        );
 
         // Should have recorded a lazy batch
-        assert_eq!(codegen.lazy_batches.len(), 1, "should record one lazy batch");
+        assert_eq!(
+            codegen.lazy_batches.len(),
+            1,
+            "should record one lazy batch"
+        );
         assert_eq!(codegen.lazy_batches[0].binding, "x");
         assert_eq!(codegen.lazy_batches[0].comp, "TestComp");
         assert!(!codegen.lazy_batches[0].is_range);
@@ -32045,10 +36948,9 @@ component ItemList {
                 start: Box::new(Expr::Integer(0)),
                 end: Box::new(Expr::Integer(100)),
             }),
-            children: vec![
-                TemplateNode::TextLiteral("num".to_string()),
-            ],
-            lazy: true, inplace: false,
+            children: vec![TemplateNode::TextLiteral("num".to_string())],
+            lazy: true,
+            inplace: false,
         };
         codegen.generate_template(&node, "$root");
         let mut out = String::new();
@@ -32059,10 +36961,17 @@ component ItemList {
         out.push_str(&codegen.output);
 
         assert!(out.contains("lazy for i"), "should emit lazy for comment");
-        assert!(out.contains("i32.ge_s"), "range lazy for should use signed comparison");
+        assert!(
+            out.contains("i32.ge_s"),
+            "range lazy for should use signed comparison"
+        );
 
         // Should have recorded a lazy batch
-        assert_eq!(codegen.lazy_batches.len(), 1, "should record one lazy batch");
+        assert_eq!(
+            codegen.lazy_batches.len(),
+            1,
+            "should record one lazy batch"
+        );
         assert_eq!(codegen.lazy_batches[0].binding, "i");
         assert!(codegen.lazy_batches[0].is_range);
     }
@@ -32073,12 +36982,24 @@ component ItemList {
     fn test_http_namespace_fetch_resolves() {
         let codegen = WasmCodegen::new();
         assert_eq!(codegen.resolve_stdlib_fn("http::fetch"), "$http_fetch");
-        assert_eq!(codegen.resolve_stdlib_fn("http::setMethod"), "$http_setMethod");
-        assert_eq!(codegen.resolve_stdlib_fn("http::set_method"), "$http_setMethod");
+        assert_eq!(
+            codegen.resolve_stdlib_fn("http::setMethod"),
+            "$http_setMethod"
+        );
+        assert_eq!(
+            codegen.resolve_stdlib_fn("http::set_method"),
+            "$http_setMethod"
+        );
         assert_eq!(codegen.resolve_stdlib_fn("http::setBody"), "$http_setBody");
         assert_eq!(codegen.resolve_stdlib_fn("http::set_body"), "$http_setBody");
-        assert_eq!(codegen.resolve_stdlib_fn("http::addHeader"), "$http_addHeader");
-        assert_eq!(codegen.resolve_stdlib_fn("http::add_header"), "$http_addHeader");
+        assert_eq!(
+            codegen.resolve_stdlib_fn("http::addHeader"),
+            "$http_addHeader"
+        );
+        assert_eq!(
+            codegen.resolve_stdlib_fn("http::add_header"),
+            "$http_addHeader"
+        );
     }
 
     #[test]
@@ -32090,9 +37011,16 @@ component ItemList {
             method: "fetch".into(),
             args: vec![Expr::StringLit("/api/data".into())],
         };
-        codegen.generate_iterator_method(&Expr::Ident("http".into()), "fetch", &[Expr::StringLit("/api/data".into())]);
+        codegen.generate_iterator_method(
+            &Expr::Ident("http".into()),
+            "fetch",
+            &[Expr::StringLit("/api/data".into())],
+        );
         let output = codegen.output.clone();
-        assert!(output.contains("call $http_fetch"), "http.fetch() should call $http_fetch");
+        assert!(
+            output.contains("call $http_fetch"),
+            "http.fetch() should call $http_fetch"
+        );
     }
 
     #[test]
@@ -32103,7 +37031,10 @@ component ItemList {
             method: "setMethod".into(),
             args: vec![Expr::StringLit("POST".into())],
         };
-        assert!(codegen.expr_is_void(&expr), "http.setMethod() should be void");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "http.setMethod() should be void"
+        );
     }
 
     #[test]
@@ -32114,7 +37045,10 @@ component ItemList {
             method: "fetch".into(),
             args: vec![Expr::StringLit("/api".into())],
         };
-        assert!(!codegen.expr_is_void(&expr), "http.fetch() should NOT be void (returns i32)");
+        assert!(
+            !codegen.expr_is_void(&expr),
+            "http.fetch() should NOT be void (returns i32)"
+        );
     }
 
     // ── Feature 2: Router popstate + container clearing ───────────────────
@@ -32122,31 +37056,46 @@ component ItemList {
     #[test]
     fn test_router_init_registers_popstate() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("call $webapi_onPopState"), "router_init should register popstate listener");
+        assert!(
+            wat.contains("call $webapi_onPopState"),
+            "router_init should register popstate listener"
+        );
     }
 
     #[test]
     fn test_router_navigate_clears_container() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("call $dom_clearChildren"), "router_navigate should clear container before mounting");
+        assert!(
+            wat.contains("call $dom_clearChildren"),
+            "router_navigate should clear container before mounting"
+        );
     }
 
     #[test]
     fn test_router_popstate_handler_exists() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("__router_on_popstate"), "popstate handler should be exported");
+        assert!(
+            wat.contains("__router_on_popstate"),
+            "popstate handler should be exported"
+        );
     }
 
     #[test]
     fn test_router_navigate_no_push_exists() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("router_navigate_no_push"), "navigate_no_push should exist for popstate");
+        assert!(
+            wat.contains("router_navigate_no_push"),
+            "navigate_no_push should exist for popstate"
+        );
     }
 
     #[test]
     fn test_dom_clear_children_import() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("\"clearChildren\""), "should import dom.clearChildren");
+        assert!(
+            wat.contains("\"clearChildren\""),
+            "should import dom.clearChildren"
+        );
     }
 
     // ── Feature 3: String operations (pure WASM) ──────────────────────────
@@ -32155,39 +37104,36 @@ component ItemList {
     fn test_string_trim_method_generates_call() {
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
-        codegen.generate_iterator_method(
-            &Expr::Ident("s".into()),
-            "trim",
-            &[],
-        );
+        codegen.generate_iterator_method(&Expr::Ident("s".into()), "trim", &[]);
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_trim"), ".trim() should call $string_trim");
+        assert!(
+            output.contains("call $string_trim"),
+            ".trim() should call $string_trim"
+        );
     }
 
     #[test]
     fn test_string_to_upper_method_generates_call() {
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
-        codegen.generate_iterator_method(
-            &Expr::Ident("s".into()),
-            "to_upper",
-            &[],
-        );
+        codegen.generate_iterator_method(&Expr::Ident("s".into()), "to_upper", &[]);
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_to_upper"), ".to_upper() should call $string_to_upper");
+        assert!(
+            output.contains("call $string_to_upper"),
+            ".to_upper() should call $string_to_upper"
+        );
     }
 
     #[test]
     fn test_string_to_lower_method_generates_call() {
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
-        codegen.generate_iterator_method(
-            &Expr::Ident("s".into()),
-            "to_lower",
-            &[],
-        );
+        codegen.generate_iterator_method(&Expr::Ident("s".into()), "to_lower", &[]);
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_to_lower"), ".to_lower() should call $string_to_lower");
+        assert!(
+            output.contains("call $string_to_lower"),
+            ".to_lower() should call $string_to_lower"
+        );
     }
 
     #[test]
@@ -32200,7 +37146,10 @@ component ItemList {
             &[Expr::StringLit(",".into())],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_split"), ".split() should call $string_split");
+        assert!(
+            output.contains("call $string_split"),
+            ".split() should call $string_split"
+        );
     }
 
     #[test]
@@ -32213,7 +37162,10 @@ component ItemList {
             &[Expr::Integer(2), Expr::Integer(5)],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_slice"), ".slice() should call $string_slice");
+        assert!(
+            output.contains("call $string_slice"),
+            ".slice() should call $string_slice"
+        );
     }
 
     #[test]
@@ -32226,7 +37178,10 @@ component ItemList {
             &[Expr::StringLit("old".into()), Expr::StringLit("new".into())],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_replace"), ".replace() should call $string_replace");
+        assert!(
+            output.contains("call $string_replace"),
+            ".replace() should call $string_replace"
+        );
     }
 
     #[test]
@@ -32239,7 +37194,10 @@ component ItemList {
             &[Expr::StringLit("needle".into())],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_index_of"), ".index_of() should call $string_index_of");
+        assert!(
+            output.contains("call $string_index_of"),
+            ".index_of() should call $string_index_of"
+        );
     }
 
     #[test]
@@ -32252,7 +37210,10 @@ component ItemList {
             &[Expr::StringLit("pre".into())],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_starts_with"), ".starts_with() should call $string_starts_with");
+        assert!(
+            output.contains("call $string_starts_with"),
+            ".starts_with() should call $string_starts_with"
+        );
     }
 
     #[test]
@@ -32265,42 +37226,76 @@ component ItemList {
             &[Expr::StringLit(".txt".into())],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_ends_with"), ".ends_with() should call $string_ends_with");
+        assert!(
+            output.contains("call $string_ends_with"),
+            ".ends_with() should call $string_ends_with"
+        );
     }
 
     #[test]
     fn test_string_parse_int_method_generates_call() {
         let mut codegen = WasmCodegen::new();
         codegen.indent = 1;
-        codegen.generate_iterator_method(
-            &Expr::Ident("s".into()),
-            "parse_int",
-            &[],
-        );
+        codegen.generate_iterator_method(&Expr::Ident("s".into()), "parse_int", &[]);
         let output = codegen.output.clone();
-        assert!(output.contains("call $string_parse_int"), ".parse_int() should call $string_parse_int");
+        assert!(
+            output.contains("call $string_parse_int"),
+            ".parse_int() should call $string_parse_int"
+        );
     }
 
     #[test]
     fn test_string_runtime_functions_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("func $string_trim"), "should emit $string_trim");
-        assert!(wat.contains("func $string_slice"), "should emit $string_slice");
-        assert!(wat.contains("func $string_to_upper"), "should emit $string_to_upper");
-        assert!(wat.contains("func $string_to_lower"), "should emit $string_to_lower");
-        assert!(wat.contains("func $string_index_of"), "should emit $string_index_of");
-        assert!(wat.contains("func $string_starts_with"), "should emit $string_starts_with");
-        assert!(wat.contains("func $string_ends_with"), "should emit $string_ends_with");
-        assert!(wat.contains("func $string_replace"), "should emit $string_replace");
-        assert!(wat.contains("func $string_parse_int"), "should emit $string_parse_int");
-        assert!(wat.contains("func $string_split"), "should emit $string_split");
+        assert!(
+            wat.contains("func $string_trim"),
+            "should emit $string_trim"
+        );
+        assert!(
+            wat.contains("func $string_slice"),
+            "should emit $string_slice"
+        );
+        assert!(
+            wat.contains("func $string_to_upper"),
+            "should emit $string_to_upper"
+        );
+        assert!(
+            wat.contains("func $string_to_lower"),
+            "should emit $string_to_lower"
+        );
+        assert!(
+            wat.contains("func $string_index_of"),
+            "should emit $string_index_of"
+        );
+        assert!(
+            wat.contains("func $string_starts_with"),
+            "should emit $string_starts_with"
+        );
+        assert!(
+            wat.contains("func $string_ends_with"),
+            "should emit $string_ends_with"
+        );
+        assert!(
+            wat.contains("func $string_replace"),
+            "should emit $string_replace"
+        );
+        assert!(
+            wat.contains("func $string_parse_int"),
+            "should emit $string_parse_int"
+        );
+        assert!(
+            wat.contains("func $string_split"),
+            "should emit $string_split"
+        );
     }
 
     #[test]
     fn test_json_parse_function_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("func $json_parse (param $ptr i32) (param $len i32) (result i32)"),
-            "should emit $json_parse with correct signature");
+        assert!(
+            wat.contains("func $json_parse (param $ptr i32) (param $len i32) (result i32)"),
+            "should emit $json_parse with correct signature"
+        );
     }
 
     #[test]
@@ -32313,41 +37308,90 @@ component ItemList {
     #[test]
     fn test_json_parse_value_function_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("func $json_parse_value (result i32 i32 i32)"),
-            "should emit $json_parse_value returning type, data_lo, data_hi");
+        assert!(
+            wat.contains("func $json_parse_value (result i32 i32 i32)"),
+            "should emit $json_parse_value returning type, data_lo, data_hi"
+        );
     }
 
     #[test]
     fn test_json_helper_functions_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("func $json_skip_whitespace"), "should emit $json_skip_whitespace");
-        assert!(wat.contains("func $json_parse_string"), "should emit $json_parse_string");
-        assert!(wat.contains("func $json_parse_number"), "should emit $json_parse_number");
-        assert!(wat.contains("func $json_get_field"), "should emit $json_get_field");
-        assert!(wat.contains("func $json_get_field3"), "should emit $json_get_field3");
-        assert!(wat.contains("func $json_get_array_element"), "should emit $json_get_array_element");
-        assert!(wat.contains("func $json_array_length"), "should emit $json_array_length");
+        assert!(
+            wat.contains("func $json_skip_whitespace"),
+            "should emit $json_skip_whitespace"
+        );
+        assert!(
+            wat.contains("func $json_parse_string"),
+            "should emit $json_parse_string"
+        );
+        assert!(
+            wat.contains("func $json_parse_number"),
+            "should emit $json_parse_number"
+        );
+        assert!(
+            wat.contains("func $json_get_field"),
+            "should emit $json_get_field"
+        );
+        assert!(
+            wat.contains("func $json_get_field3"),
+            "should emit $json_get_field3"
+        );
+        assert!(
+            wat.contains("func $json_get_array_element"),
+            "should emit $json_get_array_element"
+        );
+        assert!(
+            wat.contains("func $json_array_length"),
+            "should emit $json_array_length"
+        );
     }
 
     #[test]
     fn test_json_serializer_helpers_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("func $json_write_byte"), "should emit $json_write_byte");
-        assert!(wat.contains("func $json_write_bytes"), "should emit $json_write_bytes");
-        assert!(wat.contains("func $json_write_escaped_string"), "should emit $json_write_escaped_string");
-        assert!(wat.contains("func $json_serialize_value"), "should emit $json_serialize_value");
-        assert!(wat.contains("func $json_serialize_object_inner"), "should emit $json_serialize_object_inner");
-        assert!(wat.contains("func $json_serialize_array_inner"), "should emit $json_serialize_array_inner");
+        assert!(
+            wat.contains("func $json_write_byte"),
+            "should emit $json_write_byte"
+        );
+        assert!(
+            wat.contains("func $json_write_bytes"),
+            "should emit $json_write_bytes"
+        );
+        assert!(
+            wat.contains("func $json_write_escaped_string"),
+            "should emit $json_write_escaped_string"
+        );
+        assert!(
+            wat.contains("func $json_serialize_value"),
+            "should emit $json_serialize_value"
+        );
+        assert!(
+            wat.contains("func $json_serialize_object_inner"),
+            "should emit $json_serialize_object_inner"
+        );
+        assert!(
+            wat.contains("func $json_serialize_array_inner"),
+            "should emit $json_serialize_array_inner"
+        );
     }
 
     #[test]
     fn test_json_runtime_globals_emitted() {
         let wat = compile(r#"pub fn f() -> i32 { return 0; }"#);
-        assert!(wat.contains("global $__json_pos (mut i32)"), "should emit parse position global");
-        assert!(wat.contains("global $__json_end (mut i32)"), "should emit parse end global");
-        assert!(wat.contains("global $__json_out_pos (mut i32)"), "should emit serializer output position global");
+        assert!(
+            wat.contains("global $__json_pos (mut i32)"),
+            "should emit parse position global"
+        );
+        assert!(
+            wat.contains("global $__json_end (mut i32)"),
+            "should emit parse end global"
+        );
+        assert!(
+            wat.contains("global $__json_out_pos (mut i32)"),
+            "should emit serializer output position global"
+        );
     }
-
 }
 
 #[cfg(test)]
@@ -32379,9 +37423,24 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "UserResponse".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
-                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
-                ContractField { name: "email".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("u32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "email".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32392,24 +37451,47 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _parse function exists with correct signature
-        assert!(output.contains("func $UserResponse_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
-            "should emit $UserResponse_parse with correct signature");
+        assert!(
+            output.contains(
+                "func $UserResponse_parse (param $json_ptr i32) (param $json_len i32) (result i32)"
+            ),
+            "should emit $UserResponse_parse with correct signature"
+        );
         // Calls $json_parse to parse the JSON
-        assert!(output.contains("call $json_parse"),
-            "_parse should call $json_parse");
+        assert!(
+            output.contains("call $json_parse"),
+            "_parse should call $json_parse"
+        );
         // Calls $json_get_field for each of the 3 fields
         let get_field_count = output.matches("call $json_get_field").count();
-        assert_eq!(get_field_count, 3, "_parse should call $json_get_field once per field (expected 3, got {})", get_field_count);
+        assert_eq!(
+            get_field_count, 3,
+            "_parse should call $json_get_field once per field (expected 3, got {})",
+            get_field_count
+        );
         // Allocates the struct (3 fields x 4 bytes = 12 bytes)
-        assert!(output.contains("i32.const 12") && output.contains("call $alloc"),
-            "_parse should allocate 12 bytes for the struct");
+        assert!(
+            output.contains("i32.const 12") && output.contains("call $alloc"),
+            "_parse should allocate 12 bytes for the struct"
+        );
         // Returns the struct pointer
-        assert!(output.contains("local.get $struct_ptr"),
-            "_parse should return the struct pointer");
+        assert!(
+            output.contains("local.get $struct_ptr"),
+            "_parse should return the struct pointer"
+        );
         // Field names are referenced for json_get_field lookups
-        assert!(output.contains("\"id\""), "_parse should reference field name 'id'");
-        assert!(output.contains("\"name\""), "_parse should reference field name 'name'");
-        assert!(output.contains("\"email\""), "_parse should reference field name 'email'");
+        assert!(
+            output.contains("\"id\""),
+            "_parse should reference field name 'id'"
+        );
+        assert!(
+            output.contains("\"name\""),
+            "_parse should reference field name 'name'"
+        );
+        assert!(
+            output.contains("\"email\""),
+            "_parse should reference field name 'email'"
+        );
     }
 
     #[test]
@@ -32417,10 +37499,30 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "Product".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "title".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
-                ContractField { name: "price".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
-                ContractField { name: "active".into(), ty: Type::Named("bool".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "title".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "price".into(),
+                    ty: Type::Named("f64".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "active".into(),
+                    ty: Type::Named("bool".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32431,33 +37533,50 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _serialize function exists with correct signature
-        assert!(output.contains("func $Product_serialize (param $struct_ptr i32) (result i32 i32)"),
-            "should emit $Product_serialize returning (ptr, len)");
+        assert!(
+            output.contains("func $Product_serialize (param $struct_ptr i32) (result i32 i32)"),
+            "should emit $Product_serialize returning (ptr, len)"
+        );
         // Allocates field array (4 fields x 20 bytes = 80 bytes)
-        assert!(output.contains("i32.const 80") && output.contains("call $alloc"),
-            "_serialize should allocate 80 bytes for field entries");
+        assert!(
+            output.contains("i32.const 80") && output.contains("call $alloc"),
+            "_serialize should allocate 80 bytes for field entries"
+        );
         // Calls $json_serialize_object
-        assert!(output.contains("call $json_serialize_object"),
-            "_serialize should call $json_serialize_object");
+        assert!(
+            output.contains("call $json_serialize_object"),
+            "_serialize should call $json_serialize_object"
+        );
         // Passes correct field count
-        assert!(output.contains("i32.const 4 ;; field count"),
-            "_serialize should pass field_count = 4");
+        assert!(
+            output.contains("i32.const 4 ;; field count"),
+            "_serialize should pass field_count = 4"
+        );
         // Type tags: id=integer(2), title=string(1), price=number(2), active=boolean(3)
-        assert!(output.contains("i32.const 2 ;; type tag"),
-            "_serialize should have integer type tag");
-        assert!(output.contains("i32.const 1 ;; type tag"),
-            "_serialize should have string type tag");
-        assert!(output.contains("i32.const 3 ;; type tag"),
-            "_serialize should have boolean type tag");
+        assert!(
+            output.contains("i32.const 2 ;; type tag"),
+            "_serialize should have integer type tag"
+        );
+        assert!(
+            output.contains("i32.const 1 ;; type tag"),
+            "_serialize should have string type tag"
+        );
+        assert!(
+            output.contains("i32.const 3 ;; type tag"),
+            "_serialize should have boolean type tag"
+        );
     }
 
     #[test]
     fn contract_call_function_emitted() {
         let contract = ContractDef {
             name: "GetProducts".into(),
-            fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
-            ],
+            fields: vec![ContractField {
+                name: "id".into(),
+                ty: Type::Named("u32".into()),
+                nullable: false,
+                span: span(),
+            }],
             is_pub: false,
             span: span(),
         };
@@ -32467,31 +37586,53 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _call function exists with full HTTP signature
-        assert!(output.contains("func $GetProducts_call"),
-            "should emit $GetProducts_call function");
-        assert!(output.contains("param $url_ptr i32"),
-            "_call should accept url_ptr param");
-        assert!(output.contains("param $method_ptr i32"),
-            "_call should accept method_ptr param");
-        assert!(output.contains("param $body_ptr i32"),
-            "_call should accept body_ptr param");
-        assert!(output.contains("param $callback_idx i32"),
-            "_call should accept callback_idx param");
-        assert!(output.contains("result i32"),
-            "_call should return i32 (fetch promise ID)");
+        assert!(
+            output.contains("func $GetProducts_call"),
+            "should emit $GetProducts_call function"
+        );
+        assert!(
+            output.contains("param $url_ptr i32"),
+            "_call should accept url_ptr param"
+        );
+        assert!(
+            output.contains("param $method_ptr i32"),
+            "_call should accept method_ptr param"
+        );
+        assert!(
+            output.contains("param $body_ptr i32"),
+            "_call should accept body_ptr param"
+        );
+        assert!(
+            output.contains("param $callback_idx i32"),
+            "_call should accept callback_idx param"
+        );
+        assert!(
+            output.contains("result i32"),
+            "_call should return i32 (fetch promise ID)"
+        );
         // Uses typed setters — no serialization
-        assert!(output.contains("call $http_setMethod"),
-            "_call should set HTTP method via typed setter");
-        assert!(output.contains("call $http_fetch"),
-            "_call should call $http_fetch");
+        assert!(
+            output.contains("call $http_setMethod"),
+            "_call should set HTTP method via typed setter"
+        );
+        assert!(
+            output.contains("call $http_fetch"),
+            "_call should call $http_fetch"
+        );
         // Conditionally sets body
-        assert!(output.contains("call $http_setBody"),
-            "_call should conditionally set HTTP body");
+        assert!(
+            output.contains("call $http_setBody"),
+            "_call should conditionally set HTTP body"
+        );
         // Adds Content-Type header
-        assert!(output.contains("call $http_addHeader"),
-            "_call should add Content-Type header");
-        assert!(output.contains("application/json"),
-            "_call should set Content-Type to application/json");
+        assert!(
+            output.contains("call $http_addHeader"),
+            "_call should add Content-Type header"
+        );
+        assert!(
+            output.contains("application/json"),
+            "_call should set Content-Type to application/json"
+        );
     }
 
     #[test]
@@ -32499,17 +37640,40 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "OrderResponse".into(),
             fields: vec![
-                ContractField { name: "order_id".into(), ty: Type::Named("u32".into()), nullable: false, span: span() },
-                ContractField { name: "total".into(), ty: Type::Named("f64".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "order_id".into(),
+                    ty: Type::Named("u32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "total".into(),
+                    ty: Type::Named("f64".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
         };
         let mut codegen = WasmCodegen::new();
-        codegen.known_contracts.push((contract.name.clone(), contract.fields.clone()));
-        assert_eq!(codegen.known_contracts.len(), 1, "should track one contract");
-        assert_eq!(codegen.known_contracts[0].0, "OrderResponse", "should store contract name");
-        assert_eq!(codegen.known_contracts[0].1.len(), 2, "should store 2 fields");
+        codegen
+            .known_contracts
+            .push((contract.name.clone(), contract.fields.clone()));
+        assert_eq!(
+            codegen.known_contracts.len(),
+            1,
+            "should track one contract"
+        );
+        assert_eq!(
+            codegen.known_contracts[0].0, "OrderResponse",
+            "should store contract name"
+        );
+        assert_eq!(
+            codegen.known_contracts[0].1.len(),
+            2,
+            "should store 2 fields"
+        );
     }
 
     #[test]
@@ -32517,8 +37681,18 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "UserWithRoles".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "roles".into(), ty: Type::Array(Box::new(Type::Named("String".into()))), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "roles".into(),
+                    ty: Type::Array(Box::new(Type::Named("String".into()))),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32529,23 +37703,37 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _parse function exists
-        assert!(output.contains("func $UserWithRoles_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
-            "should emit $UserWithRoles_parse");
+        assert!(
+            output.contains(
+                "func $UserWithRoles_parse (param $json_ptr i32) (param $json_len i32) (result i32)"
+            ),
+            "should emit $UserWithRoles_parse"
+        );
         // _parse_from_obj function exists
-        assert!(output.contains("func $UserWithRoles_parse_from_obj (param $obj i32) (result i32)"),
-            "should emit $UserWithRoles_parse_from_obj");
+        assert!(
+            output.contains("func $UserWithRoles_parse_from_obj (param $obj i32) (result i32)"),
+            "should emit $UserWithRoles_parse_from_obj"
+        );
         // _parse delegates to _parse_from_obj
-        assert!(output.contains("call $UserWithRoles_parse_from_obj"),
-            "_parse should call _parse_from_obj");
+        assert!(
+            output.contains("call $UserWithRoles_parse_from_obj"),
+            "_parse should call _parse_from_obj"
+        );
         // Array field uses json_get_field3
-        assert!(output.contains("call $json_get_field3"),
-            "array field should use $json_get_field3");
+        assert!(
+            output.contains("call $json_get_field3"),
+            "array field should use $json_get_field3"
+        );
         // Array field iterates with json_get_array_element
-        assert!(output.contains("call $json_get_array_element"),
-            "array field should iterate with $json_get_array_element");
+        assert!(
+            output.contains("call $json_get_array_element"),
+            "array field should iterate with $json_get_array_element"
+        );
         // Vec header allocation (12 bytes)
-        assert!(output.contains("Allocate Vec header"),
-            "array field should allocate Vec header");
+        assert!(
+            output.contains("Allocate Vec header"),
+            "array field should allocate Vec header"
+        );
     }
 
     #[test]
@@ -32553,9 +37741,24 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "AdminUser".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "email".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
-                ContractField { name: "organization".into(), ty: Type::Named("Organization".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "email".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "organization".into(),
+                    ty: Type::Named("Organization".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32566,14 +37769,20 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _parse_from_obj exists
-        assert!(output.contains("func $AdminUser_parse_from_obj (param $obj i32) (result i32)"),
-            "should emit $AdminUser_parse_from_obj");
+        assert!(
+            output.contains("func $AdminUser_parse_from_obj (param $obj i32) (result i32)"),
+            "should emit $AdminUser_parse_from_obj"
+        );
         // Nested field calls Organization_parse_from_obj
-        assert!(output.contains("call $Organization_parse_from_obj"),
-            "nested field should call $Organization_parse_from_obj");
+        assert!(
+            output.contains("call $Organization_parse_from_obj"),
+            "nested field should call $Organization_parse_from_obj"
+        );
         // Nested field comment
-        assert!(output.contains("nested Organization"),
-            "should have nested field comment");
+        assert!(
+            output.contains("nested Organization"),
+            "should have nested field comment"
+        );
     }
 
     #[test]
@@ -32581,8 +37790,18 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "RoleList".into(),
             fields: vec![
-                ContractField { name: "user_id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "roles".into(), ty: Type::Array(Box::new(Type::Named("String".into()))), nullable: false, span: span() },
+                ContractField {
+                    name: "user_id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "roles".into(),
+                    ty: Type::Array(Box::new(Type::Named("String".into()))),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32593,14 +37812,20 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _serialize handles array fields
-        assert!(output.contains("func $RoleList_serialize (param $struct_ptr i32) (result i32 i32)"),
-            "should emit $RoleList_serialize");
+        assert!(
+            output.contains("func $RoleList_serialize (param $struct_ptr i32) (result i32 i32)"),
+            "should emit $RoleList_serialize"
+        );
         // Array field reads Vec header
-        assert!(output.contains("Array field: roles"),
-            "_serialize should handle array field");
+        assert!(
+            output.contains("Array field: roles"),
+            "_serialize should handle array field"
+        );
         // Uses type tag 5 for array
-        assert!(output.contains("i32.const 5 ;; type tag"),
-            "_serialize should use type=5 for arrays");
+        assert!(
+            output.contains("i32.const 5 ;; type tag"),
+            "_serialize should use type=5 for arrays"
+        );
     }
 
     #[test]
@@ -32608,8 +37833,18 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "OrderWithUser".into(),
             fields: vec![
-                ContractField { name: "order_id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "user".into(), ty: Type::Named("UserRow".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "order_id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "user".into(),
+                    ty: Type::Named("UserRow".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32620,14 +37855,20 @@ mod contract_api_tests {
         let output = codegen.output.clone();
 
         // _serialize handles nested contract fields
-        assert!(output.contains("Nested contract field: user"),
-            "_serialize should handle nested contract field");
+        assert!(
+            output.contains("Nested contract field: user"),
+            "_serialize should handle nested contract field"
+        );
         // Calls the nested contract's _serialize
-        assert!(output.contains("call $UserRow_serialize"),
-            "_serialize should call nested contract's _serialize");
+        assert!(
+            output.contains("call $UserRow_serialize"),
+            "_serialize should call nested contract's _serialize"
+        );
         // Uses type tag 6 (raw pre-serialized JSON)
-        assert!(output.contains("i32.const 6 ;; type tag (raw JSON)"),
-            "_serialize should use type=6 for nested contracts");
+        assert!(
+            output.contains("i32.const 6 ;; type tag (raw JSON)"),
+            "_serialize should use type=6 for nested contracts"
+        );
     }
 
     #[test]
@@ -32635,9 +37876,12 @@ mod contract_api_tests {
         // Every contract should get a _parse_from_obj function
         let contract = ContractDef {
             name: "SimpleContract".into(),
-            fields: vec![
-                ContractField { name: "value".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-            ],
+            fields: vec![ContractField {
+                name: "value".into(),
+                ty: Type::Named("i32".into()),
+                nullable: false,
+                span: span(),
+            }],
             is_pub: false,
             span: span(),
         };
@@ -32646,8 +37890,10 @@ mod contract_api_tests {
         codegen.generate_contract(&contract);
         let output = codegen.output.clone();
 
-        assert!(output.contains("func $SimpleContract_parse_from_obj (param $obj i32) (result i32)"),
-            "even simple contracts should have _parse_from_obj");
+        assert!(
+            output.contains("func $SimpleContract_parse_from_obj (param $obj i32) (result i32)"),
+            "even simple contracts should have _parse_from_obj"
+        );
         assert!(output.contains("func $SimpleContract_parse (param $json_ptr i32) (param $json_len i32) (result i32)"),
             "simple contracts should still have _parse");
     }
@@ -32683,7 +37929,10 @@ mod contract_api_tests {
             args: vec![Expr::Integer(99)],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("call $Some"), "Some(99) should emit call $Some");
+        assert!(
+            output.contains("call $Some"),
+            "Some(99) should emit call $Some"
+        );
     }
 
     #[test]
@@ -32691,7 +37940,10 @@ mod contract_api_tests {
         let mut codegen = WasmCodegen::new();
         codegen.generate_expr(&Expr::Ident("None".into()));
         let output = codegen.output.clone();
-        assert!(output.contains("i32.const 0 ;; None"), "None should be i32.const 0");
+        assert!(
+            output.contains("i32.const 0 ;; None"),
+            "None should be i32.const 0"
+        );
     }
 
     #[test]
@@ -32703,11 +37955,23 @@ mod contract_api_tests {
             args: vec![Expr::Integer(5)],
         })));
         let output = codegen.output.clone();
-        assert!(output.contains("? error propagation"), "should have try comment");
-        assert!(output.contains("i32.load ;; discriminant"), "should load discriminant");
-        assert!(output.contains("if ;; error check"), "should branch on discriminant");
+        assert!(
+            output.contains("? error propagation"),
+            "should have try comment"
+        );
+        assert!(
+            output.contains("i32.load ;; discriminant"),
+            "should load discriminant"
+        );
+        assert!(
+            output.contains("if ;; error check"),
+            "should branch on discriminant"
+        );
         assert!(output.contains("return"), "should return on Err path");
-        assert!(output.contains("i32.load offset=4 ;; unwrapped Ok/Some value"), "should unwrap Ok value at offset 4");
+        assert!(
+            output.contains("i32.load offset=4 ;; unwrapped Ok/Some value"),
+            "should unwrap Ok value at offset 4"
+        );
     }
 
     #[test]
@@ -32715,8 +37979,18 @@ mod contract_api_tests {
         let contract = ContractDef {
             name: "UserApi".into(),
             fields: vec![
-                ContractField { name: "id".into(), ty: Type::Named("i32".into()), nullable: false, span: span() },
-                ContractField { name: "name".into(), ty: Type::Named("String".into()), nullable: false, span: span() },
+                ContractField {
+                    name: "id".into(),
+                    ty: Type::Named("i32".into()),
+                    nullable: false,
+                    span: span(),
+                },
+                ContractField {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    nullable: false,
+                    span: span(),
+                },
             ],
             is_pub: false,
             span: span(),
@@ -32726,15 +38000,24 @@ mod contract_api_tests {
         codegen.generate_contract(&contract);
         let output = codegen.output.clone();
         // _call function should exist
-        assert!(output.contains("func $UserApi_call"), "should emit $UserApi_call");
+        assert!(
+            output.contains("func $UserApi_call"),
+            "should emit $UserApi_call"
+        );
         // Should use fetchWithCallback, not plain fetch
-        assert!(output.contains("call $http_fetchWithCallback"),
-            "_call should use fetchWithCallback for async response");
-        assert!(!output.contains("call $http_fetch\n"),
-            "_call should not use plain http_fetch");
+        assert!(
+            output.contains("call $http_fetchWithCallback"),
+            "_call should use fetchWithCallback for async response"
+        );
+        assert!(
+            !output.contains("call $http_fetch\n"),
+            "_call should not use plain http_fetch"
+        );
         // Should accept callback_idx parameter
-        assert!(output.contains("param $callback_idx i32"),
-            "_call should accept callback_idx parameter");
+        assert!(
+            output.contains("param $callback_idx i32"),
+            "_call should accept callback_idx parameter"
+        );
         // Should not return a value (async callback delivers it)
         assert!(!output.contains("func $UserApi_call") || !output.contains("(result i32)") ||
             output.contains("func $UserApi_call (param $url_ptr i32) (param $url_len i32) (param $method_ptr i32) (param $method_len i32) (param $body_ptr i32) (param $body_len i32) (param $callback_idx i32)\n"),
@@ -32745,11 +38028,15 @@ mod contract_api_tests {
     fn http_fetch_with_callback_import_exists() {
         let codegen = WasmCodegen::new();
         let resolved = codegen.resolve_stdlib_fn("http::fetchWithCallback");
-        assert_eq!(resolved, "$http_fetchWithCallback",
-            "should resolve http::fetchWithCallback");
+        assert_eq!(
+            resolved, "$http_fetchWithCallback",
+            "should resolve http::fetchWithCallback"
+        );
         let resolved2 = codegen.resolve_stdlib_fn("http::fetch_with_callback");
-        assert_eq!(resolved2, "$http_fetchWithCallback",
-            "should resolve snake_case variant");
+        assert_eq!(
+            resolved2, "$http_fetchWithCallback",
+            "should resolve snake_case variant"
+        );
     }
 
     #[test]
@@ -32761,12 +38048,18 @@ mod contract_api_tests {
         let subject = Box::new(Expr::Ident("status".into()));
         let arms = vec![
             TemplateMatchArm {
-                pattern: Pattern::Variant { name: "Ok".into(), fields: vec![Pattern::Ident("data".into())] },
+                pattern: Pattern::Variant {
+                    name: "Ok".into(),
+                    fields: vec![Pattern::Ident("data".into())],
+                },
                 guard: None,
                 body: vec![],
             },
             TemplateMatchArm {
-                pattern: Pattern::Variant { name: "Err".into(), fields: vec![Pattern::Ident("e".into())] },
+                pattern: Pattern::Variant {
+                    name: "Err".into(),
+                    fields: vec![Pattern::Ident("e".into())],
+                },
                 guard: None,
                 body: vec![],
             },
@@ -32774,16 +38067,28 @@ mod contract_api_tests {
         codegen.for_loop_bindings.push("status".into());
         codegen.generate_template(&TemplateNode::TemplateMatch { subject, arms }, parent);
         let output = codegen.output.clone();
-        assert!(output.contains("template match on tagged value"), "should have match comment");
-        assert!(output.contains("i32.load ;; tag"), "should load tag from tagged value");
+        assert!(
+            output.contains("template match on tagged value"),
+            "should have match comment"
+        );
+        assert!(
+            output.contains("i32.load ;; tag"),
+            "should load tag from tagged value"
+        );
         assert!(output.contains("match arm: Ok(..)"), "should have Ok arm");
         assert!(output.contains("match arm: Err(..)"), "should have Err arm");
-        assert!(output.contains("i32.const 0") && output.contains("i32.eq"),
-            "Ok should check tag == 0");
-        assert!(output.contains("i32.const 1") && output.contains("i32.eq"),
-            "Err should check tag == 1");
-        assert!(output.contains("i32.load offset=4 ;; payload"),
-            "should extract payload at offset 4");
+        assert!(
+            output.contains("i32.const 0") && output.contains("i32.eq"),
+            "Ok should check tag == 0"
+        );
+        assert!(
+            output.contains("i32.const 1") && output.contains("i32.eq"),
+            "Err should check tag == 1"
+        );
+        assert!(
+            output.contains("i32.load offset=4 ;; payload"),
+            "should extract payload at offset 4"
+        );
     }
 
     #[test]
@@ -32792,24 +38097,26 @@ mod contract_api_tests {
         codegen.defer_template_locals = true;
         codegen.label_counter = 0;
         let parent = "root";
-        let arms = vec![
-            TemplateMatchArm {
-                pattern: Pattern::Wildcard,
-                guard: None,
-                body: vec![],
+        let arms = vec![TemplateMatchArm {
+            pattern: Pattern::Wildcard,
+            guard: None,
+            body: vec![],
+        }];
+        codegen.generate_template(
+            &TemplateNode::TemplateMatch {
+                subject: Box::new(Expr::Integer(0)),
+                arms,
             },
-        ];
-        codegen.generate_template(&TemplateNode::TemplateMatch {
-            subject: Box::new(Expr::Integer(0)),
-            arms,
-        }, parent);
+            parent,
+        );
         let output = codegen.output.clone();
         assert!(output.contains("wildcard"), "should have wildcard comment");
     }
 
     #[test]
     fn ok_err_helpers_emit_tagged_structs() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             pub fn make_ok() -> i32 {
                 return Ok(100);
             }
@@ -32819,21 +38126,34 @@ mod contract_api_tests {
             pub fn make_some() -> i32 {
                 return Some(77);
             }
-        "#);
+        "#,
+        );
         // Verify helper functions are emitted
-        assert!(wat.contains("func $Ok (param $val i32) (result i32)"),
-            "should emit $Ok helper");
-        assert!(wat.contains("func $Err (param $val i32) (result i32)"),
-            "should emit $Err helper");
-        assert!(wat.contains("func $Some (param $val i32) (result i32)"),
-            "should emit $Some helper");
-        assert!(wat.contains("func $None (result i32)"),
-            "should emit $None helper");
+        assert!(
+            wat.contains("func $Ok (param $val i32) (result i32)"),
+            "should emit $Ok helper"
+        );
+        assert!(
+            wat.contains("func $Err (param $val i32) (result i32)"),
+            "should emit $Err helper"
+        );
+        assert!(
+            wat.contains("func $Some (param $val i32) (result i32)"),
+            "should emit $Some helper"
+        );
+        assert!(
+            wat.contains("func $None (result i32)"),
+            "should emit $None helper"
+        );
         // Ok tag is 0, Err tag is 1
-        assert!(wat.contains("i32.const 0  i32.store ;; tag=Ok"),
-            "Ok should store tag 0");
-        assert!(wat.contains("i32.const 1  i32.store ;; tag=Err"),
-            "Err should store tag 1");
+        assert!(
+            wat.contains("i32.const 0  i32.store ;; tag=Ok"),
+            "Ok should store tag 0"
+        );
+        assert!(
+            wat.contains("i32.const 1  i32.store ;; tag=Err"),
+            "Err should store tag 1"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -32852,224 +38172,466 @@ mod contract_api_tests {
     #[test]
     fn test_wasi_target_emits_wasi_preview1_imports() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("wasi_snapshot_preview1"), "WASI target should emit wasi_snapshot_preview1 imports");
-        assert!(wat.contains("$fd_write"), "WASI target should import fd_write");
-        assert!(wat.contains("$fd_read"), "WASI target should import fd_read");
-        assert!(wat.contains("$environ_get"), "WASI target should import environ_get");
-        assert!(wat.contains("$environ_sizes_get"), "WASI target should import environ_sizes_get");
-        assert!(wat.contains("$clock_time_get"), "WASI target should import clock_time_get");
-        assert!(wat.contains("$random_get"), "WASI target should import random_get");
-        assert!(wat.contains("$proc_exit"), "WASI target should import proc_exit");
-        assert!(wat.contains("$args_get"), "WASI target should import args_get");
-        assert!(wat.contains("$args_sizes_get"), "WASI target should import args_sizes_get");
+        assert!(
+            wat.contains("wasi_snapshot_preview1"),
+            "WASI target should emit wasi_snapshot_preview1 imports"
+        );
+        assert!(
+            wat.contains("$fd_write"),
+            "WASI target should import fd_write"
+        );
+        assert!(
+            wat.contains("$fd_read"),
+            "WASI target should import fd_read"
+        );
+        assert!(
+            wat.contains("$environ_get"),
+            "WASI target should import environ_get"
+        );
+        assert!(
+            wat.contains("$environ_sizes_get"),
+            "WASI target should import environ_sizes_get"
+        );
+        assert!(
+            wat.contains("$clock_time_get"),
+            "WASI target should import clock_time_get"
+        );
+        assert!(
+            wat.contains("$random_get"),
+            "WASI target should import random_get"
+        );
+        assert!(
+            wat.contains("$proc_exit"),
+            "WASI target should import proc_exit"
+        );
+        assert!(
+            wat.contains("$args_get"),
+            "WASI target should import args_get"
+        );
+        assert!(
+            wat.contains("$args_sizes_get"),
+            "WASI target should import args_sizes_get"
+        );
     }
 
     #[test]
     fn test_wasi_target_emits_edge_http_import() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("nectar:edge/http"), "WASI target should import nectar:edge/http");
-        assert!(wat.contains("$edge_http_fetch"), "WASI target should import edge_http_fetch");
+        assert!(
+            wat.contains("nectar:edge/http"),
+            "WASI target should import nectar:edge/http"
+        );
+        assert!(
+            wat.contains("$edge_http_fetch"),
+            "WASI target should import edge_http_fetch"
+        );
     }
 
     #[test]
     fn test_wasi_target_does_not_emit_dom_imports() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("\"dom\""), "WASI target should NOT emit dom imports");
-        assert!(!wat.contains("\"timer\""), "WASI target should NOT emit timer imports");
-        assert!(!wat.contains("\"webapi\""), "WASI target should NOT emit webapi imports");
-        assert!(!wat.contains("\"http\""), "WASI target should NOT emit browser http imports");
-        assert!(!wat.contains("\"ws\""), "WASI target should NOT emit ws imports");
-        assert!(!wat.contains("\"observe\""), "WASI target should NOT emit observe imports");
-        assert!(!wat.contains("\"db\""), "WASI target should NOT emit db imports");
-        assert!(!wat.contains("\"worker\""), "WASI target should NOT emit worker imports");
-        assert!(!wat.contains("\"pwa\""), "WASI target should NOT emit pwa imports");
-        assert!(!wat.contains("\"hardware\""), "WASI target should NOT emit hardware imports");
-        assert!(!wat.contains("\"gpu\""), "WASI target should NOT emit gpu imports");
+        assert!(
+            !wat.contains("\"dom\""),
+            "WASI target should NOT emit dom imports"
+        );
+        assert!(
+            !wat.contains("\"timer\""),
+            "WASI target should NOT emit timer imports"
+        );
+        assert!(
+            !wat.contains("\"webapi\""),
+            "WASI target should NOT emit webapi imports"
+        );
+        assert!(
+            !wat.contains("\"http\""),
+            "WASI target should NOT emit browser http imports"
+        );
+        assert!(
+            !wat.contains("\"ws\""),
+            "WASI target should NOT emit ws imports"
+        );
+        assert!(
+            !wat.contains("\"observe\""),
+            "WASI target should NOT emit observe imports"
+        );
+        assert!(
+            !wat.contains("\"db\""),
+            "WASI target should NOT emit db imports"
+        );
+        assert!(
+            !wat.contains("\"worker\""),
+            "WASI target should NOT emit worker imports"
+        );
+        assert!(
+            !wat.contains("\"pwa\""),
+            "WASI target should NOT emit pwa imports"
+        );
+        assert!(
+            !wat.contains("\"hardware\""),
+            "WASI target should NOT emit hardware imports"
+        );
+        assert!(
+            !wat.contains("\"gpu\""),
+            "WASI target should NOT emit gpu imports"
+        );
     }
 
     #[test]
     fn test_wasi_target_exports_start() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("(export \"_start\")"), "WASI target should export _start");
+        assert!(
+            wat.contains("(export \"_start\")"),
+            "WASI target should export _start"
+        );
     }
 
     #[test]
     fn test_wasi_target_exports_handle_request() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("(export \"handle_request\")"), "WASI target should export handle_request");
-        assert!(wat.contains("$handle_request"), "WASI target should define handle_request function");
+        assert!(
+            wat.contains("(export \"handle_request\")"),
+            "WASI target should export handle_request"
+        );
+        assert!(
+            wat.contains("$handle_request"),
+            "WASI target should define handle_request function"
+        );
     }
 
     #[test]
     fn test_browser_target_unchanged() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("\"dom\""), "Browser target should still emit dom imports");
-        assert!(wat.contains("\"timer\""), "Browser target should still emit timer imports");
-        assert!(!wat.contains("wasi_snapshot_preview1"), "Browser target should NOT emit WASI imports");
-        assert!(!wat.contains("(export \"_start\")"), "Browser target should NOT export _start");
+        assert!(
+            wat.contains("\"dom\""),
+            "Browser target should still emit dom imports"
+        );
+        assert!(
+            wat.contains("\"timer\""),
+            "Browser target should still emit timer imports"
+        );
+        assert!(
+            !wat.contains("wasi_snapshot_preview1"),
+            "Browser target should NOT emit WASI imports"
+        );
+        assert!(
+            !wat.contains("(export \"_start\")"),
+            "Browser target should NOT export _start"
+        );
     }
 
     #[test]
     fn test_wasi_target_still_has_memory_import() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("(import \"env\" \"memory\" (memory "), "WASI target should still import memory");
+        assert!(
+            wat.contains("(import \"env\" \"memory\" (memory "),
+            "WASI target should still import memory"
+        );
     }
 
     #[test]
     fn test_wasi_target_has_module_wrapper() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
         assert!(wat.contains("(module"), "WASI WAT should contain (module");
-        assert!(wat.contains("func $add"), "WASI target should still generate user functions");
+        assert!(
+            wat.contains("func $add"),
+            "WASI target should still generate user functions"
+        );
     }
 
     #[test]
     fn test_wasi_target_has_keyvalue_imports() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("wasi:keyvalue/store"), "WASI target should emit wasi:keyvalue/store imports");
-        assert!(wat.contains("$kv_open"), "WASI target should import kv_open");
+        assert!(
+            wat.contains("wasi:keyvalue/store"),
+            "WASI target should emit wasi:keyvalue/store imports"
+        );
+        assert!(
+            wat.contains("$kv_open"),
+            "WASI target should import kv_open"
+        );
         assert!(wat.contains("$kv_get"), "WASI target should import kv_get");
         assert!(wat.contains("$kv_set"), "WASI target should import kv_set");
-        assert!(wat.contains("$kv_delete"), "WASI target should import kv_delete");
-        assert!(wat.contains("$kv_exists"), "WASI target should import kv_exists");
-        assert!(wat.contains("$kv_keys"), "WASI target should import kv_keys");
+        assert!(
+            wat.contains("$kv_delete"),
+            "WASI target should import kv_delete"
+        );
+        assert!(
+            wat.contains("$kv_exists"),
+            "WASI target should import kv_exists"
+        );
+        assert!(
+            wat.contains("$kv_keys"),
+            "WASI target should import kv_keys"
+        );
     }
 
     #[test]
     fn test_browser_target_no_keyvalue_imports() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("wasi:keyvalue/store"), "Browser target should NOT emit wasi:keyvalue/store imports");
-        assert!(!wat.contains("$kv_open"), "Browser target should NOT have kv_open");
-        assert!(!wat.contains("$kv_get"), "Browser target should NOT have kv_get");
-        assert!(!wat.contains("$kv_set"), "Browser target should NOT have kv_set");
-        assert!(!wat.contains("$kv_delete"), "Browser target should NOT have kv_delete");
-        assert!(!wat.contains("$kv_exists"), "Browser target should NOT have kv_exists");
-        assert!(!wat.contains("$kv_keys"), "Browser target should NOT have kv_keys");
+        assert!(
+            !wat.contains("wasi:keyvalue/store"),
+            "Browser target should NOT emit wasi:keyvalue/store imports"
+        );
+        assert!(
+            !wat.contains("$kv_open"),
+            "Browser target should NOT have kv_open"
+        );
+        assert!(
+            !wat.contains("$kv_get"),
+            "Browser target should NOT have kv_get"
+        );
+        assert!(
+            !wat.contains("$kv_set"),
+            "Browser target should NOT have kv_set"
+        );
+        assert!(
+            !wat.contains("$kv_delete"),
+            "Browser target should NOT have kv_delete"
+        );
+        assert!(
+            !wat.contains("$kv_exists"),
+            "Browser target should NOT have kv_exists"
+        );
+        assert!(
+            !wat.contains("$kv_keys"),
+            "Browser target should NOT have kv_keys"
+        );
     }
 
     #[test]
     fn test_wasi_target_has_io_stream_imports() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("wasi:io/streams"), "WASI target should emit wasi:io/streams imports");
-        assert!(wat.contains("$stream_read"), "WASI target should import stream_read");
-        assert!(wat.contains("$stream_write"), "WASI target should import stream_write");
-        assert!(wat.contains("$stream_subscribe"), "WASI target should import stream_subscribe");
+        assert!(
+            wat.contains("wasi:io/streams"),
+            "WASI target should emit wasi:io/streams imports"
+        );
+        assert!(
+            wat.contains("$stream_read"),
+            "WASI target should import stream_read"
+        );
+        assert!(
+            wat.contains("$stream_write"),
+            "WASI target should import stream_write"
+        );
+        assert!(
+            wat.contains("$stream_subscribe"),
+            "WASI target should import stream_subscribe"
+        );
     }
 
     #[test]
     fn test_wasi_target_has_io_poll_import() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("wasi:io/poll"), "WASI target should emit wasi:io/poll import");
-        assert!(wat.contains("$poll_poll"), "WASI target should import poll_poll");
+        assert!(
+            wat.contains("wasi:io/poll"),
+            "WASI target should emit wasi:io/poll import"
+        );
+        assert!(
+            wat.contains("$poll_poll"),
+            "WASI target should import poll_poll"
+        );
     }
 
     #[test]
     fn test_wasi_target_has_blob_store_imports() {
         let wat = compile_wasi("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(wat.contains("wasi:blob/store"), "WASI target should emit wasi:blob/store imports");
-        assert!(wat.contains("$blob_create"), "WASI target should import blob_create");
-        assert!(wat.contains("$blob_get"), "WASI target should import blob_get");
-        assert!(wat.contains("$blob_delete"), "WASI target should import blob_delete");
-        assert!(wat.contains("$blob_list"), "WASI target should import blob_list");
+        assert!(
+            wat.contains("wasi:blob/store"),
+            "WASI target should emit wasi:blob/store imports"
+        );
+        assert!(
+            wat.contains("$blob_create"),
+            "WASI target should import blob_create"
+        );
+        assert!(
+            wat.contains("$blob_get"),
+            "WASI target should import blob_get"
+        );
+        assert!(
+            wat.contains("$blob_delete"),
+            "WASI target should import blob_delete"
+        );
+        assert!(
+            wat.contains("$blob_list"),
+            "WASI target should import blob_list"
+        );
     }
 
     #[test]
     fn test_browser_target_no_io_stream_imports() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("wasi:io/streams"), "Browser target should NOT emit wasi:io/streams imports");
-        assert!(!wat.contains("$stream_read"), "Browser target should NOT have stream_read");
-        assert!(!wat.contains("$stream_write"), "Browser target should NOT have stream_write");
-        assert!(!wat.contains("wasi:io/poll"), "Browser target should NOT emit wasi:io/poll import");
+        assert!(
+            !wat.contains("wasi:io/streams"),
+            "Browser target should NOT emit wasi:io/streams imports"
+        );
+        assert!(
+            !wat.contains("$stream_read"),
+            "Browser target should NOT have stream_read"
+        );
+        assert!(
+            !wat.contains("$stream_write"),
+            "Browser target should NOT have stream_write"
+        );
+        assert!(
+            !wat.contains("wasi:io/poll"),
+            "Browser target should NOT emit wasi:io/poll import"
+        );
     }
 
     #[test]
     fn test_browser_target_no_blob_store_imports() {
         let wat = compile("pub fn add(a: i32, b: i32) -> i32 { return a + b; }");
-        assert!(!wat.contains("wasi:blob/store"), "Browser target should NOT emit wasi:blob/store imports");
-        assert!(!wat.contains("$blob_create"), "Browser target should NOT have blob_create");
-        assert!(!wat.contains("$blob_get"), "Browser target should NOT have blob_get");
-        assert!(!wat.contains("$blob_delete"), "Browser target should NOT have blob_delete");
-        assert!(!wat.contains("$blob_list"), "Browser target should NOT have blob_list");
+        assert!(
+            !wat.contains("wasi:blob/store"),
+            "Browser target should NOT emit wasi:blob/store imports"
+        );
+        assert!(
+            !wat.contains("$blob_create"),
+            "Browser target should NOT have blob_create"
+        );
+        assert!(
+            !wat.contains("$blob_get"),
+            "Browser target should NOT have blob_get"
+        );
+        assert!(
+            !wat.contains("$blob_delete"),
+            "Browser target should NOT have blob_delete"
+        );
+        assert!(
+            !wat.contains("$blob_list"),
+            "Browser target should NOT have blob_list"
+        );
     }
 
     #[test]
     fn test_channel_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $channel_connect_named"), "channel_connect_named should be pruned when unused");
+        assert!(
+            !wat.contains("func $channel_connect_named"),
+            "channel_connect_named should be pruned when unused"
+        );
     }
 
     #[test]
     fn test_channel_send_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $channel_send"), "channel_send should be pruned when unused");
+        assert!(
+            !wat.contains("func $channel_send"),
+            "channel_send should be pruned when unused"
+        );
     }
 
     #[test]
     fn test_channel_close_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $channel_close"), "channel_close should be pruned when unused");
+        assert!(
+            !wat.contains("func $channel_close"),
+            "channel_close should be pruned when unused"
+        );
     }
 
     #[test]
     fn test_upload_pruned_when_unused() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(!wat.contains("func $upload_select"), "upload_select should be pruned when unused");
+        assert!(
+            !wat.contains("func $upload_select"),
+            "upload_select should be pruned when unused"
+        );
     }
 
     #[test]
     fn test_streaming_yield_defined() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $streaming_yield"), "streaming_yield should be defined");
+        assert!(
+            wat.contains("func $streaming_yield"),
+            "streaming_yield should be defined"
+        );
     }
 
     #[test]
     fn test_pdf_create_allocates_handle() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
         // pdf_create should allocate a 16-byte struct, not return 0
-        assert!(wat.contains("i32.const 16  call $alloc"), "pdf_create should allocate a handle struct");
+        assert!(
+            wat.contains("i32.const 16  call $alloc"),
+            "pdf_create should allocate a handle struct"
+        );
     }
 
     #[test]
     fn test_wasi_channel_uses_stream_write() {
-        let wat = compile_wasi(r#"
+        let wat = compile_wasi(
+            r#"
             channel notifications {
                 url: "/ws"
             }
-        "#);
-        assert!(wat.contains("stream_write"), "WASI channel connect should use stream_write");
-        assert!(!wat.contains("channel_connect_named"), "WASI channel should NOT use browser ws bridge");
+        "#,
+        );
+        assert!(
+            wat.contains("stream_write"),
+            "WASI channel connect should use stream_write"
+        );
+        assert!(
+            !wat.contains("channel_connect_named"),
+            "WASI channel should NOT use browser ws bridge"
+        );
     }
 
     #[test]
     fn test_wasi_upload_uses_blob_store() {
-        let wat = compile_wasi(r#"
+        let wat = compile_wasi(
+            r#"
             upload avatar {
                 endpoint: "/upload"
             }
-        "#);
-        assert!(wat.contains("blob_create"), "WASI upload register should use blob_create");
-        assert!(!wat.contains("upload_init"), "WASI upload should NOT use browser upload_init");
+        "#,
+        );
+        assert!(
+            wat.contains("blob_create"),
+            "WASI upload register should use blob_create"
+        );
+        assert!(
+            !wat.contains("upload_init"),
+            "WASI upload should NOT use browser upload_init"
+        );
     }
 
     #[test]
     fn test_browser_channel_uses_ws_bridge() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             channel notifications {
                 url: "/ws"
             }
-        "#);
-        assert!(wat.contains("channel_connect_named"), "Browser channel should use channel_connect_named");
-        assert!(!wat.contains("stream_write"), "Browser channel should NOT use wasi:io/streams");
+        "#,
+        );
+        assert!(
+            wat.contains("channel_connect_named"),
+            "Browser channel should use channel_connect_named"
+        );
+        assert!(
+            !wat.contains("stream_write"),
+            "Browser channel should NOT use wasi:io/streams"
+        );
     }
 
     #[test]
     fn test_browser_upload_uses_upload_init() {
-        let wat = compile(r#"
+        let wat = compile(
+            r#"
             upload avatar {
                 endpoint: "/upload"
             }
-        "#);
-        assert!(wat.contains("upload_init"), "Browser upload should use upload_init");
-        assert!(!wat.contains("blob_create"), "Browser upload should NOT use wasi:blob/store");
+        "#,
+        );
+        assert!(
+            wat.contains("upload_init"),
+            "Browser upload should use upload_init"
+        );
+        assert!(
+            !wat.contains("blob_create"),
+            "Browser upload should NOT use wasi:blob/store"
+        );
     }
 }
 
@@ -33090,7 +38652,12 @@ mod async_state_machine_tests {
     }
 
     fn span() -> Span {
-        Span { start: 0, end: 0, line: 1, col: 1 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        }
     }
 
     #[test]
@@ -33130,16 +38697,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "response".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(42))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "response".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(42))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33153,10 +38718,22 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("br_table"), "async fn should use br_table dispatch");
-        assert!(output.contains("$__state_0"), "should have state 0 block label");
-        assert!(output.contains("$__state_1"), "should have state 1 block label");
-        assert!(output.contains("$__state_end"), "should have state end block");
+        assert!(
+            output.contains("br_table"),
+            "async fn should use br_table dispatch"
+        );
+        assert!(
+            output.contains("$__state_0"),
+            "should have state 0 block label"
+        );
+        assert!(
+            output.contains("$__state_1"),
+            "should have state 1 block label"
+        );
+        assert!(
+            output.contains("$__state_end"),
+            "should have state end block"
+        );
     }
 
     #[test]
@@ -33201,8 +38778,10 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("3 states (2 await points)"),
-            "should report 3 states for 2 await points");
+        assert!(
+            output.contains("3 states (2 await points)"),
+            "should report 3 states for 2 await points"
+        );
         assert!(output.contains("$__state_0"), "should have state 0");
         assert!(output.contains("$__state_1"), "should have state 1");
         assert!(output.contains("$__state_2"), "should have state 2");
@@ -33218,16 +38797,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "data".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "data".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33241,8 +38818,10 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("i32.const 0 ;; Poll::Pending"),
-            "state 0 should return Pending after initiating async op");
+        assert!(
+            output.contains("i32.const 0 ;; Poll::Pending"),
+            "state 0 should return Pending after initiating async op"
+        );
     }
 
     #[test]
@@ -33255,16 +38834,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "data".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "data".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33278,8 +38855,10 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("i32.const 1 ;; Poll::Ready"),
-            "final state should return Ready");
+        assert!(
+            output.contains("i32.const 1 ;; Poll::Ready"),
+            "final state should return Ready"
+        );
     }
 
     #[test]
@@ -33292,16 +38871,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "r".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "r".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33315,12 +38892,18 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("func $fetch_stuff__repoll"),
-            "should emit repoll callback function");
-        assert!(output.contains("call $fetch_stuff ;; re-poll"),
-            "repoll should call the poll function");
-        assert!(output.contains("__callback_data"),
-            "repoll should read callback data");
+        assert!(
+            output.contains("func $fetch_stuff__repoll"),
+            "should emit repoll callback function"
+        );
+        assert!(
+            output.contains("call $fetch_stuff ;; re-poll"),
+            "repoll should call the poll function"
+        );
+        assert!(
+            output.contains("__callback_data"),
+            "repoll should read callback data"
+        );
     }
 
     #[test]
@@ -33333,16 +38916,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "data".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "data".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33357,10 +38938,18 @@ mod async_state_machine_tests {
         let output = codegen.output.clone();
 
         // Entry trampoline should allocate 8 bytes (state + result, no self)
-        assert!(output.contains("i32.const 8"), "should allocate 8-byte future struct (no self)");
-        assert!(output.contains("call $alloc"), "should call alloc for future struct");
-        assert!(output.contains("func $my_fetch_entry"),
-            "should emit entry trampoline function");
+        assert!(
+            output.contains("i32.const 8"),
+            "should allocate 8-byte future struct (no self)"
+        );
+        assert!(
+            output.contains("call $alloc"),
+            "should call alloc for future struct"
+        );
+        assert!(
+            output.contains("func $my_fetch_entry"),
+            "should emit entry trampoline function"
+        );
     }
 
     #[test]
@@ -33374,9 +38963,7 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Expr(Expr::Integer(42)),
-                ],
+                stmts: vec![Stmt::Expr(Expr::Integer(42))],
                 span: span(),
             },
             is_pub: false,
@@ -33391,10 +38978,14 @@ mod async_state_machine_tests {
         let output = codegen.output.clone();
 
         // Should NOT have br_table (treated as sync)
-        assert!(!output.contains("br_table"),
-            "async fn without awaits should not use br_table");
-        assert!(output.contains("func $no_await"),
-            "should generate the function normally");
+        assert!(
+            !output.contains("br_table"),
+            "async fn without awaits should not use br_table"
+        );
+        assert!(
+            output.contains("func $no_await"),
+            "should generate the function normally"
+        );
     }
 
     #[test]
@@ -33447,8 +39038,10 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("4 states (3 await points)"),
-            "should have 4 states for 3 awaits");
+        assert!(
+            output.contains("4 states (3 await points)"),
+            "should have 4 states for 3 awaits"
+        );
         assert!(output.contains("$__state_0"), "should have state 0");
         assert!(output.contains("$__state_1"), "should have state 1");
         assert!(output.contains("$__state_2"), "should have state 2");
@@ -33456,11 +39049,15 @@ mod async_state_machine_tests {
 
         // Should have exactly one poll function (not N+1 separate state functions)
         // The br_table instruction appears once per poll function
-        let poll_func_count = output.matches("(param $future_ptr i32) (result i32)").count();
+        let poll_func_count = output
+            .matches("(param $future_ptr i32) (result i32)")
+            .count();
         assert_eq!(poll_func_count, 1, "should have exactly one poll function");
         // Should NOT have separate CPS state functions
-        assert!(!output.contains("func $multi__state_"),
-            "should NOT have separate CPS state functions");
+        assert!(
+            !output.contains("func $multi__state_"),
+            "should NOT have separate CPS state functions"
+        );
     }
 
     #[test]
@@ -33469,27 +39066,23 @@ mod async_state_machine_tests {
             name: "method".into(),
             lifetimes: vec![],
             type_params: vec![],
-            params: vec![
-                Param {
-                    name: "self".into(),
-                    ty: Type::Named("Self".into()),
-                    ownership: Ownership::MutBorrowed,
-                    secret: false,
-                },
-            ],
+            params: vec![Param {
+                name: "self".into(),
+                ty: Type::Named("Self".into()),
+                ownership: Ownership::MutBorrowed,
+                secret: false,
+            }],
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "r".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "r".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33504,14 +39097,20 @@ mod async_state_machine_tests {
         let output = codegen.output.clone();
 
         // Should allocate 12 bytes (state + result + self)
-        assert!(output.contains("i32.const 12"),
-            "method should allocate 12-byte future struct (with self)");
+        assert!(
+            output.contains("i32.const 12"),
+            "method should allocate 12-byte future struct (with self)"
+        );
         // Poll function should restore self from future
-        assert!(output.contains("i32.load offset=8 ;; self_ptr"),
-            "poll should restore self from future struct offset 8");
+        assert!(
+            output.contains("i32.load offset=8 ;; self_ptr"),
+            "poll should restore self from future struct offset 8"
+        );
         // Entry trampoline should save self into future
-        assert!(output.contains("i32.store offset=8 ;; future.self_ptr = self"),
-            "entry should save self into future struct");
+        assert!(
+            output.contains("i32.store offset=8 ;; future.self_ptr = self"),
+            "entry should save self into future struct"
+        );
     }
 
     #[test]
@@ -33524,16 +39123,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "x".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33547,10 +39144,14 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("i32.const 1 ;; advance to state 1"),
-            "state 0 should advance state to 1 before returning Pending");
-        assert!(output.contains("i32.store ;; future.state = next"),
-            "should store next state into future struct");
+        assert!(
+            output.contains("i32.const 1 ;; advance to state 1"),
+            "state 0 should advance state to 1 before returning Pending"
+        );
+        assert!(
+            output.contains("i32.store ;; future.state = next"),
+            "should store next state into future struct"
+        );
     }
 
     #[test]
@@ -33563,16 +39164,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "data".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "data".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33586,10 +39185,14 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("i32.load offset=4 ;; result_ptr"),
-            "continuation state should load result from future struct offset 4");
-        assert!(output.contains("local.set $data ;; bind await result"),
-            "should bind result to the let-binding variable");
+        assert!(
+            output.contains("i32.load offset=4 ;; result_ptr"),
+            "continuation state should load result from future struct offset 4"
+        );
+        assert!(
+            output.contains("local.set $data ;; bind await result"),
+            "should bind result to the let-binding variable"
+        );
     }
 
     #[test]
@@ -33635,20 +39238,30 @@ mod async_state_machine_tests {
         let output = codegen.output.clone();
 
         // Should have the poll function
-        assert!(output.contains("func $one_poll (param $future_ptr i32) (result i32)"),
-            "should emit poll function with future_ptr param and i32 result");
+        assert!(
+            output.contains("func $one_poll (param $future_ptr i32) (result i32)"),
+            "should emit poll function with future_ptr param and i32 result"
+        );
 
         // Should NOT have separate state functions (old CPS pattern)
-        assert!(!output.contains("func $one_poll__state_1"),
-            "should NOT have separate CPS state functions");
-        assert!(!output.contains("func $one_poll__state_2"),
-            "should NOT have separate CPS state functions");
+        assert!(
+            !output.contains("func $one_poll__state_1"),
+            "should NOT have separate CPS state functions"
+        );
+        assert!(
+            !output.contains("func $one_poll__state_2"),
+            "should NOT have separate CPS state functions"
+        );
 
         // Should have the repoll and entry functions
-        assert!(output.contains("func $one_poll__repoll"),
-            "should have repoll callback function");
-        assert!(output.contains("func $one_poll_entry"),
-            "should have entry trampoline function");
+        assert!(
+            output.contains("func $one_poll__repoll"),
+            "should have repoll callback function"
+        );
+        assert!(
+            output.contains("func $one_poll_entry"),
+            "should have entry trampoline function"
+        );
     }
 
     #[test]
@@ -33661,16 +39274,14 @@ mod async_state_machine_tests {
             return_type: None,
             trait_bounds: vec![],
             body: Block {
-                stmts: vec![
-                    Stmt::Let {
-                        name: "x".into(),
-                        ty: None,
-                        mutable: false,
-                        secret: false,
-                        value: Expr::Await(Box::new(Expr::Integer(0))),
-                        ownership: Ownership::Owned,
-                    },
-                ],
+                stmts: vec![Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Await(Box::new(Expr::Integer(0))),
+                    ownership: Ownership::Owned,
+                }],
                 span: span(),
             },
             is_pub: false,
@@ -33684,19 +39295,23 @@ mod async_state_machine_tests {
         codegen.generate_async_function(&func);
         let output = codegen.output.clone();
 
-        assert!(output.contains("global $__async_future_my_async (mut i32) (i32.const 0)"),
-            "should emit per-function future pointer global");
+        assert!(
+            output.contains("global $__async_future_my_async (mut i32) (i32.const 0)"),
+            "should emit per-function future pointer global"
+        );
     }
 }
 
 #[cfg(test)]
 mod payhive_feature_tests {
     use super::*;
-    use crate::token::{Span, TokenKind};
     use crate::lexer::Lexer;
     use crate::parser::Parser;
+    use crate::token::{Span, TokenKind};
 
-    fn span() -> Span { Span::new(0, 0, 1, 1) }
+    fn span() -> Span {
+        Span::new(0, 0, 1, 1)
+    }
 
     fn compile(src: &str) -> String {
         let mut lexer = Lexer::new(src);
@@ -33718,9 +39333,15 @@ mod payhive_feature_tests {
             field: "address".into(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("optional chain: ?.address"), "should emit optional chain comment");
+        assert!(
+            output.contains("optional chain: ?.address"),
+            "should emit optional chain comment"
+        );
         assert!(output.contains("i32.eqz"), "should check for null");
-        assert!(output.contains("i32.const 0"), "should short-circuit to 0 on null");
+        assert!(
+            output.contains("i32.const 0"),
+            "should short-circuit to 0 on null"
+        );
         assert!(output.contains("i32.load"), "should load field on non-null");
     }
 
@@ -33737,11 +39358,20 @@ mod payhive_feature_tests {
             field: "street".into(),
         });
         let output = codegen.output.clone();
-        assert!(output.contains("?.address"), "should have inner optional chain");
-        assert!(output.contains("?.street"), "should have outer optional chain");
+        assert!(
+            output.contains("?.address"),
+            "should have inner optional chain"
+        );
+        assert!(
+            output.contains("?.street"),
+            "should have outer optional chain"
+        );
         // Should have two null checks (two i32.eqz)
         let eqz_count = output.matches("i32.eqz").count();
-        assert!(eqz_count >= 2, "nested optional chain should have at least 2 null checks");
+        assert!(
+            eqz_count >= 2,
+            "nested optional chain should have at least 2 null checks"
+        );
     }
 
     #[test]
@@ -33762,7 +39392,10 @@ mod payhive_feature_tests {
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
         // The program should parse without errors — the ?. operator is accepted
-        assert!(!program.items.is_empty(), "should parse program with ?. operator");
+        assert!(
+            !program.items.is_empty(),
+            "should parse program with ?. operator"
+        );
     }
 
     // ── Feature 2: String match ────────────────────────────────────
@@ -33792,9 +39425,15 @@ mod payhive_feature_tests {
             ],
         });
         let output = codegen.output.clone();
-        assert!(output.contains("call $str_eq"), "string match should use $str_eq");
+        assert!(
+            output.contains("call $str_eq"),
+            "string match should use $str_eq"
+        );
         assert!(output.contains("i32.const 1"), "should have paid arm body");
-        assert!(output.contains("i32.const 2"), "should have pending arm body");
+        assert!(
+            output.contains("i32.const 2"),
+            "should have pending arm body"
+        );
     }
 
     #[test]
@@ -33821,8 +39460,14 @@ mod payhive_feature_tests {
             "$parent",
         );
         let output = codegen.output.clone();
-        assert!(output.contains("template match on string"), "should detect string match");
-        assert!(output.contains("call $str_eq"), "template string match should use $str_eq");
+        assert!(
+            output.contains("template match on string"),
+            "should detect string match"
+        );
+        assert!(
+            output.contains("call $str_eq"),
+            "template string match should use $str_eq"
+        );
     }
 
     // ── Feature 3: DateTime runtime ────────────────────────────────
@@ -33830,19 +39475,58 @@ mod payhive_feature_tests {
     #[test]
     fn test_datetime_runtime_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $datetime_now"), "should emit $datetime_now");
-        assert!(wat.contains("func $datetime_from_ymd"), "should emit $datetime_from_ymd");
-        assert!(wat.contains("func $datetime_year"), "should emit $datetime_year");
-        assert!(wat.contains("func $datetime_month"), "should emit $datetime_month");
-        assert!(wat.contains("func $datetime_day"), "should emit $datetime_day");
-        assert!(wat.contains("func $datetime_hour"), "should emit $datetime_hour");
-        assert!(wat.contains("func $datetime_minute"), "should emit $datetime_minute");
-        assert!(wat.contains("func $datetime_add_days"), "should emit $datetime_add_days");
-        assert!(wat.contains("func $datetime_diff_days"), "should emit $datetime_diff_days");
-        assert!(wat.contains("func $datetime_day_of_week"), "should emit $datetime_day_of_week");
-        assert!(wat.contains("func $datetime_format_iso"), "should emit $datetime_format_iso");
-        assert!(wat.contains("func $datetime_format_time"), "should emit $datetime_format_time");
-        assert!(wat.contains("func $datetime_to_local"), "should emit $datetime_to_local");
+        assert!(
+            wat.contains("func $datetime_now"),
+            "should emit $datetime_now"
+        );
+        assert!(
+            wat.contains("func $datetime_from_ymd"),
+            "should emit $datetime_from_ymd"
+        );
+        assert!(
+            wat.contains("func $datetime_year"),
+            "should emit $datetime_year"
+        );
+        assert!(
+            wat.contains("func $datetime_month"),
+            "should emit $datetime_month"
+        );
+        assert!(
+            wat.contains("func $datetime_day"),
+            "should emit $datetime_day"
+        );
+        assert!(
+            wat.contains("func $datetime_hour"),
+            "should emit $datetime_hour"
+        );
+        assert!(
+            wat.contains("func $datetime_minute"),
+            "should emit $datetime_minute"
+        );
+        assert!(
+            wat.contains("func $datetime_add_days"),
+            "should emit $datetime_add_days"
+        );
+        assert!(
+            wat.contains("func $datetime_diff_days"),
+            "should emit $datetime_diff_days"
+        );
+        assert!(
+            wat.contains("func $datetime_day_of_week"),
+            "should emit $datetime_day_of_week"
+        );
+        assert!(
+            wat.contains("func $datetime_format_iso"),
+            "should emit $datetime_format_iso"
+        );
+        assert!(
+            wat.contains("func $datetime_format_time"),
+            "should emit $datetime_format_time"
+        );
+        assert!(
+            wat.contains("func $datetime_to_local"),
+            "should emit $datetime_to_local"
+        );
     }
 
     #[test]
@@ -33850,12 +39534,21 @@ mod payhive_feature_tests {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
         // datetime_add_days should use i64 arithmetic (pure WASM)
         let section = wat.split("func $datetime_add_days").nth(1).unwrap_or("");
-        assert!(section.contains("i64.add"), "datetime_add_days should use i64.add");
-        assert!(section.contains("i64.const 86400000"), "datetime_add_days should use 86400000 ms/day");
+        assert!(
+            section.contains("i64.add"),
+            "datetime_add_days should use i64.add"
+        );
+        assert!(
+            section.contains("i64.const 86400000"),
+            "datetime_add_days should use 86400000 ms/day"
+        );
 
         // datetime_to_local should call time_getTimezoneOffset (only JS bridge)
         let local_section = wat.split("func $datetime_to_local").nth(1).unwrap_or("");
-        assert!(local_section.contains("call $time_getTimezoneOffset"), "datetime_to_local should call timezone offset import");
+        assert!(
+            local_section.contains("call $time_getTimezoneOffset"),
+            "datetime_to_local should call timezone offset import"
+        );
     }
 
     // ── Feature 4: Router query params ─────────────────────────────
@@ -33863,10 +39556,22 @@ mod payhive_feature_tests {
     #[test]
     fn test_router_query_functions_emitted() {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
-        assert!(wat.contains("func $router_parse_query"), "should emit $router_parse_query");
-        assert!(wat.contains("func $router_get_query"), "should emit $router_get_query");
-        assert!(wat.contains("func $router_get_current_query"), "should emit $router_get_current_query");
-        assert!(wat.contains("func $router_navigate_with_query"), "should emit $router_navigate_with_query");
+        assert!(
+            wat.contains("func $router_parse_query"),
+            "should emit $router_parse_query"
+        );
+        assert!(
+            wat.contains("func $router_get_query"),
+            "should emit $router_get_query"
+        );
+        assert!(
+            wat.contains("func $router_get_current_query"),
+            "should emit $router_get_current_query"
+        );
+        assert!(
+            wat.contains("func $router_navigate_with_query"),
+            "should emit $router_navigate_with_query"
+        );
     }
 
     #[test]
@@ -33874,9 +39579,18 @@ mod payhive_feature_tests {
         let wat = compile("pub fn noop() -> i32 { return 0; }");
         // router_parse_query should scan for '?' (ASCII 63) in pure WASM
         let section = wat.split("func $router_parse_query").nth(1).unwrap_or("");
-        assert!(section.contains("i32.const 63"), "should look for '?' character (ASCII 63)");
-        assert!(section.contains("i32.const 61"), "should look for '=' character (ASCII 61)");
-        assert!(section.contains("i32.const 38"), "should look for '&' character (ASCII 38)");
+        assert!(
+            section.contains("i32.const 63"),
+            "should look for '?' character (ASCII 63)"
+        );
+        assert!(
+            section.contains("i32.const 61"),
+            "should look for '=' character (ASCII 61)"
+        );
+        assert!(
+            section.contains("i32.const 38"),
+            "should look for '&' character (ASCII 38)"
+        );
     }
 
     // ── Feature 5: SSE (Server-Sent Events) ────────────────────────
@@ -33901,8 +39615,14 @@ mod payhive_feature_tests {
         codegen.indent = 1;
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
-        assert!(output.contains("call $streaming_sseConnect"), "SSE channel should call streaming_sseConnect");
-        assert!(!output.contains("call $channel_connect_named"), "SSE channel should NOT call channel_connect_named");
+        assert!(
+            output.contains("call $streaming_sseConnect"),
+            "SSE channel should call streaming_sseConnect"
+        );
+        assert!(
+            !output.contains("call $channel_connect_named"),
+            "SSE channel should NOT call channel_connect_named"
+        );
     }
 
     #[test]
@@ -33925,8 +39645,14 @@ mod payhive_feature_tests {
         codegen.indent = 1;
         codegen.generate_channel(&ch);
         let output = codegen.output.clone();
-        assert!(output.contains("call $channel_connect"), "WS channel should still call channel_connect");
-        assert!(!output.contains("sseConnect"), "WS channel should NOT call sseConnect");
+        assert!(
+            output.contains("call $channel_connect"),
+            "WS channel should still call channel_connect"
+        );
+        assert!(
+            !output.contains("sseConnect"),
+            "WS channel should NOT call sseConnect"
+        );
     }
 
     #[test]
@@ -33940,7 +39666,11 @@ mod payhive_feature_tests {
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
         if let Item::Channel(ch) = &program.items[0] {
-            assert_eq!(ch.provider.as_deref(), Some("sse"), "should parse provider as sse");
+            assert_eq!(
+                ch.provider.as_deref(),
+                Some("sse"),
+                "should parse provider as sse"
+            );
         } else {
             panic!("Expected Channel item");
         }
@@ -33959,7 +39689,10 @@ mod payhive_feature_tests {
             &[Expr::Integer(500)],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $debounce_create"), "debounce.create should resolve to $debounce_create");
+        assert!(
+            output.contains("call $debounce_create"),
+            "debounce.create should resolve to $debounce_create"
+        );
     }
 
     #[test]
@@ -33973,7 +39706,10 @@ mod payhive_feature_tests {
             &[Expr::Integer(0), Expr::Integer(1)],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $debounce_call"), "debounce.call should resolve to $debounce_call");
+        assert!(
+            output.contains("call $debounce_call"),
+            "debounce.call should resolve to $debounce_call"
+        );
     }
 
     #[test]
@@ -33987,7 +39723,10 @@ mod payhive_feature_tests {
             &[Expr::Integer(0)],
         );
         let output = codegen.output.clone();
-        assert!(output.contains("call $debounce_cancel"), "debounce.cancel should resolve to $debounce_cancel");
+        assert!(
+            output.contains("call $debounce_cancel"),
+            "debounce.cancel should resolve to $debounce_cancel"
+        );
     }
 
     // ── Bug fix: fetchWithCallback is void ──────────────────────────────
@@ -33998,13 +39737,12 @@ mod payhive_feature_tests {
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("http".into())),
             method: "fetchWithCallback".into(),
-            args: vec![
-                Expr::StringLit("/api".into()),
-                Expr::Integer(0),
-            ],
+            args: vec![Expr::StringLit("/api".into()), Expr::Integer(0)],
         };
-        assert!(codegen.expr_is_void(&expr),
-            "http.fetchWithCallback() should be void — no drop after call");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "http.fetchWithCallback() should be void — no drop after call"
+        );
     }
 
     #[test]
@@ -34013,13 +39751,12 @@ mod payhive_feature_tests {
         let expr = Expr::MethodCall {
             object: Box::new(Expr::Ident("http".into())),
             method: "fetch_with_callback".into(),
-            args: vec![
-                Expr::StringLit("/api".into()),
-                Expr::Integer(0),
-            ],
+            args: vec![Expr::StringLit("/api".into()), Expr::Integer(0)],
         };
-        assert!(codegen.expr_is_void(&expr),
-            "http.fetch_with_callback() should be void");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "http.fetch_with_callback() should be void"
+        );
     }
 
     // ── Bug fix: router.navigate is void ────────────────────────────────
@@ -34032,8 +39769,10 @@ mod payhive_feature_tests {
             method: "navigate".into(),
             args: vec![Expr::StringLit("/home".into())],
         };
-        assert!(codegen.expr_is_void(&expr),
-            "router.navigate() should be void — no drop after call");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "router.navigate() should be void — no drop after call"
+        );
     }
 
     #[test]
@@ -34047,8 +39786,10 @@ mod payhive_feature_tests {
                 Expr::StringLit("q=test".into()),
             ],
         };
-        assert!(codegen.expr_is_void(&expr),
-            "router.navigate_with_query() should be void");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "router.navigate_with_query() should be void"
+        );
     }
 
     // ── Bug fix: self.method() calls within component ───────────────────
@@ -34061,14 +39802,13 @@ mod payhive_feature_tests {
         codegen.component_name = "AdminPanel".to_string();
         codegen.component_method_names = vec!["load_data".to_string(), "refresh".to_string()];
         codegen.global_handler_base = 5;
-        codegen.generate_iterator_method(
-            &Expr::SelfExpr,
-            "refresh",
-            &[],
-        );
+        codegen.generate_iterator_method(&Expr::SelfExpr, "refresh", &[]);
         let output = codegen.output.clone();
-        assert!(output.contains("call $AdminPanel__handler_1"),
-            "self.refresh() should emit call $AdminPanel__handler_1 (local method index), got:\n{}", output);
+        assert!(
+            output.contains("call $AdminPanel__handler_1"),
+            "self.refresh() should emit call $AdminPanel__handler_1 (local method index), got:\n{}",
+            output
+        );
     }
 
     #[test]
@@ -34080,8 +39820,10 @@ mod payhive_feature_tests {
             method: "refresh".into(),
             args: vec![],
         };
-        assert!(codegen.expr_is_void(&expr),
-            "self.refresh() should be void — component methods don't return values");
+        assert!(
+            codegen.expr_is_void(&expr),
+            "self.refresh() should be void — component methods don't return values"
+        );
     }
 
     // ── Bug fix: format() with multiple args chains calls ───────────────
@@ -34093,15 +39835,15 @@ mod payhive_feature_tests {
         // format("Page {}", page) — 2 args, uses single $format call
         codegen.generate_expr(&Expr::FnCall {
             callee: Box::new(Expr::Ident("format".into())),
-            args: vec![
-                Expr::StringLit("Page {}".into()),
-                Expr::Integer(1),
-            ],
+            args: vec![Expr::StringLit("Page {}".into()), Expr::Integer(1)],
         });
         let output = codegen.output.clone();
         let format_count = output.matches("call $format").count();
-        assert_eq!(format_count, 1,
-            "format with 2 args should call $format once, got {}", format_count);
+        assert_eq!(
+            format_count, 1,
+            "format with 2 args should call $format once, got {}",
+            format_count
+        );
     }
 
     #[test]
@@ -34119,8 +39861,11 @@ mod payhive_feature_tests {
         });
         let output = codegen.output.clone();
         let format_count = output.matches("call $format").count();
-        assert_eq!(format_count, 2,
-            "format with 3 args should chain 2 $format calls, got {}", format_count);
+        assert_eq!(
+            format_count, 2,
+            "format with 3 args should chain 2 $format calls, got {}",
+            format_count
+        );
     }
 
     #[test]
@@ -34139,8 +39884,11 @@ mod payhive_feature_tests {
         });
         let output = codegen.output.clone();
         let format_count = output.matches("call $format").count();
-        assert_eq!(format_count, 3,
-            "format with 4 args should chain 3 $format calls, got {}", format_count);
+        assert_eq!(
+            format_count, 3,
+            "format with 4 args should chain 3 $format calls, got {}",
+            format_count
+        );
     }
 
     // ── Bug fix: dynamic attr with format() skips str_len ───────────────
@@ -34149,20 +39897,21 @@ mod payhive_feature_tests {
     fn test_expr_returns_ptr_len_for_format() {
         let expr = Expr::FnCall {
             callee: Box::new(Expr::Ident("format".into())),
-            args: vec![
-                Expr::StringLit("{}".into()),
-                Expr::Integer(42),
-            ],
+            args: vec![Expr::StringLit("{}".into()), Expr::Integer(42)],
         };
-        assert!(WasmCodegen::expr_returns_ptr_len(&expr),
-            "format() should be recognized as returning (ptr, len)");
+        assert!(
+            WasmCodegen::expr_returns_ptr_len(&expr),
+            "format() should be recognized as returning (ptr, len)"
+        );
     }
 
     #[test]
     fn test_expr_returns_ptr_len_for_string_lit() {
         let expr = Expr::StringLit("hello".into());
-        assert!(WasmCodegen::expr_returns_ptr_len(&expr),
-            "string literals should be recognized as returning (ptr, len)");
+        assert!(
+            WasmCodegen::expr_returns_ptr_len(&expr),
+            "string literals should be recognized as returning (ptr, len)"
+        );
     }
 
     #[test]
@@ -34171,8 +39920,10 @@ mod payhive_feature_tests {
             object: Box::new(Expr::SelfExpr),
             field: "count".into(),
         };
-        assert!(!WasmCodegen::expr_returns_ptr_len(&expr),
-            "signal reads should NOT return (ptr, len)");
+        assert!(
+            !WasmCodegen::expr_returns_ptr_len(&expr),
+            "signal reads should NOT return (ptr, len)"
+        );
     }
 
     #[test]
@@ -34192,7 +39943,10 @@ mod payhive_feature_tests {
             }),
         };
         codegen.generate_expr(&assign);
-        assert!(codegen.output.contains("drop"), "format() len must be dropped before signal_set");
+        assert!(
+            codegen.output.contains("drop"),
+            "format() len must be dropped before signal_set"
+        );
     }
 
     #[test]
@@ -34201,6 +39955,9 @@ mod payhive_feature_tests {
             callee: Box::new(Expr::Ident("format".to_string())),
             args: vec![Expr::StringLit("{}".to_string()), Expr::Integer(1)],
         };
-        assert!(WasmCodegen::expr_returns_ptr_len(&format_expr), "format() returns (ptr,len)");
+        assert!(
+            WasmCodegen::expr_returns_ptr_len(&format_expr),
+            "format() returns (ptr,len)"
+        );
     }
 }

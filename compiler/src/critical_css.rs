@@ -75,7 +75,10 @@ impl CriticalCssExtractor {
                     if !css.is_empty() {
                         // Lazy components are deferred unless they are the
                         // first route target
-                        if extractor.first_route_components.contains(&lazy.component.name) {
+                        if extractor
+                            .first_route_components
+                            .contains(&lazy.component.name)
+                        {
                             critical_css.push_str(&css);
                             critical_css.push('\n');
                         } else {
@@ -108,7 +111,8 @@ impl CriticalCssExtractor {
                 Item::Router(router) => {
                     // The first route in each router is considered above-the-fold
                     if let Some(first_route) = router.routes.first() {
-                        self.first_route_components.push(first_route.component.clone());
+                        self.first_route_components
+                            .push(first_route.component.clone());
                     }
                 }
                 _ => {}
@@ -412,7 +416,10 @@ mod tests {
             ],
         };
         let result = CriticalCssExtractor::extract(&program);
-        assert!(result.critical_css.contains(".home"), "first-route lazy component should be critical");
+        assert!(
+            result.critical_css.contains(".home"),
+            "first-route lazy component should be critical"
+        );
         assert!(!result.deferred_css.contains(".home"));
     }
 

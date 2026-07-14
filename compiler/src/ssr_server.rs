@@ -147,7 +147,9 @@ impl ServerState {
         if !el.styles.is_empty() {
             out.push_str(" style=\"");
             for (i, (prop, val)) in el.styles.iter().enumerate() {
-                if i > 0 { out.push_str("; "); }
+                if i > 0 {
+                    out.push_str("; ");
+                }
                 out.push_str(prop);
                 out.push_str(": ");
                 out.push_str(val);
@@ -182,19 +184,34 @@ impl ServerState {
 
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn html_escape_attr(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('"', "&quot;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn is_void_element(tag: &str) -> bool {
-    matches!(tag, "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input" | "link" | "meta" | "source" | "track" | "wbr")
+    matches!(
+        tag,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "source"
+            | "track"
+            | "wbr"
+    )
 }
 
 /// Configuration for the SSR server.
@@ -234,7 +251,10 @@ pub fn serve(config: SsrServerConfig) -> anyhow::Result<()> {
     let wasm_bytes = match std::fs::read(&config.wasm_path) {
         Ok(bytes) => bytes,
         Err(_) => {
-            eprintln!("nectar serve: no WASM file at {} — starting in standby mode", config.wasm_path.display());
+            eprintln!(
+                "nectar serve: no WASM file at {} — starting in standby mode",
+                config.wasm_path.display()
+            );
             Vec::new()
         }
     };
@@ -250,9 +270,7 @@ pub fn serve(config: SsrServerConfig) -> anyhow::Result<()> {
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| anyhow::anyhow!("failed to create tokio runtime: {}", e))?;
 
-    rt.block_on(async move {
-        run_server(server, config.port, config.static_dir).await
-    })
+    rt.block_on(async move { run_server(server, config.port, config.static_dir).await })
 }
 
 /// Serve a static HTML page from the static directory.
@@ -363,7 +381,11 @@ async fn api_proxy_handler(
     let (base_url, api_key) = resolve_provider(&provider);
 
     if base_url.is_empty() {
-        eprintln!("api_proxy: provider '{}' not configured (no NECTAR_{}_URL)", provider, provider.to_uppercase());
+        eprintln!(
+            "api_proxy: provider '{}' not configured (no NECTAR_{}_URL)",
+            provider,
+            provider.to_uppercase()
+        );
         return (StatusCode::NOT_FOUND, "provider not configured").into_response();
     }
 
@@ -384,7 +406,8 @@ async fn api_proxy_handler(
     }
 
     // Build the outbound request
-    let mut outbound = state.http_client
+    let mut outbound = state
+        .http_client
         .request(method.clone(), &base_url)
         .header("Content-Type", "application/json");
 
@@ -406,25 +429,36 @@ async fn api_proxy_handler(
             let status = resp.status();
             eprintln!(
                 "api_proxy: provider={} method={} status={} latency={}ms",
-                provider, method, status.as_u16(), elapsed.as_millis()
+                provider,
+                method,
+                status.as_u16(),
+                elapsed.as_millis()
             );
 
-            let resp_status = StatusCode::from_u16(status.as_u16())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let resp_status =
+                StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
             let resp_body = resp.text().await.unwrap_or_default();
 
             (
                 resp_status,
                 [("content-type", "application/json")],
                 resp_body,
-            ).into_response()
+            )
+                .into_response()
         }
         Err(e) => {
             eprintln!(
                 "api_proxy: provider={} method={} error={} latency={}ms",
-                provider, method, e, elapsed.as_millis()
+                provider,
+                method,
+                e,
+                elapsed.as_millis()
             );
-            (StatusCode::BAD_GATEWAY, format!("upstream request failed: {}", e)).into_response()
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("upstream request failed: {}", e),
+            )
+                .into_response()
         }
     }
 }
@@ -435,12 +469,14 @@ async fn run_server(
     port: u16,
     static_dir: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    use axum::{Router, routing::{get, any}};
+    use axum::{
+        Router,
+        routing::{any, get},
+    };
     use tower_http::services::ServeDir;
 
     // Health check endpoint (Cloud Run uses this)
-    let health = Router::new()
-        .route("/_health", get(|| async { "ok" }));
+    let health = Router::new().route("/_health", get(|| async { "ok" }));
 
     // Set up the API proxy with rate limiting
     let rate_limiter = Arc::new(RateLimiter::new(1000));
@@ -465,8 +501,7 @@ async fn run_server(
         .with_state(api_state);
 
     // Build the SSR-only router first (needs state)
-    let ssr_router: Router<Arc<SsrServer>> = Router::new()
-        .fallback(get(ssr_handler));
+    let ssr_router: Router<Arc<SsrServer>> = Router::new().fallback(get(ssr_handler));
     let ssr_router: Router = health
         .merge(api_router)
         .merge(ssr_router.with_state(server.clone()));
@@ -484,10 +519,8 @@ async fn run_server(
                         if stem != "index" {
                             let route = format!("/{}", stem);
                             let state = (server.clone(), dir.clone());
-                            page_router = page_router.route(
-                                &route,
-                                get(static_page_handler).with_state(state),
-                            );
+                            page_router = page_router
+                                .route(&route, get(static_page_handler).with_state(state));
                         }
                     }
                 }
@@ -501,12 +534,17 @@ async fn run_server(
     };
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
-    eprintln!("nectar serve: SSR server running at http://localhost:{}", port);
+    eprintln!(
+        "nectar serve: SSR server running at http://localhost:{}",
+        port
+    );
 
-    let listener = tokio::net::TcpListener::bind(addr).await
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
         .map_err(|e| anyhow::anyhow!("failed to bind to port {}: {}", port, e))?;
 
-    axum::serve(listener, app).await
+    axum::serve(listener, app)
+        .await
         .map_err(|e| anyhow::anyhow!("server error: {}", e))
 }
 
@@ -564,7 +602,12 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     // ── DOM stubs that build the SSR element table ─────────────────
 
     // Helper: read a string from WASM linear memory
-    fn read_wasm_str(memory: Memory, caller: &Caller<'_, ServerState>, ptr: i32, len: i32) -> String {
+    fn read_wasm_str(
+        memory: Memory,
+        caller: &Caller<'_, ServerState>,
+        ptr: i32,
+        len: i32,
+    ) -> String {
         let data = memory.data(caller);
         let start = ptr as usize;
         let end = start + len as usize;
@@ -577,81 +620,126 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
 
     // createElement(tag_ptr, tag_len) -> element_id
     let mem_ce = memory;
-    linker.func_wrap("dom", "createElement", move |mut caller: Caller<'_, ServerState>, ptr: i32, len: i32| -> i32 {
-        let tag = read_wasm_str(mem_ce, &caller, ptr, len);
-        let id = caller.data_mut().alloc_id();
-        caller.data_mut().elements.insert(id, SsrElement::new(&tag));
-        id
-    })?;
+    linker.func_wrap(
+        "dom",
+        "createElement",
+        move |mut caller: Caller<'_, ServerState>, ptr: i32, len: i32| -> i32 {
+            let tag = read_wasm_str(mem_ce, &caller, ptr, len);
+            let id = caller.data_mut().alloc_id();
+            caller.data_mut().elements.insert(id, SsrElement::new(&tag));
+            id
+        },
+    )?;
 
     // createTextNode(text_ptr, text_len) -> element_id
     let mem_tn = memory;
-    linker.func_wrap("dom", "createTextNode", move |mut caller: Caller<'_, ServerState>, ptr: i32, len: i32| -> i32 {
-        let text = read_wasm_str(mem_tn, &caller, ptr, len);
-        let id = caller.data_mut().alloc_id();
-        caller.data_mut().elements.insert(id, SsrElement::text_node(&text));
-        id
-    })?;
+    linker.func_wrap(
+        "dom",
+        "createTextNode",
+        move |mut caller: Caller<'_, ServerState>, ptr: i32, len: i32| -> i32 {
+            let text = read_wasm_str(mem_tn, &caller, ptr, len);
+            let id = caller.data_mut().alloc_id();
+            caller
+                .data_mut()
+                .elements
+                .insert(id, SsrElement::text_node(&text));
+            id
+        },
+    )?;
 
     // setText(el_id, text_ptr, text_len)
     let mem_st = memory;
-    linker.func_wrap("dom", "setText", move |mut caller: Caller<'_, ServerState>, el: i32, ptr: i32, len: i32| {
-        let text = read_wasm_str(mem_st, &caller, ptr, len);
-        if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
-            elem.text = Some(text);
-        }
-    })?;
+    linker.func_wrap(
+        "dom",
+        "setText",
+        move |mut caller: Caller<'_, ServerState>, el: i32, ptr: i32, len: i32| {
+            let text = read_wasm_str(mem_st, &caller, ptr, len);
+            if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
+                elem.text = Some(text);
+            }
+        },
+    )?;
 
     // appendChild(parent_id, child_id)
-    linker.func_wrap("dom", "appendChild", |mut caller: Caller<'_, ServerState>, parent: i32, child: i32| {
-        if let Some(p) = caller.data_mut().elements.get_mut(&parent) {
-            p.children.push(child);
-        }
-    })?;
+    linker.func_wrap(
+        "dom",
+        "appendChild",
+        |mut caller: Caller<'_, ServerState>, parent: i32, child: i32| {
+            if let Some(p) = caller.data_mut().elements.get_mut(&parent) {
+                p.children.push(child);
+            }
+        },
+    )?;
 
     // setAttribute(el_id, key_ptr, key_len, val_ptr, val_len)
     let mem_sa = memory;
-    linker.func_wrap("dom", "setAttribute", move |mut caller: Caller<'_, ServerState>, el: i32, k_ptr: i32, k_len: i32, v_ptr: i32, v_len: i32| {
-        let key = read_wasm_str(mem_sa, &caller, k_ptr, k_len);
-        let val = read_wasm_str(mem_sa, &caller, v_ptr, v_len);
-        if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
-            elem.attrs.push((key, val));
-        }
-    })?;
+    linker.func_wrap(
+        "dom",
+        "setAttribute",
+        move |mut caller: Caller<'_, ServerState>,
+              el: i32,
+              k_ptr: i32,
+              k_len: i32,
+              v_ptr: i32,
+              v_len: i32| {
+            let key = read_wasm_str(mem_sa, &caller, k_ptr, k_len);
+            let val = read_wasm_str(mem_sa, &caller, v_ptr, v_len);
+            if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
+                elem.attrs.push((key, val));
+            }
+        },
+    )?;
 
     // setStyle(el_id, prop_ptr, prop_len, val_ptr, val_len)
     let mem_ss = memory;
-    linker.func_wrap("dom", "setStyle", move |mut caller: Caller<'_, ServerState>, el: i32, p_ptr: i32, p_len: i32, v_ptr: i32, v_len: i32| {
-        let prop = read_wasm_str(mem_ss, &caller, p_ptr, p_len);
-        let val = read_wasm_str(mem_ss, &caller, v_ptr, v_len);
-        if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
-            elem.styles.push((prop, val));
-        }
-    })?;
+    linker.func_wrap(
+        "dom",
+        "setStyle",
+        move |mut caller: Caller<'_, ServerState>,
+              el: i32,
+              p_ptr: i32,
+              p_len: i32,
+              v_ptr: i32,
+              v_len: i32| {
+            let prop = read_wasm_str(mem_ss, &caller, p_ptr, p_len);
+            let val = read_wasm_str(mem_ss, &caller, v_ptr, v_len);
+            if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
+                elem.styles.push((prop, val));
+            }
+        },
+    )?;
 
     // setInnerHTML(el_id, html_ptr, html_len)
     let mem_ih = memory;
-    linker.func_wrap("dom", "setInnerHTML", move |mut caller: Caller<'_, ServerState>, el: i32, ptr: i32, len: i32| {
-        let html = read_wasm_str(mem_ih, &caller, ptr, len);
-        if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
-            elem.inner_html = Some(html);
-        }
-    })?;
+    linker.func_wrap(
+        "dom",
+        "setInnerHTML",
+        move |mut caller: Caller<'_, ServerState>, el: i32, ptr: i32, len: i32| {
+            let html = read_wasm_str(mem_ih, &caller, ptr, len);
+            if let Some(elem) = caller.data_mut().elements.get_mut(&el) {
+                elem.inner_html = Some(html);
+            }
+        },
+    )?;
 
     // mount(container_id, html_ptr, html_len) — innerHTML-based mount
     let mem_m = memory;
-    linker.func_wrap("dom", "mount", move |mut caller: Caller<'_, ServerState>, container: i32, ptr: i32, len: i32| {
-        let html = read_wasm_str(mem_m, &caller, ptr, len);
-        if let Some(elem) = caller.data_mut().elements.get_mut(&container) {
-            elem.inner_html = Some(html);
-        } else {
-            // Mount to root if container doesn't exist
-            let root_id = caller.data().root_id;
-            if let Some(elem) = caller.data_mut().elements.get_mut(&root_id) {
+    linker.func_wrap(
+        "dom",
+        "mount",
+        move |mut caller: Caller<'_, ServerState>, container: i32, ptr: i32, len: i32| {
+            let html = read_wasm_str(mem_m, &caller, ptr, len);
+            if let Some(elem) = caller.data_mut().elements.get_mut(&container) {
                 elem.inner_html = Some(html);
+            } else {
+                // Mount to root if container doesn't exist
+                let root_id = caller.data().root_id;
+                if let Some(elem) = caller.data_mut().elements.get_mut(&root_id) {
+                    elem.inner_html = Some(html);
+                }
             }
-        }
-    })?;
+        },
+    )?;
 
     // getRoot() -> element_id (the #app container)
     linker.func_wrap("dom", "getRoot", |caller: Caller<'_, ServerState>| -> i32 {
@@ -669,50 +757,81 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     })?;
 
     // getDocumentElement() -> element_id
-    linker.func_wrap("dom", "getDocumentElement", |caller: Caller<'_, ServerState>| -> i32 {
-        caller.data().root_id
-    })?;
+    linker.func_wrap(
+        "dom",
+        "getDocumentElement",
+        |caller: Caller<'_, ServerState>| -> i32 { caller.data().root_id },
+    )?;
 
     // getElementById(id_ptr, id_len) -> element_id (return root as placeholder)
-    linker.func_wrap("dom", "getElementById", |caller: Caller<'_, ServerState>, _ptr: i32, _len: i32| -> i32 {
-        caller.data().root_id
-    })?;
+    linker.func_wrap(
+        "dom",
+        "getElementById",
+        |caller: Caller<'_, ServerState>, _ptr: i32, _len: i32| -> i32 { caller.data().root_id },
+    )?;
 
     // querySelector(sel_ptr, sel_len) -> element_id
-    linker.func_wrap("dom", "querySelector", |caller: Caller<'_, ServerState>, _ptr: i32, _len: i32| -> i32 {
-        caller.data().root_id
-    })?;
+    linker.func_wrap(
+        "dom",
+        "querySelector",
+        |caller: Caller<'_, ServerState>, _ptr: i32, _len: i32| -> i32 { caller.data().root_id },
+    )?;
 
     // injectStyles(name_ptr, name_len, css_ptr, css_len) -> style_id
     let mem_is = memory;
-    linker.func_wrap("dom", "injectStyles", move |mut caller: Caller<'_, ServerState>, _n_ptr: i32, _n_len: i32, c_ptr: i32, c_len: i32| -> i32 {
-        let css = read_wasm_str(mem_is, &caller, c_ptr, c_len);
-        caller.data_mut().style_blocks.push(css);
-        0
-    })?;
+    linker.func_wrap(
+        "dom",
+        "injectStyles",
+        move |mut caller: Caller<'_, ServerState>,
+              _n_ptr: i32,
+              _n_len: i32,
+              c_ptr: i32,
+              c_len: i32|
+              -> i32 {
+            let css = read_wasm_str(mem_is, &caller, c_ptr, c_len);
+            caller.data_mut().style_blocks.push(css);
+            0
+        },
+    )?;
 
     // addEventListener — no-op on server
-    linker.func_wrap("dom", "addEventListener", |_caller: Caller<'_, ServerState>, _el: i32, _ev_ptr: i32, _ev_len: i32, _cb: i32| {})?;
+    linker.func_wrap(
+        "dom",
+        "addEventListener",
+        |_caller: Caller<'_, ServerState>, _el: i32, _ev_ptr: i32, _ev_len: i32, _cb: i32| {},
+    )?;
 
     // removeEventListener — no-op
-    linker.func_wrap("dom", "removeEventListener", |_caller: Caller<'_, ServerState>, _el: i32, _ev_ptr: i32, _ev_len: i32, _cb: i32| {})?;
+    linker.func_wrap(
+        "dom",
+        "removeEventListener",
+        |_caller: Caller<'_, ServerState>, _el: i32, _ev_ptr: i32, _ev_len: i32, _cb: i32| {},
+    )?;
 
     // removeChild — no-op (initial render only)
-    linker.func_wrap("dom", "removeChild", |_caller: Caller<'_, ServerState>, _parent: i32, _child: i32| {})?;
+    linker.func_wrap(
+        "dom",
+        "removeChild",
+        |_caller: Caller<'_, ServerState>, _parent: i32, _child: i32| {},
+    )?;
 
     // webapi::getLocationPathname — returns server request path
     let mem_lp = memory;
-    linker.func_wrap("webapi", "getLocationPathname", move |mut caller: Caller<'_, ServerState>| -> i32 {
-        let path = caller.data().request_path.clone();
-        let bytes = path.as_bytes();
-        let str_offset = 128u32;
-        let data = mem_lp.data_mut(&mut caller);
-        let end = str_offset as usize + bytes.len();
-        if end <= data.len() {
-            data[str_offset as usize..end].copy_from_slice(bytes);
-        }
-        str_offset as i32
-    })?;
+    linker.func_wrap(
+        "webapi",
+        "getLocationPathname",
+        move |mut caller: Caller<'_, ServerState>| -> i32 {
+            let path = caller.data().request_path.clone();
+            let bytes = path.as_bytes();
+            let str_offset = 128u32;
+            let data = mem_lp.data_mut(&mut caller);
+            let end = str_offset as usize + bytes.len();
+            if end <= data.len() {
+                data[str_offset as usize..end].copy_from_slice(bytes);
+            }
+            str_offset as i32
+        },
+    )?;
 
     // ── Auto-stub all remaining imports ──────────────────────────────
     // Dynamically create no-op stubs for every import not already defined.
@@ -743,30 +862,38 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
         let module_name = import.module();
         let field_name = import.name();
 
-        if defined.iter().any(|(m, f)| m == module_name && f == field_name) {
+        if defined
+            .iter()
+            .any(|(m, f)| m == module_name && f == field_name)
+        {
             continue;
         }
 
         if let ExternType::Func(func_type) = import.ty() {
             let results: Vec<ValType> = func_type.results().collect();
-            let func = Func::new(&mut store, func_type.clone(), move |_caller, _params, out_results| {
-                for (i, ty) in results.iter().enumerate() {
-                    out_results[i] = match ty {
-                        ValType::I32 => Val::I32(0),
-                        ValType::I64 => Val::I64(0),
-                        ValType::F32 => Val::F32(0.0_f32.to_bits()),
-                        ValType::F64 => Val::F64(0.0_f64.to_bits()),
-                        _ => Val::I32(0),
-                    };
-                }
-                Ok(())
-            });
+            let func = Func::new(
+                &mut store,
+                func_type.clone(),
+                move |_caller, _params, out_results| {
+                    for (i, ty) in results.iter().enumerate() {
+                        out_results[i] = match ty {
+                            ValType::I32 => Val::I32(0),
+                            ValType::I64 => Val::I64(0),
+                            ValType::F32 => Val::F32(0.0_f32.to_bits()),
+                            ValType::F64 => Val::F64(0.0_f64.to_bits()),
+                            _ => Val::I32(0),
+                        };
+                    }
+                    Ok(())
+                },
+            );
             linker.define(&store, module_name, field_name, func)?;
         }
     }
 
     // ── Instantiate and run ────────────────────────────────────────────
-    let instance = linker.instantiate(&mut store, &module)
+    let instance = linker
+        .instantiate(&mut store, &module)
         .map_err(|e| anyhow::anyhow!("WASM instantiation failed: {}", e))?;
 
     // ── Entry point resolution ─────────────────────────────────────────
@@ -789,7 +916,11 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     let page_name = if request_path == "/" {
         "HomePage".to_string()
     } else {
-        let slug = request_path.trim_start_matches('/').split('/').next().unwrap_or("");
+        let slug = request_path
+            .trim_start_matches('/')
+            .split('/')
+            .next()
+            .unwrap_or("");
         // Convert "examples" → "Examples", "docs" → "Docs"
         let mut chars = slug.chars();
         match chars.next() {
@@ -810,7 +941,8 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     // Fall back to route mount trampolines (__route_mount_N)
     if !called {
         // Collect route mount exports and try them
-        let export_names: Vec<String> = module.exports()
+        let export_names: Vec<String> = module
+            .exports()
             .filter(|e| e.name().starts_with("__route_mount_"))
             .map(|e| e.name().to_string())
             .collect();
@@ -839,9 +971,7 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
 
     if !called {
         // Scan all exports for any *_init (0 params) or *_mount (1 param)
-        let export_names: Vec<String> = module.exports()
-            .map(|e| e.name().to_string())
-            .collect();
+        let export_names: Vec<String> = module.exports().map(|e| e.name().to_string()).collect();
         for name in &export_names {
             if name.ends_with("_init") {
                 if let Ok(func) = instance.get_typed_func::<(), ()>(&mut store, name) {
@@ -860,7 +990,9 @@ fn render_with_wasmtime(wasm_bytes: &[u8], request_path: &str) -> anyhow::Result
     }
 
     if !called {
-        return Err(anyhow::anyhow!("no mount/init function found in WASM exports"));
+        return Err(anyhow::anyhow!(
+            "no mount/init function found in WASM exports"
+        ));
     }
 
     Ok(store.into_data())
@@ -881,23 +1013,44 @@ fn generate_ssr_meta_html(meta: &SsrPageMeta) -> String {
 
     if let Some(ref title) = meta.title {
         out.push_str(&format!("    <title>{}</title>\n", ssr_html_escape(title)));
-        out.push_str(&format!("    <meta property=\"og:title\" content=\"{}\">\n", ssr_html_escape(title)));
+        out.push_str(&format!(
+            "    <meta property=\"og:title\" content=\"{}\">\n",
+            ssr_html_escape(title)
+        ));
     }
     if let Some(ref desc) = meta.description {
-        out.push_str(&format!("    <meta name=\"description\" content=\"{}\">\n", ssr_html_escape(desc)));
-        out.push_str(&format!("    <meta property=\"og:description\" content=\"{}\">\n", ssr_html_escape(desc)));
+        out.push_str(&format!(
+            "    <meta name=\"description\" content=\"{}\">\n",
+            ssr_html_escape(desc)
+        ));
+        out.push_str(&format!(
+            "    <meta property=\"og:description\" content=\"{}\">\n",
+            ssr_html_escape(desc)
+        ));
     }
     if let Some(ref canonical) = meta.canonical {
-        out.push_str(&format!("    <link rel=\"canonical\" href=\"{}\">\n", ssr_html_escape(canonical)));
-        out.push_str(&format!("    <meta property=\"og:url\" content=\"{}\">\n", ssr_html_escape(canonical)));
+        out.push_str(&format!(
+            "    <link rel=\"canonical\" href=\"{}\">\n",
+            ssr_html_escape(canonical)
+        ));
+        out.push_str(&format!(
+            "    <meta property=\"og:url\" content=\"{}\">\n",
+            ssr_html_escape(canonical)
+        ));
     }
     if let Some(ref og_img) = meta.og_image {
-        out.push_str(&format!("    <meta property=\"og:image\" content=\"{}\">\n", ssr_html_escape(og_img)));
+        out.push_str(&format!(
+            "    <meta property=\"og:image\" content=\"{}\">\n",
+            ssr_html_escape(og_img)
+        ));
     }
     out.push_str("    <meta property=\"og:type\" content=\"website\">\n");
 
     for json in &meta.structured_data_json {
-        out.push_str(&format!("    <script type=\"application/ld+json\">{}</script>\n", json));
+        out.push_str(&format!(
+            "    <script type=\"application/ld+json\">{}</script>\n",
+            json
+        ));
     }
 
     out
@@ -905,9 +1058,9 @@ fn generate_ssr_meta_html(meta: &SsrPageMeta) -> String {
 
 fn ssr_html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('"', "&quot;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Build the complete HTML document wrapping SSR-rendered content.
@@ -930,11 +1083,12 @@ fn build_html_shell_with_meta(ssr_html: &str, path: &str, meta: Option<&SsrPageM
     };
     let mount_fn = format!("{}_mount", page_name);
 
-    let meta_html = meta.map(|m| generate_ssr_meta_html(m)).unwrap_or_else(|| {
-        "    <title>Nectar App</title>\n".to_string()
-    });
+    let meta_html = meta
+        .map(|m| generate_ssr_meta_html(m))
+        .unwrap_or_else(|| "    <title>Nectar App</title>\n".to_string());
 
-    format!(r#"<!DOCTYPE html>
+    format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -956,12 +1110,17 @@ fn build_html_shell_with_meta(ssr_html: &str, path: &str, meta: Option<&SsrPageM
         }}
     </script>
 </body>
-</html>"#, meta_html = meta_html, ssr = ssr_html, mount_fn = mount_fn)
+</html>"#,
+        meta_html = meta_html,
+        ssr = ssr_html,
+        mount_fn = mount_fn
+    )
 }
 
 /// Build an error page for SSR failures.
 fn build_error_page(path: &str, error: &str) -> String {
-    format!(r#"<!DOCTYPE html>
+    format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -981,7 +1140,9 @@ fn build_error_page(path: &str, error: &str) -> String {
         }}
     </script>
 </body>
-</html>"#, path, error)
+</html>"#,
+        path, error
+    )
 }
 
 // ==========================================================================
@@ -1019,13 +1180,30 @@ mod tests {
         let mut state = ServerState::default();
         let div_id = state.alloc_id();
         state.elements.insert(div_id, SsrElement::new("div"));
-        state.elements.get_mut(&div_id).unwrap().attrs.push(("class".into(), "hero".into()));
+        state
+            .elements
+            .get_mut(&div_id)
+            .unwrap()
+            .attrs
+            .push(("class".into(), "hero".into()));
 
         let text_id = state.alloc_id();
-        state.elements.insert(text_id, SsrElement::text_node("Hello Nectar"));
-        state.elements.get_mut(&div_id).unwrap().children.push(text_id);
+        state
+            .elements
+            .insert(text_id, SsrElement::text_node("Hello Nectar"));
+        state
+            .elements
+            .get_mut(&div_id)
+            .unwrap()
+            .children
+            .push(text_id);
 
-        state.elements.get_mut(&state.root_id).unwrap().children.push(div_id);
+        state
+            .elements
+            .get_mut(&state.root_id)
+            .unwrap()
+            .children
+            .push(div_id);
 
         let html = state.serialize_html();
         assert!(html.contains("<div class=\"hero\">"));
@@ -1046,8 +1224,18 @@ mod tests {
         let mut state = ServerState::default();
         let img_id = state.alloc_id();
         state.elements.insert(img_id, SsrElement::new("img"));
-        state.elements.get_mut(&img_id).unwrap().attrs.push(("src".into(), "logo.png".into()));
-        state.elements.get_mut(&state.root_id).unwrap().children.push(img_id);
+        state
+            .elements
+            .get_mut(&img_id)
+            .unwrap()
+            .attrs
+            .push(("src".into(), "logo.png".into()));
+        state
+            .elements
+            .get_mut(&state.root_id)
+            .unwrap()
+            .children
+            .push(img_id);
         let html = state.serialize_html();
         assert!(html.contains("<img src=\"logo.png\" />"));
         assert!(!html.contains("</img>"));
@@ -1058,9 +1246,24 @@ mod tests {
         let mut state = ServerState::default();
         let div_id = state.alloc_id();
         state.elements.insert(div_id, SsrElement::new("div"));
-        state.elements.get_mut(&div_id).unwrap().styles.push(("color".into(), "red".into()));
-        state.elements.get_mut(&div_id).unwrap().styles.push(("font-size".into(), "16px".into()));
-        state.elements.get_mut(&state.root_id).unwrap().children.push(div_id);
+        state
+            .elements
+            .get_mut(&div_id)
+            .unwrap()
+            .styles
+            .push(("color".into(), "red".into()));
+        state
+            .elements
+            .get_mut(&div_id)
+            .unwrap()
+            .styles
+            .push(("font-size".into(), "16px".into()));
+        state
+            .elements
+            .get_mut(&state.root_id)
+            .unwrap()
+            .children
+            .push(div_id);
         let html = state.serialize_html();
         assert!(html.contains("style=\"color: red; font-size: 16px\""));
     }
@@ -1072,7 +1275,12 @@ mod tests {
         let mut el = SsrElement::new("div");
         el.inner_html = Some("<b>bold</b>".into());
         state.elements.insert(div_id, el);
-        state.elements.get_mut(&state.root_id).unwrap().children.push(div_id);
+        state
+            .elements
+            .get_mut(&state.root_id)
+            .unwrap()
+            .children
+            .push(div_id);
         let html = state.serialize_html();
         assert!(html.contains("<div><b>bold</b></div>"));
     }
@@ -1143,7 +1351,10 @@ mod tests {
 
     #[test]
     fn test_html_escape() {
-        assert_eq!(html_escape("<script>alert('xss')</script>"), "&lt;script&gt;alert('xss')&lt;/script&gt;");
+        assert_eq!(
+            html_escape("<script>alert('xss')</script>"),
+            "&lt;script&gt;alert('xss')&lt;/script&gt;"
+        );
         assert_eq!(html_escape_attr("a\"b"), "a&quot;b");
     }
 
@@ -1233,8 +1444,8 @@ mod tests {
         // when the provider is not configured (no env vars set).
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            use axum::http::{Request, Method};
             use axum::body::Body;
+            use axum::http::{Method, Request};
             use axum::response::IntoResponse;
 
             let state = Arc::new(ApiProxyState {
@@ -1259,7 +1470,8 @@ mod tests {
                 axum::extract::State(state),
                 axum::extract::Path("xyznotreal".to_string()),
                 request,
-            ).await;
+            )
+            .await;
 
             assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
         });
@@ -1269,8 +1481,8 @@ mod tests {
     fn test_api_proxy_rejects_invalid_json() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            use axum::http::{Request, Method};
             use axum::body::Body;
+            use axum::http::{Method, Request};
 
             let state = Arc::new(ApiProxyState {
                 http_client: reqwest::Client::new(),
@@ -1294,7 +1506,8 @@ mod tests {
                 axum::extract::State(state),
                 axum::extract::Path("jsontest".to_string()),
                 request,
-            ).await;
+            )
+            .await;
 
             assert_eq!(response.status(), axum::http::StatusCode::BAD_REQUEST);
 
@@ -1309,15 +1522,17 @@ mod tests {
     fn test_api_proxy_rate_limit() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            use axum::http::{Request, Method};
             use axum::body::Body;
+            use axum::http::{Method, Request};
 
             let state = Arc::new(ApiProxyState {
                 http_client: reqwest::Client::new(),
                 rate_limiter: Arc::new(RateLimiter::new(1)), // Only 1 request allowed
             });
 
-            unsafe { std::env::remove_var("NECTAR_RATELIMITPROV_URL"); }
+            unsafe {
+                std::env::remove_var("NECTAR_RATELIMITPROV_URL");
+            }
 
             // First request uses the one allowed slot (will get 404 since no URL)
             let req1 = Request::builder()
@@ -1329,7 +1544,8 @@ mod tests {
                 axum::extract::State(state.clone()),
                 axum::extract::Path("ratelimitprov".to_string()),
                 req1,
-            ).await;
+            )
+            .await;
             // First is allowed (gets 404 because no env var, but not 429)
             assert_ne!(resp1.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
 
@@ -1343,7 +1559,8 @@ mod tests {
                 axum::extract::State(state.clone()),
                 axum::extract::Path("ratelimitprov".to_string()),
                 req2,
-            ).await;
+            )
+            .await;
             assert_eq!(resp2.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
         });
     }
@@ -1352,8 +1569,8 @@ mod tests {
     fn test_api_proxy_empty_body_allowed() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            use axum::http::{Request, Method};
             use axum::body::Body;
+            use axum::http::{Method, Request};
 
             let state = Arc::new(ApiProxyState {
                 http_client: reqwest::Client::new(),
@@ -1362,7 +1579,9 @@ mod tests {
 
             // Provider not configured — we just verify empty body doesn't
             // trigger the "invalid JSON" rejection
-            unsafe { std::env::remove_var("NECTAR_EMPTYTEST_URL"); }
+            unsafe {
+                std::env::remove_var("NECTAR_EMPTYTEST_URL");
+            }
 
             let request = Request::builder()
                 .method(Method::GET)
@@ -1374,7 +1593,8 @@ mod tests {
                 axum::extract::State(state),
                 axum::extract::Path("emptytest".to_string()),
                 request,
-            ).await;
+            )
+            .await;
 
             // Should be 404 (not configured), not 400 (bad JSON)
             assert_eq!(response.status(), axum::http::StatusCode::NOT_FOUND);
@@ -1391,14 +1611,17 @@ mod tests {
             canonical: Some("https://example.com".to_string()),
             og_image: Some("https://example.com/og.png".to_string()),
             structured_data_json: vec![
-                r#"{"@context":"https://schema.org","@type":"Product","name":"Widget"}"#.to_string(),
+                r#"{"@context":"https://schema.org","@type":"Product","name":"Widget"}"#
+                    .to_string(),
             ],
         };
         let html = build_html_shell_with_meta("<p>content</p>", "/", Some(&meta));
         assert!(html.contains("<title>My Store</title>"));
         assert!(html.contains("<meta name=\"description\" content=\"Best products\">"));
         assert!(html.contains("<meta property=\"og:title\" content=\"My Store\">"));
-        assert!(html.contains("<meta property=\"og:image\" content=\"https://example.com/og.png\">"));
+        assert!(
+            html.contains("<meta property=\"og:image\" content=\"https://example.com/og.png\">")
+        );
         assert!(html.contains("<link rel=\"canonical\" href=\"https://example.com\">"));
         assert!(html.contains("application/ld+json"));
         assert!(html.contains("\"@type\":\"Product\""));

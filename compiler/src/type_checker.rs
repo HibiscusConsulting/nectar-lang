@@ -53,7 +53,10 @@ pub enum Ty {
     Iterator(Box<Ty>),
 
     /// Result<T, E> type for error handling.
-    Result_ { ok: Box<Ty>, err: Box<Ty> },
+    Result_ {
+        ok: Box<Ty>,
+        err: Box<Ty>,
+    },
 
     /// An API boundary contract type — like a struct but with runtime validation.
     Contract(String),
@@ -107,7 +110,11 @@ impl fmt::Display for Ty {
                 }
                 write!(f, ") -> {}", ret)
             }
-            Ty::Reference { mutable, lifetime: _, inner } => {
+            Ty::Reference {
+                mutable,
+                lifetime: _,
+                inner,
+            } => {
                 if *mutable {
                     write!(f, "&mut {}", inner)
                 } else {
@@ -158,7 +165,11 @@ impl fmt::Display for TypeError {
         if let Some(ref line) = self.source_line {
             writeln!(f, "  |")?;
             writeln!(f, "{} | {}", self.span.line, line)?;
-            writeln!(f, "  | {}^", " ".repeat(self.span.col.saturating_sub(1) as usize))?;
+            writeln!(
+                f,
+                "  | {}^",
+                " ".repeat(self.span.col.saturating_sub(1) as usize)
+            )?;
         }
         if let Some(ref suggestion) = self.suggestion {
             writeln!(f, "  = help: {}", suggestion)?;
@@ -231,7 +242,11 @@ impl Substitution {
                 params: params.iter().map(|t| self.resolve(t)).collect(),
                 ret: Box::new(self.resolve(ret)),
             },
-            Ty::Reference { mutable, lifetime, inner } => Ty::Reference {
+            Ty::Reference {
+                mutable,
+                lifetime,
+                inner,
+            } => Ty::Reference {
                 mutable: *mutable,
                 lifetime: lifetime.clone(),
                 inner: Box::new(self.resolve(inner)),
@@ -268,8 +283,12 @@ impl Substitution {
             // Contract <-> Struct unification: contracts are structurally
             // compatible with structs of the same name (they share the same
             // field layout in the structs registry).
-            (Ty::Contract(a_name), Ty::Struct(b_name)) | (Ty::Struct(a_name), Ty::Contract(b_name))
-                if a_name == b_name => Ok(()),
+            (Ty::Contract(a_name), Ty::Struct(b_name))
+            | (Ty::Struct(a_name), Ty::Contract(b_name))
+                if a_name == b_name =>
+            {
+                Ok(())
+            }
 
             // Numeric coercion: i32 <-> i64, f32 <-> f64, i32 <-> u32, i64 <-> u64, u32 <-> u64
             (Ty::I32, Ty::I64) | (Ty::I64, Ty::I32) => Ok(()),
@@ -293,7 +312,16 @@ impl Substitution {
             (Ty::Array(a_inner), Ty::Array(b_inner)) => self.unify(a_inner, b_inner),
             (Ty::Iterator(a_inner), Ty::Iterator(b_inner)) => self.unify(a_inner, b_inner),
             (Ty::Option_(a_inner), Ty::Option_(b_inner)) => self.unify(a_inner, b_inner),
-            (Ty::Result_ { ok: a_ok, err: a_err }, Ty::Result_ { ok: b_ok, err: b_err }) => {
+            (
+                Ty::Result_ {
+                    ok: a_ok,
+                    err: a_err,
+                },
+                Ty::Result_ {
+                    ok: b_ok,
+                    err: b_err,
+                },
+            ) => {
                 self.unify(a_ok, b_ok)?;
                 self.unify(a_err, b_err)
             }
@@ -331,10 +359,7 @@ impl Substitution {
                 },
             ) => {
                 if am != bm {
-                    return Err(format!(
-                        "reference mutability mismatch: {} vs {}",
-                        a, b
-                    ));
+                    return Err(format!("reference mutability mismatch: {} vs {}", a, b));
                 }
                 self.unify(ai, bi)
             }
@@ -436,7 +461,9 @@ impl Substitution {
         let ty = self.resolve(ty);
         match &ty {
             Ty::Var(other) => *other == id,
-            Ty::Array(inner) | Ty::Iterator(inner) | Ty::Option_(inner) => self.occurs_in(id, inner),
+            Ty::Array(inner) | Ty::Iterator(inner) | Ty::Option_(inner) => {
+                self.occurs_in(id, inner)
+            }
             Ty::Result_ { ok, err } => self.occurs_in(id, ok) || self.occurs_in(id, err),
             Ty::Tuple(tys) => tys.iter().any(|t| self.occurs_in(id, t)),
             Ty::Function { params, ret } => {
@@ -465,7 +492,11 @@ impl Substitution {
                 params: params.iter().map(|t| self.finalize(t)).collect(),
                 ret: Box::new(self.finalize(ret)),
             },
-            Ty::Reference { mutable, lifetime: _, inner } => Ty::Reference {
+            Ty::Reference {
+                mutable,
+                lifetime: _,
+                inner,
+            } => Ty::Reference {
                 mutable: *mutable,
                 lifetime: None,
                 inner: Box::new(self.finalize(inner)),
@@ -673,14 +704,15 @@ impl TypeChecker {
             },
             Type::Generic { name, args } => {
                 // Generic type application — resolve args and handle well-known types.
-                let resolved_args: Vec<Ty> = args.iter()
-                    .map(|t| self.ast_type_to_ty(t))
-                    .collect();
+                let resolved_args: Vec<Ty> = args.iter().map(|t| self.ast_type_to_ty(t)).collect();
                 match name.as_str() {
                     "Result" => {
                         let ok = resolved_args.get(0).cloned().unwrap_or(Ty::Unit);
                         let err = resolved_args.get(1).cloned().unwrap_or(Ty::String_);
-                        Ty::Result_ { ok: Box::new(ok), err: Box::new(err) }
+                        Ty::Result_ {
+                            ok: Box::new(ok),
+                            err: Box::new(err),
+                        }
                     }
                     "Option" => {
                         let inner = resolved_args.into_iter().next().unwrap_or(Ty::Unit);
@@ -701,7 +733,11 @@ impl TypeChecker {
                     }
                 }
             }
-            Type::Reference { mutable, lifetime, inner } => Ty::Reference {
+            Type::Reference {
+                mutable,
+                lifetime,
+                inner,
+            } => Ty::Reference {
                 mutable: *mutable,
                 lifetime: lifetime.clone(),
                 inner: Box::new(self.ast_type_to_ty(inner)),
@@ -712,9 +748,7 @@ impl TypeChecker {
                 ok: Box::new(self.ast_type_to_ty(ok)),
                 err: Box::new(self.ast_type_to_ty(err)),
             },
-            Type::Tuple(tys) => {
-                Ty::Tuple(tys.iter().map(|t| self.ast_type_to_ty(t)).collect())
-            }
+            Type::Tuple(tys) => Ty::Tuple(tys.iter().map(|t| self.ast_type_to_ty(t)).collect()),
             Type::Function { params, ret } => Ty::Function {
                 params: params.iter().map(|t| self.ast_type_to_ty(t)).collect(),
                 ret: Box::new(self.ast_type_to_ty(ret)),
@@ -735,7 +769,12 @@ impl TypeChecker {
             // Instant — UTC point in time
             let mut instant_fields = HashMap::new();
             instant_fields.insert("unix_ms".to_string(), Ty::I64);
-            self.structs.insert("Instant".to_string(), StructInfo { fields: instant_fields });
+            self.structs.insert(
+                "Instant".to_string(),
+                StructInfo {
+                    fields: instant_fields,
+                },
+            );
 
             // ZonedDateTime — instant + timezone
             let mut zdt_fields = HashMap::new();
@@ -746,187 +785,316 @@ impl TypeChecker {
             zdt_fields.insert("minute".to_string(), Ty::I32);
             zdt_fields.insert("second".to_string(), Ty::I32);
             zdt_fields.insert("timezone".to_string(), Ty::String_);
-            self.structs.insert("ZonedDateTime".to_string(), StructInfo { fields: zdt_fields });
+            self.structs.insert(
+                "ZonedDateTime".to_string(),
+                StructInfo { fields: zdt_fields },
+            );
 
             // Duration — length of time
             let mut duration_fields = HashMap::new();
             duration_fields.insert("ms".to_string(), Ty::I64);
-            self.structs.insert("Duration".to_string(), StructInfo { fields: duration_fields });
+            self.structs.insert(
+                "Duration".to_string(),
+                StructInfo {
+                    fields: duration_fields,
+                },
+            );
 
             // Date — calendar date (no time)
             let mut date_fields = HashMap::new();
             date_fields.insert("year".to_string(), Ty::I32);
             date_fields.insert("month".to_string(), Ty::I32);
             date_fields.insert("day".to_string(), Ty::I32);
-            self.structs.insert("Date".to_string(), StructInfo { fields: date_fields });
+            self.structs.insert(
+                "Date".to_string(),
+                StructInfo {
+                    fields: date_fields,
+                },
+            );
 
             // Time — wall clock (no date)
             let mut time_fields = HashMap::new();
             time_fields.insert("hour".to_string(), Ty::I32);
             time_fields.insert("minute".to_string(), Ty::I32);
             time_fields.insert("second".to_string(), Ty::I32);
-            self.structs.insert("Time".to_string(), StructInfo { fields: time_fields });
+            self.structs.insert(
+                "Time".to_string(),
+                StructInfo {
+                    fields: time_fields,
+                },
+            );
 
             // Register time module functions
-            self.fn_sigs.insert("time::now".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Struct("Instant".to_string())),
-            });
-            self.fn_sigs.insert("time::zoned".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Struct("ZonedDateTime".to_string())),
-            });
-            self.fn_sigs.insert("time::date".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Struct("Date".to_string())),
-            });
-            self.fn_sigs.insert("Duration::seconds".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::Struct("Duration".to_string())),
-            });
-            self.fn_sigs.insert("Duration::minutes".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::Struct("Duration".to_string())),
-            });
-            self.fn_sigs.insert("Duration::hours".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::Struct("Duration".to_string())),
-            });
-            self.fn_sigs.insert("Duration::days".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::Struct("Duration".to_string())),
-            });
+            self.fn_sigs.insert(
+                "time::now".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Struct("Instant".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "time::zoned".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Struct("ZonedDateTime".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "time::date".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Struct("Date".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "Duration::seconds".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::Struct("Duration".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "Duration::minutes".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::Struct("Duration".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "Duration::hours".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::Struct("Duration".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "Duration::days".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::Struct("Duration".to_string())),
+                },
+            );
         }
 
         // Register clipboard namespace functions
         {
-            self.fn_sigs.insert("clipboard::copy".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("clipboard::paste".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("clipboard::copy_image".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "clipboard::copy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "clipboard::paste".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "clipboard::copy_image".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Register crypto namespace functions
         {
-            self.fn_sigs.insert("crypto::sha256".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::sha512".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::hmac".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::encrypt".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::decrypt".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::sign".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::verify".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("crypto::derive_key".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::random_uuid".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::random_bytes".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::sha1".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::sha384".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::generate_key_pair".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Tuple(vec![Ty::String_, Ty::String_])),
-            });
-            self.fn_sigs.insert("crypto::export_key".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::ecdh_derive".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::derive_bits".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::encrypt_aes_cbc".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::decrypt_aes_cbc".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::encrypt_aes_ctr".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::decrypt_aes_ctr".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::hmac_sha512".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("crypto::hkdf".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::String_, Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "crypto::sha256".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::sha512".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::hmac".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::encrypt".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::decrypt".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::sign".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::verify".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::derive_key".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::random_uuid".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::random_bytes".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::sha1".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::sha384".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::generate_key_pair".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Tuple(vec![Ty::String_, Ty::String_])),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::export_key".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::ecdh_derive".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::derive_bits".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::encrypt_aes_cbc".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::decrypt_aes_cbc".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::encrypt_aes_ctr".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::decrypt_aes_ctr".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::hmac_sha512".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "crypto::hkdf".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
 
             // Also register common crypto functions without the namespace prefix
             // so that `sha256(x)` works in addition to `crypto::sha256(x)`.
-            self.fn_sigs.insert("sha256".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("sha512".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("hmac".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("encrypt".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("decrypt".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "sha256".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "sha512".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "hmac".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "encrypt".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "decrypt".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register hardware / sensor API functions.
@@ -934,176 +1102,326 @@ impl TypeChecker {
         // browser hardware APIs.  Register them as callable top-level functions
         // so `haptic("light")` type-checks without a namespace qualifier.
         {
-            self.fn_sigs.insert("haptic".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("vibrate".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "haptic".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "vibrate".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register debounce and throttle utility functions
         {
-            self.fn_sigs.insert("debounce".to_string(), Ty::Function {
-                params: vec![Ty::Function { params: vec![], ret: Box::new(Ty::Unit) }, Ty::I32],
-                ret: Box::new(Ty::Function { params: vec![], ret: Box::new(Ty::Unit) }),
-            });
-            self.fn_sigs.insert("throttle".to_string(), Ty::Function {
-                params: vec![Ty::Function { params: vec![], ret: Box::new(Ty::Unit) }, Ty::I32],
-                ret: Box::new(Ty::Function { params: vec![], ret: Box::new(Ty::Unit) }),
-            });
+            self.fn_sigs.insert(
+                "debounce".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Function {
+                            params: vec![],
+                            ret: Box::new(Ty::Unit),
+                        },
+                        Ty::I32,
+                    ],
+                    ret: Box::new(Ty::Function {
+                        params: vec![],
+                        ret: Box::new(Ty::Unit),
+                    }),
+                },
+            );
+            self.fn_sigs.insert(
+                "throttle".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Function {
+                            params: vec![],
+                            ret: Box::new(Ty::Unit),
+                        },
+                        Ty::I32,
+                    ],
+                    ret: Box::new(Ty::Function {
+                        params: vec![],
+                        ret: Box::new(Ty::Unit),
+                    }),
+                },
+            );
         }
 
         // Register GPU (WebGPU) namespace functions
         {
             // Initialization
-            self.fn_sigs.insert("gpu::request_adapter".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::I32], // power_preference, cbIdx
-                ret: Box::new(Ty::Unit), // async — calls back with adapter ID
-            });
-            self.fn_sigs.insert("gpu::request_device".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32], // adapterId, optsPtr, cbIdx
-                ret: Box::new(Ty::Unit), // async — calls back with device ID
-            });
-            self.fn_sigs.insert("gpu::configure_canvas".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::String_], // canvasElId, deviceId, format
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::get_preferred_format".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
+            self.fn_sigs.insert(
+                "gpu::request_adapter".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::I32], // power_preference, cbIdx
+                    ret: Box::new(Ty::Unit),            // async — calls back with adapter ID
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::request_device".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32], // adapterId, optsPtr, cbIdx
+                    ret: Box::new(Ty::Unit),                 // async — calls back with device ID
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::configure_canvas".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::String_], // canvasElId, deviceId, format
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::get_preferred_format".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
             // Resource creation
-            self.fn_sigs.insert("gpu::create_buffer".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32], // deviceId, size, usage
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::write_buffer".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bufferId, dataPtr, dataLen, offset
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::create_shader_module".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_], // deviceId, code
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_render_pipeline".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::String_, Ty::String_, Ty::String_, Ty::String_], // deviceId, shaderModuleId, vsEntry, fsEntry, topology, format
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_texture".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, width, height, format, usage
-                ret: Box::new(Ty::I32),
-            });
+            self.fn_sigs.insert(
+                "gpu::create_buffer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32], // deviceId, size, usage
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::write_buffer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bufferId, dataPtr, dataLen, offset
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_shader_module".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_], // deviceId, code
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_render_pipeline".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::I32,
+                        Ty::I32,
+                        Ty::String_,
+                        Ty::String_,
+                        Ty::String_,
+                        Ty::String_,
+                    ], // deviceId, shaderModuleId, vsEntry, fsEntry, topology, format
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_texture".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, width, height, format, usage
+                    ret: Box::new(Ty::I32),
+                },
+            );
             // Rendering
-            self.fn_sigs.insert("gpu::begin_render_pass".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::F32, Ty::F32, Ty::F32, Ty::F32, Ty::I32], // deviceId, viewId, r, g, b, a, depthViewId
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::set_pipeline".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::set_vertex_buffer".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::draw".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::submit_render_pass".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::get_current_texture".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_texture_view".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::destroy_buffer".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::destroy_texture".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "gpu::begin_render_pass".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::I32,
+                        Ty::I32,
+                        Ty::F32,
+                        Ty::F32,
+                        Ty::F32,
+                        Ty::F32,
+                        Ty::I32,
+                    ], // deviceId, viewId, r, g, b, a, depthViewId
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::set_pipeline".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::set_vertex_buffer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::draw".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::submit_render_pass".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::get_current_texture".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_texture_view".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::destroy_buffer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::destroy_texture".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
             // Phase 3: compute, bind groups, indexed draw
-            self.fn_sigs.insert("gpu::create_compute_pipeline".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, shaderModuleId, entryPoint, layoutId
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_pipeline_layout".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bgl0, bgl1, bgl2, bgl3
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_bind_group_layout".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::create_bind_group".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::set_bind_group".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::set_index_buffer".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::draw_indexed".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::begin_compute_pass".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::dispatch_workgroups".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("gpu::submit_compute_pass".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "gpu::create_compute_pipeline".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::String_, Ty::I32], // deviceId, shaderModuleId, entryPoint, layoutId
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_pipeline_layout".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32], // deviceId, bgl0, bgl1, bgl2, bgl3
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_bind_group_layout".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::create_bind_group".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32], // deviceId, descPtr
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::set_bind_group".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::set_index_buffer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::draw_indexed".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::begin_compute_pass".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::dispatch_workgroups".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::submit_compute_pass".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
             // Usage flag constants
-            self.fn_sigs.insert("gpu::buffer_usage_vertex".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::buffer_usage_index".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::buffer_usage_uniform".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::buffer_usage_copy_dst".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::buffer_usage_storage".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("gpu::buffer_usage".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
+            self.fn_sigs.insert(
+                "gpu::buffer_usage_vertex".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::buffer_usage_index".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::buffer_usage_uniform".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::buffer_usage_copy_dst".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::buffer_usage_storage".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "gpu::buffer_usage".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
             // Binary fetch
-            self.fn_sigs.insert("http::fetch_binary".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "http::fetch_binary".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register BigDecimal type and methods
@@ -1112,53 +1430,84 @@ impl TypeChecker {
             let mut bd_fields = HashMap::new();
             bd_fields.insert("value".to_string(), Ty::String_);
             bd_fields.insert("precision".to_string(), Ty::I32);
-            self.structs.insert("BigDecimal".to_string(), StructInfo { fields: bd_fields });
+            self.structs
+                .insert("BigDecimal".to_string(), StructInfo { fields: bd_fields });
 
             // BigDecimal constructor and methods
-            self.fn_sigs.insert("BigDecimal::new".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Struct("BigDecimal".to_string())),
-            });
-            self.fn_sigs.insert("BigDecimal::from_i64".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::Struct("BigDecimal".to_string())),
-            });
-            self.fn_sigs.insert("BigDecimal::from_f64".to_string(), Ty::Function {
-                params: vec![Ty::F64],
-                ret: Box::new(Ty::Struct("BigDecimal".to_string())),
-            });
+            self.fn_sigs.insert(
+                "BigDecimal::new".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Struct("BigDecimal".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "BigDecimal::from_i64".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::Struct("BigDecimal".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "BigDecimal::from_f64".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64],
+                    ret: Box::new(Ty::Struct("BigDecimal".to_string())),
+                },
+            );
         }
 
         // Register format namespace functions
         {
-            self.fn_sigs.insert("format::number".to_string(), Ty::Function {
-                params: vec![Ty::F64, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::currency".to_string(), Ty::Function {
-                params: vec![Ty::F64, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::percent".to_string(), Ty::Function {
-                params: vec![Ty::F64],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::bytes".to_string(), Ty::Function {
-                params: vec![Ty::I64],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::compact".to_string(), Ty::Function {
-                params: vec![Ty::F64],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::ordinal".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("format::relative_time".to_string(), Ty::Function {
-                params: vec![Ty::Struct("Instant".to_string())],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "format::number".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::currency".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::percent".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::bytes".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I64],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::compact".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::ordinal".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "format::relative_time".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("Instant".to_string())],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register url namespace functions and Url type
@@ -1172,241 +1521,403 @@ impl TypeChecker {
             url_fields.insert("pathname".to_string(), Ty::String_);
             url_fields.insert("search".to_string(), Ty::String_);
             url_fields.insert("hash".to_string(), Ty::String_);
-            self.structs.insert("Url".to_string(), StructInfo { fields: url_fields });
+            self.structs
+                .insert("Url".to_string(), StructInfo { fields: url_fields });
 
-            self.fn_sigs.insert("url::parse".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Struct("Url".to_string())),
-            });
-            self.fn_sigs.insert("url::build".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Struct("Url".to_string())),
-            });
-            self.fn_sigs.insert("url::query_get".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Option_(Box::new(Ty::String_))),
-            });
-            self.fn_sigs.insert("url::query_set".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "url::parse".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Struct("Url".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "url::build".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Struct("Url".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "url::query_get".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Option_(Box::new(Ty::String_))),
+                },
+            );
+            self.fn_sigs.insert(
+                "url::query_set".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register collections namespace functions
         {
             // Collections utility functions (generic over arrays)
-            self.fn_sigs.insert("collections::group_by".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
-                ret: Box::new(Ty::Error), // Returns Map<String, Array<T>>
-            });
-            self.fn_sigs.insert("collections::sort_by".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("collections::uniq_by".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("collections::chunk".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::Array(Box::new(Ty::Error))))),
-            });
-            self.fn_sigs.insert("collections::flatten".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Array(Box::new(Ty::Error))))],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("collections::zip".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::Error))],
-                ret: Box::new(Ty::Array(Box::new(Ty::Tuple(vec![Ty::Error, Ty::Error])))),
-            });
-            self.fn_sigs.insert("collections::partition".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Function { params: vec![Ty::Error], ret: Box::new(Ty::Bool) }],
-                ret: Box::new(Ty::Tuple(vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::Error))])),
-            });
+            self.fn_sigs.insert(
+                "collections::group_by".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
+                    ret: Box::new(Ty::Error), // Returns Map<String, Array<T>>
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::sort_by".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::uniq_by".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Error)), Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::chunk".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Error)), Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Array(Box::new(Ty::Error))))),
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::flatten".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Array(Box::new(Ty::Error))))],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::zip".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Array(Box::new(Ty::Error)),
+                    ],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Tuple(vec![Ty::Error, Ty::Error])))),
+                },
+            );
+            self.fn_sigs.insert(
+                "collections::partition".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Function {
+                            params: vec![Ty::Error],
+                            ret: Box::new(Ty::Bool),
+                        },
+                    ],
+                    ret: Box::new(Ty::Tuple(vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Array(Box::new(Ty::Error)),
+                    ])),
+                },
+            );
         }
 
         // Register mask namespace functions
         {
-            self.fn_sigs.insert("mask::phone".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("mask::currency".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("mask::pattern".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("mask::credit_card".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "mask::phone".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "mask::currency".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "mask::pattern".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "mask::credit_card".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register search namespace functions and SearchIndex type
         {
-            self.fn_sigs.insert("search::create_index".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::String_))],
-                ret: Box::new(Ty::Struct("SearchIndex".to_string())),
-            });
-            self.fn_sigs.insert("search::query".to_string(), Ty::Function {
-                params: vec![Ty::Struct("SearchIndex".to_string()), Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
+            self.fn_sigs.insert(
+                "search::create_index".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Array(Box::new(Ty::String_)),
+                    ],
+                    ret: Box::new(Ty::Struct("SearchIndex".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "search::query".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("SearchIndex".to_string()), Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
 
             let mut search_idx_fields = HashMap::new();
             search_idx_fields.insert("size".to_string(), Ty::I32);
-            self.structs.insert("SearchIndex".to_string(), StructInfo { fields: search_idx_fields });
+            self.structs.insert(
+                "SearchIndex".to_string(),
+                StructInfo {
+                    fields: search_idx_fields,
+                },
+            );
         }
 
         // Register theme namespace functions
         {
-            self.fn_sigs.insert("theme::init".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("theme::toggle".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("theme::set".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("theme::current".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "theme::init".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "theme::toggle".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "theme::set".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "theme::current".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register auth namespace functions
         {
-            self.fn_sigs.insert("auth::init".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("auth::login".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("auth::logout".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("auth::get_user".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Error), // opaque user object
-            });
-            self.fn_sigs.insert("auth::is_authenticated".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "auth::init".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "auth::login".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "auth::logout".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "auth::get_user".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Error), // opaque user object
+                },
+            );
+            self.fn_sigs.insert(
+                "auth::is_authenticated".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Register upload namespace functions
         {
-            self.fn_sigs.insert("upload::init".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("upload::start".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("upload::cancel".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "upload::init".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "upload::start".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "upload::cancel".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Register db namespace functions
         {
-            self.fn_sigs.insert("db::open".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("db::put".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::Error], // key, value (generic)
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("db::get".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Error), // generic value
-            });
-            self.fn_sigs.insert("db::delete".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("db::query".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
+            self.fn_sigs.insert(
+                "db::open".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "db::put".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::Error], // key, value (generic)
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "db::get".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Error), // generic value
+                },
+            );
+            self.fn_sigs.insert(
+                "db::delete".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "db::query".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
         }
 
         // Register animate namespace functions
         {
-            self.fn_sigs.insert("animate::spring".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::Error], // target, config
-                ret: Box::new(Ty::String_), // animation ID
-            });
-            self.fn_sigs.insert("animate::keyframes".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::Error, Ty::F64], // target, keyframes, duration
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("animate::stagger".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::Error, Ty::F64], // targets, config, delay
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("animate::cancel".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "animate::spring".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::Error], // target, config
+                    ret: Box::new(Ty::String_),           // animation ID
+                },
+            );
+            self.fn_sigs.insert(
+                "animate::keyframes".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::Error, Ty::F64], // target, keyframes, duration
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "animate::stagger".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::Error, Ty::F64], // targets, config, delay
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "animate::cancel".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Register responsive namespace functions
         {
-            self.fn_sigs.insert("responsive::register_breakpoints".to_string(), Ty::Function {
-                params: vec![Ty::Error], // breakpoints config (generic)
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("responsive::get_breakpoint".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("responsive::fluid".to_string(), Ty::Function {
-                params: vec![Ty::F64, Ty::F64],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "responsive::register_breakpoints".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Error], // breakpoints config (generic)
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "responsive::get_breakpoint".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "responsive::fluid".to_string(),
+                Ty::Function {
+                    params: vec![Ty::F64, Ty::F64],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register toast namespace functions (pure WASM — DOM syscalls)
         {
-            self.fn_sigs.insert("toast::success".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("toast::error".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("toast::warning".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("toast::info".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("toast::dismiss".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("toast::dismiss_all".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "toast::success".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "toast::error".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "toast::warning".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "toast::info".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "toast::dismiss".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "toast::dismiss_all".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register DataTable<T> type and methods (pure WASM computation)
@@ -1414,47 +1925,87 @@ impl TypeChecker {
             let mut column_fields = HashMap::new();
             column_fields.insert("name".to_string(), Ty::String_);
             column_fields.insert("label".to_string(), Ty::String_);
-            self.structs.insert("Column".to_string(), StructInfo { fields: column_fields });
+            self.structs.insert(
+                "Column".to_string(),
+                StructInfo {
+                    fields: column_fields,
+                },
+            );
 
             let mut page_fields = HashMap::new();
             page_fields.insert("items".to_string(), Ty::Array(Box::new(Ty::Error)));
             page_fields.insert("current_page".to_string(), Ty::I32);
             page_fields.insert("total_pages".to_string(), Ty::I32);
             page_fields.insert("total_items".to_string(), Ty::I32);
-            self.structs.insert("Page".to_string(), StructInfo { fields: page_fields });
+            self.structs.insert(
+                "Page".to_string(),
+                StructInfo {
+                    fields: page_fields,
+                },
+            );
 
-            self.fn_sigs.insert("DataTable::new".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::Struct("Column".to_string())))],
-                ret: Box::new(Ty::Struct("DataTable".to_string())),
-            });
-            self.fn_sigs.insert("DataTable::sort".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("DataTable::filter".to_string(), Ty::Function {
-                params: vec![Ty::Function { params: vec![Ty::Error], ret: Box::new(Ty::Bool) }],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("DataTable::paginate".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("DataTable::pin_column".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("DataTable::edit_cell".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_, Ty::Error],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("DataTable::get_visible_rows".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("DataTable::export_csv".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "DataTable::new".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Array(Box::new(Ty::Struct("Column".to_string()))),
+                    ],
+                    ret: Box::new(Ty::Struct("DataTable".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::sort".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::filter".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Function {
+                        params: vec![Ty::Error],
+                        ret: Box::new(Ty::Bool),
+                    }],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::paginate".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::pin_column".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::edit_cell".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_, Ty::Error],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::get_visible_rows".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "DataTable::export_csv".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register datepicker namespace functions (pure WASM — DOM syscalls)
@@ -1462,108 +2013,176 @@ impl TypeChecker {
             let mut dp_options_fields = HashMap::new();
             dp_options_fields.insert("format".to_string(), Ty::String_);
             dp_options_fields.insert("placeholder".to_string(), Ty::String_);
-            self.structs.insert("DatePickerOptions".to_string(), StructInfo { fields: dp_options_fields });
+            self.structs.insert(
+                "DatePickerOptions".to_string(),
+                StructInfo {
+                    fields: dp_options_fields,
+                },
+            );
 
-            self.fn_sigs.insert("datepicker::create".to_string(), Ty::Function {
-                params: vec![Ty::Struct("DatePickerOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("datepicker::get_value".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("datepicker::set_value".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("datepicker::set_range".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("datepicker::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "datepicker::create".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("DatePickerOptions".to_string())],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "datepicker::get_value".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "datepicker::set_value".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "datepicker::set_range".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "datepicker::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register skeleton namespace functions (pure WASM — DOM syscalls)
         {
-            self.fn_sigs.insert("skeleton::text".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("skeleton::circle".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("skeleton::rect".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("skeleton::card".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("skeleton::avatar".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("skeleton::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "skeleton::text".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "skeleton::circle".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "skeleton::rect".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "skeleton::card".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "skeleton::avatar".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "skeleton::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register pagination namespace functions (pure WASM computation)
         {
-            self.fn_sigs.insert("pagination::paginate".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Struct("Page".to_string())),
-            });
-            self.fn_sigs.insert("pagination::page_numbers".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
-            });
-            self.fn_sigs.insert("pagination::has_next".to_string(), Ty::Function {
-                params: vec![Ty::Struct("Page".to_string())],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("pagination::has_prev".to_string(), Ty::Function {
-                params: vec![Ty::Struct("Page".to_string())],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "pagination::paginate".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Error)), Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Struct("Page".to_string())),
+                },
+            );
+            self.fn_sigs.insert(
+                "pagination::page_numbers".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+                },
+            );
+            self.fn_sigs.insert(
+                "pagination::has_next".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("Page".to_string())],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "pagination::has_prev".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("Page".to_string())],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Extend search namespace with autocomplete and highlight (pure WASM)
         {
-            self.fn_sigs.insert("search::autocomplete".to_string(), Ty::Function {
-                params: vec![Ty::Struct("SearchIndex".to_string()), Ty::String_, Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("search::highlight".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "search::autocomplete".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("SearchIndex".to_string()), Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "search::highlight".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register combobox namespace functions (pure WASM — DOM syscalls)
         {
-            self.fn_sigs.insert("combobox::create".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::String_))],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("combobox::get_selected".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::String_))),
-            });
-            self.fn_sigs.insert("combobox::set_filter".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("combobox::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "combobox::create".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::String_))],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "combobox::get_selected".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::String_))),
+                },
+            );
+            self.fn_sigs.insert(
+                "combobox::set_filter".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "combobox::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register chart namespace functions and types (pure WASM — SVG/Canvas via DOM syscalls)
@@ -1571,50 +2190,95 @@ impl TypeChecker {
             let mut point_fields = HashMap::new();
             point_fields.insert("x".to_string(), Ty::F64);
             point_fields.insert("y".to_string(), Ty::F64);
-            self.structs.insert("Point".to_string(), StructInfo { fields: point_fields });
+            self.structs.insert(
+                "Point".to_string(),
+                StructInfo {
+                    fields: point_fields,
+                },
+            );
 
             let mut bar_fields = HashMap::new();
             bar_fields.insert("label".to_string(), Ty::String_);
             bar_fields.insert("value".to_string(), Ty::F64);
-            self.structs.insert("BarData".to_string(), StructInfo { fields: bar_fields });
+            self.structs
+                .insert("BarData".to_string(), StructInfo { fields: bar_fields });
 
             let mut pie_fields = HashMap::new();
             pie_fields.insert("label".to_string(), Ty::String_);
             pie_fields.insert("value".to_string(), Ty::F64);
             pie_fields.insert("color".to_string(), Ty::String_);
-            self.structs.insert("PieSlice".to_string(), StructInfo { fields: pie_fields });
+            self.structs
+                .insert("PieSlice".to_string(), StructInfo { fields: pie_fields });
 
             let mut chart_opts_fields = HashMap::new();
             chart_opts_fields.insert("width".to_string(), Ty::I32);
             chart_opts_fields.insert("height".to_string(), Ty::I32);
             chart_opts_fields.insert("title".to_string(), Ty::String_);
             chart_opts_fields.insert("animate".to_string(), Ty::Bool);
-            self.structs.insert("ChartOptions".to_string(), StructInfo { fields: chart_opts_fields });
+            self.structs.insert(
+                "ChartOptions".to_string(),
+                StructInfo {
+                    fields: chart_opts_fields,
+                },
+            );
 
-            self.fn_sigs.insert("chart::line".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Struct("Point".to_string()))), Ty::Struct("ChartOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("chart::bar".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Struct("BarData".to_string()))), Ty::Struct("ChartOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("chart::pie".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Struct("PieSlice".to_string()))), Ty::Struct("ChartOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("chart::scatter".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Struct("Point".to_string()))), Ty::Struct("ChartOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("chart::update".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::Array(Box::new(Ty::Struct("Point".to_string())))],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("chart::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "chart::line".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Struct("Point".to_string()))),
+                        Ty::Struct("ChartOptions".to_string()),
+                    ],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "chart::bar".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Struct("BarData".to_string()))),
+                        Ty::Struct("ChartOptions".to_string()),
+                    ],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "chart::pie".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Struct("PieSlice".to_string()))),
+                        Ty::Struct("ChartOptions".to_string()),
+                    ],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "chart::scatter".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Struct("Point".to_string()))),
+                        Ty::Struct("ChartOptions".to_string()),
+                    ],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "chart::update".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::I32,
+                        Ty::Array(Box::new(Ty::Struct("Point".to_string()))),
+                    ],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "chart::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register editor namespace functions (pure WASM — contenteditable via DOM syscalls)
@@ -1622,72 +2286,128 @@ impl TypeChecker {
             let mut editor_opts_fields = HashMap::new();
             editor_opts_fields.insert("mode".to_string(), Ty::String_);
             editor_opts_fields.insert("placeholder".to_string(), Ty::String_);
-            self.structs.insert("EditorOptions".to_string(), StructInfo { fields: editor_opts_fields });
+            self.structs.insert(
+                "EditorOptions".to_string(),
+                StructInfo {
+                    fields: editor_opts_fields,
+                },
+            );
 
-            self.fn_sigs.insert("editor::create".to_string(), Ty::Function {
-                params: vec![Ty::Struct("EditorOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("editor::get_content".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("editor::set_content".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("editor::get_markdown".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("editor::insert".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("editor::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "editor::create".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Struct("EditorOptions".to_string())],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "editor::get_content".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "editor::set_content".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "editor::get_markdown".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "editor::insert".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "editor::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register image namespace functions (pure WASM pixel manipulation)
         {
-            self.fn_sigs.insert("image::crop".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::I32, Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
-            });
-            self.fn_sigs.insert("image::resize".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
-            });
-            self.fn_sigs.insert("image::compress".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::I32)), Ty::F64],
-                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
-            });
-            self.fn_sigs.insert("image::to_base64".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::I32))],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "image::crop".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::I32)),
+                        Ty::I32,
+                        Ty::I32,
+                        Ty::I32,
+                        Ty::I32,
+                    ],
+                    ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+                },
+            );
+            self.fn_sigs.insert(
+                "image::resize".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::I32)), Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+                },
+            );
+            self.fn_sigs.insert(
+                "image::compress".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::I32)), Ty::F64],
+                    ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+                },
+            );
+            self.fn_sigs.insert(
+                "image::to_base64".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::I32))],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register csv namespace functions (pure WASM string processing)
         {
-            self.fn_sigs.insert("csv::parse".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))),
-            });
-            self.fn_sigs.insert("csv::stringify".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("csv::parse_typed".to_string(), Ty::Function {
-                params: vec![Ty::String_],
-                ret: Box::new(Ty::Array(Box::new(Ty::Error))),
-            });
-            self.fn_sigs.insert("csv::export".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Error)), Ty::Array(Box::new(Ty::String_))],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "csv::parse".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))),
+                },
+            );
+            self.fn_sigs.insert(
+                "csv::stringify".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Array(Box::new(Ty::String_))))],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "csv::parse_typed".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_],
+                    ret: Box::new(Ty::Array(Box::new(Ty::Error))),
+                },
+            );
+            self.fn_sigs.insert(
+                "csv::export".to_string(),
+                Ty::Function {
+                    params: vec![
+                        Ty::Array(Box::new(Ty::Error)),
+                        Ty::Array(Box::new(Ty::String_)),
+                    ],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register maps namespace functions and types (pure WASM — tile rendering via DOM syscalls)
@@ -1697,44 +2417,73 @@ impl TypeChecker {
             map_opts_fields.insert("center_lng".to_string(), Ty::F64);
             map_opts_fields.insert("zoom".to_string(), Ty::I32);
             map_opts_fields.insert("tile_url".to_string(), Ty::String_);
-            self.structs.insert("MapOptions".to_string(), StructInfo { fields: map_opts_fields });
+            self.structs.insert(
+                "MapOptions".to_string(),
+                StructInfo {
+                    fields: map_opts_fields,
+                },
+            );
 
-            self.fn_sigs.insert("maps::create".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::Struct("MapOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("maps::add_marker".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::F64, Ty::F64, Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("maps::remove_marker".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("maps::set_center".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::F64, Ty::F64],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("maps::set_zoom".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("maps::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "maps::create".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::Struct("MapOptions".to_string())],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "maps::add_marker".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::F64, Ty::F64, Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "maps::remove_marker".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "maps::set_center".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::F64, Ty::F64],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "maps::set_zoom".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "maps::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register syntax namespace functions (pure WASM tokenizer)
         {
-            self.fn_sigs.insert("syntax::highlight".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("syntax::highlight_lines".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::Array(Box::new(Ty::I32))],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "syntax::highlight".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "syntax::highlight_lines".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::Array(Box::new(Ty::I32))],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         // Register media namespace functions (pure WASM — DOM syscalls for audio/video)
@@ -1744,182 +2493,312 @@ impl TypeChecker {
             media_opts_fields.insert("autoplay".to_string(), Ty::Bool);
             media_opts_fields.insert("loop_playback".to_string(), Ty::Bool);
             media_opts_fields.insert("captions_src".to_string(), Ty::String_);
-            self.structs.insert("MediaOptions".to_string(), StructInfo { fields: media_opts_fields });
+            self.structs.insert(
+                "MediaOptions".to_string(),
+                StructInfo {
+                    fields: media_opts_fields,
+                },
+            );
 
-            self.fn_sigs.insert("media::create_player".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::Struct("MediaOptions".to_string())],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("media::play".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("media::pause".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("media::seek".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::F64],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("media::get_duration".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::F64),
-            });
-            self.fn_sigs.insert("media::get_current_time".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::F64),
-            });
-            self.fn_sigs.insert("media::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "media::create_player".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::Struct("MediaOptions".to_string())],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::play".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::pause".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::seek".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::F64],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::get_duration".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::F64),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::get_current_time".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::F64),
+                },
+            );
+            self.fn_sigs.insert(
+                "media::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register qr namespace functions (pure WASM — QR algorithm in WASM)
         {
-            self.fn_sigs.insert("qr::generate".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("qr::generate_png".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::I32],
-                ret: Box::new(Ty::Array(Box::new(Ty::I32))),
-            });
+            self.fn_sigs.insert(
+                "qr::generate".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "qr::generate_png".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::I32],
+                    ret: Box::new(Ty::Array(Box::new(Ty::I32))),
+                },
+            );
         }
 
         // Register share namespace functions (WASM logic + navigator.share JS syscall)
         {
-            self.fn_sigs.insert("share::native".to_string(), Ty::Function {
-                params: vec![Ty::String_, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("share::can_share".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::Bool),
-            });
+            self.fn_sigs.insert(
+                "share::native".to_string(),
+                Ty::Function {
+                    params: vec![Ty::String_, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "share::can_share".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
         }
 
         // Register wizard namespace functions and WizardStep type (pure WASM state machine)
         {
             let mut wizard_step_fields = HashMap::new();
             wizard_step_fields.insert("name".to_string(), Ty::String_);
-            wizard_step_fields.insert("validator".to_string(), Ty::Function { params: vec![], ret: Box::new(Ty::Bool) });
-            self.structs.insert("WizardStep".to_string(), StructInfo { fields: wizard_step_fields });
+            wizard_step_fields.insert(
+                "validator".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.structs.insert(
+                "WizardStep".to_string(),
+                StructInfo {
+                    fields: wizard_step_fields,
+                },
+            );
 
-            self.fn_sigs.insert("wizard::create".to_string(), Ty::Function {
-                params: vec![Ty::Array(Box::new(Ty::Struct("WizardStep".to_string())))],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("wizard::next".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("wizard::prev".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("wizard::get_current_step".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("wizard::validate_step".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Bool),
-            });
-            self.fn_sigs.insert("wizard::get_data".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("wizard::destroy".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
+            self.fn_sigs.insert(
+                "wizard::create".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Array(Box::new(Ty::Struct("WizardStep".to_string())))],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::next".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::prev".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::get_current_step".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::validate_step".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Bool),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::get_data".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "wizard::destroy".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
         }
 
         // Register RTC (WebRTC) namespace functions
         {
             let string_array = Ty::Array(Box::new(Ty::String_));
-            self.fn_sigs.insert("rtc_create_peer".to_string(), Ty::Function {
-                params: vec![string_array],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("rtc_create_offer".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("rtc_create_answer".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("rtc_set_local_description".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_set_remote_description".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_add_ice_candidate".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_close".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_get_user_media".to_string(), Ty::Function {
-                params: vec![Ty::Bool, Ty::Bool],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("rtc_get_display_media".to_string(), Ty::Function {
-                params: vec![],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("rtc_add_track".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32, Ty::I32],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("rtc_remove_track".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_stop_track".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_set_track_enabled".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::Bool],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_get_track_kind".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("rtc_attach_stream".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_get_connection_state".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
-            self.fn_sigs.insert("rtc_create_data_channel".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::I32),
-            });
-            self.fn_sigs.insert("rtc_data_channel_send".to_string(), Ty::Function {
-                params: vec![Ty::I32, Ty::String_],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_data_channel_close".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::Unit),
-            });
-            self.fn_sigs.insert("rtc_get_stats".to_string(), Ty::Function {
-                params: vec![Ty::I32],
-                ret: Box::new(Ty::String_),
-            });
+            self.fn_sigs.insert(
+                "rtc_create_peer".to_string(),
+                Ty::Function {
+                    params: vec![string_array],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_create_offer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_create_answer".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_set_local_description".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_set_remote_description".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_add_ice_candidate".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_close".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_get_user_media".to_string(),
+                Ty::Function {
+                    params: vec![Ty::Bool, Ty::Bool],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_get_display_media".to_string(),
+                Ty::Function {
+                    params: vec![],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_add_track".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_remove_track".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_stop_track".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_set_track_enabled".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::Bool],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_get_track_kind".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_attach_stream".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_get_connection_state".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_create_data_channel".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::I32),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_data_channel_send".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32, Ty::String_],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_data_channel_close".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Unit),
+                },
+            );
+            self.fn_sigs.insert(
+                "rtc_get_stats".to_string(),
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::String_),
+                },
+            );
         }
 
         for item in &program.items {
@@ -1935,8 +2814,7 @@ impl TypeChecker {
                     for field in &s.fields {
                         fields.insert(field.name.clone(), self.ast_type_to_ty(&field.ty));
                     }
-                    self.structs
-                        .insert(s.name.clone(), StructInfo { fields });
+                    self.structs.insert(s.name.clone(), StructInfo { fields });
                     self.type_params_in_scope = prev;
                 }
                 Item::Component(c) => {
@@ -1957,8 +2835,11 @@ impl TypeChecker {
                     for tp in &f.type_params {
                         self.type_params_in_scope.insert(tp.clone());
                     }
-                    let param_tys: Vec<Ty> =
-                        f.params.iter().map(|p| self.ast_type_to_ty(&p.ty)).collect();
+                    let param_tys: Vec<Ty> = f
+                        .params
+                        .iter()
+                        .map(|p| self.ast_type_to_ty(&p.ty))
+                        .collect();
                     let ret_ty = f
                         .return_type
                         .as_ref()
@@ -2000,8 +2881,7 @@ impl TypeChecker {
                     }
                 }
                 Item::Enum(e) => {
-                    let variants: Vec<String> =
-                        e.variants.iter().map(|v| v.name.clone()).collect();
+                    let variants: Vec<String> = e.variants.iter().map(|v| v.name.clone()).collect();
                     self.enum_defs.insert(e.name.clone(), variants);
                 }
                 Item::Contract(c) => {
@@ -2025,21 +2905,36 @@ impl TypeChecker {
                                 Item::Struct(s) => {
                                     let mut fields = std::collections::HashMap::new();
                                     for field in &s.fields {
-                                        fields.insert(field.name.clone(), self.ast_type_to_ty(&field.ty));
+                                        fields.insert(
+                                            field.name.clone(),
+                                            self.ast_type_to_ty(&field.ty),
+                                        );
                                     }
                                     self.structs.insert(s.name.clone(), StructInfo { fields });
                                 }
                                 Item::Function(f) => {
-                                    let param_tys: Vec<Ty> = f.params.iter().map(|p| self.ast_type_to_ty(&p.ty)).collect();
-                                    let ret_ty = f.return_type.as_ref().map(|t| self.ast_type_to_ty(t)).unwrap_or_else(|| self.fresh_var());
-                                    let fn_ty = Ty::Function { params: param_tys, ret: Box::new(ret_ty) };
+                                    let param_tys: Vec<Ty> = f
+                                        .params
+                                        .iter()
+                                        .map(|p| self.ast_type_to_ty(&p.ty))
+                                        .collect();
+                                    let ret_ty = f
+                                        .return_type
+                                        .as_ref()
+                                        .map(|t| self.ast_type_to_ty(t))
+                                        .unwrap_or_else(|| self.fresh_var());
+                                    let fn_ty = Ty::Function {
+                                        params: param_tys,
+                                        ret: Box::new(ret_ty),
+                                    };
                                     self.fn_sigs.insert(f.name.clone(), fn_ty);
                                 }
                                 Item::Enum(e) => {
-                                    let variants: Vec<String> = e.variants.iter().map(|v| v.name.clone()).collect();
+                                    let variants: Vec<String> =
+                                        e.variants.iter().map(|v| v.name.clone()).collect();
                                     self.enum_defs.insert(e.name.clone(), variants);
                                 }
-                                _ => {},
+                                _ => {}
                             }
                         }
                         // Also register namespaced versions of public items
@@ -2057,7 +2952,7 @@ impl TypeChecker {
                                         self.structs.insert(qualified, info);
                                     }
                                 }
-                                _ => {},
+                                _ => {}
                             }
                         }
                     }
@@ -2105,7 +3000,10 @@ impl TypeChecker {
                     }
                     self.traits.insert(
                         trait_def.name.clone(),
-                        TraitInfo { methods, default_methods },
+                        TraitInfo {
+                            methods,
+                            default_methods,
+                        },
                     );
                     self.type_params_in_scope = prev;
                 }
@@ -2113,39 +3011,88 @@ impl TypeChecker {
                 // be referenced by name in the rest of the program without
                 // producing "undefined variable: <Name>" errors.
                 Item::Auth(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Cache(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Db(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Payment(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::MiniProgram(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Banking(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Map(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Pdf(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Upload(def) => {
-                    self.structs.insert(def.name.clone(), StructInfo { fields: HashMap::new() });
+                    self.structs.insert(
+                        def.name.clone(),
+                        StructInfo {
+                            fields: HashMap::new(),
+                        },
+                    );
                 }
                 Item::Store(store) => {
                     // Pre-register store names so forward references in
                     // collect_declarations work; the real struct entry with
                     // signal fields is populated during check_store.
-                    self.structs.entry(store.name.clone()).or_insert(StructInfo { fields: HashMap::new() });
+                    self.structs
+                        .entry(store.name.clone())
+                        .or_insert(StructInfo {
+                            fields: HashMap::new(),
+                        });
                 }
-                _ => {},
+                _ => {}
             }
         }
     }
@@ -2207,10 +3154,8 @@ impl TypeChecker {
                         if let Some(ref body) = method.default_body {
                             let mut method_env = env.child();
                             for param in &method.params {
-                                method_env.insert(
-                                    param.name.clone(),
-                                    self.ast_type_to_ty(&param.ty),
-                                );
+                                method_env
+                                    .insert(param.name.clone(), self.ast_type_to_ty(&param.ty));
                             }
                             let body_ty = self.infer_block(body, &mut method_env);
                             if let Some(ref ret_ast) = method.return_type {
@@ -2247,9 +3192,15 @@ impl TypeChecker {
                     for method in &ch.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = ch.on_message { self.check_function(f, &mut env); }
-                    if let Some(ref f) = ch.on_connect { self.check_function(f, &mut env); }
-                    if let Some(ref f) = ch.on_disconnect { self.check_function(f, &mut env); }
+                    if let Some(ref f) = ch.on_message {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = ch.on_connect {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = ch.on_disconnect {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::Embed(_) => { /* embed is config-only */ }
                 Item::Pdf(_) => { /* pdf is config-only */ }
@@ -2257,22 +3208,34 @@ impl TypeChecker {
                     for method in &pay.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = pay.on_success { self.check_function(f, &mut env); }
-                    if let Some(ref f) = pay.on_error { self.check_function(f, &mut env); }
+                    if let Some(ref f) = pay.on_success {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = pay.on_error {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::Banking(bank) => {
                     for method in &bank.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = bank.on_success { self.check_function(f, &mut env); }
-                    if let Some(ref f) = bank.on_exit { self.check_function(f, &mut env); }
-                    if let Some(ref f) = bank.on_error { self.check_function(f, &mut env); }
+                    if let Some(ref f) = bank.on_success {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = bank.on_exit {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = bank.on_error {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::Map(map_def) => {
-                    let handlers: Vec<&Function> = [
-                        map_def.on_ready.as_ref(),
-                        map_def.on_click.as_ref(),
-                    ].into_iter().flatten().chain(map_def.methods.iter()).collect();
+                    let handlers: Vec<&Function> =
+                        [map_def.on_ready.as_ref(), map_def.on_click.as_ref()]
+                            .into_iter()
+                            .flatten()
+                            .chain(map_def.methods.iter())
+                            .collect();
                     for method in handlers {
                         self.check_function(method, &mut env);
                     }
@@ -2281,25 +3244,43 @@ impl TypeChecker {
                     for method in &auth.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = auth.on_login { self.check_function(f, &mut env); }
-                    if let Some(ref f) = auth.on_logout { self.check_function(f, &mut env); }
-                    if let Some(ref f) = auth.on_error { self.check_function(f, &mut env); }
+                    if let Some(ref f) = auth.on_login {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = auth.on_logout {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = auth.on_error {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::MiniProgram(mp) => {
                     for method in &mp.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = mp.on_launch { self.check_function(f, &mut env); }
-                    if let Some(ref f) = mp.on_show { self.check_function(f, &mut env); }
-                    if let Some(ref f) = mp.on_hide { self.check_function(f, &mut env); }
+                    if let Some(ref f) = mp.on_launch {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = mp.on_show {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = mp.on_hide {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::Upload(upload) => {
                     for method in &upload.methods {
                         self.check_function(method, &mut env);
                     }
-                    if let Some(ref f) = upload.on_progress { self.check_function(f, &mut env); }
-                    if let Some(ref f) = upload.on_complete { self.check_function(f, &mut env); }
-                    if let Some(ref f) = upload.on_error { self.check_function(f, &mut env); }
+                    if let Some(ref f) = upload.on_progress {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = upload.on_complete {
+                        self.check_function(f, &mut env);
+                    }
+                    if let Some(ref f) = upload.on_error {
+                        self.check_function(f, &mut env);
+                    }
                 }
                 Item::Db(_) => { /* db stores are config-only */ }
                 Item::Cache(_) => { /* cache is config-only */ }
@@ -2330,10 +3311,7 @@ impl TypeChecker {
                             }
                         }
                     } else {
-                        self.error(
-                            format!("trait `{}` not found", trait_name),
-                            imp.span,
-                        );
+                        self.error(format!("trait `{}` not found", trait_name), imp.span);
                     }
                 }
             }
@@ -2352,7 +3330,8 @@ impl TypeChecker {
         let mut store_mutators: HM<String, Vec<String>> = HM::new();
 
         // Collect store names that have atomic signals
-        let mut stores_with_atomics: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut stores_with_atomics: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         for item in &program.items {
             if let Item::Store(s) = item {
                 if s.signals.iter().any(|sig| sig.atomic) {
@@ -2406,7 +3385,12 @@ impl TypeChecker {
         store_mutators: &mut std::collections::HashMap<String, Vec<String>>,
     ) {
         match expr {
-            Expr::MethodCall { object, method: _method, args, .. } => {
+            Expr::MethodCall {
+                object,
+                method: _method,
+                args,
+                ..
+            } => {
                 // Pattern: StoreName.dispatch(...) or StoreName.some_action(...)
                 if let Expr::Ident(store_name) = object.as_ref() {
                     // Heuristic: if calling a method on a PascalCase name, assume it's a store mutation
@@ -2645,7 +3629,11 @@ impl TypeChecker {
                     self.check_template_secret_safety(child, env, span);
                 }
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 self.check_expr_not_secret(condition, env, span);
                 for child in then_children {
                     self.check_template_secret_safety(child, env, span);
@@ -2656,7 +3644,9 @@ impl TypeChecker {
                     }
                 }
             }
-            TemplateNode::TemplateFor { children, inplace, .. } => {
+            TemplateNode::TemplateFor {
+                children, inplace, ..
+            } => {
                 if *inplace {
                     self.check_inplace_safety(children, span);
                 }
@@ -2722,7 +3712,11 @@ impl TypeChecker {
                     self.check_inplace_node(child, span);
                 }
             }
-            TemplateNode::TemplateIf { then_children, else_children, .. } => {
+            TemplateNode::TemplateIf {
+                then_children,
+                else_children,
+                ..
+            } => {
                 for child in then_children {
                     self.check_inplace_node(child, span);
                 }
@@ -2806,7 +3800,13 @@ impl TypeChecker {
                 env.insert(name.clone(), final_ty);
                 Ty::Unit
             }
-            Stmt::Signal { name, ty, secret, value, .. } => {
+            Stmt::Signal {
+                name,
+                ty,
+                secret,
+                value,
+                ..
+            } => {
                 let val_ty = self.infer_expr(value, env);
                 let base_ty = if let Some(ast_ty) = ty {
                     let declared = self.ast_type_to_ty(ast_ty);
@@ -2842,14 +3842,16 @@ impl TypeChecker {
                 // Warn if discarding Result<T,E>
                 if matches!(resolved, Ty::Result_ { .. }) {
                     self.error(
-                        "unused Result value — must be handled with match, unwrap, or let binding".to_string(),
+                        "unused Result value — must be handled with match, unwrap, or let binding"
+                            .to_string(),
                         span,
                     );
                 }
                 // Warn if discarding Option<T>
                 else if matches!(resolved, Ty::Option_(_)) {
                     self.error(
-                        "unused Option value — must be handled with match, unwrap, or let binding".to_string(),
+                        "unused Option value — must be handled with match, unwrap, or let binding"
+                            .to_string(),
                         span,
                     );
                 }
@@ -2875,9 +3877,7 @@ impl TypeChecker {
                     Ty::Unit
                 }
             }
-            Stmt::Yield(expr) => {
-                self.infer_expr(expr, env)
-            }
+            Stmt::Yield(expr) => self.infer_expr(expr, env),
             Stmt::LetDestructure { pattern, ty, value } => {
                 let val_ty = self.infer_expr(value, env);
                 let final_ty = if let Some(ast_ty) = ty {
@@ -2905,7 +3905,11 @@ impl TypeChecker {
                 if let Ty::Tuple(tys) = &resolved {
                     if pats.len() != tys.len() {
                         self.error(
-                            format!("tuple pattern has {} elements but type has {}", pats.len(), tys.len()),
+                            format!(
+                                "tuple pattern has {} elements but type has {}",
+                                pats.len(),
+                                tys.len()
+                            ),
                             span,
                         );
                     }
@@ -2943,7 +3947,10 @@ impl TypeChecker {
                     }
                 } else {
                     self.error(
-                        format!("cannot destructure non-struct type {} with struct pattern", resolved),
+                        format!(
+                            "cannot destructure non-struct type {} with struct pattern",
+                            resolved
+                        ),
                         span,
                     );
                 }
@@ -3001,7 +4008,12 @@ impl TypeChecker {
                     let is_namespace = self.fn_sigs.keys().any(|k| k.starts_with(&ns_prefix));
                     if is_namespace {
                         if !self.structs.contains_key(name.as_str()) {
-                            self.structs.insert(name.clone(), StructInfo { fields: HashMap::new() });
+                            self.structs.insert(
+                                name.clone(),
+                                StructInfo {
+                                    fields: HashMap::new(),
+                                },
+                            );
                         }
                         return Ty::Struct(name.clone());
                     }
@@ -3049,7 +4061,10 @@ impl TypeChecker {
                             // Check fn_sigs for the qualified name or method
                             if self.structs.contains_key(type_name)
                                 || self.components.contains_key(type_name)
-                                || self.fn_sigs.keys().any(|k| k.starts_with(&format!("{}::", type_name)))
+                                || self
+                                    .fn_sigs
+                                    .keys()
+                                    .any(|k| k.starts_with(&format!("{}::", type_name)))
                             {
                                 return self.fresh_var(); // Treat as valid callable
                             }
@@ -3059,20 +4074,45 @@ impl TypeChecker {
                     // `geolocation`, `camera`, `biometric`, `haptic` are
                     // hardware-access namespaces bridged via the `hardware`
                     // syscall namespace in core.js.
-                    let stdlib_ns = ["clipboard", "time", "crypto", "format", "url", "search",
-                        "collections", "toast", "skeleton", "datepicker", "pagination",
-                        "chart", "csv", "compress", "animate", "theme", "mask",
-                        "combobox", "editor", "syntax", "media", "image", "qr",
-                        "share", "wizard", "maps", "responsive",
-                        "geolocation", "camera", "biometric", "haptic",
-                        "rtc", "gpu"];
+                    let stdlib_ns = [
+                        "clipboard",
+                        "time",
+                        "crypto",
+                        "format",
+                        "url",
+                        "search",
+                        "collections",
+                        "toast",
+                        "skeleton",
+                        "datepicker",
+                        "pagination",
+                        "chart",
+                        "csv",
+                        "compress",
+                        "animate",
+                        "theme",
+                        "mask",
+                        "combobox",
+                        "editor",
+                        "syntax",
+                        "media",
+                        "image",
+                        "qr",
+                        "share",
+                        "wizard",
+                        "maps",
+                        "responsive",
+                        "geolocation",
+                        "camera",
+                        "biometric",
+                        "haptic",
+                        "rtc",
+                        "gpu",
+                    ];
                     if stdlib_ns.contains(&name.as_str()) {
                         return Ty::Struct(name.clone());
                     }
-                    self.error(
-                        format!("undefined variable: {}", name),
-                        Self::dummy_span(),
-                    );
+                    self.error(format!("undefined variable: {}", name), Self::dummy_span());
                     Ty::Error
                 }
             }
@@ -3326,12 +4366,10 @@ impl TypeChecker {
                 let iter_ty = self.infer_expr(iterator, env);
                 let elem_ty = match self.resolve(&iter_ty) {
                     Ty::Array(inner) => *inner,
-                    Ty::Reference { inner, .. } => {
-                        match *inner {
-                            Ty::Array(elem) => *elem,
-                            _ => self.fresh_var(),
-                        }
-                    }
+                    Ty::Reference { inner, .. } => match *inner {
+                        Ty::Array(elem) => *elem,
+                        _ => self.fresh_var(),
+                    },
                     Ty::Iterator(inner) => *inner,
                     _ => self.fresh_var(),
                 };
@@ -3360,18 +4398,18 @@ impl TypeChecker {
             Expr::Borrow(inner) => {
                 let inner_ty = self.infer_expr(inner, env);
                 Ty::Reference {
-                mutable: false,
-                lifetime: None,
-                inner: Box::new(inner_ty),
-            }
+                    mutable: false,
+                    lifetime: None,
+                    inner: Box::new(inner_ty),
+                }
             }
             Expr::BorrowMut(inner) => {
                 let inner_ty = self.infer_expr(inner, env);
                 Ty::Reference {
-                mutable: true,
-                lifetime: None,
-                inner: Box::new(inner_ty),
-            }
+                    mutable: true,
+                    lifetime: None,
+                    inner: Box::new(inner_ty),
+                }
             }
 
             // --- Struct construction ---
@@ -3422,7 +4460,11 @@ impl TypeChecker {
             }
 
             // --- Fetch ---
-            Expr::Fetch { url, options, contract } => {
+            Expr::Fetch {
+                url,
+                options,
+                contract,
+            } => {
                 let url_ty = self.infer_expr(url, env);
                 self.unify(&url_ty, &Ty::String_, Self::dummy_span());
                 if let Some(opts) = options {
@@ -3495,9 +4537,7 @@ impl TypeChecker {
                 // type of its last expression — just like a regular block.
                 self.infer_block(body, env)
             }
-            Expr::Channel { .. } => {
-                self.fresh_var()
-            }
+            Expr::Channel { .. } => self.fresh_var(),
             Expr::Send { channel, value } => {
                 self.infer_expr(channel, env);
                 self.infer_expr(value, env);
@@ -3513,7 +4553,11 @@ impl TypeChecker {
                 }
                 self.fresh_var()
             }
-            Expr::TryCatch { body, error_binding, catch_body } => {
+            Expr::TryCatch {
+                body,
+                error_binding,
+                catch_body,
+            } => {
                 let try_ty = self.infer_expr(body, env);
                 let mut catch_env = env.child();
                 catch_env.insert(error_binding.clone(), Ty::String_);
@@ -3595,14 +4639,17 @@ impl TypeChecker {
                 self.infer_expr(end, env);
                 Ty::I32
             }
-            Expr::Break | Expr::Continue => {
-                Ty::Unit
-            }
+            Expr::Break | Expr::Continue => Ty::Unit,
             Expr::TupleLit(elements) => {
                 let tys: Vec<Ty> = elements.iter().map(|e| self.infer_expr(e, env)).collect();
                 Ty::Tuple(tys)
             }
-            Expr::VirtualList { items, item_height, template, .. } => {
+            Expr::VirtualList {
+                items,
+                item_height,
+                template,
+                ..
+            } => {
                 self.infer_expr(items, env);
                 self.infer_expr(item_height, env);
                 self.infer_expr(template, env);
@@ -3644,10 +4691,7 @@ impl TypeChecker {
                 }
                 if !self.is_numeric(&left) || !self.is_numeric(&right) {
                     self.error(
-                        format!(
-                            "cannot apply arithmetic operator to {} and {}",
-                            left, right
-                        ),
+                        format!("cannot apply arithmetic operator to {} and {}", left, right),
                         Self::dummy_span(),
                     );
                     return Ty::Error;
@@ -3679,7 +4723,10 @@ impl TypeChecker {
     }
 
     fn is_numeric(&self, ty: &Ty) -> bool {
-        matches!(ty, Ty::I32 | Ty::I64 | Ty::U32 | Ty::U64 | Ty::F32 | Ty::F64 | Ty::Var(_))
+        matches!(
+            ty,
+            Ty::I32 | Ty::I64 | Ty::U32 | Ty::U64 | Ty::F32 | Ty::F64 | Ty::Var(_)
+        )
     }
 
     fn is_float(&self, ty: &Ty) -> bool {
@@ -3922,7 +4969,6 @@ impl TypeChecker {
         }
     }
 
-
     fn resolve_field_access(&mut self, obj_ty: &Ty, field: &str) -> Ty {
         let resolved = self.resolve(obj_ty);
 
@@ -3934,8 +4980,8 @@ impl TypeChecker {
 
         // Resolve SelfType (and Enum("Self") produced when `Self` appears as
         // a bare identifier in an expression) to the current component/store.
-        let is_self_ty = matches!(&base, Ty::SelfType)
-            || matches!(&base, Ty::Enum(n) if n == "Self");
+        let is_self_ty =
+            matches!(&base, Ty::SelfType) || matches!(&base, Ty::Enum(n) if n == "Self");
         let base = if is_self_ty {
             if let Some(ref comp_name) = self.current_component {
                 Ty::Struct(comp_name.clone())
@@ -3955,13 +5001,20 @@ impl TypeChecker {
                 return self.fresh_var();
             }
             Ty::Struct(name) | Ty::Contract(name) => {
-                let kind = if self.contracts.contains(name) { "contract" } else { "struct" };
+                let kind = if self.contracts.contains(name) {
+                    "contract"
+                } else {
+                    "struct"
+                };
                 if let Some(info) = self.structs.get(name).cloned() {
                     if let Some(field_ty) = info.fields.get(field) {
                         field_ty.clone()
                     } else {
                         self.error(
-                            format!("{} {} has no field {} — check the {} definition", kind, name, field, kind),
+                            format!(
+                                "{} {} has no field {} — check the {} definition",
+                                kind, name, field, kind
+                            ),
                             Self::dummy_span(),
                         );
                         Ty::Error
@@ -4034,11 +5087,7 @@ pub fn infer_program(program: &Program) -> Result<TypedProgram, Vec<TypeError>> 
             .table
             .iter()
             .enumerate()
-            .map(|(i, _)| {
-                checker
-                    .subst
-                    .finalize(&Ty::Var(TypeId(i as u32)))
-            })
+            .map(|(i, _)| checker.subst.finalize(&Ty::Var(TypeId(i as u32))))
             .collect();
 
         Ok(TypedProgram { types, bindings })
@@ -4097,7 +5146,11 @@ mod tests {
         })]);
 
         let result = infer_program(&program);
-        assert!(result.is_ok(), "expected Ok, got errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "expected Ok, got errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -4199,13 +5252,13 @@ mod tests {
                     ty: Type::Named("i32".into()),
                     ownership: Ownership::Owned,
                     secret: false,
-},
+                },
                 Param {
                     name: "b".into(),
                     ty: Type::Named("i32".into()),
                     ownership: Ownership::Owned,
                     secret: false,
-},
+                },
             ],
             return_type: None, // should be inferred as i32
             trait_bounds: vec![],
@@ -4224,7 +5277,10 @@ mod tests {
         assert!(result.is_ok(), "errors: {:?}", result.err());
 
         let typed = result.unwrap();
-        let sig = typed.bindings.get("add").expect("add should be in bindings");
+        let sig = typed
+            .bindings
+            .get("add")
+            .expect("add should be in bindings");
         match sig {
             Ty::Function { ret, .. } => {
                 assert_eq!(**ret, Ty::I32, "return type should be inferred as i32");
@@ -4281,7 +5337,7 @@ mod tests {
             Item::Function(Function {
                 name: "main".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
@@ -4342,7 +5398,7 @@ mod tests {
             Item::Function(Function {
                 name: "main".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
@@ -4565,20 +5621,20 @@ mod tests {
             Item::Function(Function {
                 name: "add".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![
                     Param {
                         name: "a".into(),
                         ty: Type::Named("i32".into()),
                         ownership: Ownership::Owned,
                         secret: false,
-},
+                    },
                     Param {
                         name: "b".into(),
                         ty: Type::Named("i32".into()),
                         ownership: Ownership::Owned,
                         secret: false,
-},
+                    },
                 ],
                 return_type: Some(Type::Named("i32".into())),
                 trait_bounds: vec![],
@@ -4595,7 +5651,7 @@ mod tests {
             Item::Function(Function {
                 name: "main".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
@@ -4613,7 +5669,9 @@ mod tests {
         let result = infer_program(&program);
         assert!(result.is_err());
         assert!(
-            result.unwrap_err()[0].message.contains("expects 2 arguments"),
+            result.unwrap_err()[0]
+                .message
+                .contains("expects 2 arguments"),
             "expected argument count mismatch error"
         );
     }
@@ -4624,13 +5682,13 @@ mod tests {
             Item::Function(Function {
                 name: "greet".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![Param {
                     name: "name".into(),
                     ty: Type::Named("String".into()),
                     ownership: Ownership::Owned,
                     secret: false,
-}],
+                }],
                 return_type: Some(Type::Named("String".into())),
                 trait_bounds: vec![],
                 body: block(vec![Stmt::Expr(Expr::Ident("name".into()))]),
@@ -4642,7 +5700,7 @@ mod tests {
             Item::Function(Function {
                 name: "main".into(),
                 lifetimes: vec![],
-            type_params: vec![],
+                type_params: vec![],
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
@@ -4678,7 +5736,10 @@ mod iterator_tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     fn simple_program(items: Vec<Item>) -> Program {
@@ -4695,7 +5756,7 @@ mod iterator_tests {
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
                 secret: false,
-}],
+            }],
             return_type: None,
             trait_bounds: vec![],
             body: block(body_stmts),
@@ -4708,163 +5769,153 @@ mod iterator_tests {
 
     #[test]
     fn iter_map_filter_collect_chain() {
-        let program = simple_program(vec![make_fn(vec![
-            Stmt::Let {
-                name: "result".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::MethodCall {
-                    object: Box::new(Expr::MethodCall {
-                        object: Box::new(Expr::MethodCall {
-                            object: Box::new(Expr::MethodCall {
-                                object: Box::new(Expr::Ident("arr".into())),
-                                method: "iter".into(),
-                                args: vec![],
-                            }),
-                            method: "map".into(),
-                            args: vec![Expr::Closure {
-                                params: vec![("x".into(), None)],
-                                body: Box::new(Expr::Binary {
-                                    op: BinOp::Mul,
-                                    left: Box::new(Expr::Ident("x".into())),
-                                    right: Box::new(Expr::Integer(2)),
-                                }),
-                            }],
-                        }),
-                        method: "filter".into(),
-                        args: vec![Expr::Closure {
-                            params: vec![("x".into(), None)],
-                            body: Box::new(Expr::Binary {
-                                op: BinOp::Gt,
-                                left: Box::new(Expr::Ident("x".into())),
-                                right: Box::new(Expr::Integer(5)),
-                            }),
-                        }],
-                    }),
-                    method: "collect".into(),
-                    args: vec![],
-                },
-                ownership: Ownership::Owned,
-            },
-        ])]);
-        let result = infer_program(&program);
-        assert!(result.is_ok(), "iter chain: {:?}", result.err());
-    }
-
-    #[test]
-    fn iter_fold_type_inference() {
-        let program = simple_program(vec![make_fn(vec![
-            Stmt::Let {
-                name: "sum".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::MethodCall {
-                    object: Box::new(Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    }),
-                    method: "fold".into(),
-                    args: vec![
-                        Expr::Integer(0),
-                        Expr::Closure {
-                            params: vec![("acc".into(), None), ("x".into(), None)],
-                            body: Box::new(Expr::Binary {
-                                op: BinOp::Add,
-                                left: Box::new(Expr::Ident("acc".into())),
-                                right: Box::new(Expr::Ident("x".into())),
-                            }),
-                        },
-                    ],
-                },
-                ownership: Ownership::Owned,
-            },
-        ])]);
-        let result = infer_program(&program);
-        assert!(result.is_ok(), "fold: {:?}", result.err());
-    }
-
-    #[test]
-    fn iter_any_returns_bool() {
-        let program = simple_program(vec![make_fn(vec![
-            Stmt::Let {
-                name: "r".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::MethodCall {
-                    object: Box::new(Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    }),
-                    method: "any".into(),
-                    args: vec![Expr::Closure {
-                        params: vec![("x".into(), None)],
-                        body: Box::new(Expr::Binary {
-                            op: BinOp::Gt,
-                            left: Box::new(Expr::Ident("x".into())),
-                            right: Box::new(Expr::Integer(0)),
-                        }),
-                    }],
-                },
-                ownership: Ownership::Owned,
-            },
-        ])]);
-        let result = infer_program(&program);
-        assert!(result.is_ok(), "any: {:?}", result.err());
-    }
-
-    #[test]
-    fn iter_enumerate_collect() {
-        let program = simple_program(vec![make_fn(vec![
-            Stmt::Let {
-                name: "e".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::MethodCall {
+        let program = simple_program(vec![make_fn(vec![Stmt::Let {
+            name: "result".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::MethodCall {
+                object: Box::new(Expr::MethodCall {
                     object: Box::new(Expr::MethodCall {
                         object: Box::new(Expr::MethodCall {
                             object: Box::new(Expr::Ident("arr".into())),
                             method: "iter".into(),
                             args: vec![],
                         }),
-                        method: "enumerate".into(),
+                        method: "map".into(),
+                        args: vec![Expr::Closure {
+                            params: vec![("x".into(), None)],
+                            body: Box::new(Expr::Binary {
+                                op: BinOp::Mul,
+                                left: Box::new(Expr::Ident("x".into())),
+                                right: Box::new(Expr::Integer(2)),
+                            }),
+                        }],
+                    }),
+                    method: "filter".into(),
+                    args: vec![Expr::Closure {
+                        params: vec![("x".into(), None)],
+                        body: Box::new(Expr::Binary {
+                            op: BinOp::Gt,
+                            left: Box::new(Expr::Ident("x".into())),
+                            right: Box::new(Expr::Integer(5)),
+                        }),
+                    }],
+                }),
+                method: "collect".into(),
+                args: vec![],
+            },
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "iter chain: {:?}", result.err());
+    }
+
+    #[test]
+    fn iter_fold_type_inference() {
+        let program = simple_program(vec![make_fn(vec![Stmt::Let {
+            name: "sum".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::MethodCall {
+                object: Box::new(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "iter".into(),
+                    args: vec![],
+                }),
+                method: "fold".into(),
+                args: vec![
+                    Expr::Integer(0),
+                    Expr::Closure {
+                        params: vec![("acc".into(), None), ("x".into(), None)],
+                        body: Box::new(Expr::Binary {
+                            op: BinOp::Add,
+                            left: Box::new(Expr::Ident("acc".into())),
+                            right: Box::new(Expr::Ident("x".into())),
+                        }),
+                    },
+                ],
+            },
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "fold: {:?}", result.err());
+    }
+
+    #[test]
+    fn iter_any_returns_bool() {
+        let program = simple_program(vec![make_fn(vec![Stmt::Let {
+            name: "r".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::MethodCall {
+                object: Box::new(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "iter".into(),
+                    args: vec![],
+                }),
+                method: "any".into(),
+                args: vec![Expr::Closure {
+                    params: vec![("x".into(), None)],
+                    body: Box::new(Expr::Binary {
+                        op: BinOp::Gt,
+                        left: Box::new(Expr::Ident("x".into())),
+                        right: Box::new(Expr::Integer(0)),
+                    }),
+                }],
+            },
+            ownership: Ownership::Owned,
+        }])]);
+        let result = infer_program(&program);
+        assert!(result.is_ok(), "any: {:?}", result.err());
+    }
+
+    #[test]
+    fn iter_enumerate_collect() {
+        let program = simple_program(vec![make_fn(vec![Stmt::Let {
+            name: "e".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::MethodCall {
+                object: Box::new(Expr::MethodCall {
+                    object: Box::new(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "iter".into(),
                         args: vec![],
                     }),
-                    method: "collect".into(),
+                    method: "enumerate".into(),
                     args: vec![],
-                },
-                ownership: Ownership::Owned,
+                }),
+                method: "collect".into(),
+                args: vec![],
             },
-        ])]);
+            ownership: Ownership::Owned,
+        }])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "enumerate: {:?}", result.err());
     }
 
     #[test]
     fn iter_count_returns_i32() {
-        let program = simple_program(vec![make_fn(vec![
-            Stmt::Let {
-                name: "n".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::MethodCall {
-                    object: Box::new(Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    }),
-                    method: "count".into(),
+        let program = simple_program(vec![make_fn(vec![Stmt::Let {
+            name: "n".into(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::MethodCall {
+                object: Box::new(Expr::MethodCall {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    method: "iter".into(),
                     args: vec![],
-                },
-                ownership: Ownership::Owned,
+                }),
+                method: "count".into(),
+                args: vec![],
             },
-        ])]);
+            ownership: Ownership::Owned,
+        }])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "count: {:?}", result.err());
     }
@@ -4893,7 +5944,10 @@ mod closure_tests {
                 params: vec![],
                 return_type: None,
                 trait_bounds: vec![],
-                body: Block { stmts, span: span() },
+                body: Block {
+                    stmts,
+                    span: span(),
+                },
                 is_pub: true,
                 is_async: false,
                 must_use: false,
@@ -4906,42 +5960,38 @@ mod closure_tests {
     fn closure_type_inferred_as_function() {
         // let f = |x: i32| x + 1;
         // The type of f should be Function { params: [I32], ret: I32 }
-        let program = make_program(vec![
-            Stmt::Let {
-                name: "f".to_string(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::Closure {
-                    params: vec![("x".to_string(), Some(Type::Named("i32".to_string())))],
-                    body: Box::new(Expr::Binary {
-                        op: BinOp::Add,
-                        left: Box::new(Expr::Ident("x".to_string())),
-                        right: Box::new(Expr::Integer(1)),
-                    }),
-                },
-                ownership: Ownership::Owned,
+        let program = make_program(vec![Stmt::Let {
+            name: "f".to_string(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Closure {
+                params: vec![("x".to_string(), Some(Type::Named("i32".to_string())))],
+                body: Box::new(Expr::Binary {
+                    op: BinOp::Add,
+                    left: Box::new(Expr::Ident("x".to_string())),
+                    right: Box::new(Expr::Integer(1)),
+                }),
             },
-        ]);
+            ownership: Ownership::Owned,
+        }]);
         infer_program(&program);
     }
 
     #[test]
     fn closure_no_params_returns_integer() {
         // let f = || 42;
-        let program = make_program(vec![
-            Stmt::Let {
-                name: "f".to_string(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::Closure {
-                    params: vec![],
-                    body: Box::new(Expr::Integer(42)),
-                },
-                ownership: Ownership::Owned,
+        let program = make_program(vec![Stmt::Let {
+            name: "f".to_string(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: Expr::Closure {
+                params: vec![],
+                body: Box::new(Expr::Integer(42)),
             },
-        ]);
+            ownership: Ownership::Owned,
+        }]);
         infer_program(&program);
     }
 }
@@ -4956,14 +6006,22 @@ mod comprehensive_type_checker_tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     fn simple_program(items: Vec<Item>) -> Program {
         Program { items }
     }
 
-    fn make_fn_with_body(name: &str, params: Vec<Param>, ret: Option<Type>, stmts: Vec<Stmt>) -> Item {
+    fn make_fn_with_body(
+        name: &str,
+        params: Vec<Param>,
+        ret: Option<Type>,
+        stmts: Vec<Stmt>,
+    ) -> Item {
         Item::Function(Function {
             name: name.into(),
             lifetimes: vec![],
@@ -4998,7 +6056,11 @@ mod comprehensive_type_checker_tests {
             ownership: Ownership::Owned,
         }])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "bool literal should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "bool literal should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5016,7 +6078,11 @@ mod comprehensive_type_checker_tests {
             ownership: Ownership::Owned,
         }])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "string literal should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "string literal should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5025,14 +6091,26 @@ mod comprehensive_type_checker_tests {
 
     #[test]
     fn comparison_operators_type_check() {
-        for op in &[BinOp::Eq, BinOp::Neq, BinOp::Lt, BinOp::Gt, BinOp::Lte, BinOp::Gte] {
+        for op in &[
+            BinOp::Eq,
+            BinOp::Neq,
+            BinOp::Lt,
+            BinOp::Gt,
+            BinOp::Lte,
+            BinOp::Gte,
+        ] {
             let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Binary {
                 op: op.clone(),
                 left: Box::new(Expr::Integer(1)),
                 right: Box::new(Expr::Integer(2)),
             })])]);
             let result = infer_program(&program);
-            assert!(result.is_ok(), "{:?} should type check: {:?}", op, result.err());
+            assert!(
+                result.is_ok(),
+                "{:?} should type check: {:?}",
+                op,
+                result.err()
+            );
         }
     }
 
@@ -5048,7 +6126,11 @@ mod comprehensive_type_checker_tests {
             right: Box::new(Expr::Bool(false)),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "logical AND should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "logical AND should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5063,7 +6145,11 @@ mod comprehensive_type_checker_tests {
             right: Box::new(Expr::Float(2.0)),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "f64 + f64 should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "f64 + f64 should succeed: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5079,7 +6165,12 @@ mod comprehensive_type_checker_tests {
                 right: Box::new(Expr::Integer(3)),
             })])]);
             let result = infer_program(&program);
-            assert!(result.is_ok(), "{:?} should type check: {:?}", op, result.err());
+            assert!(
+                result.is_ok(),
+                "{:?} should type check: {:?}",
+                op,
+                result.err()
+            );
         }
     }
 
@@ -5094,7 +6185,11 @@ mod comprehensive_type_checker_tests {
             operand: Box::new(Expr::Integer(42)),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "negation should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "negation should type check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -5104,7 +6199,11 @@ mod comprehensive_type_checker_tests {
             operand: Box::new(Expr::Bool(true)),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "boolean not should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "boolean not should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5119,7 +6218,11 @@ mod comprehensive_type_checker_tests {
             else_block: Some(block(vec![Stmt::Expr(Expr::Integer(2))])),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "if/else should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "if/else should type check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -5130,7 +6233,11 @@ mod comprehensive_type_checker_tests {
             else_block: None,
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "if without else should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "if without else should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5155,7 +6262,11 @@ mod comprehensive_type_checker_tests {
             ],
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "match should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "match should type check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -5180,7 +6291,11 @@ mod comprehensive_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "secret param function should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "secret param function should type check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -5205,7 +6320,11 @@ mod comprehensive_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "non-secret param should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "non-secret param should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5223,7 +6342,7 @@ mod comprehensive_type_checker_tests {
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
                 secret: false,
-}],
+            }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::For {
@@ -5237,7 +6356,11 @@ mod comprehensive_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "for loop should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "for loop should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5251,7 +6374,11 @@ mod comprehensive_type_checker_tests {
             body: block(vec![Stmt::Expr(Expr::Integer(0))]),
         })])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "while loop should type check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "while loop should type check: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5279,7 +6406,11 @@ mod comprehensive_type_checker_tests {
             ownership: Ownership::Owned,
         }])]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "closure with two params: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "closure with two params: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -5318,7 +6449,7 @@ mod comprehensive_type_checker_tests {
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
                 secret: false,
-}],
+            }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Let {
@@ -5354,7 +6485,11 @@ mod comprehensive_type_checker_tests {
                 lifetimes: vec![],
                 type_params: vec![],
                 trait_bounds: vec![],
-                fields: vec![Field { name: "val".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                fields: vec![Field {
+                    name: "val".into(),
+                    ty: Type::Named("i32".into()),
+                    is_pub: true,
+                }],
                 is_pub: true,
                 span: span(),
             }),
@@ -5363,7 +6498,11 @@ mod comprehensive_type_checker_tests {
                 lifetimes: vec![],
                 type_params: vec![],
                 trait_bounds: vec![],
-                fields: vec![Field { name: "inner".into(), ty: Type::Named("Inner".into()), is_pub: true }],
+                fields: vec![Field {
+                    name: "inner".into(),
+                    ty: Type::Named("Inner".into()),
+                    is_pub: true,
+                }],
                 is_pub: true,
                 span: span(),
             }),
@@ -5382,12 +6521,13 @@ mod comprehensive_type_checker_tests {
                         secret: false,
                         value: Expr::StructInit {
                             name: "Outer".into(),
-                            fields: vec![
-                                ("inner".into(), Expr::StructInit {
+                            fields: vec![(
+                                "inner".into(),
+                                Expr::StructInit {
                                     name: "Inner".into(),
                                     fields: vec![("val".into(), Expr::Integer(42))],
-                                }),
-                            ],
+                                },
+                            )],
                         },
                         ownership: Ownership::Owned,
                     },
@@ -5403,7 +6543,11 @@ mod comprehensive_type_checker_tests {
             }),
         ]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "nested struct field access: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "nested struct field access: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5417,9 +6561,18 @@ mod comprehensive_type_checker_tests {
                 name: "Color".into(),
                 type_params: vec![],
                 variants: vec![
-                    Variant { name: "Red".into(), fields: vec![] },
-                    Variant { name: "Green".into(), fields: vec![] },
-                    Variant { name: "Blue".into(), fields: vec![] },
+                    Variant {
+                        name: "Red".into(),
+                        fields: vec![],
+                    },
+                    Variant {
+                        name: "Green".into(),
+                        fields: vec![],
+                    },
+                    Variant {
+                        name: "Blue".into(),
+                        fields: vec![],
+                    },
                 ],
                 is_pub: true,
                 span: span(),
@@ -5457,7 +6610,7 @@ mod comprehensive_type_checker_tests {
                 ty: Type::Named("i32".into()),
                 ownership: Ownership::Owned,
                 secret: false,
-}],
+            }],
             Some(Type::Named("bool".into())),
             vec![Stmt::Expr(Expr::Binary {
                 op: BinOp::Gt,
@@ -5478,7 +6631,10 @@ mod comprehensive_type_checker_tests {
             vec![Stmt::Expr(Expr::Integer(42))],
         )]);
         let result = infer_program(&program);
-        assert!(result.is_err(), "returning int when String expected should fail");
+        assert!(
+            result.is_err(),
+            "returning int when String expected should fail"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5490,7 +6646,12 @@ mod comprehensive_type_checker_tests {
         let program = simple_program(vec![
             make_fn_with_body(
                 "square",
-                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
+                vec![Param {
+                    name: "x".into(),
+                    ty: Type::Named("i32".into()),
+                    ownership: Ownership::Owned,
+                    secret: false,
+                }],
                 Some(Type::Named("i32".into())),
                 vec![Stmt::Expr(Expr::Binary {
                     op: BinOp::Mul,
@@ -5504,7 +6665,11 @@ mod comprehensive_type_checker_tests {
             })]),
         ]);
         let result = infer_program(&program);
-        assert!(result.is_ok(), "fn call with correct types: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "fn call with correct types: {:?}",
+            result.err()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5517,8 +6682,16 @@ mod comprehensive_type_checker_tests {
             name: "Greeting".into(),
             type_params: vec![],
             props: vec![
-                Prop { name: "name".into(), ty: Type::Named("String".into()), default: None },
-                Prop { name: "count".into(), ty: Type::Named("i32".into()), default: Some(Expr::Integer(0)) },
+                Prop {
+                    name: "name".into(),
+                    ty: Type::Named("String".into()),
+                    default: None,
+                },
+                Prop {
+                    name: "count".into(),
+                    ty: Type::Named("i32".into()),
+                    default: Some(Expr::Integer(0)),
+                },
             ],
             state: vec![StateField {
                 name: "visible".into(),
@@ -5533,7 +6706,10 @@ mod comprehensive_type_checker_tests {
             styles: vec![],
             transitions: vec![],
             trait_bounds: vec![],
-            render: RenderBlock { body: TemplateNode::TextLiteral("hi".into()), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::TextLiteral("hi".into()),
+                span: span(),
+            },
             permissions: None,
             gestures: vec![],
             skeleton: None,
@@ -5554,15 +6730,13 @@ mod comprehensive_type_checker_tests {
 
     #[test]
     fn signal_statement_type_inferred() {
-        let program = simple_program(vec![make_main(vec![
-            Stmt::Signal {
-                name: "count".into(),
-                ty: None,
-                secret: false,
-                atomic: false,
-                value: Expr::Integer(0),
-            },
-        ])]);
+        let program = simple_program(vec![make_main(vec![Stmt::Signal {
+            name: "count".into(),
+            ty: None,
+            secret: false,
+            atomic: false,
+            value: Expr::Integer(0),
+        }])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "signal statement: {:?}", result.err());
     }
@@ -5573,12 +6747,17 @@ mod comprehensive_type_checker_tests {
 
     #[test]
     fn block_expression() {
-        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Block(
-            block(vec![
-                Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(1), ownership: Ownership::Owned },
-                Stmt::Expr(Expr::Ident("x".into())),
-            ]),
-        ))])]);
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Block(block(vec![
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Integer(1),
+                ownership: Ownership::Owned,
+            },
+            Stmt::Expr(Expr::Ident("x".into())),
+        ])))])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "block expression: {:?}", result.err());
     }
@@ -5611,8 +6790,16 @@ mod comprehensive_type_checker_tests {
                 type_params: vec![],
                 trait_bounds: vec![],
                 fields: vec![
-                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: true },
-                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: true },
+                    Field {
+                        name: "x".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: true,
+                    },
+                    Field {
+                        name: "y".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: true,
+                    },
                 ],
                 is_pub: true,
                 span: span(),
@@ -5649,7 +6836,12 @@ mod comprehensive_type_checker_tests {
             })]),
             make_fn_with_body(
                 "helper",
-                vec![Param { name: "x".into(), ty: Type::Named("i32".into()), ownership: Ownership::Owned, secret: false }],
+                vec![Param {
+                    name: "x".into(),
+                    ty: Type::Named("i32".into()),
+                    ownership: Ownership::Owned,
+                    secret: false,
+                }],
                 Some(Type::Named("i32".into())),
                 vec![Stmt::Expr(Expr::Ident("x".into()))],
             ),
@@ -5665,7 +6857,14 @@ mod comprehensive_type_checker_tests {
     #[test]
     fn assign_expression() {
         let program = simple_program(vec![make_main(vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: Expr::Integer(1), ownership: Ownership::Owned },
+            Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: true,
+                secret: false,
+                value: Expr::Integer(1),
+                ownership: Ownership::Owned,
+            },
             Stmt::Expr(Expr::Assign {
                 target: Box::new(Expr::Ident("x".into())),
                 value: Box::new(Expr::Integer(2)),
@@ -5681,13 +6880,13 @@ mod comprehensive_type_checker_tests {
 
     #[test]
     fn await_expression() {
-        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Await(
-            Box::new(Expr::Fetch {
+        let program = simple_program(vec![make_main(vec![Stmt::Expr(Expr::Await(Box::new(
+            Expr::Fetch {
                 url: Box::new(Expr::StringLit("https://api.example.com".into())),
                 options: None,
                 contract: None,
-            }),
-        ))])]);
+            },
+        )))])]);
         let result = infer_program(&program);
         assert!(result.is_ok(), "await expression: {:?}", result.err());
     }
@@ -5720,7 +6919,11 @@ mod comprehensive_type_checker_tests {
                 lifetimes: vec![],
                 type_params: vec![],
                 trait_bounds: vec![],
-                fields: vec![Field { name: "val".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                fields: vec![Field {
+                    name: "val".into(),
+                    ty: Type::Named("i32".into()),
+                    is_pub: true,
+                }],
                 is_pub: true,
                 span: span(),
             }),
@@ -5784,7 +6987,7 @@ mod comprehensive_type_checker_tests {
                 ty: Type::Array(Box::new(Type::Named("i32".into()))),
                 ownership: Ownership::Owned,
                 secret: false,
-}],
+            }],
             return_type: None,
             trait_bounds: vec![],
             body: block(vec![Stmt::Expr(Expr::Index {
@@ -5830,8 +7033,16 @@ mod comprehensive_type_checker_tests {
                 type_params: vec![],
                 trait_bounds: vec![],
                 fields: vec![
-                    Field { name: "a".into(), ty: Type::Named("i32".into()), is_pub: true },
-                    Field { name: "b".into(), ty: Type::Named("String".into()), is_pub: true },
+                    Field {
+                        name: "a".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: true,
+                    },
+                    Field {
+                        name: "b".into(),
+                        ty: Type::Named("String".into()),
+                        is_pub: true,
+                    },
                 ],
                 is_pub: true,
                 span: span(),
@@ -5876,7 +7087,11 @@ mod comprehensive_type_checker_tests {
         let result = infer_program(&program);
         assert!(result.is_err(), "should have type errors");
         let errors = result.unwrap_err();
-        assert!(errors.len() >= 2, "should accumulate multiple errors, got {}", errors.len());
+        assert!(
+            errors.len() >= 2,
+            "should accumulate multiple errors, got {}",
+            errors.len()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -5891,7 +7106,11 @@ mod comprehensive_type_checker_tests {
                 lifetimes: vec![],
                 type_params: vec![],
                 trait_bounds: vec![],
-                fields: vec![Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: true }],
+                fields: vec![Field {
+                    name: "x".into(),
+                    ty: Type::Named("i32".into()),
+                    is_pub: true,
+                }],
                 is_pub: true,
                 span: span(),
             }),
@@ -5907,7 +7126,7 @@ mod comprehensive_type_checker_tests {
                         ty: Type::Named("Foo".into()),
                         ownership: Ownership::Borrowed,
                         secret: false,
-}],
+                    }],
                     return_type: Some(Type::Named("i32".into())),
                     trait_bounds: vec![],
                     body: block(vec![Stmt::Expr(Expr::FieldAccess {
@@ -5937,7 +7156,10 @@ mod coverage_type_checker_tests {
     }
 
     fn block(stmts: Vec<Stmt>) -> Block {
-        Block { stmts, span: span() }
+        Block {
+            stmts,
+            span: span(),
+        }
     }
 
     fn program(items: Vec<Item>) -> Program {
@@ -5976,7 +7198,12 @@ mod coverage_type_checker_tests {
         }
     }
 
-    fn func_with_params(name: &str, params: Vec<Param>, ret: Option<Type>, body: Vec<Stmt>) -> Function {
+    fn func_with_params(
+        name: &str,
+        params: Vec<Param>,
+        ret: Option<Type>,
+        body: Vec<Stmt>,
+    ) -> Function {
         Function {
             name: name.into(),
             lifetimes: vec![],
@@ -5993,7 +7220,12 @@ mod coverage_type_checker_tests {
     }
 
     fn param(name: &str, ty: Type) -> Param {
-        Param { name: name.into(), ty, ownership: Ownership::Owned, secret: false }
+        Param {
+            name: name.into(),
+            ty,
+            ownership: Ownership::Owned,
+            secret: false,
+        }
     }
 
     // ── Ty Display coverage ─────────────────────────────────────────────
@@ -6011,26 +7243,58 @@ mod coverage_type_checker_tests {
         assert_eq!(format!("{}", Ty::String_), "String");
         assert_eq!(format!("{}", Ty::Unit), "()");
         assert_eq!(format!("{}", Ty::Array(Box::new(Ty::I32))), "[i32]");
-        assert_eq!(format!("{}", Ty::Iterator(Box::new(Ty::I32))), "Iterator<i32>");
-        assert_eq!(format!("{}", Ty::Option_(Box::new(Ty::I32))), "Option<i32>");
-        assert_eq!(format!("{}", Ty::Tuple(vec![Ty::I32, Ty::Bool])), "(i32, bool)");
         assert_eq!(
-            format!("{}", Ty::Function { params: vec![Ty::I32], ret: Box::new(Ty::Bool) }),
+            format!("{}", Ty::Iterator(Box::new(Ty::I32))),
+            "Iterator<i32>"
+        );
+        assert_eq!(format!("{}", Ty::Option_(Box::new(Ty::I32))), "Option<i32>");
+        assert_eq!(
+            format!("{}", Ty::Tuple(vec![Ty::I32, Ty::Bool])),
+            "(i32, bool)"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                Ty::Function {
+                    params: vec![Ty::I32],
+                    ret: Box::new(Ty::Bool)
+                }
+            ),
             "fn(i32) -> bool"
         );
         assert_eq!(
-            format!("{}", Ty::Reference { mutable: false, lifetime: None, inner: Box::new(Ty::I32) }),
+            format!(
+                "{}",
+                Ty::Reference {
+                    mutable: false,
+                    lifetime: None,
+                    inner: Box::new(Ty::I32)
+                }
+            ),
             "&i32"
         );
         assert_eq!(
-            format!("{}", Ty::Reference { mutable: true, lifetime: None, inner: Box::new(Ty::I32) }),
+            format!(
+                "{}",
+                Ty::Reference {
+                    mutable: true,
+                    lifetime: None,
+                    inner: Box::new(Ty::I32)
+                }
+            ),
             "&mut i32"
         );
         assert_eq!(format!("{}", Ty::Struct("Foo".into())), "Foo");
         assert_eq!(format!("{}", Ty::Enum("Color".into())), "Color");
         assert_eq!(format!("{}", Ty::Contract("Api".into())), "contract Api");
         assert_eq!(
-            format!("{}", Ty::Result_ { ok: Box::new(Ty::I32), err: Box::new(Ty::String_) }),
+            format!(
+                "{}",
+                Ty::Result_ {
+                    ok: Box::new(Ty::I32),
+                    err: Box::new(Ty::String_)
+                }
+            ),
             "Result<i32, String>"
         );
         assert_eq!(format!("{}", Ty::TypeParam("T".into())), "T");
@@ -6107,8 +7371,9 @@ mod coverage_type_checker_tests {
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Let {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Let {
                     name: "u".into(),
                     ty: None,
                     mutable: false,
@@ -6118,11 +7383,15 @@ mod coverage_type_checker_tests {
                         fields: vec![("name".into(), Expr::StringLit("Alice".into()))],
                     },
                     ownership: Ownership::Owned,
-                },
-            ])),
+                }],
+            )),
         ]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "contract-struct unification: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "contract-struct unification: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -6130,7 +7399,10 @@ mod coverage_type_checker_tests {
         // i32 and i64 should unify, f32 and f64 should unify
         let prog = program(vec![Item::Function(func_with_params(
             "coerce",
-            vec![param("a", Type::Named("i32".into())), param("b", Type::Named("i64".into()))],
+            vec![
+                param("a", Type::Named("i32".into())),
+                param("b", Type::Named("i64".into())),
+            ],
             Some(Type::Named("i32".into())),
             vec![Stmt::Return(Some(Expr::Binary {
                 op: BinOp::Add,
@@ -6145,12 +7417,13 @@ mod coverage_type_checker_tests {
     #[test]
     fn unify_error_absorbs() {
         // Error type should unify with anything
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::FnCall {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::FnCall {
                 callee: Box::new(Expr::Ident("nonexistent".into())),
                 args: vec![],
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         // Should have errors but not panic
         assert!(result.is_err());
@@ -6160,9 +7433,10 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_self_outside_impl() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::SelfExpr),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::SelfExpr)],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -6171,8 +7445,9 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_unary_neg_numeric() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "x".into(),
                 ty: None,
                 mutable: false,
@@ -6182,20 +7457,21 @@ mod coverage_type_checker_tests {
                     operand: Box::new(Expr::Integer(5)),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_unary_neg_non_numeric() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Unary {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Unary {
                 op: UnaryOp::Neg,
                 operand: Box::new(Expr::Bool(true)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -6204,8 +7480,9 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_unary_not() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "x".into(),
                 ty: None,
                 mutable: false,
@@ -6215,8 +7492,8 @@ mod coverage_type_checker_tests {
                     operand: Box::new(Expr::Bool(true)),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6226,7 +7503,10 @@ mod coverage_type_checker_tests {
         let prog = program(vec![
             Item::Function(func_with_params(
                 "add",
-                vec![param("a", Type::Named("i32".into())), param("b", Type::Named("i32".into()))],
+                vec![
+                    param("a", Type::Named("i32".into())),
+                    param("b", Type::Named("i32".into())),
+                ],
                 Some(Type::Named("i32".into())),
                 vec![Stmt::Return(Some(Expr::Binary {
                     op: BinOp::Add,
@@ -6234,28 +7514,42 @@ mod coverage_type_checker_tests {
                     right: Box::new(Expr::Ident("b".into())),
                 }))],
             )),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::FnCall {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("add".into())),
                     args: vec![Expr::Integer(1)], // only 1 arg, needs 2
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("expects 2 arguments")));
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("expects 2 arguments"))
+        );
     }
 
     #[test]
     fn infer_fn_call_non_callable() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
-            Stmt::Expr(Expr::FnCall {
-                callee: Box::new(Expr::Ident("x".into())),
-                args: vec![],
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(5),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("x".into())),
+                    args: vec![],
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -6264,13 +7558,23 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_index_non_array() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
-            Stmt::Expr(Expr::Index {
-                object: Box::new(Expr::Ident("x".into())),
-                index: Box::new(Expr::Integer(0)),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(5),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::Index {
+                    object: Box::new(Expr::Ident("x".into())),
+                    index: Box::new(Expr::Integer(0)),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -6279,30 +7583,37 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_index_non_integer_idx() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "arr".into(),
-                ty: Some(Type::Array(Box::new(Type::Named("i32".into())))),
-                mutable: false,
-                secret: false,
-                value: Expr::Integer(0),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::Index {
-                object: Box::new(Expr::Ident("arr".into())),
-                index: Box::new(Expr::StringLit("key".into())),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "arr".into(),
+                    ty: Some(Type::Array(Box::new(Type::Named("i32".into())))),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::Index {
+                    object: Box::new(Expr::Ident("arr".into())),
+                    index: Box::new(Expr::StringLit("key".into())),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("index must be integer")));
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("index must be integer"))
+        );
     }
 
     #[test]
     fn infer_if_else_unifies() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "x".into(),
                 ty: None,
                 mutable: false,
@@ -6313,29 +7624,31 @@ mod coverage_type_checker_tests {
                     else_block: Some(block(vec![Stmt::Expr(Expr::Integer(2))])),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_if_no_else_is_unit() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::If {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::If {
                 condition: Box::new(Expr::Bool(true)),
                 then_block: block(vec![Stmt::Expr(Expr::Integer(1))]),
                 else_block: None,
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_match_expr() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "x".into(),
                 ty: None,
                 mutable: false,
@@ -6356,53 +7669,82 @@ mod coverage_type_checker_tests {
                     ],
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_for_loop() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::For {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::For {
                 binding: "item".into(),
                 iterator: Box::new(Expr::Integer(0)), // not really an array, but covered
                 body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_while_loop() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::While {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::While {
                 condition: Box::new(Expr::Bool(true)),
                 body: block(vec![Stmt::Expr(Expr::Integer(1))]),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_block_expr() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Block(block(vec![Stmt::Expr(Expr::Integer(42))]))),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Block(block(vec![Stmt::Expr(
+                Expr::Integer(42),
+            )])))],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_borrow_and_borrow_mut() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: false, secret: false, value: Expr::Integer(5), ownership: Ownership::Owned },
-            Stmt::Let { name: "r".into(), ty: None, mutable: false, secret: false, value: Expr::Borrow(Box::new(Expr::Ident("x".into()))), ownership: Ownership::Owned },
-            Stmt::Let { name: "m".into(), ty: None, mutable: false, secret: false, value: Expr::BorrowMut(Box::new(Expr::Ident("x".into()))), ownership: Ownership::Owned },
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(5),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "r".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Borrow(Box::new(Expr::Ident("x".into()))),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "m".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::BorrowMut(Box::new(Expr::Ident("x".into()))),
+                    ownership: Ownership::Owned,
+                },
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6414,16 +7756,25 @@ mod coverage_type_checker_tests {
                 name: "Point".into(),
                 type_params: vec![],
                 fields: vec![
-                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
-                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: false },
+                    Field {
+                        name: "x".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: false,
+                    },
+                    Field {
+                        name: "y".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: false,
+                    },
                 ],
                 lifetimes: vec![],
                 trait_bounds: vec![],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Let {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Let {
                     name: "p".into(),
                     ty: None,
                     mutable: false,
@@ -6436,8 +7787,8 @@ mod coverage_type_checker_tests {
                         ],
                     },
                     ownership: Ownership::Owned,
-                },
-            ])),
+                }],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
@@ -6450,20 +7801,29 @@ mod coverage_type_checker_tests {
                 name: "Point".into(),
                 type_params: vec![],
                 fields: vec![
-                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
-                    Field { name: "y".into(), ty: Type::Named("i32".into()), is_pub: false },
+                    Field {
+                        name: "x".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: false,
+                    },
+                    Field {
+                        name: "y".into(),
+                        ty: Type::Named("i32".into()),
+                        is_pub: false,
+                    },
                 ],
                 lifetimes: vec![],
                 trait_bounds: vec![],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::StructInit {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::StructInit {
                     name: "Point".into(),
                     fields: vec![("x".into(), Expr::Integer(1))], // missing y
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
@@ -6477,23 +7837,26 @@ mod coverage_type_checker_tests {
             Item::Struct(StructDef {
                 name: "Point".into(),
                 type_params: vec![],
-                fields: vec![
-                    Field { name: "x".into(), ty: Type::Named("i32".into()), is_pub: false },
-                ],
+                fields: vec![Field {
+                    name: "x".into(),
+                    ty: Type::Named("i32".into()),
+                    is_pub: false,
+                }],
                 lifetimes: vec![],
                 trait_bounds: vec![],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::StructInit {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::StructInit {
                     name: "Point".into(),
                     fields: vec![
                         ("x".into(), Expr::Integer(1)),
                         ("z".into(), Expr::Integer(3)), // unknown
                     ],
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
@@ -6503,34 +7866,46 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_struct_init_unknown_struct() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::StructInit {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::StructInit {
                 name: "Unknown".into(),
                 fields: vec![],
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
     }
 
     #[test]
     fn infer_assign() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let { name: "x".into(), ty: None, mutable: true, secret: false, value: Expr::Integer(0), ownership: Ownership::Owned },
-            Stmt::Expr(Expr::Assign {
-                target: Box::new(Expr::Ident("x".into())),
-                value: Box::new(Expr::Integer(42)),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: true,
+                    secret: false,
+                    value: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::Assign {
+                    target: Box::new(Expr::Ident("x".into())),
+                    value: Box::new(Expr::Integer(42)),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_await() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Await(Box::new(Expr::Integer(1)))),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Await(Box::new(Expr::Integer(1))))],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6549,8 +7924,9 @@ mod coverage_type_checker_tests {
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Let {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Let {
                     name: "u".into(),
                     ty: None,
                     mutable: false,
@@ -6561,8 +7937,8 @@ mod coverage_type_checker_tests {
                         contract: Some("UserApi".into()),
                     },
                     ownership: Ownership::Owned,
-                },
-            ])),
+                }],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
@@ -6570,34 +7946,37 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_fetch_unknown_contract() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Fetch {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Fetch {
                 url: Box::new(Expr::StringLit("https://api.example.com".into())),
                 options: None,
                 contract: Some("Unknown".into()),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
     }
 
     #[test]
     fn infer_fetch_no_contract() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Fetch {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Fetch {
                 url: Box::new(Expr::StringLit("https://api.example.com".into())),
                 options: Some(Box::new(Expr::Integer(0))),
                 contract: None,
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_closure() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "f".into(),
                 ty: None,
                 mutable: false,
@@ -6614,157 +7993,177 @@ mod coverage_type_checker_tests {
                     }),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_prompt_template() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::PromptTemplate {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::PromptTemplate {
                 template: "Hello {name}!".into(),
                 interpolations: vec![("name".into(), Expr::StringLit("world".into()))],
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_navigate() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Navigate {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Navigate {
                 path: Box::new(Expr::StringLit("/home".into())),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_stream() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Stream {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Stream {
                 source: Box::new(Expr::Integer(0)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_suspend() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Suspend {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Suspend {
                 fallback: Box::new(Expr::StringLit("loading".into())),
                 body: Box::new(Expr::Integer(42)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_spawn() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Spawn {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Spawn {
                 body: block(vec![Stmt::Expr(Expr::Integer(1))]),
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_channel_send_receive() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "ch".into(), ty: None, mutable: false, secret: false,
-                value: Expr::Channel { ty: None },
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::Send {
-                channel: Box::new(Expr::Ident("ch".into())),
-                value: Box::new(Expr::Integer(42)),
-            }),
-            Stmt::Expr(Expr::Receive {
-                channel: Box::new(Expr::Ident("ch".into())),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "ch".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Channel { ty: None },
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::Send {
+                    channel: Box::new(Expr::Ident("ch".into())),
+                    value: Box::new(Expr::Integer(42)),
+                }),
+                Stmt::Expr(Expr::Receive {
+                    channel: Box::new(Expr::Ident("ch".into())),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_parallel() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Parallel {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Parallel {
                 tasks: vec![Expr::Integer(1), Expr::Integer(2)],
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_try_catch() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::TryCatch {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::TryCatch {
                 body: Box::new(Expr::Integer(1)),
                 error_binding: "err".into(),
                 catch_body: Box::new(Expr::Integer(0)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_assert() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Assert {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Assert {
                 condition: Box::new(Expr::Bool(true)),
                 message: Some("test".into()),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_assert_eq() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::AssertEq {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::AssertEq {
                 left: Box::new(Expr::Integer(1)),
                 right: Box::new(Expr::Integer(1)),
                 message: None,
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_animate() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Animate {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Animate {
                 target: Box::new(Expr::Integer(0)),
                 animation: "fadeIn".into(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_format_string() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "s".into(), ty: None, mutable: false, secret: false,
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
+                name: "s".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::FormatString {
                     parts: vec![
                         FormatPart::Literal("hello ".into()),
@@ -6772,8 +8171,8 @@ mod coverage_type_checker_tests {
                     ],
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6782,12 +8181,17 @@ mod coverage_type_checker_tests {
     fn infer_try_operator_on_result() {
         let prog = program(vec![Item::Function(func_with_params(
             "main",
-            vec![param("r", Type::Result {
-                ok: Box::new(Type::Named("i32".into())),
-                err: Box::new(Type::Named("String".into())),
-            })],
+            vec![param(
+                "r",
+                Type::Result {
+                    ok: Box::new(Type::Named("i32".into())),
+                    err: Box::new(Type::Named("String".into())),
+                },
+            )],
             Some(Type::Named("i32".into())),
-            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("r".into())))))],
+            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident(
+                "r".into(),
+            )))))],
         ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
@@ -6797,9 +8201,14 @@ mod coverage_type_checker_tests {
     fn infer_try_operator_on_option() {
         let prog = program(vec![Item::Function(func_with_params(
             "main",
-            vec![param("o", Type::Option(Box::new(Type::Named("i32".into()))))],
+            vec![param(
+                "o",
+                Type::Option(Box::new(Type::Named("i32".into()))),
+            )],
             Some(Type::Named("i32".into())),
-            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident("o".into())))))],
+            vec![Stmt::Return(Some(Expr::Try(Box::new(Expr::Ident(
+                "o".into(),
+            )))))],
         ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
@@ -6807,9 +8216,10 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_try_operator_on_non_result() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Try(Box::new(Expr::Integer(1)))),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Try(Box::new(Expr::Integer(1))))],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -6818,78 +8228,90 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_dynamic_import() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::DynamicImport {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::DynamicImport {
                 path: Box::new(Expr::StringLit("./module.js".into())),
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_download() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Download {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Download {
                 data: Box::new(Expr::StringLit("data".into())),
                 filename: Box::new(Expr::StringLit("file.txt".into())),
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_env() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Env {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Env {
                 name: Box::new(Expr::StringLit("HOME".into())),
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_trace() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Trace {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Trace {
                 label: Box::new(Expr::StringLit("debug".into())),
                 body: block(vec![Stmt::Expr(Expr::Integer(1))]),
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_flag() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
-                value: Expr::Flag { name: Box::new(Expr::StringLit("dark-mode".into())), span: span() },
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
+                name: "f".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
+                value: Expr::Flag {
+                    name: Box::new(Expr::StringLit("dark-mode".into())),
+                    span: span(),
+                },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_virtual_list() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::VirtualList {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::VirtualList {
                 items: Box::new(Expr::Integer(0)),
                 item_height: Box::new(Expr::Integer(50)),
                 template: Box::new(Expr::Integer(0)),
                 buffer: None,
                 span: span(),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6898,49 +8320,50 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_signal_with_secret() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Signal {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Signal {
                 name: "token".into(),
                 ty: Some(Type::Named("String".into())),
                 secret: true,
                 atomic: false,
                 value: Expr::StringLit("abc".into()),
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_let_with_secret() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "key".into(),
                 ty: None,
                 mutable: false,
                 secret: true,
                 value: Expr::StringLit("secret-value".into()),
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_return_none() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Return(None),
-        ]))]);
+        let prog = program(vec![Item::Function(func("main", vec![Stmt::Return(None)]))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn infer_yield_stmt() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Yield(Expr::Integer(42)),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Yield(Expr::Integer(42))],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -6948,24 +8371,41 @@ mod coverage_type_checker_tests {
     #[test]
     fn infer_let_destructure_tuple() {
         let prog = program(vec![
-            Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "t".into(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::LetDestructure {
-                    pattern: Pattern::Tuple(vec![Pattern::Ident("a".into()), Pattern::Ident("b".into())]),
-                    ty: None,
-                    value: Expr::Ident("t".into()),
-                },
-            ])),
+            Item::Function(func_ret(
+                "make_tuple",
+                Type::Tuple(vec![
+                    Type::Named("i32".into()),
+                    Type::Named("String".into()),
+                ]),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_tuple".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "t".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_tuple".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::LetDestructure {
+                        pattern: Pattern::Tuple(vec![
+                            Pattern::Ident("a".into()),
+                            Pattern::Ident("b".into()),
+                        ]),
+                        ty: None,
+                        value: Expr::Ident("t".into()),
+                    },
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "destructure_tuple: {:?}", result.err());
@@ -6974,24 +8414,38 @@ mod coverage_type_checker_tests {
     #[test]
     fn infer_let_destructure_array() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::LetDestructure {
-                    pattern: Pattern::Array(vec![Pattern::Ident("first".into()), Pattern::Wildcard]),
-                    ty: None,
-                    value: Expr::Ident("arr".into()),
-                },
-            ])),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::LetDestructure {
+                        pattern: Pattern::Array(vec![
+                            Pattern::Ident("first".into()),
+                            Pattern::Wildcard,
+                        ]),
+                        ty: None,
+                        value: Expr::Ident("arr".into()),
+                    },
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "destructure_array: {:?}", result.err());
@@ -6999,13 +8453,14 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_let_destructure_non_tuple() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::LetDestructure {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::LetDestructure {
                 pattern: Pattern::Tuple(vec![Pattern::Ident("a".into())]),
                 ty: None,
                 value: Expr::Integer(0), // i32, not a tuple
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -7014,13 +8469,14 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_let_destructure_non_array() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::LetDestructure {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::LetDestructure {
                 pattern: Pattern::Array(vec![Pattern::Ident("a".into())]),
                 ty: None,
                 value: Expr::Integer(0),
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -7029,8 +8485,9 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn infer_let_destructure_non_struct() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::LetDestructure {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::LetDestructure {
                 pattern: Pattern::Struct {
                     name: "Foo".into(),
                     fields: vec![("x".into(), Pattern::Ident("x".into()))],
@@ -7038,8 +8495,8 @@ mod coverage_type_checker_tests {
                 },
                 ty: None,
                 value: Expr::Integer(0),
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -7050,67 +8507,90 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn binary_string_concat() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "s".into(), ty: None, mutable: false, secret: false,
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
+                name: "s".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Binary {
                     op: BinOp::Add,
                     left: Box::new(Expr::StringLit("hello".into())),
                     right: Box::new(Expr::StringLit(" world".into())),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn binary_arithmetic_non_numeric() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Binary {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Binary {
                 op: BinOp::Sub,
                 left: Box::new(Expr::Bool(true)),
                 right: Box::new(Expr::Bool(false)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("cannot apply arithmetic")));
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("cannot apply arithmetic"))
+        );
     }
 
     #[test]
     fn binary_float_arithmetic() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "x".into(), ty: None, mutable: false, secret: false,
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
+                name: "x".into(),
+                ty: None,
+                mutable: false,
+                secret: false,
                 value: Expr::Binary {
                     op: BinOp::Mul,
                     left: Box::new(Expr::Float(1.5)),
                     right: Box::new(Expr::Integer(2)),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn binary_comparison_ops() {
-        for op in &[BinOp::Eq, BinOp::Neq, BinOp::Lt, BinOp::Gt, BinOp::Lte, BinOp::Gte] {
-            let prog = program(vec![Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "b".into(), ty: None, mutable: false, secret: false,
+        for op in &[
+            BinOp::Eq,
+            BinOp::Neq,
+            BinOp::Lt,
+            BinOp::Gt,
+            BinOp::Lte,
+            BinOp::Gte,
+        ] {
+            let prog = program(vec![Item::Function(func(
+                "main",
+                vec![Stmt::Let {
+                    name: "b".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
                     value: Expr::Binary {
                         op: op.clone(),
                         left: Box::new(Expr::Integer(1)),
                         right: Box::new(Expr::Integer(2)),
                     },
                     ownership: Ownership::Owned,
-                },
-            ]))]);
+                }],
+            ))]);
             let result = infer_program(&prog);
             assert!(result.is_ok(), "comparison op {:?} failed", op);
         }
@@ -7119,17 +8599,21 @@ mod coverage_type_checker_tests {
     #[test]
     fn binary_logical_ops() {
         for op in &[BinOp::And, BinOp::Or] {
-            let prog = program(vec![Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "b".into(), ty: None, mutable: false, secret: false,
+            let prog = program(vec![Item::Function(func(
+                "main",
+                vec![Stmt::Let {
+                    name: "b".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
                     value: Expr::Binary {
                         op: op.clone(),
                         left: Box::new(Expr::Bool(true)),
                         right: Box::new(Expr::Bool(false)),
                     },
                     ownership: Ownership::Owned,
-                },
-            ]))]);
+                }],
+            ))]);
             let result = infer_program(&prog);
             assert!(result.is_ok(), "logical op {:?} failed", op);
         }
@@ -7140,23 +8624,37 @@ mod coverage_type_checker_tests {
     #[test]
     fn field_access_on_tuple() {
         let prog = program(vec![
-            Item::Function(func_ret("make_tuple", Type::Tuple(vec![Type::Named("i32".into()), Type::Named("String".into())]), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "t".into(),
-                    ty: None,
-                    mutable: false,
-                    secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_tuple".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::FieldAccess {
-                    object: Box::new(Expr::Ident("t".into())),
-                    field: "0".into(),
-                }),
-            ])),
+            Item::Function(func_ret(
+                "make_tuple",
+                Type::Tuple(vec![
+                    Type::Named("i32".into()),
+                    Type::Named("String".into()),
+                ]),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_tuple".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "t".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_tuple".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::FieldAccess {
+                        object: Box::new(Expr::Ident("t".into())),
+                        field: "0".into(),
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "field_access_on_tuple: {:?}", result.err());
@@ -7164,20 +8662,23 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn field_access_tuple_out_of_range() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "t".into(),
-                ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
-                mutable: false,
-                secret: false,
-                value: Expr::Integer(0),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::FieldAccess {
-                object: Box::new(Expr::Ident("t".into())),
-                field: "5".into(),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "t".into(),
+                    ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("t".into())),
+                    field: "5".into(),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
@@ -7186,39 +8687,51 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn field_access_tuple_non_numeric() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "t".into(),
-                ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
-                mutable: false,
-                secret: false,
-                value: Expr::Integer(0),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::FieldAccess {
-                object: Box::new(Expr::Ident("t".into())),
-                field: "name".into(),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "t".into(),
+                    ty: Some(Type::Tuple(vec![Type::Named("i32".into())])),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(0),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("t".into())),
+                    field: "name".into(),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("cannot access field")));
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("cannot access field"))
+        );
     }
 
     #[test]
     fn field_access_on_non_struct() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "x".into(), ty: None, mutable: false, secret: false,
-                value: Expr::Integer(5),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::FieldAccess {
-                object: Box::new(Expr::Ident("x".into())),
-                field: "y".into(),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(5),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("x".into())),
+                    field: "y".into(),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
         assert!(result.is_err());
     }
@@ -7228,44 +8741,64 @@ mod coverage_type_checker_tests {
     #[test]
     fn iterator_fold() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "iter".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
                     },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "sum".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("iter".into())),
-                        method: "fold".into(),
-                        args: vec![
-                            Expr::Integer(0),
-                            Expr::Closure {
-                                params: vec![("acc".into(), None), ("x".into(), None)],
-                                body: Box::new(Expr::Binary {
-                                    op: BinOp::Add,
-                                    left: Box::new(Expr::Ident("acc".into())),
-                                    right: Box::new(Expr::Ident("x".into())),
-                                }),
-                            },
-                        ],
+                    Stmt::Let {
+                        name: "iter".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("arr".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
                     },
-                    ownership: Ownership::Owned,
-                },
-            ])),
+                    Stmt::Let {
+                        name: "sum".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("iter".into())),
+                            method: "fold".into(),
+                            args: vec![
+                                Expr::Integer(0),
+                                Expr::Closure {
+                                    params: vec![("acc".into(), None), ("x".into(), None)],
+                                    body: Box::new(Expr::Binary {
+                                        op: BinOp::Add,
+                                        left: Box::new(Expr::Ident("acc".into())),
+                                        right: Box::new(Expr::Ident("x".into())),
+                                    }),
+                                },
+                            ],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "fold: {:?}", result.err());
@@ -7275,33 +8808,50 @@ mod coverage_type_checker_tests {
     fn iterator_any_all() {
         for method in &["any", "all"] {
             let prog = program(vec![
-                Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                    Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-                ])),
-                Item::Function(func("main", vec![
-                    Stmt::Let {
-                        name: "arr".into(), ty: None, mutable: false, secret: false,
-                        value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                        ownership: Ownership::Owned,
-                    },
-                    Stmt::Let {
-                        name: "iter".into(), ty: None, mutable: false, secret: false,
-                        value: Expr::MethodCall {
-                            object: Box::new(Expr::Ident("arr".into())),
-                            method: "iter".into(),
-                            args: vec![],
+                Item::Function(func_ret(
+                    "make_arr",
+                    Type::Array(Box::new(Type::Named("i32".into()))),
+                    vec![Stmt::Expr(Expr::FnCall {
+                        callee: Box::new(Expr::Ident("make_arr".into())),
+                        args: vec![],
+                    })],
+                )),
+                Item::Function(func(
+                    "main",
+                    vec![
+                        Stmt::Let {
+                            name: "arr".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::FnCall {
+                                callee: Box::new(Expr::Ident("make_arr".into())),
+                                args: vec![],
+                            },
+                            ownership: Ownership::Owned,
                         },
-                        ownership: Ownership::Owned,
-                    },
-                    Stmt::Expr(Expr::MethodCall {
-                        object: Box::new(Expr::Ident("iter".into())),
-                        method: method.to_string(),
-                        args: vec![Expr::Closure {
-                            params: vec![("x".into(), None)],
-                            body: Box::new(Expr::Bool(true)),
-                        }],
-                    }),
-                ])),
+                        Stmt::Let {
+                            name: "iter".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::MethodCall {
+                                object: Box::new(Expr::Ident("arr".into())),
+                                method: "iter".into(),
+                                args: vec![],
+                            },
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Expr(Expr::MethodCall {
+                            object: Box::new(Expr::Ident("iter".into())),
+                            method: method.to_string(),
+                            args: vec![Expr::Closure {
+                                params: vec![("x".into(), None)],
+                                body: Box::new(Expr::Bool(true)),
+                            }],
+                        }),
+                    ],
+                )),
             ]);
             let result = infer_program(&prog);
             assert!(result.is_ok(), "{}: {:?}", method, result.err());
@@ -7311,131 +8861,33 @@ mod coverage_type_checker_tests {
     #[test]
     fn iterator_enumerate() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "iter".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("iter".into())),
-                    method: "enumerate".into(),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
                     args: vec![],
-                }),
-            ])),
-        ]);
-        let result = infer_program(&prog);
-        assert!(result.is_ok(), "enumerate: {:?}", result.err());
-    }
-
-    #[test]
-    fn iterator_zip() {
-        let prog = program(vec![
-            Item::Function(func_ret("make_arr_i32", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_i32".into())), args: vec![] }),
-            ])),
-            Item::Function(func_ret("make_arr_str", Type::Array(Box::new(Type::Named("String".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_str".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "a".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_i32".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "b".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr_str".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "ai".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("a".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "bi".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("b".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("ai".into())),
-                    method: "zip".into(),
-                    args: vec![Expr::Ident("bi".into())],
-                }),
-            ])),
-        ]);
-        let result = infer_program(&prog);
-        assert!(result.is_ok(), "zip: {:?}", result.err());
-    }
-
-    #[test]
-    fn iterator_count() {
-        let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Let {
-                    name: "iter".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::MethodCall {
-                        object: Box::new(Expr::Ident("arr".into())),
-                        method: "iter".into(),
-                        args: vec![],
-                    },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("iter".into())),
-                    method: "count".into(),
-                    args: vec![],
-                }),
-            ])),
-        ]);
-        let result = infer_program(&prog);
-        assert!(result.is_ok(), "count: {:?}", result.err());
-    }
-
-    #[test]
-    fn iterator_take_skip() {
-        for method in &["take", "skip"] {
-            let prog = program(vec![
-                Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                    Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-                ])),
-                Item::Function(func("main", vec![
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
                     Stmt::Let {
-                        name: "arr".into(), ty: None, mutable: false, secret: false,
-                        value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
                         ownership: Ownership::Owned,
                     },
                     Stmt::Let {
-                        name: "iter".into(), ty: None, mutable: false, secret: false,
+                        name: "iter".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
                         value: Expr::MethodCall {
                             object: Box::new(Expr::Ident("arr".into())),
                             method: "iter".into(),
@@ -7445,10 +8897,190 @@ mod coverage_type_checker_tests {
                     },
                     Stmt::Expr(Expr::MethodCall {
                         object: Box::new(Expr::Ident("iter".into())),
-                        method: method.to_string(),
-                        args: vec![Expr::Integer(5)],
+                        method: "enumerate".into(),
+                        args: vec![],
                     }),
-                ])),
+                ],
+            )),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "enumerate: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_zip() {
+        let prog = program(vec![
+            Item::Function(func_ret(
+                "make_arr_i32",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr_i32".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func_ret(
+                "make_arr_str",
+                Type::Array(Box::new(Type::Named("String".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr_str".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "a".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr_i32".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "b".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr_str".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "ai".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("a".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "bi".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("b".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("ai".into())),
+                        method: "zip".into(),
+                        args: vec![Expr::Ident("bi".into())],
+                    }),
+                ],
+            )),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "zip: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_count() {
+        let prog = program(vec![
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Let {
+                        name: "iter".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::MethodCall {
+                            object: Box::new(Expr::Ident("arr".into())),
+                            method: "iter".into(),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("iter".into())),
+                        method: "count".into(),
+                        args: vec![],
+                    }),
+                ],
+            )),
+        ]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "count: {:?}", result.err());
+    }
+
+    #[test]
+    fn iterator_take_skip() {
+        for method in &["take", "skip"] {
+            let prog = program(vec![
+                Item::Function(func_ret(
+                    "make_arr",
+                    Type::Array(Box::new(Type::Named("i32".into()))),
+                    vec![Stmt::Expr(Expr::FnCall {
+                        callee: Box::new(Expr::Ident("make_arr".into())),
+                        args: vec![],
+                    })],
+                )),
+                Item::Function(func(
+                    "main",
+                    vec![
+                        Stmt::Let {
+                            name: "arr".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::FnCall {
+                                callee: Box::new(Expr::Ident("make_arr".into())),
+                                args: vec![],
+                            },
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Let {
+                            name: "iter".into(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: Expr::MethodCall {
+                                object: Box::new(Expr::Ident("arr".into())),
+                                method: "iter".into(),
+                                args: vec![],
+                            },
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Expr(Expr::MethodCall {
+                            object: Box::new(Expr::Ident("iter".into())),
+                            method: method.to_string(),
+                            args: vec![Expr::Integer(5)],
+                        }),
+                    ],
+                )),
             ]);
             let result = infer_program(&prog);
             assert!(result.is_ok(), "{}: {:?}", method, result.err());
@@ -7459,88 +9091,80 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn check_test_block() {
-        let prog = program(vec![
-            Item::Test(TestDef {
-                name: "basic".into(),
-                body: block(vec![Stmt::Expr(Expr::Assert {
-                    condition: Box::new(Expr::Bool(true)),
-                    message: None,
-                })]),
-                span: span(),
-            }),
-        ]);
+        let prog = program(vec![Item::Test(TestDef {
+            name: "basic".into(),
+            body: block(vec![Stmt::Expr(Expr::Assert {
+                condition: Box::new(Expr::Bool(true)),
+                message: None,
+            })]),
+            span: span(),
+        })]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn check_store() {
-        let prog = program(vec![
-            Item::Store(StoreDef {
-                name: "AppStore".into(),
-                signals: vec![StateField {
-                    name: "count".into(),
-                    ty: Some(Type::Named("i32".into())),
-                    mutable: true,
-                    secret: false,
-                    atomic: false,
-                    initializer: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                }],
-                actions: vec![],
-                computed: vec![],
-                effects: vec![],
-                selectors: vec![],
-                is_pub: false,
-                span: span(),
-            }),
-        ]);
+        let prog = program(vec![Item::Store(StoreDef {
+            name: "AppStore".into(),
+            signals: vec![StateField {
+                name: "count".into(),
+                ty: Some(Type::Named("i32".into())),
+                mutable: true,
+                secret: false,
+                atomic: false,
+                initializer: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            }],
+            actions: vec![],
+            computed: vec![],
+            effects: vec![],
+            selectors: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn check_form_methods() {
-        let prog = program(vec![
-            Item::Form(FormDef {
-                name: "LoginForm".into(),
-                fields: vec![],
-                on_submit: None,
-                steps: vec![],
-                methods: vec![func("on_submit", vec![Stmt::Return(None)])],
-                styles: vec![],
-                render: Some(RenderBlock {
-                    body: TemplateNode::Fragment(vec![]),
-                    span: span(),
-                }),
-                is_pub: false,
+        let prog = program(vec![Item::Form(FormDef {
+            name: "LoginForm".into(),
+            fields: vec![],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![func("on_submit", vec![Stmt::Return(None)])],
+            styles: vec![],
+            render: Some(RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
                 span: span(),
             }),
-        ]);
+            is_pub: false,
+            span: span(),
+        })]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
 
     #[test]
     fn check_page_methods() {
-        let prog = program(vec![
-            Item::Page(PageDef {
-                name: "HomePage".into(),
-                props: vec![],
-                meta: None,
-                state: vec![],
-                methods: vec![func("load", vec![Stmt::Return(None)])],
-                styles: vec![],
-                render: RenderBlock {
-                    body: TemplateNode::Fragment(vec![]),
-                    span: span(),
-                },
-                permissions: None,
-                gestures: vec![],
-                is_pub: false,
+        let prog = program(vec![Item::Page(PageDef {
+            name: "HomePage".into(),
+            props: vec![],
+            meta: None,
+            state: vec![],
+            methods: vec![func("load", vec![Stmt::Return(None)])],
+            styles: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
                 span: span(),
-            }),
-        ]);
+            },
+            permissions: None,
+            gestures: vec![],
+            is_pub: false,
+            span: span(),
+        })]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -7579,7 +9203,10 @@ mod coverage_type_checker_tests {
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("does not implement required trait method")));
+        assert!(errs.iter().any(|e| {
+            e.message
+                .contains("does not implement required trait method")
+        }));
     }
 
     #[test]
@@ -7604,7 +9231,10 @@ mod coverage_type_checker_tests {
         let result = infer_program(&prog);
         assert!(result.is_err());
         let errs = result.unwrap_err();
-        assert!(errs.iter().any(|e| e.message.contains("trait") && e.message.contains("not found")));
+        assert!(
+            errs.iter()
+                .any(|e| e.message.contains("trait") && e.message.contains("not found"))
+        );
     }
 
     // ── Must-use warning ────────────────────────────────────────────────
@@ -7625,12 +9255,13 @@ mod coverage_type_checker_tests {
                 must_use: true,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::FnCall {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("important".into())),
                     args: vec![],
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
@@ -7659,12 +9290,13 @@ mod coverage_type_checker_tests {
                 must_use: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::FnCall {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("fallible".into())),
                     args: vec![],
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
@@ -7688,12 +9320,13 @@ mod coverage_type_checker_tests {
                 must_use: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::FnCall {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("maybe".into())),
                     args: vec![],
-                }),
-            ])),
+                })],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_err());
@@ -7707,63 +9340,133 @@ mod coverage_type_checker_tests {
     fn check_various_items_pass_through() {
         // These items have TODO type checking, they should not cause errors
         let prog = program(vec![
-            Item::Use(UsePath { segments: vec!["std".into(), "io".into()], alias: None, glob: false, group: None, span: span() }),
+            Item::Use(UsePath {
+                segments: vec!["std".into(), "io".into()],
+                alias: None,
+                glob: false,
+                group: None,
+                span: span(),
+            }),
             Item::Channel(ChannelDef {
-                name: "Events".into(), url: Expr::StringLit("ws://localhost".into()),
-                provider: None, contract: None, on_message: None, on_connect: None, on_disconnect: None,
-                reconnect: false, heartbeat_interval: None, methods: vec![],
-                is_pub: false, span: span(),
+                name: "Events".into(),
+                url: Expr::StringLit("ws://localhost".into()),
+                provider: None,
+                contract: None,
+                on_message: None,
+                on_connect: None,
+                on_disconnect: None,
+                reconnect: false,
+                heartbeat_interval: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
             }),
             Item::Embed(EmbedDef {
-                name: "Map".into(), src: Expr::StringLit("https://maps.example.com".into()),
-                loading: None, sandbox: true, integrity: None, permissions: None,
-                is_pub: false, span: span(),
+                name: "Map".into(),
+                src: Expr::StringLit("https://maps.example.com".into()),
+                loading: None,
+                sandbox: true,
+                integrity: None,
+                permissions: None,
+                is_pub: false,
+                span: span(),
             }),
             Item::Pdf(PdfDef {
                 name: "Invoice".into(),
-                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
-                page_size: None, orientation: None, margins: None,
-                is_pub: false, span: span(),
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: span(),
+                },
+                page_size: None,
+                orientation: None,
+                margins: None,
+                is_pub: false,
+                span: span(),
             }),
             Item::Payment(PaymentDef {
-                name: "Checkout".into(), provider: None, public_key: None,
-                sandbox_mode: false, on_success: None, on_error: None,
-                methods: vec![], is_pub: false, span: span(),
+                name: "Checkout".into(),
+                provider: None,
+                public_key: None,
+                sandbox_mode: false,
+                on_success: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
             }),
             Item::Auth(AuthDef {
-                name: "Auth".into(), provider: None, providers: vec![], methods: vec![],
-                on_login: None, on_logout: None, on_error: None,
-                session_storage: None, is_pub: false, span: span(),
+                name: "Auth".into(),
+                provider: None,
+                providers: vec![],
+                methods: vec![],
+                on_login: None,
+                on_logout: None,
+                on_error: None,
+                session_storage: None,
+                is_pub: false,
+                span: span(),
             }),
             Item::Upload(UploadDef {
-                name: "Files".into(), endpoint: Expr::StringLit("/up".into()),
-                max_size: None, accept: vec![], chunked: false,
-                on_progress: None, on_complete: None, on_error: None,
-                methods: vec![], is_pub: false, span: span(),
+                name: "Files".into(),
+                endpoint: Expr::StringLit("/up".into()),
+                max_size: None,
+                accept: vec![],
+                chunked: false,
+                on_progress: None,
+                on_complete: None,
+                on_error: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
             }),
             Item::Cache(CacheDef {
-                name: "C".into(), strategy: None, default_ttl: None,
-                persist: false, max_entries: None, queries: vec![],
-                mutations: vec![], is_pub: false, span: span(),
+                name: "C".into(),
+                strategy: None,
+                default_ttl: None,
+                persist: false,
+                max_entries: None,
+                queries: vec![],
+                mutations: vec![],
+                is_pub: false,
+                span: span(),
             }),
             Item::Breakpoints(BreakpointsDef {
-                breakpoints: vec![], span: span(),
+                breakpoints: vec![],
+                span: span(),
             }),
             Item::Theme(ThemeDef {
-                name: "T".into(), light: None, dark: None, dark_auto: false,
-                primary: None, is_pub: false, span: span(),
+                name: "T".into(),
+                light: None,
+                dark: None,
+                dark_auto: false,
+                primary: None,
+                is_pub: false,
+                span: span(),
             }),
             Item::MiniProgram(MiniProgramDef {
-                name: "MP".into(), payment_provider: None, auth_provider: None,
-                map_provider: None, offline: false, cache_strategy: None,
-                on_launch: None, on_show: None, on_hide: None,
-                methods: vec![], is_pub: false, span: span(),
+                name: "MP".into(),
+                payment_provider: None,
+                auth_provider: None,
+                map_provider: None,
+                offline: false,
+                cache_strategy: None,
+                on_launch: None,
+                on_show: None,
+                on_hide: None,
+                methods: vec![],
+                is_pub: false,
+                span: span(),
             }),
             Item::Animation(AnimationBlockDef {
-                name: "A".into(), kind: AnimationKind::Spring {
-                    stiffness: None, damping: None, mass: None, properties: vec![],
+                name: "A".into(),
+                kind: AnimationKind::Spring {
+                    stiffness: None,
+                    damping: None,
+                    mass: None,
+                    properties: vec![],
                 },
-                is_pub: false, span: span(),
+                is_pub: false,
+                span: span(),
             }),
         ]);
         let result = infer_program(&prog);
@@ -7774,25 +9477,59 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn check_component_basic() {
-        let prog = program(vec![
-            Item::Component(Component {
-                name: "Counter".into(),
+        let prog = program(vec![Item::Component(Component {
+            name: "Counter".into(),
+            type_params: vec![],
+            props: vec![],
+            state: vec![StateField {
+                name: "count".into(),
+                ty: Some(Type::Named("i32".into())),
+                mutable: true,
+                secret: false,
+                atomic: false,
+                initializer: Expr::Integer(0),
+                ownership: Ownership::Owned,
+            }],
+            methods: vec![func("increment", vec![Stmt::Return(None)])],
+            styles: vec![],
+            transitions: vec![],
+            trait_bounds: vec![],
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            skeleton: None,
+            error_boundary: None,
+            chunk: None,
+            on_destroy: None,
+            a11y: None,
+            shortcuts: vec![],
+            span: span(),
+        })]);
+        let result = infer_program(&prog);
+        assert!(result.is_ok(), "component: {:?}", result.err());
+    }
+
+    // ── Lazy component ──────────────────────────────────────────────────
+
+    #[test]
+    fn check_lazy_component() {
+        let prog = program(vec![Item::LazyComponent(LazyComponentDef {
+            component: Component {
+                name: "Heavy".into(),
                 type_params: vec![],
                 props: vec![],
-                state: vec![StateField {
-                    name: "count".into(),
-                    ty: Some(Type::Named("i32".into())),
-                    mutable: true,
-                    secret: false,
-                    atomic: false,
-                    initializer: Expr::Integer(0),
-                    ownership: Ownership::Owned,
-                }],
-                methods: vec![func("increment", vec![Stmt::Return(None)])],
+                state: vec![],
+                methods: vec![],
                 styles: vec![],
                 transitions: vec![],
                 trait_bounds: vec![],
-                render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+                render: RenderBlock {
+                    body: TemplateNode::Fragment(vec![]),
+                    span: span(),
+                },
                 permissions: None,
                 gestures: vec![],
                 skeleton: None,
@@ -7802,41 +9539,9 @@ mod coverage_type_checker_tests {
                 a11y: None,
                 shortcuts: vec![],
                 span: span(),
-            }),
-        ]);
-        let result = infer_program(&prog);
-        assert!(result.is_ok(), "component: {:?}", result.err());
-    }
-
-    // ── Lazy component ──────────────────────────────────────────────────
-
-    #[test]
-    fn check_lazy_component() {
-        let prog = program(vec![
-            Item::LazyComponent(LazyComponentDef {
-                component: Component {
-                    name: "Heavy".into(),
-                    type_params: vec![],
-                    props: vec![],
-                    state: vec![],
-                    methods: vec![],
-                    styles: vec![],
-                    transitions: vec![],
-                    trait_bounds: vec![],
-                    render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
-                    permissions: None,
-                    gestures: vec![],
-                    skeleton: None,
-                    error_boundary: None,
-                    chunk: None,
-                    on_destroy: None,
-                    a11y: None,
-                    shortcuts: vec![],
-                    span: span(),
-                },
-                span: span(),
-            }),
-        ]);
+            },
+            span: span(),
+        })]);
         let result = infer_program(&prog);
         assert!(result.is_ok());
     }
@@ -7889,12 +9594,10 @@ mod coverage_type_checker_tests {
                 body: TemplateNode::Element(Element {
                     tag: "div".into(),
                     attributes: vec![],
-                    children: vec![TemplateNode::Expression(Box::new(
-                        Expr::FieldAccess {
-                            object: Box::new(Expr::SelfExpr),
-                            field: "count".into(),
-                        },
-                    ))],
+                    children: vec![TemplateNode::Expression(Box::new(Expr::FieldAccess {
+                        object: Box::new(Expr::SelfExpr),
+                        field: "count".into(),
+                    }))],
                     span: span(),
                 }),
                 span: span(),
@@ -7910,7 +9613,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "component self.field should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "component self.field should type-check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -7929,12 +9636,10 @@ mod coverage_type_checker_tests {
             transitions: vec![],
             trait_bounds: vec![],
             render: RenderBlock {
-                body: TemplateNode::Expression(Box::new(
-                    Expr::FieldAccess {
-                        object: Box::new(Expr::SelfExpr),
-                        field: "name".into(),
-                    },
-                )),
+                body: TemplateNode::Expression(Box::new(Expr::FieldAccess {
+                    object: Box::new(Expr::SelfExpr),
+                    field: "name".into(),
+                })),
                 span: span(),
             },
             permissions: None,
@@ -7948,7 +9653,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "component self.prop should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "component self.prop should type-check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -7973,7 +9682,11 @@ mod coverage_type_checker_tests {
         let mut p = parser::Parser::new(tokens);
         let prog = p.parse_program().unwrap();
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "self.field end-to-end should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "self.field end-to-end should type-check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -7996,7 +9709,11 @@ mod coverage_type_checker_tests {
         let mut p = parser::Parser::new(tokens);
         let prog = p.parse_program().unwrap();
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "mut self field access should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "mut self field access should type-check: {:?}",
+            result.err()
+        );
     }
 
     // ── Integer coercion tests ──────────────────────────────────────────
@@ -8044,7 +9761,10 @@ mod coverage_type_checker_tests {
         let checker = TypeChecker::new();
         let ty = checker.ast_type_to_ty(&Type::Generic {
             name: "Result".to_string(),
-            args: vec![Type::Named("i32".to_string()), Type::Named("String".to_string())],
+            args: vec![
+                Type::Named("i32".to_string()),
+                Type::Named("String".to_string()),
+            ],
         });
         match ty {
             Ty::Result_ { ok, err } => {
@@ -8072,23 +9792,30 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn for_loop_over_reference_array() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "arr".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2)]),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::For {
-                binding: "x".into(),
-                iterator: Box::new(Expr::Borrow(Box::new(Expr::Ident("arr".into())))),
-                body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
-            }),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "arr".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2)]),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Expr(Expr::For {
+                    binding: "x".into(),
+                    iterator: Box::new(Expr::Borrow(Box::new(Expr::Ident("arr".into())))),
+                    body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "For loop over &array should work: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "For loop over &array should work: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8096,11 +9823,14 @@ mod coverage_type_checker_tests {
         let mut checker = TypeChecker::new();
         let mut env = TypeEnv::new();
         env.insert("items".into(), Ty::Iterator(Box::new(Ty::String_)));
-        let ty = checker.infer_expr(&Expr::For {
-            binding: "item".into(),
-            iterator: Box::new(Expr::Ident("items".into())),
-            body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
-        }, &mut env);
+        let ty = checker.infer_expr(
+            &Expr::For {
+                binding: "item".into(),
+                iterator: Box::new(Expr::Ident("items".into())),
+                body: block(vec![Stmt::Expr(Expr::Ident("item".into()))]),
+            },
+            &mut env,
+        );
         assert_eq!(ty, Ty::Unit);
     }
 
@@ -8133,10 +9863,13 @@ mod coverage_type_checker_tests {
     #[test]
     fn infer_namespace_prefix_as_struct() {
         let mut checker = TypeChecker::new();
-        checker.fn_sigs.insert("time::now".into(), Ty::Function {
-            params: vec![],
-            ret: Box::new(Ty::I64),
-        });
+        checker.fn_sigs.insert(
+            "time::now".into(),
+            Ty::Function {
+                params: vec![],
+                ret: Box::new(Ty::I64),
+            },
+        );
         let mut env = TypeEnv::new();
         let ty = checker.infer_expr(&Expr::Ident("time".into()), &mut env);
         assert!(matches!(ty, Ty::Struct(ref n) if n == "time"));
@@ -8149,7 +9882,9 @@ mod coverage_type_checker_tests {
         let mut checker = TypeChecker::new();
         let mut fields = HashMap::new();
         fields.insert("count".to_string(), Ty::I32);
-        checker.structs.insert("Counter".to_string(), StructInfo { fields });
+        checker
+            .structs
+            .insert("Counter".to_string(), StructInfo { fields });
         checker.current_component = Some("Counter".to_string());
         let ty = checker.resolve_field_access(&Ty::SelfType, "count");
         assert_eq!(ty, Ty::I32);
@@ -8159,27 +9894,34 @@ mod coverage_type_checker_tests {
 
     #[test]
     fn match_with_guard_type_checks() {
-        let prog = program(vec![Item::Function(func("main", vec![Stmt::Expr(Expr::Match {
-            subject: Box::new(Expr::Integer(1)),
-            arms: vec![
-                MatchArm {
-                    pattern: Pattern::Ident("n".into()),
-                    guard: Some(Expr::Binary {
-                        op: BinOp::Gt,
-                        left: Box::new(Expr::Ident("n".into())),
-                        right: Box::new(Expr::Integer(0)),
-                    }),
-                    body: Expr::Integer(10),
-                },
-                MatchArm {
-                    pattern: Pattern::Wildcard,
-                    guard: None,
-                    body: Expr::Integer(0),
-                },
-            ],
-        })]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Match {
+                subject: Box::new(Expr::Integer(1)),
+                arms: vec![
+                    MatchArm {
+                        pattern: Pattern::Ident("n".into()),
+                        guard: Some(Expr::Binary {
+                            op: BinOp::Gt,
+                            left: Box::new(Expr::Ident("n".into())),
+                            right: Box::new(Expr::Integer(0)),
+                        }),
+                        body: Expr::Integer(10),
+                    },
+                    MatchArm {
+                        pattern: Pattern::Wildcard,
+                        guard: None,
+                        body: Expr::Integer(0),
+                    },
+                ],
+            })],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Match with guard should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Match with guard should type-check: {:?}",
+            result.err()
+        );
     }
 
     // ── ArrayLit / ObjectLit type inference ──────────────────────────────
@@ -8188,9 +9930,10 @@ mod coverage_type_checker_tests {
     fn infer_array_lit_type() {
         let mut checker = TypeChecker::new();
         let mut env = TypeEnv::new();
-        let ty = checker.infer_expr(&Expr::ArrayLit(vec![
-            Expr::Integer(1), Expr::Integer(2), Expr::Integer(3),
-        ]), &mut env);
+        let ty = checker.infer_expr(
+            &Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2), Expr::Integer(3)]),
+            &mut env,
+        );
         match ty {
             Ty::Array(inner) => assert_eq!(*inner, Ty::I32),
             other => panic!("Expected Array(I32), got {:?}", other),
@@ -8209,12 +9952,15 @@ mod coverage_type_checker_tests {
     fn infer_object_lit_type() {
         let mut checker = TypeChecker::new();
         let mut env = TypeEnv::new();
-        let ty = checker.infer_expr(&Expr::ObjectLit {
-            fields: vec![
-                ("x".into(), Expr::Integer(1)),
-                ("y".into(), Expr::Integer(2)),
-            ],
-        }, &mut env);
+        let ty = checker.infer_expr(
+            &Expr::ObjectLit {
+                fields: vec![
+                    ("x".into(), Expr::Integer(1)),
+                    ("y".into(), Expr::Integer(2)),
+                ],
+            },
+            &mut env,
+        );
         // ObjectLit infers field types and returns a fresh type variable
         assert!(matches!(ty, Ty::Var(_)));
     }
@@ -8231,10 +9977,13 @@ mod coverage_type_checker_tests {
     fn infer_nested_array_lit() {
         let mut checker = TypeChecker::new();
         let mut env = TypeEnv::new();
-        let ty = checker.infer_expr(&Expr::ArrayLit(vec![
-            Expr::ArrayLit(vec![Expr::Integer(1)]),
-            Expr::ArrayLit(vec![Expr::Integer(2)]),
-        ]), &mut env);
+        let ty = checker.infer_expr(
+            &Expr::ArrayLit(vec![
+                Expr::ArrayLit(vec![Expr::Integer(1)]),
+                Expr::ArrayLit(vec![Expr::Integer(2)]),
+            ]),
+            &mut env,
+        );
         match ty {
             Ty::Array(inner) => assert!(matches!(*inner, Ty::Array(_))),
             other => panic!("Expected Array(Array(I32)), got {:?}", other),
@@ -8273,7 +10022,11 @@ mod coverage_type_checker_tests {
     fn unify_i32_i64_succeeds() {
         let mut table = Substitution::new();
         let result = table.unify(&Ty::I32, &Ty::I64);
-        assert!(result.is_ok(), "I32 and I64 should unify via numeric coercion: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "I32 and I64 should unify via numeric coercion: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -8292,12 +10045,18 @@ mod coverage_type_checker_tests {
         let mut checker = TypeChecker::new();
         let mut fields = HashMap::new();
         fields.insert("is_logged_in".to_string(), Ty::Bool);
-        checker.structs.insert("AppAuth".to_string(), StructInfo { fields });
+        checker
+            .structs
+            .insert("AppAuth".to_string(), StructInfo { fields });
         checker.current_component = Some("AppAuth".to_string());
         // Ty::Enum("Self") is what the type checker produces when the user
         // writes `Self` as a bare identifier in an expression.
         let ty = checker.resolve_field_access(&Ty::Enum("Self".to_string()), "is_logged_in");
-        assert_eq!(ty, Ty::Bool, "Enum(\"Self\") should delegate to current component");
+        assert_eq!(
+            ty,
+            Ty::Bool,
+            "Enum(\"Self\") should delegate to current component"
+        );
     }
 
     #[test]
@@ -8307,7 +10066,8 @@ mod coverage_type_checker_tests {
         let ty = checker.resolve_field_access(&Ty::Enum("Self".to_string()), "x");
         assert!(
             matches!(ty, Ty::Error),
-            "Self field access with no current component should produce Ty::Error, got {:?}", ty
+            "Self field access with no current component should produce Ty::Error, got {:?}",
+            ty
         );
     }
 
@@ -8317,7 +10077,9 @@ mod coverage_type_checker_tests {
         let mut checker = TypeChecker::new();
         let mut fields = HashMap::new();
         fields.insert("count".to_string(), Ty::I32);
-        checker.structs.insert("Counter".to_string(), StructInfo { fields });
+        checker
+            .structs
+            .insert("Counter".to_string(), StructInfo { fields });
         checker.current_component = Some("Counter".to_string());
         let ty = checker.resolve_field_access(&Ty::SelfType, "count");
         assert_eq!(ty, Ty::I32);
@@ -8343,7 +10105,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "auth def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "auth def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8360,7 +10126,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "cache def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "cache def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8373,7 +10143,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "db def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "db def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8390,7 +10164,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "payment def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "payment def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8406,7 +10184,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "banking def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "banking def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8424,14 +10206,21 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "map def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "map def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn pdf_def_registers_name_in_structs() {
         let prog = program(vec![Item::Pdf(PdfDef {
             name: "InvoicePdf".into(),
-            render: RenderBlock { body: TemplateNode::Fragment(vec![]), span: span() },
+            render: RenderBlock {
+                body: TemplateNode::Fragment(vec![]),
+                span: span(),
+            },
             page_size: None,
             orientation: None,
             margins: None,
@@ -8439,7 +10228,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "pdf def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "pdf def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8458,7 +10251,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "upload def should not produce errors: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "upload def should not produce errors: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8478,12 +10275,17 @@ mod coverage_type_checker_tests {
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("use_auth", vec![
-                Stmt::Expr(Expr::Ident("AppAuth".into())),
-            ])),
+            Item::Function(func(
+                "use_auth",
+                vec![Stmt::Expr(Expr::Ident("AppAuth".into()))],
+            )),
         ]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "AppAuth ident should resolve after auth registration: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "AppAuth ident should resolve after auth registration: {:?}",
+            result.err()
+        );
     }
 
     // ── Keyword block method type-checking ─────────────────────────────────
@@ -8522,7 +10324,11 @@ mod coverage_type_checker_tests {
         })]);
         // This should succeed (handler body returns i32 as declared)
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "auth with valid method body should pass: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "auth with valid method body should pass: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8554,7 +10360,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "payment with valid handler should pass: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "payment with valid handler should pass: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8594,7 +10404,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "miniprogram with valid lifecycle hook should pass: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "miniprogram with valid lifecycle hook should pass: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8614,7 +10428,11 @@ mod coverage_type_checker_tests {
             span: span(),
         })]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "miniprogram should register as struct name: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "miniprogram should register as struct name: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix 3: Vec<T> unifies with array literals ─────────────────────────
@@ -8629,15 +10447,17 @@ mod coverage_type_checker_tests {
         });
         assert!(
             matches!(ty, Ty::Array(ref inner) if **inner == Ty::I32),
-            "Vec<i32> should map to Array(I32), got {:?}", ty
+            "Vec<i32> should map to Array(I32), got {:?}",
+            ty
         );
     }
 
     #[test]
     fn vec_annotation_unifies_with_array_literal() {
         // `let xs: Vec<i32> = [1, 2, 3];` should type-check without errors.
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "xs".into(),
                 ty: Some(Type::Generic {
                     name: "Vec".into(),
@@ -8645,16 +10465,16 @@ mod coverage_type_checker_tests {
                 }),
                 mutable: false,
                 secret: false,
-                value: Expr::ArrayLit(vec![
-                    Expr::Integer(1),
-                    Expr::Integer(2),
-                    Expr::Integer(3),
-                ]),
+                value: Expr::ArrayLit(vec![Expr::Integer(1), Expr::Integer(2), Expr::Integer(3)]),
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Vec<i32> annotation should unify with array literal: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Vec<i32> annotation should unify with array literal: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8667,7 +10487,8 @@ mod coverage_type_checker_tests {
         });
         assert!(
             matches!(ty, Ty::Array(ref inner) if **inner == Ty::Error),
-            "Vec with no args should map to Array(Error), got {:?}", ty
+            "Vec with no args should map to Array(Error), got {:?}",
+            ty
         );
     }
 
@@ -8676,21 +10497,35 @@ mod coverage_type_checker_tests {
     #[test]
     fn array_len_returns_i32() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("arr".into())),
-                    method: "len".into(),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
                     args: vec![],
-                }),
-            ])),
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "len".into(),
+                        args: vec![],
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "array len: {:?}", result.err());
@@ -8699,21 +10534,35 @@ mod coverage_type_checker_tests {
     #[test]
     fn array_is_empty_returns_bool() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("arr".into())),
-                    method: "is_empty".into(),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
                     args: vec![],
-                }),
-            ])),
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "is_empty".into(),
+                        args: vec![],
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "array is_empty: {:?}", result.err());
@@ -8722,21 +10571,35 @@ mod coverage_type_checker_tests {
     #[test]
     fn array_push_returns_array() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("arr".into())),
-                    method: "push".into(),
-                    args: vec![Expr::Integer(42)],
-                }),
-            ])),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "push".into(),
+                        args: vec![Expr::Integer(42)],
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "array push: {:?}", result.err());
@@ -8745,21 +10608,35 @@ mod coverage_type_checker_tests {
     #[test]
     fn array_contains_returns_bool() {
         let prog = program(vec![
-            Item::Function(func_ret("make_arr", Type::Array(Box::new(Type::Named("i32".into()))), vec![
-                Stmt::Expr(Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] }),
-            ])),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "arr".into(), ty: None, mutable: false, secret: false,
-                    value: Expr::FnCall { callee: Box::new(Expr::Ident("make_arr".into())), args: vec![] },
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(Expr::Ident("arr".into())),
-                    method: "contains".into(),
-                    args: vec![Expr::Integer(7)],
-                }),
-            ])),
+            Item::Function(func_ret(
+                "make_arr",
+                Type::Array(Box::new(Type::Named("i32".into()))),
+                vec![Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("make_arr".into())),
+                    args: vec![],
+                })],
+            )),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "arr".into(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::FnCall {
+                            callee: Box::new(Expr::Ident("make_arr".into())),
+                            args: vec![],
+                        },
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::MethodCall {
+                        object: Box::new(Expr::Ident("arr".into())),
+                        method: "contains".into(),
+                        args: vec![Expr::Integer(7)],
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
         assert!(result.is_ok(), "array contains: {:?}", result.err());
@@ -8776,43 +10653,55 @@ mod coverage_type_checker_tests {
         let result = checker.resolve_field_access(&var, "status");
         assert!(
             matches!(result, Ty::Var(_)),
-            "field access on unresolved var should return fresh var, got {:?}", result
+            "field access on unresolved var should return fresh var, got {:?}",
+            result
         );
-        assert!(checker.errors.is_empty(), "should not emit errors for field access on type var");
+        assert!(
+            checker.errors.is_empty(),
+            "should not emit errors for field access on type var"
+        );
     }
 
     #[test]
     fn field_access_on_fetch_result_no_error() {
         // `let r = fetch("/api"); r.status` — fetch without contract returns a
         // fresh type variable; field access on it must not produce an error.
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "r".into(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: Expr::Fetch {
-                    url: Box::new(Expr::StringLit("/api".into())),
-                    options: None,
-                    contract: None,
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "r".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Fetch {
+                        url: Box::new(Expr::StringLit("/api".into())),
+                        options: None,
+                        contract: None,
+                    },
+                    ownership: Ownership::Owned,
                 },
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::FieldAccess {
-                object: Box::new(Expr::Ident("r".into())),
-                field: "status".into(),
-            }),
-        ]))]);
+                Stmt::Expr(Expr::FieldAccess {
+                    object: Box::new(Expr::Ident("r".into())),
+                    field: "status".into(),
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "field access on fetch result (no contract): {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "field access on fetch result (no contract): {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: spawn block returns the type of its last expression ─────────
 
     #[test]
     fn spawn_block_returns_body_type() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "result".into(),
                 ty: Some(Type::Named("String".into())),
                 mutable: false,
@@ -8822,42 +10711,57 @@ mod coverage_type_checker_tests {
                     span: span(),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "spawn block should return body type: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "spawn block should return body type: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn spawn_block_string_body_assigned_to_string_var() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "x".into(), ty: None, mutable: false, secret: false,
-                value: Expr::StringLit("data".into()),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Let {
-                name: "out".into(),
-                ty: Some(Type::Named("String".into())),
-                mutable: false,
-                secret: false,
-                value: Expr::Spawn {
-                    body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
-                    span: span(),
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "x".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::StringLit("data".into()),
+                    ownership: Ownership::Owned,
                 },
-                ownership: Ownership::Owned,
-            },
-        ]))]);
+                Stmt::Let {
+                    name: "out".into(),
+                    ty: Some(Type::Named("String".into())),
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Spawn {
+                        body: block(vec![Stmt::Expr(Expr::Ident("x".into()))]),
+                        span: span(),
+                    },
+                    ownership: Ownership::Owned,
+                },
+            ],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "spawn block body type propagates to binding: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "spawn block body type propagates to binding: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: trace block returns the type of its last expression ──────────
 
     #[test]
     fn trace_block_returns_body_type() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Let {
                 name: "result".into(),
                 ty: Some(Type::Named("String".into())),
                 mutable: false,
@@ -8868,10 +10772,14 @@ mod coverage_type_checker_tests {
                     span: span(),
                 },
                 ownership: Ownership::Owned,
-            },
-        ]))]);
+            }],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "trace block should return body type: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "trace block should return body type: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: unresolved type variable callee does not error ───────────────
@@ -8880,22 +10788,32 @@ mod coverage_type_checker_tests {
     fn calling_fn_value_held_in_var_no_error() {
         // A closure stored in a variable is callable. The type of the closure
         // is a concrete Ty::Function, so calling it should succeed.
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "f".into(), ty: None, mutable: false, secret: false,
-                value: Expr::Closure {
-                    params: vec![],
-                    body: Box::new(Expr::Integer(42)),
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "f".into(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Closure {
+                        params: vec![],
+                        body: Box::new(Expr::Integer(42)),
+                    },
+                    ownership: Ownership::Owned,
                 },
-                ownership: Ownership::Owned,
-            },
-            Stmt::Expr(Expr::FnCall {
-                callee: Box::new(Expr::Ident("f".into())),
-                args: vec![],
-            }),
-        ]))]);
+                Stmt::Expr(Expr::FnCall {
+                    callee: Box::new(Expr::Ident("f".into())),
+                    args: vec![],
+                }),
+            ],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "calling a closure value should not error: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "calling a closure value should not error: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8912,37 +10830,58 @@ mod coverage_type_checker_tests {
             args: vec![],
         };
         let result_ty = checker.infer_expr(&call_expr, &mut env);
-        assert!(matches!(result_ty, Ty::Var(_)), "call on type var should return fresh var");
-        assert!(checker.errors.is_empty(), "call on type var should not emit errors");
+        assert!(
+            matches!(result_ty, Ty::Var(_)),
+            "call on type var should return fresh var"
+        );
+        assert!(
+            checker.errors.is_empty(),
+            "call on type var should not emit errors"
+        );
     }
 
     // ── Fix: geolocation and sibling hardware namespaces are recognized ────
 
     #[test]
     fn geolocation_namespace_ident_resolves() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Ident("geolocation".into())),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Ident("geolocation".into()))],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "geolocation namespace should resolve: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "geolocation namespace should resolve: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn camera_namespace_ident_resolves() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Ident("camera".into())),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Ident("camera".into()))],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "camera namespace should resolve: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "camera namespace should resolve: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn biometric_namespace_ident_resolves() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Ident("biometric".into())),
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Ident("biometric".into()))],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "biometric namespace should resolve: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "biometric namespace should resolve: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: qualified enum variant access (Enum::Variant) ───────────────
@@ -8954,19 +10893,33 @@ mod coverage_type_checker_tests {
                 name: "Filter".into(),
                 type_params: vec![],
                 variants: vec![
-                    Variant { name: "All".into(), fields: vec![] },
-                    Variant { name: "Active".into(), fields: vec![] },
-                    Variant { name: "Completed".into(), fields: vec![] },
+                    Variant {
+                        name: "All".into(),
+                        fields: vec![],
+                    },
+                    Variant {
+                        name: "Active".into(),
+                        fields: vec![],
+                    },
+                    Variant {
+                        name: "Completed".into(),
+                        fields: vec![],
+                    },
                 ],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::Ident("Filter::All".into())),
-            ])),
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::Ident("Filter::All".into()))],
+            )),
         ]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Filter::All should resolve to enum type: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Filter::All should resolve to enum type: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -8975,23 +10928,31 @@ mod coverage_type_checker_tests {
             Item::Enum(EnumDef {
                 name: "Filter".into(),
                 type_params: vec![],
-                variants: vec![Variant { name: "All".into(), fields: vec![] }],
+                variants: vec![Variant {
+                    name: "All".into(),
+                    fields: vec![],
+                }],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Let {
+            Item::Function(func(
+                "main",
+                vec![Stmt::Let {
                     name: "filter".into(),
                     ty: Some(Type::Named("Filter".into())),
                     mutable: false,
                     secret: false,
                     value: Expr::Ident("Filter::All".into()),
                     ownership: Ownership::Owned,
-                },
-            ])),
+                }],
+            )),
         ]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "let filter: Filter = Filter::All should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "let filter: Filter = Filter::All should type-check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -9001,13 +10962,17 @@ mod coverage_type_checker_tests {
             Item::Enum(EnumDef {
                 name: "Filter".into(),
                 type_params: vec![],
-                variants: vec![Variant { name: "All".into(), fields: vec![] }],
+                variants: vec![Variant {
+                    name: "All".into(),
+                    fields: vec![],
+                }],
                 is_pub: false,
                 span: span(),
             }),
-            Item::Function(func("main", vec![
-                Stmt::Expr(Expr::Ident("Filter::NonExistent".into())),
-            ])),
+            Item::Function(func(
+                "main",
+                vec![Stmt::Expr(Expr::Ident("Filter::NonExistent".into()))],
+            )),
         ]);
         let _result = infer_program(&prog);
     }
@@ -9017,52 +10982,67 @@ mod coverage_type_checker_tests {
     #[test]
     fn secret_value_passes_to_non_secret_param() {
         let prog = program(vec![
-            Item::Function(func_with_params("accept",
+            Item::Function(func_with_params(
+                "accept",
                 vec![param("x", Type::Named("String".into()))],
                 None,
                 vec![],
             )),
-            Item::Function(func("main", vec![
-                Stmt::Let {
-                    name: "v".into(),
-                    ty: Some(Type::Named("String".into())),
-                    mutable: false,
-                    secret: true,
-                    value: Expr::StringLit("secret".into()),
-                    ownership: Ownership::Owned,
-                },
-                Stmt::Expr(Expr::FnCall {
-                    callee: Box::new(Expr::Ident("accept".into())),
-                    args: vec![Expr::Ident("v".into())],
-                }),
-            ])),
+            Item::Function(func(
+                "main",
+                vec![
+                    Stmt::Let {
+                        name: "v".into(),
+                        ty: Some(Type::Named("String".into())),
+                        mutable: false,
+                        secret: true,
+                        value: Expr::StringLit("secret".into()),
+                        ownership: Ownership::Owned,
+                    },
+                    Stmt::Expr(Expr::FnCall {
+                        callee: Box::new(Expr::Ident("accept".into())),
+                        args: vec![Expr::Ident("v".into())],
+                    }),
+                ],
+            )),
         ]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "secret String should satisfy String param: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "secret String should satisfy String param: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn two_secret_types_unify() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Let {
-                name: "a".into(),
-                ty: Some(Type::Named("String".into())),
-                mutable: false,
-                secret: true,
-                value: Expr::StringLit("sec".into()),
-                ownership: Ownership::Owned,
-            },
-            Stmt::Let {
-                name: "b".into(),
-                ty: Some(Type::Named("String".into())),
-                mutable: false,
-                secret: true,
-                value: Expr::Ident("a".into()),
-                ownership: Ownership::Owned,
-            },
-        ]))]);
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![
+                Stmt::Let {
+                    name: "a".into(),
+                    ty: Some(Type::Named("String".into())),
+                    mutable: false,
+                    secret: true,
+                    value: Expr::StringLit("sec".into()),
+                    ownership: Ownership::Owned,
+                },
+                Stmt::Let {
+                    name: "b".into(),
+                    ty: Some(Type::Named("String".into())),
+                    mutable: false,
+                    secret: true,
+                    value: Expr::Ident("a".into()),
+                    ownership: Ownership::Owned,
+                },
+            ],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "two secret Strings should unify: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "two secret Strings should unify: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: iterator closure with reference params ───────────────────────
@@ -9087,7 +11067,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "filter with &T param over T iterator: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "filter with &T param over T iterator: {:?}",
+            result.err()
+        );
     }
 
     /// map(fn(p: &T)) over Iterator<T> should also work.
@@ -9107,7 +11091,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "map with &T param over T iterator: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "map with &T param over T iterator: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: Iterator<T> and &[T] unification ────────────────────────────
@@ -9128,7 +11116,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Iterator<T> should unify with [&T]: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Iterator<T> should unify with [&T]: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: sha256 and haptic as top-level callable functions ───────────
@@ -9147,7 +11139,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "sha256 should be callable without namespace: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "sha256 should be callable without namespace: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -9164,7 +11160,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "haptic should be callable as a function: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "haptic should be callable as a function: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: match arm variant pattern bindings ───────────────────────────
@@ -9190,7 +11190,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "variant pattern bindings should resolve: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "variant pattern bindings should resolve: {:?}",
+            result.err()
+        );
     }
 
     /// Result::Ok and Result::Err used in match patterns should bind the
@@ -9212,7 +11216,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Result variant pattern should bind inner: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Result variant pattern should bind inner: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: enum/struct constructor calls type-check ────────────────────
@@ -9233,7 +11241,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Result::Ok constructor should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Result::Ok constructor should type-check: {:?}",
+            result.err()
+        );
     }
 
     // ── Fix: impl method self-param detection ─────────────────────────────
@@ -9261,7 +11273,11 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "impl method &self param should be skipped in arg count: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "impl method &self param should be skipped in arg count: {:?}",
+            result.err()
+        );
     }
 
     /// Methods with no params (only &self) should be callable with no args.
@@ -9286,19 +11302,28 @@ mod coverage_type_checker_tests {
         let (prog, errs) = parser::parse(tokens);
         assert!(errs.is_empty(), "parse errors: {:?}", errs);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "zero-arg impl method with &self should work: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "zero-arg impl method with &self should work: {:?}",
+            result.err()
+        );
     }
 
     #[test]
     fn infer_range_expr() {
-        let prog = program(vec![Item::Function(func("main", vec![
-            Stmt::Expr(Expr::Range {
+        let prog = program(vec![Item::Function(func(
+            "main",
+            vec![Stmt::Expr(Expr::Range {
                 start: Box::new(Expr::Integer(0)),
                 end: Box::new(Expr::Integer(10)),
-            }),
-        ]))]);
+            })],
+        ))]);
         let result = infer_program(&prog);
-        assert!(result.is_ok(), "Range expression should type-check: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Range expression should type-check: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -9306,25 +11331,33 @@ mod coverage_type_checker_tests {
         use crate::ast::*;
         use crate::token::Span;
         let mut checker = TypeChecker::new();
-        let span = Span { start: 0, end: 0, line: 1, col: 1 };
-        let children = vec![
-            TemplateNode::Element(Element {
-                tag: "div".to_string(),
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        };
+        let children = vec![TemplateNode::Element(Element {
+            tag: "div".to_string(),
+            attributes: vec![],
+            children: vec![TemplateNode::Element(Element {
+                tag: "input".to_string(),
                 attributes: vec![],
-                children: vec![
-                    TemplateNode::Element(Element {
-                        tag: "input".to_string(),
-                        attributes: vec![],
-                        children: vec![],
-                        span,
-                    }),
-                ],
+                children: vec![],
                 span,
-            }),
-        ];
+            })],
+            span,
+        })];
         checker.check_inplace_safety(&children, span);
-        assert!(!checker.errors.is_empty(), "Should reject <input> in inplace for-loop");
-        assert!(checker.errors[0].message.contains("input"), "Error should mention input: {}", checker.errors[0].message);
+        assert!(
+            !checker.errors.is_empty(),
+            "Should reject <input> in inplace for-loop"
+        );
+        assert!(
+            checker.errors[0].message.contains("input"),
+            "Error should mention input: {}",
+            checker.errors[0].message
+        );
     }
 
     #[test]
@@ -9332,17 +11365,23 @@ mod coverage_type_checker_tests {
         use crate::ast::*;
         use crate::token::Span;
         let mut checker = TypeChecker::new();
-        let span = Span { start: 0, end: 0, line: 1, col: 1 };
-        let children = vec![
-            TemplateNode::Element(Element {
-                tag: "textarea".to_string(),
-                attributes: vec![],
-                children: vec![],
-                span,
-            }),
-        ];
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        };
+        let children = vec![TemplateNode::Element(Element {
+            tag: "textarea".to_string(),
+            attributes: vec![],
+            children: vec![],
+            span,
+        })];
         checker.check_inplace_safety(&children, span);
-        assert!(!checker.errors.is_empty(), "Should reject <textarea> in inplace for-loop");
+        assert!(
+            !checker.errors.is_empty(),
+            "Should reject <textarea> in inplace for-loop"
+        );
     }
 
     #[test]
@@ -9350,19 +11389,26 @@ mod coverage_type_checker_tests {
         use crate::ast::*;
         use crate::token::Span;
         let mut checker = TypeChecker::new();
-        let span = Span { start: 0, end: 0, line: 1, col: 1 };
-        let children = vec![
-            TemplateNode::Element(Element {
-                tag: "div".to_string(),
-                attributes: vec![
-                    Attribute::Static { name: "contenteditable".to_string(), value: "true".to_string() },
-                ],
-                children: vec![],
-                span,
-            }),
-        ];
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        };
+        let children = vec![TemplateNode::Element(Element {
+            tag: "div".to_string(),
+            attributes: vec![Attribute::Static {
+                name: "contenteditable".to_string(),
+                value: "true".to_string(),
+            }],
+            children: vec![],
+            span,
+        })];
         checker.check_inplace_safety(&children, span);
-        assert!(!checker.errors.is_empty(), "Should reject contenteditable in inplace for-loop");
+        assert!(
+            !checker.errors.is_empty(),
+            "Should reject contenteditable in inplace for-loop"
+        );
     }
 
     #[test]
@@ -9370,38 +11416,46 @@ mod coverage_type_checker_tests {
         use crate::ast::*;
         use crate::token::Span;
         let mut checker = TypeChecker::new();
-        let span = Span { start: 0, end: 0, line: 1, col: 1 };
-        let children = vec![
-            TemplateNode::Element(Element {
-                tag: "div".to_string(),
-                attributes: vec![
-                    Attribute::Static { name: "class".to_string(), value: "card".to_string() },
-                ],
-                children: vec![
-                    TemplateNode::Element(Element {
-                        tag: "p".to_string(),
-                        attributes: vec![],
-                        children: vec![TemplateNode::TextLiteral("Product Name".to_string())],
-                        span,
-                    }),
-                    TemplateNode::Element(Element {
-                        tag: "span".to_string(),
-                        attributes: vec![],
-                        children: vec![TemplateNode::TextLiteral("$19.99".to_string())],
-                        span,
-                    }),
-                    TemplateNode::Element(Element {
-                        tag: "button".to_string(),
-                        attributes: vec![],
-                        children: vec![TemplateNode::TextLiteral("Add to Cart".to_string())],
-                        span,
-                    }),
-                ],
-                span,
-            }),
-        ];
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        };
+        let children = vec![TemplateNode::Element(Element {
+            tag: "div".to_string(),
+            attributes: vec![Attribute::Static {
+                name: "class".to_string(),
+                value: "card".to_string(),
+            }],
+            children: vec![
+                TemplateNode::Element(Element {
+                    tag: "p".to_string(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::TextLiteral("Product Name".to_string())],
+                    span,
+                }),
+                TemplateNode::Element(Element {
+                    tag: "span".to_string(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::TextLiteral("$19.99".to_string())],
+                    span,
+                }),
+                TemplateNode::Element(Element {
+                    tag: "button".to_string(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::TextLiteral("Add to Cart".to_string())],
+                    span,
+                }),
+            ],
+            span,
+        })];
         checker.check_inplace_safety(&children, span);
-        assert!(checker.errors.is_empty(), "Read-only card should be accepted: {:?}", checker.errors);
+        assert!(
+            checker.errors.is_empty(),
+            "Read-only card should be accepted: {:?}",
+            checker.errors
+        );
     }
 
     #[test]
@@ -9409,45 +11463,45 @@ mod coverage_type_checker_tests {
         use crate::ast::*;
         use crate::token::Span;
         let mut checker = TypeChecker::new();
-        let span = Span { start: 0, end: 0, line: 1, col: 1 };
-        let children = vec![
-            TemplateNode::Element(Element {
+        let span = Span {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        };
+        let children = vec![TemplateNode::Element(Element {
+            tag: "div".to_string(),
+            attributes: vec![],
+            children: vec![TemplateNode::Element(Element {
                 tag: "div".to_string(),
                 attributes: vec![],
-                children: vec![
-                    TemplateNode::Element(Element {
-                        tag: "div".to_string(),
+                children: vec![TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![TemplateNode::Element(Element {
+                        tag: "select".to_string(),
                         attributes: vec![],
-                        children: vec![
-                            TemplateNode::Element(Element {
-                                tag: "div".to_string(),
-                                attributes: vec![],
-                                children: vec![
-                                    TemplateNode::Element(Element {
-                                        tag: "select".to_string(),
-                                        attributes: vec![],
-                                        children: vec![],
-                                        span,
-                                    }),
-                                ],
-                                span,
-                            }),
-                        ],
+                        children: vec![],
                         span,
-                    }),
-                ],
+                    })],
+                    span,
+                })],
                 span,
-            }),
-        ];
+            })],
+            span,
+        })];
         checker.check_inplace_safety(&children, span);
-        assert!(!checker.errors.is_empty(), "Should reject deeply nested <select> in inplace for-loop");
+        assert!(
+            !checker.errors.is_empty(),
+            "Should reject deeply nested <select> in inplace for-loop"
+        );
     }
 
     #[test]
     fn keyword_block_type_checks_agent_methods() {
         // Agent with a method that has a type error should be caught.
-        use crate::parser::Parser;
         use crate::lexer::Lexer;
+        use crate::parser::Parser;
 
         let src = r#"
             agent Helper {
@@ -9469,8 +11523,8 @@ mod coverage_type_checker_tests {
     #[test]
     fn keyword_block_type_checks_payment_methods() {
         // Verify payment method bodies are type-checked
-        use crate::parser::Parser;
         use crate::lexer::Lexer;
+        use crate::parser::Parser;
 
         let src = r#"
             payment Stripe {

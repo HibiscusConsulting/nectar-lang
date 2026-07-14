@@ -90,7 +90,11 @@ fn eliminate_in_block(block: &mut Block, stats: &mut DceStats) {
     }
 
     // Find first return statement and truncate after it
-    if let Some(pos) = block.stmts.iter().position(|s| matches!(s, Stmt::Return(_))) {
+    if let Some(pos) = block
+        .stmts
+        .iter()
+        .position(|s| matches!(s, Stmt::Return(_)))
+    {
         let removed = block.stmts.len() - (pos + 1);
         if removed > 0 {
             block.stmts.truncate(pos + 1);
@@ -127,7 +131,12 @@ fn eliminate_in_stmt(stmt: &mut Stmt, stats: &mut DceStats) {
 
 fn eliminate_in_expr(expr: &mut Expr, stats: &mut DceStats) {
     match expr {
-        Expr::If { condition, then_block, else_block, .. } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
             eliminate_in_expr(condition, stats);
             eliminate_in_block(then_block, stats);
             if let Some(eb) = else_block {
@@ -139,7 +148,9 @@ fn eliminate_in_expr(expr: &mut Expr, stats: &mut DceStats) {
             eliminate_in_expr(iterator, stats);
             eliminate_in_block(body, stats);
         }
-        Expr::While { condition, body, .. } => {
+        Expr::While {
+            condition, body, ..
+        } => {
             eliminate_in_expr(condition, stats);
             eliminate_in_block(body, stats);
         }
@@ -195,7 +206,9 @@ fn collect_references_in_stmt(stmt: &Stmt, refs: &mut HashSet<String>) {
 
 fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
     match expr {
-        Expr::Ident(name) => { refs.insert(name.clone()); }
+        Expr::Ident(name) => {
+            refs.insert(name.clone());
+        }
         Expr::Binary { left, right, .. } => {
             collect_references_in_expr(left, refs);
             collect_references_in_expr(right, refs);
@@ -203,34 +216,55 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
         Expr::Unary { operand, .. } => collect_references_in_expr(operand, refs),
         Expr::FnCall { callee, args, .. } => {
             collect_references_in_expr(callee, refs);
-            for arg in args { collect_references_in_expr(arg, refs); }
+            for arg in args {
+                collect_references_in_expr(arg, refs);
+            }
         }
         Expr::MethodCall { object, args, .. } => {
             collect_references_in_expr(object, refs);
-            for arg in args { collect_references_in_expr(arg, refs); }
+            for arg in args {
+                collect_references_in_expr(arg, refs);
+            }
         }
         Expr::FieldAccess { object, .. } => collect_references_in_expr(object, refs),
         Expr::Index { object, index, .. } => {
             collect_references_in_expr(object, refs);
             collect_references_in_expr(index, refs);
         }
-        Expr::If { condition, then_block, else_block, .. } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+            ..
+        } => {
             collect_references_in_expr(condition, refs);
-            for s in &then_block.stmts { collect_references_in_stmt(s, refs); }
+            for s in &then_block.stmts {
+                collect_references_in_stmt(s, refs);
+            }
             if let Some(eb) = else_block {
-                for s in &eb.stmts { collect_references_in_stmt(s, refs); }
+                for s in &eb.stmts {
+                    collect_references_in_stmt(s, refs);
+                }
             }
         }
         Expr::Block(block) => {
-            for s in &block.stmts { collect_references_in_stmt(s, refs); }
+            for s in &block.stmts {
+                collect_references_in_stmt(s, refs);
+            }
         }
         Expr::For { iterator, body, .. } => {
             collect_references_in_expr(iterator, refs);
-            for s in &body.stmts { collect_references_in_stmt(s, refs); }
+            for s in &body.stmts {
+                collect_references_in_stmt(s, refs);
+            }
         }
-        Expr::While { condition, body, .. } => {
+        Expr::While {
+            condition, body, ..
+        } => {
             collect_references_in_expr(condition, refs);
-            for s in &body.stmts { collect_references_in_stmt(s, refs); }
+            for s in &body.stmts {
+                collect_references_in_stmt(s, refs);
+            }
         }
         Expr::Assign { target, value, .. } => {
             collect_references_in_expr(target, refs);
@@ -238,7 +272,9 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
         }
         Expr::Closure { body, .. } => collect_references_in_expr(body, refs),
         Expr::StructInit { fields, .. } => {
-            for (_, v) in fields { collect_references_in_expr(v, refs); }
+            for (_, v) in fields {
+                collect_references_in_expr(v, refs);
+            }
         }
         Expr::Match { subject, arms, .. } => {
             collect_references_in_expr(subject, refs);
@@ -250,18 +286,27 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
             }
         }
         Expr::ArrayLit(elements) => {
-            for e in elements { collect_references_in_expr(e, refs); }
+            for e in elements {
+                collect_references_in_expr(e, refs);
+            }
         }
         Expr::ObjectLit { fields } => {
-            for (_, v) in fields { collect_references_in_expr(v, refs); }
+            for (_, v) in fields {
+                collect_references_in_expr(v, refs);
+            }
         }
-        Expr::Borrow(e) | Expr::BorrowMut(e) | Expr::Await(e)
-        | Expr::Stream { source: e } | Expr::Navigate { path: e }
+        Expr::Borrow(e)
+        | Expr::BorrowMut(e)
+        | Expr::Await(e)
+        | Expr::Stream { source: e }
+        | Expr::Navigate { path: e }
         | Expr::Receive { channel: e } => {
             collect_references_in_expr(e, refs);
         }
         Expr::Spawn { body, .. } => {
-            for s in &body.stmts { collect_references_in_stmt(s, refs); }
+            for s in &body.stmts {
+                collect_references_in_stmt(s, refs);
+            }
         }
         Expr::Send { channel, value } => {
             collect_references_in_expr(channel, refs);
@@ -271,26 +316,36 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
             collect_references_in_expr(fallback, refs);
             collect_references_in_expr(body, refs);
         }
-        Expr::TryCatch { body, catch_body, .. } => {
+        Expr::TryCatch {
+            body, catch_body, ..
+        } => {
             collect_references_in_expr(body, refs);
             collect_references_in_expr(catch_body, refs);
         }
         Expr::Fetch { url, options, .. } => {
             collect_references_in_expr(url, refs);
-            if let Some(opts) = options { collect_references_in_expr(opts, refs); }
+            if let Some(opts) = options {
+                collect_references_in_expr(opts, refs);
+            }
         }
         Expr::Parallel { tasks, .. } => {
-            for e in tasks { collect_references_in_expr(e, refs); }
+            for e in tasks {
+                collect_references_in_expr(e, refs);
+            }
         }
         Expr::PromptTemplate { interpolations, .. } => {
-            for (_, e) in interpolations { collect_references_in_expr(e, refs); }
+            for (_, e) in interpolations {
+                collect_references_in_expr(e, refs);
+            }
         }
         Expr::Env { name, .. } => {
             collect_references_in_expr(name, refs);
         }
         Expr::Trace { label, body, .. } => {
             collect_references_in_expr(label, refs);
-            for s in &body.stmts { collect_references_in_stmt(s, refs); }
+            for s in &body.stmts {
+                collect_references_in_stmt(s, refs);
+            }
         }
         Expr::Flag { name, .. } => {
             collect_references_in_expr(name, refs);
@@ -302,8 +357,12 @@ fn collect_references_in_expr(expr: &Expr, refs: &mut HashSet<String>) {
 /// Check if an expression is pure (has no side effects).
 fn is_pure(expr: &Expr) -> bool {
     match expr {
-        Expr::Integer(_) | Expr::Float(_) | Expr::StringLit(_)
-        | Expr::Bool(_) | Expr::Ident(_) | Expr::SelfExpr => true,
+        Expr::Integer(_)
+        | Expr::Float(_)
+        | Expr::StringLit(_)
+        | Expr::Bool(_)
+        | Expr::Ident(_)
+        | Expr::SelfExpr => true,
         Expr::Binary { left, right, .. } => is_pure(left) && is_pure(right),
         Expr::Unary { operand, .. } => is_pure(operand),
         Expr::StructInit { fields, .. } => fields.iter().all(|(_, v)| is_pure(v)),
@@ -342,37 +401,53 @@ fn remove_unused_functions(program: &mut Program, stats: &mut DceStats) {
 fn collect_called_functions_in_item(item: &Item, called: &mut HashSet<String>) {
     match item {
         Item::Function(f) => {
-            for s in &f.body.stmts { collect_references_in_stmt(s, called); }
+            for s in &f.body.stmts {
+                collect_references_in_stmt(s, called);
+            }
         }
         Item::Component(c) => {
             for method in &c.methods {
-                for s in &method.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &method.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
             // Mark component name as used
             called.insert(c.name.clone());
         }
         Item::Impl(imp) => {
             for method in &imp.methods {
-                for s in &method.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &method.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
         }
         Item::Store(store) => {
             for action in &store.actions {
-                for s in &action.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &action.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
             for computed in &store.computed {
-                for s in &computed.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &computed.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
             for effect in &store.effects {
-                for s in &effect.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &effect.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
         }
         Item::Agent(agent) => {
             for method in &agent.methods {
-                for s in &method.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &method.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
             for tool in &agent.tools {
-                for s in &tool.body.stmts { collect_references_in_stmt(s, called); }
+                for s in &tool.body.stmts {
+                    collect_references_in_stmt(s, called);
+                }
             }
         }
         Item::Router(router) => {
@@ -393,7 +468,12 @@ mod tests {
     use crate::token::Span;
 
     fn dummy_span() -> Span {
-        Span { start: 0, end: 0, line: 0, col: 0 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            col: 0,
+        }
     }
 
     fn make_fn(name: &str, is_pub: bool, stmts: Vec<Stmt>) -> Item {
@@ -404,7 +484,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub,
             is_async: false,
             must_use: false,
@@ -416,8 +499,8 @@ mod tests {
     fn test_remove_after_return() {
         let stmts = vec![
             Stmt::Return(Some(Expr::Integer(42))),
-            Stmt::Expr(Expr::Integer(99)),   // dead
-            Stmt::Expr(Expr::Integer(100)),  // dead
+            Stmt::Expr(Expr::Integer(99)),  // dead
+            Stmt::Expr(Expr::Integer(100)), // dead
         ];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
@@ -467,12 +550,14 @@ mod tests {
     #[test]
     fn test_remove_unused_private_function() {
         let items = vec![
-            make_fn("main", true, vec![
-                Stmt::Expr(Expr::FnCall {
+            make_fn(
+                "main",
+                true,
+                vec![Stmt::Expr(Expr::FnCall {
                     callee: Box::new(Expr::Ident("helper".to_string())),
                     args: vec![],
-                }),
-            ]),
+                })],
+            ),
             make_fn("helper", false, vec![Stmt::Return(Some(Expr::Integer(1)))]),
             make_fn("unused", false, vec![Stmt::Return(Some(Expr::Integer(2)))]),
         ];
@@ -482,12 +567,14 @@ mod tests {
 
         // `unused` should be removed, `helper` and `main` kept
         assert_eq!(program.items.len(), 2);
-        let names: Vec<_> = program.items.iter().map(|item| {
-            match item {
+        let names: Vec<_> = program
+            .items
+            .iter()
+            .map(|item| match item {
                 Item::Function(f) => f.name.as_str(),
                 _ => "",
-            }
-        }).collect();
+            })
+            .collect();
         assert!(names.contains(&"main"));
         assert!(names.contains(&"helper"));
         assert!(!names.contains(&"unused"));
@@ -555,19 +642,17 @@ mod tests {
 
     #[test]
     fn test_remove_after_return_in_nested_if() {
-        let stmts = vec![
-            Stmt::Expr(Expr::If {
-                condition: Box::new(Expr::Bool(true)),
-                then_block: Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Integer(1))),
-                        Stmt::Expr(Expr::Integer(99)), // dead
-                    ],
-                    span: dummy_span(),
-                },
-                else_block: None,
-            }),
-        ];
+        let stmts = vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Bool(true)),
+            then_block: Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
+            },
+            else_block: None,
+        })];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -578,22 +663,20 @@ mod tests {
 
     #[test]
     fn test_remove_after_return_in_else_block() {
-        let stmts = vec![
-            Stmt::Expr(Expr::If {
-                condition: Box::new(Expr::Ident("x".to_string())),
-                then_block: Block {
-                    stmts: vec![Stmt::Expr(Expr::Integer(1))],
-                    span: dummy_span(),
-                },
-                else_block: Some(Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Integer(2))),
-                        Stmt::Expr(Expr::Integer(99)), // dead
-                    ],
-                    span: dummy_span(),
-                }),
+        let stmts = vec![Stmt::Expr(Expr::If {
+            condition: Box::new(Expr::Ident("x".to_string())),
+            then_block: Block {
+                stmts: vec![Stmt::Expr(Expr::Integer(1))],
+                span: dummy_span(),
+            },
+            else_block: Some(Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(2))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
             }),
-        ];
+        })];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -604,19 +687,17 @@ mod tests {
 
     #[test]
     fn test_dead_code_in_for_loop() {
-        let stmts = vec![
-            Stmt::Expr(Expr::For {
-                binding: "i".to_string(),
-                iterator: Box::new(Expr::Ident("items".to_string())),
-                body: Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Integer(1))),
-                        Stmt::Expr(Expr::Integer(99)), // dead
-                    ],
-                    span: dummy_span(),
-                },
-            }),
-        ];
+        let stmts = vec![Stmt::Expr(Expr::For {
+            binding: "i".to_string(),
+            iterator: Box::new(Expr::Ident("items".to_string())),
+            body: Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
+            },
+        })];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -627,18 +708,16 @@ mod tests {
 
     #[test]
     fn test_dead_code_in_while_loop() {
-        let stmts = vec![
-            Stmt::Expr(Expr::While {
-                condition: Box::new(Expr::Bool(true)),
-                body: Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Integer(1))),
-                        Stmt::Expr(Expr::Integer(99)), // dead
-                    ],
-                    span: dummy_span(),
-                },
-            }),
-        ];
+        let stmts = vec![Stmt::Expr(Expr::While {
+            condition: Box::new(Expr::Bool(true)),
+            body: Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
+            },
+        })];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -649,18 +728,16 @@ mod tests {
 
     #[test]
     fn test_dead_code_in_closure() {
-        let stmts = vec![
-            Stmt::Expr(Expr::Closure {
-                params: vec![],
-                body: Box::new(Expr::Block(Block {
-                    stmts: vec![
-                        Stmt::Return(Some(Expr::Integer(1))),
-                        Stmt::Expr(Expr::Integer(99)), // dead
-                    ],
-                    span: dummy_span(),
-                })),
-            }),
-        ];
+        let stmts = vec![Stmt::Expr(Expr::Closure {
+            params: vec![],
+            body: Box::new(Expr::Block(Block {
+                stmts: vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+                span: dummy_span(),
+            })),
+        })];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -908,7 +985,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -922,7 +1002,8 @@ mod tests {
             name: "S".to_string(),
             signals: vec![],
             actions: vec![ActionDef {
-                name: "inc".to_string(), params: vec![],
+                name: "inc".to_string(),
+                params: vec![],
                 body: Block {
                     stmts: vec![
                         Stmt::Return(Some(Expr::Integer(1))),
@@ -930,10 +1011,12 @@ mod tests {
                     ],
                     span: dummy_span(),
                 },
-                is_async: false, span: dummy_span(),
+                is_async: false,
+                span: dummy_span(),
             }],
             computed: vec![ComputedDef {
-                name: "dbl".to_string(), return_type: None,
+                name: "dbl".to_string(),
+                return_type: None,
                 body: Block {
                     stmts: vec![
                         Stmt::Return(Some(Expr::Integer(2))),
@@ -955,7 +1038,8 @@ mod tests {
                 span: dummy_span(),
             }],
             selectors: vec![],
-            is_pub: false, span: dummy_span(),
+            is_pub: false,
+            span: dummy_span(),
         })];
         let mut program = Program { items };
         let mut stats = DceStats::default();
@@ -971,7 +1055,9 @@ mod tests {
             name: "Bot".to_string(),
             system_prompt: None,
             tools: vec![ToolDef {
-                name: "search".to_string(), description: None, params: vec![],
+                name: "search".to_string(),
+                description: None,
+                params: vec![],
                 return_type: None,
                 body: Block {
                     stmts: vec![
@@ -983,11 +1069,15 @@ mod tests {
                 span: dummy_span(),
             }],
             state: vec![],
-            methods: vec![make_method("go", vec![
-                Stmt::Return(Some(Expr::Integer(2))),
-                Stmt::Expr(Expr::Integer(99)), // dead
-            ])],
-            render: None, span: dummy_span(),
+            methods: vec![make_method(
+                "go",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(2))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+            )],
+            render: None,
+            span: dummy_span(),
         })];
         let mut program = Program { items };
         let mut stats = DceStats::default();
@@ -1000,18 +1090,26 @@ mod tests {
     #[test]
     fn test_dce_inside_page() {
         let items = vec![Item::Page(PageDef {
-            name: "Home".to_string(), props: vec![], meta: None, state: vec![],
-            methods: vec![make_method("init", vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(99)), // dead
-            ])],
+            name: "Home".to_string(),
+            props: vec![],
+            meta: None,
+            state: vec![],
+            methods: vec![make_method(
+                "init",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+            )],
             styles: vec![],
             render: RenderBlock {
                 body: TemplateNode::Fragment(vec![]),
                 span: dummy_span(),
             },
-            permissions: None, gestures: vec![],
-            is_pub: false, span: dummy_span(),
+            permissions: None,
+            gestures: vec![],
+            is_pub: false,
+            span: dummy_span(),
         })];
         let mut program = Program { items };
         let mut stats = DceStats::default();
@@ -1024,12 +1122,21 @@ mod tests {
     #[test]
     fn test_dce_inside_form() {
         let items = vec![Item::Form(FormDef {
-            name: "F".to_string(), fields: vec![], on_submit: None, steps: vec![],
-            methods: vec![make_method("submit", vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(99)), // dead
-            ])],
-            styles: vec![], render: None, is_pub: false, span: dummy_span(),
+            name: "F".to_string(),
+            fields: vec![],
+            on_submit: None,
+            steps: vec![],
+            methods: vec![make_method(
+                "submit",
+                vec![
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead
+                ],
+            )],
+            styles: vec![],
+            render: None,
+            is_pub: false,
+            span: dummy_span(),
         })];
         let mut program = Program { items };
         let mut stats = DceStats::default();
@@ -1042,11 +1149,14 @@ mod tests {
     #[test]
     fn test_collect_refs_binary() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Binary {
-            op: BinOp::Add,
-            left: Box::new(Expr::Ident("a".to_string())),
-            right: Box::new(Expr::Ident("b".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Binary {
+                op: BinOp::Add,
+                left: Box::new(Expr::Ident("a".to_string())),
+                right: Box::new(Expr::Ident("b".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("a"));
         assert!(refs.contains("b"));
     }
@@ -1054,21 +1164,27 @@ mod tests {
     #[test]
     fn test_collect_refs_unary() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Unary {
-            op: UnaryOp::Neg,
-            operand: Box::new(Expr::Ident("x".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(Expr::Ident("x".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("x"));
     }
 
     #[test]
     fn test_collect_refs_method_call() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::MethodCall {
-            object: Box::new(Expr::Ident("obj".to_string())),
-            method: "m".to_string(),
-            args: vec![Expr::Ident("arg".to_string())],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::MethodCall {
+                object: Box::new(Expr::Ident("obj".to_string())),
+                method: "m".to_string(),
+                args: vec![Expr::Ident("arg".to_string())],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("obj"));
         assert!(refs.contains("arg"));
     }
@@ -1076,20 +1192,26 @@ mod tests {
     #[test]
     fn test_collect_refs_field_access() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::FieldAccess {
-            object: Box::new(Expr::Ident("x".to_string())),
-            field: "f".to_string(),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::FieldAccess {
+                object: Box::new(Expr::Ident("x".to_string())),
+                field: "f".to_string(),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("x"));
     }
 
     #[test]
     fn test_collect_refs_index() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Index {
-            object: Box::new(Expr::Ident("arr".to_string())),
-            index: Box::new(Expr::Ident("i".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Index {
+                object: Box::new(Expr::Ident("arr".to_string())),
+                index: Box::new(Expr::Ident("i".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("arr"));
         assert!(refs.contains("i"));
     }
@@ -1097,10 +1219,13 @@ mod tests {
     #[test]
     fn test_collect_refs_assign() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Assign {
-            target: Box::new(Expr::Ident("t".to_string())),
-            value: Box::new(Expr::Ident("v".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Assign {
+                target: Box::new(Expr::Ident("t".to_string())),
+                value: Box::new(Expr::Ident("v".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("t"));
         assert!(refs.contains("v"));
     }
@@ -1108,34 +1233,43 @@ mod tests {
     #[test]
     fn test_collect_refs_closure() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Closure {
-            params: vec![],
-            body: Box::new(Expr::Ident("body_dep".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Closure {
+                params: vec![],
+                body: Box::new(Expr::Ident("body_dep".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("body_dep"));
     }
 
     #[test]
     fn test_collect_refs_struct_init() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::StructInit {
-            name: "S".to_string(),
-            fields: vec![("x".to_string(), Expr::Ident("val".to_string()))],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::StructInit {
+                name: "S".to_string(),
+                fields: vec![("x".to_string(), Expr::Ident("val".to_string()))],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("val"));
     }
 
     #[test]
     fn test_collect_refs_match() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("subj".to_string())),
-            arms: vec![MatchArm {
-                pattern: Pattern::Wildcard,
-                guard: None,
-                body: Expr::Ident("arm_body".to_string()),
-            }],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Match {
+                subject: Box::new(Expr::Ident("subj".to_string())),
+                arms: vec![MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Ident("arm_body".to_string()),
+                }],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("subj"));
         assert!(refs.contains("arm_body"));
     }
@@ -1143,12 +1277,36 @@ mod tests {
     #[test]
     fn test_collect_refs_borrow_await_etc() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Borrow(Box::new(Expr::Ident("a".to_string()))), &mut refs);
-        collect_references_in_expr(&Expr::BorrowMut(Box::new(Expr::Ident("b".to_string()))), &mut refs);
-        collect_references_in_expr(&Expr::Await(Box::new(Expr::Ident("c".to_string()))), &mut refs);
-        collect_references_in_expr(&Expr::Stream { source: Box::new(Expr::Ident("d".to_string())) }, &mut refs);
-        collect_references_in_expr(&Expr::Navigate { path: Box::new(Expr::Ident("e".to_string())) }, &mut refs);
-        collect_references_in_expr(&Expr::Receive { channel: Box::new(Expr::Ident("f".to_string())) }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Borrow(Box::new(Expr::Ident("a".to_string()))),
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::BorrowMut(Box::new(Expr::Ident("b".to_string()))),
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Await(Box::new(Expr::Ident("c".to_string()))),
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Stream {
+                source: Box::new(Expr::Ident("d".to_string())),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Navigate {
+                path: Box::new(Expr::Ident("e".to_string())),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Receive {
+                channel: Box::new(Expr::Ident("f".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("a") && refs.contains("b") && refs.contains("c"));
         assert!(refs.contains("d") && refs.contains("e") && refs.contains("f"));
     }
@@ -1156,18 +1314,30 @@ mod tests {
     #[test]
     fn test_collect_refs_spawn_send_suspend() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Spawn {
-            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("sp".to_string()))], span: dummy_span() },
-            span: dummy_span(),
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Send {
-            channel: Box::new(Expr::Ident("ch".to_string())),
-            value: Box::new(Expr::Ident("v".to_string())),
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Suspend {
-            fallback: Box::new(Expr::Ident("fb".to_string())),
-            body: Box::new(Expr::Ident("bd".to_string())),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Spawn {
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("sp".to_string()))],
+                    span: dummy_span(),
+                },
+                span: dummy_span(),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Send {
+                channel: Box::new(Expr::Ident("ch".to_string())),
+                value: Box::new(Expr::Ident("v".to_string())),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Suspend {
+                fallback: Box::new(Expr::Ident("fb".to_string())),
+                body: Box::new(Expr::Ident("bd".to_string())),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("sp") && refs.contains("ch") && refs.contains("v"));
         assert!(refs.contains("fb") && refs.contains("bd"));
     }
@@ -1175,20 +1345,29 @@ mod tests {
     #[test]
     fn test_collect_refs_try_catch_fetch_parallel() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::TryCatch {
-            body: Box::new(Expr::Ident("tc".to_string())),
-            error_binding: "e".to_string(),
-            catch_body: Box::new(Expr::Ident("ca".to_string())),
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Fetch {
-            url: Box::new(Expr::Ident("u".to_string())),
-            options: Some(Box::new(Expr::Ident("o".to_string()))),
-            contract: None,
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Parallel {
-            tasks: vec![Expr::Ident("t1".to_string())],
-            span: dummy_span(),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::TryCatch {
+                body: Box::new(Expr::Ident("tc".to_string())),
+                error_binding: "e".to_string(),
+                catch_body: Box::new(Expr::Ident("ca".to_string())),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Fetch {
+                url: Box::new(Expr::Ident("u".to_string())),
+                options: Some(Box::new(Expr::Ident("o".to_string()))),
+                contract: None,
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Parallel {
+                tasks: vec![Expr::Ident("t1".to_string())],
+                span: dummy_span(),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("tc") && refs.contains("ca"));
         assert!(refs.contains("u") && refs.contains("o"));
         assert!(refs.contains("t1"));
@@ -1197,23 +1376,38 @@ mod tests {
     #[test]
     fn test_collect_refs_prompt_env_trace_flag() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::PromptTemplate {
-            template: "hi".to_string(),
-            interpolations: vec![("x".to_string(), Expr::Ident("pt".to_string()))],
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Env {
-            name: Box::new(Expr::Ident("en".to_string())),
-            span: dummy_span(),
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Trace {
-            label: Box::new(Expr::Ident("lb".to_string())),
-            body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tb".to_string()))], span: dummy_span() },
-            span: dummy_span(),
-        }, &mut refs);
-        collect_references_in_expr(&Expr::Flag {
-            name: Box::new(Expr::Ident("fl".to_string())),
-            span: dummy_span(),
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::PromptTemplate {
+                template: "hi".to_string(),
+                interpolations: vec![("x".to_string(), Expr::Ident("pt".to_string()))],
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Env {
+                name: Box::new(Expr::Ident("en".to_string())),
+                span: dummy_span(),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Trace {
+                label: Box::new(Expr::Ident("lb".to_string())),
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("tb".to_string()))],
+                    span: dummy_span(),
+                },
+                span: dummy_span(),
+            },
+            &mut refs,
+        );
+        collect_references_in_expr(
+            &Expr::Flag {
+                name: Box::new(Expr::Ident("fl".to_string())),
+                span: dummy_span(),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("pt") && refs.contains("en"));
         assert!(refs.contains("lb") && refs.contains("tb"));
         assert!(refs.contains("fl"));
@@ -1256,8 +1450,12 @@ mod tests {
 
     #[test]
     fn test_is_pure_borrow() {
-        assert!(is_pure(&Expr::Borrow(Box::new(Expr::Ident("x".to_string())))));
-        assert!(is_pure(&Expr::BorrowMut(Box::new(Expr::Ident("x".to_string())))));
+        assert!(is_pure(&Expr::Borrow(Box::new(Expr::Ident(
+            "x".to_string()
+        )))));
+        assert!(is_pure(&Expr::BorrowMut(Box::new(Expr::Ident(
+            "x".to_string()
+        )))));
     }
 
     #[test]
@@ -1279,23 +1477,38 @@ mod tests {
     fn test_called_fns_in_store() {
         let mut called = std::collections::HashSet::new();
         let item = Item::Store(StoreDef {
-            name: "S".to_string(), signals: vec![],
+            name: "S".to_string(),
+            signals: vec![],
             actions: vec![ActionDef {
-                name: "a".to_string(), params: vec![],
-                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep1".to_string()))], span: dummy_span() },
-                is_async: false, span: dummy_span(),
+                name: "a".to_string(),
+                params: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("dep1".to_string()))],
+                    span: dummy_span(),
+                },
+                is_async: false,
+                span: dummy_span(),
             }],
             computed: vec![ComputedDef {
-                name: "c".to_string(), return_type: None,
-                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep2".to_string()))], span: dummy_span() },
+                name: "c".to_string(),
+                return_type: None,
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("dep2".to_string()))],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
             effects: vec![EffectDef {
                 name: "e".to_string(),
-                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("dep3".to_string()))], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("dep3".to_string()))],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
-            selectors: vec![], is_pub: false, span: dummy_span(),
+            selectors: vec![],
+            is_pub: false,
+            span: dummy_span(),
         });
         collect_called_functions_in_item(&item, &mut called);
         assert!(called.contains("dep1"));
@@ -1307,21 +1520,38 @@ mod tests {
     fn test_called_fns_in_agent() {
         let mut called = std::collections::HashSet::new();
         let item = Item::Agent(AgentDef {
-            name: "A".to_string(), system_prompt: None,
+            name: "A".to_string(),
+            system_prompt: None,
             tools: vec![ToolDef {
-                name: "t".to_string(), description: None, params: vec![],
+                name: "t".to_string(),
+                description: None,
+                params: vec![],
                 return_type: None,
-                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("tool_dep".to_string()))], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("tool_dep".to_string()))],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
             state: vec![],
             methods: vec![Function {
-                name: "m".to_string(), lifetimes: vec![], type_params: vec![],
-                params: vec![], return_type: None, trait_bounds: vec![],
-                body: Block { stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))], span: dummy_span() },
-                is_pub: false, is_async: false, must_use: false, span: dummy_span(),
+                name: "m".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Expr(Expr::Ident("meth_dep".to_string()))],
+                    span: dummy_span(),
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: dummy_span(),
             }],
-            render: None, span: dummy_span(),
+            render: None,
+            span: dummy_span(),
         });
         collect_called_functions_in_item(&item, &mut called);
         assert!(called.contains("tool_dep"));
@@ -1334,13 +1564,17 @@ mod tests {
         let item = Item::Router(RouterDef {
             name: "R".to_string(),
             routes: vec![RouteDef {
-                path: "/".to_string(), params: vec![],
+                path: "/".to_string(),
+                params: vec![],
                 component: "Home".to_string(),
                 guard: Some(Expr::Ident("guard_fn".to_string())),
                 transition: None,
                 span: dummy_span(),
             }],
-            fallback: None, layout: None, transition: None, span: dummy_span(),
+            fallback: None,
+            layout: None,
+            transition: None,
+            span: dummy_span(),
         });
         collect_called_functions_in_item(&item, &mut called);
         assert!(called.contains("Home"));
@@ -1351,22 +1585,23 @@ mod tests {
 
     #[test]
     fn test_dce_signal_stmt() {
-        let stmts = vec![
-            Stmt::Signal {
-                name: "s".to_string(), ty: None, secret: false, atomic: false,
-                value: Expr::If {
-                    condition: Box::new(Expr::Bool(true)),
-                    then_block: Block {
-                        stmts: vec![
-                            Stmt::Return(Some(Expr::Integer(1))),
-                            Stmt::Expr(Expr::Integer(99)), // dead
-                        ],
-                        span: dummy_span(),
-                    },
-                    else_block: None,
+        let stmts = vec![Stmt::Signal {
+            name: "s".to_string(),
+            ty: None,
+            secret: false,
+            atomic: false,
+            value: Expr::If {
+                condition: Box::new(Expr::Bool(true)),
+                then_block: Block {
+                    stmts: vec![
+                        Stmt::Return(Some(Expr::Integer(1))),
+                        Stmt::Expr(Expr::Integer(99)), // dead
+                    ],
+                    span: dummy_span(),
                 },
+                else_block: None,
             },
-        ];
+        }];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -1377,15 +1612,13 @@ mod tests {
 
     #[test]
     fn test_dce_yield_stmt() {
-        let stmts = vec![
-            Stmt::Yield(Expr::Block(Block {
-                stmts: vec![
-                    Stmt::Return(Some(Expr::Integer(1))),
-                    Stmt::Expr(Expr::Integer(99)), // dead
-                ],
-                span: dummy_span(),
-            })),
-        ];
+        let stmts = vec![Stmt::Yield(Expr::Block(Block {
+            stmts: vec![
+                Stmt::Return(Some(Expr::Integer(1))),
+                Stmt::Expr(Expr::Integer(99)), // dead
+            ],
+            span: dummy_span(),
+        }))];
         let mut program = Program {
             items: vec![make_fn("test", true, stmts)],
         };
@@ -1413,20 +1646,29 @@ mod tests {
     #[test]
     fn test_collect_refs_in_stmt_signal() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_stmt(&Stmt::Signal {
-            name: "s".to_string(), ty: None, secret: false, atomic: false,
-            value: Expr::Ident("sig_dep".to_string()),
-        }, &mut refs);
+        collect_references_in_stmt(
+            &Stmt::Signal {
+                name: "s".to_string(),
+                ty: None,
+                secret: false,
+                atomic: false,
+                value: Expr::Ident("sig_dep".to_string()),
+            },
+            &mut refs,
+        );
         assert!(refs.contains("sig_dep"));
     }
 
     #[test]
     fn test_collect_refs_array_lit() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::ArrayLit(vec![
-            Expr::Ident("a".to_string()),
-            Expr::Ident("b".to_string()),
-        ]), &mut refs);
+        collect_references_in_expr(
+            &Expr::ArrayLit(vec![
+                Expr::Ident("a".to_string()),
+                Expr::Ident("b".to_string()),
+            ]),
+            &mut refs,
+        );
         assert!(refs.contains("a"));
         assert!(refs.contains("b"));
     }
@@ -1434,12 +1676,15 @@ mod tests {
     #[test]
     fn test_collect_refs_object_lit() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::ObjectLit {
-            fields: vec![
-                ("x".into(), Expr::Ident("val1".to_string())),
-                ("y".into(), Expr::Ident("val2".to_string())),
-            ],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::ObjectLit {
+                fields: vec![
+                    ("x".into(), Expr::Ident("val1".to_string())),
+                    ("y".into(), Expr::Ident("val2".to_string())),
+                ],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("val1"));
         assert!(refs.contains("val2"));
     }
@@ -1447,14 +1692,17 @@ mod tests {
     #[test]
     fn test_collect_refs_match_with_guard() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("subj".to_string())),
-            arms: vec![MatchArm {
-                pattern: Pattern::Ident("n".to_string()),
-                guard: Some(Expr::Ident("guard_var".to_string())),
-                body: Expr::Ident("arm_body".to_string()),
-            }],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Match {
+                subject: Box::new(Expr::Ident("subj".to_string())),
+                arms: vec![MatchArm {
+                    pattern: Pattern::Ident("n".to_string()),
+                    guard: Some(Expr::Ident("guard_var".to_string())),
+                    body: Expr::Ident("arm_body".to_string()),
+                }],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("subj"));
         assert!(refs.contains("guard_var"));
         assert!(refs.contains("arm_body"));
@@ -1477,14 +1725,17 @@ mod tests {
     #[test]
     fn test_collect_refs_match_no_guard() {
         let mut refs = std::collections::HashSet::new();
-        collect_references_in_expr(&Expr::Match {
-            subject: Box::new(Expr::Ident("x".to_string())),
-            arms: vec![MatchArm {
-                pattern: Pattern::Wildcard,
-                guard: None,
-                body: Expr::Integer(0),
-            }],
-        }, &mut refs);
+        collect_references_in_expr(
+            &Expr::Match {
+                subject: Box::new(Expr::Ident("x".to_string())),
+                arms: vec![MatchArm {
+                    pattern: Pattern::Wildcard,
+                    guard: None,
+                    body: Expr::Integer(0),
+                }],
+            },
+            &mut refs,
+        );
         assert!(refs.contains("x"));
         assert_eq!(refs.len(), 1);
     }

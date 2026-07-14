@@ -200,8 +200,12 @@ fn deduplicate_functions(wat: &str, stats: &mut WasmOptStats) -> String {
                 // Find matching closing paren by counting parens
                 for j in i..lines.len() {
                     for ch in lines[j].chars() {
-                        if ch == '(' { depth += 1; }
-                        if ch == ')' { depth -= 1; }
+                        if ch == '(' {
+                            depth += 1;
+                        }
+                        if ch == ')' {
+                            depth -= 1;
+                        }
                     }
                     if depth == 0 {
                         end = j;
@@ -211,7 +215,8 @@ fn deduplicate_functions(wat: &str, stats: &mut WasmOptStats) -> String {
                 // Extract body (everything except the func declaration line)
                 // Guard: if function opens and closes on the same line, body is empty
                 let body: String = if start + 1 <= end {
-                    lines[start + 1..end].iter()
+                    lines[start + 1..end]
+                        .iter()
                         .map(|l| l.trim())
                         .collect::<Vec<_>>()
                         .join("\n")
@@ -266,7 +271,10 @@ fn deduplicate_functions(wat: &str, stats: &mut WasmOptStats) -> String {
             if last.trim() == ")" {
                 let closing = result.pop().unwrap();
                 for (alias, canonical) in &aliases {
-                    result.push(format!("  ;; {} is identical to {}, deduplicated", alias, canonical));
+                    result.push(format!(
+                        "  ;; {} is identical to {}, deduplicated",
+                        alias, canonical
+                    ));
                 }
                 result.push(closing);
             }
@@ -280,7 +288,9 @@ fn extract_func_name(line: &str) -> Option<&str> {
     // Match pattern like `(func $name ...`
     let trimmed = line.trim();
     if let Some(rest) = trimmed.strip_prefix("(func ") {
-        let name_end = rest.find(|c: char| c.is_whitespace() || c == '(').unwrap_or(rest.len());
+        let name_end = rest
+            .find(|c: char| c.is_whitespace() || c == '(')
+            .unwrap_or(rest.len());
         let name = &rest[..name_end];
         if name.starts_with('$') {
             return Some(name);

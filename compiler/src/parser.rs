@@ -1,5 +1,5 @@
 use crate::ast::*;
-use crate::token::{Token, TokenKind, FormatStringPart, Span};
+use crate::token::{FormatStringPart, Span, Token, TokenKind};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -21,7 +21,11 @@ enum SyncContext {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, pos: 0, errors: Vec::new() }
+        Self {
+            tokens,
+            pos: 0,
+            errors: Vec::new(),
+        }
     }
 
     /// Returns true if any parse errors have been recorded.
@@ -74,72 +78,72 @@ impl Parser {
     /// Core synchronization driver.
     fn synchronize(&mut self, ctx: SyncContext) {
         match ctx {
-            SyncContext::TopLevel => {
-                loop {
-                    if self.is_at_end() {
-                        break;
-                    }
-                    match self.peek_kind() {
-                        TokenKind::Fn
-                        | TokenKind::Component
-                        | TokenKind::Struct
-                        | TokenKind::Enum
-                        | TokenKind::Impl
-                        | TokenKind::Use
-                        | TokenKind::Store
-                        | TokenKind::Agent
-                        | TokenKind::Router
-                        | TokenKind::Lazy
-                        | TokenKind::Test
-                        | TokenKind::Trait
-                        | TokenKind::Contract
-                        | TokenKind::App
-                        | TokenKind::Page
-                        | TokenKind::Form
-                        | TokenKind::Channel
-                        | TokenKind::Embed
-                        | TokenKind::Pdf
-                        | TokenKind::Payment
-                        | TokenKind::Auth
-                        | TokenKind::Upload
-                        | TokenKind::Db
-                        | TokenKind::Cache
-                        | TokenKind::Breakpoint
-                        | TokenKind::Theme
-                        | TokenKind::Spring
-                        | TokenKind::Stagger
-                        | TokenKind::Keyframes
-                        | TokenKind::Pub => break,
-                        _ => { self.advance(); }
+            SyncContext::TopLevel => loop {
+                if self.is_at_end() {
+                    break;
+                }
+                match self.peek_kind() {
+                    TokenKind::Fn
+                    | TokenKind::Component
+                    | TokenKind::Struct
+                    | TokenKind::Enum
+                    | TokenKind::Impl
+                    | TokenKind::Use
+                    | TokenKind::Store
+                    | TokenKind::Agent
+                    | TokenKind::Router
+                    | TokenKind::Lazy
+                    | TokenKind::Test
+                    | TokenKind::Trait
+                    | TokenKind::Contract
+                    | TokenKind::App
+                    | TokenKind::Page
+                    | TokenKind::Form
+                    | TokenKind::Channel
+                    | TokenKind::Embed
+                    | TokenKind::Pdf
+                    | TokenKind::Payment
+                    | TokenKind::Auth
+                    | TokenKind::Upload
+                    | TokenKind::Db
+                    | TokenKind::Cache
+                    | TokenKind::Breakpoint
+                    | TokenKind::Theme
+                    | TokenKind::Spring
+                    | TokenKind::Stagger
+                    | TokenKind::Keyframes
+                    | TokenKind::Pub => break,
+                    _ => {
+                        self.advance();
                     }
                 }
-            }
-            SyncContext::Statement => {
-                loop {
-                    if self.is_at_end() {
+            },
+            SyncContext::Statement => loop {
+                if self.is_at_end() {
+                    break;
+                }
+                match self.peek_kind() {
+                    TokenKind::Semicolon => {
+                        self.advance();
                         break;
                     }
-                    match self.peek_kind() {
-                        TokenKind::Semicolon => {
-                            self.advance();
-                            break;
-                        }
-                        TokenKind::RightBrace => {
-                            break;
-                        }
-                        TokenKind::Let
-                        | TokenKind::Signal
-                        | TokenKind::Return
-                        | TokenKind::Yield
-                        | TokenKind::Fn
-                        | TokenKind::If
-                        | TokenKind::For
-                        | TokenKind::While
-                        | TokenKind::Match => break,
-                        _ => { self.advance(); }
+                    TokenKind::RightBrace => {
+                        break;
+                    }
+                    TokenKind::Let
+                    | TokenKind::Signal
+                    | TokenKind::Return
+                    | TokenKind::Yield
+                    | TokenKind::Fn
+                    | TokenKind::If
+                    | TokenKind::For
+                    | TokenKind::While
+                    | TokenKind::Match => break,
+                    _ => {
+                        self.advance();
                     }
                 }
-            }
+            },
             SyncContext::Block => {
                 let mut depth: u32 = 1;
                 loop {
@@ -147,7 +151,10 @@ impl Parser {
                         break;
                     }
                     match self.peek_kind() {
-                        TokenKind::LeftBrace => { depth += 1; self.advance(); }
+                        TokenKind::LeftBrace => {
+                            depth += 1;
+                            self.advance();
+                        }
                         TokenKind::RightBrace => {
                             depth -= 1;
                             if depth == 0 {
@@ -156,7 +163,9 @@ impl Parser {
                             }
                             self.advance();
                         }
-                        _ => { self.advance(); }
+                        _ => {
+                            self.advance();
+                        }
                     }
                 }
             }
@@ -260,7 +269,19 @@ impl Parser {
 
         let body = self.parse_block()?;
 
-        Ok(Function { name, lifetimes, type_params, params, return_type, trait_bounds, body, is_pub, is_async, must_use, span })
+        Ok(Function {
+            name,
+            lifetimes,
+            type_params,
+            params,
+            return_type,
+            trait_bounds,
+            body,
+            is_pub,
+            is_async,
+            must_use,
+            span,
+        })
     }
 
     /// Parse optional where clause: `where T: Display, U: Clone`
@@ -273,7 +294,10 @@ impl Parser {
             let type_param = self.expect_ident()?;
             self.expect(&TokenKind::Colon)?;
             let trait_name = self.expect_ident()?;
-            bounds.push(TraitBound { type_param, trait_name });
+            bounds.push(TraitBound {
+                type_param,
+                trait_name,
+            });
             if !self.match_token(&TokenKind::Comma) {
                 break;
             }
@@ -491,7 +515,26 @@ impl Parser {
             span,
         })?;
 
-        Ok(Component { name, type_params, props, state, methods, styles, transitions, trait_bounds, render, gestures, permissions, skeleton, error_boundary, chunk, on_destroy, a11y, shortcuts, span })
+        Ok(Component {
+            name,
+            type_params,
+            props,
+            state,
+            methods,
+            styles,
+            transitions,
+            trait_bounds,
+            render,
+            gestures,
+            permissions,
+            skeleton,
+            error_boundary,
+            chunk,
+            on_destroy,
+            a11y,
+            shortcuts,
+            span,
+        })
     }
 
     fn parse_page(&mut self, is_pub: bool) -> Result<PageDef, ParseError> {
@@ -547,10 +590,9 @@ impl Parser {
                     gestures.push(self.parse_gesture()?);
                 }
                 _ => {
-                    return Err(self.error(&format!(
-                        "unexpected token in page: {:?}",
-                        self.peek_kind()
-                    )));
+                    return Err(
+                        self.error(&format!("unexpected token in page: {:?}", self.peek_kind()))
+                    );
                 }
             }
         }
@@ -593,10 +635,18 @@ impl Parser {
             self.expect(&TokenKind::Colon)?;
 
             match key.as_str() {
-                "title" => { title = Some(self.parse_expr()?); }
-                "description" => { description = Some(self.parse_expr()?); }
-                "canonical" => { canonical = Some(self.parse_expr()?); }
-                "og_image" => { og_image = Some(self.parse_expr()?); }
+                "title" => {
+                    title = Some(self.parse_expr()?);
+                }
+                "description" => {
+                    description = Some(self.parse_expr()?);
+                }
+                "canonical" => {
+                    canonical = Some(self.parse_expr()?);
+                }
+                "og_image" => {
+                    og_image = Some(self.parse_expr()?);
+                }
                 "structured_data" => {
                     structured_data.push(self.parse_structured_data()?);
                 }
@@ -612,7 +662,15 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(MetaDef { title, description, canonical, og_image, structured_data, extra, span })
+        Ok(MetaDef {
+            title,
+            description,
+            canonical,
+            og_image,
+            structured_data,
+            extra,
+            span,
+        })
     }
 
     fn parse_structured_data(&mut self) -> Result<StructuredDataDef, ParseError> {
@@ -642,7 +700,11 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(StructuredDataDef { schema_type, fields, span })
+        Ok(StructuredDataDef {
+            schema_type,
+            fields,
+            span,
+        })
     }
 
     /// Parse `permissions { network: [...], storage: [...], capabilities: [...] }`
@@ -666,14 +728,22 @@ impl Parser {
                 "network" => network = values,
                 "storage" => storage = values,
                 "capabilities" => capabilities = values,
-                _ => return Err(self.error(&format!(
-                    "Unknown permissions key '{}'; expected network, storage, or capabilities", key
-                ))),
+                _ => {
+                    return Err(self.error(&format!(
+                        "Unknown permissions key '{}'; expected network, storage, or capabilities",
+                        key
+                    )));
+                }
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(PermissionsDef { network, storage, capabilities, span })
+        Ok(PermissionsDef {
+            network,
+            storage,
+            capabilities,
+            span,
+        })
     }
 
     /// Parse `["str1", "str2", ...]`
@@ -723,7 +793,11 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(ErrorBoundary { fallback, body, span })
+        Ok(ErrorBoundary {
+            fallback,
+            body,
+            span,
+        })
     }
 
     /// Parse an inline render block: `{ <template_node> }`
@@ -786,7 +860,15 @@ impl Parser {
         let initializer = self.parse_expr()?;
         self.expect(&TokenKind::Semicolon)?;
 
-        Ok(StateField { name, ty, mutable, secret, atomic: false, initializer, ownership })
+        Ok(StateField {
+            name,
+            ty,
+            mutable,
+            secret,
+            atomic: false,
+            initializer,
+            ownership,
+        })
     }
 
     fn parse_signal_field(&mut self) -> Result<StateField, ParseError> {
@@ -836,7 +918,10 @@ impl Parser {
         while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
             // Read CSS property name (may be hyphenated, e.g. background-color)
             let mut prop_name = String::new();
-            while !self.check(&TokenKind::Colon) && !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+            while !self.check(&TokenKind::Colon)
+                && !self.check(&TokenKind::RightBrace)
+                && !self.is_at_end()
+            {
                 let tok = self.advance();
                 match &tok.kind {
                     TokenKind::Ident(s) => {
@@ -854,7 +939,11 @@ impl Parser {
 
             // Value is a string literal like "0.3s ease"
             let value = if let TokenKind::StringLit(_) = self.peek_kind() {
-                if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() }
+                if let TokenKind::StringLit(s) = self.advance().kind {
+                    s
+                } else {
+                    unreachable!()
+                }
             } else {
                 return Err(self.error("Expected string literal for transition value"));
             };
@@ -905,11 +994,16 @@ impl Parser {
                 let mut properties = Vec::new();
                 while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
                     let mut kf_prop = String::new();
-                    while !self.check(&TokenKind::Colon) && !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                    while !self.check(&TokenKind::Colon)
+                        && !self.check(&TokenKind::RightBrace)
+                        && !self.is_at_end()
+                    {
                         let tok = self.advance();
                         match &tok.kind {
                             TokenKind::Ident(s) => {
-                                if !kf_prop.is_empty() { kf_prop.push('-'); }
+                                if !kf_prop.is_empty() {
+                                    kf_prop.push('-');
+                                }
                                 kf_prop.push_str(s);
                             }
                             TokenKind::Minus => {}
@@ -918,9 +1012,15 @@ impl Parser {
                     }
                     self.expect(&TokenKind::Colon)?;
                     let kf_val = if let TokenKind::StringLit(_) = self.peek_kind() {
-                        if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() }
+                        if let TokenKind::StringLit(s) = self.advance().kind {
+                            s
+                        } else {
+                            unreachable!()
+                        }
                     } else {
-                        return Err(self.error("Expected string literal for keyframe property value"));
+                        return Err(
+                            self.error("Expected string literal for keyframe property value")
+                        );
                     };
                     self.expect(&TokenKind::Semicolon)?;
                     properties.push((kf_prop, kf_val));
@@ -936,7 +1036,11 @@ impl Parser {
                 let opt_name = self.expect_ident()?;
                 self.expect(&TokenKind::Colon)?;
                 let opt_value = if let TokenKind::StringLit(_) = self.peek_kind() {
-                    if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() }
+                    if let TokenKind::StringLit(s) = self.advance().kind {
+                        s
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     return Err(self.error("Expected string literal for animation option"));
                 };
@@ -1040,9 +1144,7 @@ impl Parser {
                         //   None => <span />,
                         // We parse one template node unless the arm starts with `{`
                         // followed by multiple nodes.
-                        if self.check(&TokenKind::LeftBrace)
-                            && !self.is_object_literal_brace()
-                        {
+                        if self.check(&TokenKind::LeftBrace) && !self.is_object_literal_brace() {
                             // Block: { <node1> <node2> ... }
                             self.advance(); // consume `{`
                             while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
@@ -1052,7 +1154,11 @@ impl Parser {
                         } else {
                             body.push(self.parse_template_node()?);
                         }
-                        arms.push(TemplateMatchArm { pattern, guard, body });
+                        arms.push(TemplateMatchArm {
+                            pattern,
+                            guard,
+                            body,
+                        });
                         if !self.check(&TokenKind::RightBrace) {
                             self.expect(&TokenKind::Comma)?;
                         }
@@ -1102,7 +1208,10 @@ impl Parser {
         }
 
         // Layout primitives — compile-time CSS sugar
-        if matches!(tag.as_str(), "Stack" | "Row" | "Grid" | "Center" | "Cluster" | "Sidebar" | "Switcher") {
+        if matches!(
+            tag.as_str(),
+            "Stack" | "Row" | "Grid" | "Center" | "Cluster" | "Sidebar" | "Switcher"
+        ) {
             return self.parse_layout_element(&tag, span);
         }
 
@@ -1141,7 +1250,10 @@ impl Parser {
                     self.advance();
                     let value = self.parse_expr()?;
                     self.expect(&TokenKind::RightBrace)?;
-                    attributes.push(Attribute::Aria { name: aria_name, value });
+                    attributes.push(Attribute::Aria {
+                        name: aria_name,
+                        value,
+                    });
                 } else if let TokenKind::StringLit(_) = self.peek_kind() {
                     if let TokenKind::StringLit(s) = self.advance().kind {
                         attributes.push(Attribute::Aria {
@@ -1169,10 +1281,16 @@ impl Parser {
                     self.advance();
                     let value = self.parse_expr()?;
                     self.expect(&TokenKind::RightBrace)?;
-                    attributes.push(Attribute::Dynamic { name: "tabindex".into(), value });
+                    attributes.push(Attribute::Dynamic {
+                        name: "tabindex".into(),
+                        value,
+                    });
                 } else if let TokenKind::StringLit(_) = self.peek_kind() {
                     if let TokenKind::StringLit(s) = self.advance().kind {
-                        attributes.push(Attribute::Static { name: "tabindex".into(), value: s });
+                        attributes.push(Attribute::Static {
+                            name: "tabindex".into(),
+                            value: s,
+                        });
                     }
                 } else {
                     return Err(self.error("Expected tabindex value"));
@@ -1183,10 +1301,16 @@ impl Parser {
                     self.advance();
                     let value = self.parse_expr()?;
                     self.expect(&TokenKind::RightBrace)?;
-                    attributes.push(Attribute::Dynamic { name: attr_name, value });
+                    attributes.push(Attribute::Dynamic {
+                        name: attr_name,
+                        value,
+                    });
                 } else if let TokenKind::StringLit(_) = self.peek_kind() {
                     if let TokenKind::StringLit(s) = self.advance().kind {
-                        attributes.push(Attribute::Static { name: attr_name, value: s });
+                        attributes.push(Attribute::Static {
+                            name: attr_name,
+                            value: s,
+                        });
                     }
                 } else {
                     return Err(self.error("Expected attribute value"));
@@ -1194,7 +1318,10 @@ impl Parser {
             } else {
                 // Boolean attribute (e.g., disabled, checked, readonly)
                 // No `=` follows — treat as a static attribute with empty value
-                attributes.push(Attribute::Static { name: attr_name, value: String::new() });
+                attributes.push(Attribute::Static {
+                    name: attr_name,
+                    value: String::new(),
+                });
             }
         }
 
@@ -1283,7 +1410,10 @@ impl Parser {
                     self.advance();
                     let value = self.parse_expr()?;
                     self.expect(&TokenKind::RightBrace)?;
-                    attributes.push(Attribute::Aria { name: aria_name, value });
+                    attributes.push(Attribute::Aria {
+                        name: aria_name,
+                        value,
+                    });
                 } else if let TokenKind::StringLit(_) = self.peek_kind() {
                     if let TokenKind::StringLit(s) = self.advance().kind {
                         attributes.push(Attribute::Aria {
@@ -1309,24 +1439,37 @@ impl Parser {
                     self.advance();
                     let value = self.parse_expr()?;
                     self.expect(&TokenKind::RightBrace)?;
-                    attributes.push(Attribute::Dynamic { name: attr_name, value });
+                    attributes.push(Attribute::Dynamic {
+                        name: attr_name,
+                        value,
+                    });
                 } else if let TokenKind::StringLit(_) = self.peek_kind() {
                     if let TokenKind::StringLit(s) = self.advance().kind {
-                        attributes.push(Attribute::Static { name: attr_name, value: s });
+                        attributes.push(Attribute::Static {
+                            name: attr_name,
+                            value: s,
+                        });
                     }
                 } else {
                     return Err(self.error("Expected attribute value"));
                 }
             } else {
                 // Boolean attribute (e.g., disabled, checked, readonly)
-                attributes.push(Attribute::Static { name: attr_name, value: String::new() });
+                attributes.push(Attribute::Static {
+                    name: attr_name,
+                    value: String::new(),
+                });
             }
         }
 
         // Self-closing: <Link to="/" />
         if self.match_token(&TokenKind::Slash) {
             self.expect(&TokenKind::RightAngle)?;
-            return Ok(TemplateNode::Link { to, attributes, children: vec![] });
+            return Ok(TemplateNode::Link {
+                to,
+                attributes,
+                children: vec![],
+            });
         }
 
         self.expect(&TokenKind::RightAngle)?;
@@ -1348,18 +1491,29 @@ impl Parser {
         }
         self.expect(&TokenKind::RightAngle)?;
 
-        Ok(TemplateNode::Link { to, attributes, children })
+        Ok(TemplateNode::Link {
+            to,
+            attributes,
+            children,
+        })
     }
 
     /// Parse layout primitive elements: Stack, Row, Grid, Center, Cluster, Sidebar, Switcher
     fn parse_layout_element(&mut self, tag: &str, span: Span) -> Result<TemplateNode, ParseError> {
         // Parse key="value" attributes
         let mut attrs: Vec<(String, String)> = Vec::new();
-        while !self.check(&TokenKind::RightAngle) && !self.check(&TokenKind::Slash) && !self.is_at_end() {
+        while !self.check(&TokenKind::RightAngle)
+            && !self.check(&TokenKind::Slash)
+            && !self.is_at_end()
+        {
             let name = self.expect_ident()?;
             self.expect(&TokenKind::Equals)?;
             let value = if let TokenKind::StringLit(_) = self.peek_kind() {
-                if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() }
+                if let TokenKind::StringLit(s) = self.advance().kind {
+                    s
+                } else {
+                    unreachable!()
+                }
             } else {
                 return Err(self.error("Expected string value for layout attribute"));
             };
@@ -1380,24 +1534,61 @@ impl Parser {
             self.expect(&TokenKind::Slash)?;
             let closing = self.expect_ident()?;
             if closing != tag {
-                return Err(self.error(&format!("Mismatched closing tag: expected </{tag}>, found </{closing}>")));
+                return Err(self.error(&format!(
+                    "Mismatched closing tag: expected </{tag}>, found </{closing}>"
+                )));
             }
             self.expect(&TokenKind::RightAngle)?;
             kids
         };
 
         let get = |name: &str| -> Option<String> {
-            attrs.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone())
+            attrs
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
         };
 
         let node = match tag {
-            "Stack" => LayoutNode::Stack { gap: get("gap"), children, span },
-            "Row" => LayoutNode::Row { gap: get("gap"), align: get("align"), children, span },
-            "Grid" => LayoutNode::Grid { cols: get("cols"), rows: get("rows"), gap: get("gap"), children, span },
-            "Center" => LayoutNode::Center { max_width: get("max_width"), children, span },
-            "Cluster" => LayoutNode::Cluster { gap: get("gap"), children, span },
-            "Sidebar" => LayoutNode::Sidebar { side: get("side"), width: get("width"), children, span },
-            "Switcher" => LayoutNode::Switcher { threshold: get("threshold"), children, span },
+            "Stack" => LayoutNode::Stack {
+                gap: get("gap"),
+                children,
+                span,
+            },
+            "Row" => LayoutNode::Row {
+                gap: get("gap"),
+                align: get("align"),
+                children,
+                span,
+            },
+            "Grid" => LayoutNode::Grid {
+                cols: get("cols"),
+                rows: get("rows"),
+                gap: get("gap"),
+                children,
+                span,
+            },
+            "Center" => LayoutNode::Center {
+                max_width: get("max_width"),
+                children,
+                span,
+            },
+            "Cluster" => LayoutNode::Cluster {
+                gap: get("gap"),
+                children,
+                span,
+            },
+            "Sidebar" => LayoutNode::Sidebar {
+                side: get("side"),
+                width: get("width"),
+                children,
+                span,
+            },
+            "Switcher" => LayoutNode::Switcher {
+                threshold: get("threshold"),
+                children,
+                span,
+            },
             _ => unreachable!(),
         };
 
@@ -1424,7 +1615,11 @@ impl Parser {
             let field_name = self.expect_ident()?;
             self.expect(&TokenKind::Colon)?;
             let ty = self.parse_type()?;
-            fields.push(Field { name: field_name, ty, is_pub: field_pub });
+            fields.push(Field {
+                name: field_name,
+                ty,
+                is_pub: field_pub,
+            });
 
             if !self.check(&TokenKind::RightBrace) {
                 self.expect(&TokenKind::Comma)?;
@@ -1432,7 +1627,15 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(StructDef { name, lifetimes, type_params, fields, trait_bounds, is_pub, span })
+        Ok(StructDef {
+            name,
+            lifetimes,
+            type_params,
+            fields,
+            trait_bounds,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_enum(&mut self, is_pub: bool) -> Result<EnumDef, ParseError> {
@@ -1459,7 +1662,10 @@ impl Parser {
             } else {
                 vec![]
             };
-            variants.push(Variant { name: var_name, fields });
+            variants.push(Variant {
+                name: var_name,
+                fields,
+            });
 
             if !self.check(&TokenKind::RightBrace) {
                 self.expect(&TokenKind::Comma)?;
@@ -1467,7 +1673,13 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(EnumDef { name, type_params, variants, is_pub, span })
+        Ok(EnumDef {
+            name,
+            type_params,
+            variants,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_impl(&mut self) -> Result<ImplBlock, ParseError> {
@@ -1492,7 +1704,12 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(ImplBlock { target, trait_impls, methods, span })
+        Ok(ImplBlock {
+            target,
+            trait_impls,
+            methods,
+            span,
+        })
     }
 
     fn parse_trait(&mut self) -> Result<TraitDef, ParseError> {
@@ -1535,7 +1752,12 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(TraitDef { name, type_params, methods, span })
+        Ok(TraitDef {
+            name,
+            type_params,
+            methods,
+            span,
+        })
     }
 
     fn parse_use(&mut self) -> Result<UsePath, ParseError> {
@@ -1548,7 +1770,13 @@ impl Parser {
             if self.check(&TokenKind::Star) {
                 self.advance();
                 self.expect(&TokenKind::Semicolon)?;
-                return Ok(UsePath { segments, alias: None, glob: true, group: None, span });
+                return Ok(UsePath {
+                    segments,
+                    alias: None,
+                    glob: true,
+                    group: None,
+                    span,
+                });
             }
             // Check for group import: `use foo::{A, B, C};`
             if self.check(&TokenKind::LeftBrace) {
@@ -1561,14 +1789,23 @@ impl Parser {
                     } else {
                         None
                     };
-                    group_items.push(UseGroupItem { name: item_name, alias: item_alias });
+                    group_items.push(UseGroupItem {
+                        name: item_name,
+                        alias: item_alias,
+                    });
                     if !self.check(&TokenKind::RightBrace) {
                         self.expect(&TokenKind::Comma)?;
                     }
                 }
                 self.expect(&TokenKind::RightBrace)?;
                 self.expect(&TokenKind::Semicolon)?;
-                return Ok(UsePath { segments, alias: None, glob: false, group: Some(group_items), span });
+                return Ok(UsePath {
+                    segments,
+                    alias: None,
+                    glob: false,
+                    group: Some(group_items),
+                    span,
+                });
             }
             segments.push(self.expect_ident()?);
         }
@@ -1581,7 +1818,13 @@ impl Parser {
         };
 
         self.expect(&TokenKind::Semicolon)?;
-        Ok(UsePath { segments, alias, glob: false, group: None, span })
+        Ok(UsePath {
+            segments,
+            alias,
+            glob: false,
+            group: None,
+            span,
+        })
     }
 
     fn parse_mod(&mut self) -> Result<ModDef, ParseError> {
@@ -1591,7 +1834,12 @@ impl Parser {
 
         if self.match_token(&TokenKind::Semicolon) {
             // External module: `mod foo;`
-            Ok(ModDef { name, items: None, is_external: true, span })
+            Ok(ModDef {
+                name,
+                items: None,
+                is_external: true,
+                span,
+            })
         } else {
             // Inline module: `mod foo { ... }`
             self.expect(&TokenKind::LeftBrace)?;
@@ -1600,7 +1848,12 @@ impl Parser {
                 items.push(self.parse_item()?);
             }
             self.expect(&TokenKind::RightBrace)?;
-            Ok(ModDef { name, items: Some(items), is_external: false, span })
+            Ok(ModDef {
+                name,
+                items: Some(items),
+                is_external: false,
+                span,
+            })
         }
     }
 
@@ -1673,7 +1926,12 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(ContractDef { name, fields, is_pub, span })
+        Ok(ContractDef {
+            name,
+            fields,
+            is_pub,
+            span,
+        })
     }
 
     /// Parse `app PayHive { manifest { ... } offline { ... } push { ... } router AppRouter { ... } }`
@@ -1720,12 +1978,25 @@ impl Parser {
                     }
                     self.match_token(&TokenKind::Comma);
                 }
-                _ => return Err(self.error("Expected manifest, offline, push, router, or a11y in app")),
+                _ => {
+                    return Err(
+                        self.error("Expected manifest, offline, push, router, or a11y in app")
+                    );
+                }
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(AppDef { name, manifest, offline, push, router, a11y, is_pub, span })
+        Ok(AppDef {
+            name,
+            manifest,
+            offline,
+            push,
+            router,
+            a11y,
+            is_pub,
+            span,
+        })
     }
 
     /// Parse `manifest { name: "My App", short_name: "app", ... }`
@@ -1791,7 +2062,12 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(OfflineDef { precache, strategy, fallback, span })
+        Ok(OfflineDef {
+            precache,
+            strategy,
+            fallback,
+            span,
+        })
     }
 
     /// Parse `push { vapid_key: "...", on_message: handle_push }`
@@ -1819,7 +2095,11 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(PushDef { vapid_key, on_message, span })
+        Ok(PushDef {
+            vapid_key,
+            on_message,
+            span,
+        })
     }
 
     /// Parse `gesture swipe_left { ... }` or `gesture long_press on:card { ... }`
@@ -1837,7 +2117,12 @@ impl Parser {
         };
 
         let body = self.parse_block()?;
-        Ok(GestureDef { gesture_type, target, body, span })
+        Ok(GestureDef {
+            gesture_type,
+            target,
+            body,
+            span,
+        })
     }
 
     fn parse_store(&mut self, is_pub: bool) -> Result<StoreDef, ParseError> {
@@ -1874,14 +2159,31 @@ impl Parser {
                     self.expect(&TokenKind::Colon)?;
                     let body = self.parse_expr()?;
                     self.match_token(&TokenKind::Semicolon);
-                    selectors.push(SelectorDef { name: sel_name, deps: vec![], body, span: sel_span });
+                    selectors.push(SelectorDef {
+                        name: sel_name,
+                        deps: vec![],
+                        body,
+                        span: sel_span,
+                    });
                 }
-                _ => return Err(self.error("Expected signal, action, computed, effect, or selector in store")),
+                _ => {
+                    return Err(self
+                        .error("Expected signal, action, computed, effect, or selector in store"));
+                }
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(StoreDef { name, signals, actions, computed, effects, selectors, is_pub, span })
+        Ok(StoreDef {
+            name,
+            signals,
+            actions,
+            computed,
+            effects,
+            selectors,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_action(&mut self, is_async: bool) -> Result<ActionDef, ParseError> {
@@ -1892,7 +2194,13 @@ impl Parser {
         let params = self.parse_params()?;
         self.expect(&TokenKind::RightParen)?;
         let body = self.parse_block()?;
-        Ok(ActionDef { name, params, body, is_async, span })
+        Ok(ActionDef {
+            name,
+            params,
+            body,
+            is_async,
+            span,
+        })
     }
 
     fn parse_computed(&mut self) -> Result<ComputedDef, ParseError> {
@@ -1908,7 +2216,12 @@ impl Parser {
             None
         };
         let body = self.parse_block()?;
-        Ok(ComputedDef { name, return_type, body, span })
+        Ok(ComputedDef {
+            name,
+            return_type,
+            body,
+            span,
+        })
     }
 
     fn parse_effect(&mut self) -> Result<EffectDef, ParseError> {
@@ -1964,9 +2277,11 @@ impl Parser {
                 TokenKind::Render => {
                     render = Some(self.parse_render_block()?);
                 }
-                _ => return Err(self.error(
-                    "Expected prompt, tool, signal, let, fn, or render in agent"
-                )),
+                _ => {
+                    return Err(
+                        self.error("Expected prompt, tool, signal, let, fn, or render in agent")
+                    );
+                }
             }
         }
 
@@ -2052,7 +2367,12 @@ impl Parser {
                     (Ownership::Owned, self.parse_type()?)
                 };
 
-                params.push(Param { name, ty, ownership, secret: is_secret });
+                params.push(Param {
+                    name,
+                    ty,
+                    ownership,
+                    secret: is_secret,
+                });
             }
 
             if !self.check(&TokenKind::RightParen) {
@@ -2074,7 +2394,11 @@ impl Parser {
             };
             let mutable = self.match_token(&TokenKind::Mut);
             let inner = self.parse_type()?;
-            return Ok(Type::Reference { mutable, lifetime, inner: Box::new(inner) });
+            return Ok(Type::Reference {
+                mutable,
+                lifetime,
+                inner: Box::new(inner),
+            });
         }
 
         if self.match_token(&TokenKind::LeftBracket) {
@@ -2084,15 +2408,42 @@ impl Parser {
         }
 
         let name: String = match self.peek_kind() {
-            TokenKind::I32 => { self.advance(); "i32".into() }
-            TokenKind::I64 => { self.advance(); "i64".into() }
-            TokenKind::F32 => { self.advance(); "f32".into() }
-            TokenKind::F64 => { self.advance(); "f64".into() }
-            TokenKind::U32 => { self.advance(); "u32".into() }
-            TokenKind::U64 => { self.advance(); "u64".into() }
-            TokenKind::Bool_ => { self.advance(); "bool".into() }
-            TokenKind::StringType => { self.advance(); "String".into() }
-            TokenKind::SelfType => { self.advance(); "Self".into() }
+            TokenKind::I32 => {
+                self.advance();
+                "i32".into()
+            }
+            TokenKind::I64 => {
+                self.advance();
+                "i64".into()
+            }
+            TokenKind::F32 => {
+                self.advance();
+                "f32".into()
+            }
+            TokenKind::F64 => {
+                self.advance();
+                "f64".into()
+            }
+            TokenKind::U32 => {
+                self.advance();
+                "u32".into()
+            }
+            TokenKind::U64 => {
+                self.advance();
+                "u64".into()
+            }
+            TokenKind::Bool_ => {
+                self.advance();
+                "bool".into()
+            }
+            TokenKind::StringType => {
+                self.advance();
+                "String".into()
+            }
+            TokenKind::SelfType => {
+                self.advance();
+                "Self".into()
+            }
             _ => self.expect_ident()?,
         };
 
@@ -2179,7 +2530,14 @@ impl Parser {
 
                         let value = self.parse_expr()?;
                         self.expect(&TokenKind::Semicolon)?;
-                        Ok(Stmt::Let { name, ty, mutable, secret, value, ownership })
+                        Ok(Stmt::Let {
+                            name,
+                            ty,
+                            mutable,
+                            secret,
+                            value,
+                            ownership,
+                        })
                     }
                 }
             }
@@ -2196,7 +2554,13 @@ impl Parser {
                 self.expect(&TokenKind::Equals)?;
                 let value = self.parse_expr()?;
                 self.expect(&TokenKind::Semicolon)?;
-                Ok(Stmt::Signal { name, ty, secret, atomic, value })
+                Ok(Stmt::Signal {
+                    name,
+                    ty,
+                    secret,
+                    atomic,
+                    value,
+                })
             }
             TokenKind::Return => {
                 self.advance();
@@ -2229,9 +2593,7 @@ impl Parser {
             // a closure body (e.g., the virtual list row template).
             // We parse and discard the element structure; codegen handles the virtual
             // list template separately via the VirtualList AST node.
-            TokenKind::LeftAngle => {
-                self.parse_template_element_as_stmt()
-            }
+            TokenKind::LeftAngle => self.parse_template_element_as_stmt(),
             _ => {
                 let expr = self.parse_expr()?;
                 // Optional semicolon for expression statements
@@ -2264,7 +2626,9 @@ impl Parser {
                     break;
                 }
                 TokenKind::Eof => break,
-                _ => { self.advance(); }
+                _ => {
+                    self.advance();
+                }
             }
         }
         if !self_closing {
@@ -2289,14 +2653,22 @@ impl Parser {
                                         let _ = self.expect(&TokenKind::RightAngle);
                                         break;
                                     }
-                                    TokenKind::RightAngle => { self.advance(); depth += 1; break; }
+                                    TokenKind::RightAngle => {
+                                        self.advance();
+                                        depth += 1;
+                                        break;
+                                    }
                                     TokenKind::Eof => break,
-                                    _ => { self.advance(); }
+                                    _ => {
+                                        self.advance();
+                                    }
                                 }
                             }
                         }
                     }
-                    _ => { self.advance(); }
+                    _ => {
+                        self.advance();
+                    }
                 }
             }
         }
@@ -2354,7 +2726,11 @@ impl Parser {
         let mut left = self.parse_and()?;
         while self.match_token(&TokenKind::PipePipe) {
             let right = self.parse_and()?;
-            left = Expr::Binary { op: BinOp::Or, left: Box::new(left), right: Box::new(right) };
+            left = Expr::Binary {
+                op: BinOp::Or,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
@@ -2363,7 +2739,11 @@ impl Parser {
         let mut left = self.parse_equality()?;
         while self.match_token(&TokenKind::AmpAmp) {
             let right = self.parse_equality()?;
-            left = Expr::Binary { op: BinOp::And, left: Box::new(left), right: Box::new(right) };
+            left = Expr::Binary {
+                op: BinOp::And,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
         }
         Ok(left)
     }
@@ -2373,10 +2753,18 @@ impl Parser {
         loop {
             if self.match_token(&TokenKind::DoubleEquals) {
                 let right = self.parse_comparison()?;
-                left = Expr::Binary { op: BinOp::Eq, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Eq,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::NotEquals) {
                 let right = self.parse_comparison()?;
-                left = Expr::Binary { op: BinOp::Neq, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Neq,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else {
                 break;
             }
@@ -2389,16 +2777,32 @@ impl Parser {
         loop {
             if self.match_token(&TokenKind::LeftAngle) {
                 let right = self.parse_additive()?;
-                left = Expr::Binary { op: BinOp::Lt, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Lt,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::RightAngle) {
                 let right = self.parse_additive()?;
-                left = Expr::Binary { op: BinOp::Gt, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Gt,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::LessEqual) {
                 let right = self.parse_additive()?;
-                left = Expr::Binary { op: BinOp::Lte, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Lte,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::GreaterEqual) {
                 let right = self.parse_additive()?;
-                left = Expr::Binary { op: BinOp::Gte, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Gte,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else {
                 break;
             }
@@ -2411,10 +2815,18 @@ impl Parser {
         loop {
             if self.match_token(&TokenKind::Plus) {
                 let right = self.parse_multiplicative()?;
-                left = Expr::Binary { op: BinOp::Add, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Add,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::Minus) {
                 let right = self.parse_multiplicative()?;
-                left = Expr::Binary { op: BinOp::Sub, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Sub,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else {
                 break;
             }
@@ -2427,13 +2839,25 @@ impl Parser {
         loop {
             if self.match_token(&TokenKind::Star) {
                 let right = self.parse_unary()?;
-                left = Expr::Binary { op: BinOp::Mul, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Mul,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::Slash) {
                 let right = self.parse_unary()?;
-                left = Expr::Binary { op: BinOp::Div, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Div,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else if self.match_token(&TokenKind::Percent) {
                 let right = self.parse_unary()?;
-                left = Expr::Binary { op: BinOp::Mod, left: Box::new(left), right: Box::new(right) };
+                left = Expr::Binary {
+                    op: BinOp::Mod,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
             } else {
                 break;
             }
@@ -2444,11 +2868,17 @@ impl Parser {
     fn parse_unary(&mut self) -> Result<Expr, ParseError> {
         if self.match_token(&TokenKind::Minus) {
             let operand = self.parse_unary()?;
-            return Ok(Expr::Unary { op: UnaryOp::Neg, operand: Box::new(operand) });
+            return Ok(Expr::Unary {
+                op: UnaryOp::Neg,
+                operand: Box::new(operand),
+            });
         }
         if self.match_token(&TokenKind::Bang) {
             let operand = self.parse_unary()?;
-            return Ok(Expr::Unary { op: UnaryOp::Not, operand: Box::new(operand) });
+            return Ok(Expr::Unary {
+                op: UnaryOp::Not,
+                operand: Box::new(operand),
+            });
         }
         if self.match_token(&TokenKind::Ampersand) {
             if self.match_token(&TokenKind::Mut) {
@@ -2526,7 +2956,10 @@ impl Parser {
                         }
                     }
                     self.expect(&TokenKind::RightBrace)?;
-                    expr = Expr::StructInit { name: base_name, fields };
+                    expr = Expr::StructInit {
+                        name: base_name,
+                        fields,
+                    };
                 } else {
                     expr = Expr::FieldAccess {
                         object: Box::new(expr),
@@ -2570,24 +3003,37 @@ impl Parser {
             TokenKind::Integer(_) => {
                 if let TokenKind::Integer(n) = self.advance().kind {
                     Ok(Expr::Integer(n))
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             }
             TokenKind::Float(_) => {
                 if let TokenKind::Float(f) = self.advance().kind {
                     Ok(Expr::Float(f))
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             }
             TokenKind::StringLit(_) => {
                 if let TokenKind::StringLit(s) = self.advance().kind {
                     Ok(Expr::StringLit(s))
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             }
-            TokenKind::FormatString(_) => {
-                self.parse_format_string_expr()
+            TokenKind::FormatString(_) => self.parse_format_string_expr(),
+            TokenKind::True => {
+                self.advance();
+                Ok(Expr::Bool(true))
             }
-            TokenKind::True => { self.advance(); Ok(Expr::Bool(true)) }
-            TokenKind::False => { self.advance(); Ok(Expr::Bool(false)) }
-            TokenKind::SelfKw => { self.advance(); Ok(Expr::SelfExpr) }
+            TokenKind::False => {
+                self.advance();
+                Ok(Expr::Bool(false))
+            }
+            TokenKind::SelfKw => {
+                self.advance();
+                Ok(Expr::SelfExpr)
+            }
             TokenKind::LeftBracket => {
                 self.advance();
                 let mut elements = Vec::new();
@@ -2617,16 +3063,16 @@ impl Parser {
                     while let Some(start) = rest.find('{') {
                         if let Some(end) = rest[start..].find('}') {
                             let var_name = rest[start + 1..start + end].to_string();
-                            interpolations.push((
-                                var_name.clone(),
-                                Expr::Ident(var_name),
-                            ));
+                            interpolations.push((var_name.clone(), Expr::Ident(var_name)));
                             rest = &rest[start + end + 1..];
                         } else {
                             break;
                         }
                     }
-                    Ok(Expr::PromptTemplate { template, interpolations })
+                    Ok(Expr::PromptTemplate {
+                        template,
+                        interpolations,
+                    })
                 } else {
                     Err(self.error("Expected string literal after prompt"))
                 }
@@ -2647,7 +3093,10 @@ impl Parser {
                     None
                 };
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::Assert { condition: Box::new(condition), message })
+                Ok(Expr::Assert {
+                    condition: Box::new(condition),
+                    message,
+                })
             }
             TokenKind::AssertEq => {
                 // assert_eq(left, right) or assert_eq(left, right, "message")
@@ -2667,7 +3116,11 @@ impl Parser {
                     None
                 };
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::AssertEq { left: Box::new(left), right: Box::new(right), message })
+                Ok(Expr::AssertEq {
+                    left: Box::new(left),
+                    right: Box::new(right),
+                    message,
+                })
             }
             TokenKind::Env => {
                 self.advance();
@@ -2675,7 +3128,10 @@ impl Parser {
                 self.expect(&TokenKind::LeftParen)?;
                 let name = self.parse_expr()?;
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::Env { name: Box::new(name), span })
+                Ok(Expr::Env {
+                    name: Box::new(name),
+                    span,
+                })
             }
             TokenKind::Trace => {
                 self.advance();
@@ -2684,7 +3140,11 @@ impl Parser {
                 let label = self.parse_expr()?;
                 self.expect(&TokenKind::RightParen)?;
                 let body = self.parse_block()?;
-                Ok(Expr::Trace { label: Box::new(label), body, span })
+                Ok(Expr::Trace {
+                    label: Box::new(label),
+                    body,
+                    span,
+                })
             }
             TokenKind::Flag => {
                 self.advance();
@@ -2692,7 +3152,10 @@ impl Parser {
                 self.expect(&TokenKind::LeftParen)?;
                 let name = self.parse_expr()?;
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::Flag { name: Box::new(name), span })
+                Ok(Expr::Flag {
+                    name: Box::new(name),
+                    span,
+                })
             }
             TokenKind::Fetch => {
                 self.advance();
@@ -2710,14 +3173,20 @@ impl Parser {
                 } else {
                     None
                 };
-                Ok(Expr::Fetch { url: Box::new(url), options, contract })
+                Ok(Expr::Fetch {
+                    url: Box::new(url),
+                    options,
+                    contract,
+                })
             }
             TokenKind::Navigate => {
                 self.advance();
                 self.expect(&TokenKind::LeftParen)?;
                 let path = self.parse_expr()?;
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::Navigate { path: Box::new(path) })
+                Ok(Expr::Navigate {
+                    path: Box::new(path),
+                })
             }
             TokenKind::Download => {
                 let span = self.current_span();
@@ -2727,7 +3196,11 @@ impl Parser {
                 self.expect(&TokenKind::Comma)?;
                 let filename = self.parse_expr()?;
                 self.expect(&TokenKind::RightParen)?;
-                Ok(Expr::Download { data: Box::new(data), filename: Box::new(filename), span })
+                Ok(Expr::Download {
+                    data: Box::new(data),
+                    filename: Box::new(filename),
+                    span,
+                })
             }
             TokenKind::Spawn => {
                 self.advance();
@@ -2773,7 +3246,9 @@ impl Parser {
                 // e.g., for chunk in stream fetch("...") { ... }
                 self.advance();
                 let source = self.parse_unary()?;
-                Ok(Expr::Stream { source: Box::new(source) })
+                Ok(Expr::Stream {
+                    source: Box::new(source),
+                })
             }
             TokenKind::Suspend => {
                 // suspend(<fallback_expr>) { <body_expr> }
@@ -2813,12 +3288,20 @@ impl Parser {
                 let mut buffer = None;
 
                 // Parse key=value attributes until left brace
-                while !self.check(&TokenKind::LeftBrace) && !self.check(&TokenKind::Pipe) && !self.check(&TokenKind::PipePipe) && !self.is_at_end() {
+                while !self.check(&TokenKind::LeftBrace)
+                    && !self.check(&TokenKind::Pipe)
+                    && !self.check(&TokenKind::PipePipe)
+                    && !self.is_at_end()
+                {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Equals)?;
                     match key.as_str() {
-                        "list" => { items = Some(self.parse_expr()?); }
-                        "item_height" => { item_height = Some(self.parse_expr()?); }
+                        "list" => {
+                            items = Some(self.parse_expr()?);
+                        }
+                        "item_height" => {
+                            item_height = Some(self.parse_expr()?);
+                        }
                         "buffer" => {
                             if let TokenKind::Integer(n) = self.peek_kind() {
                                 buffer = Some(n as u32);
@@ -2827,7 +3310,9 @@ impl Parser {
                                 return Err(self.error("Expected integer for buffer"));
                             }
                         }
-                        _ => { self.advance(); }
+                        _ => {
+                            self.advance();
+                        }
                     }
                     self.match_token(&TokenKind::Comma);
                 }
@@ -2849,7 +3334,11 @@ impl Parser {
                 let target = self.parse_expr()?;
                 self.expect(&TokenKind::Comma)?;
                 let animation = if let TokenKind::StringLit(_) = self.peek_kind() {
-                    if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() }
+                    if let TokenKind::StringLit(s) = self.advance().kind {
+                        s
+                    } else {
+                        unreachable!()
+                    }
                 } else {
                     return Err(self.error("Expected string literal for animation name"));
                 };
@@ -2883,13 +3372,19 @@ impl Parser {
                 let params = self.parse_closure_params()?;
                 self.expect(&TokenKind::Pipe)?; // consume closing `|`
                 let body = self.parse_closure_body()?;
-                Ok(Expr::Closure { params, body: Box::new(body) })
+                Ok(Expr::Closure {
+                    params,
+                    body: Box::new(body),
+                })
             }
             // No-param closure: || body
             TokenKind::PipePipe => {
                 self.advance(); // consume `||`
                 let body = self.parse_closure_body()?;
-                Ok(Expr::Closure { params: Vec::new(), body: Box::new(body) })
+                Ok(Expr::Closure {
+                    params: Vec::new(),
+                    body: Box::new(body),
+                })
             }
             // fn(params) -> RetType { body } closure syntax
             TokenKind::Fn => {
@@ -2926,7 +3421,10 @@ impl Parser {
                 } else {
                     self.parse_expr()?
                 };
-                Ok(Expr::Closure { params, body: Box::new(body) })
+                Ok(Expr::Closure {
+                    params,
+                    body: Box::new(body),
+                })
             }
 
             TokenKind::Ident(ref id) if id == "vec" => {
@@ -2973,10 +3471,15 @@ impl Parser {
                     self.expect(&TokenKind::LeftParen)?;
                     let path = self.parse_expr()?;
                     self.expect(&TokenKind::RightParen)?;
-                    return Ok(Expr::DynamicImport { path: Box::new(path), span });
+                    return Ok(Expr::DynamicImport {
+                        path: Box::new(path),
+                        span,
+                    });
                 }
                 // Check for struct init: Name { field: val }
-                if self.check(&TokenKind::LeftBrace) && name.chars().next().is_some_and(|c| c.is_uppercase()) {
+                if self.check(&TokenKind::LeftBrace)
+                    && name.chars().next().is_some_and(|c| c.is_uppercase())
+                {
                     self.advance();
                     let mut fields = Vec::new();
                     while !self.check(&TokenKind::RightBrace) {
@@ -2995,9 +3498,15 @@ impl Parser {
                 }
             }
             // Keyword tokens that double as stdlib namespace prefixes (crypto::sha256, etc.)
-            TokenKind::Crypto | TokenKind::Cache | TokenKind::Db | TokenKind::Auth
-            | TokenKind::Clipboard | TokenKind::Upload | TokenKind::Payment
-            | TokenKind::Banking | TokenKind::MapKeyword => {
+            TokenKind::Crypto
+            | TokenKind::Cache
+            | TokenKind::Db
+            | TokenKind::Auth
+            | TokenKind::Clipboard
+            | TokenKind::Upload
+            | TokenKind::Payment
+            | TokenKind::Banking
+            | TokenKind::MapKeyword => {
                 let _span = self.current_span();
                 let name = match self.peek_kind() {
                     TokenKind::Crypto => "crypto",
@@ -3010,7 +3519,8 @@ impl Parser {
                     TokenKind::Banking => "banking",
                     TokenKind::MapKeyword => "map",
                     _ => unreachable!(),
-                }.to_string();
+                }
+                .to_string();
                 self.advance();
                 // Require :: namespace access — bare keyword use is handled elsewhere
                 let name = if self.check(&TokenKind::ColonColon) {
@@ -3142,14 +3652,21 @@ impl Parser {
             };
             self.expect(&TokenKind::FatArrow)?;
             let body = self.parse_expr()?;
-            arms.push(MatchArm { pattern, guard, body });
+            arms.push(MatchArm {
+                pattern,
+                guard,
+                body,
+            });
             if !self.check(&TokenKind::RightBrace) {
                 self.expect(&TokenKind::Comma)?;
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(Expr::Match { subject: Box::new(subject), arms })
+        Ok(Expr::Match {
+            subject: Box::new(subject),
+            arms,
+        })
     }
 
     fn parse_for_expr(&mut self) -> Result<Expr, ParseError> {
@@ -3213,7 +3730,10 @@ impl Parser {
                 self.advance();
                 Ok(Pattern::Wildcard)
             }
-            TokenKind::Integer(_) | TokenKind::StringLit(_) | TokenKind::True | TokenKind::False => {
+            TokenKind::Integer(_)
+            | TokenKind::StringLit(_)
+            | TokenKind::True
+            | TokenKind::False => {
                 let expr = self.parse_primary()?;
                 Ok(Pattern::Literal(expr))
             }
@@ -3237,10 +3757,16 @@ impl Parser {
                     self.expect(&TokenKind::RightParen)?;
                     // Variant with fields — use variant name (unqualified) for codegen
                     let pat_name = if is_qualified { variant_name } else { name };
-                    Ok(Pattern::Variant { name: pat_name, fields })
+                    Ok(Pattern::Variant {
+                        name: pat_name,
+                        fields,
+                    })
                 } else if is_qualified {
                     // Qualified variant without fields (e.g., Status::Active)
-                    Ok(Pattern::Variant { name: variant_name, fields: vec![] })
+                    Ok(Pattern::Variant {
+                        name: variant_name,
+                        fields: vec![],
+                    })
                 } else {
                     Ok(Pattern::Ident(name))
                 }
@@ -3366,24 +3892,14 @@ impl Parser {
                 FormatStringPart::Expr(expr_text) => {
                     // Re-lex and re-parse the expression text as a full expression.
                     let mut inner_lexer = crate::lexer::Lexer::new(&expr_text);
-                    let inner_tokens = inner_lexer.tokenize().map_err(|e| {
-                        ParseError {
-                            message: format!(
-                                "Error in format string interpolation: {}",
-                                e.message
-                            ),
-                            span: token.span,
-                        }
+                    let inner_tokens = inner_lexer.tokenize().map_err(|e| ParseError {
+                        message: format!("Error in format string interpolation: {}", e.message),
+                        span: token.span,
                     })?;
                     let mut inner_parser = Parser::new(inner_tokens);
-                    let expr = inner_parser.parse_expr().map_err(|e| {
-                        ParseError {
-                            message: format!(
-                                "Error in format string interpolation: {}",
-                                e.message
-                            ),
-                            span: token.span,
-                        }
+                    let expr = inner_parser.parse_expr().map_err(|e| ParseError {
+                        message: format!("Error in format string interpolation: {}", e.message),
+                        span: token.span,
                     })?;
                     ast_parts.push(FormatPart::Expression(Box::new(expr)));
                 }
@@ -3404,7 +3920,6 @@ impl Parser {
         Ok(args)
     }
 
-
     // === Router parsing ===
 
     fn parse_router(&mut self) -> Result<RouterDef, ParseError> {
@@ -3423,9 +3938,9 @@ impl Parser {
                 self.advance();
                 self.expect(&TokenKind::FatArrow)?;
                 let comp_name = self.expect_ident()?;
-                fallback = Some(Box::new(TemplateNode::Expression(
-                    Box::new(Expr::Ident(comp_name)),
-                )));
+                fallback = Some(Box::new(TemplateNode::Expression(Box::new(Expr::Ident(
+                    comp_name,
+                )))));
                 self.match_token(&TokenKind::Comma);
             } else if self.check(&TokenKind::Route) {
                 routes.push(self.parse_route_def()?);
@@ -3436,7 +3951,10 @@ impl Parser {
                 let render_span = self.current_span();
                 let body = self.parse_template_node()?;
                 self.expect(&TokenKind::RightBrace)?;
-                layout = Some(RenderBlock { body, span: render_span });
+                layout = Some(RenderBlock {
+                    body,
+                    span: render_span,
+                });
             } else if self.check(&TokenKind::Transition) {
                 self.advance();
                 if let TokenKind::StringLit(s) = self.peek_kind() {
@@ -3447,12 +3965,21 @@ impl Parser {
                 }
                 self.match_token(&TokenKind::Semicolon);
             } else {
-                return Err(self.error("Expected 'route', 'fallback', 'layout', or 'transition' in router block"));
+                return Err(self.error(
+                    "Expected 'route', 'fallback', 'layout', or 'transition' in router block",
+                ));
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(RouterDef { name, routes, fallback, layout, transition, span })
+        Ok(RouterDef {
+            name,
+            routes,
+            fallback,
+            layout,
+            transition,
+            span,
+        })
     }
 
     fn parse_route_def(&mut self) -> Result<RouteDef, ParseError> {
@@ -3466,7 +3993,8 @@ impl Parser {
             return Err(self.error("Expected string literal for route path"));
         };
 
-        let params: Vec<String> = path.split('/')
+        let params: Vec<String> = path
+            .split('/')
             .filter(|seg| seg.starts_with(':'))
             .map(|seg| seg[1..].to_string())
             .collect();
@@ -3496,7 +4024,14 @@ impl Parser {
             None
         };
 
-        Ok(RouteDef { path, params, component, guard, transition, span })
+        Ok(RouteDef {
+            path,
+            params,
+            component,
+            guard,
+            transition,
+            span,
+        })
     }
 
     // === Style parsing ===
@@ -3527,7 +4062,13 @@ impl Parser {
                 match &tok.kind {
                     TokenKind::Dot => selector.push('.'),
                     TokenKind::Ident(s) => {
-                        if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') && !selector.ends_with('-') && !selector.ends_with('#') {
+                        if !selector.is_empty()
+                            && !selector.ends_with('.')
+                            && !selector.ends_with(' ')
+                            && !selector.ends_with('@')
+                            && !selector.ends_with('-')
+                            && !selector.ends_with('#')
+                        {
                             selector.push(' ');
                         }
                         selector.push_str(s);
@@ -3553,7 +4094,13 @@ impl Parser {
                         // Use as_css_text() to handle every keyword generically.
                         let text = tok.kind.as_css_text();
                         if !text.is_empty() {
-                            if !selector.is_empty() && !selector.ends_with('.') && !selector.ends_with(' ') && !selector.ends_with('@') && !selector.ends_with('-') && !selector.ends_with('#') {
+                            if !selector.is_empty()
+                                && !selector.ends_with('.')
+                                && !selector.ends_with(' ')
+                                && !selector.ends_with('@')
+                                && !selector.ends_with('-')
+                                && !selector.ends_with('#')
+                            {
                                 selector.push(' ');
                             }
                             selector.push_str(&text);
@@ -3591,7 +4138,10 @@ impl Parser {
             let mut properties = Vec::new();
             while !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
                 let mut prop_name = String::new();
-                while !self.check(&TokenKind::Colon) && !self.check(&TokenKind::RightBrace) && !self.is_at_end() {
+                while !self.check(&TokenKind::Colon)
+                    && !self.check(&TokenKind::RightBrace)
+                    && !self.is_at_end()
+                {
                     let tok = self.advance();
                     match &tok.kind {
                         TokenKind::Ident(s) => {
@@ -3618,13 +4168,18 @@ impl Parser {
                     // Unquoted CSS value: collect tokens until `;` or `}`
                     let mut val = String::new();
                     while !self.check(&TokenKind::Semicolon)
-                          && !self.check(&TokenKind::RightBrace)
-                          && !self.is_at_end()
+                        && !self.check(&TokenKind::RightBrace)
+                        && !self.is_at_end()
                     {
                         let tok = self.advance();
                         match &tok.kind {
                             TokenKind::Ident(s) => {
-                                if !val.is_empty() && !val.ends_with(' ') && !val.ends_with('(') && !val.ends_with('#') && !val.ends_with('-') {
+                                if !val.is_empty()
+                                    && !val.ends_with(' ')
+                                    && !val.ends_with('(')
+                                    && !val.ends_with('#')
+                                    && !val.ends_with('-')
+                                {
                                     val.push(' ');
                                 }
                                 val.push_str(s);
@@ -3671,7 +4226,11 @@ impl Parser {
             }
 
             self.expect(&TokenKind::RightBrace)?;
-            blocks.push(StyleBlock { selector: trimmed_sel, properties, span });
+            blocks.push(StyleBlock {
+                selector: trimmed_sel,
+                properties,
+                span,
+            });
         }
 
         Ok(blocks)
@@ -3712,14 +4271,26 @@ impl Parser {
                     render = Some(self.parse_render_block()?);
                 }
                 _ => {
-                    return Err(self.error(&format!("unexpected token in form: {:?}", self.peek_kind())));
+                    return Err(
+                        self.error(&format!("unexpected token in form: {:?}", self.peek_kind()))
+                    );
                 }
             }
         }
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(FormDef { name, fields, on_submit, steps, methods, styles, render, is_pub, span })
+        Ok(FormDef {
+            name,
+            fields,
+            on_submit,
+            steps,
+            methods,
+            styles,
+            render,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_form_field(&mut self) -> Result<FormFieldDef, ParseError> {
@@ -3745,14 +4316,22 @@ impl Parser {
                         } else {
                             None
                         };
-                        validators.push(ValidatorDef { kind: ValidatorKind::Required, message, span });
+                        validators.push(ValidatorDef {
+                            kind: ValidatorKind::Required,
+                            message,
+                            span,
+                        });
                     }
                     "min_length" => {
                         self.expect(&TokenKind::Colon)?;
                         if let TokenKind::Integer(n) = self.peek_kind() {
                             let n = n as usize;
                             self.advance();
-                            validators.push(ValidatorDef { kind: ValidatorKind::MinLength(n), message: None, span });
+                            validators.push(ValidatorDef {
+                                kind: ValidatorKind::MinLength(n),
+                                message: None,
+                                span,
+                            });
                         }
                     }
                     "max_length" => {
@@ -3760,7 +4339,11 @@ impl Parser {
                         if let TokenKind::Integer(n) = self.peek_kind() {
                             let n = n as usize;
                             self.advance();
-                            validators.push(ValidatorDef { kind: ValidatorKind::MaxLength(n), message: None, span });
+                            validators.push(ValidatorDef {
+                                kind: ValidatorKind::MaxLength(n),
+                                message: None,
+                                span,
+                            });
                         }
                     }
                     "pattern" => {
@@ -3768,14 +4351,26 @@ impl Parser {
                         if let TokenKind::StringLit(s) = self.peek_kind() {
                             let s = s.clone();
                             self.advance();
-                            validators.push(ValidatorDef { kind: ValidatorKind::Pattern(s), message: None, span });
+                            validators.push(ValidatorDef {
+                                kind: ValidatorKind::Pattern(s),
+                                message: None,
+                                span,
+                            });
                         }
                     }
                     "email" => {
-                        validators.push(ValidatorDef { kind: ValidatorKind::Email, message: None, span });
+                        validators.push(ValidatorDef {
+                            kind: ValidatorKind::Email,
+                            message: None,
+                            span,
+                        });
                     }
                     "url" => {
-                        validators.push(ValidatorDef { kind: ValidatorKind::Url, message: None, span });
+                        validators.push(ValidatorDef {
+                            kind: ValidatorKind::Url,
+                            message: None,
+                            span,
+                        });
                     }
                     "label" => {
                         self.expect(&TokenKind::Colon)?;
@@ -3792,7 +4387,11 @@ impl Parser {
                     "validate" => {
                         self.expect(&TokenKind::Colon)?;
                         let fn_name = self.expect_ident()?;
-                        validators.push(ValidatorDef { kind: ValidatorKind::Custom(fn_name), message: None, span });
+                        validators.push(ValidatorDef {
+                            kind: ValidatorKind::Custom(fn_name),
+                            message: None,
+                            span,
+                        });
                     }
                     _ => {
                         return Err(self.error(&format!("unknown form field attribute: {}", key)));
@@ -3806,7 +4405,15 @@ impl Parser {
         // Semicolon optional
         self.match_token(&TokenKind::Semicolon);
 
-        Ok(FormFieldDef { name, ty, validators, label, placeholder, default_value, span })
+        Ok(FormFieldDef {
+            name,
+            ty,
+            validators,
+            label,
+            placeholder,
+            default_value,
+            span,
+        })
     }
 
     /// Parse a single style block (used by form parser)
@@ -3869,21 +4476,30 @@ impl Parser {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
-                        "url" => { url = self.parse_expr()?; }
+                        "url" => {
+                            url = self.parse_expr()?;
+                        }
                         "provider" => {
                             if let TokenKind::StringLit(s) = self.peek_kind() {
                                 provider = Some(s.clone());
                                 self.advance();
                             }
                         }
-                        "reconnect" => {
-                            match self.peek_kind() {
-                                TokenKind::True => { reconnect = true; self.advance(); }
-                                TokenKind::False => { reconnect = false; self.advance(); }
-                                TokenKind::Ident(v) => { reconnect = v == "true"; self.advance(); }
-                                _ => {}
+                        "reconnect" => match self.peek_kind() {
+                            TokenKind::True => {
+                                reconnect = true;
+                                self.advance();
                             }
-                        }
+                            TokenKind::False => {
+                                reconnect = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                reconnect = v == "true";
+                                self.advance();
+                            }
+                            _ => {}
+                        },
                         "heartbeat" => {
                             if let TokenKind::Integer(n) = self.peek_kind() {
                                 heartbeat_interval = Some(n as u64);
@@ -3905,7 +4521,20 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(ChannelDef { name, url, provider, contract, on_message, on_connect, on_disconnect, reconnect, heartbeat_interval, methods, is_pub, span })
+        Ok(ChannelDef {
+            name,
+            url,
+            provider,
+            contract,
+            on_message,
+            on_connect,
+            on_disconnect,
+            reconnect,
+            heartbeat_interval,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     /// Parse a channel handler: either a named `fn name(params) { body }` or
@@ -3961,22 +4590,33 @@ impl Parser {
             let key = self.expect_ident()?;
             self.expect(&TokenKind::Colon)?;
             match key.as_str() {
-                "src" => { src = self.parse_expr()?; }
+                "src" => {
+                    src = self.parse_expr()?;
+                }
                 "loading" => {
                     if let TokenKind::StringLit(s) = self.peek_kind() {
                         loading = Some(s);
                         self.advance();
                     }
                 }
-                "sandbox" => {
-                    match self.peek_kind() {
-                        TokenKind::True => { sandbox = true; self.advance(); }
-                        TokenKind::False => { sandbox = false; self.advance(); }
-                        TokenKind::Ident(v) => { sandbox = v == "true"; self.advance(); }
-                        _ => {}
+                "sandbox" => match self.peek_kind() {
+                    TokenKind::True => {
+                        sandbox = true;
+                        self.advance();
                     }
+                    TokenKind::False => {
+                        sandbox = false;
+                        self.advance();
+                    }
+                    TokenKind::Ident(v) => {
+                        sandbox = v == "true";
+                        self.advance();
+                    }
+                    _ => {}
+                },
+                "integrity" => {
+                    integrity = Some(self.parse_expr()?);
                 }
-                "integrity" => { integrity = Some(self.parse_expr()?); }
                 "permissions" => {
                     permissions = Some(self.parse_permissions()?);
                 }
@@ -3993,7 +4633,16 @@ impl Parser {
 
         self.expect(&TokenKind::RightBrace)?;
 
-        Ok(EmbedDef { name, src, loading, sandbox, integrity, permissions, is_pub, span })
+        Ok(EmbedDef {
+            name,
+            src,
+            loading,
+            sandbox,
+            integrity,
+            permissions,
+            is_pub,
+            span,
+        })
     }
 
     // === PDF parsing ===
@@ -4030,7 +4679,9 @@ impl Parser {
                                 self.advance();
                             }
                         }
-                        "margins" => { margins = Some(self.parse_expr()?); }
+                        "margins" => {
+                            margins = Some(self.parse_expr()?);
+                        }
                         _ => {
                             self.errors.push(ParseError {
                                 message: format!("unknown pdf property: {}", key),
@@ -4052,7 +4703,15 @@ impl Parser {
             span,
         });
 
-        Ok(PdfDef { name, render, page_size, orientation, margins, is_pub, span })
+        Ok(PdfDef {
+            name,
+            render,
+            page_size,
+            orientation,
+            margins,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_payment(&mut self, is_pub: bool) -> Result<PaymentDef, ParseError> {
@@ -4082,24 +4741,47 @@ impl Parser {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
-                        "provider" => { provider = Some(self.parse_expr()?); }
-                        "public_key" => { public_key = Some(self.parse_expr()?); }
-                        "sandbox" => {
-                            match self.peek_kind() {
-                                TokenKind::True => { sandbox_mode = true; self.advance(); }
-                                TokenKind::False => { sandbox_mode = false; self.advance(); }
-                                TokenKind::Ident(v) => { sandbox_mode = v == "true"; self.advance(); }
-                                _ => {}
-                            }
+                        "provider" => {
+                            provider = Some(self.parse_expr()?);
                         }
-                        _ => { self.parse_expr()?; } // skip unknown
+                        "public_key" => {
+                            public_key = Some(self.parse_expr()?);
+                        }
+                        "sandbox" => match self.peek_kind() {
+                            TokenKind::True => {
+                                sandbox_mode = true;
+                                self.advance();
+                            }
+                            TokenKind::False => {
+                                sandbox_mode = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                sandbox_mode = v == "true";
+                                self.advance();
+                            }
+                            _ => {}
+                        },
+                        _ => {
+                            self.parse_expr()?;
+                        } // skip unknown
                     }
                     self.match_token(&TokenKind::Comma);
                 }
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(PaymentDef { name, provider, public_key, sandbox_mode, on_success, on_error, methods, is_pub, span })
+        Ok(PaymentDef {
+            name,
+            provider,
+            public_key,
+            sandbox_mode,
+            on_success,
+            on_error,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_miniprogram(&mut self, is_pub: bool) -> Result<MiniProgramDef, ParseError> {
@@ -4157,15 +4839,24 @@ impl Parser {
                                 self.advance();
                             }
                         }
-                        "offline" => {
-                            match self.peek_kind() {
-                                TokenKind::True => { offline = true; self.advance(); }
-                                TokenKind::False => { offline = false; self.advance(); }
-                                TokenKind::Ident(v) => { offline = v == "true"; self.advance(); }
-                                _ => {}
+                        "offline" => match self.peek_kind() {
+                            TokenKind::True => {
+                                offline = true;
+                                self.advance();
                             }
-                        }
-                        _ => { self.parse_expr()?; } // skip unknown
+                            TokenKind::False => {
+                                offline = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                offline = v == "true";
+                                self.advance();
+                            }
+                            _ => {}
+                        },
+                        _ => {
+                            self.parse_expr()?;
+                        } // skip unknown
                     }
                     self.match_token(&TokenKind::Comma);
                 }
@@ -4173,9 +4864,18 @@ impl Parser {
         }
         self.expect(&TokenKind::RightBrace)?;
         Ok(MiniProgramDef {
-            name, payment_provider, auth_provider, map_provider,
-            offline, cache_strategy, on_launch, on_show, on_hide,
-            methods, is_pub, span,
+            name,
+            payment_provider,
+            auth_provider,
+            map_provider,
+            offline,
+            cache_strategy,
+            on_launch,
+            on_show,
+            on_hide,
+            methods,
+            is_pub,
+            span,
         })
     }
 
@@ -4206,15 +4906,28 @@ impl Parser {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
-                        "provider" => { provider = Some(self.parse_expr()?); }
-                        _ => { self.parse_expr()?; } // skip unknown
+                        "provider" => {
+                            provider = Some(self.parse_expr()?);
+                        }
+                        _ => {
+                            self.parse_expr()?;
+                        } // skip unknown
                     }
                     self.match_token(&TokenKind::Comma);
                 }
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(BankingDef { name, provider, on_success, on_exit, on_error, methods, is_pub, span })
+        Ok(BankingDef {
+            name,
+            provider,
+            on_success,
+            on_exit,
+            on_error,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_map(&mut self, is_pub: bool) -> Result<MapDef, ParseError> {
@@ -4245,8 +4958,12 @@ impl Parser {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
-                        "provider" => { provider = Some(self.parse_expr()?); }
-                        "style" => { style = Some(self.parse_expr()?); }
+                        "provider" => {
+                            provider = Some(self.parse_expr()?);
+                        }
+                        "style" => {
+                            style = Some(self.parse_expr()?);
+                        }
                         "center" => {
                             // Parse (lat, lng) tuple
                             self.expect(&TokenKind::LeftParen)?;
@@ -4257,7 +4974,10 @@ impl Parser {
                             let lat = match &lat_expr {
                                 Expr::Float(f) => *f,
                                 Expr::Integer(i) => *i as f64,
-                                Expr::Unary { op: UnaryOp::Neg, operand } => match operand.as_ref() {
+                                Expr::Unary {
+                                    op: UnaryOp::Neg,
+                                    operand,
+                                } => match operand.as_ref() {
                                     Expr::Float(f) => -f,
                                     Expr::Integer(i) => -(*i as f64),
                                     _ => 0.0,
@@ -4267,7 +4987,10 @@ impl Parser {
                             let lng = match &lng_expr {
                                 Expr::Float(f) => *f,
                                 Expr::Integer(i) => *i as f64,
-                                Expr::Unary { op: UnaryOp::Neg, operand } => match operand.as_ref() {
+                                Expr::Unary {
+                                    op: UnaryOp::Neg,
+                                    operand,
+                                } => match operand.as_ref() {
                                     Expr::Float(f) => -f,
                                     Expr::Integer(i) => -(*i as f64),
                                     _ => 0.0,
@@ -4284,14 +5007,27 @@ impl Parser {
                                 _ => None,
                             };
                         }
-                        _ => { self.parse_expr()?; } // skip unknown
+                        _ => {
+                            self.parse_expr()?;
+                        } // skip unknown
                     }
                     self.match_token(&TokenKind::Comma);
                 }
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(MapDef { name, provider, center, zoom, style, on_ready, on_click, methods, is_pub, span })
+        Ok(MapDef {
+            name,
+            provider,
+            center,
+            zoom,
+            style,
+            on_ready,
+            on_click,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_auth(&mut self, is_pub: bool) -> Result<AuthDef, ParseError> {
@@ -4325,7 +5061,12 @@ impl Parser {
                         "provider" => {
                             // provider "google" { client_id: ..., scopes: [...] }
                             if let TokenKind::StringLit(_) = self.peek_kind() {
-                                let prov_name = if let TokenKind::StringLit(s) = self.advance().kind { s } else { unreachable!() };
+                                let prov_name = if let TokenKind::StringLit(s) = self.advance().kind
+                                {
+                                    s
+                                } else {
+                                    unreachable!()
+                                };
                                 let prov_span = self.current_span();
                                 self.expect(&TokenKind::LeftBrace)?;
                                 let mut client_id = None;
@@ -4334,10 +5075,14 @@ impl Parser {
                                     let pkey = self.expect_ident()?;
                                     self.expect(&TokenKind::Colon)?;
                                     match pkey.as_str() {
-                                        "client_id" => { client_id = Some(self.parse_expr()?); }
+                                        "client_id" => {
+                                            client_id = Some(self.parse_expr()?);
+                                        }
                                         "scopes" => {
                                             self.expect(&TokenKind::LeftBracket)?;
-                                            while !self.check(&TokenKind::RightBracket) && !self.is_at_end() {
+                                            while !self.check(&TokenKind::RightBracket)
+                                                && !self.is_at_end()
+                                            {
                                                 if let TokenKind::StringLit(s) = self.peek_kind() {
                                                     scopes.push(s);
                                                     self.advance();
@@ -4348,12 +5093,19 @@ impl Parser {
                                             }
                                             self.expect(&TokenKind::RightBracket)?;
                                         }
-                                        _ => { self.parse_expr()?; }
+                                        _ => {
+                                            self.parse_expr()?;
+                                        }
                                     }
                                     self.match_token(&TokenKind::Comma);
                                 }
                                 self.expect(&TokenKind::RightBrace)?;
-                                providers.push(AuthProvider { name: prov_name, client_id, scopes, span: prov_span });
+                                providers.push(AuthProvider {
+                                    name: prov_name,
+                                    client_id,
+                                    scopes,
+                                    span: prov_span,
+                                });
                             } else {
                                 self.expect(&TokenKind::Colon)?;
                                 provider = Some(self.parse_expr()?);
@@ -4376,7 +5128,18 @@ impl Parser {
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(AuthDef { name, provider, providers, on_login, on_logout, on_error, session_storage, methods, is_pub, span })
+        Ok(AuthDef {
+            name,
+            provider,
+            providers,
+            on_login,
+            on_logout,
+            on_error,
+            session_storage,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_upload(&mut self, is_pub: bool) -> Result<UploadDef, ParseError> {
@@ -4409,8 +5172,12 @@ impl Parser {
                     let key = self.expect_ident()?;
                     self.expect(&TokenKind::Colon)?;
                     match key.as_str() {
-                        "endpoint" => { endpoint = self.parse_expr()?; }
-                        "max_size" => { max_size = Some(self.parse_expr()?); }
+                        "endpoint" => {
+                            endpoint = self.parse_expr()?;
+                        }
+                        "max_size" => {
+                            max_size = Some(self.parse_expr()?);
+                        }
                         "accept" => {
                             self.expect(&TokenKind::LeftBracket)?;
                             while !self.check(&TokenKind::RightBracket) && !self.is_at_end() {
@@ -4424,22 +5191,43 @@ impl Parser {
                             }
                             self.expect(&TokenKind::RightBracket)?;
                         }
-                        "chunked" => {
-                            match self.peek_kind() {
-                                TokenKind::True => { chunked = true; self.advance(); }
-                                TokenKind::False => { chunked = false; self.advance(); }
-                                TokenKind::Ident(v) => { chunked = v == "true"; self.advance(); }
-                                _ => {}
+                        "chunked" => match self.peek_kind() {
+                            TokenKind::True => {
+                                chunked = true;
+                                self.advance();
                             }
-                        }
-                        _ => { self.parse_expr()?; } // skip unknown
+                            TokenKind::False => {
+                                chunked = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                chunked = v == "true";
+                                self.advance();
+                            }
+                            _ => {}
+                        },
+                        _ => {
+                            self.parse_expr()?;
+                        } // skip unknown
                     }
                     self.match_token(&TokenKind::Comma);
                 }
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(UploadDef { name, endpoint, max_size, accept, chunked, on_progress, on_complete, on_error, methods, is_pub, span })
+        Ok(UploadDef {
+            name,
+            endpoint,
+            max_size,
+            accept,
+            chunked,
+            on_progress,
+            on_complete,
+            on_error,
+            methods,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_cache(&mut self, is_pub: bool) -> Result<CacheDef, ParseError> {
@@ -4479,21 +5267,30 @@ impl Parser {
                                 self.advance();
                             }
                         }
-                        "persist" => {
-                            match self.peek_kind() {
-                                TokenKind::True => { persist = true; self.advance(); }
-                                TokenKind::False => { persist = false; self.advance(); }
-                                TokenKind::Ident(v) => { persist = v == "true"; self.advance(); }
-                                _ => {}
+                        "persist" => match self.peek_kind() {
+                            TokenKind::True => {
+                                persist = true;
+                                self.advance();
                             }
-                        }
+                            TokenKind::False => {
+                                persist = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                persist = v == "true";
+                                self.advance();
+                            }
+                            _ => {}
+                        },
                         "max_entries" => {
                             if let TokenKind::Integer(n) = self.peek_kind() {
                                 max_entries = Some(n as u64);
                                 self.advance();
                             }
                         }
-                        _ => { self.advance(); }
+                        _ => {
+                            self.advance();
+                        }
                     }
                     self.match_token(&TokenKind::Comma);
                 }
@@ -4501,7 +5298,17 @@ impl Parser {
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(CacheDef { name, strategy, default_ttl, persist, max_entries, queries, mutations, is_pub, span })
+        Ok(CacheDef {
+            name,
+            strategy,
+            default_ttl,
+            persist,
+            max_entries,
+            queries,
+            mutations,
+            is_pub,
+            span,
+        })
     }
 
     fn parse_cache_query(&mut self) -> Result<CacheQueryDef, ParseError> {
@@ -4565,7 +5372,9 @@ impl Parser {
                             self.expect(&TokenKind::RightBracket)?;
                         }
                     }
-                    _ => { self.advance(); }
+                    _ => {
+                        self.advance();
+                    }
                 }
                 self.match_token(&TokenKind::Comma);
             }
@@ -4574,7 +5383,16 @@ impl Parser {
 
         self.match_token(&TokenKind::Comma);
 
-        Ok(CacheQueryDef { name, params, fetch_expr, contract, ttl, stale, invalidate_on, span })
+        Ok(CacheQueryDef {
+            name,
+            params,
+            fetch_expr,
+            contract,
+            ttl,
+            stale,
+            invalidate_on,
+            span,
+        })
     }
 
     fn parse_cache_mutation(&mut self) -> Result<CacheMutationDef, ParseError> {
@@ -4604,18 +5422,36 @@ impl Parser {
                     "optimistic" => {
                         self.expect(&TokenKind::Colon)?;
                         match self.peek_kind() {
-                            TokenKind::True => { optimistic = true; self.advance(); }
-                            TokenKind::False => { optimistic = false; self.advance(); }
-                            TokenKind::Ident(v) => { optimistic = v == "true"; self.advance(); }
+                            TokenKind::True => {
+                                optimistic = true;
+                                self.advance();
+                            }
+                            TokenKind::False => {
+                                optimistic = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                optimistic = v == "true";
+                                self.advance();
+                            }
                             _ => {}
                         }
                     }
                     "rollback_on_error" => {
                         self.expect(&TokenKind::Colon)?;
                         match self.peek_kind() {
-                            TokenKind::True => { rollback_on_error = true; self.advance(); }
-                            TokenKind::False => { rollback_on_error = false; self.advance(); }
-                            TokenKind::Ident(v) => { rollback_on_error = v == "true"; self.advance(); }
+                            TokenKind::True => {
+                                rollback_on_error = true;
+                                self.advance();
+                            }
+                            TokenKind::False => {
+                                rollback_on_error = false;
+                                self.advance();
+                            }
+                            TokenKind::Ident(v) => {
+                                rollback_on_error = v == "true";
+                                self.advance();
+                            }
                             _ => {}
                         }
                     }
@@ -4644,7 +5480,15 @@ impl Parser {
 
         self.match_token(&TokenKind::Comma);
 
-        Ok(CacheMutationDef { name, params, fetch_expr, optimistic, rollback_on_error, invalidate, span })
+        Ok(CacheMutationDef {
+            name,
+            params,
+            fetch_expr,
+            optimistic,
+            rollback_on_error,
+            invalidate,
+            span,
+        })
     }
 
     fn parse_db(&mut self, is_pub: bool) -> Result<DbDef, ParseError> {
@@ -4715,7 +5559,12 @@ impl Parser {
                         }
                     }
                     self.expect(&TokenKind::RightBrace)?;
-                    stores.push(DbStoreDef { name: store_name, key: store_key, indexes, span: store_span });
+                    stores.push(DbStoreDef {
+                        name: store_name,
+                        key: store_key,
+                        indexes,
+                        span: store_span,
+                    });
                 }
                 _ => {
                     // skip unknown
@@ -4726,7 +5575,13 @@ impl Parser {
             }
         }
         self.expect(&TokenKind::RightBrace)?;
-        Ok(DbDef { name, version, stores, is_pub, span })
+        Ok(DbDef {
+            name,
+            version,
+            stores,
+            is_pub,
+            span,
+        })
     }
 
     /// Parse `breakpoints Name { sm: 640, md: 768 }` where the keyword is the
@@ -4858,13 +5713,25 @@ impl Parser {
                     let _val = self.parse_expr()?;
                     self.match_token(&TokenKind::Comma);
                 }
-                _ => return Err(self.error("Expected light, dark, auto, primary, or default in theme")),
+                _ => {
+                    return Err(
+                        self.error("Expected light, dark, auto, primary, or default in theme")
+                    );
+                }
             }
             self.match_token(&TokenKind::Comma);
         }
 
         self.expect(&TokenKind::RightBrace)?;
-        Ok(ThemeDef { name, light, dark, dark_auto, primary, is_pub, span })
+        Ok(ThemeDef {
+            name,
+            light,
+            dark,
+            dark_auto,
+            primary,
+            is_pub,
+            span,
+        })
     }
 
     /// Parse `spring FadeIn { stiffness: 120, damping: 14, mass: 1, properties: ["opacity", "transform"] }`
@@ -4923,7 +5790,9 @@ impl Parser {
                     }
                     self.expect(&TokenKind::RightBracket)?;
                 }
-                _ => { self.advance(); }
+                _ => {
+                    self.advance();
+                }
             }
             self.match_token(&TokenKind::Comma);
         }
@@ -4931,7 +5800,12 @@ impl Parser {
         self.expect(&TokenKind::RightBrace)?;
         Ok(AnimationBlockDef {
             name,
-            kind: AnimationKind::Spring { stiffness, damping, mass, properties },
+            kind: AnimationKind::Spring {
+                stiffness,
+                damping,
+                mass,
+                properties,
+            },
             is_pub,
             span,
         })
@@ -4984,7 +5858,9 @@ impl Parser {
                             self.advance();
                         }
                     }
-                    _ => { self.advance(); }
+                    _ => {
+                        self.advance();
+                    }
                 }
                 self.match_token(&TokenKind::Comma);
             } else {
@@ -4995,7 +5871,11 @@ impl Parser {
         self.expect(&TokenKind::RightBrace)?;
         Ok(AnimationBlockDef {
             name,
-            kind: AnimationKind::Keyframes { frames, duration, easing },
+            kind: AnimationKind::Keyframes {
+                frames,
+                duration,
+                easing,
+            },
             is_pub,
             span,
         })
@@ -5031,7 +5911,9 @@ impl Parser {
                         self.advance();
                     }
                 }
-                _ => { self.advance(); }
+                _ => {
+                    self.advance();
+                }
             }
             self.match_token(&TokenKind::Comma);
         }
@@ -5039,7 +5921,11 @@ impl Parser {
         self.expect(&TokenKind::RightBrace)?;
         Ok(AnimationBlockDef {
             name,
-            kind: AnimationKind::Stagger { animation, delay, selector },
+            kind: AnimationKind::Stagger {
+                animation,
+                delay,
+                selector,
+            },
             is_pub,
             span,
         })
@@ -5048,11 +5934,17 @@ impl Parser {
     // === Helpers ===
 
     fn peek_kind(&self) -> TokenKind {
-        self.tokens.get(self.pos).map(|t| t.kind.clone()).unwrap_or(TokenKind::Eof)
+        self.tokens
+            .get(self.pos)
+            .map(|t| t.kind.clone())
+            .unwrap_or(TokenKind::Eof)
     }
 
     fn current_span(&self) -> Span {
-        self.tokens.get(self.pos).map(|t| t.span).unwrap_or(Span::new(0, 0, 0, 0))
+        self.tokens
+            .get(self.pos)
+            .map(|t| t.span)
+            .unwrap_or(Span::new(0, 0, 0, 0))
     }
 
     fn advance(&mut self) -> Token {
@@ -5153,21 +6045,49 @@ impl Parser {
     /// Returns true if the token kind is a keyword that can be used as an
     /// object literal key (i.e., it is recognized by `expect_ident`).
     fn token_is_keyword_ident(kind: &TokenKind) -> bool {
-        matches!(kind,
-            TokenKind::Canonical | TokenKind::Selector | TokenKind::Sandbox
-            | TokenKind::Loading | TokenKind::Duration | TokenKind::Invalidate
-            | TokenKind::Optimistic | TokenKind::Validate | TokenKind::Schema
-            | TokenKind::Instant | TokenKind::Fluid | TokenKind::Clipboard
-            | TokenKind::Draggable | TokenKind::Droppable | TokenKind::Crypto
-            | TokenKind::Virtual | TokenKind::Breakpoint | TokenKind::Download
-            | TokenKind::Haptic | TokenKind::Biometric | TokenKind::Camera
-            | TokenKind::Geolocation | TokenKind::Flag | TokenKind::Trace
-            | TokenKind::Env | TokenKind::Fallback | TokenKind::Push
-            | TokenKind::Query | TokenKind::Store | TokenKind::True
-            | TokenKind::False | TokenKind::Secret | TokenKind::Tool
-            | TokenKind::Theme | TokenKind::Page | TokenKind::Chunk
-            | TokenKind::Form | TokenKind::OnMessage | TokenKind::Upload
-            | TokenKind::Payment | TokenKind::Style
+        matches!(
+            kind,
+            TokenKind::Canonical
+                | TokenKind::Selector
+                | TokenKind::Sandbox
+                | TokenKind::Loading
+                | TokenKind::Duration
+                | TokenKind::Invalidate
+                | TokenKind::Optimistic
+                | TokenKind::Validate
+                | TokenKind::Schema
+                | TokenKind::Instant
+                | TokenKind::Fluid
+                | TokenKind::Clipboard
+                | TokenKind::Draggable
+                | TokenKind::Droppable
+                | TokenKind::Crypto
+                | TokenKind::Virtual
+                | TokenKind::Breakpoint
+                | TokenKind::Download
+                | TokenKind::Haptic
+                | TokenKind::Biometric
+                | TokenKind::Camera
+                | TokenKind::Geolocation
+                | TokenKind::Flag
+                | TokenKind::Trace
+                | TokenKind::Env
+                | TokenKind::Fallback
+                | TokenKind::Push
+                | TokenKind::Query
+                | TokenKind::Store
+                | TokenKind::True
+                | TokenKind::False
+                | TokenKind::Secret
+                | TokenKind::Tool
+                | TokenKind::Theme
+                | TokenKind::Page
+                | TokenKind::Chunk
+                | TokenKind::Form
+                | TokenKind::OnMessage
+                | TokenKind::Upload
+                | TokenKind::Payment
+                | TokenKind::Style
         )
     }
 
@@ -5244,7 +6164,8 @@ mod tests {
 
     #[test]
     fn test_parse_component() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Hello(name: String) {
                 render {
                     <div>
@@ -5252,7 +6173,8 @@ mod tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         assert!(matches!(prog.items[0], Item::Component(_)));
     }
@@ -5279,7 +6201,11 @@ mod tests {
         // to the next `fn`, which also fails the same way — two errors.
         let src = "fn ; fn ;";
         let (_prog, errors) = parse_recovering(src);
-        assert!(errors.len() >= 2, "expected at least 2 errors, got {}", errors.len());
+        assert!(
+            errors.len() >= 2,
+            "expected at least 2 errors, got {}",
+            errors.len()
+        );
     }
 
     #[test]
@@ -5295,8 +6221,10 @@ mod tests {
         assert!(!errors.is_empty(), "expected at least one error");
         // The two valid items should still be present in the AST
         assert_eq!(
-            prog.items.len(), 2,
-            "expected 2 valid items, got {}", prog.items.len()
+            prog.items.len(),
+            2,
+            "expected 2 valid items, got {}",
+            prog.items.len()
         );
         assert!(matches!(prog.items[0], Item::Function(_)));
         assert!(matches!(prog.items[1], Item::Struct(_)));
@@ -5327,8 +6255,17 @@ mod tests {
             fn last() {}
         "#;
         let (prog, errors) = parse_recovering(src);
-        assert!(errors.len() >= 2, "expected at least 2 errors, got {}", errors.len());
-        assert_eq!(prog.items.len(), 3, "expected 3 valid items, got {}", prog.items.len());
+        assert!(
+            errors.len() >= 2,
+            "expected at least 2 errors, got {}",
+            errors.len()
+        );
+        assert_eq!(
+            prog.items.len(),
+            3,
+            "expected 3 valid items, got {}",
+            prog.items.len()
+        );
     }
 
     #[test]
@@ -5719,7 +6656,11 @@ mod tests {
         assert!(errors.is_empty(), "errors: {:?}", errors);
         if let Item::Function(f) = &program.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
-                assert!(matches!(value, Expr::Try(_)), "Expected Try expr, got {:?}", value);
+                assert!(
+                    matches!(value, Expr::Try(_)),
+                    "Expected Try expr, got {:?}",
+                    value
+                );
             } else {
                 panic!("Expected Let");
             }
@@ -5734,7 +6675,11 @@ mod tests {
         if let Item::Function(f) = &program.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
                 // The outer value should be Try(MethodCall { ... })
-                assert!(matches!(value, Expr::Try(_)), "Expected Try expr, got {:?}", value);
+                assert!(
+                    matches!(value, Expr::Try(_)),
+                    "Expected Try expr, got {:?}",
+                    value
+                );
             } else {
                 panic!("Expected Let");
             }
@@ -5933,14 +6878,16 @@ mod tests {
 
     #[test]
     fn test_parse_store() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             store AppStore {
                 signal count: i32 = 0;
                 action increment(&mut self) { self.count = self.count + 1; }
                 computed double(&self) -> i32 { return self.count * 2; }
                 effect log_count(&self) { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Store(s) = &prog.items[0] {
             assert_eq!(s.name, "AppStore");
             assert_eq!(s.signals.len(), 1);
@@ -5954,12 +6901,14 @@ mod tests {
 
     #[test]
     fn test_parse_store_async_action() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             store S {
                 signal x: i32 = 0;
                 async action fetch_data(&mut self) { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Store(s) = &prog.items[0] {
             assert!(s.actions[0].is_async);
         } else {
@@ -5969,11 +6918,13 @@ mod tests {
 
     #[test]
     fn test_parse_store_atomic_signal() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             store S {
                 signal atomic counter: i32 = 0;
             }
-        "#);
+        "#,
+        );
         if let Item::Store(s) = &prog.items[0] {
             assert!(s.signals[0].atomic);
         } else {
@@ -5983,12 +6934,14 @@ mod tests {
 
     #[test]
     fn test_parse_store_selector() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             store S {
                 signal count: i32 = 0;
                 selector doubled: count * 2;
             }
-        "#);
+        "#,
+        );
         if let Item::Store(s) = &prog.items[0] {
             assert_eq!(s.selectors.len(), 1);
             assert_eq!(s.selectors[0].name, "doubled");
@@ -6011,13 +6964,15 @@ mod tests {
 
     #[test]
     fn test_parse_router() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             router AppRouter {
                 route "/" => Home,
                 route "/about" => About,
                 fallback => NotFound,
             }
-        "#);
+        "#,
+        );
         if let Item::Router(r) = &prog.items[0] {
             assert_eq!(r.name, "AppRouter");
             assert_eq!(r.routes.len(), 2);
@@ -6032,11 +6987,13 @@ mod tests {
 
     #[test]
     fn test_parse_router_with_params() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             router R {
                 route "/user/:id" => UserProfile,
             }
-        "#);
+        "#,
+        );
         if let Item::Router(r) = &prog.items[0] {
             assert_eq!(r.routes[0].params, vec!["id"]);
         } else {
@@ -6046,11 +7003,13 @@ mod tests {
 
     #[test]
     fn test_parse_router_with_guard() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             router R {
                 route "/admin" => Admin guard { is_admin() },
             }
-        "#);
+        "#,
+        );
         if let Item::Router(r) = &prog.items[0] {
             assert!(r.routes[0].guard.is_some());
         } else {
@@ -6062,7 +7021,8 @@ mod tests {
 
     #[test]
     fn test_parse_agent() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             agent Assistant {
                 prompt system = "You are helpful.";
                 tool search(text: String) -> String {
@@ -6072,7 +7032,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Agent(a) = &prog.items[0] {
             assert_eq!(a.name, "Assistant");
             assert_eq!(a.system_prompt, Some("You are helpful.".to_string()));
@@ -6089,13 +7050,15 @@ mod tests {
 
     #[test]
     fn test_parse_contract() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract UserResponse {
                 id: u32,
                 name: String,
                 email: String,
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             assert_eq!(c.name, "UserResponse");
             assert_eq!(c.fields.len(), 3);
@@ -6107,11 +7070,13 @@ mod tests {
 
     #[test]
     fn test_parse_contract_nullable() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract Response {
                 deleted_at: String?,
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             assert!(c.fields[0].nullable);
             assert!(matches!(c.fields[0].ty, Type::Option(_)));
@@ -6122,11 +7087,13 @@ mod tests {
 
     #[test]
     fn test_parse_contract_inline_enum() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract C {
                 tier: enum { free, pro },
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             // Inline enum is represented as Type::Named with generated name
             assert!(matches!(&c.fields[0].ty, Type::Named(n) if n == "C_tier"));
@@ -6147,22 +7114,28 @@ mod tests {
 
     #[test]
     fn test_parse_contract_array_field() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract AdminUser {
                 id: i32,
                 roles: [String],
                 scores: [i32],
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             assert_eq!(c.name, "AdminUser");
             assert_eq!(c.fields.len(), 3);
             assert_eq!(c.fields[1].name, "roles");
-            assert!(matches!(&c.fields[1].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "String")),
-                "roles field should be [String]");
+            assert!(
+                matches!(&c.fields[1].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "String")),
+                "roles field should be [String]"
+            );
             assert_eq!(c.fields[2].name, "scores");
-            assert!(matches!(&c.fields[2].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "i32")),
-                "scores field should be [i32]");
+            assert!(
+                matches!(&c.fields[2].ty, Type::Array(inner) if matches!(inner.as_ref(), Type::Named(n) if n == "i32")),
+                "scores field should be [i32]"
+            );
         } else {
             panic!("Expected Contract");
         }
@@ -6170,22 +7143,28 @@ mod tests {
 
     #[test]
     fn test_parse_contract_nested_type() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract OrderResponse {
                 id: u32,
                 user: UserRow,
                 address: ShippingAddress,
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             assert_eq!(c.name, "OrderResponse");
             assert_eq!(c.fields.len(), 3);
             assert_eq!(c.fields[1].name, "user");
-            assert!(matches!(&c.fields[1].ty, Type::Named(n) if n == "UserRow"),
-                "user field should be UserRow");
+            assert!(
+                matches!(&c.fields[1].ty, Type::Named(n) if n == "UserRow"),
+                "user field should be UserRow"
+            );
             assert_eq!(c.fields[2].name, "address");
-            assert!(matches!(&c.fields[2].ty, Type::Named(n) if n == "ShippingAddress"),
-                "address field should be ShippingAddress");
+            assert!(
+                matches!(&c.fields[2].ty, Type::Named(n) if n == "ShippingAddress"),
+                "address field should be ShippingAddress"
+            );
         } else {
             panic!("Expected Contract");
         }
@@ -6193,14 +7172,16 @@ mod tests {
 
     #[test]
     fn test_parse_contract_array_and_nested() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             contract FullResponse {
                 id: i32,
                 roles: [String],
                 user: UserRow,
                 tags: [i32],
             }
-        "#);
+        "#,
+        );
         if let Item::Contract(c) = &prog.items[0] {
             assert_eq!(c.fields.len(), 4);
             assert!(matches!(&c.fields[1].ty, Type::Array(_)));
@@ -6215,7 +7196,8 @@ mod tests {
 
     #[test]
     fn test_parse_app() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             app MyApp {
                 manifest {
                     name: "My App",
@@ -6225,7 +7207,8 @@ mod tests {
                     strategy: "cache-first",
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::App(a) = &prog.items[0] {
             assert_eq!(a.name, "MyApp");
             assert!(a.manifest.is_some());
@@ -6240,13 +7223,15 @@ mod tests {
 
     #[test]
     fn test_parse_app_with_push() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             app PA {
                 push {
                     vapid_key: "key123",
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::App(a) = &prog.items[0] {
             let push = a.push.as_ref().unwrap();
             assert!(push.vapid_key.is_some());
@@ -6257,11 +7242,13 @@ mod tests {
 
     #[test]
     fn test_parse_app_with_a11y() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             app A {
                 a11y: manual,
             }
-        "#);
+        "#,
+        );
         if let Item::App(a) = &prog.items[0] {
             assert_eq!(a.a11y, Some(A11yMode::Manual));
         } else {
@@ -6271,11 +7258,13 @@ mod tests {
 
     #[test]
     fn test_parse_app_with_a11y_auto() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             app A {
                 a11y: auto,
             }
-        "#);
+        "#,
+        );
         if let Item::App(a) = &prog.items[0] {
             assert_eq!(a.a11y, Some(A11yMode::Auto));
         } else {
@@ -6287,7 +7276,8 @@ mod tests {
 
     #[test]
     fn test_parse_page() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page BlogPost(slug: String) {
                 meta {
                     title: "Blog",
@@ -6297,7 +7287,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             assert_eq!(p.name, "BlogPost");
             assert_eq!(p.props.len(), 1);
@@ -6313,7 +7304,8 @@ mod tests {
     fn test_parse_page_meta_canonical() {
         // Note: "canonical" is a keyword token, so it can't be used as a
         // key in meta {} (which uses expect_ident()). Test with non-keyword keys.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page P {
                 meta {
                     title: "My Page",
@@ -6324,7 +7316,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             let meta = p.meta.as_ref().unwrap();
             assert!(meta.title.is_some());
@@ -6337,7 +7330,8 @@ mod tests {
 
     #[test]
     fn test_parse_page_meta_structured_data() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page P {
                 meta {
                     structured_data: Article {
@@ -6348,7 +7342,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             let meta = p.meta.as_ref().unwrap();
             assert_eq!(meta.structured_data.len(), 1);
@@ -6362,7 +7357,8 @@ mod tests {
 
     #[test]
     fn test_parse_form() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             form LoginForm {
                 field username: String {
                     required,
@@ -6379,7 +7375,8 @@ mod tests {
                     default: "test",
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Form(f) = &prog.items[0] {
             assert_eq!(f.name, "LoginForm");
             assert_eq!(f.fields.len(), 2);
@@ -6388,12 +7385,24 @@ mod tests {
             assert!(f.fields[0].placeholder.is_some());
             // Check validators
             let v = &f.fields[0].validators;
-            assert!(v.iter().any(|vi| matches!(vi.kind, ValidatorKind::Required)));
-            assert!(v.iter().any(|vi| matches!(vi.kind, ValidatorKind::MinLength(3))));
-            assert!(v.iter().any(|vi| matches!(vi.kind, ValidatorKind::MaxLength(20))));
+            assert!(
+                v.iter()
+                    .any(|vi| matches!(vi.kind, ValidatorKind::Required))
+            );
+            assert!(
+                v.iter()
+                    .any(|vi| matches!(vi.kind, ValidatorKind::MinLength(3)))
+            );
+            assert!(
+                v.iter()
+                    .any(|vi| matches!(vi.kind, ValidatorKind::MaxLength(20)))
+            );
 
             let v2 = &f.fields[1].validators;
-            assert!(v2.iter().any(|vi| matches!(vi.kind, ValidatorKind::Pattern(_))));
+            assert!(
+                v2.iter()
+                    .any(|vi| matches!(vi.kind, ValidatorKind::Pattern(_)))
+            );
             assert!(v2.iter().any(|vi| matches!(vi.kind, ValidatorKind::Email)));
             assert!(v2.iter().any(|vi| matches!(vi.kind, ValidatorKind::Url)));
             assert!(f.fields[1].default_value.is_some());
@@ -6404,12 +7413,14 @@ mod tests {
 
     #[test]
     fn test_parse_form_with_on_submit() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             form F {
                 field name: String;
                 fn on_submit() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Form(f) = &prog.items[0] {
             assert_eq!(f.on_submit, Some("on_submit".to_string()));
             assert_eq!(f.methods.len(), 1);
@@ -6422,7 +7433,8 @@ mod tests {
 
     #[test]
     fn test_parse_channel() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             channel Chat -> ChatMessage {
                 url: "/ws/chat",
                 heartbeat: 30000,
@@ -6431,7 +7443,8 @@ mod tests {
                 on_disconnect fn disc(&self) {}
                 fn send_msg(&self) {}
             }
-        "#);
+        "#,
+        );
         if let Item::Channel(ch) = &prog.items[0] {
             assert_eq!(ch.name, "Chat");
             assert_eq!(ch.contract, Some("ChatMessage".to_string()));
@@ -6449,11 +7462,13 @@ mod tests {
 
     #[test]
     fn test_parse_embed() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             embed Analytics {
                 src: "https://example.com/script.js",
             }
-        "#);
+        "#,
+        );
         if let Item::Embed(e) = &prog.items[0] {
             assert_eq!(e.name, "Analytics");
         } else {
@@ -6465,12 +7480,14 @@ mod tests {
     fn test_parse_embed_sandbox_false() {
         // `sandbox` and `loading` are keywords, so they can't be parsed as
         // ident keys in the embed key-value pairs. Test basic embed parsing.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             embed E {
                 src: "https://cdn.example.com/x.js",
                 integrity: "sha256-abc",
             }
-        "#);
+        "#,
+        );
         if let Item::Embed(e) = &prog.items[0] {
             assert_eq!(e.name, "E");
             assert!(e.integrity.is_some());
@@ -6483,7 +7500,8 @@ mod tests {
 
     #[test]
     fn test_parse_pdf() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             pdf InvoicePdf {
                 page_size: "A4",
                 orientation: "portrait",
@@ -6491,7 +7509,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Pdf(p) = &prog.items[0] {
             assert_eq!(p.name, "InvoicePdf");
             assert_eq!(p.page_size, Some("A4".to_string()));
@@ -6503,11 +7522,13 @@ mod tests {
 
     #[test]
     fn test_parse_pdf_no_render() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             pdf P {
                 page_size: "letter",
             }
-        "#);
+        "#,
+        );
         if let Item::Pdf(p) = &prog.items[0] {
             assert_eq!(p.name, "P");
             // Should get default empty render block
@@ -6520,14 +7541,16 @@ mod tests {
 
     #[test]
     fn test_parse_payment() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             payment StripePayment {
                 provider: "stripe",
                 public_key: "pk_test_123",
                 fn on_success() { return; }
                 fn on_error() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Payment(p) = &prog.items[0] {
             assert_eq!(p.name, "StripePayment");
             assert!(p.provider.is_some());
@@ -6543,14 +7566,16 @@ mod tests {
 
     #[test]
     fn test_parse_banking() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             banking AccountLink {
                 provider: "plaid",
                 fn on_success() { return; }
                 fn on_exit() { return; }
                 fn on_error() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Banking(b) = &prog.items[0] {
             assert_eq!(b.name, "AccountLink");
             assert!(b.provider.is_some());
@@ -6564,11 +7589,13 @@ mod tests {
 
     #[test]
     fn test_parse_banking_minimal() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             banking BankLink {
                 provider: "plaid",
             }
-        "#);
+        "#,
+        );
         if let Item::Banking(b) = &prog.items[0] {
             assert_eq!(b.name, "BankLink");
             assert!(b.provider.is_some());
@@ -6582,12 +7609,14 @@ mod tests {
 
     #[test]
     fn test_parse_banking_with_methods() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             banking Fin {
                 provider: "mx",
                 fn get_accounts() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Banking(b) = &prog.items[0] {
             assert_eq!(b.name, "Fin");
             assert_eq!(b.methods.len(), 1);
@@ -6601,7 +7630,8 @@ mod tests {
 
     #[test]
     fn test_parse_map() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             map StoreLocator {
                 provider: "mapbox",
                 center: (40.7128, -74.0060),
@@ -6609,7 +7639,8 @@ mod tests {
                 fn on_ready() { return; }
                 fn on_click() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Map(m) = &prog.items[0] {
             assert_eq!(m.name, "StoreLocator");
             assert!(m.provider.is_some());
@@ -6627,11 +7658,13 @@ mod tests {
 
     #[test]
     fn test_parse_map_minimal() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             map SimpleMap {
                 provider: "mapbox",
             }
-        "#);
+        "#,
+        );
         if let Item::Map(m) = &prog.items[0] {
             assert_eq!(m.name, "SimpleMap");
             assert!(m.center.is_none());
@@ -6644,7 +7677,8 @@ mod tests {
 
     #[test]
     fn test_parse_map_with_methods() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             map GeoMap {
                 provider: "mapbox",
                 center: (0, 0),
@@ -6652,7 +7686,8 @@ mod tests {
                 fn add_markers() { return; }
                 fn fly_to() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Map(m) = &prog.items[0] {
             assert_eq!(m.name, "GeoMap");
             assert_eq!(m.methods.len(), 2);
@@ -6668,11 +7703,13 @@ mod tests {
 
     #[test]
     fn test_parse_map_no_provider_defaults() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             map DefaultMap {
                 zoom: 8,
             }
-        "#);
+        "#,
+        );
         if let Item::Map(m) = &prog.items[0] {
             assert_eq!(m.name, "DefaultMap");
             assert!(m.provider.is_none());
@@ -6686,7 +7723,8 @@ mod tests {
 
     #[test]
     fn test_parse_auth() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             auth AppAuth {
                 provider "google" {
                     client_id: "abc",
@@ -6697,7 +7735,8 @@ mod tests {
                 fn on_logout() { return; }
                 fn on_error() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Auth(a) = &prog.items[0] {
             assert_eq!(a.name, "AppAuth");
             assert_eq!(a.providers.len(), 1);
@@ -6716,7 +7755,8 @@ mod tests {
 
     #[test]
     fn test_parse_upload() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             upload FileUpload {
                 endpoint: "/api/upload",
                 max_size: 10485760,
@@ -6725,7 +7765,8 @@ mod tests {
                 fn on_complete() { return; }
                 fn on_error() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Upload(u) = &prog.items[0] {
             assert_eq!(u.name, "FileUpload");
             assert!(u.max_size.is_some());
@@ -6744,11 +7785,13 @@ mod tests {
     fn test_parse_db() {
         // Note: `store` is a keyword so expect_ident won't return it.
         // Test db with version only.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             db AppDb {
                 version: 1,
             }
-        "#);
+        "#,
+        );
         if let Item::Db(d) = &prog.items[0] {
             assert_eq!(d.name, "AppDb");
             assert_eq!(d.version, Some(1));
@@ -6763,7 +7806,8 @@ mod tests {
     fn test_parse_cache() {
         // Note: "invalidate" is a keyword token, so mutation body with
         // invalidate: [...] fails expect_ident(). Test without mutation body.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             cache ApiCache {
                 strategy: "stale-while-revalidate",
                 ttl: 300,
@@ -6771,7 +7815,8 @@ mod tests {
                 query users: fetch("/api/users"),
                 mutation update_user(id: String): fetch("/api/users"),
             }
-        "#);
+        "#,
+        );
         if let Item::Cache(c) = &prog.items[0] {
             assert_eq!(c.name, "ApiCache");
             assert_eq!(c.strategy, Some("stale-while-revalidate".to_string()));
@@ -6786,7 +7831,8 @@ mod tests {
 
     #[test]
     fn test_parse_cache_query_with_config() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             cache C {
                 query user(id: String): fetch("/api/user") {
                     ttl: 60,
@@ -6794,7 +7840,8 @@ mod tests {
                     invalidate_on: ["user_updated"],
                 },
             }
-        "#);
+        "#,
+        );
         if let Item::Cache(c) = &prog.items[0] {
             let q = &c.queries[0];
             assert_eq!(q.name, "user");
@@ -6810,13 +7857,15 @@ mod tests {
 
     #[test]
     fn test_parse_breakpoints() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             breakpoint {
                 sm: 640,
                 md: 768,
                 lg: 1024,
             }
-        "#);
+        "#,
+        );
         if let Item::Breakpoints(b) = &prog.items[0] {
             assert_eq!(b.breakpoints.len(), 3);
             assert_eq!(b.breakpoints[0], ("sm".to_string(), 640));
@@ -6831,7 +7880,8 @@ mod tests {
 
     #[test]
     fn test_parse_theme_light_dark() {
-        let prog = parse(r##"
+        let prog = parse(
+            r##"
             theme AppTheme {
                 light {
                     bg: "white",
@@ -6840,7 +7890,8 @@ mod tests {
                     bg: "black",
                 }
             }
-        "##);
+        "##,
+        );
         if let Item::Theme(t) = &prog.items[0] {
             assert_eq!(t.name, "AppTheme");
             assert!(t.light.is_some());
@@ -6853,14 +7904,16 @@ mod tests {
 
     #[test]
     fn test_parse_theme_dark_auto() {
-        let prog = parse(r##"
+        let prog = parse(
+            r##"
             theme T {
                 light {
                     bg: "white",
                 }
                 dark: auto,
             }
-        "##);
+        "##,
+        );
         if let Item::Theme(t) = &prog.items[0] {
             assert!(t.dark_auto);
             assert!(t.dark.is_none());
@@ -6871,12 +7924,14 @@ mod tests {
 
     #[test]
     fn test_parse_theme_auto_primary() {
-        let prog = parse(r##"
+        let prog = parse(
+            r##"
             theme T {
                 auto,
                 primary: "red",
             }
-        "##);
+        "##,
+        );
         if let Item::Theme(t) = &prog.items[0] {
             assert!(t.dark_auto);
             assert!(t.primary.is_some());
@@ -6889,17 +7944,25 @@ mod tests {
 
     #[test]
     fn test_parse_spring_animation() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             spring FadeIn {
                 stiffness: 120,
                 damping: 14,
                 mass: 1,
                 properties: ["opacity", "transform"],
             }
-        "#);
+        "#,
+        );
         if let Item::Animation(a) = &prog.items[0] {
             assert_eq!(a.name, "FadeIn");
-            if let AnimationKind::Spring { stiffness, damping, mass, properties } = &a.kind {
+            if let AnimationKind::Spring {
+                stiffness,
+                damping,
+                mass,
+                properties,
+            } = &a.kind
+            {
                 assert_eq!(*stiffness, Some(120.0));
                 assert_eq!(*damping, Some(14.0));
                 assert_eq!(*mass, Some(1.0));
@@ -6914,15 +7977,23 @@ mod tests {
 
     #[test]
     fn test_parse_spring_float_values() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             spring S {
                 stiffness: 1.5,
                 damping: 0.7,
                 mass: 2.0,
             }
-        "#);
+        "#,
+        );
         if let Item::Animation(a) = &prog.items[0] {
-            if let AnimationKind::Spring { stiffness, damping, mass, .. } = &a.kind {
+            if let AnimationKind::Spring {
+                stiffness,
+                damping,
+                mass,
+                ..
+            } = &a.kind
+            {
                 assert_eq!(*stiffness, Some(1.5));
                 assert_eq!(*damping, Some(0.7));
                 assert_eq!(*mass, Some(2.0));
@@ -6939,7 +8010,8 @@ mod tests {
         // Note: "duration" is a keyword token (TokenKind::Duration), so it
         // doesn't match the Ident branch in parse_keyframes_block. We test
         // only the frames, which parse correctly.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             keyframes SlideIn {
                 0% {
                     x: 0,
@@ -6948,10 +8020,16 @@ mod tests {
                     x: 100,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Animation(a) = &prog.items[0] {
             assert_eq!(a.name, "SlideIn");
-            if let AnimationKind::Keyframes { frames, duration, easing } = &a.kind {
+            if let AnimationKind::Keyframes {
+                frames,
+                duration,
+                easing,
+            } = &a.kind
+            {
                 assert_eq!(frames.len(), 2);
                 assert_eq!(*duration, None);
                 assert_eq!(*easing, None);
@@ -6967,15 +8045,22 @@ mod tests {
     fn test_parse_stagger_animation() {
         // Note: "selector" is a keyword token, so it can't be used as a key
         // in stagger {} (which uses expect_ident()). Test without selector.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             stagger ListAppear {
                 animation: FadeIn,
                 delay: "50ms",
             }
-        "#);
+        "#,
+        );
         if let Item::Animation(a) = &prog.items[0] {
             assert_eq!(a.name, "ListAppear");
-            if let AnimationKind::Stagger { animation, delay, selector } = &a.kind {
+            if let AnimationKind::Stagger {
+                animation,
+                delay,
+                selector,
+            } = &a.kind
+            {
                 assert_eq!(animation, "FadeIn");
                 assert_eq!(*delay, Some("50ms".to_string()));
                 assert_eq!(*selector, None);
@@ -6991,11 +8076,13 @@ mod tests {
 
     #[test]
     fn test_parse_test_def() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             test "addition works" {
                 assert_eq(1 + 1, 2);
             }
-        "#);
+        "#,
+        );
         if let Item::Test(t) = &prog.items[0] {
             assert_eq!(t.name, "addition works");
             assert!(!t.body.stmts.is_empty());
@@ -7008,13 +8095,15 @@ mod tests {
 
     #[test]
     fn test_parse_lazy_component() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             lazy component HeavyChart {
                 render {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::LazyComponent(lc) = &prog.items[0] {
             assert_eq!(lc.component.name, "HeavyChart");
         } else {
@@ -7026,7 +8115,8 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_state_and_methods() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Counter {
                 let mut count: i32 = 0;
                 signal reactive_val: i32 = 10;
@@ -7037,7 +8127,8 @@ mod tests {
                     <div>{self.count}</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "Counter");
             assert_eq!(c.state.len(), 2);
@@ -7050,7 +8141,8 @@ mod tests {
 
     #[test]
     fn test_parse_mut_self_parameter() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Counter {
                 let count: i32 = 0;
                 fn increment(mut self) {
@@ -7060,7 +8152,8 @@ mod tests {
                     <div>{self.count}</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "Counter");
             assert_eq!(c.methods.len(), 1);
@@ -7074,7 +8167,8 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_permissions() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Secure {
                 permissions {
                     network: ["https://api.example.com/*"],
@@ -7085,7 +8179,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             let perms = c.permissions.as_ref().unwrap();
             assert_eq!(perms.network, vec!["https://api.example.com/*"]);
@@ -7098,7 +8193,8 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_gesture() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Swipeable {
                 gesture swipe_left {
                     return;
@@ -7107,7 +8203,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.gestures.len(), 1);
             assert_eq!(c.gestures[0].gesture_type, "swipe_left");
@@ -7119,12 +8216,14 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_a11y_manual() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 a11y manual;
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.a11y, Some(A11yMode::Manual));
         } else {
@@ -7134,12 +8233,14 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_a11y_auto() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 a11y auto;
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.a11y, Some(A11yMode::Auto));
         } else {
@@ -7149,12 +8250,14 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_a11y_default() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 a11y;
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.a11y, Some(A11yMode::Auto));
         } else {
@@ -7164,14 +8267,16 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_shortcuts() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Editor {
                 shortcut "ctrl+s" {
                     return;
                 }
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.shortcuts.len(), 1);
             assert_eq!(c.shortcuts[0].keys, "ctrl+s");
@@ -7182,12 +8287,14 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_on_destroy() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 fn on_destroy(&self) { return; }
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(c.on_destroy.is_some());
             assert!(c.methods.is_empty());
@@ -7198,12 +8305,14 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_chunk() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Dashboard {
                 chunk "dashboard";
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.chunk, Some("dashboard".to_string()));
         } else {
@@ -7213,7 +8322,8 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_style_and_transition() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Styled {
                 style {
                     .container {
@@ -7225,7 +8335,8 @@ mod tests {
                 }
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.styles.len(), 1);
             assert_eq!(c.styles[0].selector, ".container");
@@ -7238,13 +8349,15 @@ mod tests {
 
     #[test]
     fn test_parse_component_secret_state() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 let mut secret token: String = "abc";
                 signal secret api_key: String = "key";
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(c.state[0].secret);
             assert!(c.state[1].secret);
@@ -7255,11 +8368,13 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_type_params() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component List<T> where T: Display {
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.type_params, vec!["T"]);
             assert_eq!(c.trait_bounds.len(), 1);
@@ -7347,7 +8462,13 @@ mod tests {
     #[test]
     fn test_parse_unary_not() {
         let e = parse_expr("!is_active");
-        assert!(matches!(e, Expr::Unary { op: UnaryOp::Not, .. }));
+        assert!(matches!(
+            e,
+            Expr::Unary {
+                op: UnaryOp::Not,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -7376,7 +8497,12 @@ mod tests {
     #[test]
     fn test_parse_method_call() {
         let e = parse_expr("obj.method(1, 2)");
-        if let Expr::MethodCall { object, method, args } = &e {
+        if let Expr::MethodCall {
+            object,
+            method,
+            args,
+        } = &e
+        {
             assert_eq!(method, "method");
             assert_eq!(args.len(), 2);
             assert!(matches!(**object, Expr::Ident(_)));
@@ -7444,14 +8570,16 @@ mod tests {
 
     #[test]
     fn test_parse_match_expr() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 match x {
                     1 => true,
                     _ => false,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
                 assert_eq!(arms.len(), 2);
@@ -7465,14 +8593,16 @@ mod tests {
 
     #[test]
     fn test_parse_match_variant_pattern() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 match shape {
                     Circle(r) => r,
                     name => name,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
                 assert!(matches!(arms[0].pattern, Pattern::Variant { .. }));
@@ -7485,17 +8615,22 @@ mod tests {
 
     #[test]
     fn test_parse_match_string_pattern() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 match s {
                     "hello" => 1,
                     _ => 0,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
-                assert!(matches!(arms[0].pattern, Pattern::Literal(Expr::StringLit(_))));
+                assert!(matches!(
+                    arms[0].pattern,
+                    Pattern::Literal(Expr::StringLit(_))
+                ));
             } else {
                 panic!("Expected Match");
             }
@@ -7504,18 +8639,26 @@ mod tests {
 
     #[test]
     fn test_parse_match_bool_pattern() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 match b {
                     true => 1,
                     false => 0,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
-                assert!(matches!(arms[0].pattern, Pattern::Literal(Expr::Bool(true))));
-                assert!(matches!(arms[1].pattern, Pattern::Literal(Expr::Bool(false))));
+                assert!(matches!(
+                    arms[0].pattern,
+                    Pattern::Literal(Expr::Bool(true))
+                ));
+                assert!(matches!(
+                    arms[1].pattern,
+                    Pattern::Literal(Expr::Bool(false))
+                ));
             } else {
                 panic!("Expected Match");
             }
@@ -7594,7 +8737,12 @@ mod tests {
     #[test]
     fn test_parse_fetch() {
         let e = parse_expr(r#"fetch("/api/users")"#);
-        if let Expr::Fetch { url, options, contract } = &e {
+        if let Expr::Fetch {
+            url,
+            options,
+            contract,
+        } = &e
+        {
             assert!(matches!(**url, Expr::StringLit(_)));
             assert!(options.is_none());
             assert!(contract.is_none());
@@ -7684,7 +8832,10 @@ mod tests {
     fn test_parse_assert_eq() {
         let prog = parse(r#"fn f() { assert_eq(1 + 1, 2); }"#);
         if let Item::Function(f) = &prog.items[0] {
-            assert!(matches!(&f.body.stmts[0], Stmt::Expr(Expr::AssertEq { .. })));
+            assert!(matches!(
+                &f.body.stmts[0],
+                Stmt::Expr(Expr::AssertEq { .. })
+            ));
         }
     }
 
@@ -7714,7 +8865,8 @@ mod tests {
 
     #[test]
     fn test_parse_try_catch() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 try {
                     return;
@@ -7722,7 +8874,8 @@ mod tests {
                     return;
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::TryCatch { error_binding, .. }) = &f.body.stmts[0] {
                 assert_eq!(error_binding, "err");
@@ -7753,7 +8906,11 @@ mod tests {
     #[test]
     fn test_parse_prompt_template() {
         let e = parse_expr(r#"prompt "Hello {name}, welcome to {place}""#);
-        if let Expr::PromptTemplate { template, interpolations } = &e {
+        if let Expr::PromptTemplate {
+            template,
+            interpolations,
+        } = &e
+        {
             assert_eq!(template, "Hello {name}, welcome to {place}");
             assert_eq!(interpolations.len(), 2);
             assert_eq!(interpolations[0].0, "name");
@@ -7841,7 +8998,10 @@ mod tests {
     #[test]
     fn test_parse_let_with_type() {
         let s = parse_stmt_helper("let x: i32 = 42;");
-        if let Stmt::Let { name, ty, mutable, .. } = &s {
+        if let Stmt::Let {
+            name, ty, mutable, ..
+        } = &s
+        {
             assert_eq!(name, "x");
             assert_eq!(*ty, Some(Type::Named("i32".to_string())));
             assert!(!mutable);
@@ -7883,7 +9043,14 @@ mod tests {
     #[test]
     fn test_parse_signal_stmt() {
         let s = parse_stmt_helper("signal count: i32 = 0;");
-        if let Stmt::Signal { name, ty, atomic, secret, .. } = &s {
+        if let Stmt::Signal {
+            name,
+            ty,
+            atomic,
+            secret,
+            ..
+        } = &s
+        {
             assert_eq!(name, "count");
             assert!(ty.is_some());
             assert!(!atomic);
@@ -8037,7 +9204,8 @@ mod tests {
 
     #[test]
     fn test_parse_all_primitive_types() {
-        let prog = parse("fn f(a: i32, b: i64, c: f32, d: f64, e: u32, f: u64, g: bool, h: String) {}");
+        let prog =
+            parse("fn f(a: i32, b: i64, c: f32, d: f64, e: u32, f: u64, g: bool, h: String) {}");
         if let Item::Function(f) = &prog.items[0] {
             assert_eq!(f.params[0].ty, Type::Named("i32".to_string()));
             assert_eq!(f.params[1].ty, Type::Named("i64".to_string()));
@@ -8146,13 +9314,15 @@ mod tests {
 
     #[test]
     fn test_parse_self_closing_element() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <input />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "input");
@@ -8165,7 +9335,8 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_attributes() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div class="main" id={dynamic_id}>
@@ -8173,12 +9344,17 @@ mod tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.attributes.len(), 2);
-                assert!(matches!(&el.attributes[0], Attribute::Static { name, .. } if name == "class"));
-                assert!(matches!(&el.attributes[1], Attribute::Dynamic { name, .. } if name == "id"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Static { name, .. } if name == "class")
+                );
+                assert!(
+                    matches!(&el.attributes[1], Attribute::Dynamic { name, .. } if name == "id")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8187,16 +9363,20 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_event_handler() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <button on:click={handle_click} />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::EventHandler { event, .. } if event == "click"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::EventHandler { event, .. } if event == "click")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8205,16 +9385,20 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_bind() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <input bind:value={text} />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::Bind { property, signal } if property == "value" && signal == "text"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Bind { property, signal } if property == "value" && signal == "text")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8223,17 +9407,23 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_aria() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div aria-label="test" aria-hidden={hidden} />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::Aria { name, value: Expr::StringLit(_) } if name == "aria-label"));
-                assert!(matches!(&el.attributes[1], Attribute::Aria { name, value: Expr::Ident(_) } if name == "aria-hidden"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Aria { name, value: Expr::StringLit(_) } if name == "aria-label")
+                );
+                assert!(
+                    matches!(&el.attributes[1], Attribute::Aria { name, value: Expr::Ident(_) } if name == "aria-hidden")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8242,16 +9432,20 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_role() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div role="button" />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::Role { value } if value == "button"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Role { value } if value == "button")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8260,16 +9454,20 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_tabindex_static() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div tabindex="0" />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "tabindex" && value == "0"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Static { name, value } if name == "tabindex" && value == "0")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8278,16 +9476,20 @@ mod tests {
 
     #[test]
     fn test_parse_element_with_tabindex_dynamic() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div tabindex={idx} />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                assert!(matches!(&el.attributes[0], Attribute::Dynamic { name, .. } if name == "tabindex"));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Dynamic { name, .. } if name == "tabindex")
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -8296,13 +9498,15 @@ mod tests {
 
     #[test]
     fn test_parse_link_element() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <Link to="/about">"About"</Link>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(matches!(&c.render.body, TemplateNode::Link { .. }));
         }
@@ -8310,13 +9514,15 @@ mod tests {
 
     #[test]
     fn test_parse_link_self_closing() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <Link to="/home" />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Link { children, .. } = &c.render.body {
                 assert!(children.is_empty());
@@ -8328,13 +9534,15 @@ mod tests {
 
     #[test]
     fn test_parse_link_dynamic_to() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <Link to={path} />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Link { to, .. } = &c.render.body {
                 assert!(matches!(to, Expr::Ident(_)));
@@ -8346,15 +9554,22 @@ mod tests {
 
     #[test]
     fn test_parse_link_with_class_attribute() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <Link to="/about" class="btn btn-primary">"Go"</Link>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
-            if let TemplateNode::Link { to, attributes, children } = &c.render.body {
+            if let TemplateNode::Link {
+                to,
+                attributes,
+                children,
+            } = &c.render.body
+            {
                 assert!(matches!(to, Expr::StringLit(_)));
                 assert_eq!(attributes.len(), 1);
                 match &attributes[0] {
@@ -8373,13 +9588,15 @@ mod tests {
 
     #[test]
     fn test_parse_link_with_multiple_attributes() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <Link to="/page" class="nav-link" style="color: red" />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Link { attributes, .. } = &c.render.body {
                 assert_eq!(attributes.len(), 2);
@@ -8391,13 +9608,15 @@ mod tests {
 
     #[test]
     fn test_parse_style_attribute_on_element() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div style="color: red; font-size: 16px">"hello"</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.attributes.len(), 1);
@@ -8416,13 +9635,15 @@ mod tests {
 
     #[test]
     fn test_parse_text_literal_template() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     "Hello"
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(matches!(&c.render.body, TemplateNode::TextLiteral(s) if s == "Hello"));
         }
@@ -8430,13 +9651,15 @@ mod tests {
 
     #[test]
     fn test_parse_expression_template() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     {name}
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(matches!(&c.render.body, TemplateNode::Expression(_)));
         }
@@ -8446,11 +9669,13 @@ mod tests {
 
     #[test]
     fn test_parse_component_prop_with_default() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C(name: String = "World") {
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.props.len(), 1);
             assert!(c.props[0].default.is_some());
@@ -8463,13 +9688,18 @@ mod tests {
 
     #[test]
     fn test_parse_virtual_list() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 virtual list=items item_height=40 |item| item
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
-            assert!(matches!(&f.body.stmts[0], Stmt::Expr(Expr::VirtualList { .. })));
+            assert!(matches!(
+                &f.body.stmts[0],
+                Stmt::Expr(Expr::VirtualList { .. })
+            ));
         }
     }
 
@@ -8500,7 +9730,8 @@ mod tests {
 
     #[test]
     fn test_parse_component_with_skeleton() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 skeleton {
                     <div />
@@ -8509,7 +9740,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert!(c.skeleton.is_some());
         } else {
@@ -8538,11 +9770,13 @@ mod tests {
     fn test_parse_cache_query_with_contract() {
         // The fetch expr parser consumes `-> ContractName` itself,
         // so the contract lives on the fetch expr, not the cache query.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             cache C {
                 query users: fetch("/api/users") -> UserContract,
             }
-        "#);
+        "#,
+        );
         if let Item::Cache(c) = &prog.items[0] {
             assert_eq!(c.queries.len(), 1);
             assert_eq!(c.queries[0].name, "users");
@@ -8561,11 +9795,13 @@ mod tests {
 
     #[test]
     fn test_parse_auth_simple_provider() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             auth A {
                 provider: "jwt",
             }
-        "#);
+        "#,
+        );
         if let Item::Auth(a) = &prog.items[0] {
             assert!(a.provider.is_some());
         } else {
@@ -8577,7 +9813,8 @@ mod tests {
 
     #[test]
     fn test_parse_page_with_state_and_methods() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page P {
                 let mut count: i32 = 0;
                 signal val: i32 = 5;
@@ -8586,7 +9823,8 @@ mod tests {
                     <div />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             assert_eq!(p.state.len(), 2);
             assert_eq!(p.methods.len(), 1);
@@ -8622,10 +9860,12 @@ mod tests {
     fn test_parse_db_ident_store() {
         // `store` is a keyword so expect_ident won't match it in db context.
         // Test empty db.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             db D {
             }
-        "#);
+        "#,
+        );
         if let Item::Db(d) = &prog.items[0] {
             assert_eq!(d.name, "D");
         } else {
@@ -8639,11 +9879,13 @@ mod tests {
     fn test_parse_db_index_ident() {
         // `store` keyword prevents parsing store blocks via expect_ident.
         // Verify db parses with just version.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             db D {
                 version: 2,
             }
-        "#);
+        "#,
+        );
         if let Item::Db(d) = &prog.items[0] {
             assert_eq!(d.version, Some(2));
         } else {
@@ -8655,13 +9897,15 @@ mod tests {
 
     #[test]
     fn test_parse_agent_with_state() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             agent A {
                 let count: i32 = 0;
                 signal history: i32 = 0;
                 fn process(&self) { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::Agent(a) = &prog.items[0] {
             assert_eq!(a.state.len(), 2);
             assert_eq!(a.methods.len(), 1);
@@ -8790,11 +10034,13 @@ mod tests {
     fn test_parse_channel_reconnect_false() {
         // reconnect expects Ident("true"/"false") but true/false are keywords,
         // so the default reconnect=true stays. Test url parsing instead.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             channel C {
                 url: "/ws",
             }
-        "#);
+        "#,
+        );
         if let Item::Channel(ch) = &prog.items[0] {
             assert_eq!(ch.name, "C");
             // default reconnect is true
@@ -8809,11 +10055,13 @@ mod tests {
     #[test]
     fn test_parse_payment_sandbox() {
         // sandbox is a keyword; test payment with provider string
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             payment P {
                 provider: "stripe",
             }
-        "#);
+        "#,
+        );
         if let Item::Payment(p) = &prog.items[0] {
             assert!(p.provider.is_some());
         } else {
@@ -8825,7 +10073,8 @@ mod tests {
 
     #[test]
     fn test_parse_miniprogram_with_providers() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             miniprogram AlipayCheckout {
                 payment_provider: "moov",
                 auth_provider: "google",
@@ -8836,7 +10085,8 @@ mod tests {
                 fn onShow() { return; }
                 fn onHide() { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::MiniProgram(mp) = &prog.items[0] {
             assert_eq!(mp.name, "AlipayCheckout");
             assert_eq!(mp.payment_provider.as_deref(), Some("moov"));
@@ -8854,11 +10104,13 @@ mod tests {
 
     #[test]
     fn test_parse_miniprogram_minimal() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             miniprogram MiniApp {
                 payment_provider: "stripe",
             }
-        "#);
+        "#,
+        );
         if let Item::MiniProgram(mp) = &prog.items[0] {
             assert_eq!(mp.name, "MiniApp");
             assert_eq!(mp.payment_provider.as_deref(), Some("stripe"));
@@ -8876,12 +10128,14 @@ mod tests {
 
     #[test]
     fn test_parse_miniprogram_with_methods() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             miniprogram TestMP {
                 fn handleScan() { return; }
                 fn processPayment(id: String) { return; }
             }
-        "#);
+        "#,
+        );
         if let Item::MiniProgram(mp) = &prog.items[0] {
             assert_eq!(mp.name, "TestMP");
             assert_eq!(mp.methods.len(), 2);
@@ -8894,11 +10148,13 @@ mod tests {
 
     #[test]
     fn test_parse_miniprogram_offline_false() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             miniprogram OfflineMP {
                 offline: false,
             }
-        "#);
+        "#,
+        );
         if let Item::MiniProgram(mp) = &prog.items[0] {
             assert!(!mp.offline);
         } else {
@@ -8911,11 +10167,13 @@ mod tests {
     #[test]
     fn test_parse_upload_chunked_false() {
         // chunked: true/false uses Ident matching but true/false are keywords
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             upload U {
                 endpoint: "/u",
             }
-        "#);
+        "#,
+        );
         if let Item::Upload(u) = &prog.items[0] {
             assert!(!u.chunked); // default false
         } else {
@@ -8928,11 +10186,13 @@ mod tests {
     #[test]
     fn test_parse_cache_persist_false() {
         // persist expects Ident but true/false are keywords; test without it
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             cache C {
                 strategy: "cache-first",
             }
-        "#);
+        "#,
+        );
         if let Item::Cache(c) = &prog.items[0] {
             assert_eq!(c.strategy, Some("cache-first".to_string()));
             assert!(!c.persist); // default
@@ -8945,13 +10205,15 @@ mod tests {
 
     #[test]
     fn test_parse_app_with_router() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             app A {
                 router AppRouter {
                     route "/" => Home,
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::App(a) = &prog.items[0] {
             assert!(a.router.is_some());
         } else {
@@ -8963,13 +10225,15 @@ mod tests {
 
     #[test]
     fn test_parse_form_field_required_with_message() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             form F {
                 field name: String {
                     required: "Name is required",
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Form(f) = &prog.items[0] {
             let v = &f.fields[0].validators;
             assert_eq!(v.len(), 1);
@@ -8984,7 +10248,8 @@ mod tests {
 
     #[test]
     fn test_parse_page_with_style_and_perms() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page P {
                 style {
                     .container {
@@ -8999,7 +10264,8 @@ mod tests {
                 }
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             assert!(!p.styles.is_empty());
             assert!(p.permissions.is_some());
@@ -9035,7 +10301,8 @@ mod tests {
 
     #[test]
     fn test_parse_structured_data_with_schema() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             page P {
                 meta {
                     structured_data: schema.Product {
@@ -9044,7 +10311,8 @@ mod tests {
                 }
                 render { <div /> }
             }
-        "#);
+        "#,
+        );
         if let Item::Page(p) = &prog.items[0] {
             let meta = p.meta.as_ref().unwrap();
             assert_eq!(meta.structured_data[0].schema_type, "Product");
@@ -9145,7 +10413,11 @@ mod tests {
     #[test]
     fn test_parse_vec_ident_no_bang() {
         let e = parse_expr("vec");
-        assert!(matches!(e, Expr::Ident(ref n) if n == "vec"), "Expected Ident(\"vec\"), got {:?}", e);
+        assert!(
+            matches!(e, Expr::Ident(ref n) if n == "vec"),
+            "Expected Ident(\"vec\"), got {:?}",
+            e
+        );
     }
 
     // --- fn closure parsing ---
@@ -9222,20 +10494,30 @@ mod tests {
     #[test]
     fn test_parse_enum_variant_no_fields_pattern() {
         // Enum::Variant without payload should produce Pattern::Variant with empty fields
-        let prog = parse("fn main() { match status { Status::Active => 1, Status::Inactive => 0, } }");
+        let prog =
+            parse("fn main() { match status { Status::Active => 1, Status::Inactive => 0, } }");
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
                 if let Pattern::Variant { name, fields } = &arms[0].pattern {
                     assert_eq!(name, "Active");
-                    assert!(fields.is_empty(), "No-payload variant should have empty fields");
+                    assert!(
+                        fields.is_empty(),
+                        "No-payload variant should have empty fields"
+                    );
                 } else {
-                    panic!("Expected Variant pattern for Status::Active, got {:?}", arms[0].pattern);
+                    panic!(
+                        "Expected Variant pattern for Status::Active, got {:?}",
+                        arms[0].pattern
+                    );
                 }
                 if let Pattern::Variant { name, fields } = &arms[1].pattern {
                     assert_eq!(name, "Inactive");
                     assert!(fields.is_empty());
                 } else {
-                    panic!("Expected Variant pattern for Status::Inactive, got {:?}", arms[1].pattern);
+                    panic!(
+                        "Expected Variant pattern for Status::Inactive, got {:?}",
+                        arms[1].pattern
+                    );
                 }
             } else {
                 panic!("Expected Match expr");
@@ -9361,7 +10643,9 @@ mod tests {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
                 assert!(arms[0].guard.is_some());
                 assert_eq!(arms.len(), 2);
-            } else { panic!("Expected Match"); }
+            } else {
+                panic!("Expected Match");
+            }
         }
     }
 
@@ -9374,7 +10658,9 @@ mod tests {
                 assert!(arms[1].guard.is_some());
                 assert!(arms[2].guard.is_none());
                 assert_eq!(arms.len(), 3);
-            } else { panic!("Expected Match"); }
+            } else {
+                panic!("Expected Match");
+            }
         }
     }
 
@@ -9412,8 +10698,12 @@ mod tests {
             if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.stmts[0] {
                 if let Pattern::Ident(name) = &arms[0].pattern {
                     assert_eq!(name, "y");
-                } else { panic!("Expected Ident pattern"); }
-            } else { panic!("Expected Match"); }
+                } else {
+                    panic!("Expected Ident pattern");
+                }
+            } else {
+                panic!("Expected Match");
+            }
         }
     }
 
@@ -9447,7 +10737,9 @@ mod tests {
                 assert_eq!(arms.len(), 1);
                 assert!(matches!(&arms[0].pattern, Pattern::Wildcard));
                 assert!(arms[0].guard.is_none());
-            } else { panic!("Expected Match"); }
+            } else {
+                panic!("Expected Match");
+            }
         }
     }
 
@@ -9455,7 +10747,8 @@ mod tests {
 
     #[test]
     fn test_parse_template_if() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Test() {
                 render {
                     <div>
@@ -9465,14 +10758,16 @@ mod tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         assert!(matches!(prog.items[0], Item::Component(_)));
     }
 
     #[test]
     fn test_parse_template_for() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component List() {
                 render {
                     <ul>
@@ -9482,7 +10777,8 @@ mod tests {
                     </ul>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         assert!(matches!(prog.items[0], Item::Component(_)));
     }
@@ -9496,7 +10792,11 @@ mod tests {
     #[test]
     fn test_parse_object_literal_as_arg() {
         let e = parse_expr(r#"fetch("url", { method: "POST" })"#);
-        if let Expr::Fetch { options: Some(opts), .. } = e {
+        if let Expr::Fetch {
+            options: Some(opts),
+            ..
+        } = e
+        {
             assert!(matches!(*opts, Expr::ObjectLit { .. }));
         } else {
             panic!("Expected Fetch with object literal options, got {:?}", e);
@@ -9506,7 +10806,8 @@ mod tests {
     #[test]
     fn test_parse_object_literal_nested() {
         // { method: "POST", headers: { "Content-Type": "application/json" } }
-        let e = parse_expr(r#"{ method: "POST", headers: { "Content-Type": "application/json" } }"#);
+        let e =
+            parse_expr(r#"{ method: "POST", headers: { "Content-Type": "application/json" } }"#);
         if let Expr::ObjectLit { fields } = e {
             assert_eq!(fields.len(), 2);
             assert_eq!(fields[0].0, "method");
@@ -9552,7 +10853,8 @@ mod tests {
 
     #[test]
     fn test_parse_fetch_with_object_options() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn post() {
                 let resp = await fetch("https://api.example.com/posts", {
                     method: "POST",
@@ -9560,7 +10862,8 @@ mod tests {
                     body: "data",
                 });
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
                 // The outer expression is Await(Fetch(...))
@@ -9603,7 +10906,8 @@ mod tests {
 
     #[test]
     fn test_parse_shortcut_fat_arrow_syntax() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Editor() {
                 shortcut "Cmd+S" => self.save;
 
@@ -9613,7 +10917,8 @@ mod tests {
                     <div>"editor"</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.shortcuts.len(), 1);
             assert_eq!(c.shortcuts[0].keys, "Cmd+S");
@@ -9626,7 +10931,8 @@ mod tests {
 
     #[test]
     fn test_parse_shortcut_multiple_fat_arrows() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component App() {
                 shortcut "Cmd+S" => self.save;
                 shortcut "Cmd+Z" => self.undo;
@@ -9638,7 +10944,8 @@ mod tests {
                     <div>"app"</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.shortcuts.len(), 2);
             assert_eq!(c.shortcuts[0].keys, "Cmd+S");
@@ -9652,21 +10959,31 @@ mod tests {
 
     #[test]
     fn test_parse_for_tuple_destructure() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 for (i, col) in items.iter().enumerate() {
                     let x = i;
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::For { binding, body, .. }) = &f.body.stmts[0] {
                 assert_eq!(binding, "__for_tuple__");
                 // First stmt in body should be LetDestructure with Tuple pattern
-                assert!(matches!(&body.stmts[0], Stmt::LetDestructure {
-                    pattern: Pattern::Tuple(_), ..
-                }));
-                if let Stmt::LetDestructure { pattern: Pattern::Tuple(pats), .. } = &body.stmts[0] {
+                assert!(matches!(
+                    &body.stmts[0],
+                    Stmt::LetDestructure {
+                        pattern: Pattern::Tuple(_),
+                        ..
+                    }
+                ));
+                if let Stmt::LetDestructure {
+                    pattern: Pattern::Tuple(pats),
+                    ..
+                } = &body.stmts[0]
+                {
                     assert_eq!(pats.len(), 2);
                     assert!(matches!(&pats[0], Pattern::Ident(n) if n == "i"));
                     assert!(matches!(&pats[1], Pattern::Ident(n) if n == "col"));
@@ -9681,17 +10998,23 @@ mod tests {
 
     #[test]
     fn test_parse_for_triple_tuple_destructure() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 for (a, b, c) in triples {
                     let x = a;
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::For { binding, body, .. }) = &f.body.stmts[0] {
                 assert_eq!(binding, "__for_tuple__");
-                if let Stmt::LetDestructure { pattern: Pattern::Tuple(pats), .. } = &body.stmts[0] {
+                if let Stmt::LetDestructure {
+                    pattern: Pattern::Tuple(pats),
+                    ..
+                } = &body.stmts[0]
+                {
                     assert_eq!(pats.len(), 3);
                 }
             } else {
@@ -9704,7 +11027,8 @@ mod tests {
 
     #[test]
     fn test_parse_channel_on_connect_anonymous_fn() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             channel Chat {
                 url: "wss://example.com/ws",
 
@@ -9714,7 +11038,8 @@ mod tests {
                 on_disconnect fn() {
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Channel(ch) = &prog.items[0] {
             assert!(ch.on_connect.is_some());
             let f = ch.on_connect.as_ref().unwrap();
@@ -9728,14 +11053,16 @@ mod tests {
 
     #[test]
     fn test_parse_channel_on_message_with_param() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             channel Chat {
                 url: "wss://example.com/ws",
 
                 on_message fn(msg: String) {
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Channel(ch) = &prog.items[0] {
             assert!(ch.on_message.is_some());
             let f = ch.on_message.as_ref().unwrap();
@@ -9750,7 +11077,8 @@ mod tests {
 
     #[test]
     fn test_parse_spring_in_component() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Modal() {
                 let mut visible: bool = false;
 
@@ -9769,7 +11097,8 @@ mod tests {
                     <div>"modal"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "Modal");
@@ -9783,7 +11112,8 @@ mod tests {
 
     #[test]
     fn test_parse_keyframes_in_component() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Spinner() {
                 keyframes spin {
                     from: { transform: "rotate(0deg)" },
@@ -9794,7 +11124,8 @@ mod tests {
                     <div>"spinner"</div>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "Spinner");
@@ -9805,7 +11136,8 @@ mod tests {
 
     #[test]
     fn test_parse_stagger_in_component() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component FeedList() {
                 stagger feed_enter {
                     from: { opacity: 0.0 },
@@ -9817,7 +11149,8 @@ mod tests {
                     <ul>"items"</ul>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "FeedList");
@@ -9830,13 +11163,15 @@ mod tests {
 
     #[test]
     fn test_parse_breakpoints_with_name() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             breakpoints AppBreakpoints {
                 sm: 640,
                 md: 768,
                 lg: 1024,
             }
-        "#);
+        "#,
+        );
         if let Item::Breakpoints(bp) = &prog.items[0] {
             assert_eq!(bp.breakpoints.len(), 3);
             assert_eq!(bp.breakpoints[0], ("sm".to_string(), 640));
@@ -9849,12 +11184,14 @@ mod tests {
 
     #[test]
     fn test_parse_breakpoints_without_name() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             breakpoints {
                 sm: 640,
                 md: 768,
             }
-        "#);
+        "#,
+        );
         if let Item::Breakpoints(bp) = &prog.items[0] {
             assert_eq!(bp.breakpoints.len(), 2);
         } else {
@@ -9866,7 +11203,8 @@ mod tests {
 
     #[test]
     fn test_parse_closure_with_template_body_in_virtual_list() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component LogViewer() {
                 let logs: Vec<String> = vec![];
 
@@ -9882,7 +11220,8 @@ mod tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         assert_eq!(prog.items.len(), 1);
         assert!(matches!(prog.items[0], Item::Component(_)));
     }
@@ -9891,14 +11230,16 @@ mod tests {
 
     #[test]
     fn test_parse_schema_dot_struct_init() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 let sd = Schema.Article {
                     headline: title,
                     author: name,
                 };
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
                 assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Article"));
@@ -9912,14 +11253,16 @@ mod tests {
 
     #[test]
     fn test_parse_schema_dot_product_init() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 let sd = Schema.Product {
                     name: product_name,
                     price: price_str,
                 };
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
                 assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Product"));
@@ -9933,7 +11276,8 @@ mod tests {
 
     #[test]
     fn test_parse_theme_with_default_field() {
-        let prog = parse(r##"
+        let prog = parse(
+            r##"
             theme AppTheme {
                 light {
                     bg: "#ffffff",
@@ -9945,7 +11289,8 @@ mod tests {
                 }
                 default: "auto",
             }
-        "##);
+        "##,
+        );
         if let Item::Theme(t) = &prog.items[0] {
             assert_eq!(t.name, "AppTheme");
             assert!(t.light.is_some());
@@ -9957,12 +11302,14 @@ mod tests {
 
     #[test]
     fn test_parse_theme_default_only() {
-        let prog = parse(r##"
+        let prog = parse(
+            r##"
             theme SimpleTheme {
                 primary: "#2563eb",
                 default: "light",
             }
-        "##);
+        "##,
+        );
         if let Item::Theme(t) = &prog.items[0] {
             assert_eq!(t.name, "SimpleTheme");
         } else {
@@ -9975,7 +11322,8 @@ mod tests {
     #[test]
     fn test_parse_fetch_with_nested_object_options() {
         // Models api.nectar pattern: fetch(url, { method: "POST", headers: {...}, body: ... })
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn create_post(title: String, body: String) {
                 let response = await fetch("https://api.example.com/posts", {
                     method: "POST",
@@ -9983,7 +11331,8 @@ mod tests {
                     body: body,
                 });
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             assert_eq!(f.name, "create_post");
             assert_eq!(f.body.stmts.len(), 1);
@@ -9994,7 +11343,8 @@ mod tests {
 
     #[test]
     fn test_parse_channel_realtime_example() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             channel Chat {
                 url: "wss://api.example.com/ws/chat",
                 reconnect: true,
@@ -10012,7 +11362,8 @@ mod tests {
                 fn send_message(&self, text: String) {
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Channel(ch) = &prog.items[0] {
             assert_eq!(ch.name, "Chat");
             assert!(ch.on_connect.is_some());
@@ -10026,7 +11377,8 @@ mod tests {
 
     #[test]
     fn test_parse_shortcuts_example() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component TextEditor() {
                 let mut content: String = "";
                 let mut saved: bool = true;
@@ -10045,7 +11397,8 @@ mod tests {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.shortcuts.len(), 3);
             assert_eq!(c.shortcuts[0].keys, "Cmd+S");
@@ -10059,13 +11412,15 @@ mod tests {
     #[test]
     fn test_parse_for_tuple_in_template() {
         // Tests for (i, col) in template context (dnd.nectar pattern)
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn f() {
                 for (i, item) in self.items.iter().enumerate() {
                     let idx = i;
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Expr(Expr::For { binding, .. }) = &f.body.stmts[0] {
                 assert_eq!(binding, "__for_tuple__");
@@ -10078,11 +11433,13 @@ mod tests {
     #[test]
     fn test_parse_crypto_secret_param() {
         // Tests crypto.nectar pattern: fn secure_token_flow(secret user_password: String)
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             fn secure_token_flow(secret user_password: String) {
                 let key = crypto.derive_key(user_password, "salt");
             }
-        "#);
+        "#,
+        );
         if let Item::Function(f) = &prog.items[0] {
             assert_eq!(f.params.len(), 1);
             assert_eq!(f.params[0].name, "user_password");
@@ -10094,7 +11451,8 @@ mod tests {
     #[test]
     fn test_parse_animations_component() {
         // Tests animations.nectar: spring enter/exit inside component
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component Modal() {
                 let mut visible: bool = false;
 
@@ -10120,7 +11478,8 @@ mod tests {
                     <div>"modal"</div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "Modal");
             assert_eq!(c.methods.len(), 1);
@@ -10136,7 +11495,8 @@ mod tests {
     #[test]
     fn test_parse_qualified_path_in_match_pattern() {
         // AuthStatus::LoggedIn(_) must parse as Pattern::Variant
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     fn check(&self) -> bool {
         match self.status {
@@ -10147,7 +11507,8 @@ component Foo() {
     }
     render { <div>"ok"</div> }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.methods.len(), 1);
@@ -10160,14 +11521,16 @@ component Foo() {
     /// `TypeName::method()` static call with `::` in expressions
     #[test]
     fn test_parse_static_method_call_via_colon_colon() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     fn handle(&mut self) {
         PostService::create_post(self.title, self.body);
     }
     render { <div>"ok"</div> }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.methods[0].name, "handle");
@@ -10188,7 +11551,8 @@ component Foo() {
     /// `{match subject { Pattern => <element> }}` in template expressions
     #[test]
     fn test_parse_template_match_with_element_arms() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         {match self.get_error() {
@@ -10197,7 +11561,8 @@ component Foo() {
         }}
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::TemplateMatch { arms, .. } = &c.render.body {
@@ -10215,7 +11580,7 @@ component Foo() {
                 // `None` with no parentheses parses as Pattern::Ident("None")
                 assert!(
                     matches!(&arms[1].pattern, Pattern::Ident(n) if n == "None")
-                    || matches!(&arms[1].pattern, Pattern::Variant { name: n, .. } if n == "None"),
+                        || matches!(&arms[1].pattern, Pattern::Variant { name: n, .. } if n == "None"),
                     "Expected Ident or Variant pattern for None arm"
                 );
                 assert_eq!(arms[1].body.len(), 1);
@@ -10232,7 +11597,8 @@ component Foo() {
     /// `<element>` inside a conditional template block works
     #[test]
     fn test_parse_template_if_with_element_body() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         {if PostService::get_loading() {
@@ -10240,10 +11606,16 @@ component Foo() {
         }}
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
-            if let TemplateNode::TemplateIf { then_children, else_children, .. } = &c.render.body {
+            if let TemplateNode::TemplateIf {
+                then_children,
+                else_children,
+                ..
+            } = &c.render.body
+            {
                 assert_eq!(then_children.len(), 1);
                 assert!(matches!(&then_children[0], TemplateNode::Element(e) if e.tag == "div"));
                 assert!(else_children.is_none());
@@ -10260,7 +11632,8 @@ component Foo() {
     fn test_parse_template_if_else_string_branches() {
         // This tests the case from shortcuts.nectar:
         // {if self.saved { "Saved" } else { "Unsaved changes" }}
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         <footer>
@@ -10268,18 +11641,28 @@ component Foo() {
         </footer>
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(footer) = &c.render.body {
                 assert_eq!(footer.tag, "footer");
                 assert_eq!(footer.children.len(), 1);
-                if let TemplateNode::TemplateIf { then_children, else_children, .. } = &footer.children[0] {
+                if let TemplateNode::TemplateIf {
+                    then_children,
+                    else_children,
+                    ..
+                } = &footer.children[0]
+                {
                     assert_eq!(then_children.len(), 1);
-                    assert!(matches!(&then_children[0], TemplateNode::TextLiteral(s) if s == "Saved"));
+                    assert!(
+                        matches!(&then_children[0], TemplateNode::TextLiteral(s) if s == "Saved")
+                    );
                     let else_nodes = else_children.as_ref().expect("Expected else branch");
                     assert_eq!(else_nodes.len(), 1);
-                    assert!(matches!(&else_nodes[0], TemplateNode::TextLiteral(s) if s == "Unsaved changes"));
+                    assert!(
+                        matches!(&else_nodes[0], TemplateNode::TextLiteral(s) if s == "Unsaved changes")
+                    );
                 } else {
                     panic!("Expected TemplateIf inside footer");
                 }
@@ -10295,13 +11678,15 @@ component Foo() {
     #[test]
     fn test_parse_format_string_with_fn_call_args_in_interpolation() {
         // fluid is a keyword-like token; it must be handled as an ident-like in parse_primary
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         <h1 style={f"font-size: {fluid(24, 64)};"}>"Title"</h1>
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(h1) = &c.render.body {
@@ -10324,11 +11709,13 @@ component Foo() {
     /// (tests the ident-like keyword fallthrough in parse_primary)
     #[test]
     fn test_parse_fluid_function_call_expression() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 fn f() {
     let size = fluid(16, 48);
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Let { name, value, .. } = &f.body.stmts[0] {
@@ -10350,7 +11737,8 @@ fn f() {
     /// Self-closing tags `<tag />` parse correctly as elements with no children
     #[test]
     fn test_parse_self_closing_tag_in_template() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         <div>
@@ -10360,7 +11748,8 @@ component Foo() {
         </div>
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(div) = &c.render.body {
@@ -10368,7 +11757,10 @@ component Foo() {
                 assert_eq!(div.children.len(), 3);
                 for child in &div.children {
                     if let TemplateNode::Element(e) = child {
-                        assert!(e.children.is_empty(), "Self-closing tag should have no children");
+                        assert!(
+                            e.children.is_empty(),
+                            "Self-closing tag should have no children"
+                        );
                     } else {
                         panic!("Expected Element child");
                     }
@@ -10385,16 +11777,21 @@ component Foo() {
     /// (verifies that the uppercase-only guard doesn't break legitimate uses)
     #[test]
     fn test_parse_dot_access_struct_init_uppercase_field() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 fn build() {
     let x = Schema.Article { id: 1, title: "hello" };
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Function(f) = &prog.items[0] {
             if let Stmt::Let { value, .. } = &f.body.stmts[0] {
-                assert!(matches!(value, Expr::StructInit { name, .. } if name == "Schema.Article"),
-                    "Expected StructInit with name Schema.Article, got {:?}", value);
+                assert!(
+                    matches!(value, Expr::StructInit { name, .. } if name == "Schema.Article"),
+                    "Expected StructInit with name Schema.Article, got {:?}",
+                    value
+                );
             } else {
                 panic!("Expected Let");
             }
@@ -10409,20 +11806,23 @@ fn build() {
     fn test_parse_lowercase_field_then_brace_is_not_struct_init() {
         // self.saved { ... } should be FieldAccess, not StructInit
         // This is the key regression that was causing issues.
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         {if self.saved { "yes" } else { "no" }}
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::TemplateIf { condition, .. } = &c.render.body {
                 // condition must be self.saved (FieldAccess), not a StructInit
                 assert!(
                     matches!(condition.as_ref(), Expr::FieldAccess { field, .. } if field == "saved"),
-                    "Expected FieldAccess(saved) as condition, got {:?}", condition
+                    "Expected FieldAccess(saved) as condition, got {:?}",
+                    condition
                 );
             } else {
                 panic!("Expected TemplateIf");
@@ -10435,7 +11835,8 @@ component Foo() {
     /// Template `{match}` with a wildcard arm renders correctly
     #[test]
     fn test_parse_template_match_with_wildcard_arm() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component Foo() {
     render {
         {match self.state {
@@ -10444,7 +11845,8 @@ component Foo() {
         }}
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::TemplateMatch { arms, .. } = &c.render.body {
@@ -10461,7 +11863,8 @@ component Foo() {
     /// Full api.nectar-style component with `{match}` and `{if}` template blocks
     #[test]
     fn test_parse_api_component_with_template_match_and_if() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
 component PostList() {
     let mut new_title: String = "";
 
@@ -10483,7 +11886,8 @@ component PostList() {
         </div>
     }
 }
-"#);
+"#,
+        );
         assert_eq!(prog.items.len(), 1);
         if let Item::Component(c) = &prog.items[0] {
             assert_eq!(c.name, "PostList");
@@ -10493,7 +11897,10 @@ component PostList() {
                 assert_eq!(div.tag, "div");
                 assert_eq!(div.children.len(), 3);
                 assert!(matches!(&div.children[0], TemplateNode::TemplateIf { .. }));
-                assert!(matches!(&div.children[1], TemplateNode::TemplateMatch { .. }));
+                assert!(matches!(
+                    &div.children[1],
+                    TemplateNode::TemplateMatch { .. }
+                ));
                 assert!(matches!(&div.children[2], TemplateNode::Element(e) if e.tag == "button"));
             } else {
                 panic!("Expected div Element");
@@ -10505,7 +11912,8 @@ component PostList() {
 
     #[test]
     fn test_parse_select_element() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <select class="picker">
@@ -10513,7 +11921,8 @@ component PostList() {
                     </select>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "select");
@@ -10534,13 +11943,15 @@ component PostList() {
 
     #[test]
     fn test_parse_select_self_closing() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <select />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "select");
@@ -10555,18 +11966,22 @@ component PostList() {
 
     #[test]
     fn test_parse_boolean_attribute_disabled() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <button disabled>"Click"</button>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "button");
                 assert_eq!(el.attributes.len(), 1);
-                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty()));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty())
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -10577,18 +11992,22 @@ component PostList() {
 
     #[test]
     fn test_parse_boolean_attribute_checked() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <input checked />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "input");
                 assert_eq!(el.attributes.len(), 1);
-                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "checked" && value.is_empty()));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Static { name, value } if name == "checked" && value.is_empty())
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -10599,20 +12018,28 @@ component PostList() {
 
     #[test]
     fn test_parse_mixed_boolean_and_value_attributes() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <input disabled type="text" readonly />
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
                 assert_eq!(el.tag, "input");
                 assert_eq!(el.attributes.len(), 3);
-                assert!(matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty()));
-                assert!(matches!(&el.attributes[1], Attribute::Static { name, value } if name == "type" && value == "text"));
-                assert!(matches!(&el.attributes[2], Attribute::Static { name, value } if name == "readonly" && value.is_empty()));
+                assert!(
+                    matches!(&el.attributes[0], Attribute::Static { name, value } if name == "disabled" && value.is_empty())
+                );
+                assert!(
+                    matches!(&el.attributes[1], Attribute::Static { name, value } if name == "type" && value == "text")
+                );
+                assert!(
+                    matches!(&el.attributes[2], Attribute::Static { name, value } if name == "readonly" && value.is_empty())
+                );
             } else {
                 panic!("Expected Element");
             }
@@ -10656,7 +12083,8 @@ component PostList() {
 
     #[test]
     fn test_parse_template_for_range() {
-        let prog = parse(r#"
+        let prog = parse(
+            r#"
             component C {
                 render {
                     <div>
@@ -10666,10 +12094,14 @@ component PostList() {
                     </div>
                 }
             }
-        "#);
+        "#,
+        );
         if let Item::Component(c) = &prog.items[0] {
             if let TemplateNode::Element(el) = &c.render.body {
-                if let TemplateNode::TemplateFor { binding, iterator, .. } = &el.children[0] {
+                if let TemplateNode::TemplateFor {
+                    binding, iterator, ..
+                } = &el.children[0]
+                {
                     assert_eq!(binding, "i");
                     assert!(matches!(iterator.as_ref(), Expr::Range { .. }));
                 } else {

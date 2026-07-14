@@ -10,7 +10,7 @@ use std::io::{self, BufRead, Read as _, Write};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::ast::{Program, Item};
+use crate::ast::{Item, Program};
 use crate::borrow_checker;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
@@ -277,7 +277,11 @@ impl LspServer {
                 if let Some(params) = request.params {
                     if let Ok(p) = serde_json::from_value::<CompletionParams>(params) {
                         let items = self.on_completion(p);
-                        self.send_response(request.id, Some(serde_json::to_value(items).unwrap()), None)?;
+                        self.send_response(
+                            request.id,
+                            Some(serde_json::to_value(items).unwrap()),
+                            None,
+                        )?;
                     }
                 }
             }
@@ -322,10 +326,8 @@ impl LspServer {
         let program = self.parse_document(&text);
         let diagnostics = self.collect_diagnostics(&text, &program);
 
-        self.documents.insert(
-            uri.clone(),
-            DocumentState { text, program },
-        );
+        self.documents
+            .insert(uri.clone(), DocumentState { text, program });
 
         self.publish_diagnostics(&uri, diagnostics)
     }
@@ -339,10 +341,8 @@ impl LspServer {
             let program = self.parse_document(&text);
             let diagnostics = self.collect_diagnostics(&text, &program);
 
-            self.documents.insert(
-                uri.clone(),
-                DocumentState { text, program },
-            );
+            self.documents
+                .insert(uri.clone(), DocumentState { text, program });
 
             self.publish_diagnostics(&uri, diagnostics)?;
         }
@@ -367,9 +367,8 @@ impl LspServer {
             if let Some(doc) = self.documents.get(uri) {
                 if let Some(program) = &doc.program {
                     // Try to resolve the type of the identifier before the dot.
-                    let resolved_type = self.resolve_identifier_type(
-                        &ident_before_dot, program, position,
-                    );
+                    let resolved_type =
+                        self.resolve_identifier_type(&ident_before_dot, program, position);
 
                     if let Some(type_name) = resolved_type {
                         // Return only fields and methods of the resolved type
@@ -391,7 +390,10 @@ impl LspServer {
                                         items.push(CompletionItem {
                                             label: method.name.clone(),
                                             kind: 2, // Method
-                                            detail: Some(format!("{}::{}", imp.target, method.name)),
+                                            detail: Some(format!(
+                                                "{}::{}",
+                                                imp.target, method.name
+                                            )),
                                         });
                                     }
                                 }
@@ -400,7 +402,11 @@ impl LspServer {
                             if ident_before_dot == "self" {
                                 if let Item::Component(c) = item {
                                     // Check if cursor is inside this component
-                                    if self.span_contains(&c.span, position.line + 1, position.character + 1) {
+                                    if self.span_contains(
+                                        &c.span,
+                                        position.line + 1,
+                                        position.character + 1,
+                                    ) {
                                         for field in &c.state {
                                             items.push(CompletionItem {
                                                 label: field.name.clone(),
@@ -420,8 +426,21 @@ impl LspServer {
                             }
                         }
                         // Add built-in methods for common types
-                        for builtin in &["len", "push", "pop", "contains", "map", "filter", "reduce",
-                                         "trim", "to_upper", "to_lower", "split", "starts_with", "ends_with"] {
+                        for builtin in &[
+                            "len",
+                            "push",
+                            "pop",
+                            "contains",
+                            "map",
+                            "filter",
+                            "reduce",
+                            "trim",
+                            "to_upper",
+                            "to_lower",
+                            "split",
+                            "starts_with",
+                            "ends_with",
+                        ] {
                             items.push(CompletionItem {
                                 label: builtin.to_string(),
                                 kind: 2, // Method
@@ -454,8 +473,21 @@ impl LspServer {
                         }
                     }
                     // Add built-in methods for common types
-                    for builtin in &["len", "push", "pop", "contains", "map", "filter", "reduce",
-                                     "trim", "to_upper", "to_lower", "split", "starts_with", "ends_with"] {
+                    for builtin in &[
+                        "len",
+                        "push",
+                        "pop",
+                        "contains",
+                        "map",
+                        "filter",
+                        "reduce",
+                        "trim",
+                        "to_upper",
+                        "to_lower",
+                        "split",
+                        "starts_with",
+                        "ends_with",
+                    ] {
                         items.push(CompletionItem {
                             label: builtin.to_string(),
                             kind: 2, // Method
@@ -469,15 +501,66 @@ impl LspServer {
 
         // Not dot-completion — return keywords + top-level names (full completion).
         let keywords = [
-            "let", "mut", "fn", "component", "render", "struct", "enum",
-            "impl", "trait", "if", "else", "match", "for", "in", "while",
-            "return", "own", "ref", "self", "Self", "pub", "use", "mod",
-            "true", "false", "signal", "store", "action", "effect",
-            "computed", "async", "await", "fetch", "derive", "spawn",
-            "channel", "select", "parallel", "stream", "lazy", "suspend",
-            "yield", "agent", "prompt", "tool", "route", "link",
-            "navigate", "router", "fallback", "guard", "style",
-            "i32", "i64", "f32", "f64", "u32", "u64", "bool", "String",
+            "let",
+            "mut",
+            "fn",
+            "component",
+            "render",
+            "struct",
+            "enum",
+            "impl",
+            "trait",
+            "if",
+            "else",
+            "match",
+            "for",
+            "in",
+            "while",
+            "return",
+            "own",
+            "ref",
+            "self",
+            "Self",
+            "pub",
+            "use",
+            "mod",
+            "true",
+            "false",
+            "signal",
+            "store",
+            "action",
+            "effect",
+            "computed",
+            "async",
+            "await",
+            "fetch",
+            "derive",
+            "spawn",
+            "channel",
+            "select",
+            "parallel",
+            "stream",
+            "lazy",
+            "suspend",
+            "yield",
+            "agent",
+            "prompt",
+            "tool",
+            "route",
+            "link",
+            "navigate",
+            "router",
+            "fallback",
+            "guard",
+            "style",
+            "i32",
+            "i64",
+            "f32",
+            "f64",
+            "u32",
+            "u64",
+            "bool",
+            "String",
         ];
         for kw in &keywords {
             items.push(CompletionItem {
@@ -595,7 +678,8 @@ impl LspServer {
                 }
                 let ident_end = end;
                 // Walk backwards to find the start of the identifier
-                while end > 0 && (bytes[end - 1].is_ascii_alphanumeric() || bytes[end - 1] == b'_') {
+                while end > 0 && (bytes[end - 1].is_ascii_alphanumeric() || bytes[end - 1] == b'_')
+                {
                     end -= 1;
                 }
                 return line[end..ident_end].to_string();
@@ -648,9 +732,7 @@ impl LspServer {
     fn type_name_from_ast(&self, ty: &crate::ast::Type) -> String {
         match ty {
             crate::ast::Type::Named(name) => name.clone(),
-            crate::ast::Type::Reference { inner, .. } => {
-                self.type_name_from_ast(inner)
-            }
+            crate::ast::Type::Reference { inner, .. } => self.type_name_from_ast(inner),
             crate::ast::Type::Option(inner) => self.type_name_from_ast(inner),
             crate::ast::Type::Array(inner) => self.type_name_from_ast(inner),
             _ => String::new(),
@@ -753,42 +835,60 @@ impl LspServer {
         for item in &program.items {
             match item {
                 Item::Function(f) if f.name == identifier => {
-                    return Some(serde_json::to_value(Location {
-                        uri: uri.clone(),
-                        range: self.span_to_range(&f.span),
-                    }).ok()?);
+                    return Some(
+                        serde_json::to_value(Location {
+                            uri: uri.clone(),
+                            range: self.span_to_range(&f.span),
+                        })
+                        .ok()?,
+                    );
                 }
                 Item::Component(c) if c.name == identifier => {
-                    return Some(serde_json::to_value(Location {
-                        uri: uri.clone(),
-                        range: self.span_to_range(&c.span),
-                    }).ok()?);
+                    return Some(
+                        serde_json::to_value(Location {
+                            uri: uri.clone(),
+                            range: self.span_to_range(&c.span),
+                        })
+                        .ok()?,
+                    );
                 }
                 Item::Struct(s) if s.name == identifier => {
-                    return Some(serde_json::to_value(Location {
-                        uri: uri.clone(),
-                        range: self.span_to_range(&s.span),
-                    }).ok()?);
+                    return Some(
+                        serde_json::to_value(Location {
+                            uri: uri.clone(),
+                            range: self.span_to_range(&s.span),
+                        })
+                        .ok()?,
+                    );
                 }
                 Item::Enum(e) if e.name == identifier => {
-                    return Some(serde_json::to_value(Location {
-                        uri: uri.clone(),
-                        range: self.span_to_range(&e.span),
-                    }).ok()?);
+                    return Some(
+                        serde_json::to_value(Location {
+                            uri: uri.clone(),
+                            range: self.span_to_range(&e.span),
+                        })
+                        .ok()?,
+                    );
                 }
                 Item::Store(s) if s.name == identifier => {
-                    return Some(serde_json::to_value(Location {
-                        uri: uri.clone(),
-                        range: self.span_to_range(&s.span),
-                    }).ok()?);
+                    return Some(
+                        serde_json::to_value(Location {
+                            uri: uri.clone(),
+                            range: self.span_to_range(&s.span),
+                        })
+                        .ok()?,
+                    );
                 }
                 Item::Impl(imp) => {
                     for method in &imp.methods {
                         if method.name == identifier {
-                            return Some(serde_json::to_value(Location {
-                                uri: uri.clone(),
-                                range: self.span_to_range(&method.span),
-                            }).ok()?);
+                            return Some(
+                                serde_json::to_value(Location {
+                                    uri: uri.clone(),
+                                    range: self.span_to_range(&method.span),
+                                })
+                                .ok()?,
+                            );
                         }
                     }
                 }
@@ -811,8 +911,14 @@ impl LspServer {
                 Err(e) => {
                     diagnostics.push(Diagnostic {
                         range: Range {
-                            start: Position { line: e.line.saturating_sub(1), character: e.col.saturating_sub(1) },
-                            end: Position { line: e.line.saturating_sub(1), character: e.col },
+                            start: Position {
+                                line: e.line.saturating_sub(1),
+                                character: e.col.saturating_sub(1),
+                            },
+                            end: Position {
+                                line: e.line.saturating_sub(1),
+                                character: e.col,
+                            },
                         },
                         severity: 1, // Error
                         source: "nectar-lexer".to_string(),
@@ -872,8 +978,14 @@ impl LspServer {
             for err in &errors {
                 diagnostics.push(Diagnostic {
                     range: Range {
-                        start: Position { line: 0, character: 0 },
-                        end: Position { line: 0, character: 1 },
+                        start: Position {
+                            line: 0,
+                            character: 0,
+                        },
+                        end: Position {
+                            line: 0,
+                            character: 1,
+                        },
                     },
                     severity: 1,
                     source: "nectar-types".to_string(),
@@ -1030,7 +1142,10 @@ mod tests {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1049,7 +1164,10 @@ mod tests {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1088,14 +1206,20 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
 
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1178,7 +1302,10 @@ mod tests {
             text_document: TextDocumentIdentifier {
                 uri: "file:///nonexistent.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let result = server.on_hover(params);
         assert!(result.is_none());
@@ -1193,7 +1320,10 @@ mod tests {
             text_document: TextDocumentIdentifier {
                 uri: "file:///nonexistent.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let result = server.on_definition(params);
         assert!(result.is_none());
@@ -1235,14 +1365,20 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
 
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1258,14 +1394,20 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
 
         let params = HoverParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 3 }, // on "add"
+            position: Position {
+                line: 0,
+                character: 3,
+            }, // on "add"
         };
         let result = server.on_hover(params);
         // May or may not return hover info depending on span matching
@@ -1282,13 +1424,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1304,13 +1452,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1326,13 +1480,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 0 },
+            position: Position {
+                line: 0,
+                character: 0,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
@@ -1351,21 +1511,37 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 1, character: 22 }, // after the dot in "p."
+            position: Position {
+                line: 1,
+                character: 22,
+            }, // after the dot in "p."
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         // Dot completion should return struct fields (from type resolution of param `p: Point`)
-        assert!(labels.contains(&"x"), "dot completion on Point should include field 'x', got: {:?}", labels);
-        assert!(labels.contains(&"y"), "dot completion on Point should include field 'y'");
+        assert!(
+            labels.contains(&"x"),
+            "dot completion on Point should include field 'x', got: {:?}",
+            labels
+        );
+        assert!(
+            labels.contains(&"y"),
+            "dot completion on Point should include field 'y'"
+        );
         // Should NOT include keywords in dot-completion context
-        assert!(!labels.contains(&"let"), "dot completion should not include keywords");
+        assert!(
+            !labels.contains(&"let"),
+            "dot completion should not include keywords"
+        );
     }
 
     // --- Hover on struct ---
@@ -1377,13 +1553,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = HoverParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 7 }, // on "Point"
+            position: Position {
+                line: 0,
+                character: 7,
+            }, // on "Point"
         };
         let result = server.on_hover(params);
         // Should not panic
@@ -1399,13 +1581,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = HoverParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 10 }, // on "App"
+            position: Position {
+                line: 0,
+                character: 10,
+            }, // on "App"
         };
         let result = server.on_hover(params);
         let _ = result;
@@ -1420,13 +1608,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = DefinitionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 3 }, // on "helper"
+            position: Position {
+                line: 0,
+                character: 3,
+            }, // on "helper"
         };
         let result = server.on_definition(params);
         // Should not panic. May or may not find definition depending on span matching.
@@ -1442,13 +1636,19 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
         let params = DefinitionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 7 }, // on "Point"
+            position: Position {
+                line: 0,
+                character: 7,
+            }, // on "Point"
         };
         let result = server.on_definition(params);
         let _ = result;
@@ -1634,7 +1834,10 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
 
         let params = CompletionParams {
@@ -1642,14 +1845,23 @@ mod tests {
                 uri: "file:///test.nectar".to_string(),
             },
             // Position right after the dot: line 0, char 2
-            position: Position { line: 0, character: 2 },
+            position: Position {
+                line: 0,
+                character: 2,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         // Should have built-in methods, but NOT keywords
-        assert!(labels.contains(&"len") || labels.contains(&"push"),
-            "After dot, should include built-in methods, got: {:?}", labels);
-        assert!(!labels.contains(&"fn"), "After dot, should NOT include keyword 'fn'");
+        assert!(
+            labels.contains(&"len") || labels.contains(&"push"),
+            "After dot, should include built-in methods, got: {:?}",
+            labels
+        );
+        assert!(
+            !labels.contains(&"fn"),
+            "After dot, should NOT include keyword 'fn'"
+        );
     }
 
     #[test]
@@ -1659,18 +1871,30 @@ mod tests {
         let program = server.parse_document(source);
         server.documents.insert(
             "file:///test.nectar".to_string(),
-            DocumentState { text: source.to_string(), program },
+            DocumentState {
+                text: source.to_string(),
+                program,
+            },
         );
 
         let params = CompletionParams {
             text_document: TextDocumentIdentifier {
                 uri: "file:///test.nectar".to_string(),
             },
-            position: Position { line: 0, character: 5 },
+            position: Position {
+                line: 0,
+                character: 5,
+            },
         };
         let items = server.on_completion(params);
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-        assert!(labels.contains(&"fn"), "Should include keywords when not after dot");
-        assert!(labels.contains(&"component"), "Should include component keyword");
+        assert!(
+            labels.contains(&"fn"),
+            "Should include keywords when not after dot"
+        );
+        assert!(
+            labels.contains(&"component"),
+            "Should include component keyword"
+        );
     }
 }

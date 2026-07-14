@@ -3,7 +3,6 @@
 /// Produces canonical, deterministic source text from a parsed AST.
 /// Configurable indent size, line width, trailing commas, and
 /// single-line expression threshold.
-
 use crate::ast::*;
 
 /// Configuration options for the formatter.
@@ -129,7 +128,9 @@ impl Formatter {
             Item::Contract(_) => {}
             Item::Page(page) => {
                 self.push_indent();
-                if page.is_pub { self.push("pub "); }
+                if page.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("page {} {{\n", page.name));
                 self.indent += 1;
                 // Minimal formatting — body details omitted
@@ -139,7 +140,9 @@ impl Formatter {
             }
             Item::App(app) => {
                 self.push_indent();
-                if app.is_pub { self.push("pub "); }
+                if app.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("app {} {{\n", app.name));
                 self.indent += 1;
                 // Minimal formatting — body details omitted
@@ -149,7 +152,9 @@ impl Formatter {
             }
             Item::Form(form) => {
                 self.push_indent();
-                if form.is_pub { self.push("pub "); }
+                if form.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("form {} {{\n", form.name));
                 self.indent += 1;
                 for field in &form.fields {
@@ -165,7 +170,9 @@ impl Formatter {
             }
             Item::Channel(ch) => {
                 self.push_indent();
-                if ch.is_pub { self.push("pub "); }
+                if ch.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("channel {}", ch.name));
                 if let Some(ref contract) = ch.contract {
                     self.push(&format!(" -> {}", contract));
@@ -182,7 +189,9 @@ impl Formatter {
             Item::Mod(m) => self.format_mod(m),
             Item::Embed(e) => {
                 self.push_indent();
-                if e.is_pub { self.push("pub "); }
+                if e.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("embed {} {{\n", e.name));
                 self.indent += 1;
                 self.push_indent();
@@ -201,7 +210,9 @@ impl Formatter {
             }
             Item::Pdf(p) => {
                 self.push_indent();
-                if p.is_pub { self.push("pub "); }
+                if p.is_pub {
+                    self.push("pub ");
+                }
                 self.push(&format!("pdf {} {{\n", p.name));
                 self.indent += 1;
                 if let Some(ref size) = p.page_size {
@@ -315,7 +326,10 @@ impl Formatter {
         }
         for t in &c.transitions {
             self.push_indent();
-            self.push(&format!("transition {} {}ms {};\n", t.property, t.duration, t.easing));
+            self.push(&format!(
+                "transition {} {}ms {};\n",
+                t.property, t.duration, t.easing
+            ));
         }
         if let Some(skel) = &c.skeleton {
             self.push_indent();
@@ -609,7 +623,12 @@ impl Formatter {
         self.push(&r.name);
         self.push(" {\n");
         self.inc();
-        let max_path_len = r.routes.iter().map(|rt| rt.path.len() + 2).max().unwrap_or(0);
+        let max_path_len = r
+            .routes
+            .iter()
+            .map(|rt| rt.path.len() + 2)
+            .max()
+            .unwrap_or(0);
         for rt in &r.routes {
             self.push_indent();
             self.push("route \"");
@@ -628,7 +647,11 @@ impl Formatter {
         }
         if let Some(fb) = &r.fallback {
             self.push_indent();
-            let padding = if max_path_len > 8 { max_path_len - 8 } else { 0 };
+            let padding = if max_path_len > 8 {
+                max_path_len - 8
+            } else {
+                0
+            };
             self.push("fallback");
             self.push(&" ".repeat(padding));
             self.push(" => ");
@@ -740,7 +763,7 @@ impl Formatter {
                 let parts: Vec<String> = params.iter().map(Self::format_type).collect();
                 format!("fn({}) -> {}", parts.join(", "), Self::format_type(ret))
             }
-            _ => "<unknown>".to_string()
+            _ => "<unknown>".to_string(),
         }
     }
 
@@ -756,7 +779,14 @@ impl Formatter {
 
     fn format_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Let { name, ty, mutable, secret, value, .. } => {
+            Stmt::Let {
+                name,
+                ty,
+                mutable,
+                secret,
+                value,
+                ..
+            } => {
                 self.push_indent();
                 self.push("let ");
                 if *mutable {
@@ -774,7 +804,13 @@ impl Formatter {
                 self.push(&self.format_expr_to_string(value));
                 self.push(";\n");
             }
-            Stmt::Signal { name, ty, secret, value, .. } => {
+            Stmt::Signal {
+                name,
+                ty,
+                secret,
+                value,
+                ..
+            } => {
                 self.push_indent();
                 self.push("signal ");
                 if *secret {
@@ -866,10 +902,16 @@ impl Formatter {
                 format!("{}?.{}", self.format_expr_inner(object, depth), field)
             }
 
-            Expr::MethodCall { object, method, args } => {
+            Expr::MethodCall {
+                object,
+                method,
+                args,
+            } => {
                 let obj = self.format_expr_inner(object, depth);
-                let args_str: Vec<String> =
-                    args.iter().map(|a| self.format_expr_inner(a, depth)).collect();
+                let args_str: Vec<String> = args
+                    .iter()
+                    .map(|a| self.format_expr_inner(a, depth))
+                    .collect();
                 let call = format!(".{}({})", method, args_str.join(", "));
                 let one_line = format!("{}{}", obj, call);
                 if one_line.len() <= self.options.max_line_width {
@@ -881,18 +923,26 @@ impl Formatter {
 
             Expr::FnCall { callee, args } => {
                 let callee_str = self.format_expr_inner(callee, depth);
-                let args_str: Vec<String> =
-                    args.iter().map(|a| self.format_expr_inner(a, depth)).collect();
+                let args_str: Vec<String> = args
+                    .iter()
+                    .map(|a| self.format_expr_inner(a, depth))
+                    .collect();
                 format!("{}({})", callee_str, args_str.join(", "))
             }
 
             Expr::Index { object, index } => {
-                format!("{}[{}]",
+                format!(
+                    "{}[{}]",
                     self.format_expr_inner(object, depth),
-                    self.format_expr_inner(index, depth))
+                    self.format_expr_inner(index, depth)
+                )
             }
 
-            Expr::If { condition, then_block, else_block } => {
+            Expr::If {
+                condition,
+                then_block,
+                else_block,
+            } => {
                 let cond = self.format_expr_inner(condition, depth);
                 let then_stmts = self.format_block_to_string(then_block, depth + 1);
                 let mut result = format!("if {} {{\n{}{}}}", cond, then_stmts, indent_str);
@@ -906,8 +956,10 @@ impl Formatter {
             Expr::Match { subject, arms } => {
                 let subj = self.format_expr_inner(subject, depth);
                 let mut result = format!("match {} {{\n", subj);
-                let pattern_strs: Vec<String> =
-                    arms.iter().map(|a| Self::format_pattern(&a.pattern)).collect();
+                let pattern_strs: Vec<String> = arms
+                    .iter()
+                    .map(|a| Self::format_pattern(&a.pattern))
+                    .collect();
                 let max_pat_len = pattern_strs.iter().map(|p| p.len()).max().unwrap_or(0);
                 for (arm, pat_str) in arms.iter().zip(pattern_strs.iter()) {
                     let padding = max_pat_len - pat_str.len();
@@ -919,17 +971,28 @@ impl Formatter {
                     };
                     result.push_str(&format!(
                         "{}{}{}{} => {},\n",
-                        next_indent, pat_str, " ".repeat(padding), guard_str, body_str
+                        next_indent,
+                        pat_str,
+                        " ".repeat(padding),
+                        guard_str,
+                        body_str
                     ));
                 }
                 result.push_str(&format!("{}}}", indent_str));
                 result
             }
 
-            Expr::For { binding, iterator, body } => {
+            Expr::For {
+                binding,
+                iterator,
+                body,
+            } => {
                 let iter_str = self.format_expr_inner(iterator, depth);
                 let body_str = self.format_block_to_string(body, depth + 1);
-                format!("for {} in {} {{\n{}{}}}", binding, iter_str, body_str, indent_str)
+                format!(
+                    "for {} in {} {{\n{}{}}}",
+                    binding, iter_str, body_str, indent_str
+                )
             }
 
             Expr::While { condition, body } => {
@@ -965,9 +1028,11 @@ impl Formatter {
             }
 
             Expr::Assign { target, value } => {
-                format!("{} = {}",
+                format!(
+                    "{} = {}",
                     self.format_expr_inner(target, depth),
-                    self.format_expr_inner(value, depth))
+                    self.format_expr_inner(value, depth)
+                )
             }
 
             Expr::Await(inner) => format!("{}.await", self.format_expr_inner(inner, depth)),
@@ -975,7 +1040,11 @@ impl Formatter {
             Expr::Fetch { url, options, .. } => {
                 let url_str = self.format_expr_inner(url, depth);
                 if let Some(opts) = options {
-                    format!("fetch({}, {})", url_str, self.format_expr_inner(opts, depth))
+                    format!(
+                        "fetch({}, {})",
+                        url_str,
+                        self.format_expr_inner(opts, depth)
+                    )
                 } else {
                     format!("fetch({})", url_str)
                 }
@@ -997,8 +1066,13 @@ impl Formatter {
                 if self.fits_single_line(&one_line) {
                     one_line
                 } else {
-                    format!("|{}| {{\n{}{}\n{}}}",
-                        params_str.join(", "), next_indent, body_str, indent_str)
+                    format!(
+                        "|{}| {{\n{}{}\n{}}}",
+                        params_str.join(", "),
+                        next_indent,
+                        body_str,
+                        indent_str
+                    )
                 }
             }
 
@@ -1007,9 +1081,11 @@ impl Formatter {
             Expr::Stream { source } => format!("stream {}", self.format_expr_inner(source, depth)),
 
             Expr::Suspend { fallback, body } => {
-                format!("suspend({}) {{ {} }}",
+                format!(
+                    "suspend({}) {{ {} }}",
                     self.format_expr_inner(fallback, depth),
-                    self.format_expr_inner(body, depth))
+                    self.format_expr_inner(body, depth)
+                )
             }
 
             Expr::Spawn { body, .. } => {
@@ -1026,9 +1102,11 @@ impl Formatter {
             }
 
             Expr::Send { channel, value } => {
-                format!("{}.send({})",
+                format!(
+                    "{}.send({})",
                     self.format_expr_inner(channel, depth),
-                    self.format_expr_inner(value, depth))
+                    self.format_expr_inner(value, depth)
+                )
             }
 
             Expr::Receive { channel } => {
@@ -1036,16 +1114,24 @@ impl Formatter {
             }
 
             Expr::Parallel { tasks, .. } => {
-                let parts: Vec<String> =
-                    tasks.iter().map(|e| self.format_expr_inner(e, depth)).collect();
+                let parts: Vec<String> = tasks
+                    .iter()
+                    .map(|e| self.format_expr_inner(e, depth))
+                    .collect();
                 format!("parallel {{ {} }}", parts.join(", "))
             }
 
-            Expr::TryCatch { body, error_binding, catch_body } => {
-                format!("try {{ {} }} catch {} {{ {} }}",
+            Expr::TryCatch {
+                body,
+                error_binding,
+                catch_body,
+            } => {
+                format!(
+                    "try {{ {} }} catch {} {{ {} }}",
                     self.format_expr_inner(body, depth),
                     error_binding,
-                    self.format_expr_inner(catch_body, depth))
+                    self.format_expr_inner(catch_body, depth)
+                )
             }
 
             Expr::Assert { condition, message } => {
@@ -1057,7 +1143,11 @@ impl Formatter {
                 }
             }
 
-            Expr::AssertEq { left, right, message } => {
+            Expr::AssertEq {
+                left,
+                right,
+                message,
+            } => {
                 let l = self.format_expr_inner(left, depth);
                 let r = self.format_expr_inner(right, depth);
                 if let Some(msg) = message {
@@ -1068,7 +1158,11 @@ impl Formatter {
             }
 
             Expr::Animate { target, animation } => {
-                format!("animate({}, \"{}\")", self.format_expr_inner(target, depth), animation)
+                format!(
+                    "animate({}, \"{}\")",
+                    self.format_expr_inner(target, depth),
+                    animation
+                )
             }
 
             Expr::FormatString { parts } => {
@@ -1096,14 +1190,23 @@ impl Formatter {
             }
 
             Expr::Download { data, filename, .. } => {
-                format!("download({}, {})", self.format_expr_inner(data, depth), self.format_expr_inner(filename, depth))
+                format!(
+                    "download({}, {})",
+                    self.format_expr_inner(data, depth),
+                    self.format_expr_inner(filename, depth)
+                )
             }
             Expr::Env { name, .. } => {
                 format!("env({})", self.format_expr_inner(name, depth))
             }
             Expr::Trace { label, body, .. } => {
                 let body_str = self.format_block_to_string(body, depth + 1);
-                format!("trace({}) {{\n{}{}}}", self.format_expr_inner(label, depth), body_str, " ".repeat(depth * self.options.indent_size))
+                format!(
+                    "trace({}) {{\n{}{}}}",
+                    self.format_expr_inner(label, depth),
+                    body_str,
+                    " ".repeat(depth * self.options.indent_size)
+                )
             }
             Expr::Flag { name, .. } => {
                 format!("flag({})", self.format_expr_inner(name, depth))
@@ -1111,19 +1214,37 @@ impl Formatter {
             Expr::Break => "break".to_string(),
             Expr::Continue => "continue".to_string(),
             Expr::TupleLit(elements) => {
-                let elem_strs: Vec<String> = elements.iter()
+                let elem_strs: Vec<String> = elements
+                    .iter()
                     .map(|e| self.format_expr_inner(e, depth + 1))
                     .collect();
                 format!("({})", elem_strs.join(", "))
             }
             Expr::Range { start, end } => {
-                format!("{}..{}", self.format_expr_inner(start, depth), self.format_expr_inner(end, depth))
+                format!(
+                    "{}..{}",
+                    self.format_expr_inner(start, depth),
+                    self.format_expr_inner(end, depth)
+                )
             }
-            Expr::VirtualList { items, item_height, template, .. } => {
-                format!("virtual_list({}, {}, {})", self.format_expr_inner(items, depth), self.format_expr_inner(item_height, depth), self.format_expr_inner(template, depth))
+            Expr::VirtualList {
+                items,
+                item_height,
+                template,
+                ..
+            } => {
+                format!(
+                    "virtual_list({}, {}, {})",
+                    self.format_expr_inner(items, depth),
+                    self.format_expr_inner(item_height, depth),
+                    self.format_expr_inner(template, depth)
+                )
             }
             Expr::ArrayLit(elements) => {
-                let elems: Vec<String> = elements.iter().map(|e| self.format_expr_inner(e, depth)).collect();
+                let elems: Vec<String> = elements
+                    .iter()
+                    .map(|e| self.format_expr_inner(e, depth))
+                    .collect();
                 let one_line = format!("[{}]", elems.join(", "));
                 if self.fits_single_line(&one_line) {
                     one_line
@@ -1137,7 +1258,8 @@ impl Formatter {
                 }
             }
             Expr::ObjectLit { fields } => {
-                let field_strs: Vec<String> = fields.iter()
+                let field_strs: Vec<String> = fields
+                    .iter()
                     .map(|(k, v)| format!("{}: {}", k, self.format_expr_inner(v, depth + 1)))
                     .collect();
                 let one_line = format!("{{ {} }}", field_strs.join(", "));
@@ -1168,10 +1290,21 @@ impl Formatter {
 
     fn format_stmt_to_string(&self, stmt: &Stmt, depth: usize) -> String {
         match stmt {
-            Stmt::Let { name, ty, mutable, secret, value, .. } => {
+            Stmt::Let {
+                name,
+                ty,
+                mutable,
+                secret,
+                value,
+                ..
+            } => {
                 let mut s = "let ".to_string();
-                if *mutable { s.push_str("mut "); }
-                if *secret { s.push_str("secret "); }
+                if *mutable {
+                    s.push_str("mut ");
+                }
+                if *secret {
+                    s.push_str("secret ");
+                }
                 s.push_str(name);
                 if let Some(t) = ty {
                     s.push_str(": ");
@@ -1182,9 +1315,17 @@ impl Formatter {
                 s.push(';');
                 s
             }
-            Stmt::Signal { name, ty, secret, value, .. } => {
+            Stmt::Signal {
+                name,
+                ty,
+                secret,
+                value,
+                ..
+            } => {
                 let mut s = "signal ".to_string();
-                if *secret { s.push_str("secret "); }
+                if *secret {
+                    s.push_str("secret ");
+                }
                 s.push_str(name);
                 if let Some(t) = ty {
                     s.push_str(": ");
@@ -1254,7 +1395,11 @@ impl Formatter {
                     self.format_template_node(child);
                 }
             }
-            TemplateNode::Link { to, attributes, children } => {
+            TemplateNode::Link {
+                to,
+                attributes,
+                children,
+            } => {
                 self.push_indent();
                 self.push("<Link to={");
                 self.push(&self.format_expr_to_string(to));
@@ -1282,7 +1427,11 @@ impl Formatter {
             TemplateNode::Layout(layout_node) => {
                 self.format_layout_node(layout_node);
             }
-            TemplateNode::TemplateIf { condition, then_children, else_children } => {
+            TemplateNode::TemplateIf {
+                condition,
+                then_children,
+                else_children,
+            } => {
                 self.push_indent();
                 self.push("{if ");
                 self.push(&self.format_expr_to_string(condition));
@@ -1305,7 +1454,13 @@ impl Formatter {
                 }
                 self.push_line("}}");
             }
-            TemplateNode::TemplateFor { binding, iterator, children, lazy, inplace } => {
+            TemplateNode::TemplateFor {
+                binding,
+                iterator,
+                children,
+                lazy,
+                inplace,
+            } => {
                 self.push_indent();
                 if *lazy {
                     self.push(&format!("{{lazy for {} in ", binding));
@@ -1370,41 +1525,87 @@ impl Formatter {
         let (tag, attrs, children) = match node {
             LayoutNode::Stack { gap, children, .. } => {
                 let mut a = Vec::new();
-                if let Some(g) = gap { a.push(format!("gap=\"{}\"", g)); }
+                if let Some(g) = gap {
+                    a.push(format!("gap=\"{}\"", g));
+                }
                 ("Stack", a, children)
             }
-            LayoutNode::Row { gap, align, children, .. } => {
+            LayoutNode::Row {
+                gap,
+                align,
+                children,
+                ..
+            } => {
                 let mut a = Vec::new();
-                if let Some(g) = gap { a.push(format!("gap=\"{}\"", g)); }
-                if let Some(al) = align { a.push(format!("align=\"{}\"", al)); }
+                if let Some(g) = gap {
+                    a.push(format!("gap=\"{}\"", g));
+                }
+                if let Some(al) = align {
+                    a.push(format!("align=\"{}\"", al));
+                }
                 ("Row", a, children)
             }
-            LayoutNode::Grid { cols, rows, gap, children, .. } => {
+            LayoutNode::Grid {
+                cols,
+                rows,
+                gap,
+                children,
+                ..
+            } => {
                 let mut a = Vec::new();
-                if let Some(c) = cols { a.push(format!("cols=\"{}\"", c)); }
-                if let Some(r) = rows { a.push(format!("rows=\"{}\"", r)); }
-                if let Some(g) = gap { a.push(format!("gap=\"{}\"", g)); }
+                if let Some(c) = cols {
+                    a.push(format!("cols=\"{}\"", c));
+                }
+                if let Some(r) = rows {
+                    a.push(format!("rows=\"{}\"", r));
+                }
+                if let Some(g) = gap {
+                    a.push(format!("gap=\"{}\"", g));
+                }
                 ("Grid", a, children)
             }
-            LayoutNode::Center { max_width, children, .. } => {
+            LayoutNode::Center {
+                max_width,
+                children,
+                ..
+            } => {
                 let mut a = Vec::new();
-                if let Some(mw) = max_width { a.push(format!("max_width=\"{}\"", mw)); }
+                if let Some(mw) = max_width {
+                    a.push(format!("max_width=\"{}\"", mw));
+                }
                 ("Center", a, children)
             }
             LayoutNode::Cluster { gap, children, .. } => {
                 let mut a = Vec::new();
-                if let Some(g) = gap { a.push(format!("gap=\"{}\"", g)); }
+                if let Some(g) = gap {
+                    a.push(format!("gap=\"{}\"", g));
+                }
                 ("Cluster", a, children)
             }
-            LayoutNode::Sidebar { side, width, children, .. } => {
+            LayoutNode::Sidebar {
+                side,
+                width,
+                children,
+                ..
+            } => {
                 let mut a = Vec::new();
-                if let Some(s) = side { a.push(format!("side=\"{}\"", s)); }
-                if let Some(w) = width { a.push(format!("width=\"{}\"", w)); }
+                if let Some(s) = side {
+                    a.push(format!("side=\"{}\"", s));
+                }
+                if let Some(w) = width {
+                    a.push(format!("width=\"{}\"", w));
+                }
                 ("Sidebar", a, children)
             }
-            LayoutNode::Switcher { threshold, children, .. } => {
+            LayoutNode::Switcher {
+                threshold,
+                children,
+                ..
+            } => {
                 let mut a = Vec::new();
-                if let Some(t) = threshold { a.push(format!("threshold=\"{}\"", t)); }
+                if let Some(t) = threshold {
+                    a.push(format!("threshold=\"{}\"", t));
+                }
                 ("Switcher", a, children)
             }
         };
@@ -1618,7 +1819,10 @@ mod tests {
             params,
             return_type: ret,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub: false,
             is_async: false,
             must_use: false,
@@ -1645,10 +1849,7 @@ mod tests {
             items: vec![Item::Function(Function {
                 name: "add".to_string(),
                 type_params: vec![],
-                params: vec![
-                    make_param("a", "i32"),
-                    make_param("b", "i32"),
-                ],
+                params: vec![make_param("a", "i32"), make_param("b", "i32")],
                 return_type: Some(Type::Named("i32".to_string())),
                 trait_bounds: vec![],
                 body: Block {
@@ -1747,7 +1948,9 @@ mod tests {
     fn test_pub_function() {
         let mut f = make_fn("greet", vec![], None, vec![Stmt::Return(None)]);
         f.is_pub = true;
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub fn greet()"), "got: {}", result);
     }
@@ -1755,20 +1958,31 @@ mod tests {
     #[test]
     fn test_function_no_params_no_return() {
         let f = make_fn("noop", vec![], None, vec![]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("fn noop() {"), "got: {}", result);
     }
 
     #[test]
     fn test_function_with_type_params() {
-        let mut f = make_fn("identity", vec![make_param("x", "T")], Some(Type::Named("T".to_string())), vec![
-            Stmt::Return(Some(Expr::Ident("x".to_string()))),
-        ]);
+        let mut f = make_fn(
+            "identity",
+            vec![make_param("x", "T")],
+            Some(Type::Named("T".to_string())),
+            vec![Stmt::Return(Some(Expr::Ident("x".to_string())))],
+        );
         f.type_params = vec!["T".to_string()];
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("fn identity<T>(x: T) -> T {"), "got: {}", result);
+        assert!(
+            result.contains("fn identity<T>(x: T) -> T {"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -1779,7 +1993,9 @@ mod tests {
             type_param: "T".to_string(),
             trait_name: "Display".to_string(),
         }];
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("where T: Display"), "got: {}", result);
     }
@@ -1793,19 +2009,37 @@ mod tests {
             make_param("d", "bool"),
         ];
         let f = make_fn("multi", params, None, vec![]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("fn multi(a: i32, b: i32, c: String, d: bool)"), "got: {}", result);
+        assert!(
+            result.contains("fn multi(a: i32, b: i32, c: String, d: bool)"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
     fn test_function_borrowed_params() {
         let params = vec![
-            Param { name: "x".to_string(), ty: Type::Named("String".to_string()), ownership: Ownership::Borrowed, secret: false },
-            Param { name: "y".to_string(), ty: Type::Named("Vec".to_string()), ownership: Ownership::MutBorrowed, secret: false },
+            Param {
+                name: "x".to_string(),
+                ty: Type::Named("String".to_string()),
+                ownership: Ownership::Borrowed,
+                secret: false,
+            },
+            Param {
+                name: "y".to_string(),
+                ty: Type::Named("Vec".to_string()),
+                ownership: Ownership::MutBorrowed,
+                secret: false,
+            },
         ];
         let f = make_fn("borrow_test", params, None, vec![]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("&x: String"), "got: {}", result);
         assert!(result.contains("&mut y: Vec"), "got: {}", result);
@@ -1822,14 +2056,24 @@ mod tests {
             lifetimes: vec![],
             type_params: vec![],
             fields: vec![
-                Field { name: "x".to_string(), ty: Type::Named("f64".to_string()), is_pub: false },
-                Field { name: "y".to_string(), ty: Type::Named("f64".to_string()), is_pub: false },
+                Field {
+                    name: "x".to_string(),
+                    ty: Type::Named("f64".to_string()),
+                    is_pub: false,
+                },
+                Field {
+                    name: "y".to_string(),
+                    ty: Type::Named("f64".to_string()),
+                    is_pub: false,
+                },
             ],
             trait_bounds: vec![],
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
         let result = format_program(&program);
         assert!(result.contains("struct Point {"), "got: {}", result);
         assert!(result.contains("x: f64,"), "got: {}", result);
@@ -1843,14 +2087,24 @@ mod tests {
             lifetimes: vec![],
             type_params: vec![],
             fields: vec![
-                Field { name: "name".to_string(), ty: Type::Named("String".to_string()), is_pub: true },
-                Field { name: "age".to_string(), ty: Type::Named("u32".to_string()), is_pub: true },
+                Field {
+                    name: "name".to_string(),
+                    ty: Type::Named("String".to_string()),
+                    is_pub: true,
+                },
+                Field {
+                    name: "age".to_string(),
+                    ty: Type::Named("u32".to_string()),
+                    is_pub: true,
+                },
             ],
             trait_bounds: vec![],
             is_pub: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub struct User {"), "got: {}", result);
         assert!(result.contains("pub name"), "got: {}", result);
@@ -1863,9 +2117,11 @@ mod tests {
             name: "Container".to_string(),
             lifetimes: vec![],
             type_params: vec!["T".to_string()],
-            fields: vec![
-                Field { name: "value".to_string(), ty: Type::Named("T".to_string()), is_pub: false },
-            ],
+            fields: vec![Field {
+                name: "value".to_string(),
+                ty: Type::Named("T".to_string()),
+                is_pub: false,
+            }],
             trait_bounds: vec![TraitBound {
                 type_param: "T".to_string(),
                 trait_name: "Clone".to_string(),
@@ -1873,7 +2129,9 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
         let result = format_program(&program);
         assert!(result.contains("struct Container<T>"), "got: {}", result);
         assert!(result.contains("where T: Clone"), "got: {}", result);
@@ -1886,14 +2144,24 @@ mod tests {
             lifetimes: vec![],
             type_params: vec![],
             fields: vec![
-                Field { name: "x".to_string(), ty: Type::Named("i32".to_string()), is_pub: false },
-                Field { name: "long_name".to_string(), ty: Type::Named("String".to_string()), is_pub: false },
+                Field {
+                    name: "x".to_string(),
+                    ty: Type::Named("i32".to_string()),
+                    is_pub: false,
+                },
+                Field {
+                    name: "long_name".to_string(),
+                    ty: Type::Named("String".to_string()),
+                    is_pub: false,
+                },
             ],
             trait_bounds: vec![],
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Struct(s)] };
+        let program = Program {
+            items: vec![Item::Struct(s)],
+        };
         let result = format_program(&program);
         // x should be padded relative to long_name
         assert!(result.contains("x"), "got: {}", result);
@@ -1910,14 +2178,25 @@ mod tests {
             name: "Color".to_string(),
             type_params: vec![],
             variants: vec![
-                Variant { name: "Red".to_string(), fields: vec![] },
-                Variant { name: "Green".to_string(), fields: vec![] },
-                Variant { name: "Blue".to_string(), fields: vec![] },
+                Variant {
+                    name: "Red".to_string(),
+                    fields: vec![],
+                },
+                Variant {
+                    name: "Green".to_string(),
+                    fields: vec![],
+                },
+                Variant {
+                    name: "Blue".to_string(),
+                    fields: vec![],
+                },
             ],
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Enum(e)] };
+        let program = Program {
+            items: vec![Item::Enum(e)],
+        };
         let result = format_program(&program);
         assert!(result.contains("enum Color {"), "got: {}", result);
         assert!(result.contains("Red,"), "got: {}", result);
@@ -1931,13 +2210,24 @@ mod tests {
             name: "Shape".to_string(),
             type_params: vec![],
             variants: vec![
-                Variant { name: "Circle".to_string(), fields: vec![Type::Named("f64".to_string())] },
-                Variant { name: "Rect".to_string(), fields: vec![Type::Named("f64".to_string()), Type::Named("f64".to_string())] },
+                Variant {
+                    name: "Circle".to_string(),
+                    fields: vec![Type::Named("f64".to_string())],
+                },
+                Variant {
+                    name: "Rect".to_string(),
+                    fields: vec![
+                        Type::Named("f64".to_string()),
+                        Type::Named("f64".to_string()),
+                    ],
+                },
             ],
             is_pub: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Enum(e)] };
+        let program = Program {
+            items: vec![Item::Enum(e)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub enum Shape {"), "got: {}", result);
         assert!(result.contains("Circle(f64),"), "got: {}", result);
@@ -1950,13 +2240,21 @@ mod tests {
             name: "Option".to_string(),
             type_params: vec!["T".to_string()],
             variants: vec![
-                Variant { name: "Some".to_string(), fields: vec![Type::Named("T".to_string())] },
-                Variant { name: "None".to_string(), fields: vec![] },
+                Variant {
+                    name: "Some".to_string(),
+                    fields: vec![Type::Named("T".to_string())],
+                },
+                Variant {
+                    name: "None".to_string(),
+                    fields: vec![],
+                },
             ],
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Enum(e)] };
+        let program = Program {
+            items: vec![Item::Enum(e)],
+        };
         let result = format_program(&program);
         assert!(result.contains("enum Option<T> {"), "got: {}", result);
     }
@@ -2003,10 +2301,16 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("component Counter {"), "got: {}", result);
-        assert!(result.contains("signal mut count: i32 = 0;"), "got: {}", result);
+        assert!(
+            result.contains("signal mut count: i32 = 0;"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2047,7 +2351,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("signal secret token"), "got: {}", result);
     }
@@ -2058,8 +2364,16 @@ mod tests {
             name: "Card".to_string(),
             type_params: vec![],
             props: vec![
-                Prop { name: "title".to_string(), ty: Type::Named("String".to_string()), default: None },
-                Prop { name: "visible".to_string(), ty: Type::Named("bool".to_string()), default: Some(Expr::Bool(true)) },
+                Prop {
+                    name: "title".to_string(),
+                    ty: Type::Named("String".to_string()),
+                    default: None,
+                },
+                Prop {
+                    name: "visible".to_string(),
+                    ty: Type::Named("bool".to_string()),
+                    default: Some(Expr::Bool(true)),
+                },
             ],
             state: vec![],
             methods: vec![],
@@ -2085,17 +2399,26 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("prop title: String;"), "got: {}", result);
-        assert!(result.contains("prop visible: bool = true;"), "got: {}", result);
+        assert!(
+            result.contains("prop visible: bool = true;"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
     fn test_component_with_methods() {
-        let method = make_fn("handle_click", vec![], None, vec![
-            Stmt::Expr(Expr::Ident("do_something".to_string())),
-        ]);
+        let method = make_fn(
+            "handle_click",
+            vec![],
+            None,
+            vec![Stmt::Expr(Expr::Ident("do_something".to_string()))],
+        );
         let c = Component {
             name: "Clickable".to_string(),
             type_params: vec![],
@@ -2106,7 +2429,10 @@ mod tests {
             transitions: vec![],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2121,7 +2447,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("fn handle_click()"), "got: {}", result);
     }
@@ -2145,7 +2473,10 @@ mod tests {
             transitions: vec![],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2160,7 +2491,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("style \".button\" {"), "got: {}", result);
         assert!(result.contains("color: red;"), "got: {}", result);
@@ -2184,7 +2517,10 @@ mod tests {
             }],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2199,9 +2535,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("transition opacity 300ms ease-in;"), "got: {}", result);
+        assert!(
+            result.contains("transition opacity 300ms ease-in;"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2216,7 +2558,10 @@ mod tests {
             transitions: vec![],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2226,7 +2571,10 @@ mod tests {
             skeleton: Some(SkeletonDef {
                 body: RenderBlock {
                     body: TemplateNode::Element(Element {
-                        tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "div".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     }),
                     span: dummy_span(),
                 },
@@ -2239,7 +2587,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("skeleton {"), "got: {}", result);
     }
@@ -2256,7 +2606,10 @@ mod tests {
             transitions: vec![],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2281,7 +2634,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("error_boundary {"), "got: {}", result);
         assert!(result.contains("} fallback {"), "got: {}", result);
@@ -2299,7 +2654,10 @@ mod tests {
             transitions: vec![],
             render: RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             },
@@ -2314,9 +2672,15 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("component Generic<T, U> {"), "got: {}", result);
+        assert!(
+            result.contains("component Generic<T, U> {"),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -2387,13 +2751,27 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Store(store)] };
+        let program = Program {
+            items: vec![Item::Store(store)],
+        };
         let result = format_program(&program);
         assert!(result.contains("store AppStore {"), "got: {}", result);
-        assert!(result.contains("signal mut count: i32 = 0;"), "got: {}", result);
+        assert!(
+            result.contains("signal mut count: i32 = 0;"),
+            "got: {}",
+            result
+        );
         assert!(result.contains("action increment()"), "got: {}", result);
-        assert!(result.contains("computed double_count(&self) -> i32"), "got: {}", result);
-        assert!(result.contains("effect log_count(&self)"), "got: {}", result);
+        assert!(
+            result.contains("computed double_count(&self) -> i32"),
+            "got: {}",
+            result
+        );
+        assert!(
+            result.contains("effect log_count(&self)"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2404,7 +2782,10 @@ mod tests {
             actions: vec![ActionDef {
                 name: "fetch_data".to_string(),
                 params: vec![make_param("id", "u32")],
-                body: Block { stmts: vec![], span: dummy_span() },
+                body: Block {
+                    stmts: vec![],
+                    span: dummy_span(),
+                },
                 is_async: true,
                 span: dummy_span(),
             }],
@@ -2414,10 +2795,16 @@ mod tests {
             is_pub: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Store(store)] };
+        let program = Program {
+            items: vec![Item::Store(store)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub store DataStore {"), "got: {}", result);
-        assert!(result.contains("async action fetch_data(id: u32)"), "got: {}", result);
+        assert!(
+            result.contains("async action fetch_data(id: u32)"),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -2451,7 +2838,9 @@ mod tests {
             transition: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Router(router)] };
+        let program = Program {
+            items: vec![Item::Router(router)],
+        };
         let result = format_program(&program);
         assert!(result.contains("router AppRouter {"), "got: {}", result);
         assert!(result.contains("route \"/\""), "got: {}", result);
@@ -2465,22 +2854,22 @@ mod tests {
     fn test_router_with_guard() {
         let router = RouterDef {
             name: "SecureRouter".to_string(),
-            routes: vec![
-                RouteDef {
-                    path: "/admin".to_string(),
-                    params: vec![],
-                    component: "Admin".to_string(),
-                    guard: Some(Expr::Ident("is_admin".to_string())),
-                    transition: None,
-                    span: dummy_span(),
-                },
-            ],
+            routes: vec![RouteDef {
+                path: "/admin".to_string(),
+                params: vec![],
+                component: "Admin".to_string(),
+                guard: Some(Expr::Ident("is_admin".to_string())),
+                transition: None,
+                span: dummy_span(),
+            }],
             fallback: None,
             layout: None,
             transition: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Router(router)] };
+        let program = Program {
+            items: vec![Item::Router(router)],
+        };
         let result = format_program(&program);
         assert!(result.contains("guard { is_admin }"), "got: {}", result);
     }
@@ -2668,15 +3057,25 @@ mod tests {
     #[test]
     fn test_use_simple() {
         let u = UsePath {
-            segments: vec!["std".to_string(), "collections".to_string(), "HashMap".to_string()],
+            segments: vec![
+                "std".to_string(),
+                "collections".to_string(),
+                "HashMap".to_string(),
+            ],
             alias: None,
             glob: false,
             group: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Use(u)] };
+        let program = Program {
+            items: vec![Item::Use(u)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("use std::collections::HashMap;"), "got: {}", result);
+        assert!(
+            result.contains("use std::collections::HashMap;"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2688,7 +3087,9 @@ mod tests {
             group: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Use(u)] };
+        let program = Program {
+            items: vec![Item::Use(u)],
+        };
         let result = format_program(&program);
         assert!(result.contains("use std::io::*;"), "got: {}", result);
     }
@@ -2696,15 +3097,25 @@ mod tests {
     #[test]
     fn test_use_with_alias() {
         let u = UsePath {
-            segments: vec!["std".to_string(), "collections".to_string(), "HashMap".to_string()],
+            segments: vec![
+                "std".to_string(),
+                "collections".to_string(),
+                "HashMap".to_string(),
+            ],
             alias: Some("Map".to_string()),
             glob: false,
             group: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Use(u)] };
+        let program = Program {
+            items: vec![Item::Use(u)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("use std::collections::HashMap as Map;"), "got: {}", result);
+        assert!(
+            result.contains("use std::collections::HashMap as Map;"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2714,15 +3125,30 @@ mod tests {
             alias: None,
             glob: false,
             group: Some(vec![
-                UseGroupItem { name: "HashMap".to_string(), alias: None },
-                UseGroupItem { name: "HashSet".to_string(), alias: None },
-                UseGroupItem { name: "BTreeMap".to_string(), alias: Some("BTree".to_string()) },
+                UseGroupItem {
+                    name: "HashMap".to_string(),
+                    alias: None,
+                },
+                UseGroupItem {
+                    name: "HashSet".to_string(),
+                    alias: None,
+                },
+                UseGroupItem {
+                    name: "BTreeMap".to_string(),
+                    alias: Some("BTree".to_string()),
+                },
             ]),
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Use(u)] };
+        let program = Program {
+            items: vec![Item::Use(u)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("use std::collections::{HashMap, HashSet, BTreeMap as BTree};"), "got: {}", result);
+        assert!(
+            result.contains("use std::collections::{HashMap, HashSet, BTreeMap as BTree};"),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -2755,11 +3181,17 @@ mod tests {
             ],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Trait(t)] };
+        let program = Program {
+            items: vec![Item::Trait(t)],
+        };
         let result = format_program(&program);
         assert!(result.contains("trait Printable {"), "got: {}", result);
         assert!(result.contains("fn print();"), "got: {}", result);
-        assert!(result.contains("fn to_string() -> String {"), "got: {}", result);
+        assert!(
+            result.contains("fn to_string() -> String {"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2770,7 +3202,9 @@ mod tests {
             methods: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Trait(t)] };
+        let program = Program {
+            items: vec![Item::Trait(t)],
+        };
         let result = format_program(&program);
         assert!(result.contains("trait Converter<T> {"), "got: {}", result);
     }
@@ -2781,25 +3215,37 @@ mod tests {
             target: "Point".to_string(),
             trait_impls: vec![],
             methods: vec![
-                make_fn("new", vec![make_param("x", "f64"), make_param("y", "f64")], Some(Type::Named("Point".to_string())), vec![
-                    Stmt::Return(Some(Expr::StructInit {
+                make_fn(
+                    "new",
+                    vec![make_param("x", "f64"), make_param("y", "f64")],
+                    Some(Type::Named("Point".to_string())),
+                    vec![Stmt::Return(Some(Expr::StructInit {
                         name: "Point".to_string(),
                         fields: vec![
                             ("x".to_string(), Expr::Ident("x".to_string())),
                             ("y".to_string(), Expr::Ident("y".to_string())),
                         ],
-                    })),
-                ]),
-                make_fn("distance", vec![], Some(Type::Named("f64".to_string())), vec![
-                    Stmt::Return(Some(Expr::Float(0.0))),
-                ]),
+                    }))],
+                ),
+                make_fn(
+                    "distance",
+                    vec![],
+                    Some(Type::Named("f64".to_string())),
+                    vec![Stmt::Return(Some(Expr::Float(0.0)))],
+                ),
             ],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Impl(im)] };
+        let program = Program {
+            items: vec![Item::Impl(im)],
+        };
         let result = format_program(&program);
         assert!(result.contains("impl Point {"), "got: {}", result);
-        assert!(result.contains("fn new(x: f64, y: f64) -> Point"), "got: {}", result);
+        assert!(
+            result.contains("fn new(x: f64, y: f64) -> Point"),
+            "got: {}",
+            result
+        );
         assert!(result.contains("fn distance() -> f64"), "got: {}", result);
     }
 
@@ -2811,10 +3257,19 @@ mod tests {
     fn test_all_binary_operators() {
         let fmt = Formatter::new(FormatterOptions::default());
         let ops = vec![
-            (BinOp::Add, "+"), (BinOp::Sub, "-"), (BinOp::Mul, "*"), (BinOp::Div, "/"),
-            (BinOp::Mod, "%"), (BinOp::Eq, "=="), (BinOp::Neq, "!="), (BinOp::Lt, "<"),
-            (BinOp::Gt, ">"), (BinOp::Lte, "<="), (BinOp::Gte, ">="),
-            (BinOp::And, "&&"), (BinOp::Or, "||"),
+            (BinOp::Add, "+"),
+            (BinOp::Sub, "-"),
+            (BinOp::Mul, "*"),
+            (BinOp::Div, "/"),
+            (BinOp::Mod, "%"),
+            (BinOp::Eq, "=="),
+            (BinOp::Neq, "!="),
+            (BinOp::Lt, "<"),
+            (BinOp::Gt, ">"),
+            (BinOp::Lte, "<="),
+            (BinOp::Gte, ">="),
+            (BinOp::And, "&&"),
+            (BinOp::Or, "||"),
         ];
         for (op, sym) in ops {
             let expr = Expr::Binary {
@@ -2830,8 +3285,14 @@ mod tests {
     #[test]
     fn test_unary_operators() {
         let fmt = Formatter::new(FormatterOptions::default());
-        let neg = Expr::Unary { op: UnaryOp::Neg, operand: Box::new(Expr::Integer(5)) };
-        let not = Expr::Unary { op: UnaryOp::Not, operand: Box::new(Expr::Bool(true)) };
+        let neg = Expr::Unary {
+            op: UnaryOp::Neg,
+            operand: Box::new(Expr::Integer(5)),
+        };
+        let not = Expr::Unary {
+            op: UnaryOp::Not,
+            operand: Box::new(Expr::Bool(true)),
+        };
         assert_eq!(fmt.format_expr_to_string(&neg), "-5");
         assert_eq!(fmt.format_expr_to_string(&not), "!true");
     }
@@ -2906,7 +3367,11 @@ mod tests {
             ],
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains('\n'), "Expected multiline output, got: {}", result);
+        assert!(
+            result.contains('\n'),
+            "Expected multiline output, got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2944,7 +3409,11 @@ mod tests {
             contract: None,
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("fetch(\"https://api.example.com\")"), "got: {}", result);
+        assert!(
+            result.contains("fetch(\"https://api.example.com\")"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2956,7 +3425,11 @@ mod tests {
             contract: None,
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("fetch(\"https://api.example.com\", opts)"), "got: {}", result);
+        assert!(
+            result.contains("fetch(\"https://api.example.com\", opts)"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -2988,7 +3461,9 @@ mod tests {
     fn test_channel_expression() {
         let fmt = Formatter::new(FormatterOptions::default());
         let no_type = Expr::Channel { ty: None };
-        let with_type = Expr::Channel { ty: Some(Type::Named("i32".to_string())) };
+        let with_type = Expr::Channel {
+            ty: Some(Type::Named("i32".to_string())),
+        };
         assert_eq!(fmt.format_expr_to_string(&no_type), "channel()");
         assert_eq!(fmt.format_expr_to_string(&with_type), "channel::<i32>()");
     }
@@ -3027,7 +3502,11 @@ mod tests {
             catch_body: Box::new(Expr::Ident("handle".to_string())),
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("try { risky } catch e { handle }"), "got: {}", result);
+        assert!(
+            result.contains("try { risky } catch e { handle }"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3042,7 +3521,10 @@ mod tests {
             message: Some("should be true".to_string()),
         };
         assert_eq!(fmt.format_expr_to_string(&assert_no_msg), "assert(true)");
-        assert_eq!(fmt.format_expr_to_string(&assert_with_msg), "assert(false, \"should be true\")");
+        assert_eq!(
+            fmt.format_expr_to_string(&assert_with_msg),
+            "assert(false, \"should be true\")"
+        );
     }
 
     #[test]
@@ -3059,7 +3541,10 @@ mod tests {
             message: Some("not equal".to_string()),
         };
         assert_eq!(fmt.format_expr_to_string(&eq_no_msg), "assert_eq(1, 1)");
-        assert_eq!(fmt.format_expr_to_string(&eq_with_msg), "assert_eq(a, b, \"not equal\")");
+        assert_eq!(
+            fmt.format_expr_to_string(&eq_with_msg),
+            "assert_eq(a, b, \"not equal\")"
+        );
     }
 
     #[test]
@@ -3080,7 +3565,11 @@ mod tests {
             body: Box::new(Expr::Ident("content".to_string())),
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("suspend(spinner) { content }"), "got: {}", result);
+        assert!(
+            result.contains("suspend(spinner) { content }"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3091,7 +3580,11 @@ mod tests {
             interpolations: vec![],
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("prompt \"Summarize: {doc}\""), "got: {}", result);
+        assert!(
+            result.contains("prompt \"Summarize: {doc}\""),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3126,7 +3619,10 @@ mod tests {
             filename: Box::new(Expr::StringLit("file.txt".to_string())),
             span: dummy_span(),
         };
-        assert_eq!(fmt.format_expr_to_string(&expr), "download(blob, \"file.txt\")");
+        assert_eq!(
+            fmt.format_expr_to_string(&expr),
+            "download(blob, \"file.txt\")"
+        );
     }
 
     #[test]
@@ -3175,7 +3671,11 @@ mod tests {
             span: dummy_span(),
         };
         let result = fmt.format_expr_to_string(&expr);
-        assert!(result.contains("virtual_list(data, 50, render_row)"), "got: {}", result);
+        assert!(
+            result.contains("virtual_list(data, 50, render_row)"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3183,7 +3683,14 @@ mod tests {
         let fmt = Formatter::new(FormatterOptions::default());
         let expr = Expr::Block(Block {
             stmts: vec![
-                Stmt::Let { name: "x".to_string(), ty: None, mutable: false, secret: false, value: Expr::Integer(1), ownership: Ownership::Owned },
+                Stmt::Let {
+                    name: "x".to_string(),
+                    ty: None,
+                    mutable: false,
+                    secret: false,
+                    value: Expr::Integer(1),
+                    ownership: Ownership::Owned,
+                },
                 Stmt::Expr(Expr::Ident("x".to_string())),
             ],
             span: dummy_span(),
@@ -3225,127 +3732,165 @@ mod tests {
 
     #[test]
     fn test_let_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Let {
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Let {
                 name: "x".to_string(),
                 ty: Some(Type::Named("i32".to_string())),
                 mutable: false,
                 secret: false,
                 value: Expr::Integer(42),
                 ownership: Ownership::Owned,
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("let x: i32 = 42;"), "got: {}", result);
     }
 
     #[test]
     fn test_let_mut_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Let {
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Let {
                 name: "y".to_string(),
                 ty: None,
                 mutable: true,
                 secret: false,
                 value: Expr::Integer(0),
                 ownership: Ownership::Owned,
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("let mut y = 0;"), "got: {}", result);
     }
 
     #[test]
     fn test_let_secret_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Let {
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Let {
                 name: "key".to_string(),
                 ty: None,
                 mutable: false,
                 secret: true,
                 value: Expr::StringLit("abc".to_string()),
                 ownership: Ownership::Owned,
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("let secret key"), "got: {}", result);
     }
 
     #[test]
     fn test_signal_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Signal {
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Signal {
                 name: "count".to_string(),
                 ty: Some(Type::Named("i32".to_string())),
                 secret: false,
                 atomic: false,
                 value: Expr::Integer(0),
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("signal count: i32 = 0;"), "got: {}", result);
     }
 
     #[test]
     fn test_signal_secret_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Signal {
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Signal {
                 name: "token".to_string(),
                 ty: None,
                 secret: true,
                 atomic: false,
                 value: Expr::StringLit("".to_string()),
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("signal secret token"), "got: {}", result);
     }
 
     #[test]
     fn test_return_statement_with_value() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Return(Some(Expr::Integer(42))),
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::Return(Some(Expr::Integer(42)))],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("return 42;"), "got: {}", result);
     }
 
     #[test]
     fn test_return_statement_empty() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Return(None),
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let f = make_fn("test", vec![], None, vec![Stmt::Return(None)]);
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("return;"), "got: {}", result);
     }
 
     #[test]
     fn test_yield_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::Yield(Expr::Integer(1)),
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+        let f = make_fn("test", vec![], None, vec![Stmt::Yield(Expr::Integer(1))]);
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("yield 1;"), "got: {}", result);
     }
 
     #[test]
     fn test_let_destructure_statement() {
-        let f = make_fn("test", vec![], None, vec![
-            Stmt::LetDestructure {
-                pattern: Pattern::Tuple(vec![Pattern::Ident("a".to_string()), Pattern::Ident("b".to_string())]),
+        let f = make_fn(
+            "test",
+            vec![],
+            None,
+            vec![Stmt::LetDestructure {
+                pattern: Pattern::Tuple(vec![
+                    Pattern::Ident("a".to_string()),
+                    Pattern::Ident("b".to_string()),
+                ]),
                 ty: None,
                 value: Expr::Ident("pair".to_string()),
-            },
-        ]);
-        let program = Program { items: vec![Item::Function(f)] };
+            }],
+        );
+        let program = Program {
+            items: vec![Item::Function(f)],
+        };
         let result = format_program(&program);
         assert!(result.contains("let (a, b) = pair;"), "got: {}", result);
     }
@@ -3357,25 +3902,52 @@ mod tests {
     #[test]
     fn test_pattern_formatting() {
         assert_eq!(Formatter::format_pattern(&Pattern::Wildcard), "_");
-        assert_eq!(Formatter::format_pattern(&Pattern::Ident("x".to_string())), "x");
-        assert_eq!(Formatter::format_pattern(&Pattern::Literal(Expr::Integer(42))), "42");
-        assert_eq!(Formatter::format_pattern(&Pattern::Literal(Expr::Float(3.14))), "3.14");
-        assert_eq!(Formatter::format_pattern(&Pattern::Literal(Expr::StringLit("hello".to_string()))), "\"hello\"");
-        assert_eq!(Formatter::format_pattern(&Pattern::Literal(Expr::Bool(true))), "true");
         assert_eq!(
-            Formatter::format_pattern(&Pattern::Variant { name: "Some".to_string(), fields: vec![Pattern::Ident("x".to_string())] }),
+            Formatter::format_pattern(&Pattern::Ident("x".to_string())),
+            "x"
+        );
+        assert_eq!(
+            Formatter::format_pattern(&Pattern::Literal(Expr::Integer(42))),
+            "42"
+        );
+        assert_eq!(
+            Formatter::format_pattern(&Pattern::Literal(Expr::Float(3.14))),
+            "3.14"
+        );
+        assert_eq!(
+            Formatter::format_pattern(&Pattern::Literal(Expr::StringLit("hello".to_string()))),
+            "\"hello\""
+        );
+        assert_eq!(
+            Formatter::format_pattern(&Pattern::Literal(Expr::Bool(true))),
+            "true"
+        );
+        assert_eq!(
+            Formatter::format_pattern(&Pattern::Variant {
+                name: "Some".to_string(),
+                fields: vec![Pattern::Ident("x".to_string())]
+            }),
             "Some(x)"
         );
         assert_eq!(
-            Formatter::format_pattern(&Pattern::Variant { name: "None".to_string(), fields: vec![] }),
+            Formatter::format_pattern(&Pattern::Variant {
+                name: "None".to_string(),
+                fields: vec![]
+            }),
             "None"
         );
         assert_eq!(
-            Formatter::format_pattern(&Pattern::Tuple(vec![Pattern::Ident("a".to_string()), Pattern::Ident("b".to_string())])),
+            Formatter::format_pattern(&Pattern::Tuple(vec![
+                Pattern::Ident("a".to_string()),
+                Pattern::Ident("b".to_string())
+            ])),
             "(a, b)"
         );
         assert_eq!(
-            Formatter::format_pattern(&Pattern::Array(vec![Pattern::Ident("x".to_string()), Pattern::Wildcard])),
+            Formatter::format_pattern(&Pattern::Array(vec![
+                Pattern::Ident("x".to_string()),
+                Pattern::Wildcard
+            ])),
             "[x, _]"
         );
     }
@@ -3411,17 +3983,31 @@ mod tests {
 
     #[test]
     fn test_type_formatting() {
-        assert_eq!(Formatter::format_type(&Type::Named("i32".to_string())), "i32");
         assert_eq!(
-            Formatter::format_type(&Type::Generic { name: "Vec".to_string(), args: vec![Type::Named("i32".to_string())] }),
+            Formatter::format_type(&Type::Named("i32".to_string())),
+            "i32"
+        );
+        assert_eq!(
+            Formatter::format_type(&Type::Generic {
+                name: "Vec".to_string(),
+                args: vec![Type::Named("i32".to_string())]
+            }),
             "Vec<i32>"
         );
         assert_eq!(
-            Formatter::format_type(&Type::Reference { mutable: false, lifetime: None, inner: Box::new(Type::Named("str".to_string())) }),
+            Formatter::format_type(&Type::Reference {
+                mutable: false,
+                lifetime: None,
+                inner: Box::new(Type::Named("str".to_string()))
+            }),
             "&str"
         );
         assert_eq!(
-            Formatter::format_type(&Type::Reference { mutable: true, lifetime: None, inner: Box::new(Type::Named("Vec".to_string())) }),
+            Formatter::format_type(&Type::Reference {
+                mutable: true,
+                lifetime: None,
+                inner: Box::new(Type::Named("Vec".to_string()))
+            }),
             "&mut Vec"
         );
         assert_eq!(
@@ -3433,7 +4019,10 @@ mod tests {
             "Option<String>"
         );
         assert_eq!(
-            Formatter::format_type(&Type::Tuple(vec![Type::Named("i32".to_string()), Type::Named("String".to_string())])),
+            Formatter::format_type(&Type::Tuple(vec![
+                Type::Named("i32".to_string()),
+                Type::Named("String".to_string())
+            ])),
             "(i32, String)"
         );
         assert_eq!(
@@ -3490,7 +4079,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("<input />"), "got: {}", result);
     }
@@ -3509,9 +4100,18 @@ mod tests {
                 body: TemplateNode::Element(Element {
                     tag: "div".to_string(),
                     attributes: vec![
-                        Attribute::Static { name: "class".to_string(), value: "container".to_string() },
-                        Attribute::Dynamic { name: "id".to_string(), value: Expr::Ident("my_id".to_string()) },
-                        Attribute::EventHandler { event: "click".to_string(), handler: Expr::Ident("handle_click".to_string()) },
+                        Attribute::Static {
+                            name: "class".to_string(),
+                            value: "container".to_string(),
+                        },
+                        Attribute::Dynamic {
+                            name: "id".to_string(),
+                            value: Expr::Ident("my_id".to_string()),
+                        },
+                        Attribute::EventHandler {
+                            event: "click".to_string(),
+                            handler: Expr::Ident("handle_click".to_string()),
+                        },
                     ],
                     children: vec![TemplateNode::TextLiteral("Hello".to_string())],
                     span: dummy_span(),
@@ -3529,20 +4129,34 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("class=\"container\""), "got: {}", result);
         assert!(result.contains("id={my_id}"), "got: {}", result);
-        assert!(result.contains("on:click={handle_click}"), "got: {}", result);
+        assert!(
+            result.contains("on:click={handle_click}"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
     fn test_element_with_aria_role_bind() {
         let fmt = Formatter::new(FormatterOptions::default());
         let attrs = vec![
-            Attribute::Aria { name: "label".to_string(), value: Expr::StringLit("Close".to_string()) },
-            Attribute::Role { value: "button".to_string() },
-            Attribute::Bind { property: "value".to_string(), signal: "count".to_string() },
+            Attribute::Aria {
+                name: "label".to_string(),
+                value: Expr::StringLit("Close".to_string()),
+            },
+            Attribute::Role {
+                value: "button".to_string(),
+            },
+            Attribute::Bind {
+                property: "value".to_string(),
+                signal: "count".to_string(),
+            },
         ];
         let result = fmt.format_attributes(&attrs);
         assert_eq!(result[0], "aria-label={\"Close\"}");
@@ -3575,7 +4189,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("{content}"), "got: {}", result);
     }
@@ -3608,7 +4224,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("Hello"), "got: {}", result);
         assert!(result.contains("World"), "got: {}", result);
@@ -3643,7 +4261,9 @@ mod tests {
             shortcuts: vec![],
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Component(c)] };
+        let program = Program {
+            items: vec![Item::Component(c)],
+        };
         let result = format_program(&program);
         assert!(result.contains("<Link to={\"/about\"}>"), "got: {}", result);
         assert!(result.contains("</Link>"), "got: {}", result);
@@ -3661,7 +4281,9 @@ mod tests {
             is_external: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Mod(m)] };
+        let program = Program {
+            items: vec![Item::Mod(m)],
+        };
         let result = format_program(&program);
         assert!(result.contains("mod utils;"), "got: {}", result);
     }
@@ -3674,7 +4296,9 @@ mod tests {
             is_external: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Mod(m)] };
+        let program = Program {
+            items: vec![Item::Mod(m)],
+        };
         let result = format_program(&program);
         assert!(result.contains("mod helpers {"), "got: {}", result);
         assert!(result.contains("fn help()"), "got: {}", result);
@@ -3694,7 +4318,10 @@ mod tests {
                 description: None,
                 params: vec![make_param("query", "String")],
                 return_type: Some(Type::Named("String".to_string())),
-                body: Block { stmts: vec![Stmt::Return(Some(Expr::StringLit("result".to_string())))], span: dummy_span() },
+                body: Block {
+                    stmts: vec![Stmt::Return(Some(Expr::StringLit("result".to_string())))],
+                    span: dummy_span(),
+                },
                 span: dummy_span(),
             }],
             state: vec![],
@@ -3702,11 +4329,21 @@ mod tests {
             render: None,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Agent(agent)] };
+        let program = Program {
+            items: vec![Item::Agent(agent)],
+        };
         let result = format_program(&program);
         assert!(result.contains("agent Assistant {"), "got: {}", result);
-        assert!(result.contains("prompt system = \"You are helpful.\";"), "got: {}", result);
-        assert!(result.contains("tool search(query: String) -> String"), "got: {}", result);
+        assert!(
+            result.contains("prompt system = \"You are helpful.\";"),
+            "got: {}",
+            result
+        );
+        assert!(
+            result.contains("tool search(query: String) -> String"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3719,13 +4356,18 @@ mod tests {
             methods: vec![],
             render: Some(RenderBlock {
                 body: TemplateNode::Element(Element {
-                    tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
                 }),
                 span: dummy_span(),
             }),
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Agent(agent)] };
+        let program = Program {
+            items: vec![Item::Agent(agent)],
+        };
         let result = format_program(&program);
         assert!(result.contains("render {"), "got: {}", result);
     }
@@ -3748,9 +4390,15 @@ mod tests {
             },
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Test(t)] };
+        let program = Program {
+            items: vec![Item::Test(t)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("test \"addition works\" {"), "got: {}", result);
+        assert!(
+            result.contains("test \"addition works\" {"),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -3770,7 +4418,10 @@ mod tests {
                 transitions: vec![],
                 render: RenderBlock {
                     body: TemplateNode::Element(Element {
-                        tag: "canvas".to_string(), attributes: vec![], children: vec![], span: dummy_span(),
+                        tag: "canvas".to_string(),
+                        attributes: vec![],
+                        children: vec![],
+                        span: dummy_span(),
                     }),
                     span: dummy_span(),
                 },
@@ -3787,9 +4438,15 @@ mod tests {
             },
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::LazyComponent(lc)] };
+        let program = Program {
+            items: vec![Item::LazyComponent(lc)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("lazy component HeavyChart {"), "got: {}", result);
+        assert!(
+            result.contains("lazy component HeavyChart {"),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -3806,7 +4463,12 @@ mod tests {
             methods: vec![],
             styles: vec![],
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             permissions: None,
@@ -3814,7 +4476,9 @@ mod tests {
             is_pub: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Page(page)] };
+        let program = Program {
+            items: vec![Item::Page(page)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub page HomePage {"), "got: {}", result);
     }
@@ -3831,7 +4495,9 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::App(app)] };
+        let program = Program {
+            items: vec![Item::App(app)],
+        };
         let result = format_program(&program);
         assert!(result.contains("app MyApp {"), "got: {}", result);
     }
@@ -3852,9 +4518,15 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Channel(ch)] };
+        let program = Program {
+            items: vec![Item::Channel(ch)],
+        };
         let result = format_program(&program);
-        assert!(result.contains("channel Chat -> ChatMsg {"), "got: {}", result);
+        assert!(
+            result.contains("channel Chat -> ChatMsg {"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -3869,7 +4541,9 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Embed(e)] };
+        let program = Program {
+            items: vec![Item::Embed(e)],
+        };
         let result = format_program(&program);
         assert!(result.contains("embed GA {"), "got: {}", result);
         assert!(result.contains("loading: \"lazy\""), "got: {}", result);
@@ -3881,7 +4555,12 @@ mod tests {
         let p = PdfDef {
             name: "Invoice".to_string(),
             render: RenderBlock {
-                body: TemplateNode::Element(Element { tag: "div".to_string(), attributes: vec![], children: vec![], span: dummy_span() }),
+                body: TemplateNode::Element(Element {
+                    tag: "div".to_string(),
+                    attributes: vec![],
+                    children: vec![],
+                    span: dummy_span(),
+                }),
                 span: dummy_span(),
             },
             page_size: Some("A4".to_string()),
@@ -3890,11 +4569,17 @@ mod tests {
             is_pub: true,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Pdf(p)] };
+        let program = Program {
+            items: vec![Item::Pdf(p)],
+        };
         let result = format_program(&program);
         assert!(result.contains("pub pdf Invoice {"), "got: {}", result);
         assert!(result.contains("page_size: \"A4\""), "got: {}", result);
-        assert!(result.contains("orientation: \"portrait\""), "got: {}", result);
+        assert!(
+            result.contains("orientation: \"portrait\""),
+            "got: {}",
+            result
+        );
     }
 
     // ===================================================================
@@ -3926,9 +4611,12 @@ mod tests {
         };
         let mut fmt = Formatter::new(opts);
         let program = Program {
-            items: vec![Item::Function(make_fn("test", vec![], None, vec![
-                Stmt::Return(Some(Expr::Integer(1))),
-            ]))],
+            items: vec![Item::Function(make_fn(
+                "test",
+                vec![],
+                None,
+                vec![Stmt::Return(Some(Expr::Integer(1)))],
+            ))],
         };
         let result = fmt.format_program(&program);
         // With indent_size=2, body should be indented by 2 spaces
@@ -3947,7 +4635,10 @@ mod tests {
         let fmt = Formatter::new(FormatterOptions::default());
         assert_eq!(fmt.format_expr_to_string(&Expr::Integer(42)), "42");
         assert_eq!(fmt.format_expr_to_string(&Expr::Float(3.14)), "3.14");
-        assert_eq!(fmt.format_expr_to_string(&Expr::StringLit("hello".to_string())), "\"hello\"");
+        assert_eq!(
+            fmt.format_expr_to_string(&Expr::StringLit("hello".to_string())),
+            "\"hello\""
+        );
         assert_eq!(fmt.format_expr_to_string(&Expr::Bool(true)), "true");
         assert_eq!(fmt.format_expr_to_string(&Expr::Bool(false)), "false");
     }
@@ -4006,7 +4697,9 @@ mod tests {
             is_pub: false,
             span: dummy_span(),
         };
-        let program = Program { items: vec![Item::Form(form)] };
+        let program = Program {
+            items: vec![Item::Form(form)],
+        };
         let result = format_program(&program);
         assert!(result.contains("form LoginForm {"), "got: {}", result);
         assert!(result.contains("field username"), "got: {}", result);
@@ -4103,7 +4796,10 @@ mod tests {
                 styles: vec![],
                 transitions: vec![],
                 trait_bounds: vec![],
-                render: RenderBlock { body: node, span: dummy_span() },
+                render: RenderBlock {
+                    body: node,
+                    span: dummy_span(),
+                },
                 permissions: None,
                 gestures: vec![],
                 skeleton: None,
@@ -4164,9 +4860,12 @@ mod tests {
     #[test]
     fn test_format_object_lit_single_field() {
         let f = Formatter::new(FormatterOptions::default());
-        let result = f.format_expr_inner(&Expr::ObjectLit {
-            fields: vec![("name".into(), Expr::StringLit("test".into()))],
-        }, 0);
+        let result = f.format_expr_inner(
+            &Expr::ObjectLit {
+                fields: vec![("name".into(), Expr::StringLit("test".into()))],
+            },
+            0,
+        );
         assert!(result.contains("name"), "got: {}", result);
     }
 
@@ -4195,14 +4894,22 @@ mod tests {
             arms: vec![arm],
         };
         let result = f.format_expr_inner(&expr, 0);
-        assert!(result.contains("if"), "Match guard should contain 'if': {}", result);
+        assert!(
+            result.contains("if"),
+            "Match guard should contain 'if': {}",
+            result
+        );
     }
 
     #[test]
     fn test_format_empty_array_lit_brackets() {
         let f = Formatter::new(FormatterOptions::default());
         let result = f.format_expr_inner(&Expr::ArrayLit(vec![]), 0);
-        assert!(result.contains("[") && result.contains("]"), "got: {}", result);
+        assert!(
+            result.contains("[") && result.contains("]"),
+            "got: {}",
+            result
+        );
     }
 
     #[test]
@@ -4214,7 +4921,11 @@ mod tests {
         };
         let result = format_program(&make_component_with_template(node));
         assert!(result.contains("if"), "got: {}", result);
-        assert!(!result.contains("else"), "Should not contain else: {}", result);
+        assert!(
+            !result.contains("else"),
+            "Should not contain else: {}",
+            result
+        );
     }
 
     #[test]
@@ -4240,14 +4951,12 @@ mod tests {
             items: vec![Item::Function(Function {
                 name: "hash".to_string(),
                 type_params: vec![],
-                params: vec![
-                    Param {
-                        name: "password".to_string(),
-                        ty: Type::Named("String".to_string()),
-                        ownership: Ownership::Owned,
-                        secret: true,
-                    },
-                ],
+                params: vec![Param {
+                    name: "password".to_string(),
+                    ty: Type::Named("String".to_string()),
+                    ownership: Ownership::Owned,
+                    secret: true,
+                }],
                 return_type: Some(Type::Named("String".to_string())),
                 trait_bounds: vec![],
                 body: Block {
@@ -4262,26 +4971,36 @@ mod tests {
             })],
         };
         let result = format_program(&program);
-        assert!(result.contains("secret password"), "secret keyword should appear before param name, got: {}", result);
+        assert!(
+            result.contains("secret password"),
+            "secret keyword should appear before param name, got: {}",
+            result
+        );
     }
 
     #[test]
     fn test_format_range_expression() {
         let formatter = Formatter::new(FormatterOptions::default());
-        let result = formatter.format_expr_inner(&Expr::Range {
-            start: Box::new(Expr::Integer(0)),
-            end: Box::new(Expr::Integer(10)),
-        }, 0);
+        let result = formatter.format_expr_inner(
+            &Expr::Range {
+                start: Box::new(Expr::Integer(0)),
+                end: Box::new(Expr::Integer(10)),
+            },
+            0,
+        );
         assert_eq!(result, "0..10");
     }
 
     #[test]
     fn test_format_range_with_idents() {
         let formatter = Formatter::new(FormatterOptions::default());
-        let result = formatter.format_expr_inner(&Expr::Range {
-            start: Box::new(Expr::Ident("start".into())),
-            end: Box::new(Expr::Ident("end".into())),
-        }, 0);
+        let result = formatter.format_expr_inner(
+            &Expr::Range {
+                start: Box::new(Expr::Ident("start".into())),
+                end: Box::new(Expr::Ident("end".into())),
+            },
+            0,
+        );
         assert_eq!(result, "start..end");
     }
 
@@ -4341,15 +5060,22 @@ mod tests {
     #[test]
     fn roundtrip_match() {
         // Match formatting may alter comma placement; verify it does not panic.
-        let src = "fn f(x: i32) -> i32 { match x { Ok(v) => { return v; }, Err(e) => { return 0; } } }";
+        let src =
+            "fn f(x: i32) -> i32 { match x { Ok(v) => { return v; }, Err(e) => { return 0; } } }";
         let prog = parse_for_fmt(src);
         let formatted = format_program(&prog);
-        assert!(formatted.contains("match"), "Should contain match: {}", formatted);
+        assert!(
+            formatted.contains("match"),
+            "Should contain match: {}",
+            formatted
+        );
     }
 
     #[test]
     fn roundtrip_impl_block() {
-        assert_roundtrip("impl Point { fn new(x: i32, y: i32) -> Point { return Point { x: x, y: y }; } }");
+        assert_roundtrip(
+            "impl Point { fn new(x: i32, y: i32) -> Point { return Point { x: x, y: y }; } }",
+        );
     }
 
     #[test]
@@ -4359,7 +5085,11 @@ mod tests {
         let src = "fn f() { let add = |a: i32, b: i32| { a + b }; }";
         let prog = parse_for_fmt(src);
         let formatted = format_program(&prog);
-        assert!(formatted.contains("|a: i32, b: i32|"), "Should contain closure params: {}", formatted);
+        assert!(
+            formatted.contains("|a: i32, b: i32|"),
+            "Should contain closure params: {}",
+            formatted
+        );
     }
 
     #[test]
@@ -4408,7 +5138,11 @@ mod tests {
         let src = "trait Display { fn display(self) -> String; }";
         let prog = parse_for_fmt(src);
         let formatted = format_program(&prog);
-        assert!(formatted.contains("trait Display"), "Should contain trait: {}", formatted);
+        assert!(
+            formatted.contains("trait Display"),
+            "Should contain trait: {}",
+            formatted
+        );
     }
 
     #[test]
@@ -4424,21 +5158,22 @@ mod tests {
     #[test]
     fn test_format_tuple_literal() {
         let formatter = Formatter::new(FormatterOptions::default());
-        let result = formatter.format_expr_inner(&Expr::TupleLit(vec![
-            Expr::Integer(1),
-            Expr::StringLit("hello".into()),
-            Expr::Bool(true),
-        ]), 0);
+        let result = formatter.format_expr_inner(
+            &Expr::TupleLit(vec![
+                Expr::Integer(1),
+                Expr::StringLit("hello".into()),
+                Expr::Bool(true),
+            ]),
+            0,
+        );
         assert_eq!(result, r#"(1, "hello", true)"#);
     }
 
     #[test]
     fn test_format_tuple_literal_two_elements() {
         let formatter = Formatter::new(FormatterOptions::default());
-        let result = formatter.format_expr_inner(&Expr::TupleLit(vec![
-            Expr::Integer(1),
-            Expr::Integer(2),
-        ]), 0);
+        let result = formatter
+            .format_expr_inner(&Expr::TupleLit(vec![Expr::Integer(1), Expr::Integer(2)]), 0);
         assert_eq!(result, "(1, 2)");
     }
 

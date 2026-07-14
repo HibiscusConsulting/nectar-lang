@@ -73,11 +73,20 @@ CLAMP_BLOCK = """        if self.scroll_row < 0 {
 
 SELECT_DERIVE_BLOCK = """        let mut sd: i32 = self.selected_id;
         let mut sdepth: i32 = 0;
+        let mut chain: [i32] = [];
+        chain.push(sd);
         while sd > 0 {
             sd = (sd - 1) / self.branching;
             sdepth = sdepth + 1;
+            chain.push(sd);
         }
         self.selected_depth = sdepth;
+        self.crumb_ids = [];
+        let mut ci: i32 = chain.len() - 1;
+        while ci >= 0 {
+            self.crumb_ids.push(chain[ci]);
+            ci = ci - 1;
+        }
         self.uses_ids = [];
         if self.loaded[self.selected_id] {
             let cc: i32 = self.children_count[self.selected_id];
@@ -180,6 +189,7 @@ component TreeBench {
     let mut selected_id: i32 = 0;
     let mut selected_depth: i32 = 0;
     let mut uses_ids: [i32] = [];
+    let mut crumb_ids: [i32] = [];
 
     let mut status: String = "not connected — click Connect to load the root assembly from the BOM API";
 
@@ -286,6 +296,7 @@ parts.append("""    fn init_connect(&mut self) {
         self.hay[0] = format("pn-0 turbofan engine hbt-9000");
         self.loaded_count = 1;
         self.selected_id = 0;
+        self.crumb_ids.push(0);
         self.pending_parent = 0 - 2;
         self.status = "auto-loading full BOM: GET /api/bom/tree … (71,284 nodes, ~4MB JSON)";
         self.last_url = "GET /api/bom/tree";
@@ -598,22 +609,18 @@ parts.append(scroll_handler("scroll_to_middle", "self.scroll_row = self.visible.
 parts.append(scroll_handler("scroll_to_bottom", "self.scroll_row = self.visible.len() - self.viewport_rows;",
     'format("row {} of {}", self.scroll_row + 1, self.visible.len())'))
 
-# --- breadcrumb_jump_K ---
+# --- breadcrumb_jump_K: select the k-th ancestor on the selected part's
+# path and scroll the tree to it. Real breadcrumb semantics: the row shows
+# the ancestry of the SELECTED part, so it only ever changes on selection.
 for k in range(MAX_DEPTH + 1):
-    before = f"""        if self.window_ids.len() == 0 {{
-            self.status = "not connected — click Connect first";
+    before = f"""        if self.crumb_ids.len() <= {k} {{
             return;
         }}
-        let mut cur: i32 = self.window_ids[0];
-        let mut cur_depth: i32 = self.window_depths[0];
-        while cur_depth > {k} {{
-            cur = (cur - 1) / self.branching;
-            cur_depth = cur_depth - 1;
-        }}
-        let mut found_row: i32 = -1;
+        self.selected_id = self.crumb_ids[{k}];
+{SELECT_DERIVE_BLOCK}        let mut found_row: i32 = -1;
         let mut i: i32 = 0;
         while i < self.visible.len() {{
-            if self.visible[i] == cur {{
+            if self.visible[i] == self.selected_id {{
                 found_row = i;
             }}
             i = i + 1;
@@ -622,9 +629,9 @@ for k in range(MAX_DEPTH + 1):
             self.scroll_row = found_row;
         }}
 """
-    parts.append(scroll_handler(
-        f"breadcrumb_jump_{k}", before.rstrip('\n'),
-        f'format("jumped to {LEVEL_NAMES[k]} (row {{}} of {{}})", self.scroll_row + 1, self.visible.len())'
+    parts.append(handler(
+        f"breadcrumb_jump_{k}", before,
+        'format("selected PN-{} via path", self.selected_id)'
     ))
 
 # ---- render ----
@@ -677,9 +684,14 @@ for handler_name, label in filters:
 render_lines.append('                <div style="font-size: 11px; color: #6e7781; padding: 0 6">{format("→ {}", self.filter_label)}</div>')
 render_lines.append('            </div>')
 
-render_lines.append('            <div style="direction: horizontal; gap: 8; height: 22px; align: center">')
+render_lines.append('            <div style="direction: horizontal; gap: 5; height: 22px; align: center">')
+render_lines.append('                <div style="width: hug; font-size: 11px; font-weight: 700; color: #6e7781; padding-right: 4">"PATH"</div>')
 for k in range(MAX_DEPTH + 1):
-    render_lines.append(f'                <div style="height: 18px; padding: 0 10; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={{self.breadcrumb_jump_{k}}}>"{LEVEL_NAMES[k]}"</div>')
+    if k > 0:
+        render_lines.append(f'                {{if self.crumb_ids.len() > {k} {{ <div style="width: hug; color: #8c959f; font-size: 11px">"›"</div> }}}}')
+    render_lines.append(f'                {{if self.crumb_ids.len() > {k} {{')
+    render_lines.append(f'                    <div style="width: hug; height: 18px; padding: 0 8; background-color: #eef1f4; border-radius: 3; cursor: pointer; align: center; justify: center; font-size: 11px; color: #57606a" on:click={{self.breadcrumb_jump_{k}}}>{{format("{{}}", self.names[self.crumb_ids[{k}]])}}</div>')
+    render_lines.append('                }}')
 render_lines.append('            </div>')
 
 # ===== main: tree pane + attributes pane =====

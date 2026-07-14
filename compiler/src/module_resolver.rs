@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 /// Resolves module paths to file system paths and loads source files.
 pub struct ModuleResolver {
@@ -92,17 +92,13 @@ impl ModuleResolver {
     /// Mark a module as loaded. Returns false if it was already loaded
     /// (indicating a circular dependency).
     pub fn mark_loaded(&mut self, path: &Path) -> bool {
-        let canonical = path
-            .canonicalize()
-            .unwrap_or_else(|_| path.to_path_buf());
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         self.loaded.insert(canonical)
     }
 
     /// Check if a module has already been loaded.
     pub fn is_loaded(&self, path: &Path) -> bool {
-        let canonical = path
-            .canonicalize()
-            .unwrap_or_else(|_| path.to_path_buf());
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         self.loaded.contains(&canonical)
     }
 }
@@ -120,11 +116,19 @@ mod tests {
 
         // Create bar/mod.nectar
         fs::create_dir_all(dir.path().join("bar")).unwrap();
-        fs::write(dir.path().join("bar").join("mod.nectar"), "pub fn world() {}").unwrap();
+        fs::write(
+            dir.path().join("bar").join("mod.nectar"),
+            "pub fn world() {}",
+        )
+        .unwrap();
 
         // Create math/vec3.nectar
         fs::create_dir_all(dir.path().join("math")).unwrap();
-        fs::write(dir.path().join("math").join("vec3.nectar"), "pub struct Vec3 {}").unwrap();
+        fs::write(
+            dir.path().join("math").join("vec3.nectar"),
+            "pub struct Vec3 {}",
+        )
+        .unwrap();
 
         dir
     }
@@ -185,7 +189,9 @@ mod tests {
         let dir = setup_test_dir();
         let resolver = ModuleResolver::new(dir.path().to_path_buf());
 
-        let content = resolver.load_module(&dir.path().join("foo.nectar")).unwrap();
+        let content = resolver
+            .load_module(&dir.path().join("foo.nectar"))
+            .unwrap();
         assert_eq!(content, "pub fn hello() {}");
     }
 }

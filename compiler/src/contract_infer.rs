@@ -50,8 +50,15 @@ impl std::fmt::Display for InferredType {
             InferredType::Object(fields) => {
                 write!(f, "{{")?;
                 for (i, field) in fields.iter().enumerate() {
-                    if i > 0 { write!(f, ", ")?; }
-                    write!(f, "{}: {}", field.path.last().unwrap_or(&"?".to_string()), field.inferred_type)?;
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(
+                        f,
+                        "{}: {}",
+                        field.path.last().unwrap_or(&"?".to_string()),
+                        field.inferred_type
+                    )?;
                 }
                 write!(f, "}}")
             }
@@ -174,7 +181,11 @@ fn extract_fetch_contract(expr: &Expr, context: &str) -> Option<InferredContract
 
 /// Extract the HTTP method from a fetch expression's options.
 fn extract_method(expr: &Expr) -> String {
-    if let Expr::Fetch { options: Some(opts), .. } = expr {
+    if let Expr::Fetch {
+        options: Some(opts),
+        ..
+    } = expr
+    {
         if let Expr::StructInit { fields, .. } = opts.as_ref() {
             for (name, value) in fields {
                 if name == "method" {
@@ -194,7 +205,11 @@ fn infer_from_expr_recursive(expr: &Expr, context: &str, contracts: &mut Vec<Inf
         Expr::Fetch { .. } => {
             // Standalone fetch without let binding — can't trace usage
         }
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             infer_from_expr_recursive(condition, context, contracts);
             infer_from_block(then_block, context, contracts);
             if let Some(eb) = else_block {
@@ -213,7 +228,12 @@ fn infer_from_expr_recursive(expr: &Expr, context: &str, contracts: &mut Vec<Inf
 }
 
 /// Helper: try to infer contracts from an expression used as a state initializer.
-fn infer_from_expr(expr: &Expr, context: &str, _binding_name: &str, contracts: &mut Vec<InferredContract>) {
+fn infer_from_expr(
+    expr: &Expr,
+    context: &str,
+    _binding_name: &str,
+    contracts: &mut Vec<InferredContract>,
+) {
     match expr {
         Expr::Fetch { url, contract, .. } if contract.is_none() => {
             let url_str = expr_to_string(url);
@@ -262,10 +282,12 @@ fn collect_field_accesses(
             if is_var(object, var_name) {
                 // Direct field access: var.field
                 let path = vec![field.clone()];
-                add_or_update_field(fields, &path, InferredType::Unknown, FieldEvidence::FieldAccess(
-                    field.clone(),
-                    Span::new(0, 0, 0, 0),
-                ));
+                add_or_update_field(
+                    fields,
+                    &path,
+                    InferredType::Unknown,
+                    FieldEvidence::FieldAccess(field.clone(), Span::new(0, 0, 0, 0)),
+                );
             } else if let Expr::FieldAccess { .. } = object.as_ref() {
                 // Nested: var.a.b — recurse to build path
                 let mut path = Vec::new();
@@ -273,15 +295,22 @@ fn collect_field_accesses(
                     path.push(field.clone());
                     // The intermediate path is an Object
                     if path.len() > 1 {
-                        add_or_update_field(fields, &path[..path.len()-1], InferredType::Object(vec![]), FieldEvidence::FieldAccess(
-                            path[path.len()-2].clone(),
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path[..path.len() - 1],
+                            InferredType::Object(vec![]),
+                            FieldEvidence::FieldAccess(
+                                path[path.len() - 2].clone(),
+                                Span::new(0, 0, 0, 0),
+                            ),
+                        );
                     }
-                    add_or_update_field(fields, &path, InferredType::Unknown, FieldEvidence::FieldAccess(
-                        field.clone(),
-                        Span::new(0, 0, 0, 0),
-                    ));
+                    add_or_update_field(
+                        fields,
+                        &path,
+                        InferredType::Unknown,
+                        FieldEvidence::FieldAccess(field.clone(), Span::new(0, 0, 0, 0)),
+                    );
                 }
             }
             // Continue recursing into the object
@@ -290,23 +319,37 @@ fn collect_field_accesses(
 
         Expr::Index { object, .. } => {
             // var.items[0] — implies items is an Array
-            if let Expr::FieldAccess { object: inner_obj, field } = object.as_ref() {
+            if let Expr::FieldAccess {
+                object: inner_obj,
+                field,
+            } = object.as_ref()
+            {
                 if is_var(inner_obj, var_name) {
-                    add_or_update_field(fields, &[field.clone()], InferredType::Array(Box::new(InferredType::Unknown)), FieldEvidence::IndexAccess(
-                        Span::new(0, 0, 0, 0),
-                    ));
+                    add_or_update_field(
+                        fields,
+                        &[field.clone()],
+                        InferredType::Array(Box::new(InferredType::Unknown)),
+                        FieldEvidence::IndexAccess(Span::new(0, 0, 0, 0)),
+                    );
                 }
             }
             collect_field_accesses(var_name, object, current_path, fields);
         }
 
-        Expr::For { binding: _, iterator, body } => {
+        Expr::For {
+            binding: _,
+            iterator,
+            body,
+        } => {
             // for item in var.items — implies items is an Array
             if let Expr::FieldAccess { object, field } = iterator.as_ref() {
                 if is_var(object, var_name) {
-                    add_or_update_field(fields, &[field.clone()], InferredType::Array(Box::new(InferredType::Unknown)), FieldEvidence::ForIteration(
-                        Span::new(0, 0, 0, 0),
-                    ));
+                    add_or_update_field(
+                        fields,
+                        &[field.clone()],
+                        InferredType::Array(Box::new(InferredType::Unknown)),
+                        FieldEvidence::ForIteration(Span::new(0, 0, 0, 0)),
+                    );
                 }
             }
             collect_field_accesses(var_name, iterator, current_path, fields);
@@ -322,26 +365,38 @@ fn collect_field_accesses(
             match op {
                 BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
                     if let Some(path) = extract_field_path(left, var_name) {
-                        add_or_update_field(fields, &path, InferredType::Numeric, FieldEvidence::ArithmeticOp(
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::Numeric,
+                            FieldEvidence::ArithmeticOp(Span::new(0, 0, 0, 0)),
+                        );
                     }
                     if let Some(path) = extract_field_path(right, var_name) {
-                        add_or_update_field(fields, &path, InferredType::Numeric, FieldEvidence::ArithmeticOp(
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::Numeric,
+                            FieldEvidence::ArithmeticOp(Span::new(0, 0, 0, 0)),
+                        );
                     }
                 }
                 BinOp::And | BinOp::Or => {
                     if let Some(path) = extract_field_path(left, var_name) {
-                        add_or_update_field(fields, &path, InferredType::Bool, FieldEvidence::BooleanContext(
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::Bool,
+                            FieldEvidence::BooleanContext(Span::new(0, 0, 0, 0)),
+                        );
                     }
                     if let Some(path) = extract_field_path(right, var_name) {
-                        add_or_update_field(fields, &path, InferredType::Bool, FieldEvidence::BooleanContext(
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::Bool,
+                            FieldEvidence::BooleanContext(Span::new(0, 0, 0, 0)),
+                        );
                     }
                 }
                 _ => {}
@@ -350,12 +405,19 @@ fn collect_field_accesses(
             collect_field_accesses(var_name, right, current_path, fields);
         }
 
-        Expr::If { condition, then_block, else_block } => {
+        Expr::If {
+            condition,
+            then_block,
+            else_block,
+        } => {
             // Using a field in an if condition suggests Bool
             if let Some(path) = extract_field_path(condition, var_name) {
-                add_or_update_field(fields, &path, InferredType::Bool, FieldEvidence::BooleanContext(
-                    Span::new(0, 0, 0, 0),
-                ));
+                add_or_update_field(
+                    fields,
+                    &path,
+                    InferredType::Bool,
+                    FieldEvidence::BooleanContext(Span::new(0, 0, 0, 0)),
+                );
             }
             collect_field_accesses(var_name, condition, current_path, fields);
             for stmt in &then_block.stmts {
@@ -372,13 +434,22 @@ fn collect_field_accesses(
             }
         }
 
-        Expr::MethodCall { object, method, args } => {
+        Expr::MethodCall {
+            object,
+            method,
+            args,
+        } => {
             if let Some(path) = extract_field_path(object, var_name) {
                 let evidence = FieldEvidence::MethodCall(method.clone(), Span::new(0, 0, 0, 0));
                 // .len() on arrays, .to_string() implies conversion, etc.
                 match method.as_str() {
                     "len" | "length" | "is_empty" | "push" | "pop" | "filter" | "map" => {
-                        add_or_update_field(fields, &path, InferredType::Array(Box::new(InferredType::Unknown)), evidence);
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::Array(Box::new(InferredType::Unknown)),
+                            evidence,
+                        );
                     }
                     _ => {
                         add_or_update_field(fields, &path, InferredType::Unknown, evidence);
@@ -402,9 +473,12 @@ fn collect_field_accesses(
             for part in parts {
                 if let FormatPart::Expression(expr) = part {
                     if let Some(path) = extract_field_path(expr, var_name) {
-                        add_or_update_field(fields, &path, InferredType::String, FieldEvidence::UsedAsText(
-                            Span::new(0, 0, 0, 0),
-                        ));
+                        add_or_update_field(
+                            fields,
+                            &path,
+                            InferredType::String,
+                            FieldEvidence::UsedAsText(Span::new(0, 0, 0, 0)),
+                        );
                     }
                     collect_field_accesses(var_name, expr, current_path, fields);
                 }
@@ -514,15 +588,20 @@ pub fn print_inferred_contracts(contracts: &[InferredContract]) {
         );
         for field in &contract.fields {
             let path_str = field.path.join(".");
-            let evidence_str = field.evidence.iter().map(|e| match e {
-                FieldEvidence::UsedAsText(_) => "text",
-                FieldEvidence::ArithmeticOp(_) => "arithmetic",
-                FieldEvidence::BooleanContext(_) => "condition",
-                FieldEvidence::FieldAccess(_, _) => "field access",
-                FieldEvidence::IndexAccess(_) => "index",
-                FieldEvidence::ForIteration(_) => "iteration",
-                FieldEvidence::MethodCall(m, _) => m.as_str(),
-            }).collect::<Vec<_>>().join(", ");
+            let evidence_str = field
+                .evidence
+                .iter()
+                .map(|e| match e {
+                    FieldEvidence::UsedAsText(_) => "text",
+                    FieldEvidence::ArithmeticOp(_) => "arithmetic",
+                    FieldEvidence::BooleanContext(_) => "condition",
+                    FieldEvidence::FieldAccess(_, _) => "field access",
+                    FieldEvidence::IndexAccess(_) => "index",
+                    FieldEvidence::ForIteration(_) => "iteration",
+                    FieldEvidence::MethodCall(m, _) => m.as_str(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             eprintln!("  {}: {} ({})", path_str, field.inferred_type, evidence_str);
         }
     }
@@ -553,9 +632,7 @@ mod tests {
             url: Box::new(Expr::StringLit(url.to_string())),
             options: Some(Box::new(Expr::StructInit {
                 name: String::new(),
-                fields: vec![
-                    ("method".to_string(), Expr::StringLit(method.to_string())),
-                ],
+                fields: vec![("method".to_string(), Expr::StringLit(method.to_string()))],
             })),
             contract: None,
         }
@@ -579,38 +656,38 @@ mod tests {
         expr
     }
 
-    fn make_program_with_fetch_and_usage(url: &str, var_name: &str, usage_stmts: Vec<Stmt>) -> Program {
-        let mut stmts = vec![
-            Stmt::Let {
-                name: var_name.to_string(),
-                ty: None,
-                mutable: false,
-                secret: false,
-                value: make_fetch_expr(url),
-                ownership: Ownership::Owned,
-            },
-        ];
+    fn make_program_with_fetch_and_usage(
+        url: &str,
+        var_name: &str,
+        usage_stmts: Vec<Stmt>,
+    ) -> Program {
+        let mut stmts = vec![Stmt::Let {
+            name: var_name.to_string(),
+            ty: None,
+            mutable: false,
+            secret: false,
+            value: make_fetch_expr(url),
+            ownership: Ownership::Owned,
+        }];
         stmts.extend(usage_stmts);
 
         Program {
-            items: vec![
-                Item::Function(Function {
-                    name: "test_fn".to_string(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    params: vec![],
-                    return_type: None,
-                    trait_bounds: vec![],
-                    body: Block {
-                        stmts,
-                        span: dummy_span(),
-                    },
-                    is_pub: false,
-                    is_async: false,
-                    must_use: false,
+            items: vec![Item::Function(Function {
+                name: "test_fn".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts,
                     span: dummy_span(),
-                }),
-            ],
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: dummy_span(),
+            })],
         }
     }
 
@@ -619,14 +696,12 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/users",
             "response",
-            vec![
-                Stmt::Expr(Expr::FormatString {
-                    parts: vec![
-                        FormatPart::Literal("Hello ".to_string()),
-                        FormatPart::Expression(Box::new(make_field_access("response", "name"))),
-                    ],
-                }),
-            ],
+            vec![Stmt::Expr(Expr::FormatString {
+                parts: vec![
+                    FormatPart::Literal("Hello ".to_string()),
+                    FormatPart::Expression(Box::new(make_field_access("response", "name"))),
+                ],
+            })],
         );
 
         let contracts = infer_contracts(&program);
@@ -642,13 +717,11 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products/1",
             "product",
-            vec![
-                Stmt::Expr(Expr::Binary {
-                    op: BinOp::Mul,
-                    left: Box::new(make_field_access("product", "price")),
-                    right: Box::new(Expr::Integer(2)),
-                }),
-            ],
+            vec![Stmt::Expr(Expr::Binary {
+                op: BinOp::Mul,
+                left: Box::new(make_field_access("product", "price")),
+                right: Box::new(Expr::Integer(2)),
+            })],
         );
 
         let contracts = infer_contracts(&program);
@@ -663,13 +736,14 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products/1",
             "product",
-            vec![
-                Stmt::Expr(Expr::If {
-                    condition: Box::new(make_field_access("product", "active")),
-                    then_block: Block { stmts: vec![], span: dummy_span() },
-                    else_block: None,
-                }),
-            ],
+            vec![Stmt::Expr(Expr::If {
+                condition: Box::new(make_field_access("product", "active")),
+                then_block: Block {
+                    stmts: vec![],
+                    span: dummy_span(),
+                },
+                else_block: None,
+            })],
         );
 
         let contracts = infer_contracts(&program);
@@ -684,20 +758,24 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products",
             "response",
-            vec![
-                Stmt::Expr(Expr::For {
-                    binding: "item".to_string(),
-                    iterator: Box::new(make_field_access("response", "items")),
-                    body: Block { stmts: vec![], span: dummy_span() },
-                }),
-            ],
+            vec![Stmt::Expr(Expr::For {
+                binding: "item".to_string(),
+                iterator: Box::new(make_field_access("response", "items")),
+                body: Block {
+                    stmts: vec![],
+                    span: dummy_span(),
+                },
+            })],
         );
 
         let contracts = infer_contracts(&program);
         assert_eq!(contracts.len(), 1);
         assert_eq!(contracts[0].fields.len(), 1);
         assert_eq!(contracts[0].fields[0].path, vec!["items"]);
-        assert!(matches!(contracts[0].fields[0].inferred_type, InferredType::Array(_)));
+        assert!(matches!(
+            contracts[0].fields[0].inferred_type,
+            InferredType::Array(_)
+        ));
     }
 
     #[test]
@@ -705,19 +783,20 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products",
             "response",
-            vec![
-                Stmt::Expr(Expr::Index {
-                    object: Box::new(make_field_access("response", "images")),
-                    index: Box::new(Expr::Integer(0)),
-                }),
-            ],
+            vec![Stmt::Expr(Expr::Index {
+                object: Box::new(make_field_access("response", "images")),
+                index: Box::new(Expr::Integer(0)),
+            })],
         );
 
         let contracts = infer_contracts(&program);
         assert_eq!(contracts.len(), 1);
         assert_eq!(contracts[0].fields.len(), 1);
         assert_eq!(contracts[0].fields[0].path, vec!["images"]);
-        assert!(matches!(contracts[0].fields[0].inferred_type, InferredType::Array(_)));
+        assert!(matches!(
+            contracts[0].fields[0].inferred_type,
+            InferredType::Array(_)
+        ));
     }
 
     #[test]
@@ -725,16 +804,20 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products/1",
             "product",
-            vec![
-                Stmt::Expr(make_nested_field("product", &["vendor", "name"])),
-            ],
+            vec![Stmt::Expr(make_nested_field(
+                "product",
+                &["vendor", "name"],
+            ))],
         );
 
         let contracts = infer_contracts(&program);
         assert_eq!(contracts.len(), 1);
         // Should have both vendor (Object) and vendor.name (Unknown)
         assert!(contracts[0].fields.len() >= 1);
-        let vendor_field = contracts[0].fields.iter().find(|f| f.path == vec!["vendor"]);
+        let vendor_field = contracts[0]
+            .fields
+            .iter()
+            .find(|f| f.path == vec!["vendor"]);
         assert!(vendor_field.is_some());
     }
 
@@ -743,93 +826,92 @@ mod tests {
         let program = make_program_with_fetch_and_usage(
             "https://api.example.com/products",
             "response",
-            vec![
-                Stmt::Expr(Expr::MethodCall {
-                    object: Box::new(make_field_access("response", "items")),
-                    method: "len".to_string(),
-                    args: vec![],
-                }),
-            ],
+            vec![Stmt::Expr(Expr::MethodCall {
+                object: Box::new(make_field_access("response", "items")),
+                method: "len".to_string(),
+                args: vec![],
+            })],
         );
 
         let contracts = infer_contracts(&program);
         assert_eq!(contracts.len(), 1);
         assert_eq!(contracts[0].fields[0].path, vec!["items"]);
-        assert!(matches!(contracts[0].fields[0].inferred_type, InferredType::Array(_)));
+        assert!(matches!(
+            contracts[0].fields[0].inferred_type,
+            InferredType::Array(_)
+        ));
     }
 
     #[test]
     fn test_skip_explicit_contract() {
         let program = Program {
-            items: vec![
-                Item::Function(Function {
-                    name: "test_fn".to_string(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    params: vec![],
-                    return_type: None,
-                    trait_bounds: vec![],
-                    body: Block {
-                        stmts: vec![
-                            Stmt::Let {
-                                name: "data".to_string(),
-                                ty: None,
-                                mutable: false,
-                                secret: false,
-                                value: Expr::Fetch {
-                                    url: Box::new(Expr::StringLit("https://api.example.com".to_string())),
-                                    options: None,
-                                    contract: Some("UserContract".to_string()),
-                                },
-                                ownership: Ownership::Owned,
-                            },
-                        ],
-                        span: dummy_span(),
-                    },
-                    is_pub: false,
-                    is_async: false,
-                    must_use: false,
+            items: vec![Item::Function(Function {
+                name: "test_fn".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![Stmt::Let {
+                        name: "data".to_string(),
+                        ty: None,
+                        mutable: false,
+                        secret: false,
+                        value: Expr::Fetch {
+                            url: Box::new(Expr::StringLit("https://api.example.com".to_string())),
+                            options: None,
+                            contract: Some("UserContract".to_string()),
+                        },
+                        ownership: Ownership::Owned,
+                    }],
                     span: dummy_span(),
-                }),
-            ],
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: dummy_span(),
+            })],
         };
 
         let contracts = infer_contracts(&program);
         // Should find 0 inferred contracts since there's an explicit one
-        assert!(contracts.iter().all(|c| c.fields.is_empty() || c.fetch_url != "https://api.example.com"));
+        assert!(
+            contracts
+                .iter()
+                .all(|c| c.fields.is_empty() || c.fetch_url != "https://api.example.com")
+        );
     }
 
     #[test]
     fn test_infer_method_from_options() {
         let program = Program {
-            items: vec![
-                Item::Function(Function {
-                    name: "test_fn".to_string(),
-                    lifetimes: vec![],
-                    type_params: vec![],
-                    params: vec![],
-                    return_type: None,
-                    trait_bounds: vec![],
-                    body: Block {
-                        stmts: vec![
-                            Stmt::Let {
-                                name: "data".to_string(),
-                                ty: None,
-                                mutable: false,
-                                secret: false,
-                                value: make_fetch_with_method("https://api.example.com/users", "POST"),
-                                ownership: Ownership::Owned,
-                            },
-                            Stmt::Expr(make_field_access("data", "id")),
-                        ],
-                        span: dummy_span(),
-                    },
-                    is_pub: false,
-                    is_async: false,
-                    must_use: false,
+            items: vec![Item::Function(Function {
+                name: "test_fn".to_string(),
+                lifetimes: vec![],
+                type_params: vec![],
+                params: vec![],
+                return_type: None,
+                trait_bounds: vec![],
+                body: Block {
+                    stmts: vec![
+                        Stmt::Let {
+                            name: "data".to_string(),
+                            ty: None,
+                            mutable: false,
+                            secret: false,
+                            value: make_fetch_with_method("https://api.example.com/users", "POST"),
+                            ownership: Ownership::Owned,
+                        },
+                        Stmt::Expr(make_field_access("data", "id")),
+                    ],
                     span: dummy_span(),
-                }),
-            ],
+                },
+                is_pub: false,
+                is_async: false,
+                must_use: false,
+                span: dummy_span(),
+            })],
         };
 
         let contracts = infer_contracts(&program);
@@ -844,9 +926,9 @@ mod tests {
             "product",
             vec![
                 Stmt::Expr(Expr::FormatString {
-                    parts: vec![
-                        FormatPart::Expression(Box::new(make_field_access("product", "name"))),
-                    ],
+                    parts: vec![FormatPart::Expression(Box::new(make_field_access(
+                        "product", "name",
+                    )))],
                 }),
                 Stmt::Expr(Expr::Binary {
                     op: BinOp::Mul,
@@ -855,13 +937,19 @@ mod tests {
                 }),
                 Stmt::Expr(Expr::If {
                     condition: Box::new(make_field_access("product", "in_stock")),
-                    then_block: Block { stmts: vec![], span: dummy_span() },
+                    then_block: Block {
+                        stmts: vec![],
+                        span: dummy_span(),
+                    },
                     else_block: None,
                 }),
                 Stmt::Expr(Expr::For {
                     binding: "tag".to_string(),
                     iterator: Box::new(make_field_access("product", "tags")),
-                    body: Block { stmts: vec![], span: dummy_span() },
+                    body: Block {
+                        stmts: vec![],
+                        span: dummy_span(),
+                    },
                 }),
             ],
         );
@@ -877,7 +965,11 @@ mod tests {
         let price_field = c.fields.iter().find(|f| f.path == vec!["price"]).unwrap();
         assert_eq!(price_field.inferred_type, InferredType::Numeric);
 
-        let stock_field = c.fields.iter().find(|f| f.path == vec!["in_stock"]).unwrap();
+        let stock_field = c
+            .fields
+            .iter()
+            .find(|f| f.path == vec!["in_stock"])
+            .unwrap();
         assert_eq!(stock_field.inferred_type, InferredType::Bool);
 
         let tags_field = c.fields.iter().find(|f| f.path == vec!["tags"]).unwrap();
@@ -887,50 +979,52 @@ mod tests {
     #[test]
     fn test_infer_from_store_action() {
         let program = Program {
-            items: vec![
-                Item::Store(StoreDef {
-                    name: "ProductStore".to_string(),
-                    signals: vec![],
-                    actions: vec![
-                        ActionDef {
-                            name: "load_products".to_string(),
-                            params: vec![],
-                            body: Block {
-                                stmts: vec![
-                                    Stmt::Let {
-                                        name: "response".to_string(),
-                                        ty: None,
-                                        mutable: false,
-                                        secret: false,
-                                        value: make_fetch_expr("https://api.example.com/products"),
-                                        ownership: Ownership::Owned,
-                                    },
-                                    Stmt::Expr(Expr::For {
-                                        binding: "p".to_string(),
-                                        iterator: Box::new(make_field_access("response", "data")),
-                                        body: Block { stmts: vec![], span: dummy_span() },
-                                    }),
-                                ],
-                                span: dummy_span(),
+            items: vec![Item::Store(StoreDef {
+                name: "ProductStore".to_string(),
+                signals: vec![],
+                actions: vec![ActionDef {
+                    name: "load_products".to_string(),
+                    params: vec![],
+                    body: Block {
+                        stmts: vec![
+                            Stmt::Let {
+                                name: "response".to_string(),
+                                ty: None,
+                                mutable: false,
+                                secret: false,
+                                value: make_fetch_expr("https://api.example.com/products"),
+                                ownership: Ownership::Owned,
                             },
-                            is_async: true,
-                            span: dummy_span(),
-                        },
-                    ],
-                    computed: vec![],
-                    effects: vec![],
-                    selectors: vec![],
-                    is_pub: false,
+                            Stmt::Expr(Expr::For {
+                                binding: "p".to_string(),
+                                iterator: Box::new(make_field_access("response", "data")),
+                                body: Block {
+                                    stmts: vec![],
+                                    span: dummy_span(),
+                                },
+                            }),
+                        ],
+                        span: dummy_span(),
+                    },
+                    is_async: true,
                     span: dummy_span(),
-                }),
-            ],
+                }],
+                computed: vec![],
+                effects: vec![],
+                selectors: vec![],
+                is_pub: false,
+                span: dummy_span(),
+            })],
         };
 
         let contracts = infer_contracts(&program);
         assert_eq!(contracts.len(), 1);
         assert_eq!(contracts[0].source_context, "ProductStore::load_products");
         assert_eq!(contracts[0].fields[0].path, vec!["data"]);
-        assert!(matches!(contracts[0].fields[0].inferred_type, InferredType::Array(_)));
+        assert!(matches!(
+            contracts[0].fields[0].inferred_type,
+            InferredType::Array(_)
+        ));
     }
 
     #[test]
@@ -946,12 +1040,18 @@ mod tests {
         assert_eq!(format!("{}", InferredType::Numeric), "Numeric");
         assert_eq!(format!("{}", InferredType::Bool), "Bool");
         assert_eq!(format!("{}", InferredType::Unknown), "Unknown");
-        assert_eq!(format!("{}", InferredType::Array(Box::new(InferredType::String))), "[String]");
+        assert_eq!(
+            format!("{}", InferredType::Array(Box::new(InferredType::String))),
+            "[String]"
+        );
     }
 
     #[test]
     fn test_expr_to_string_literals() {
-        assert_eq!(expr_to_string(&Expr::StringLit("https://api.com".to_string())), "https://api.com");
+        assert_eq!(
+            expr_to_string(&Expr::StringLit("https://api.com".to_string())),
+            "https://api.com"
+        );
         assert_eq!(expr_to_string(&Expr::Integer(42)), "<dynamic>");
     }
 
@@ -970,8 +1070,18 @@ mod tests {
     #[test]
     fn test_add_or_update_field_dedup() {
         let mut fields = Vec::new();
-        add_or_update_field(&mut fields, &["name".to_string()], InferredType::Unknown, FieldEvidence::FieldAccess("name".to_string(), dummy_span()));
-        add_or_update_field(&mut fields, &["name".to_string()], InferredType::String, FieldEvidence::UsedAsText(dummy_span()));
+        add_or_update_field(
+            &mut fields,
+            &["name".to_string()],
+            InferredType::Unknown,
+            FieldEvidence::FieldAccess("name".to_string(), dummy_span()),
+        );
+        add_or_update_field(
+            &mut fields,
+            &["name".to_string()],
+            InferredType::String,
+            FieldEvidence::UsedAsText(dummy_span()),
+        );
 
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].inferred_type, InferredType::String);

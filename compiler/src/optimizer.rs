@@ -53,10 +53,16 @@ impl std::fmt::Display for OptimizeStats {
             parts.push(format!("{} dead statements removed", self.stmts_removed));
         }
         if self.functions_removed > 0 {
-            parts.push(format!("{} unused functions removed", self.functions_removed));
+            parts.push(format!(
+                "{} unused functions removed",
+                self.functions_removed
+            ));
         }
         if self.unused_vars_removed > 0 {
-            parts.push(format!("{} unused variables removed", self.unused_vars_removed));
+            parts.push(format!(
+                "{} unused variables removed",
+                self.unused_vars_removed
+            ));
         }
         if self.items_shaken > 0 {
             parts.push(format!("{} items tree-shaken", self.items_shaken));
@@ -109,7 +115,12 @@ mod tests {
     use crate::token::Span;
 
     fn dummy_span() -> Span {
-        Span { start: 0, end: 0, line: 0, col: 0 }
+        Span {
+            start: 0,
+            end: 0,
+            line: 0,
+            col: 0,
+        }
     }
 
     fn make_fn(name: &str, is_pub: bool, stmts: Vec<Stmt>) -> Item {
@@ -120,7 +131,10 @@ mod tests {
             params: vec![],
             return_type: None,
             trait_bounds: vec![],
-            body: Block { stmts, span: dummy_span() },
+            body: Block {
+                stmts,
+                span: dummy_span(),
+            },
             is_pub,
             is_async: false,
             must_use: false,
@@ -131,13 +145,15 @@ mod tests {
     #[test]
     fn test_optimization_level_none() {
         let mut program = Program {
-            items: vec![make_fn("test", true, vec![
-                Stmt::Expr(Expr::Binary {
+            items: vec![make_fn(
+                "test",
+                true,
+                vec![Stmt::Expr(Expr::Binary {
                     op: BinOp::Add,
                     left: Box::new(Expr::Integer(2)),
                     right: Box::new(Expr::Integer(3)),
-                }),
-            ])],
+                })],
+            )],
         };
         let stats = optimize(&mut program, OptimizationLevel::None);
         assert_eq!(stats.constants_folded, 0);
@@ -154,15 +170,19 @@ mod tests {
     #[test]
     fn test_optimization_level_basic() {
         let mut program = Program {
-            items: vec![make_fn("test", true, vec![
-                Stmt::Expr(Expr::Binary {
-                    op: BinOp::Add,
-                    left: Box::new(Expr::Integer(2)),
-                    right: Box::new(Expr::Integer(3)),
-                }),
-                Stmt::Return(Some(Expr::Integer(1))),
-                Stmt::Expr(Expr::Integer(99)), // dead code
-            ])],
+            items: vec![make_fn(
+                "test",
+                true,
+                vec![
+                    Stmt::Expr(Expr::Binary {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Integer(2)),
+                        right: Box::new(Expr::Integer(3)),
+                    }),
+                    Stmt::Return(Some(Expr::Integer(1))),
+                    Stmt::Expr(Expr::Integer(99)), // dead code
+                ],
+            )],
         };
         let stats = optimize(&mut program, OptimizationLevel::Basic);
         assert!(stats.constants_folded >= 1);
@@ -173,16 +193,16 @@ mod tests {
     fn test_optimization_level_full() {
         let mut program = Program {
             items: vec![
-                make_fn("main", true, vec![
-                    Stmt::Expr(Expr::Binary {
+                make_fn(
+                    "main",
+                    true,
+                    vec![Stmt::Expr(Expr::Binary {
                         op: BinOp::Add,
                         left: Box::new(Expr::Integer(2)),
                         right: Box::new(Expr::Integer(3)),
-                    }),
-                ]),
-                make_fn("unused", false, vec![
-                    Stmt::Expr(Expr::Integer(0)),
-                ]),
+                    })],
+                ),
+                make_fn("unused", false, vec![Stmt::Expr(Expr::Integer(0))]),
             ],
         };
         let stats = optimize(&mut program, OptimizationLevel::Full);
