@@ -73,7 +73,7 @@ old_touchmove = "const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.cl
 new_touchmove = ("const t=e.touches[0]; const dy=t.clientY-window._ltY; window._ltX=t.clientX; window._ltY=t.clientY; "
                  "if (Math.abs(dy)>2) window._tDrag=1; "
                  "if (__inTree(t.clientX, t.clientY)) { __treeScroll(-dy); } else if (W.app_scroll) { W.app_scroll(-dy); } "
-                 "if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render();")
+                 "if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); __renderSoon();")
 assert old_touchmove in html, "touchmove anchor missing"
 html = html.replace(old_touchmove, new_touchmove)
 
@@ -87,9 +87,24 @@ if scroll_up_idx is not None and scroll_down_idx is not None:
     scroll_fn = f"""
 // windowed-list scrolling: wheel/drag -> app scroll handlers (indexes resolved from generated.rs)
 const SCROLL_UP_CB = {scroll_up_idx}, SCROLL_DOWN_CB = {scroll_down_idx};
-// Structure-pane bounds (CSS px; pane is fixed-size in the layout).
+// Structure-pane bounds in DOCUMENT coords (pane is fixed-size in the layout).
+// Client Y is converted using the engine's live page-scroll offset, so the
+// hit-test stays aligned after the page has been scrolled.
 const TREE_L = 12, TREE_R = 640, TREE_T = 170, TREE_B = 732;
-function __inTree(x, y) {{ return x >= TREE_L && x <= TREE_R && y >= TREE_T && y <= TREE_B; }}
+function __inTree(x, y) {{
+  const sy = (W.app_page_scroll_y ? W.app_page_scroll_y() : 0);
+  const dy = y + sy;
+  return x >= TREE_L && x <= TREE_R && dy >= TREE_T && dy <= TREE_B;
+}}
+// Coalesce scroll-driven repaints to one per animation frame. Trackpads emit
+// wheel events far faster than 60Hz; painting synchronously per event tears
+// the text overlay (visible as header flicker while scrolling).
+let _rafPending = false;
+function __renderSoon() {{
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => {{ _rafPending = false; if (W.app_render) W.app_render(); }});
+}}
 let _wheelAcc = 0;
 function __treeScroll(delta) {{
   // Drop residue on direction flip: macOS momentum ends with small reverse
@@ -109,7 +124,7 @@ function __treeScroll(delta) {{
                  "  // elsewhere the wheel drives the engine's clamped page scroll.\n"
                  "  if (__inTree(e.clientX, e.clientY)) { __treeScroll(e.deltaY); }\n"
                  "  else if (W.app_scroll) { W.app_scroll(e.deltaY); }\n"
-                 "  if (W.app_render) W.app_render();\n}, { passive: false });")
+                 "  __renderSoon();\n}, { passive: false });")
     assert old_wheel in html, "wheel anchor missing"
     html = html.replace(old_wheel, new_wheel)
 
