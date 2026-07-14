@@ -533,18 +533,28 @@ window.addEventListener('resize', () => {
 eventTarget.addEventListener('wheel', e => {
   e.preventDefault();
   if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);
-  __treeScroll(e.deltaY);
+  // Tree rows scroll ONLY when the pointer is over the structure pane;
+  // elsewhere the wheel drives the engine's clamped page scroll.
+  if (__inTree(e.clientX, e.clientY)) { __treeScroll(e.deltaY); }
+  else if (W.app_scroll) { W.app_scroll(e.deltaY); }
   if (W.app_render) W.app_render();
 }, { passive: false });
 
 // windowed-list scrolling: wheel/drag -> app scroll handlers (indexes resolved from generated.rs)
 const SCROLL_UP_CB = 71, SCROLL_DOWN_CB = 72;
+// Structure-pane bounds (CSS px; pane is fixed-size in the layout).
+const TREE_L = 12, TREE_R = 640, TREE_T = 170, TREE_B = 732;
+function __inTree(x, y) { return x >= TREE_L && x <= TREE_R && y >= TREE_T && y <= TREE_B; }
 let _wheelAcc = 0;
 function __treeScroll(delta) {
+  // Drop residue on direction flip: macOS momentum ends with small reverse
+  // deltas on finger-lift, which otherwise step the list back ("bounce").
+  if (_wheelAcc !== 0 && (delta > 0) !== (_wheelAcc > 0)) _wheelAcc = 0;
   _wheelAcc += delta;
+  const ROW = 24; // one row per row-height of wheel travel: 1:1 with the pixels
   let fired = false;
-  while (_wheelAcc >= 8) { if (W.__callback) W.__callback(SCROLL_DOWN_CB); _wheelAcc -= 8; fired = true; }
-  while (_wheelAcc <= -8) { if (W.__callback) W.__callback(SCROLL_UP_CB); _wheelAcc += 8; fired = true; }
+  while (_wheelAcc >= ROW) { if (W.__callback) W.__callback(SCROLL_DOWN_CB); _wheelAcc -= ROW; fired = true; }
+  while (_wheelAcc <= -ROW) { if (W.__callback) W.__callback(SCROLL_UP_CB); _wheelAcc += ROW; fired = true; }
   return fired;
 }
 
@@ -580,7 +590,7 @@ document.addEventListener('keydown', e => {
 });
 // Touch
 eventTarget.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; window._ltX=t.clientX; window._ltY=t.clientY; window._tDrag=0; window._tAcc=0; if (W.app_touchstart) W.app_touchstart(t.clientX, t.clientY); }, { passive: false });
-eventTarget.addEventListener('touchmove', e => { e.preventDefault(); const t=e.touches[0]; const dy=t.clientY-window._ltY; window._ltX=t.clientX; window._ltY=t.clientY; if (Math.abs(dy)>2) window._tDrag=1; __treeScroll(-dy); if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }, { passive: false });
+eventTarget.addEventListener('touchmove', e => { e.preventDefault(); const t=e.touches[0]; const dy=t.clientY-window._ltY; window._ltX=t.clientX; window._ltY=t.clientY; if (Math.abs(dy)>2) window._tDrag=1; if (__inTree(t.clientX, t.clientY)) { __treeScroll(-dy); } else if (W.app_scroll) { W.app_scroll(-dy); } if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render(); }, { passive: false });
 eventTarget.addEventListener('touchend', e => { if (window._tDrag) { window._tDrag=0; if (W.app_render) W.app_render(); return; } if (W.app_touchend) W.app_touchend(window._ltX||0, window._ltY||0); if (W.app_render) W.app_render(); });
 // Caret blink
 setInterval(() => { if (W.app_needs_animation && W.app_needs_animation() && W.app_render) W.app_render(); }, 500);

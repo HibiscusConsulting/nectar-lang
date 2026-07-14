@@ -71,7 +71,8 @@ html = html.replace(old_touchstart, new_touchstart)
 
 old_touchmove = "const t=e.touches[0]; if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render();"
 new_touchmove = ("const t=e.touches[0]; const dy=t.clientY-window._ltY; window._ltX=t.clientX; window._ltY=t.clientY; "
-                 "if (Math.abs(dy)>2) window._tDrag=1; __treeScroll(-dy); "
+                 "if (Math.abs(dy)>2) window._tDrag=1; "
+                 "if (__inTree(t.clientX, t.clientY)) { __treeScroll(-dy); } else if (W.app_scroll) { W.app_scroll(-dy); } "
                  "if (W.app_touchmove) W.app_touchmove(t.clientX, t.clientY); if (W.app_render) W.app_render();")
 assert old_touchmove in html, "touchmove anchor missing"
 html = html.replace(old_touchmove, new_touchmove)
@@ -86,18 +87,29 @@ if scroll_up_idx is not None and scroll_down_idx is not None:
     scroll_fn = f"""
 // windowed-list scrolling: wheel/drag -> app scroll handlers (indexes resolved from generated.rs)
 const SCROLL_UP_CB = {scroll_up_idx}, SCROLL_DOWN_CB = {scroll_down_idx};
+// Structure-pane bounds (CSS px; pane is fixed-size in the layout).
+const TREE_L = 12, TREE_R = 640, TREE_T = 170, TREE_B = 732;
+function __inTree(x, y) {{ return x >= TREE_L && x <= TREE_R && y >= TREE_T && y <= TREE_B; }}
 let _wheelAcc = 0;
 function __treeScroll(delta) {{
+  // Drop residue on direction flip: macOS momentum ends with small reverse
+  // deltas on finger-lift, which otherwise step the list back ("bounce").
+  if (_wheelAcc !== 0 && (delta > 0) !== (_wheelAcc > 0)) _wheelAcc = 0;
   _wheelAcc += delta;
+  const ROW = 24; // one row per row-height of wheel travel: 1:1 with the pixels
   let fired = false;
-  while (_wheelAcc >= 8) {{ if (W.__callback) W.__callback(SCROLL_DOWN_CB); _wheelAcc -= 8; fired = true; }}
-  while (_wheelAcc <= -8) {{ if (W.__callback) W.__callback(SCROLL_UP_CB); _wheelAcc += 8; fired = true; }}
+  while (_wheelAcc >= ROW) {{ if (W.__callback) W.__callback(SCROLL_DOWN_CB); _wheelAcc -= ROW; fired = true; }}
+  while (_wheelAcc <= -ROW) {{ if (W.__callback) W.__callback(SCROLL_UP_CB); _wheelAcc += ROW; fired = true; }}
   return fired;
 }}
 """
     old_wheel = "eventTarget.addEventListener('wheel', e => {\n  e.preventDefault();\n  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);\n  if (W.app_scroll) W.app_scroll(e.deltaY);\n  if (W.app_render) W.app_render();\n}, { passive: false });"
     new_wheel = ("eventTarget.addEventListener('wheel', e => {\n  e.preventDefault();\n  if (W.app_mousemove) W.app_mousemove(e.offsetX, e.offsetY, 0);\n"
-                 "  __treeScroll(e.deltaY);\n  if (W.app_render) W.app_render();\n}, { passive: false });")
+                 "  // Tree rows scroll ONLY when the pointer is over the structure pane;\n"
+                 "  // elsewhere the wheel drives the engine's clamped page scroll.\n"
+                 "  if (__inTree(e.clientX, e.clientY)) { __treeScroll(e.deltaY); }\n"
+                 "  else if (W.app_scroll) { W.app_scroll(e.deltaY); }\n"
+                 "  if (W.app_render) W.app_render();\n}, { passive: false });")
     assert old_wheel in html, "wheel anchor missing"
     html = html.replace(old_wheel, new_wheel)
 
