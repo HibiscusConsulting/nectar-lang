@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Prospect-specific PLM/ALM demo, reverse-proxied from the nectar-plm-demo
+# service. It is a sales artifact, not public content — keep it out of indexes.
+Disallow: /daniel-demo/
+
+# Interactive WASM demo harnesses. They render to <canvas>, so a crawler sees an
+# empty shell and nothing useful; the docs carry the same material as real text.
+Disallow: /app/canvas-test
+Disallow: /app/canvas
+Disallow: /app/svelte
+Disallow: /app/trading
+
+Sitemap: https://buildnectar.com/sitemap.xml
