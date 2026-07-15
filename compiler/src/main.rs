@@ -1510,6 +1510,110 @@ fn generate_meta_html(meta: &PageMeta) -> String {
     out
 }
 
+/// Collect crawlable route paths from the program's router plus any page canonical.
+///
+/// Only static paths are emitted. Routes with `:param` or `*` wildcard segments are
+/// skipped: a sitemap must list real URLs, and `/user/:id` is a pattern, not a URL.
+/// Guarded routes are skipped too — if a route needs auth, a crawler cannot reach it
+/// and advertising it in the sitemap invites soft-404s.
+fn collect_sitemap_routes(program: &ast::Program) -> Vec<String> {
+    let mut routes: Vec<String> = Vec::new();
+    for item in &program.items {
+        if let ast::Item::Router(router) = item {
+            for r in &router.routes {
+                if r.guard.is_some() {
+                    continue;
+                }
+                if r.path.contains(':') || r.path.contains('*') {
+                    continue;
+                }
+                if !routes.contains(&r.path) {
+                    routes.push(r.path.clone());
+                }
+            }
+        }
+    }
+    // A single-page cell has no router; fall back to its canonical.
+    if routes.is_empty() {
+        if let Some(meta) = extract_page_meta(&program.items) {
+            if let Some(canonical) = meta.canonical {
+                let path = canonical
+                    .split_once("://")
+                    .and_then(|(_, rest)| rest.find('/').map(|i| rest[i..].to_string()))
+                    .unwrap_or(canonical);
+                routes.push(path);
+            }
+        }
+    }
+    if routes.is_empty() {
+        routes.push("/".to_string());
+    }
+    routes.sort();
+    routes
+}
+
+/// Derive the site origin (scheme://host) from a page's canonical URL, if it is absolute.
+///
+/// Returns None for relative canonicals like "/" — a sitemap needs absolute URLs, and
+/// guessing an origin would emit a sitemap pointing at the wrong host, which is worse
+/// than emitting none.
+fn site_origin(program: &ast::Program) -> Option<String> {
+    let meta = extract_page_meta(&program.items)?;
+    let canonical = meta.canonical?;
+    let (scheme, rest) = canonical.split_once("://")?;
+    let host = rest.split('/').next()?;
+    if host.is_empty() {
+        return None;
+    }
+    Some(format!("{}://{}", scheme, host))
+}
+
+/// Generate robots.txt. `sitemap_url` is emitted only when an absolute origin is known.
+///
+/// This is the file `examples/seo.nectar` has advertised as "auto-generated from router"
+/// since the SEO docs were written; until 2026-07-15 nothing wrote it. Note that a
+/// `<meta name="robots">` tag is a different mechanism and does not substitute — crawlers
+/// fetch /robots.txt before they fetch any HTML.
+fn generate_robots_txt(sitemap_url: Option<&str>) -> String {
+    let mut out = String::from("User-agent: *\nAllow: /\n");
+    if let Some(url) = sitemap_url {
+        out.push_str(&format!("\nSitemap: {}\n", url));
+    }
+    out
+}
+
+/// Generate a sitemap.xml listing every static route, as absolute URLs under `origin`.
+fn generate_sitemap_xml(origin: &str, routes: &[String]) -> String {
+    let origin = origin.trim_end_matches('/');
+    let mut out = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
+    );
+    for path in routes {
+        let path = if path.starts_with('/') {
+            path.clone()
+        } else {
+            format!("/{}", path)
+        };
+        out.push_str(&format!(
+            "  <url><loc>{}{}</loc></url>\n",
+            origin,
+            xml_escape(&path)
+        ));
+    }
+    out.push_str("</urlset>\n");
+    out
+}
+
+/// Minimal XML text escaping for sitemap <loc> values.
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// Minimal HTML entity escaping for attribute values.
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -1825,6 +1929,35 @@ rustflags = ["-C", "target-feature=+simd128", "-C", "link-args=-z stack-size=655
         // Generate DOM index.html with full SEO meta
         let dom_html = generate_dom_html(&app_name, page_meta.as_ref(), &program);
         fs::write(dom_dir.join("index.html"), &dom_html)?;
+
+        // Crawler directives: robots.txt + sitemap.xml, generated from the router.
+        // These belong at the site root (out_dir), not under dom/ — a crawler fetches
+        // /robots.txt, never /dom/robots.txt.
+        let routes = collect_sitemap_routes(&program);
+        let origin = site_origin(&program);
+        let sitemap_url = origin.as_ref().map(|o| format!("{}/sitemap.xml", o.trim_end_matches('/')));
+        fs::write(
+            out_dir.join("robots.txt"),
+            generate_robots_txt(sitemap_url.as_deref()),
+        )?;
+        println!("  robots.txt  (crawler directives)");
+        match origin {
+            Some(ref o) => {
+                fs::write(
+                    out_dir.join("sitemap.xml"),
+                    generate_sitemap_xml(o, &routes),
+                )?;
+                println!("  sitemap.xml ({} route(s))", routes.len());
+            }
+            None => {
+                // Without an absolute canonical we cannot know the host, and a sitemap
+                // of wrong-origin URLs is worse than no sitemap. Say so rather than guess.
+                eprintln!(
+                    "nectar: warning: no sitemap.xml — set an absolute `canonical` in a page's \
+                     meta block (e.g. \"https://example.com/\") so the site origin is known"
+                );
+            }
+        }
 
         let dom_wasm_kb = fs::metadata(&dom_wasm_path)
             .map(|m| m.len() as f64 / 1024.0)
@@ -3955,6 +4088,109 @@ fn check(c: Color) -> i32 {
             meta.extra[0],
             ("robots".to_string(), "index,follow".to_string())
         );
+    }
+
+    /// Build a Program containing only a router with the given (path, guarded) routes.
+    fn router_program(routes: &[(&str, bool)]) -> crate::ast::Program {
+        crate::ast::Program {
+            items: vec![crate::ast::Item::Router(crate::ast::RouterDef {
+                name: "AppRouter".to_string(),
+                routes: routes
+                    .iter()
+                    .map(|(p, guarded)| crate::ast::RouteDef {
+                        path: p.to_string(),
+                        params: vec![],
+                        component: "C".to_string(),
+                        guard: if *guarded {
+                            Some(crate::ast::Expr::StringLit("auth".to_string()))
+                        } else {
+                            None
+                        },
+                        transition: None,
+                        span: test_span(),
+                    })
+                    .collect(),
+                fallback: None,
+                layout: None,
+                transition: None,
+                span: test_span(),
+            })],
+        }
+    }
+
+    #[test]
+    fn test_robots_txt_includes_sitemap_when_origin_known() {
+        let r = generate_robots_txt(Some("https://buildnectar.com/sitemap.xml"));
+        assert!(r.contains("User-agent: *"));
+        assert!(r.contains("Allow: /"));
+        assert!(r.contains("Sitemap: https://buildnectar.com/sitemap.xml"));
+    }
+
+    #[test]
+    fn test_robots_txt_omits_sitemap_when_origin_unknown() {
+        let r = generate_robots_txt(None);
+        assert!(r.contains("User-agent: *"));
+        assert!(
+            !r.contains("Sitemap:"),
+            "must not emit a Sitemap line pointing nowhere"
+        );
+    }
+
+    #[test]
+    fn test_sitemap_routes_skip_params_wildcards_and_guards() {
+        let program = router_program(&[
+            ("/", false),
+            ("/about", false),
+            ("/user/:id", false),   // pattern, not a URL
+            ("/admin/*", false),    // wildcard
+            ("/dashboard", true),   // guarded — crawler cannot reach it
+        ]);
+        let routes = collect_sitemap_routes(&program);
+        assert_eq!(routes, vec!["/".to_string(), "/about".to_string()]);
+    }
+
+    #[test]
+    fn test_sitemap_xml_emits_absolute_urls() {
+        let xml = generate_sitemap_xml(
+            "https://buildnectar.com/",
+            &["/".to_string(), "/docs".to_string()],
+        );
+        assert!(xml.contains("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"));
+        assert!(xml.contains("<loc>https://buildnectar.com/</loc>"));
+        assert!(xml.contains("<loc>https://buildnectar.com/docs</loc>"));
+        // trailing slash on origin must not double up
+        assert!(!xml.contains("buildnectar.com//docs"));
+    }
+
+    #[test]
+    fn test_site_origin_requires_absolute_canonical() {
+        // Relative canonical -> no origin -> caller must skip the sitemap.
+        let mut program = crate::ast::Program { items: vec![] };
+        program.items.push(crate::ast::Item::Page(crate::ast::PageDef {
+            name: "Home".to_string(),
+            props: vec![],
+            meta: Some(crate::ast::MetaDef {
+                title: None,
+                description: None,
+                canonical: Some(crate::ast::Expr::StringLit("/".to_string())),
+                og_image: None,
+                structured_data: vec![],
+                extra: vec![],
+                span: test_span(),
+            }),
+            state: vec![],
+            methods: vec![],
+            styles: vec![],
+            render: crate::ast::RenderBlock {
+                body: crate::ast::TemplateNode::Fragment(vec![]),
+                span: test_span(),
+            },
+            permissions: None,
+            gestures: vec![],
+            is_pub: false,
+            span: test_span(),
+        }));
+        assert_eq!(site_origin(&program), None);
     }
 
     #[test]
