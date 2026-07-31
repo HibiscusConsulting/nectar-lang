@@ -85,7 +85,18 @@ cargo build --release"</code></pre>
                 <pre class="code-block"><code>"nectar build hello.nectar --emit-wasm"</code></pre>
                 <p>"This produces "<code>"hello.wasm"</code>"."</p>
                 <h4 id="running-in-the-browser">"Running in the Browser"</h4>
-                <p>"Create an "<code>"index.html"</code>" file:"</p>
+                <p>"You need three files in the same directory to run your component:"</p>
+                <ol>
+                    <li><strong><code>"hello.wasm"</code></strong>" — the compiled WebAssembly module"</li>
+                    <li><strong><code>"core.js"</code></strong>" — the Nectar runtime (copied from the repo)"</li>
+                    <li><strong><code>"index.html"</code></strong>" — the entry point that loads and runs your component"</li>
+                </ol>
+                <p><strong>"Step 1: Copy the runtime"</strong></p>
+                <p>"The Nectar runtime lives in the repository. Copy it to your working directory:"</p>
+                <div class="code-lang-label">"sh"</div>
+                <pre class="code-block"><code>"cp nectar-lang/runtime/modules/core.js ."</code></pre>
+                <p>"(If you installed Nectar via package manager, the path will vary; check your installation directory.)"</p>
+                <p><strong>"Step 2: Create index.html"</strong></p>
                 <div class="code-lang-label">"html"</div>
                 <pre class="code-block"><code>"<!DOCTYPE html>
 <html>
@@ -98,11 +109,13 @@ cargo build --release"</code></pre>
   </script>
 </body>
 </html>"</code></pre>
-                <p>"Copy "<code>"runtime/modules/core.js"</code>" alongside your HTML file, serve it with any static server, and open it in a browser."</p>
-                <p>"Or use the built-in dev server:"</p>
+                <p><strong>"Step 3: Use the built-in dev server"</strong></p>
                 <div class="code-lang-label">"sh"</div>
                 <pre class="code-block"><code>"nectar dev --src . --port 3000"</code></pre>
                 <p>"Open "<code>"http://localhost:3000"</code>" to see your component."</p>
+                <p>"The dev server will find your "<code>"index.html"</code>", which imports "<code>"core.js"</code>", which loads "<code>"hello.wasm"</code>". All three files must be in the directory you run "<code>"nectar dev"</code>" from."</p>
+                <p><strong>"Alternative: Manual static server"</strong></p>
+                <p>"If you prefer a different static server (Python, Node, etc.), make sure all three files ("<code>"hello.wasm"</code>", "<code>"core.js"</code>", "<code>"index.html"</code>") are in the served directory."</p>
                 <hr />
                 <h3 id="adding-state-and-reactivity">"Adding State and Reactivity"</h3>
                 <p>"Let's build a counter. Create "<code>"counter.nectar"</code>":"</p>
@@ -375,6 +388,7 @@ let longer = max(\"abc\", \"xyz\");    // generates max__String"</code></pre>
                     <li><strong><a href="/docs/architecture">"Architecture & Internals"</a></strong>" -- how the compiler works under the hood"</li>
                     <li><strong><a href="/docs/examples">"Examples Guide"</a></strong>" -- detailed walkthroughs of all example programs"</li>
                 </ul>
+                <p>"_Last verified deploy: 2026-05-07 16:36 EDT_"</p>
                 </div>
             </div>
 

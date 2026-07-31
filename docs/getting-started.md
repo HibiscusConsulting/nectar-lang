@@ -81,7 +81,23 @@ This produces `hello.wasm`.
 
 ### Running in the Browser
 
-Create an `index.html` file:
+You need three files in the same directory to run your component:
+
+1. **`hello.wasm`** — the compiled WebAssembly module
+2. **`core.js`** — the Nectar runtime (copied from the repo)
+3. **`index.html`** — the entry point that loads and runs your component
+
+**Step 1: Copy the runtime**
+
+The Nectar runtime lives in the repository. Copy it to your working directory:
+
+```sh
+cp nectar-lang/runtime/modules/core.js .
+```
+
+(If you installed Nectar via package manager, the path will vary; check your installation directory.)
+
+**Step 2: Create index.html**
 
 ```html
 <!DOCTYPE html>
@@ -97,15 +113,19 @@ Create an `index.html` file:
 </html>
 ```
 
-Copy `runtime/modules/core.js` alongside your HTML file, serve it with any static server, and open it in a browser.
-
-Or use the built-in dev server:
+**Step 3: Use the built-in dev server**
 
 ```sh
 nectar dev --src . --port 3000
 ```
 
 Open `http://localhost:3000` to see your component.
+
+The dev server will find your `index.html`, which imports `core.js`, which loads `hello.wasm`. All three files must be in the directory you run `nectar dev` from.
+
+**Alternative: Manual static server**
+
+If you prefer a different static server (Python, Node, etc.), make sure all three files (`hello.wasm`, `core.js`, `index.html`) are in the served directory.
 
 ---
 
