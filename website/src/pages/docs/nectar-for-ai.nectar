@@ -39,7 +39,7 @@ page NectarForAiDoc() {
                     <h1>"Nectar -- Complete AI Reference"</h1>
                 <p>"This is the definitive reference for AI assistants generating Nectar code. Every feature documented here has been verified to compile and produce working WASM output. Features that are parsed but not yet fully functional in codegen are clearly marked as NOT YET WORKING."</p>
                 <h3 id="core-thesis">"Core Thesis"</h3>
-                <p>"Nectar compiles to WebAssembly. All logic, state, rendering, and computation run in WASM. The only JavaScript is "<code>"core.js"</code>" (~3 KB gzip) -- a thin syscall layer for browser APIs that WASM physically cannot call (DOM, fetch, WebSocket, IndexedDB, etc.). There is no "<code>"node_modules"</code>", no "<code>"package.json"</code>", no bundler."</p>
+                <p>"Nectar compiles to WebAssembly. All logic, state, rendering, and computation run in WASM. The only JavaScript is "<code>"core.js"</code>" (~10 KB gzip) -- a thin syscall layer for browser APIs that WASM physically cannot call (DOM, fetch, WebSocket, IndexedDB, etc.). There is no "<code>"node_modules"</code>", no "<code>"package.json"</code>", no bundler."</p>
                 <p>"The compiler is a single Rust binary called "<code>"nectar"</code>"."</p>
                 <hr />
                 <h3 id="build-and-run">"Build and Run"</h3>
@@ -972,7 +972,7 @@ Codegen -> WAT (WebAssembly Text Format)
      |
 wasm_binary -> .wasm binary
      |
-Browser loads .wasm + core.js (~3 KB gzip)"</code></pre>
+Browser loads .wasm + core.js (~10 KB gzip)"</code></pre>
                 <h4 id="signal-system">"Signal System:"</h4>
                 <p>"Every "<code>"let mut"</code>" field in a component becomes a signal:"</p>
                 <ol>
@@ -1229,7 +1229,7 @@ navigate(\"/path\");"</code></pre>
                 <p>"Build: "<code>"nectar build app.nectar --emit-wasm"</code></p>
                 <p>"Output:"</p>
                 <pre class="code-block"><code>"  app.wasm            # Compiled WebAssembly binary
-  core.js             # Runtime syscall layer (~3 KB gzip)
+  core.js             # Runtime syscall layer (~10 KB gzip)
   index.html          # Generated HTML shell"</code></pre>
                 </div>
             </div>
